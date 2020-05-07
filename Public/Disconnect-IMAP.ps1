@@ -9,6 +9,7 @@
         } catch {
             Write-Warning "Disconnect-IMAP - Unable to authenticate $($_.Exception.Message)"
             return
+
         }
     }
 }
