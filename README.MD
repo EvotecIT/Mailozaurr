@@ -1,15 +1,15 @@
 ﻿<p align="center">
-  <a href="https://dev.azure.com/evotecpl/PSMailKit/_build/latest?definitionId=3"><img src="https://dev.azure.com/evotecpl/PSMailKit/_apis/build/status/EvotecIT.PSMailKit"></a>
-  <a href="https://www.powershellgallery.com/packages/PSMailKit"><img src="https://img.shields.io/powershellgallery/v/PSMailKit.svg"></a>
-  <a href="https://www.powershellgallery.com/packages/PSMailKit"><img src="https://img.shields.io/powershellgallery/vpre/PSMailKit.svg?label=powershell%20gallery%20preview&colorB=yellow"></a>
-  <a href="https://github.com/EvotecIT/PSMailKit"><img src="https://img.shields.io/github/license/EvotecIT/PSMailKit.svg"></a>
+  <a href="https://dev.azure.com/evotecpl/Mailozaurr/_build/latest?definitionId=3"><img src="https://dev.azure.com/evotecpl/Mailozaurr/_apis/build/status/EvotecIT.Mailozaurr"></a>
+  <a href="https://www.powershellgallery.com/packages/Mailozaurr"><img src="https://img.shields.io/powershellgallery/v/Mailozaurr.svg"></a>
+  <a href="https://www.powershellgallery.com/packages/Mailozaurr"><img src="https://img.shields.io/powershellgallery/vpre/Mailozaurr.svg?label=powershell%20gallery%20preview&colorB=yellow"></a>
+  <a href="https://github.com/EvotecIT/Mailozaurr"><img src="https://img.shields.io/github/license/EvotecIT/Mailozaurr.svg"></a>
 </p>
 
 <p align="center">
-  <a href="https://www.powershellgallery.com/packages/PSMailKit"><img src="https://img.shields.io/powershellgallery/p/PSMailKit.svg"></a>
-  <a href="https://github.com/EvotecIT/PSMailKit"><img src="https://img.shields.io/github/languages/top/evotecit/PSMailKit.svg"></a>
-  <a href="https://github.com/EvotecIT/PSMailKit"><img src="https://img.shields.io/github/languages/code-size/evotecit/PSMailKit.svg"></a>
-  <a href="https://www.powershellgallery.com/packages/PSMailKit"><img src="https://img.shields.io/powershellgallery/dt/PSMailKit.svg"></a>
+  <a href="https://www.powershellgallery.com/packages/Mailozaurr"><img src="https://img.shields.io/powershellgallery/p/Mailozaurr.svg"></a>
+  <a href="https://github.com/EvotecIT/Mailozaurr"><img src="https://img.shields.io/github/languages/top/evotecit/Mailozaurr.svg"></a>
+  <a href="https://github.com/EvotecIT/Mailozaurr"><img src="https://img.shields.io/github/languages/code-size/evotecit/Mailozaurr.svg"></a>
+  <a href="https://www.powershellgallery.com/packages/Mailozaurr"><img src="https://img.shields.io/powershellgallery/dt/Mailozaurr.svg"></a>
 </p>
 
 <p align="center">
@@ -18,10 +18,31 @@
   <a href="https://www.linkedin.com/in/pklys"><img src="https://img.shields.io/badge/LinkedIn-pklys-0077B5.svg?logo=LinkedIn"></a>
 </p>
 
-# PSMailKit - PowerShell Module
+# Mailozaurr - PowerShell Module
 
 ## Documentation - Development
 
-PSMailKit underneath uses MimeKit and MailKit. If you would like to help with development here are some documentation links which you may find useful.
+Mailozaurr underneath uses MimeKit and MailKit. Mailozaurr just utilizes those DLLs.
 
-- [x] [Creating messages](http://www.mimekit.net/docs/html/Creating-Messages.htm)
+## To install
+
+```powershell
+Install-Module -Name Mailozaurr -AllowClobber -Force
+```
+
+Force and AllowClobber aren't necessary, but they do skip errors in case some appear.
+
+## And to update
+
+```powershell
+Update-Module -Name Mailozaurr
+```
+
+That's it. Whenever there's a new version, you run the command, and you can enjoy it. Remember that you may need to close, reopen PowerShell session if you have already used module before updating it.
+
+**The essential thing** is if something works for you on production, keep using it till you test the new version on a test computer. I do changes that may not be big, but big enough that auto-update may break your code. For example, small rename to a parameter and your code stops working! Be responsible!
+
+## Changelog
+
+- 0.0.1 - Unreleased
+  - Initial release
