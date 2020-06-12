@@ -1,22 +1,111 @@
 ﻿function Send-EmailMessage {
+    <#
+    .SYNOPSIS
+    Short description
+
+    .DESCRIPTION
+    Long description
+
+    .PARAMETER Server
+    Parameter description
+
+    .PARAMETER Port
+    Parameter description
+
+    .PARAMETER From
+    Parameter description
+
+    .PARAMETER ReplyTo
+    Parameter description
+
+    .PARAMETER Bcc
+    Parameter description
+
+    .PARAMETER To
+    Parameter description
+
+    .PARAMETER Subject
+    Parameter description
+
+    .PARAMETER Priority
+    Parameter description
+
+    .PARAMETER Encoding
+    Parameter description
+
+    .PARAMETER DeliveryStatusNotification
+
+    +---------------+----------------------------------------------------+
+    | Member Name   | Description                                        |
+    +---------------+----------------------------------------------------+
+    | Delay         | Notify if the delivery is delayed.                 |
+    +---------------+----------------------------------------------------+
+    | Never         | A notification should not be generated under       |
+    |               | any circumstances.                                 |
+    +---------------+----------------------------------------------------+
+    | None          | No notification information will be sent. The mail |
+    |               | server will utilize its configured behavior to     |
+    |               | determine whether it should generate a delivery    |
+    |               | notification.                                      |
+    +---------------+----------------------------------------------------+
+    | Failure       | Notify if the delivery is unsuccessful.            |
+    +-------------+----------------------------------------------------+
+    | Succes  s     | Notify if the delivery is successful               |
+    +---------------+----------------------------------------------------+
+
+    .PARAMETER Credentials
+    Parameter description
+
+    .PARAMETER SecureSocketOptions
+    Parameter description
+
+    .PARAMETER UseSsl
+    Parameter description
+
+    .PARAMETER HTML
+    Parameter description
+
+    .PARAMETER Text
+    Parameter description
+
+    .PARAMETER Attachments
+    Parameter description
+
+    .PARAMETER ShowErrors
+    Parameter description
+
+    .PARAMETER Suppress
+    Parameter description
+
+    .PARAMETER Email
+    Parameter description
+
+    .EXAMPLE
+    An example
+
+    .NOTES
+    General notes
+    #>
     [cmdletBinding()]
     param(
         [Parameter(Mandatory)][alias('SmtpServer')][string] $Server,
-        [string] $Port = 587,
+        [int] $Port = 587,
         [Parameter(Mandatory)][object] $From,
         [string] $ReplyTo,
+        [Array] $Cc,
         [Array] $Bcc,
         [Array] $To,
         [string] $Subject,
-        [string] $Priority,
-        [System.Text.Encoding] $Encoding = [System.Text.Encoding]::UTF8,
-        [string] $DeliveryNotificationOption,
-        [pscredential] $Credentials,
+        [ValidateSet('Low', 'Normal', 'High')][string] $Priority,
+        [ValidateSet('ASCII', 'BigEndianUnicode', 'Default', 'Unicode', 'UTF32', 'UTF7', 'UTF8')][string] $Encoding = 'Default',
+        [ValidateSet('None', 'OnSuccess', 'OnFailure', 'Delay', 'Never')][string[]] $DeliveryNotificationOption,
+        [MailKit.Net.Smtp.DeliveryStatusNotificationType] $DeliveryStatusNotificationType,
+        [pscredential] $Credential,
         [MailKit.Security.SecureSocketOptions] $SecureSocketOptions = [MailKit.Security.SecureSocketOptions]::Auto,
         [switch] $UseSsl,
-        [string[]] $HTML,
+        [alias('Body')][string[]] $HTML,
         [string[]] $Text,
-        [string[]] $Attachments,
+        [string[]] $Attachment,
         [switch] $ShowErrors,
         [switch] $Suppress,
         [alias('EmailParameters')][System.Collections.IDictionary] $Email
@@ -46,18 +135,24 @@
         #>
 
     } else {
-
         if ($null -eq $To -and $null -eq $Bcc -and $null -eq $Cc) {
             Write-Warning "Send-EmailMessage - At least one To, CC or BCC is required."
             return
         }
     }
-
-    if ($Credentials) {
-        $SmtpCredentials = $Credentials
+    if ($Credential) {
+        $SmtpCredentials = $Credential
     }
-
     $Message = [MimeKit.MimeMessage]::new()
+
+    # Doing translation for compatibility with Send-MailMessage
+    if ($Priority -eq 'High') {
+        $Message.Priority = [MimeKit.MessagePriority]::Urgent
+    } elseif ($Priority -eq 'Low') {
+        $Message.Priority = [MimeKit.MessagePriority]::NonUrgent
+    } else {
+        $Message.Priority = [MimeKit.MessagePriority]::Normal
+    }
 
     [MimeKit.InternetAddress] $SmtpFrom = ConvertTo-MailboxAddress -MailboxAddress $From
     $Message.From.Add($SmtpFrom)
@@ -68,23 +163,24 @@
     }
     if ($Cc) {
         [MimeKit.InternetAddress[]] $SmtpCC = ConvertTo-MailboxAddress -MailboxAddress $Cc
-        $Message.To.Add($SmtpCC)
+        $Message.Cc.AddRange($SmtpCC)
     }
     if ($Bcc) {
         [MimeKit.InternetAddress[]] $SmtpBcc = ConvertTo-MailboxAddress -MailboxAddress $Bcc
-        $Message.To.Add($SmtpBcc)
+        $Message.Bcc.AddRange($SmtpBcc)
     }
-
     if ($ReplyTo) {
         [MimeKit.InternetAddress] $SmtpReplyTo = ConvertTo-MailboxAddress -MailboxAddress $ReplyTo
         $Message.ReplyTo.Add($SmtpReplyTo)
     }
-
+    $MailSentTo = -join ($To -join ',', $CC -join ', ', $Bcc -join ', ')
     if ($Subject) {
         $Message.Subject = $Subject
     }
-    if ($Body) {
-        <#
+
+
+    $BodyBuilder = [MimeKit.BodyBuilder]::new()
+    <#
         MimeKit.TextPart new(MimeKit.MimeEntityConstructorArgs args)
         MimeKit.TextPart new(string subtype, Params System.Object[] args)
         MimeKit.TextPart new(string subtype)
@@ -93,47 +189,69 @@
 
         var message = new MimeMessage();
         message.Body = new TextPart ("html") { Text = "<b>Test Message</b>" };
-
         #>
-        #$BodyText = [MimeKit.TextPart]::new()
-        #$BodyText.Text = $Body
+    if ($HTML) {
+        $BodyBuilder.HtmlBody = $HTML
+    }
+    if ($Text) {
+        $BodyBuilder.TextBody = $Text
+    }
+    $Message.Body = $BodyBuilder.ToMessageBody()
+    $Message.Attachments.AddRange($Attachment)
 
-        $BodyBuilder = [MimeKit.BodyBuilder]::new()
-        if ($BodyAsHtml) {
-            $BodyBuilder.HtmlBody = $Body
-        } else {
-            $BodyBuilder.TextBody = $Body
+
+    ### SMTP Part Below
+
+    class MySmtpClient : MailKit.Net.Smtp.SmtpClient {
+        MySmtpClient() : base() {}
+
+        [string[]] $DeliveryNotificationOption = @()
+        [Nullable[MailKit.DeliveryStatusNotification]] GetDeliveryStatusNotifications([MimeKit.MimeMessage]$message, [MimeKit.MailboxAddress]$mailbox) {
+            $Output = @(
+                if ($this.DeliveryNotificationOption -contains 'OnSuccess') {
+                    [MailKit.DeliveryStatusNotification]::Success
+                }
+                if ($this.DeliveryNotificationOption -contains 'Delay') {
+                    [MailKit.DeliveryStatusNotification]::Delay
+                }
+                if ($this.DeliveryNotificationOption -contains 'OnFailure') {
+                    [MailKit.DeliveryStatusNotification]::Failure
+                }
+                if ($this.DeliveryNotificationOption -contains 'Never') {
+                    [MailKit.DeliveryStatusNotification]::Never
+                }
+            )
+            if ($Output.Count -gt 0) {
+                return $Output
+            }
+            return $null
         }
-        $Message.Body = $BodyBuilder.ToMessageBody()
+    }
+    $SmtpClient = [MySmtpClient]::new() # [MailKit.Net.Smtp.SmtpClient]::new()
+
+    if ($DeliveryNotificationOption) {
+        # This requires custom class MySmtpClient
+        $SmtpClient.DeliveryNotificationOption = $DeliveryNotificationOption
+    }
+    if ($DeliveryStatusNotificationType) {
+        $SmtpClient.DeliveryStatusNotificationType = $DeliveryStatusNotificationType
     }
 
-
-    $SmtpClient = [MailKit.Net.Smtp.SmtpClient]::new()
-    <#
-    void Connect(string host, int port, MailKit.Security.SecureSocketOptions options, System.Threading.CancellationToken cancellationToken)
-    void Connect(System.Net.Sockets.Socket socket, string host, int port, MailKit.Security.SecureSocketOptions options, System.Threading.CancellationToken cancellationToken)
-    void Connect(System.IO.Stream stream, string host, int port, MailKit.Security.SecureSocketOptions options, System.Threading.CancellationToken cancellationToken)
-    void Connect(uri uri, System.Threading.CancellationToken cancellationToken)
-    void Connect(string host, int port, bool useSsl, System.Threading.CancellationToken cancellationToken)
-    void IMailService.Connect(string host, int port, bool useSsl, System.Threading.CancellationToken cancellationToken)
-    void IMailService.Connect(string host, int port, MailKit.Security.SecureSocketOptions options, System.Threading.CancellationToken cancellationToken)
-    void IMailService.Connect(System.Net.Sockets.Socket socket, string host, int port, MailKit.Security.SecureSocketOptions options, System.Threading.CancellationToken cancellationToken)
-    void IMailService.Connect(System.IO.Stream stream, string host, int port, MailKit.Security.SecureSocketOptions options, System.Threading.CancellationToken cancellationToken)
-    #>
     if ($UseSsl) {
-        $SmtpClient.Connect($Server, $Port, $UseSsl.IsPresent)
+        $SmtpClient.Connect($Server, $Port, [MailKit.Security.SecureSocketOptions]::StartTls)
     } else {
         $SmtpClient.Connect($Server, $Port, $SecureSocketOptions)
     }
-    if ($Credentials) {
-        $SmtpClient.Authenticate($Encoding, $SmtpCredentials, [System.Threading.CancellationToken]::None)
+    if ($Credential) {
+        [System.Text.Encoding] $SmtpEncoding = [System.Text.Encoding]::$Encoding
+        $SmtpClient.Authenticate($SmtpEncoding, $SmtpCredentials, [System.Threading.CancellationToken]::None)
     }
     try {
         $SmtpClient.Send($Message)
         if (-not $Suppress) {
-            @{
+            [PSCustomObject] @{
                 Status = $True
-                Error  = ""
+                Error  = ''
                 SentTo = $MailSentTo
             }
         }
@@ -144,10 +262,10 @@
             Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
         }
         if (-not $Suppress) {
-            @{
+            [PSCustomObject] @{
                 Status = $False
                 Error  = $($_.Exception.Message)
-                SentTo = ""
+                SentTo = $MailSentTo
             }
         }
     }
