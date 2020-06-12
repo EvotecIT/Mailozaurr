@@ -105,7 +105,7 @@
         [switch] $UseSsl,
         [alias('Body')][string[]] $HTML,
         [string[]] $Text,
-        [string[]] $Attachment,
+        [alias('Attachments')][string[]] $Attachment,
         [switch] $ShowErrors,
         [switch] $Suppress,
         [alias('EmailParameters')][System.Collections.IDictionary] $Email
@@ -196,9 +196,12 @@
     if ($Text) {
         $BodyBuilder.TextBody = $Text
     }
+    if ($Attachment) {
+        foreach ($A in $Attachment) {
+            $null = $BodyBuilder.Attachments.Add($A)
+        }
+    }
     $Message.Body = $BodyBuilder.ToMessageBody()
-    $Message.Attachments.AddRange($Attachment)
-
 
     ### SMTP Part Below
 
