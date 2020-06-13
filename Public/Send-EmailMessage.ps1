@@ -180,16 +180,6 @@
 
 
     $BodyBuilder = [MimeKit.BodyBuilder]::new()
-    <#
-        MimeKit.TextPart new(MimeKit.MimeEntityConstructorArgs args)
-        MimeKit.TextPart new(string subtype, Params System.Object[] args)
-        MimeKit.TextPart new(string subtype)
-        MimeKit.TextPart new(MimeKit.Text.TextFormat format)
-        MimeKit.TextPart new()
-
-        var message = new MimeMessage();
-        message.Body = new TextPart ("html") { Text = "<b>Test Message</b>" };
-        #>
     if ($HTML) {
         $BodyBuilder.HtmlBody = $HTML
     }
