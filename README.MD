@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://dev.azure.com/evotecpl/Mailozaurr/_build/latest?definitionId=3"><img src="https://dev.azure.com/evotecpl/Mailozaurr/_apis/build/status/EvotecIT.Mailozaurr"></a>
+  <a href="https://dev.azure.com/evotecpl/Mailozaurr/_build/results?buildId=latest"><img src="https://dev.azure.com/evotecpl/Mailozaurr/_apis/build/status/EvotecIT.Mailozaurr"></a>
   <a href="https://www.powershellgallery.com/packages/Mailozaurr"><img src="https://img.shields.io/powershellgallery/v/Mailozaurr.svg"></a>
   <a href="https://www.powershellgallery.com/packages/Mailozaurr"><img src="https://img.shields.io/powershellgallery/vpre/Mailozaurr.svg?label=powershell%20gallery%20preview&colorB=yellow"></a>
   <a href="https://github.com/EvotecIT/Mailozaurr"><img src="https://img.shields.io/github/license/EvotecIT/Mailozaurr.svg"></a>
@@ -20,9 +20,12 @@
 
 # Mailozaurr - PowerShell Module
 
-## Documentation - Development
+Mailozaurr is a PowerShell module that aims to provide SMTP, POP3, IMAP and probably some other ways to interact with Email. Underneath it uses MimeKit and MailKit libraries written by Jeffrey Stedfast.
 
-Mailozaurr underneath uses MimeKit and MailKit. Mailozaurr just utilizes those DLLs.
+- [MailKit](https://github.com/jstedfast/MailKit)
+- [MimeKit](https://github.com/jstedfast/MimeKit)
+
+This started with a single goal to replace `Send-MailMessage` which is depracated/obsolete with something more modern, but since MailKit and MimeKit have lots of options why not build on that?
 
 ## To install
 
