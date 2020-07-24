@@ -13,12 +13,13 @@ Short description
 ## SYNTAX
 
 ```
-Send-EmailMessage [-Server] <String> [[-Port] <Int32>] [-From] <Object> [[-ReplyTo] <String>] [[-Cc] <Array>]
- [[-Bcc] <Array>] [[-To] <Array>] [[-Subject] <String>] [[-Priority] <String>] [[-Encoding] <String>]
- [[-DeliveryNotificationOption] <String[]>]
+Send-EmailMessage [[-Server] <String>] [[-Port] <Int32>] [[-From] <Object>] [[-ReplyTo] <String>]
+ [[-Cc] <String[]>] [[-Bcc] <String[]>] [[-To] <String[]>] [[-Subject] <String>] [[-Priority] <String>]
+ [[-Encoding] <String>] [[-DeliveryNotificationOption] <String[]>]
  [[-DeliveryStatusNotificationType] <DeliveryStatusNotificationType>] [[-Credential] <PSCredential>]
- [[-SecureSocketOptions] <SecureSocketOptions>] [-UseSsl] [[-HTML] <String[]>] [[-Text] <String[]>]
- [[-Attachment] <String[]>] [-ShowErrors] [-Suppress] [[-Email] <IDictionary>] [<CommonParameters>]
+ [[-Username] <String>] [[-Password] <String>] [[-SecureSocketOptions] <SecureSocketOptions>] [-UseSsl]
+ [[-HTML] <String[]>] [[-Text] <String[]>] [[-Attachment] <String[]>] [[-Timeout] <Int32>] [-ShowErrors]
+ [-Suppress] [[-Email] <IDictionary>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -33,71 +34,26 @@ An example
 
 ## PARAMETERS
 
-### -Server
-Parameter description
+### -Attachment
+{{ Fill Attachment Description }}
 
 ```yaml
-Type: String
+Type: String[]
 Parameter Sets: (All)
-Aliases: SmtpServer
-
-Required: True
-Position: 1
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Port
-Parameter description
-
-```yaml
-Type: Int32
-Parameter Sets: (All)
-Aliases:
+Aliases: Attachments
 
 Required: False
-Position: 2
-Default value: 587
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -From
-Parameter description
-
-```yaml
-Type: Object
-Parameter Sets: (All)
-Aliases:
-
-Required: True
-Position: 3
+Position: 18
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -ReplyTo
+### -Bcc
 Parameter description
 
 ```yaml
-Type: String
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: 4
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Cc
-{{ Fill Cc Description }}
-
-```yaml
-Type: Array
+Type: String[]
 Parameter Sets: (All)
 Aliases:
 
@@ -108,77 +64,47 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Bcc
-Parameter description
+### -Cc
+{{ Fill Cc Description }}
 
 ```yaml
-Type: Array
+Type: String[]
 Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 6
+Position: 4
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -To
-Parameter description
+### -Confirm
+Prompts you for confirmation before running the cmdlet.
 
 ```yaml
-Type: Array
+Type: SwitchParameter
 Parameter Sets: (All)
-Aliases:
+Aliases: cf
 
 Required: False
-Position: 7
+Position: Named
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Subject
-Parameter description
+### -Credential
+{{ Fill Credential Description }}
 
 ```yaml
-Type: String
+Type: PSCredential
 Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 8
+Position: 12
 Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Priority
-Parameter description
-
-```yaml
-Type: String
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: 9
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Encoding
-Parameter description
-
-```yaml
-Type: String
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: 10
-Default value: Default
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
@@ -190,9 +116,10 @@ Accept wildcard characters: False
 Type: String[]
 Parameter Sets: (All)
 Aliases:
+Accepted values: None, OnSuccess, OnFailure, Delay, Never
 
 Required: False
-Position: 11
+Position: 10
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -208,22 +135,129 @@ Aliases:
 Accepted values: Unspecified, Full, HeadersOnly
 
 Required: False
-Position: 12
+Position: 11
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Credential
-{{ Fill Credential Description }}
+### -Email
+Parameter description
 
 ```yaml
-Type: PSCredential
+Type: IDictionary
+Parameter Sets: (All)
+Aliases: EmailParameters
+
+Required: False
+Position: 20
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Encoding
+Parameter description
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+Accepted values: ASCII, BigEndianUnicode, Default, Unicode, UTF32, UTF7, UTF8
+
+Required: False
+Position: 9
+Default value: Default
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -From
+Parameter description
+
+```yaml
+Type: Object
 Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 13
+Position: 2
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -HTML
+Parameter description
+
+```yaml
+Type: String[]
+Parameter Sets: (All)
+Aliases: Body
+
+Required: False
+Position: 16
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Password
+{{ Fill Password Description }}
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 14
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Port
+Parameter description
+
+```yaml
+Type: Int32
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 1
+Default value: 587
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Priority
+Parameter description
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+Accepted values: Low, Normal, High
+
+Required: False
+Position: 8
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ReplyTo
+Parameter description
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 3
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -239,67 +273,22 @@ Aliases:
 Accepted values: None, Auto, SslOnConnect, StartTls, StartTlsWhenAvailable
 
 Required: False
-Position: 14
+Position: 15
 Default value: Auto
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -UseSsl
+### -Server
 Parameter description
 
 ```yaml
-Type: SwitchParameter
+Type: String
 Parameter Sets: (All)
-Aliases:
+Aliases: SmtpServer
 
 Required: False
-Position: Named
-Default value: False
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -HTML
-Parameter description
-
-```yaml
-Type: String[]
-Parameter Sets: (All)
-Aliases: Body
-
-Required: False
-Position: 15
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Text
-Parameter description
-
-```yaml
-Type: String[]
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: 16
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Attachment
-{{ Fill Attachment Description }}
-
-```yaml
-Type: String[]
-Parameter Sets: (All)
-Aliases: Attachments
-
-Required: False
-Position: 17
+Position: 0
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -320,6 +309,21 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -Subject
+Parameter description
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 7
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -Suppress
 Parameter description
 
@@ -335,16 +339,91 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Email
+### -Text
 Parameter description
 
 ```yaml
-Type: IDictionary
+Type: String[]
 Parameter Sets: (All)
-Aliases: EmailParameters
+Aliases:
 
 Required: False
-Position: 18
+Position: 17
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Timeout
+{{ Fill Timeout Description }}
+
+```yaml
+Type: Int32
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 19
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -To
+Parameter description
+
+```yaml
+Type: String[]
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 6
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -UseSsl
+Parameter description
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: False
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Username
+{{ Fill Username Description }}
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 13
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -WhatIf
+Shows what would happen if the cmdlet runs. The cmdlet is not run.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: (All)
+Aliases: wi
+
+Required: False
+Position: Named
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
