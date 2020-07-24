@@ -12,29 +12,29 @@ Locale: en-US
 
 ## Mailozaurr Cmdlets
 ### [Connect-IMAP](Connect-IMAP.md)
-{{ Fill in the Description }}
+{{ Fill in the Synopsis }}
 
 ### [Connect-POP](Connect-POP.md)
-{{ Fill in the Description }}
+{{ Fill in the Synopsis }}
 
 ### [Disconnect-IMAP](Disconnect-IMAP.md)
-{{ Fill in the Description }}
+{{ Fill in the Synopsis }}
 
 ### [Disconnect-POP](Disconnect-POP.md)
-{{ Fill in the Description }}
+{{ Fill in the Synopsis }}
 
 ### [Get-IMAPFolder](Get-IMAPFolder.md)
-{{ Fill in the Description }}
+{{ Fill in the Synopsis }}
 
 ### [Get-IMAPMessage](Get-IMAPMessage.md)
-{{ Fill in the Description }}
+{{ Fill in the Synopsis }}
 
 ### [Get-POPMessage](Get-POPMessage.md)
-{{ Fill in the Description }}
+{{ Fill in the Synopsis }}
 
 ### [Save-POPMessage](Save-POPMessage.md)
-{{ Fill in the Description }}
+{{ Fill in the Synopsis }}
 
 ### [Send-EmailMessage](Send-EmailMessage.md)
-{{ Fill in the Description }}
+Short description
 
