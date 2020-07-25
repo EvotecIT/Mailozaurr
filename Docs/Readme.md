@@ -23,6 +23,18 @@ Locale: en-US
 ### [Disconnect-POP](Disconnect-POP.md)
 {{ Fill in the Synopsis }}
 
+### [Find-DKIMRecord](Find-DKIMRecord.md)
+{{ Fill in the Synopsis }}
+
+### [Find-DMARCRecord](Find-DMARCRecord.md)
+{{ Fill in the Synopsis }}
+
+### [Find-MxRecord](Find-MxRecord.md)
+{{ Fill in the Synopsis }}
+
+### [Find-SPFRecord](Find-SPFRecord.md)
+{{ Fill in the Synopsis }}
+
 ### [Get-IMAPFolder](Get-IMAPFolder.md)
 {{ Fill in the Synopsis }}
 
