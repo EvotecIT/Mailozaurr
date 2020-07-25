@@ -1,4 +1,4 @@
-﻿#Import-Module $PSScriptRoot\..\Mailozaurr.psd1 -Force
+﻿Import-Module $PSScriptRoot\..\Mailozaurr.psd1 -Force
 
 $Body = EmailBody {
     EmailText -Text "This is my text"
