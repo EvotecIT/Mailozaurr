@@ -22,7 +22,7 @@ jobs:
         displayName: "Install PowerShell Core"
 
       - script: |
-          pwsh -c '.\PSWriteExcel.Tests.ps1'
+          pwsh -c '.\Mailozaurr.Tests.ps1'
         displayName: "Run Mailozaurr Tests on Linux"
 
   - job: Build_PSCore_MacOS1013
