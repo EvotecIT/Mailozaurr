@@ -45,7 +45,9 @@
         [switch] $ShowErrors,
         [switch] $Suppress,
 
-        [alias('EmailParameters')][System.Collections.IDictionary] $Email
+        [alias('EmailParameters')][System.Collections.IDictionary] $Email,
+
+        [MailKit.Security.SaslMechanismOAuth2] $oAuth
     )
     if ($Email) {
         # Following code makes sure both formats are accepted.
@@ -155,7 +157,6 @@
 
     ### SMTP Part Below
 
-
     $SmtpClient = [MySmtpClient]::new() # [MailKit.Net.Smtp.SmtpClient]::new()
 
     if ($DeliveryNotificationOption) {
@@ -175,6 +176,10 @@
         [System.Text.Encoding] $SmtpEncoding = [System.Text.Encoding]::$Encoding
         $SmtpClient.Authenticate($SmtpEncoding, $SmtpCredentials, [System.Threading.CancellationToken]::None)
     }
+    if ($oAuth) {
+        $SmtpClient.Authenticate($oAuth2)
+    }
+
     if ($Username -and $Password) {
         #void Authenticate(string userName, string password, System.Threading.CancellationToken cancellationToken)
     }
