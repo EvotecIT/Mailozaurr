@@ -1,7 +1,7 @@
 function Find-SPFRecord {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory, ValueFromPipelineByPropertyName, ValueFromPipeline)][string[]]$DomainName,
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName, ValueFromPipeline, Position = 0)][string[]]$DomainName,
         [System.Net.IPAddress] $DnsServer,
         [switch] $AsHashTable,
         [switch] $AsObject

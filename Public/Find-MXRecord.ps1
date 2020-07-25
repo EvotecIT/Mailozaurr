@@ -1,7 +1,7 @@
 function Find-MxRecord {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory, ValueFromPipeline)][string[]]$DomainName,
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName, ValueFromPipeline, Position = 0)][string[]]$DomainName,
         [System.Net.IPAddress] $DnsServer,
         [switch] $ResolvePTR,
         [switch] $AsHashTable,

@@ -1,7 +1,7 @@
 function Find-DKIMRecord {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory, ValueFromPipelineByPropertyName, ValueFromPipeline)][string[]] $DomainName,
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName, ValueFromPipeline, Position = 0)][string[]] $DomainName,
         [string[]] $Selector = "selector1",
         [System.Net.IPAddress] $DnsServer,
         [switch] $AsHashTable,
