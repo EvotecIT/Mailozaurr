@@ -8,15 +8,6 @@ $Assembly = @(
         Get-ChildItem -Path $PSScriptRoot\Lib\Default\*.dll -ErrorAction SilentlyContinue
     }
 )
-#Dot source the files
-Foreach ($Import in @($Public + $Private)) {
-    Try {
-        . $Import.Fullname
-    } Catch {
-        Write-Error -Message "Failed to import function $($import.Fullname): $_"
-    }
-}
-
 Foreach ($Import in @($Assembly)) {
     try {
         if ($Import.Extension -eq '.dll') {
@@ -30,5 +21,13 @@ Foreach ($Import in @($Assembly)) {
             #Write-Warning -Message "[x] LoaderExceptions: $($_.FileName)"
         }
         return
+    }
+}
+#Dot source the files
+Foreach ($Import in @($Public + $Private)) {
+    Try {
+        . $Import.Fullname
+    } Catch {
+        Write-Error -Message "Failed to import function $($import.Fullname): $_"
     }
 }
