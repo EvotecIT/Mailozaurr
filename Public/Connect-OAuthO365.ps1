@@ -1,6 +1,7 @@
 function Connect-oAuthO365 {
     [cmdletBinding()]
     param(
+        [string] $Login,
         [Parameter(Mandatory)][string] $ClientID,
         [Parameter(Mandatory)][string] $TenantID,
         [uri] $RedirectUri = 'https://login.microsoftonline.com/common/oauth2/nativeclient',
@@ -25,9 +26,20 @@ function Connect-oAuthO365 {
 
     $PublicClientApplication = [Microsoft.Identity.Client.PublicClientApplicationBuilder]::CreateWithApplicationOptions($Options).Build()
 
+    # Here we should implement something for Silent Token
+    # $Account = $Account
+    # $AuthToken = $PublicClientApplication.AcquireTokenSilent($Scopes, $login).ExecuteAsync([System.Threading.CancellationToken]::None) | Wait-Task
+    # $oAuth2 = [MailKit.Security.SaslMechanismOAuth2]::new($AuthToken.Account.Username, $AuthToken.AccessToken)
+
     # https://docs.microsoft.com/en-us/exchange/client-developer/legacy-protocols/how-to-authenticate-an-imap-pop-smtp-application-by-using-oauth
     try {
-        $AuthToken = $PublicClientApplication.AcquireTokenInteractive($Scopes).ExecuteAsync() | Wait-Task
+        if ($Login) {
+            $AuthToken = $PublicClientApplication.AcquireTokenInteractive($Scopes).ExecuteAsync([System.Threading.CancellationToken]::None) | Wait-Task
+        } else {
+            $AuthToken = $PublicClientApplication.AcquireTokenInteractive($Scopes).WithLoginHint($Login).ExecuteAsync([System.Threading.CancellationToken]::None) | Wait-Task
+        }
+        # Here we should save the AuthToken.Account somehow, somewhere
+        # $AuthToken.Account | Export-Clixml -Path $Env:USERPROFILE\Desktop\test.xml -Depth 2
         $oAuth2 = [MailKit.Security.SaslMechanismOAuth2]::new($AuthToken.Account.Username, $AuthToken.AccessToken)
         $oAuth2
     } catch {
