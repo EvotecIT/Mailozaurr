@@ -47,7 +47,7 @@
 
         [alias('EmailParameters')][System.Collections.IDictionary] $Email,
 
-        [MailKit.Security.SaslMechanismOAuth2] $oAuth
+        [alias('oAuth')][MailKit.Security.SaslMechanismOAuth2] $oAuth2
     )
     if ($Email) {
         # Following code makes sure both formats are accepted.
@@ -176,7 +176,7 @@
         [System.Text.Encoding] $SmtpEncoding = [System.Text.Encoding]::$Encoding
         $SmtpClient.Authenticate($SmtpEncoding, $SmtpCredentials, [System.Threading.CancellationToken]::None)
     }
-    if ($oAuth) {
+    if ($oAuth2) {
         $SmtpClient.Authenticate($oAuth2)
     }
 
