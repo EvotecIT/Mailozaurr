@@ -7,9 +7,9 @@
         [Parameter(ParameterSetName = 'ClearText', Mandatory)][string] $Password,
         [Parameter(ParameterSetName = 'Credential', Mandatory)][System.Management.Automation.PSCredential] $Credential,
         [MailKit.Security.SecureSocketOptions] $Options = [MailKit.Security.SecureSocketOptions]::Auto,
-        [int] $TimeOut = 120000
+        [int] $TimeOut = 120000,
+        [alias('oAuth')][Parameter(ParameterSetName = 'oAuth2', Mandatory)][MailKit.Security.SaslMechanismOAuth2] $oAuth2
     )
-
     $Client = [MailKit.Net.Imap.ImapClient]::new()
     try {
         $Client.Connect($Server, $Port, $Options)
@@ -40,9 +40,17 @@
                 Write-Warning "Connect-IMAP - Unable to authenticate $($_.Exception.Message)"
                 return
             }
-        } else {
+        } elseif ($Credential) {
             try {
                 $Client.Authenticate($Credential)
+            } catch {
+                Write-Warning "Connect-IMAP - Unable to authenticate $($_.Exception.Message)"
+                return
+            }
+        } elseif ($oAuth2) {
+            try {
+                $Client.Authenticate($oAuth2)
+                #$Client.AuthenticateAsync($oAuth2) | Wait-Task
             } catch {
                 Write-Warning "Connect-IMAP - Unable to authenticate $($_.Exception.Message)"
                 return

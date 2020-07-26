@@ -4,11 +4,7 @@ function Connect-oAuthGoogle {
         [Parameter(Mandatory)][string] $GmailAccount,
         [Parameter(Mandatory)][string] $ClientID,
         [Parameter(Mandatory)][string] $ClientSecret,
-        [ValidateSet(
-            "https://mail.google.com/"
-        )][string[]] $Scopes = @(
-            "https://mail.google.com/"
-        )
+        [ValidateSet("https://mail.google.com/")][string[]] $Scope = @("https://mail.google.com/")
     )
 
     $ClientSecrets = [Google.Apis.Auth.OAuth2.ClientSecrets]::new()
@@ -17,7 +13,7 @@ function Connect-oAuthGoogle {
 
     $Initializer = [Google.Apis.Auth.OAuth2.Flows.GoogleAuthorizationCodeFlow+Initializer]::new()
     $Initializer.DataStore = [Google.Apis.Util.Store.FileDataStore]::new("CredentialCacheFolder", $false)
-    $Initializer.Scopes = $Scopes
+    $Initializer.Scopes = $Scope
     $Initializer.ClientSecrets = $ClientSecrets
 
     $CodeFlow = [Google.Apis.Auth.OAuth2.Flows.GoogleAuthorizationCodeFlow]::new($Initializer)
@@ -26,10 +22,9 @@ function Connect-oAuthGoogle {
     $AuthCode = [Google.Apis.Auth.OAuth2.AuthorizationCodeInstalledApp]::new($CodeFlow, $codeReceiver)
     $Credential = $AuthCode.AuthorizeAsync($GmailAccount, [System.Threading.CancellationToken]::None) | Wait-Task
 
-    #if ($Credential.Token.IsExpired) {
-    #    [Google.Apis.Util.SystemClock]::Default
-    #}
-
+    if ($Credential.Token.IsExpired([Google.Apis.Util.SystemClock]::Default)) {
+        $credential.RefreshTokenAsync([System.Threading.CancellationToken]::None) | Wait-Task
+    }
     $oAuth2 = [MailKit.Security.SaslMechanismOAuth2]::new($credential.UserId, $credential.Token.AccessToken)
     $oAuth2
 }

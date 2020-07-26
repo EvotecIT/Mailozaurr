@@ -20,10 +20,18 @@
 
 # Mailozaurr - PowerShell Module
 
-Mailozaurr is a PowerShell module that aims to provide SMTP, POP3, IMAP and probably some other ways to interact with Email. Underneath it uses MimeKit and MailKit libraries written by Jeffrey Stedfast.
+Mailozaurr is a PowerShell module that aims to provide SMTP, POP3, IMAP and probably some other ways to interact with Email. Underneath it uses MimeKit and MailKit and EmailValidation libraries written by Jeffrey Stedfast.
 
 - [MailKit](https://github.com/jstedfast/MailKit)
 - [MimeKit](https://github.com/jstedfast/MimeKit)
+- [EmailValidation](https://github.com/jstedfast/EmailValidation)
+
+For oAuth2 it also requires some Microsoft and Google libraries that are also bundled in
+
+- [Microsoft.Identity.Client](https://www.nuget.org/packages/Microsoft.Identity.Client/)
+- [Google.Apis](https://www.nuget.org/packages/Google.Apis)
+- [Google.Apis.Core](https://www.nuget.org/packages/Google.Apis.Core)
+- [Google.Apis.Auth](https://www.nuget.org/packages/Google.Apis.Auth)
 
 This started with a single goal to replace `Send-MailMessage` which is depracated/obsolete with something more modern, but since MailKit and MimeKit have lots of options why not build on that?
 
