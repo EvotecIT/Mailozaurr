@@ -20,7 +20,7 @@
 
 # Mailozaurr - PowerShell Module
 
-Mailozaurr is a PowerShell module that aims to provide SMTP, POP3, IMAP and probably some other ways to interact with Email. Underneath it uses MimeKit and MailKit and EmailValidation libraries written by Jeffrey Stedfast.
+Mailozaurr is a PowerShell module that aims to provide SMTP, POP3, IMAP and few other ways to interact with Email. Underneath it uses MimeKit and MailKit and EmailValidation libraries written by Jeffrey Stedfast.
 
 - [MailKit](https://github.com/jstedfast/MailKit)
 - [MimeKit](https://github.com/jstedfast/MimeKit)
@@ -32,6 +32,10 @@ For oAuth2 it also requires some Microsoft and Google libraries that are also bu
 - [Google.Apis](https://www.nuget.org/packages/Google.Apis)
 - [Google.Apis.Core](https://www.nuget.org/packages/Google.Apis.Core)
 - [Google.Apis.Auth](https://www.nuget.org/packages/Google.Apis.Auth)
+
+Finally since `Resolve-DNSName` is Windows specific I'm using:
+
+- [DnsClient.NET](https://github.com/MichaCo/DnsClient.NET)
 
 This started with a single goal to replace `Send-MailMessage` which is depracated/obsolete with something more modern, but since MailKit and MimeKit have lots of options why not build on that?
 
@@ -55,5 +59,14 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 
 ## Changelog
 
+- 0.0.3 - 2020.07.26
+  - Added `Connect-OAuthGoogle`
+  - Added `Connect-OAuthO365`
+  - Added `Resolve-DNSQuery`
+- 0.0.2 - 2020.07.25
+  - Added `Find-MXRecord`
+  - Added `Find-DMARCRecord`
+  - Added `Find-DKIMRecord`
+  - Added `Find-SPFRecord`
 - 0.0.1 - 2020.06.13
   - Initial release
