@@ -17,28 +17,28 @@ function Find-SPFRecord {
                 $Splat['Server'] = $DnsServer
             }
             try {
-                $DNSRecord = Resolve-DnsName @Splat | Where-Object Strings -Match "spf1"
+                $DNSRecord = Resolve-DnsQuery @Splat | Where-Object Text -Match "spf1"
                 if (-not $AsObject) {
                     $MailRecord = [ordered] @{
-                        Name  = $Domain
-                        TTL   = $DnsRecord.TTL -join ' ;'
-                        Count = $DNSRecord.Count
-                        SPF   = $DnsRecord.Strings -join ' ;'
+                        Name       = $Domain
+                        Count      = $DNSRecord.Count
+                        TimeToLive = $DnsRecord.TimeToLive -join '; '
+                        SPF        = $DnsRecord.Text -join '; '
                     }
                 } else {
                     $MailRecord = [ordered] @{
-                        Name  = $Domain
-                        TTL   = $DnsRecord.TTL
-                        Count = $DNSRecord.Count
-                        SPF   = $DnsRecord.Strings
+                        Name       = $Domain
+                        Count      = $DNSRecord.Count
+                        TimeToLive = $DnsRecord.TimeToLive
+                        SPF        = $DnsRecord.Text
                     }
                 }
             } catch {
                 $MailRecord = [ordered] @{
-                    Name  = $Domain
-                    TTL   = ''
-                    Count = 0
-                    SPF   = ''
+                    Name       = $Domain
+                    Count      = 0
+                    TimeToLive = ''
+                    SPF        = ''
                 }
                 Write-Warning "Find-SPFRecord - $_"
             }

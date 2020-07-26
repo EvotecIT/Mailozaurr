@@ -10,35 +10,35 @@ function Find-DMARCRecord {
         foreach ($Domain in $DomainName) {
             $Splat = @{
                 Name        = "_dmarc.$Domain"
-                Type        = "txt"
+                Type        = "TXT"
                 ErrorAction = "Stop"
             }
             if ($DnsServer) {
                 $Splat['Server'] = $DnsServer
             }
             try {
-                $DNSRecord = Resolve-DnsName @Splat | Where-Object Strings -Match "DMARC1"
+                $DNSRecord = Resolve-DnsQuery @Splat | Where-Object Text -Match "DMARC1"
                 if (-not $AsObject) {
                     $MailRecord = [ordered] @{
-                        Name  = $Domain
-                        TTL   = $DnsRecord.TTL -join ' ;'
-                        Count = $DNSRecord.Count
-                        DMARC = $DnsRecord.Strings -join ' ;'
+                        Name       = $Domain
+                        Count      = $DNSRecord.Count
+                        TimeToLive = $DnsRecord.TimeToLive -join '; '
+                        DMARC      = $DnsRecord.Text -join '; '
                     }
                 } else {
                     $MailRecord = [ordered] @{
-                        Name  = $Domain
-                        TTL   = $DnsRecord.TTL
-                        Count = $DNSRecord.Count
-                        DMARC = $DnsRecord.Strings
+                        Name       = $Domain
+                        Count      = $DNSRecord.Count
+                        TimeToLive = $DnsRecord.TimeToLive
+                        DMARC      = $DnsRecord.Text
                     }
                 }
             } catch {
                 $MailRecord = [ordered] @{
-                    Name  = $Domain
-                    TTL   = ''
-                    Count = 0
-                    DMARC = ''
+                    Name       = $Domain
+                    Count      = 0
+                    TimeToLive = ''
+                    DMARC      = ''
                 }
                 Write-Warning "Find-DMARCRecord - $_"
             }

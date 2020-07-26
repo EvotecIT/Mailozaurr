@@ -18,24 +18,24 @@ function Find-MxRecord {
             if ($DnsServer) {
                 $Splat['Server'] = $DnsServer
             }
-            $MX = Resolve-DnsName @Splat | Where-Object Type -EQ "MX"
+            $MX = Resolve-DnsQuery @Splat
             [Array] $MXRecords = foreach ($MXRecord in $MX) {
                 $MailRecord = [ordered] @{
                     Name       = $Domain
                     Preference = $MXRecord.Preference
-                    TTL        = $MXRecord.TTL
-                    MX         = $MXRecord.NameExchange
+                    TimeToLive = $MXRecord.TimeToLive
+                    MX         = ($MXRecord.Exchange) -replace ".$"
                 }
-                [Array] $IPAddresses = foreach ($Record in $MX.NameExchange) {
+                [Array] $IPAddresses = foreach ($Record in $MX.Exchange) {
                     $Splat = @{
                         Name        = $Record
-                        Type        = 'A_AAAA'
+                        Type        = 'A'
                         ErrorAction = "SilentlyContinue"
                     }
                     if ($DnsServer) {
                         $Splat['Server'] = $DnsServer
                     }
-                    (Resolve-DnsName @Splat).IPAddress
+                    (Resolve-DnsQuery @Splat) | ForEach-Object { $_.Address.IPAddressToString }
                 }
                 $MailRecord['IPAddress'] = $IPAddresses
                 if ($ResolvePTR) {
@@ -48,7 +48,7 @@ function Find-MxRecord {
                         if ($DnsServer) {
                             $Splat['Server'] = $DnsServer
                         }
-                        (Resolve-DnsName @Splat).NameHost
+                        (Resolve-DnsQuery @Splat) | ForEach-Object { $_.PtrDomainName -replace ".$" }
                     }
                 }
                 $MailRecord
@@ -67,7 +67,7 @@ function Find-MxRecord {
                         Name       = $Domain
                         Count      = $MXRecords.Count
                         Preference = $MXRecords.Preference -join '; '
-                        TTL        = $MXRecords.TTL -join '; '
+                        TimeToLive = $MXRecords.TimeToLive -join '; '
                         MX         = $MXRecords.MX -join '; '
                         IPAddress  = ($MXRecords.IPAddress | Sort-Object -Unique) -join '; '
                     }
@@ -79,7 +79,7 @@ function Find-MxRecord {
                         Name       = $Domain
                         Count      = $MXRecords.Count
                         Preference = $MXRecords.Preference
-                        TTL        = $MXRecords.TTL
+                        TimeToLive = $MXRecords.TimeToLive
                         MX         = $MXRecords.MX
                         IPAddress  = ($MXRecords.IPAddress | Sort-Object -Unique)
                     }

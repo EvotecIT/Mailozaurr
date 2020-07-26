@@ -18,20 +18,20 @@ function Find-DKIMRecord {
                 if ($DnsServer) {
                     $Splat['Server'] = $DnsServer
                 }
-                $DNSRecord = Resolve-DnsName @Splat | Where-Object Strings -Match "DKIM1"
+                $DNSRecord = Resolve-DnsQuery @Splat | Where-Object Text -Match "DKIM1"
                 if (-not $AsObject) {
                     $MailRecord = [ordered] @{
                         Name     = $Domain
-                        Count    = $DNSRecord.Strings.Count
+                        Count    = $DNSRecord.Text.Count
                         Selector = "$Domain`:$S"
-                        DKIM     = $DNSRecord.Strings -join '; '
+                        DKIM     = $DNSRecord.Text -join '; '
                     }
                 } else {
                     $MailRecord = [ordered] @{
                         Name     = $Domain
-                        Count    = $DNSRecord.Strings.Count
+                        Count    = $DNSRecord.Text.Count
                         Selector = "$Domain`:$S"
-                        DKIM     = $DNSRecord.Strings -join '; '
+                        DKIM     = $DNSRecord.Text -join '; '
                     }
                 }
                 if ($AsHashTable) {
