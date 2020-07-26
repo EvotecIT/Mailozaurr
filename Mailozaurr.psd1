@@ -72,8 +72,8 @@
     FunctionsToExport    = 'Connect-IMAP', 'Connect-oAuthGoogle', 'Connect-oAuthO365', 
     'Connect-POP', 'Disconnect-IMAP', 'Disconnect-POP', 'Find-DKIMRecord', 
     'Find-DMARCRecord', 'Find-MxRecord', 'Find-SPFRecord', 'Get-IMAPFolder', 
-    'Get-IMAPMessage', 'Get-POPMessage', 'Save-POPMessage', 
-    'Send-EmailMessage', 'Test-EmailAddress'
+    'Get-IMAPMessage', 'Get-POPMessage', 'Resolve-DnsQuery', 
+    'Save-POPMessage', 'Send-EmailMessage', 'Test-EmailAddress'
 
     # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
     CmdletsToExport      = @()
