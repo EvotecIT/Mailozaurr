@@ -60,6 +60,7 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 ## Changelog
 
 - 0.0.3 - 2020.07.26
+  - Added `Test-EmailAddress`
   - Added `Connect-OAuthGoogle`
   - Added `Connect-OAuthO365`
   - Added `Resolve-DNSQuery`
