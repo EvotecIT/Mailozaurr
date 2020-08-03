@@ -13,7 +13,7 @@ schema: 2.0.0
 ## SYNTAX
 
 ```
-Get-POPMessage [-Client] <IDictionary> [[-Index] <Int32>] [[-Count] <Int32>] [-All] [<CommonParameters>]
+Get-POPMessage [[-Client] <IDictionary>] [[-Index] <Int32>] [[-Count] <Int32>] [-All] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -53,7 +53,7 @@ Type: IDictionary
 Parameter Sets: (All)
 Aliases:
 
-Required: True
+Required: False
 Position: 0
 Default value: None
 Accept pipeline input: False

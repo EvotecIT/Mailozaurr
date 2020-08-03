@@ -13,7 +13,7 @@ schema: 2.0.0
 ## SYNTAX
 
 ```
-Get-IMAPMessage [-Client] <IDictionary> [[-FolderAccess] <FolderAccess>] [<CommonParameters>]
+Get-IMAPMessage [[-Client] <IDictionary>] [[-FolderAccess] <FolderAccess>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -38,7 +38,7 @@ Type: IDictionary
 Parameter Sets: (All)
 Aliases:
 
-Required: True
+Required: False
 Position: 0
 Default value: None
 Accept pipeline input: False

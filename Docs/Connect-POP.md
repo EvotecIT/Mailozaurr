@@ -14,14 +14,20 @@ schema: 2.0.0
 
 ### ClearText
 ```
-Connect-POP -Server <String> [-Port <Int32>] -UserName <String> -Password <String>
+Connect-POP [-Server <String>] [-Port <Int32>] -UserName <String> -Password <String>
  [-Options <SecureSocketOptions>] [-TimeOut <Int32>] [<CommonParameters>]
 ```
 
 ### Credential
 ```
-Connect-POP -Server <String> [-Port <Int32>] -Credential <PSCredential> [-Options <SecureSocketOptions>]
+Connect-POP [-Server <String>] [-Port <Int32>] [-Credential <PSCredential>] [-Options <SecureSocketOptions>]
  [-TimeOut <Int32>] [<CommonParameters>]
+```
+
+### oAuth2
+```
+Connect-POP [-Server <String>] [-Port <Int32>] -Credential <PSCredential> [-Options <SecureSocketOptions>]
+ [-TimeOut <Int32>] [-oAuth2] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -44,6 +50,18 @@ PS C:\> {{ Add example code here }}
 ```yaml
 Type: PSCredential
 Parameter Sets: Credential
+Aliases:
+
+Required: False
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+```yaml
+Type: PSCredential
+Parameter Sets: oAuth2
 Aliases:
 
 Required: True
@@ -107,7 +125,7 @@ Type: String
 Parameter Sets: (All)
 Aliases:
 
-Required: True
+Required: False
 Position: Named
 Default value: None
 Accept pipeline input: False
@@ -138,6 +156,21 @@ Parameter Sets: ClearText
 Aliases:
 
 Required: True
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -oAuth2
+{{ Fill oAuth2 Description }}
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: oAuth2
+Aliases:
+
+Required: False
 Position: Named
 Default value: None
 Accept pipeline input: False

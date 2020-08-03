@@ -12,22 +12,22 @@ schema: 2.0.0
 
 ## SYNTAX
 
-### ClearText
+### Credential (Default)
 ```
-Connect-IMAP -Server <String> [-Port <Int32>] -UserName <String> -Password <String>
- [-Options <SecureSocketOptions>] [-TimeOut <Int32>] [<CommonParameters>]
+Connect-IMAP [-Server <String>] [-Port <Int32>] [-Credential <PSCredential>] [-Options <SecureSocketOptions>]
+ [-TimeOut <Int32>] [<CommonParameters>]
 ```
 
-### Credential
+### ClearText
 ```
-Connect-IMAP -Server <String> [-Port <Int32>] -Credential <PSCredential> [-Options <SecureSocketOptions>]
- [-TimeOut <Int32>] [<CommonParameters>]
+Connect-IMAP [-Server <String>] [-Port <Int32>] -UserName <String> -Password <String>
+ [-Options <SecureSocketOptions>] [-TimeOut <Int32>] [<CommonParameters>]
 ```
 
 ### oAuth2
 ```
-Connect-IMAP -Server <String> [-Port <Int32>] [-Options <SecureSocketOptions>] [-TimeOut <Int32>]
- -oAuth2 <SaslMechanismOAuth2> [<CommonParameters>]
+Connect-IMAP [-Server <String>] [-Port <Int32>] [-Credential <PSCredential>] [-Options <SecureSocketOptions>]
+ [-TimeOut <Int32>] [-oAuth2] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -49,10 +49,10 @@ PS C:\> {{ Add example code here }}
 
 ```yaml
 Type: PSCredential
-Parameter Sets: Credential
+Parameter Sets: Credential, oAuth2
 Aliases:
 
-Required: True
+Required: False
 Position: Named
 Default value: None
 Accept pipeline input: False
@@ -113,7 +113,7 @@ Type: String
 Parameter Sets: (All)
 Aliases:
 
-Required: True
+Required: False
 Position: Named
 Default value: None
 Accept pipeline input: False
@@ -154,11 +154,11 @@ Accept wildcard characters: False
 {{ Fill oAuth2 Description }}
 
 ```yaml
-Type: SaslMechanismOAuth2
+Type: SwitchParameter
 Parameter Sets: oAuth2
-Aliases: oAuth
+Aliases:
 
-Required: True
+Required: False
 Position: Named
 Default value: None
 Accept pipeline input: False
