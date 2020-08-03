@@ -13,7 +13,7 @@ schema: 2.0.0
 ## SYNTAX
 
 ```
-Find-DKIMRecord [-DomainName] <String[]> [[-Selector] <String[]>] [[-DnsServer] <IPAddress>] [-AsHashTable]
+Find-DKIMRecord [-DomainName] <String[]> [-Selector <String[]>] [-DnsServer <IPAddress>] [-AsHashTable]
  [-AsObject] [<CommonParameters>]
 ```
 
@@ -70,7 +70,7 @@ Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 2
+Position: Named
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -100,7 +100,7 @@ Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: 1
+Position: Named
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False

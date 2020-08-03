@@ -24,6 +24,12 @@ Connect-IMAP -Server <String> [-Port <Int32>] -Credential <PSCredential> [-Optio
  [-TimeOut <Int32>] [<CommonParameters>]
 ```
 
+### oAuth2
+```
+Connect-IMAP -Server <String> [-Port <Int32>] [-Options <SecureSocketOptions>] [-TimeOut <Int32>]
+ -oAuth2 <SaslMechanismOAuth2> [<CommonParameters>]
+```
+
 ## DESCRIPTION
 {{ Fill in the Description }}
 
@@ -136,6 +142,21 @@ Accept wildcard characters: False
 Type: String
 Parameter Sets: ClearText
 Aliases:
+
+Required: True
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -oAuth2
+{{ Fill oAuth2 Description }}
+
+```yaml
+Type: SaslMechanismOAuth2
+Parameter Sets: oAuth2
+Aliases: oAuth
 
 Required: True
 Position: Named

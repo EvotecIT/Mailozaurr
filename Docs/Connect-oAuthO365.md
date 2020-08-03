@@ -5,7 +5,7 @@ online version:
 schema: 2.0.0
 ---
 
-# Find-DMARCRecord
+# Connect-oAuthO365
 
 ## SYNOPSIS
 {{ Fill in the Synopsis }}
@@ -13,8 +13,8 @@ schema: 2.0.0
 ## SYNTAX
 
 ```
-Find-DMARCRecord [-DomainName] <String[]> [-DnsServer <IPAddress>] [-AsHashTable] [-AsObject]
- [<CommonParameters>]
+Connect-oAuthO365 [[-Login] <String>] [-ClientID] <String> [-TenantID] <String> [[-RedirectUri] <Uri>]
+ [[-Scopes] <String[]>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -31,63 +31,79 @@ PS C:\> {{ Add example code here }}
 
 ## PARAMETERS
 
-### -AsHashTable
-{{ Fill AsHashTable Description }}
+### -ClientID
+{{ Fill ClientID Description }}
 
 ```yaml
-Type: SwitchParameter
+Type: String
 Parameter Sets: (All)
 Aliases:
 
-Required: False
-Position: Named
+Required: True
+Position: 1
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -AsObject
-{{ Fill AsObject Description }}
+### -Login
+{{ Fill Login Description }}
 
 ```yaml
-Type: SwitchParameter
+Type: String
 Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: Named
+Position: 0
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -DnsServer
-{{ Fill DnsServer Description }}
+### -RedirectUri
+{{ Fill RedirectUri Description }}
 
 ```yaml
-Type: IPAddress
+Type: Uri
 Parameter Sets: (All)
 Aliases:
 
 Required: False
-Position: Named
+Position: 3
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -DomainName
-{{ Fill DomainName Description }}
+### -Scopes
+{{ Fill Scopes Description }}
 
 ```yaml
 Type: String[]
 Parameter Sets: (All)
 Aliases:
+Accepted values: email, offline_access, https://outlook.office.com/IMAP.AccessAsUser.All, https://outlook.office.com/POP.AccessAsUser.All, https://outlook.office.com/SMTP.Send
+
+Required: False
+Position: 4
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -TenantID
+{{ Fill TenantID Description }}
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
 
 Required: True
-Position: 0
+Position: 2
 Default value: None
-Accept pipeline input: True (ByPropertyName, ByValue)
+Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
@@ -96,7 +112,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-### System.String[]
+### None
 
 ## OUTPUTS
 

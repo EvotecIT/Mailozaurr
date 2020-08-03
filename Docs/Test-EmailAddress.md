@@ -5,7 +5,7 @@ online version:
 schema: 2.0.0
 ---
 
-# Find-DMARCRecord
+# Test-EmailAddress
 
 ## SYNOPSIS
 {{ Fill in the Synopsis }}
@@ -13,8 +13,7 @@ schema: 2.0.0
 ## SYNTAX
 
 ```
-Find-DMARCRecord [-DomainName] <String[]> [-DnsServer <IPAddress>] [-AsHashTable] [-AsObject]
- [<CommonParameters>]
+Test-EmailAddress [-EmailAddress] <String[]> [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -31,53 +30,8 @@ PS C:\> {{ Add example code here }}
 
 ## PARAMETERS
 
-### -AsHashTable
-{{ Fill AsHashTable Description }}
-
-```yaml
-Type: SwitchParameter
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: Named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -AsObject
-{{ Fill AsObject Description }}
-
-```yaml
-Type: SwitchParameter
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: Named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -DnsServer
-{{ Fill DnsServer Description }}
-
-```yaml
-Type: IPAddress
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: Named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -DomainName
-{{ Fill DomainName Description }}
+### -EmailAddress
+{{ Fill EmailAddress Description }}
 
 ```yaml
 Type: String[]

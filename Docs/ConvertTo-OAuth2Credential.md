@@ -5,7 +5,7 @@ online version:
 schema: 2.0.0
 ---
 
-# Find-DMARCRecord
+# ConvertTo-OAuth2Credential
 
 ## SYNOPSIS
 {{ Fill in the Synopsis }}
@@ -13,8 +13,7 @@ schema: 2.0.0
 ## SYNTAX
 
 ```
-Find-DMARCRecord [-DomainName] <String[]> [-DnsServer <IPAddress>] [-AsHashTable] [-AsObject]
- [<CommonParameters>]
+ConvertTo-OAuth2Credential [-UserName] <String> [-Token] <String> [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -31,63 +30,33 @@ PS C:\> {{ Add example code here }}
 
 ## PARAMETERS
 
-### -AsHashTable
-{{ Fill AsHashTable Description }}
+### -Token
+{{ Fill Token Description }}
 
 ```yaml
-Type: SwitchParameter
+Type: String
 Parameter Sets: (All)
 Aliases:
 
-Required: False
-Position: Named
+Required: True
+Position: 1
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -AsObject
-{{ Fill AsObject Description }}
+### -UserName
+{{ Fill UserName Description }}
 
 ```yaml
-Type: SwitchParameter
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: Named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -DnsServer
-{{ Fill DnsServer Description }}
-
-```yaml
-Type: IPAddress
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: Named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -DomainName
-{{ Fill DomainName Description }}
-
-```yaml
-Type: String[]
+Type: String
 Parameter Sets: (All)
 Aliases:
 
 Required: True
 Position: 0
 Default value: None
-Accept pipeline input: True (ByPropertyName, ByValue)
+Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
@@ -96,7 +65,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-### System.String[]
+### None
 
 ## OUTPUTS
 
