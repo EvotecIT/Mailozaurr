@@ -64,8 +64,8 @@ function ConvertTo-GraphAddress {
             } else {
                 @{
                     emailAddress = @{
-                        address = $From.Email
-                        name    = $From.Name
+                        address = $From.Name
+                        #name    = $From.Name
                     }
                 }
             }
