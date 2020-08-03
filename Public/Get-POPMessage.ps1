@@ -2,7 +2,7 @@
     [alias('Get-POP3Message')]
     [cmdletBinding()]
     param(
-        [Parameter(Mandatory)][System.Collections.IDictionary] $Client,
+        [Parameter()][System.Collections.IDictionary] $Client,
         [int] $Index,
         [int] $Count = 1,
         [switch] $All
@@ -17,6 +17,8 @@
                 Write-Warning "Get-POP3Message - Index is out of range. Use index less than $($Client.Data.Count)."
             }
         }
+    } else {
+        Write-Warning 'Get-POP3Message - Is POP3 connected?'
     }
     <#
     $Client.Data.GetMessage
