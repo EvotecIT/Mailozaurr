@@ -25,6 +25,11 @@ function Connect-oAuthGoogle {
     if ($Credential.Token.IsExpired([Google.Apis.Util.SystemClock]::Default)) {
         $credential.RefreshTokenAsync([System.Threading.CancellationToken]::None) | Wait-Task
     }
-    $oAuth2 = [MailKit.Security.SaslMechanismOAuth2]::new($credential.UserId, $credential.Token.AccessToken)
-    $oAuth2
+    #$oAuth2 = [MailKit.Security.SaslMechanismOAuth2]::new($credential.UserId, $credential.Token.AccessToken)
+    #$oAuth2
+    #[PSCustomObject] @{
+    #    UserName = $Credential.UserId
+    #    Token    = $Credential.Token.AccessToken
+    #}
+    ConvertTo-OAuth2Credential -UserName $Credential.UserId -Token $Credential.Token.AccessToken
 }
