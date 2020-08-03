@@ -4,11 +4,11 @@ $ExcelReport = "$PSScriptRoot\Output\MailSystemSummary.xlsx"
 $HTMLReport = "$PSScriptRoot\Output\MailSystemSummary.html"
 
 $Domains = @(
-    'evotec.pl'
-    'evotec.xyz'
-    'google.com'
-    'gmail.com'
-    'microsoft.com'
+    @{ DomainName = 'evotec.pl'; Selector = 'selector1' }
+    @{ DomainName = 'evotec.xyz'; Selector = 'selector1' }
+    @{ DomainName = 'microsoft.com'; Selector = 'selector2' }
+    @{ DomainName = 'gmail.com'; Selector = 'selector2' }
+    @{ DomainName = 'google.com'; Selector = 'selector2' }
 )
 
 $MXRecords = Find-MxRecord -DomainName $Domains
