@@ -1,7 +1,7 @@
 function ConvertFrom-OAuth2Credential {
     [cmdletBinding()]
     param(
-        [alias('oAuth')][Parameter(Mandatory)][PSCredential] $Credential
+        [Parameter(Mandatory)][PSCredential] $Credential
     )
     [PSCustomObject] @{
         UserName = $Credential.UserName
