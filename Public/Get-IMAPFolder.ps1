@@ -14,6 +14,6 @@
         $Client.Recent = $Folder.Recent
         $Client
     } else {
-        Write-Verbose "Get-IMAPMessage - Client not connected."
+        Write-Verbose 'Get-IMAPMessage - Client not connected?'
     }
 }
