@@ -1,10 +1,10 @@
 function ConvertFrom-OAuth2Credential {
     [cmdletBinding()]
     param(
-        [Parameter(Mandatory)][PSCredential] $OAuth2
+        [alias('oAuth')][Parameter(Mandatory)][PSCredential] $Credential
     )
     [PSCustomObject] @{
-        UserName = $OAuth2.UserName
-        Token    = $OAuth2.GetNetworkCredential().Password
+        UserName = $Credential.UserName
+        Token    = $Credential.GetNetworkCredential().Password
     }
 }
