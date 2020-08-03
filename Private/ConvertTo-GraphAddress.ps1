@@ -7,21 +7,27 @@ function ConvertTo-GraphAddress {
     )
     foreach ($_ in $MailboxAddress) {
         if ($_ -is [string]) {
-            @{
-                emailAddress = @{
-                    address = $_
+            if ($_) {
+                @{
+                    emailAddress = @{
+                        address = $_
+                    }
                 }
             }
         } elseif ($_ -is [System.Collections.IDictionary]) {
-            @{
-                emailAddress = @{
-                    address = $_.Email
+            if ($_.Email) {
+                @{
+                    emailAddress = @{
+                        address = $_.Email
+                    }
                 }
             }
         } elseif ($_ -is [MimeKit.MailboxAddress]) {
-            @{
-                emailAddress = @{
-                    address = $_.Address
+            if ($_.Address) {
+                @{
+                    emailAddress = @{
+                        address = $_.Address
+                    }
                 }
             }
         } else {
