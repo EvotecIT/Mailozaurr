@@ -14,7 +14,19 @@ Locale: en-US
 ### [Connect-IMAP](Connect-IMAP.md)
 {{ Fill in the Synopsis }}
 
+### [Connect-oAuthGoogle](Connect-oAuthGoogle.md)
+{{ Fill in the Synopsis }}
+
+### [Connect-oAuthO365](Connect-oAuthO365.md)
+{{ Fill in the Synopsis }}
+
 ### [Connect-POP](Connect-POP.md)
+{{ Fill in the Synopsis }}
+
+### [ConvertTo-GraphCredential](ConvertTo-GraphCredential.md)
+{{ Fill in the Synopsis }}
+
+### [ConvertTo-OAuth2Credential](ConvertTo-OAuth2Credential.md)
 {{ Fill in the Synopsis }}
 
 ### [Disconnect-IMAP](Disconnect-IMAP.md)
@@ -44,9 +56,18 @@ Locale: en-US
 ### [Get-POPMessage](Get-POPMessage.md)
 {{ Fill in the Synopsis }}
 
+### [Resolve-DnsQuery](Resolve-DnsQuery.md)
+{{ Fill in the Synopsis }}
+
 ### [Save-POPMessage](Save-POPMessage.md)
 {{ Fill in the Synopsis }}
 
 ### [Send-EmailMessage](Send-EmailMessage.md)
 Short description
+
+### [Send-GraphMailMessage](Send-GraphMailMessage.md)
+{{ Fill in the Synopsis }}
+
+### [Test-EmailAddress](Test-EmailAddress.md)
+{{ Fill in the Synopsis }}
 
