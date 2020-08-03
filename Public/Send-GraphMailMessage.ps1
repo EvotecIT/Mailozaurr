@@ -34,25 +34,25 @@ function Send-GraphMailMessage {
     $Message = [ordered] @{
         # https://docs.microsoft.com/en-us/graph/api/resources/message?view=graph-rest-1.0
         message         = [ordered] @{
-            subject                = $Subject
-            body                   = $Body
-            from                   = ConvertTo-GraphAddress -From $ReplyTo
-            toRecipients           = @(
+            subject       = $Subject
+            body          = $Body
+            from          = ConvertTo-GraphAddress -From $From
+            toRecipients  = @(
                 ConvertTo-GraphAddress -MailboxAddress $To
             )
-            ccRecipients           = @(
+            ccRecipients  = @(
                 ConvertTo-GraphAddress -MailboxAddress $CC
             )
-            bccRecipients          = @(
+            bccRecipients = @(
                 ConvertTo-GraphAddress -MailboxAddress $BCC
             )
             #sender                 = @(
             #    ConvertTo-GraphAddress -MailboxAddress $From
             #)
-            replyTo                = @(
+            replyTo       = @(
                 ConvertTo-GraphAddress -MailboxAddress $ReplyTo
             )
-            attachments            = @(
+            attachments   = @(
                 foreach ($A in $Attachment) {
                     $ItemInformation = Get-Item -Path $FilePath
                     if ($ItemInformation) {
@@ -67,13 +67,14 @@ function Send-GraphMailMessage {
                     }
                 }
             )
-            importance             = $Priority
-            isReadReceiptRequested = $true
+            importance    = $Priority
+            #isReadReceiptRequested     = $true
+            #isDeliveryReceiptRequested = $true
         }
         saveToSentItems = $true
     }
     $MailSentTo = -join ($To -join ',', $CC -join ', ', $Bcc -join ', ')
-    Remove-EmptyValue -Hashtable $Message -Recursive
+    Remove-EmptyValue -Hashtable $Message -Recursive -Rerun 2
     $Body = $Message | ConvertTo-Json -Depth 5
     $FromField = ConvertTo-GraphAddress -From $From -LimitedFrom
     Try {
