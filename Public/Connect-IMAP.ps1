@@ -1,14 +1,34 @@
 ﻿function Connect-IMAP {
-    [cmdletBinding()]
+    [cmdletBinding(DefaultParameterSetName = 'Credential')]
     param(
+        [Parameter(ParameterSetName = 'oAuth2')]
+        [Parameter(ParameterSetName = 'Credential')]
+        [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(Mandatory)][string] $Server,
+
+        [Parameter(ParameterSetName = 'oAuth2')]
+        [Parameter(ParameterSetName = 'Credential')]
+        [Parameter(ParameterSetName = 'ClearText')]
         [int] $Port = '993',
+
         [Parameter(ParameterSetName = 'ClearText', Mandatory)][string] $UserName,
         [Parameter(ParameterSetName = 'ClearText', Mandatory)][string] $Password,
-        [Parameter(ParameterSetName = 'Credential', Mandatory)][System.Management.Automation.PSCredential] $Credential,
+
+        [Parameter(ParameterSetName = 'oAuth2')]
+        [Parameter(ParameterSetName = 'Credential')][System.Management.Automation.PSCredential] $Credential,
+
+        [Parameter(ParameterSetName = 'oAuth2')]
+        [Parameter(ParameterSetName = 'Credential')]
+        [Parameter(ParameterSetName = 'ClearText')]
         [MailKit.Security.SecureSocketOptions] $Options = [MailKit.Security.SecureSocketOptions]::Auto,
+
+        [Parameter(ParameterSetName = 'oAuth2')]
+        [Parameter(ParameterSetName = 'Credential')]
+        [Parameter(ParameterSetName = 'ClearText')]
         [int] $TimeOut = 120000,
-        [alias('oAuth')][Parameter(ParameterSetName = 'oAuth2', Mandatory)][MailKit.Security.SaslMechanismOAuth2] $oAuth2
+
+        [Parameter(ParameterSetName = 'oAuth2')]
+        [switch] $oAuth2
     )
     $Client = [MailKit.Net.Imap.ImapClient]::new()
     try {
@@ -33,24 +53,25 @@
         $Client.TimeOut = $Timeout
     }
     if ($Client.IsConnected) {
-        if ($UserName -and $Password) {
+        if ($oAuth2.IsPresent) {
+            $Authorization = ConvertFrom-OAuth2Credential -Credential $Credential
+            $SaslMechanismOAuth2 = [MailKit.Security.SaslMechanismOAuth2]::new($Authorization.UserName, $Authorization.Token)
+            try {
+                $Client.Authenticate($SaslMechanismOAuth2)
+            } catch {
+                Write-Warning "Connect-POP - Unable to authenticate via oAuth $($_.Exception.Message)"
+                return
+            }
+        } elseif ($UserName -and $Password) {
             try {
                 $Client.Authenticate($UserName, $Password)
             } catch {
                 Write-Warning "Connect-IMAP - Unable to authenticate $($_.Exception.Message)"
                 return
             }
-        } elseif ($Credential) {
+        } else {
             try {
                 $Client.Authenticate($Credential)
-            } catch {
-                Write-Warning "Connect-IMAP - Unable to authenticate $($_.Exception.Message)"
-                return
-            }
-        } elseif ($oAuth2) {
-            try {
-                $Client.Authenticate($oAuth2)
-                #$Client.AuthenticateAsync($oAuth2) | Wait-Task
             } catch {
                 Write-Warning "Connect-IMAP - Unable to authenticate $($_.Exception.Message)"
                 return
