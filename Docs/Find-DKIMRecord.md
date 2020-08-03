@@ -13,8 +13,8 @@ schema: 2.0.0
 ## SYNTAX
 
 ```
-Find-DKIMRecord [-DomainName] <String[]> [-Selector <String[]>] [-DnsServer <IPAddress>] [-AsHashTable]
- [-AsObject] [<CommonParameters>]
+Find-DKIMRecord [-DomainName] <Array> [-Selector <String>] [-DnsServer <IPAddress>] [-AsHashTable] [-AsObject]
+ [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -80,7 +80,7 @@ Accept wildcard characters: False
 {{ Fill DomainName Description }}
 
 ```yaml
-Type: String[]
+Type: Array
 Parameter Sets: (All)
 Aliases:
 
@@ -95,7 +95,7 @@ Accept wildcard characters: False
 {{ Fill Selector Description }}
 
 ```yaml
-Type: String[]
+Type: String
 Parameter Sets: (All)
 Aliases:
 

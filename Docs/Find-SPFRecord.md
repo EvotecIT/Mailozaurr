@@ -13,8 +13,7 @@ schema: 2.0.0
 ## SYNTAX
 
 ```
-Find-SPFRecord [-DomainName] <String[]> [-DnsServer <IPAddress>] [-AsHashTable] [-AsObject]
- [<CommonParameters>]
+Find-SPFRecord [-DomainName] <Array> [-DnsServer <IPAddress>] [-AsHashTable] [-AsObject] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -80,7 +79,7 @@ Accept wildcard characters: False
 {{ Fill DomainName Description }}
 
 ```yaml
-Type: String[]
+Type: Array
 Parameter Sets: (All)
 Aliases:
 

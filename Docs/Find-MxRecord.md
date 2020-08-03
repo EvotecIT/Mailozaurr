@@ -13,7 +13,7 @@ schema: 2.0.0
 ## SYNTAX
 
 ```
-Find-MxRecord [-DomainName] <String[]> [-DnsServer <IPAddress>] [-ResolvePTR] [-AsHashTable] [-Separate]
+Find-MxRecord [-DomainName] <Array> [-DnsServer <IPAddress>] [-ResolvePTR] [-AsHashTable] [-Separate]
  [-AsObject] [<CommonParameters>]
 ```
 
@@ -80,7 +80,7 @@ Accept wildcard characters: False
 {{ Fill DomainName Description }}
 
 ```yaml
-Type: String[]
+Type: Array
 Parameter Sets: (All)
 Aliases:
 
