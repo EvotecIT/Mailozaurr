@@ -1,53 +1,147 @@
 ﻿function Send-EmailMessage {
+    <#
+    .SYNOPSIS
+    Short description
+
+    .DESCRIPTION
+    Long description
+
+    .PARAMETER Server
+    Parameter description
+
+    .PARAMETER Port
+    Parameter DESCRIPTION
+
+    .PARAMETER From
+    Parameter description
+
+    .PARAMETER ReplyTo
+    Parameter description
+
+    .PARAMETER Cc
+    Parameter description
+
+    .PARAMETER Bcc
+    Parameter description
+
+    .PARAMETER To
+    Parameter description
+
+    .PARAMETER Subject
+    Parameter description
+
+    .PARAMETER Priority
+    Parameter description
+
+    .PARAMETER Encoding
+    Parameter description
+
+    .PARAMETER DeliveryNotificationOption
+    Parameter description
+
+    .PARAMETER DeliveryStatusNotificationType
+    Parameter description
+
+    .PARAMETER Credential
+    Parameter description
+
+    .PARAMETER Username
+    Parameter description
+
+    .PARAMETER Password
+    Parameter description
+
+    .PARAMETER SecureSocketOptions
+    Parameter description
+
+    .PARAMETER UseSsl
+    Parameter description
+
+    .PARAMETER HTML
+    Parameter description
+
+    .PARAMETER Text
+    Parameter description
+
+    .PARAMETER Attachment
+    Parameter description
+
+    .PARAMETER Timeout
+    Parameter description
+
+    .PARAMETER ShowErrors
+    Parameter description
+
+    .PARAMETER Suppress
+    Parameter description
+
+    .PARAMETER Email
+    Parameter description
+
+    .PARAMETER oAuth2
+    Accepts PSCustomObject with 2 properties UserName and Token
+
+    .EXAMPLE
+    An example
+
+    .NOTES
+    General notes
+    #>
     [cmdletBinding(DefaultParameterSetName = 'Compatibility', SupportsShouldProcess)]
     param(
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [alias('SmtpServer')][string] $Server,
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [int] $Port = 587,
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [object] $From,
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [string] $ReplyTo,
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [string[]] $Cc,
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [string[]] $Bcc,
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [string[]] $To,
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [string] $Subject,
+        [Parameter(ParameterSetName = 'Compatibility')]
         [ValidateSet('Low', 'Normal', 'High')][string] $Priority,
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [ValidateSet('ASCII', 'BigEndianUnicode', 'Default', 'Unicode', 'UTF32', 'UTF7', 'UTF8')][string] $Encoding = 'Default',
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [ValidateSet('None', 'OnSuccess', 'OnFailure', 'Delay', 'Never')][string[]] $DeliveryNotificationOption,
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [MailKit.Net.Smtp.DeliveryStatusNotificationType] $DeliveryStatusNotificationType,
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [pscredential] $Credential,
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [string] $Username,
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [string] $Password,
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [MailKit.Security.SecureSocketOptions] $SecureSocketOptions = [MailKit.Security.SecureSocketOptions]::Auto,
+        [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $UseSsl,
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [alias('Body')][string[]] $HTML,
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [string[]] $Text,
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [alias('Attachments')][string[]] $Attachment,
-
+        [Parameter(ParameterSetName = 'Compatibility')]
         [int] $Timeout = 12000,
+        [Parameter(ParameterSetName = 'Compatibility')]
+        [alias('oAuth')][switch] $oAuth2,
+        [switch] $Graph,
 
-        [switch] $ShowErrors,
-        [switch] $Suppress,
-
+        # Different feature set
+        [Parameter(ParameterSetName = 'Grouped')]
         [alias('EmailParameters')][System.Collections.IDictionary] $Email,
 
-        [alias('oAuth')][MailKit.Security.SaslMechanismOAuth2] $oAuth2
+        # Belongs to all parameter sets
+        [switch] $ShowErrors,
+        [switch] $Suppress
     )
     if ($Email) {
         # Following code makes sure both formats are accepted.
@@ -98,13 +192,27 @@
 
     } else {
         if ($null -eq $To -and $null -eq $Bcc -and $null -eq $Cc) {
-            Write-Warning "Send-EmailMessage - At least one To, CC or BCC is required."
+            Write-Warning 'Send-EmailMessage - At least one To, CC or BCC is required.'
             return
         }
     }
+
+    # lets define credentials early on, because if it's Graph we use different way to send emails
     if ($Credential) {
-        $SmtpCredentials = $Credential
+        if ($oAuth2.IsPresent) {
+            $Authorization = ConvertFrom-OAuth2Credential -OAuth2 $oAuth2
+            $SaslMechanismOAuth2 = [MailKit.Security.SaslMechanismOAuth2]::new($Authorization.UserName, $Authorization.Token)
+        } elseif ($Graph.IsPresent) {
+            return Send-GraphMailMessage -From $From -To $To -Cc $CC -Bcc $Bcc -Subject $Subject -HTML $HTML -Text $Text -Attachment $Attachment -Credential $Credential
+        } else {
+            $SmtpCredentials = $Credential
+        }
+    } elseif ($Username -and $Password) {
+        #void Authenticate(string userName, string password, System.Threading.CancellationToken cancellationToken)
     }
+
+
+
     $Message = [MimeKit.MimeMessage]::new()
 
     # Doing translation for compatibility with Send-MailMessage
@@ -140,6 +248,7 @@
         $Message.Subject = $Subject
     }
 
+    [System.Text.Encoding] $SmtpEncoding = [System.Text.Encoding]::$Encoding
 
     $BodyBuilder = [MimeKit.BodyBuilder]::new()
     if ($HTML) {
@@ -156,9 +265,7 @@
     $Message.Body = $BodyBuilder.ToMessageBody()
 
     ### SMTP Part Below
-
-    $SmtpClient = [MySmtpClient]::new() # [MailKit.Net.Smtp.SmtpClient]::new()
-
+    $SmtpClient = [MySmtpClient]::new()
     if ($DeliveryNotificationOption) {
         # This requires custom class MySmtpClient
         $SmtpClient.DeliveryNotificationOption = $DeliveryNotificationOption
@@ -166,28 +273,27 @@
     if ($DeliveryStatusNotificationType) {
         $SmtpClient.DeliveryStatusNotificationType = $DeliveryStatusNotificationType
     }
-
     if ($UseSsl) {
         $SmtpClient.Connect($Server, $Port, [MailKit.Security.SecureSocketOptions]::StartTls)
     } else {
         $SmtpClient.Connect($Server, $Port, $SecureSocketOptions)
     }
+
     if ($Credential) {
-        [System.Text.Encoding] $SmtpEncoding = [System.Text.Encoding]::$Encoding
-        $SmtpClient.Authenticate($SmtpEncoding, $SmtpCredentials, [System.Threading.CancellationToken]::None)
+        if ($oAuth2.IsPresent) {
+            $SmtpClient.Authenticate($SaslMechanismOAuth2)
+        } elseif ($Graph.IsPresent) {
+            # This is not going to happen is graph is used
+        } else {
+            $SmtpClient.Authenticate($SmtpEncoding, $SmtpCredentials, [System.Threading.CancellationToken]::None)
+        }
+    } elseif ($UserName -and $Password) {
+        $SmtpClient.Authenticate($UserName, $Password, [System.Threading.CancellationToken]::None)
     }
-    if ($oAuth2) {
-        $SmtpClient.Authenticate($oAuth2)
-    }
-
-    if ($Username -and $Password) {
-        #void Authenticate(string userName, string password, System.Threading.CancellationToken cancellationToken)
-    }
-
     $SmtpClient.Timeout = $Timeout
 
     try {
-        if ($PSCmdlet.ShouldProcess("$MailSentTo", "Send-EmailMessage")) {
+        if ($PSCmdlet.ShouldProcess("$MailSentTo", 'Send-EmailMessage')) {
             $SmtpClient.Send($Message)
             if (-not $Suppress) {
                 [PSCustomObject] @{
