@@ -26,6 +26,7 @@ function Connect-oAuthO365 {
 
     $PublicClientApplication = [Microsoft.Identity.Client.PublicClientApplicationBuilder]::CreateWithApplicationOptions($Options).Build()
 
+    # https://www.powershellgallery.com/packages/MSAL.PS/4.2.1.1/Content/Get-MsalToken.ps1
     # Here we should implement something for Silent Token
     # $Account = $Account
     # $AuthToken = $PublicClientApplication.AcquireTokenSilent($Scopes, $login).ExecuteAsync([System.Threading.CancellationToken]::None) | Wait-Task
@@ -40,8 +41,14 @@ function Connect-oAuthO365 {
         }
         # Here we should save the AuthToken.Account somehow, somewhere
         # $AuthToken.Account | Export-Clixml -Path $Env:USERPROFILE\Desktop\test.xml -Depth 2
-        $oAuth2 = [MailKit.Security.SaslMechanismOAuth2]::new($AuthToken.Account.Username, $AuthToken.AccessToken)
-        $oAuth2
+        #[PSCustomObject] @{
+        #    UserName = $AuthToken.Account.UserName
+        #    Token    = $AuthToken.AccessToken
+        #}
+        ConvertTo-OAuth2Credential -UserName $AuthToken.Account.UserName -Token $AuthToken.AccessToken
+
+        #$oAuth2 = [MailKit.Security.SaslMechanismOAuth2]::new($AuthToken.Account.Username, $AuthToken.AccessToken)
+        #$oAuth2
     } catch {
         Write-Warning "Connect-oAuth - $_"
     }
