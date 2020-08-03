@@ -285,7 +285,7 @@
     # lets define credentials early on, because if it's Graph we use different way to send emails
     if ($Credential) {
         if ($oAuth2.IsPresent) {
-            $Authorization = ConvertFrom-OAuth2Credential -OAuth2 $oAuth2
+            $Authorization = ConvertFrom-OAuth2Credential -Credential $Credential
             $SaslMechanismOAuth2 = [MailKit.Security.SaslMechanismOAuth2]::new($Authorization.UserName, $Authorization.Token)
         } elseif ($Graph.IsPresent) {
             $sendGraphMailMessageSplat = @{
