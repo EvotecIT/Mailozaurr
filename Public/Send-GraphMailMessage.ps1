@@ -11,7 +11,12 @@ function Send-GraphMailMessage {
         [alias('Attachments')][string[]] $Attachment,
         [PSCredential] $Credential
     )
-    $Authorization = Connect-O365Graph -ApplicationID $ClientID -ApplicationKey $ClientSecret -TenantDomain $DirectoryID -Resource https://graph.microsoft.com
+    if ($Credential) {
+        $AuthorizationData = ConvertFrom-GraphCredential -Credential $Credential
+    } else {
+        return
+    }
+    $Authorization = Connect-O365Graph -ApplicationID $AuthorizationData.ClientID -ApplicationKey $AuthorizationData.ClientSecret -TenantDomain $AuthorizationData.DirectoryID -Resource https://graph.microsoft.com
     $Body = @{}
     if ($HTML) {
         $Body['contentType'] = 'HTML'
@@ -25,19 +30,21 @@ function Send-GraphMailMessage {
     }
 
     $Message = [ordered] @{
-        message = @{
-            subject         = $Subject
-            body            = $Body
-            toRecipients    = @(
+        # https://docs.microsoft.com/en-us/graph/api/resources/message?view=graph-rest-1.0
+        message         = [ordered] @{
+            subject       = $Subject
+            body          = $Body
+            from          = ConvertTo-GraphAddress -From $From
+            toRecipients  = @(
                 ConvertTo-GraphAddress -MailboxAddress $To
             )
-            ccRecipients    = @(
+            ccRecipients  = @(
                 ConvertTo-GraphAddress -MailboxAddress $CC
             )
-            bccRecipients   = @(
+            bccRecipients = @(
                 ConvertTo-GraphAddress -MailboxAddress $BCC
             )
-            attachments     = @(
+            attachments   = @(
                 foreach ($A in $Attachment) {
                     $ItemInformation = Get-Item -Path $FilePath
                     if ($ItemInformation) {
@@ -52,20 +59,22 @@ function Send-GraphMailMessage {
                     }
                 }
             )
-            saveToSentItems = $true
         }
+        saveToSentItems = $true
     }
     $MailSentTo = -join ($To -join ',', $CC -join ', ', $Bcc -join ', ')
-
+    Remove-EmptyValue -Hashtable $Message -Recursive
     $Body = $Message | ConvertTo-Json -Depth 5
+    $FromField = ConvertTo-GraphAddress -From $From -LimitedFrom
     Try {
         if ($PSCmdlet.ShouldProcess("$MailSentTo", 'Send-EmailMessage')) {
-            $null = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/users/$From/sendMail" -Headers $Authorization -Method POST -Body $Body -ContentType 'application/json' -ErrorAction Stop
+            $null = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/users/$FromField/sendMail" -Headers $Authorization -Method POST -Body $Body -ContentType 'application/json' -ErrorAction Stop
             if (-not $Suppress) {
                 [PSCustomObject] @{
-                    Status = $True
-                    Error  = ''
-                    SentTo = $MailSentTo
+                    Status   = $True
+                    Error    = ''
+                    SentTo   = $MailSentTo
+                    SentFrom = $FromField
                 }
             }
         }
@@ -80,9 +89,10 @@ function Send-GraphMailMessage {
         }
         if (-not $Suppress) {
             [PSCustomObject] @{
-                Status = $False
-                Error  = $($_.Exception.Message)
-                SentTo = $MailSentTo
+                Status   = $False
+                Error    = -join ( $($_.Exception.Message), ' details: ', $($ErrorDetails.Error.Message))
+                SentTo   = $MailSentTo
+                SentFrom = $FromField
             }
         }
     }
