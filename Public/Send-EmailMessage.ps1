@@ -106,7 +106,7 @@
         [Parameter(ParameterSetName = 'Compatibility')]
         [string] $Subject,
         [Parameter(ParameterSetName = 'Compatibility')]
-        [ValidateSet('Low', 'Normal', 'High')][string] $Priority,
+        [alias('Importance')][ValidateSet('Low', 'Normal', 'High')][string] $Priority,
         [Parameter(ParameterSetName = 'Compatibility')]
         [ValidateSet('ASCII', 'BigEndianUnicode', 'Default', 'Unicode', 'UTF32', 'UTF7', 'UTF8')][string] $Encoding = 'Default',
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -203,7 +203,21 @@
             $Authorization = ConvertFrom-OAuth2Credential -OAuth2 $oAuth2
             $SaslMechanismOAuth2 = [MailKit.Security.SaslMechanismOAuth2]::new($Authorization.UserName, $Authorization.Token)
         } elseif ($Graph.IsPresent) {
-            return Send-GraphMailMessage -From $From -To $To -Cc $CC -Bcc $Bcc -Subject $Subject -HTML $HTML -Text $Text -Attachment $Attachment -Credential $Credential
+            $sendGraphMailMessageSplat = @{
+                From       = $From
+                To         = $To
+                Cc         = $CC
+                Bcc        = $Bcc
+                Subject    = $Subject
+                HTML       = $HTML
+                Text       = $Text
+                Attachment = $Attachment
+                Credential = $Credential
+                Priority   = $Priority
+                ReplyTo    = $ReplyTo
+            }
+            Remove-EmptyValue -Hashtable $sendGraphMailMessageSplat
+            return Send-GraphMailMessage @sendGraphMailMessageSplat
         } else {
             $SmtpCredentials = $Credential
         }
