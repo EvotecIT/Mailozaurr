@@ -1,7 +1,9 @@
 function ConvertTo-GraphAddress {
     [cmdletBinding()]
     param(
-        [Array] $MailboxAddress
+        [Array] $MailboxAddress,
+        [object] $From,
+        [switch] $LimitedFrom
     )
     foreach ($_ in $MailboxAddress) {
         if ($_ -is [string]) {
@@ -36,6 +38,30 @@ function ConvertTo-GraphAddress {
                     }
                 }
 
+            }
+        }
+    }
+    if ($From) {
+        if ($From -is [string]) {
+            if ($LimitedFrom) {
+                $From
+            } else {
+                @{
+                    emailAddress = @{
+                        address = $From
+                    }
+                }
+            }
+        } elseif ($From -is [System.Collections.IDictionary]) {
+            if ($LimitedFrom) {
+                $From.Email
+            } else {
+                @{
+                    emailAddress = @{
+                        address = $From.Email
+                        name    = $From.Name
+                    }
+                }
             }
         }
     }
