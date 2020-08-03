@@ -5,11 +5,13 @@ function Send-GraphMailMessage {
         [Array] $To,
         [Array] $Cc,
         [Array] $Bcc,
+        [string] $ReplyTo,
         [string] $Subject,
         [alias('Body')][string[]] $HTML,
         [string[]] $Text,
         [alias('Attachments')][string[]] $Attachment,
-        [PSCredential] $Credential
+        [PSCredential] $Credential,
+        [alias('Importance')][ValidateSet('Low', 'Normal', 'High')][string] $Priority
     )
     if ($Credential) {
         $AuthorizationData = ConvertFrom-GraphCredential -Credential $Credential
@@ -32,19 +34,25 @@ function Send-GraphMailMessage {
     $Message = [ordered] @{
         # https://docs.microsoft.com/en-us/graph/api/resources/message?view=graph-rest-1.0
         message         = [ordered] @{
-            subject       = $Subject
-            body          = $Body
-            from          = ConvertTo-GraphAddress -From $From
-            toRecipients  = @(
+            subject                = $Subject
+            body                   = $Body
+            from                   = ConvertTo-GraphAddress -From $ReplyTo
+            toRecipients           = @(
                 ConvertTo-GraphAddress -MailboxAddress $To
             )
-            ccRecipients  = @(
+            ccRecipients           = @(
                 ConvertTo-GraphAddress -MailboxAddress $CC
             )
-            bccRecipients = @(
+            bccRecipients          = @(
                 ConvertTo-GraphAddress -MailboxAddress $BCC
             )
-            attachments   = @(
+            #sender                 = @(
+            #    ConvertTo-GraphAddress -MailboxAddress $From
+            #)
+            replyTo                = @(
+                ConvertTo-GraphAddress -MailboxAddress $ReplyTo
+            )
+            attachments            = @(
                 foreach ($A in $Attachment) {
                     $ItemInformation = Get-Item -Path $FilePath
                     if ($ItemInformation) {
@@ -59,6 +67,8 @@ function Send-GraphMailMessage {
                     }
                 }
             )
+            importance             = $Priority
+            isReadReceiptRequested = $true
         }
         saveToSentItems = $true
     }
