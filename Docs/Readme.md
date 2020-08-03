@@ -65,9 +65,6 @@ Locale: en-US
 ### [Send-EmailMessage](Send-EmailMessage.md)
 Short description
 
-### [Send-GraphMailMessage](Send-GraphMailMessage.md)
-{{ Fill in the Synopsis }}
-
 ### [Test-EmailAddress](Test-EmailAddress.md)
 {{ Fill in the Synopsis }}
 
