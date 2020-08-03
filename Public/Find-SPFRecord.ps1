@@ -1,33 +1,41 @@
 function Find-SPFRecord {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory, ValueFromPipelineByPropertyName, ValueFromPipeline, Position = 0)][string[]]$DomainName,
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName, ValueFromPipeline, Position = 0)][Array]$DomainName,
         [System.Net.IPAddress] $DnsServer,
         [switch] $AsHashTable,
         [switch] $AsObject
     )
     process {
         foreach ($Domain in $DomainName) {
+            if ($Domain -is [string]) {
+                $D = $Domain
+            } elseif ($Domain -is [System.Collections.IDictionary]) {
+                $D = $Domain.DomainName
+                if (-not $D) {
+                    Write-Warning 'Find-MxRecord - property DomainName is required when passing Array of Hashtables'
+                }
+            }
             $Splat = @{
-                Name        = $Domain
-                Type        = "txt"
-                ErrorAction = "Stop"
+                Name        = $D
+                Type        = 'txt'
+                ErrorAction = 'Stop'
             }
             if ($DnsServer) {
                 $Splat['Server'] = $DnsServer
             }
             try {
-                $DNSRecord = Resolve-DnsQuery @Splat | Where-Object Text -Match "spf1"
+                $DNSRecord = Resolve-DnsQuery @Splat | Where-Object Text -Match 'spf1'
                 if (-not $AsObject) {
                     $MailRecord = [ordered] @{
-                        Name       = $Domain
+                        Name       = $D
                         Count      = $DNSRecord.Count
                         TimeToLive = $DnsRecord.TimeToLive -join '; '
                         SPF        = $DnsRecord.Text -join '; '
                     }
                 } else {
                     $MailRecord = [ordered] @{
-                        Name       = $Domain
+                        Name       = $D
                         Count      = $DNSRecord.Count
                         TimeToLive = $DnsRecord.TimeToLive
                         SPF        = $DnsRecord.Text
@@ -35,7 +43,7 @@ function Find-SPFRecord {
                 }
             } catch {
                 $MailRecord = [ordered] @{
-                    Name       = $Domain
+                    Name       = $D
                     Count      = 0
                     TimeToLive = ''
                     SPF        = ''

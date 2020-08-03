@@ -1,7 +1,7 @@
 function Find-MxRecord {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory, ValueFromPipelineByPropertyName, ValueFromPipeline, Position = 0)][string[]]$DomainName,
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName, ValueFromPipeline, Position = 0)][Array]$DomainName,
         [System.Net.IPAddress] $DnsServer,
         [switch] $ResolvePTR,
         [switch] $AsHashTable,
@@ -10,10 +10,18 @@ function Find-MxRecord {
     )
     process {
         foreach ($Domain in $DomainName) {
+            if ($Domain -is [string]) {
+                $D = $Domain
+            } elseif ($Domain -is [System.Collections.IDictionary]) {
+                $D = $Domain.DomainName
+                if (-not $D) {
+                    Write-Warning 'Find-MxRecord - property DomainName is required when passing Array of Hashtables'
+                }
+            }
             $Splat = @{
-                Name        = $Domain
-                Type        = "MX"
-                ErrorAction = "SilentlyContinue"
+                Name        = $D
+                Type        = 'MX'
+                ErrorAction = 'SilentlyContinue'
             }
             if ($DnsServer) {
                 $Splat['Server'] = $DnsServer
@@ -21,16 +29,16 @@ function Find-MxRecord {
             $MX = Resolve-DnsQuery @Splat
             [Array] $MXRecords = foreach ($MXRecord in $MX) {
                 $MailRecord = [ordered] @{
-                    Name       = $Domain
+                    Name       = $D
                     Preference = $MXRecord.Preference
                     TimeToLive = $MXRecord.TimeToLive
-                    MX         = ($MXRecord.Exchange) -replace ".$"
+                    MX         = ($MXRecord.Exchange) -replace '.$'
                 }
                 [Array] $IPAddresses = foreach ($Record in $MX.Exchange) {
                     $Splat = @{
                         Name        = $Record
                         Type        = 'A'
-                        ErrorAction = "SilentlyContinue"
+                        ErrorAction = 'SilentlyContinue'
                     }
                     if ($DnsServer) {
                         $Splat['Server'] = $DnsServer
@@ -43,12 +51,12 @@ function Find-MxRecord {
                         $Splat = @{
                             Name        = $IP
                             Type        = 'PTR'
-                            ErrorAction = "SilentlyContinue"
+                            ErrorAction = 'SilentlyContinue'
                         }
                         if ($DnsServer) {
                             $Splat['Server'] = $DnsServer
                         }
-                        (Resolve-DnsQuery @Splat) | ForEach-Object { $_.PtrDomainName -replace ".$" }
+                        (Resolve-DnsQuery @Splat) | ForEach-Object { $_.PtrDomainName -replace '.$' }
                     }
                 }
                 $MailRecord
@@ -64,7 +72,7 @@ function Find-MxRecord {
             } else {
                 if (-not $AsObject) {
                     $MXRecord = [ordered] @{
-                        Name       = $Domain
+                        Name       = $D
                         Count      = $MXRecords.Count
                         Preference = $MXRecords.Preference -join '; '
                         TimeToLive = $MXRecords.TimeToLive -join '; '
@@ -76,7 +84,7 @@ function Find-MxRecord {
                     }
                 } else {
                     $MXRecord = [ordered] @{
-                        Name       = $Domain
+                        Name       = $D
                         Count      = $MXRecords.Count
                         Preference = $MXRecords.Preference
                         TimeToLive = $MXRecords.TimeToLive

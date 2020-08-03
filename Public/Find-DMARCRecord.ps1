@@ -1,33 +1,41 @@
 function Find-DMARCRecord {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory, ValueFromPipelineByPropertyName, ValueFromPipeline, Position = 0)][string[]] $DomainName,
+        [Parameter(Mandatory, ValueFromPipelineByPropertyName, ValueFromPipeline, Position = 0)][Array] $DomainName,
         [System.Net.IPAddress] $DnsServer,
         [switch] $AsHashTable,
         [switch] $AsObject
     )
     process {
         foreach ($Domain in $DomainName) {
+            if ($Domain -is [string]) {
+                $D = $Domain
+            } elseif ($Domain -is [System.Collections.IDictionary]) {
+                $D = $Domain.DomainName
+                if (-not $D) {
+                    Write-Warning 'Find-DMARCRecord - property DomainName is required when passing Array of Hashtables'
+                }
+            }
             $Splat = @{
-                Name        = "_dmarc.$Domain"
-                Type        = "TXT"
-                ErrorAction = "Stop"
+                Name        = "_dmarc.$D"
+                Type        = 'TXT'
+                ErrorAction = 'Stop'
             }
             if ($DnsServer) {
                 $Splat['Server'] = $DnsServer
             }
             try {
-                $DNSRecord = Resolve-DnsQuery @Splat | Where-Object Text -Match "DMARC1"
+                $DNSRecord = Resolve-DnsQuery @Splat | Where-Object Text -Match 'DMARC1'
                 if (-not $AsObject) {
                     $MailRecord = [ordered] @{
-                        Name       = $Domain
+                        Name       = $D
                         Count      = $DNSRecord.Count
                         TimeToLive = $DnsRecord.TimeToLive -join '; '
                         DMARC      = $DnsRecord.Text -join '; '
                     }
                 } else {
                     $MailRecord = [ordered] @{
-                        Name       = $Domain
+                        Name       = $D
                         Count      = $DNSRecord.Count
                         TimeToLive = $DnsRecord.TimeToLive
                         DMARC      = $DnsRecord.Text
@@ -35,7 +43,7 @@ function Find-DMARCRecord {
                 }
             } catch {
                 $MailRecord = [ordered] @{
-                    Name       = $Domain
+                    Name       = $D
                     Count      = 0
                     TimeToLive = ''
                     DMARC      = ''
