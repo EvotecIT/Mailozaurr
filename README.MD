@@ -39,6 +39,14 @@ Finally since `Resolve-DNSName` is Windows specific I'm using:
 
 This started with a single goal to replace `Send-MailMessage` which is depracated/obsolete with something more modern, but since MailKit and MimeKit have lots of options why not build on that?
 
+## Documentation
+
+While I didn't spent much time creating WIKI, working on Get-Help documentation, I did write blog articles that should help you get started.
+
+- [x] Mailozaurr – New mail toolkit (SMTP, IMAP, POP3) with support for oAuth 2.0 and GraphApi for PowerShell
+
+You can also utilize Examples which should help to understand use cases.
+
 ## To install
 
 ```powershell
@@ -59,6 +67,13 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 
 ## Changelog
 
+- 0.0.6 - 2020.08.03
+  - Public release
+  - Added GraphAPI support for Send-EmailMessage
+  - Added oAuth2 support for Send-EmailMessage
+  - Added oAuth2 support for POP3
+  - Added oAuth2 support for IMAP4
+  - Fixed lots of stuff
 - 0.0.3 - 2020.07.26
   - Added `Test-EmailAddress`
   - Added `Connect-OAuthGoogle`
