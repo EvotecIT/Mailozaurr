@@ -10,7 +10,7 @@
     Parameter description
 
     .PARAMETER Port
-    Parameter DESCRIPTION
+    Parameter description
 
     .PARAMETER From
     Parameter description
@@ -69,17 +69,20 @@
     .PARAMETER Timeout
     Parameter description
 
-    .PARAMETER ShowErrors
+    .PARAMETER oAuth2
     Parameter description
 
-    .PARAMETER Suppress
+    .PARAMETER Graph
     Parameter description
 
     .PARAMETER Email
     Parameter description
 
-    .PARAMETER oAuth2
-    Accepts PSCustomObject with 2 properties UserName and Token
+    .PARAMETER ShowErrors
+    Parameter description
+
+    .PARAMETER Suppress
+    Parameter description
 
     .EXAMPLE
     An example
@@ -89,50 +92,121 @@
     #>
     [cmdletBinding(DefaultParameterSetName = 'Compatibility', SupportsShouldProcess)]
     param(
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [alias('SmtpServer')][string] $Server,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [int] $Port = 587,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [object] $From,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [string] $ReplyTo,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [string[]] $Cc,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [string[]] $Bcc,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [string[]] $To,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [string] $Subject,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [alias('Importance')][ValidateSet('Low', 'Normal', 'High')][string] $Priority,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [ValidateSet('ASCII', 'BigEndianUnicode', 'Default', 'Unicode', 'UTF32', 'UTF7', 'UTF8')][string] $Encoding = 'Default',
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [ValidateSet('None', 'OnSuccess', 'OnFailure', 'Delay', 'Never')][string[]] $DeliveryNotificationOption,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [MailKit.Net.Smtp.DeliveryStatusNotificationType] $DeliveryStatusNotificationType,
+
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [pscredential] $Credential,
-        [Parameter(ParameterSetName = 'Compatibility')]
+
+        [Parameter(ParameterSetName = 'ClearText')]
         [string] $Username,
-        [Parameter(ParameterSetName = 'Compatibility')]
+
+        [Parameter(ParameterSetName = 'ClearText')]
         [string] $Password,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [MailKit.Security.SecureSocketOptions] $SecureSocketOptions = [MailKit.Security.SecureSocketOptions]::Auto,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $UseSsl,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [alias('Body')][string[]] $HTML,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [string[]] $Text,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [alias('Attachments')][string[]] $Attachment,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [int] $Timeout = 12000,
-        [Parameter(ParameterSetName = 'Compatibility')]
+
+        [Parameter(ParameterSetName = 'oAuth')]
         [alias('oAuth')][switch] $oAuth2,
+
+        [Parameter(ParameterSetName = 'Graph')]
         [switch] $Graph,
 
         # Different feature set
@@ -140,7 +214,18 @@
         [alias('EmailParameters')][System.Collections.IDictionary] $Email,
 
         # Belongs to all parameter sets
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Compatibility')]
+        [Parameter(ParameterSetName = 'Graph')]
+        [Parameter(ParameterSetName = 'Grouped')]
         [switch] $ShowErrors,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Compatibility')]
+        [Parameter(ParameterSetName = 'Graph')]
+        [Parameter(ParameterSetName = 'Grouped')]
         [switch] $Suppress
     )
     if ($Email) {
