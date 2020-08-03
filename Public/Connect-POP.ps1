@@ -32,7 +32,6 @@
         [Parameter(ParameterSetName = 'oAuth2')]
         [switch] $oAuth2
     )
-
     $Client = [MailKit.Net.Pop3.Pop3Client]::new()
     try {
         $Client.Connect($Server, $Port, $Options)
@@ -40,7 +39,6 @@
         Write-Warning "Connect-POP - Unable to connect $($_.Exception.Message)"
         return
     }
-
     <#
     void Connect(string host, int port, MailKit.Security.SecureSocketOptions options, System.Threading.CancellationToken cancellationToken)
     void Connect(System.Net.Sockets.Socket socket, string host, int port, MailKit.Security.SecureSocketOptions options, System.Threading.CancellationToken cancellationToken)
