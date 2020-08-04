@@ -1,4 +1,4 @@
-Import-Module $PSScriptRoot\..\Mailozaurr.psd1 -Force
+﻿Import-Module $PSScriptRoot\..\Mailozaurr.psd1 -Force
 
 # It seems larger HTML is not supported. Online makes sure it uses less libraries inline
 $Body = EmailBody {
