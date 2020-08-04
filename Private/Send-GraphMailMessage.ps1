@@ -12,7 +12,7 @@ function Send-GraphMailMessage {
         [alias('Attachments')][string[]] $Attachment,
         [PSCredential] $Credential,
         [alias('Importance')][ValidateSet('Low', 'Normal', 'High')][string] $Priority,
-        [switch] $SaveToSentItems
+        [switch] $DoNotSaveToSentItems
     )
     if ($Credential) {
         $AuthorizationData = ConvertFrom-GraphCredential -Credential $Credential
@@ -72,7 +72,7 @@ function Send-GraphMailMessage {
             #isReadReceiptRequested     = $true
             #isDeliveryReceiptRequested = $true
         }
-        saveToSentItems = $SaveToSentItems.IsPresent
+        saveToSentItems = -not $DoNotSaveToSentItems.IsPresent
     }
     $MailSentTo = -join ($To -join ',', $CC -join ', ', $Bcc -join ', ')
     Remove-EmptyValue -Hashtable $Message -Recursive -Rerun 2
