@@ -18,7 +18,7 @@ Send-EmailMessage [-Server <String>] [-Port <Int32>] [-From <Object>] [-ReplyTo 
  [-Bcc <String[]>] [-To <String[]>] [-Subject <String>] [-Priority <String>] [-Encoding <String>]
  [-DeliveryNotificationOption <String[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>]
  [-Credential <PSCredential>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-HTML <String[]>]
- [-Text <String[]>] [-Attachment <String[]>] [-Timeout <Int32>] [-ShowErrors] [-Suppress] [-WhatIf] [-Confirm]
+ [-Text <String[]>] [-Attachment <String[]>] [-Timeout <Int32>] [-Suppress] [-WhatIf] [-Confirm]
  [<CommonParameters>]
 ```
 
@@ -28,8 +28,8 @@ Send-EmailMessage [-Server <String>] [-Port <Int32>] [-From <Object>] [-ReplyTo 
  [-Bcc <String[]>] [-To <String[]>] [-Subject <String>] [-Priority <String>] [-Encoding <String>]
  [-DeliveryNotificationOption <String[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>]
  [-Credential <PSCredential>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-HTML <String[]>]
- [-Text <String[]>] [-Attachment <String[]>] [-Timeout <Int32>] [-oAuth2] [-ShowErrors] [-Suppress] [-WhatIf]
- [-Confirm] [<CommonParameters>]
+ [-Text <String[]>] [-Attachment <String[]>] [-Timeout <Int32>] [-oAuth2] [-Suppress] [-WhatIf] [-Confirm]
+ [<CommonParameters>]
 ```
 
 ### ClearText
@@ -38,20 +38,21 @@ Send-EmailMessage [-Server <String>] [-Port <Int32>] [-From <Object>] [-ReplyTo 
  [-Bcc <String[]>] [-To <String[]>] [-Subject <String>] [-Priority <String>] [-Encoding <String>]
  [-DeliveryNotificationOption <String[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>]
  [-Username <String>] [-Password <String>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl]
- [-HTML <String[]>] [-Text <String[]>] [-Attachment <String[]>] [-Timeout <Int32>] [-ShowErrors] [-Suppress]
- [-WhatIf] [-Confirm] [<CommonParameters>]
+ [-HTML <String[]>] [-Text <String[]>] [-Attachment <String[]>] [-Timeout <Int32>] [-Suppress] [-WhatIf]
+ [-Confirm] [<CommonParameters>]
 ```
 
 ### Graph
 ```
 Send-EmailMessage [-From <Object>] [-ReplyTo <String>] [-Cc <String[]>] [-Bcc <String[]>] [-To <String[]>]
  [-Subject <String>] [-Priority <String>] [-Credential <PSCredential>] [-HTML <String[]>] [-Text <String[]>]
- [-Attachment <String[]>] [-Graph] [-ShowErrors] [-Suppress] [-WhatIf] [-Confirm] [<CommonParameters>]
+ [-Attachment <String[]>] [-Graph] [-DoNotSaveToSentItems] [-Suppress] [-WhatIf] [-Confirm]
+ [<CommonParameters>]
 ```
 
 ### Grouped
 ```
-Send-EmailMessage [-Email <IDictionary>] [-ShowErrors] [-Suppress] [-WhatIf] [-Confirm] [<CommonParameters>]
+Send-EmailMessage [-Email <IDictionary>] [-Suppress] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -413,6 +414,21 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -DoNotSaveToSentItems
+Parameter description
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: Graph
+Aliases:
+
+Required: False
+Position: Named
+Default value: False
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -Email
 Parameter description
 
@@ -424,21 +440,6 @@ Aliases: EmailParameters
 Required: False
 Position: Named
 Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -ShowErrors
-Parameter description
-
-```yaml
-Type: SwitchParameter
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: Named
-Default value: False
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
