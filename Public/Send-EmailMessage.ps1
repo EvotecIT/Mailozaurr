@@ -209,6 +209,9 @@
         [Parameter(ParameterSetName = 'Graph')]
         [switch] $Graph,
 
+        [Parameter(ParameterSetName = 'Graph')]
+        [switch] $SaveToSentItems,
+
         # Different feature set
         [Parameter(ParameterSetName = 'Grouped')]
         [alias('EmailParameters')][System.Collections.IDictionary] $Email,
@@ -289,17 +292,18 @@
             $SaslMechanismOAuth2 = [MailKit.Security.SaslMechanismOAuth2]::new($Authorization.UserName, $Authorization.Token)
         } elseif ($Graph.IsPresent) {
             $sendGraphMailMessageSplat = @{
-                From       = $From
-                To         = $To
-                Cc         = $CC
-                Bcc        = $Bcc
-                Subject    = $Subject
-                HTML       = $HTML
-                Text       = $Text
-                Attachment = $Attachment
-                Credential = $Credential
-                Priority   = $Priority
-                ReplyTo    = $ReplyTo
+                From            = $From
+                To              = $To
+                Cc              = $CC
+                Bcc             = $Bcc
+                Subject         = $Subject
+                HTML            = $HTML
+                Text            = $Text
+                Attachment      = $Attachment
+                Credential      = $Credential
+                Priority        = $Priority
+                ReplyTo         = $ReplyTo
+                SaveToSentItems = $SaveToSentItems
             }
             Remove-EmptyValue -Hashtable $sendGraphMailMessageSplat
             return Send-GraphMailMessage @sendGraphMailMessageSplat
