@@ -20,7 +20,7 @@ function Connect-O365Graph {
         resource      = $Resource
         client_id     = $ApplicationID
         client_secret = $ApplicationKey
-        scope         = [System.Web.HttpUtility]::UrlEncode( $Scope)
+        #scope         = [System.Web.HttpUtility]::UrlEncode( $Scope)
     }
     try {
         $Authorization = Invoke-RestMethod -Method Post -Uri "https://login.microsoftonline.com/$($TenantDomain)/oauth2/token" -Body $body -ErrorAction Stop
