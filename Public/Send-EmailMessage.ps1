@@ -75,10 +75,10 @@
     .PARAMETER Graph
     Parameter description
 
-    .PARAMETER Email
+    .PARAMETER DoNotSaveToSentItems
     Parameter description
 
-    .PARAMETER ShowErrors
+    .PARAMETER Email
     Parameter description
 
     .PARAMETER Suppress
@@ -215,14 +215,6 @@
         # Different feature set
         [Parameter(ParameterSetName = 'Grouped')]
         [alias('EmailParameters')][System.Collections.IDictionary] $Email,
-
-        # Belongs to all parameter sets
-        [Parameter(ParameterSetName = 'ClearText')]
-        [Parameter(ParameterSetName = 'oAuth')]
-        [Parameter(ParameterSetName = 'Compatibility')]
-        [Parameter(ParameterSetName = 'Graph')]
-        [Parameter(ParameterSetName = 'Grouped')]
-        [switch] $ShowErrors,
 
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
