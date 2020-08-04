@@ -53,10 +53,19 @@ Locale: en-US
 ### [Get-IMAPMessage](Get-IMAPMessage.md)
 {{ Fill in the Synopsis }}
 
+### [Get-MailFolder](Get-MailFolder.md)
+{{ Fill in the Synopsis }}
+
+### [Get-MailMessage](Get-MailMessage.md)
+{{ Fill in the Synopsis }}
+
 ### [Get-POPMessage](Get-POPMessage.md)
 {{ Fill in the Synopsis }}
 
 ### [Resolve-DnsQuery](Resolve-DnsQuery.md)
+{{ Fill in the Synopsis }}
+
+### [Save-MailMessage](Save-MailMessage.md)
 {{ Fill in the Synopsis }}
 
 ### [Save-POPMessage](Save-POPMessage.md)
