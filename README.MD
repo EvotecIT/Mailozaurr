@@ -67,6 +67,8 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 
 ## Changelog
 
+- 0.0.7 - 2020.08.04
+  - More updates making it better toolkit
 - 0.0.6 - 2020.08.03
   - Public release
   - Added GraphAPI support for Send-EmailMessage
