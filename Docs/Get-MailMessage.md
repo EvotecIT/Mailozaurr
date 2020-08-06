@@ -14,7 +14,7 @@ schema: 2.0.0
 
 ```
 Get-MailMessage [[-UserPrincipalName] <String>] [[-Credential] <PSCredential>] [-All] [[-Limit] <Int32>]
- [<CommonParameters>]
+ [[-Property] <String[]>] [[-Filter] <String>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -61,6 +61,21 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -Filter
+{{ Fill Filter Description }}
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: 4
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -Limit
 {{ Fill Limit Description }}
 
@@ -71,6 +86,22 @@ Aliases:
 
 Required: False
 Position: 2
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Property
+{{ Fill Property Description }}
+
+```yaml
+Type: String[]
+Parameter Sets: (All)
+Aliases:
+Accepted values: createdDateTime, lastModifiedDateTime, changeKey, categories, receivedDateTime, sentDateTime, hasAttachments, internetMessageId, subject, bodyPreview, importance, parentFolderId, conversationId, conversationIndex, isDeliveryReceiptRequested, isReadReceiptRequested, isRead, isDraft, webLink, inferenceClassification, body, sender, from, toRecipients, ccRecipients, bccRecipients, replyTo, flag
+
+Required: False
+Position: 3
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
