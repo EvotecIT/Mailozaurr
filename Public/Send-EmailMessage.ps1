@@ -380,13 +380,44 @@
         } elseif ($Graph.IsPresent) {
             # This is not going to happen is graph is used
         } else {
-            $SmtpClient.Authenticate($SmtpEncoding, $SmtpCredentials, [System.Threading.CancellationToken]::None)
+            try {
+                $SmtpClient.Authenticate($SmtpEncoding, $SmtpCredentials, [System.Threading.CancellationToken]::None)
+            } catch {
+                if ($PSBoundParameters.ErrorAction -eq 'Stop') {
+                    Write-Error $_
+                    return
+                } else {
+                    Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
+                    if (-not $Suppress) {
+                        return [PSCustomObject] @{
+                            Status = $False
+                            Error  = $($_.Exception.Message)
+                            SentTo = $MailSentTo
+                        }
+                    }
+                }
+            }
         }
     } elseif ($UserName -and $Password) {
-        $SmtpClient.Authenticate($UserName, $Password, [System.Threading.CancellationToken]::None)
+        try {
+            $SmtpClient.Authenticate($UserName, $Password, [System.Threading.CancellationToken]::None)
+        } catch {
+            if ($PSBoundParameters.ErrorAction -eq 'Stop') {
+                Write-Error $_
+                return
+            } else {
+                Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
+                if (-not $Suppress) {
+                    return [PSCustomObject] @{
+                        Status = $False
+                        Error  = $($_.Exception.Message)
+                        SentTo = $MailSentTo
+                    }
+                }
+            }
+        }
     }
     $SmtpClient.Timeout = $Timeout
-
     try {
         if ($PSCmdlet.ShouldProcess("$MailSentTo", 'Send-EmailMessage')) {
             $SmtpClient.Send($Message)
