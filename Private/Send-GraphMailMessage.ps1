@@ -111,11 +111,23 @@ function Send-GraphMailMessage {
     if ($VerbosePreference) {
         if ($Message.message.attachments) {
             $Message.message.attachments | ForEach-Object {
-                $_.contentBytes = -join ($_.contentBytes.Substring(0, 10), 'ContentIsTrimmed')
+                if($_.contentBytes.Length -ge 10){
+                    $_.contentBytes = -join ($_.contentBytes.Substring(0, 10), 'ContentIsTrimmed')
+                }
+                else {
+                    $_.contentBytes = -join ($_.contentBytes, 'ContentIsTrimmed')
+                }
+                
             }
         }
         If ($Message.message.body.content) {
-            $Message.message.body.content = -join ($Message.message.body.content.Substring(0, 10), 'ContentIsTrimmed')
+            if($Message.message.body.content.Length -gt 10){
+                $Message.message.body.content = -join ($Message.message.body.content.Substring(0, 10), 'ContentIsTrimmed')
+            }
+            else {
+                $Message.message.body.content = -join ($Message.message.body.content, 'ContentIsTrimmed')
+            }
+            
         }
         $TrimmedBody = $Message | ConvertTo-Json -Depth 5
         Write-Verbose "Message content: $TrimmedBody"
