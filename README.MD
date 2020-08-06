@@ -45,7 +45,7 @@ While I didn't spent much time creating WIKI, working on Get-Help documentation,
 
 - [x] [Mailozaurr – New mail toolkit (SMTP, IMAP, POP3) with support for oAuth 2.0 and GraphApi for PowerShell](https://evotec.xyz/mailozaurr-new-mail-toolkit-smtp-imap-pop3-with-support-for-oauth-2-0-and-graphapi-for-powershell/)
 
-You can also utilize Examples which should help to understand use cases.
+You can also utilize Examples which should help to understand use cases. Of course it would be great having pretty help so if you can help me out feel free to submit PR's.
 
 ## To install
 
@@ -67,6 +67,12 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 
 ## Changelog
 
+- 0.0.8 - 2020.08.06
+  - MS Graph API
+    - Added `Get-MailFolder` - work in progress
+    - Added `Get-MailMessage` - work in progress
+    - Added `Save-MailMessage` - work in progress
+    - Added check for attachments/message body less than 10 characters. - by andrew0wells [#3](https://github.com/EvotecIT/Mailozaurr/issues/3)
 - 0.0.7 - 2020.08.04
   - More updates making it better toolkit
 - 0.0.6 - 2020.08.03
