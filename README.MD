@@ -73,6 +73,8 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
     - Added `Get-MailMessage` - work in progress
     - Added `Save-MailMessage` - work in progress
     - Added check for attachments/message body less than 10 characters. - by andrew0wells [#3](https://github.com/EvotecIT/Mailozaurr/issues/3)
+  - SMTP
+    - Updated `Send-EmailMessage` error handling
 - 0.0.7 - 2020.08.04
   - More updates making it better toolkit
 - 0.0.6 - 2020.08.03
