@@ -13,7 +13,7 @@ schema: 2.0.0
 ## SYNTAX
 
 ```
-Find-DMARCRecord [-DomainName] <Array> [-DnsServer <IPAddress>] [-AsHashTable] [-AsObject] [<CommonParameters>]
+Find-DMARCRecord [-DomainName] <Array> [-DnsServer <String>] [-AsHashTable] [-AsObject] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -64,7 +64,7 @@ Accept wildcard characters: False
 {{ Fill DnsServer Description }}
 
 ```yaml
-Type: IPAddress
+Type: String
 Parameter Sets: (All)
 Aliases:
 

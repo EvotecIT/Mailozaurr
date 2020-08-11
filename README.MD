@@ -67,6 +67,9 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 
 ## Changelog
 
+- 0.0.9 - 2020.08.11
+  - DNS Records
+    - Fixed `DNSServer` parameter usage [#5](https://github.com/EvotecIT/Mailozaurr/issues/5)
 - 0.0.8 - 2020.08.06
   - MS Graph API
     - Added `Get-MailFolder` - work in progress
