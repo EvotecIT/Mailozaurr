@@ -2,7 +2,7 @@ function Find-SPFRecord {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, ValueFromPipeline, Position = 0)][Array]$DomainName,
-        [System.Net.IPAddress] $DnsServer,
+        [string] $DnsServer,
         [switch] $AsHashTable,
         [switch] $AsObject
     )
@@ -25,28 +25,32 @@ function Find-SPFRecord {
                 $Splat['Server'] = $DnsServer
             }
             try {
-                $DNSRecord = Resolve-DnsQuery @Splat | Where-Object Text -Match 'spf1'
+                $DNSRecord = Resolve-DnsQuery @Splat -All
+                $DNSRecordAnswers = $DNSRecord.Answers | Where-Object Text -Match 'spf1'
                 if (-not $AsObject) {
                     $MailRecord = [ordered] @{
-                        Name       = $D
-                        Count      = $DNSRecord.Count
-                        TimeToLive = $DnsRecord.TimeToLive -join '; '
-                        SPF        = $DnsRecord.Text -join '; '
+                        Name        = $D
+                        Count       = $DNSRecordAnswers.Count
+                        TimeToLive  = $DNSRecordAnswers.TimeToLive -join '; '
+                        SPF         = $DNSRecordAnswers.Text -join '; '
+                        QueryServer = $DNSRecord.NameServer
                     }
                 } else {
                     $MailRecord = [ordered] @{
-                        Name       = $D
-                        Count      = $DNSRecord.Count
-                        TimeToLive = $DnsRecord.TimeToLive
-                        SPF        = $DnsRecord.Text
+                        Name        = $D
+                        Count       = $DNSRecordAnswers.Count
+                        TimeToLive  = $DNSRecordAnswers.TimeToLive
+                        SPF         = $DNSRecordAnswers.Text
+                        QueryServer = $DNSRecord.NameServer
                     }
                 }
             } catch {
                 $MailRecord = [ordered] @{
-                    Name       = $D
-                    Count      = 0
-                    TimeToLive = ''
-                    SPF        = ''
+                    Name        = $D
+                    Count       = 0
+                    TimeToLive  = ''
+                    SPF         = ''
+                    QueryServer = ''
                 }
                 Write-Warning "Find-SPFRecord - $_"
             }

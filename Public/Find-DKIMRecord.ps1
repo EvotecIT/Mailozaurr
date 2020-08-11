@@ -3,7 +3,7 @@ function Find-DKIMRecord {
     param (
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, ValueFromPipeline, Position = 0)][Array] $DomainName,
         [string] $Selector = 'selector1',
-        [System.Net.IPAddress] $DnsServer,
+        [string] $DnsServer,
         [switch] $AsHashTable,
         [switch] $AsObject
     )
@@ -27,20 +27,23 @@ function Find-DKIMRecord {
             if ($DnsServer) {
                 $Splat['Server'] = $DnsServer
             }
-            $DNSRecord = Resolve-DnsQuery @Splat | Where-Object Text -Match 'DKIM1'
+            $DNSRecord = Resolve-DnsQuery @Splat -All
+            $DNSRecordAnswers = $DNSRecord.Answers | Where-Object Text -Match 'DKIM1'
             if (-not $AsObject) {
                 $MailRecord = [ordered] @{
-                    Name     = $D
-                    Count    = $DNSRecord.Text.Count
-                    Selector = "$D`:$S"
-                    DKIM     = $DNSRecord.Text -join '; '
+                    Name        = $D
+                    Count       = $DNSRecordAnswers.Text.Count
+                    Selector    = "$D`:$S"
+                    DKIM        = $DNSRecordAnswers.Text -join '; '
+                    QueryServer = $DNSRecord.NameServer
                 }
             } else {
                 $MailRecord = [ordered] @{
-                    Name     = $D
-                    Count    = $DNSRecord.Text.Count
-                    Selector = "$D`:$S"
-                    DKIM     = $DNSRecord.Text -join '; '
+                    Name        = $D
+                    Count       = $DNSRecordAnswers.Text.Count
+                    Selector    = "$D`:$S"
+                    DKIM        = $DNSRecordAnswers.Text -join '; '
+                    QueryServer = $DNSRecord.NameServer -join '; '
                 }
             }
             if ($AsHashTable) {

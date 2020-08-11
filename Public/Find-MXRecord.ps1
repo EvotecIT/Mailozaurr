@@ -2,7 +2,7 @@ function Find-MxRecord {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, ValueFromPipeline, Position = 0)][Array]$DomainName,
-        [System.Net.IPAddress] $DnsServer,
+        [string] $DnsServer,
         [switch] $ResolvePTR,
         [switch] $AsHashTable,
         [switch] $Separate,
@@ -26,15 +26,16 @@ function Find-MxRecord {
             if ($DnsServer) {
                 $Splat['Server'] = $DnsServer
             }
-            $MX = Resolve-DnsQuery @Splat
-            [Array] $MXRecords = foreach ($MXRecord in $MX) {
+            $MX = Resolve-DnsQuery @Splat -All
+            [Array] $MXRecords = foreach ($MXRecord in $MX.Answers) {
                 $MailRecord = [ordered] @{
-                    Name       = $D
-                    Preference = $MXRecord.Preference
-                    TimeToLive = $MXRecord.TimeToLive
-                    MX         = ($MXRecord.Exchange) -replace '.$'
+                    Name        = $D
+                    Preference  = $MXRecord.Preference
+                    TimeToLive  = $MXRecord.TimeToLive
+                    MX          = ($MXRecord.Exchange) -replace '.$'
+                    QueryServer = $MX.NameServer
                 }
-                [Array] $IPAddresses = foreach ($Record in $MX.Exchange) {
+                [Array] $IPAddresses = foreach ($Record in $MX.Answers.Exchange) {
                     $Splat = @{
                         Name        = $Record
                         Type        = 'A'
@@ -72,24 +73,26 @@ function Find-MxRecord {
             } else {
                 if (-not $AsObject) {
                     $MXRecord = [ordered] @{
-                        Name       = $D
-                        Count      = $MXRecords.Count
-                        Preference = $MXRecords.Preference -join '; '
-                        TimeToLive = $MXRecords.TimeToLive -join '; '
-                        MX         = $MXRecords.MX -join '; '
-                        IPAddress  = ($MXRecords.IPAddress | Sort-Object -Unique) -join '; '
+                        Name        = $D
+                        Count       = $MXRecords.Count
+                        Preference  = $MXRecords.Preference -join '; '
+                        TimeToLive  = $MXRecords.TimeToLive -join '; '
+                        MX          = $MXRecords.MX -join '; '
+                        IPAddress   = ($MXRecords.IPAddress | Sort-Object -Unique) -join '; '
+                        QueryServer = $MXRecords.QueryServer -join '; '
                     }
                     if ($ResolvePTR) {
                         $MXRecord['PTR'] = ($MXRecords.PTR | Sort-Object -Unique) -join '; '
                     }
                 } else {
                     $MXRecord = [ordered] @{
-                        Name       = $D
-                        Count      = $MXRecords.Count
-                        Preference = $MXRecords.Preference
-                        TimeToLive = $MXRecords.TimeToLive
-                        MX         = $MXRecords.MX
-                        IPAddress  = ($MXRecords.IPAddress | Sort-Object -Unique)
+                        Name        = $D
+                        Count       = $MXRecords.Count
+                        Preference  = $MXRecords.Preference
+                        TimeToLive  = $MXRecords.TimeToLive
+                        MX          = $MXRecords.MX
+                        IPAddress   = ($MXRecords.IPAddress | Sort-Object -Unique)
+                        QueryServer = $MXRecords.QueryServer
                     }
                     if ($ResolvePTR) {
                         $MXRecord['PTR'] = ($MXRecords.PTR | Sort-Object -Unique)

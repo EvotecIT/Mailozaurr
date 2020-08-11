@@ -2,7 +2,7 @@ function Find-DMARCRecord {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, ValueFromPipeline, Position = 0)][Array] $DomainName,
-        [System.Net.IPAddress] $DnsServer,
+        [string] $DnsServer,
         [switch] $AsHashTable,
         [switch] $AsObject
     )
@@ -25,28 +25,32 @@ function Find-DMARCRecord {
                 $Splat['Server'] = $DnsServer
             }
             try {
-                $DNSRecord = Resolve-DnsQuery @Splat | Where-Object Text -Match 'DMARC1'
+                $DNSRecord = Resolve-DnsQuery @Splat -All
+                $DNSRecordAnswers = $DNSRecord.Answers | Where-Object Text -Match 'DMARC1'
                 if (-not $AsObject) {
                     $MailRecord = [ordered] @{
-                        Name       = $D
-                        Count      = $DNSRecord.Count
-                        TimeToLive = $DnsRecord.TimeToLive -join '; '
-                        DMARC      = $DnsRecord.Text -join '; '
+                        Name        = $D
+                        Count       = $DNSRecordAnswers.Count
+                        TimeToLive  = $DNSRecordAnswers.TimeToLive -join '; '
+                        DMARC       = $DNSRecordAnswers.Text -join '; '
+                        QueryServer = $DNSRecord.NameServer -join '; '
                     }
                 } else {
                     $MailRecord = [ordered] @{
-                        Name       = $D
-                        Count      = $DNSRecord.Count
-                        TimeToLive = $DnsRecord.TimeToLive
-                        DMARC      = $DnsRecord.Text
+                        Name        = $D
+                        Count       = $DNSRecordAnswers.Count
+                        TimeToLive  = $DNSRecordAnswers.TimeToLive
+                        DMARC       = $DNSRecordAnswers.Text
+                        QueryServer = $DNSRecord.NameServer
                     }
                 }
             } catch {
                 $MailRecord = [ordered] @{
-                    Name       = $D
-                    Count      = 0
-                    TimeToLive = ''
-                    DMARC      = ''
+                    Name        = $D
+                    Count       = 0
+                    TimeToLive  = ''
+                    DMARC       = ''
+                    QueryServer = ''
                 }
                 Write-Warning "Find-DMARCRecord - $_"
             }
