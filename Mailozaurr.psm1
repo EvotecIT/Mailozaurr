@@ -1,28 +1,32 @@
 ﻿#Get public and private function definition files.
 $Public = @( Get-ChildItem -Path $PSScriptRoot\Public\*.ps1 -ErrorAction SilentlyContinue -Recurse )
 $Private = @( Get-ChildItem -Path $PSScriptRoot\Private\*.ps1 -ErrorAction SilentlyContinue -Recurse )
-$Assembly = @(
+
+$AssemblyFolders = Get-ChildItem -Path $PSScriptRoot\Lib -Directory
+
+if ($AssemblyFolders.BaseName -contains 'Standard') {
+    $Assembly = @( Get-ChildItem -Path $PSScriptRoot\Lib\Standard\*.dll -ErrorAction SilentlyContinue )
+} else {
     if ($PSEdition -eq 'Core') {
-        Get-ChildItem -Path $PSScriptRoot\Lib\Core\*.dll -ErrorAction SilentlyContinue
+        $Assembly = @( Get-ChildItem -Path $PSScriptRoot\Lib\Core\*.dll -ErrorAction SilentlyContinue )
     } else {
-        Get-ChildItem -Path $PSScriptRoot\Lib\Default\*.dll -ErrorAction SilentlyContinue
-    }
-)
-Foreach ($Import in @($Assembly)) {
-    try {
-        if ($Import.Extension -eq '.dll') {
-            Add-Type -Path $Import.Fullname -ErrorAction Stop
-        }
-    } catch [System.Reflection.ReflectionTypeLoadException] {
-        Write-Warning -Message "[x] Message: $($_.Exception.Message)"
-        #Write-Warning -Message "StackTrace: $($_.Exception.StackTrace)"
-        foreach ($_ in $($_.Exception.LoaderExceptions)) {
-            Write-Warning -Message "[x] LoaderExceptions: $($_.Message) "
-            #Write-Warning -Message "[x] LoaderExceptions: $($_.FileName)"
-        }
-        return
+        $Assembly = @( Get-ChildItem -Path $PSScriptRoot\Lib\Default\*.dll -ErrorAction SilentlyContinue )
     }
 }
+Foreach ($Import in @($Assembly)) {
+    try {
+        Add-Type -Path $Import.Fullname -ErrorAction Stop
+    } catch [System.Reflection.ReflectionTypeLoadException] {
+        Write-Error -Message "Message: $($_.Exception.Message)"
+        Write-Error -Message "StackTrace: $($_.Exception.StackTrace)"
+        Write-Error -Message "LoaderExceptions: $($_.Exception.LoaderExceptions)"
+    } catch {
+        Write-Error -Message "Message: $($_.Exception.Message)"
+        Write-Error -Message "StackTrace: $($_.Exception.StackTrace)"
+        Write-Error -Message "LoaderExceptions: $($_.Exception.LoaderExceptions)"
+    }
+}
+
 #Dot source the files
 Foreach ($Import in @($Public + $Private)) {
     Try {
@@ -31,3 +35,5 @@ Foreach ($Import in @($Public + $Private)) {
         Write-Error -Message "Failed to import function $($import.Fullname): $_"
     }
 }
+
+Export-ModuleMember -Function '*' -Alias '*'
