@@ -1,4 +1,59 @@
 function Find-MxRecord {
+    <#
+    .SYNOPSIS
+    Queries DNS to provide MX information
+
+    .DESCRIPTION
+    Queries DNS to provide MX information
+
+    .PARAMETER DomainName
+    Name/DomainName to query for MX record
+
+    .PARAMETER ResolvePTR
+    Parameter description
+
+    .PARAMETER DnsServer
+    Allows to choose DNS IP address to ask for DNS query. By default uses system ones.
+
+    .PARAMETER DNSProvider
+    Allows to choose DNS Provider that will be used for HTTPS based DNS query (Cloudlare or Google)
+
+    .PARAMETER AsHashTable
+    Returns Hashtable instead of PSCustomObject
+
+    .PARAMETER AsObject
+    Returns an object rather than string based represantation for name servers (for easier display purposes)
+
+    .PARAMETER Separate
+    Returns each MX record separatly
+
+    .EXAMPLE
+    # Standard way
+    Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' | Format-Table *
+
+    .EXAMPLE
+    # Https way via Cloudflare
+    Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare | Format-Table *
+
+    .EXAMPLE
+    # Https way via Google
+    Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Google | Format-Table *
+
+    .EXAMPLE
+    # Standard way with ResolvePTR
+    Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -ResolvePTR | Format-Table *
+
+    .EXAMPLE
+    # Https way via Cloudflare with ResolvePTR
+    Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare -ResolvePTR | Format-Table *
+
+    .EXAMPLE
+    # Https way via Google with ResolvePTR
+    Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Google -ResolvePTR | Format-Table *
+
+    .NOTES
+    General notes
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, ValueFromPipeline, Position = 0)][Array]$DomainName,
