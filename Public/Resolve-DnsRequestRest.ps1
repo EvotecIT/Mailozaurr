@@ -1,22 +1,22 @@
 ﻿function Resolve-DnsQueryRest {
     <#
     .SYNOPSIS
-    Short description
+    Provides basic DNS Query via HTTPS
 
     .DESCRIPTION
-    Long description
+    Provides basic DNS Query via HTTPS - tested only for use cases within Mailozaurr
 
     .PARAMETER DNSProvider
-    Parameter description
+    Allows to choose DNS Provider that will be used for HTTPS based DNS query (Cloudlare or Google). Default is Cloudflare
 
     .PARAMETER Name
-    Parameter description
+    Name/DomainName to query DNS
 
     .PARAMETER Type
-    Parameter description
+    Type of a query A, PTR, MX and so on
 
     .PARAMETER All
-    Parameter description
+    Returns full output rather than just custom, translated data
 
     .EXAMPLE
     Resolve-DnsQueryRest -Name 'evotec.pl' -Type TXT -DNSProvider Cloudflare
@@ -31,17 +31,31 @@
         [Parameter(Mandatory)][DnsQueryType] $Type,
         [switch] $All
     )
+    if ($Type -eq [DnsQueryType]::PTR) {
+        $Name = $Name -replace '^(\d+)\.(\d+)\.(\d+)\.(\d+)$', '$4.$3.$2.$1.in-addr.arpa'
+    }
     if ($DNSProvider -eq 'Cloudflare') {
         $Q = Invoke-RestMethod -Uri "https://cloudflare-dns.com/dns-query?ct=application/dns-json&name=$Name&type=$Type"
     } else {
         $Q = Invoke-RestMethod -Uri "https://dns.google.com/resolve?name=$Name&type=$Type"
     }
     $Answers = foreach ($Answer in $Q.Answer) {
-        [PSCustomObject] @{
-            Name       = $Answer.Name
-            Count      = $Answer.Type
-            TimeToLive = $Answer.TTL
-            Text       = $Answer.data
+        if ($Type -eq [DnsQueryType]::MX) {
+            $Data = $Answer.data -split ' '
+            [PSCustomObject] @{
+                Name       = $Answer.Name
+                Count      = $Answer.Type
+                TimeToLive = $Answer.TTL
+                Exchange   = $Data[1]
+                Preference = $Data[0]
+            }
+        } else {
+            [PSCustomObject] @{
+                Name       = $Answer.Name
+                Count      = $Answer.Type
+                TimeToLive = $Answer.TTL
+                Text       = $Answer.data
+            }
         }
     }
     if ($All) {
