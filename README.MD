@@ -70,6 +70,11 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 - 0.0.10 - Unreleased
   - `Send-EmailMessage` - updated error messages with tips what could be wrong
   - `Send-EmailMessage` - updated ErrorAction Stop in few places for those that prefer errors
+  - `Find-MXRecord` - updated with `DNSProvider` (`Cloudflare`/`Google`) for calls over HTTPS
+  - `Find-SPFRecord` - updated with `DNSProvider` (`Cloudflare`/`Google`) for calls over HTTPS
+  - `Find-DKIMRecord` - updated with `DNSProvider` (`Cloudflare`/`Google`) for calls over HTTPS
+  - `Find-DMARCRecord` - updated with `DNSProvider` (`Cloudflare`/`Google`) for calls over HTTPS
+  - `Resolve-DNSRequestRest` - Added just in case
 - 0.0.9 - 2020.08.11
   - DNS Records
     - Fixed `DNSServer` parameter usage [#5](https://github.com/EvotecIT/Mailozaurr/issues/5)
