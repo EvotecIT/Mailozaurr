@@ -8,7 +8,7 @@ Find-DKIMRecord -DomainName 'evotec.pl', 'evotec.xyz' -Selector 'selector1' | Fo
 
 # Or query specific server:
 
-Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DnsServer 1.1.1.1 | Format-Table *
+Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DnsServer 1.1.1.1:53 | Format-Table *
 Find-DMARCRecord -DomainName 'evotec.pl', 'evotec.xyz' -DnsServer 1.1.1.1 | Format-Table *
 Find-SPFRecord -DomainName 'evotec.pl', 'evotec.xyz' -DnsServer 1.1.1.1 | Format-Table *
 Find-DKIMRecord -DomainName 'evotec.pl', 'evotec.xyz' -DnsServer 1.1.1.1 | Format-Table *

@@ -32,4 +32,4 @@ Send-EmailMessage -From @{ Name = 'Przemysław Kłys'; Email = 'przemyslaw.klys@
     -Subject 'This is another test email'
 
 Send-MailMessage -To 'przemyslaw.klys@test.pl' -Subject 'Test' -Body 'test me' -SmtpServer 'smtp.office365.com' -From 'przemyslaw.klys@test.pl' `
-    -Attachments "$PSScriptRoot\..\Mailozaurr.psd1" -Encoding UTF8 -Cc 'przemyslaw.klys@test.pl' -DeliveryNotificationOption OnSuccess -Priority High -Credential $MailCredentials -UseSsl -Port 587 -Verbose
+    -Attachments "$PSScriptRoot\..\Mailozaurr.psd1" -Cc 'przemyslaw.klys@test.pl' -DeliveryNotificationOption OnSuccess -Priority High -Credential $MailCredentials -UseSsl -Port 587 -Verbose # -Encoding UTF8
