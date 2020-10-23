@@ -272,8 +272,13 @@
 
     } else {
         if ($null -eq $To -and $null -eq $Bcc -and $null -eq $Cc) {
-            Write-Warning 'Send-EmailMessage - At least one To, CC or BCC is required.'
-            return
+            if ($PSBoundParameters.ErrorAction -eq 'Stop') {
+                Write-Error 'At least one To, CC or BCC is required.'
+                return
+            } else {
+                Write-Warning 'Send-EmailMessage - At least one To, CC or BCC is required.'
+                return
+            }
         }
     }
 
@@ -369,11 +374,27 @@
         $SmtpClient.DeliveryStatusNotificationType = $DeliveryStatusNotificationType
     }
     if ($UseSsl) {
-        $SmtpClient.Connect($Server, $Port, [MailKit.Security.SecureSocketOptions]::StartTls)
-    } else {
-        $SmtpClient.Connect($Server, $Port, $SecureSocketOptions)
+        # By default Auto is used, but if someone wants UseSSL that's fine too
+        $SecureSocketOptions = [MailKit.Security.SecureSocketOptions]::StartTls
     }
-
+    try {
+        $SmtpClient.Connect($Server, $Port, $SecureSocketOptions)
+    } catch {
+        if ($PSBoundParameters.ErrorAction -eq 'Stop') {
+            Write-Error $_
+            return
+        } else {
+            Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
+            Write-Warning "Send-EmailMessage - Possible issue: Port? ($Port was used), Using SSL? ($SecureSocketOptions was used)"
+            if (-not $Suppress) {
+                return [PSCustomObject] @{
+                    Status = $False
+                    Error  = $($_.Exception.Message)
+                    SentTo = $MailSentTo
+                }
+            }
+        }
+    }
     if ($Credential) {
         if ($oAuth2.IsPresent) {
             $SmtpClient.Authenticate($SaslMechanismOAuth2)

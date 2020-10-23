@@ -67,6 +67,9 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 
 ## Changelog
 
+- 0.0.10 - Unreleased
+  - `Send-EmailMessage` - updated error messages with tips what could be wrong
+  - `Send-EmailMessage` - updated ErrorAction Stop in few places for those that prefer errors
 - 0.0.9 - 2020.08.11
   - DNS Records
     - Fixed `DNSServer` parameter usage [#5](https://github.com/EvotecIT/Mailozaurr/issues/5)
