@@ -13,7 +13,8 @@ schema: 2.0.0
 ## SYNTAX
 
 ```
-Find-SPFRecord [-DomainName] <Array> [-DnsServer <String>] [-AsHashTable] [-AsObject] [<CommonParameters>]
+Find-SPFRecord [-DomainName] <Array> [-DnsServer <String>] [-DNSProvider <String>] [-AsHashTable] [-AsObject]
+ [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -29,6 +30,51 @@ PS C:\> {{ Add example code here }}
 {{ Add example description here }}
 
 ## PARAMETERS
+
+### -DomainName
+{{ Fill DomainName Description }}
+
+```yaml
+Type: Array
+Parameter Sets: (All)
+Aliases:
+
+Required: True
+Position: 1
+Default value: None
+Accept pipeline input: True (ByPropertyName, ByValue)
+Accept wildcard characters: False
+```
+
+### -DnsServer
+{{ Fill DnsServer Description }}
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -DNSProvider
+Allows to choose DNS Provider that will be used for HTTPS based DNS query (Cloudlare or Google)
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
 
 ### -AsHashTable
 {{ Fill AsHashTable Description }}
@@ -57,36 +103,6 @@ Required: False
 Position: Named
 Default value: None
 Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -DnsServer
-{{ Fill DnsServer Description }}
-
-```yaml
-Type: String
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: Named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -DomainName
-{{ Fill DomainName Description }}
-
-```yaml
-Type: Array
-Parameter Sets: (All)
-Aliases:
-
-Required: True
-Position: 0
-Default value: None
-Accept pipeline input: True (ByPropertyName, ByValue)
 Accept wildcard characters: False
 ```
 

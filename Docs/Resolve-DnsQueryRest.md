@@ -5,7 +5,7 @@ online version:
 schema: 2.0.0
 ---
 
-# Find-DKIMRecord
+# Resolve-DnsQueryRest
 
 ## SYNOPSIS
 {{ Fill in the Synopsis }}
@@ -13,8 +13,8 @@ schema: 2.0.0
 ## SYNTAX
 
 ```
-Find-DKIMRecord [-DomainName] <Array> [-Selector <String>] [-DnsServer <String>] [-DNSProvider <String>]
- [-AsHashTable] [-AsObject] [<CommonParameters>]
+Resolve-DnsQueryRest [[-DNSProvider] <String>] [-Name] <String> [-Type] <DnsQueryType> [-All]
+ [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -31,83 +31,54 @@ PS C:\> {{ Add example code here }}
 
 ## PARAMETERS
 
-### -DomainName
-{{ Fill DomainName Description }}
+### -DNSProvider
+Allows to choose DNS Provider that will be used for HTTPS based DNS query (Cloudlare or Google). Default is Cloudflare
 
 ```yaml
-Type: Array
+Type: String
 Parameter Sets: (All)
 Aliases:
+
+Required: False
+Position: 1
+Default value: Cloudflare
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Name
+{{ Fill Name Description }}
+
+```yaml
+Type: String
+Parameter Sets: (All)
+Aliases: Query
 
 Required: True
-Position: 1
-Default value: None
-Accept pipeline input: True (ByPropertyName, ByValue)
-Accept wildcard characters: False
-```
-
-### -Selector
-{{ Fill Selector Description }}
-
-```yaml
-Type: String
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: Named
+Position: 2
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -DnsServer
-{{ Fill DnsServer Description }}
+### -Type
+{{ Fill Type Description }}
 
 ```yaml
-Type: String
+Type: DnsQueryType
 Parameter Sets: (All)
 Aliases:
+Accepted values: A, NS, MD, MF, CNAME, SOA, MB, MG, MR, NULL, WKS, PTR, HINFO, MINFO, MX, TXT, RP, AFSDB, X25, ISDN, RT, NSAP, NSAPPTR, SIG, KEY, PX, GPOS, AAAA, LOC, NXT, EID, NIMLOC, SRV, ATMA, NAPTR, KX, CERT, A6, DNAME, SINK, OPT, APL, DS, SSHFP, IPSECKEY, RRSIG, NSEC, DNSKEY, DHCID, NSEC3, NSEC3PARAM, TLSA, SMIMEA, Unassigned, HIP, NINFO, RKEY, TALINK, CDS, CDNSKEY, OPENPGPKEY, CSYNC, SPF, UINFO, UID, GID, UNSPEC, NID, L32, L64, LP, EUI48, EUI64, TKEY, TSIG, IXFR, AXFR, MAILB, MAILA, All, URI, CAA, AVC, DOA, TA, DLV
 
-Required: False
-Position: Named
+Required: True
+Position: 3
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -DNSProvider
-Allows to choose DNS Provider that will be used for HTTPS based DNS query (Cloudlare or Google)
-
-```yaml
-Type: String
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: Named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -AsHashTable
-{{ Fill AsHashTable Description }}
-
-```yaml
-Type: SwitchParameter
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: Named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -AsObject
-{{ Fill AsObject Description }}
+### -All
+{{ Fill All Description }}
 
 ```yaml
 Type: SwitchParameter
@@ -126,7 +97,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-### System.String[]
+### None
 
 ## OUTPUTS
 

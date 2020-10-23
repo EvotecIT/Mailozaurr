@@ -13,8 +13,8 @@ schema: 2.0.0
 ## SYNTAX
 
 ```
-Find-MxRecord [-DomainName] <Array> [-DnsServer <String>] [-ResolvePTR] [-AsHashTable] [-Separate] [-AsObject]
- [<CommonParameters>]
+Find-MxRecord [-DomainName] <Array> [-DnsServer <String>] [-DNSProvider <String>] [-ResolvePTR] [-AsHashTable]
+ [-Separate] [-AsObject] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -31,33 +31,18 @@ PS C:\> {{ Add example code here }}
 
 ## PARAMETERS
 
-### -AsHashTable
-{{ Fill AsHashTable Description }}
+### -DomainName
+{{ Fill DomainName Description }}
 
 ```yaml
-Type: SwitchParameter
+Type: Array
 Parameter Sets: (All)
 Aliases:
 
-Required: False
-Position: Named
+Required: True
+Position: 1
 Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -AsObject
-{{ Fill AsObject Description }}
-
-```yaml
-Type: SwitchParameter
-Parameter Sets: (All)
-Aliases:
-
-Required: False
-Position: Named
-Default value: None
-Accept pipeline input: False
+Accept pipeline input: True (ByPropertyName, ByValue)
 Accept wildcard characters: False
 ```
 
@@ -76,18 +61,18 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -DomainName
-{{ Fill DomainName Description }}
+### -DNSProvider
+Allows to choose DNS Provider that will be used for HTTPS based DNS query (Cloudlare or Google)
 
 ```yaml
-Type: Array
+Type: String
 Parameter Sets: (All)
 Aliases:
 
-Required: True
-Position: 0
+Required: False
+Position: Named
 Default value: None
-Accept pipeline input: True (ByPropertyName, ByValue)
+Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
@@ -106,8 +91,38 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -AsHashTable
+{{ Fill AsHashTable Description }}
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -Separate
 {{ Fill Separate Description }}
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: (All)
+Aliases:
+
+Required: False
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -AsObject
+{{ Fill AsObject Description }}
 
 ```yaml
 Type: SwitchParameter
