@@ -3,6 +3,7 @@ function Find-MxRecord {
     param (
         [Parameter(Mandatory, ValueFromPipelineByPropertyName, ValueFromPipeline, Position = 0)][Array]$DomainName,
         [string] $DnsServer,
+        [ValidateSet('Cloudflare', 'Google')][string] $DNSProvider,
         [switch] $ResolvePTR,
         [switch] $AsHashTable,
         [switch] $Separate,
@@ -23,10 +24,14 @@ function Find-MxRecord {
                 Type        = 'MX'
                 ErrorAction = 'SilentlyContinue'
             }
-            if ($DnsServer) {
-                $Splat['Server'] = $DnsServer
+            if ($DNSProvider) {
+                $MX = Resolve-DnsQueryRest @Splat -All -DNSProvider $DnsProvider
+            } else {
+                if ($DnsServer) {
+                    $Splat['Server'] = $DnsServer
+                }
+                $MX = Resolve-DnsQuery @Splat -All
             }
-            $MX = Resolve-DnsQuery @Splat -All
             [Array] $MXRecords = foreach ($MXRecord in $MX.Answers) {
                 $MailRecord = [ordered] @{
                     Name        = $D
@@ -41,10 +46,14 @@ function Find-MxRecord {
                         Type        = 'A'
                         ErrorAction = 'SilentlyContinue'
                     }
-                    if ($DnsServer) {
-                        $Splat['Server'] = $DnsServer
+                    if ($DNSProvider) {
+                        (Resolve-DnsQueryRest @Splat -DNSProvider $DnsProvider) | ForEach-Object { $_.Text }
+                    } else {
+                        if ($DnsServer) {
+                            $Splat['Server'] = $DnsServer
+                        }
+                        (Resolve-DnsQuery @Splat) | ForEach-Object { $_.Address.IPAddressToString }
                     }
-                    (Resolve-DnsQuery @Splat) | ForEach-Object { $_.Address.IPAddressToString }
                 }
                 $MailRecord['IPAddress'] = $IPAddresses
                 if ($ResolvePTR) {
@@ -54,10 +63,14 @@ function Find-MxRecord {
                             Type        = 'PTR'
                             ErrorAction = 'SilentlyContinue'
                         }
-                        if ($DnsServer) {
-                            $Splat['Server'] = $DnsServer
+                        if ($DNSProvider) {
+                            (Resolve-DnsQueryRest @Splat -DNSProvider $DnsProvider) | ForEach-Object { $_.Text -replace '.$' }
+                        } else {
+                            if ($DnsServer) {
+                                $Splat['Server'] = $DnsServer
+                            }
+                            (Resolve-DnsQuery @Splat) | ForEach-Object { $_.PtrDomainName -replace '.$' }
                         }
-                        (Resolve-DnsQuery @Splat) | ForEach-Object { $_.PtrDomainName -replace '.$' }
                     }
                 }
                 $MailRecord
