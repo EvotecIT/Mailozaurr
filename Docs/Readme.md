@@ -65,6 +65,9 @@ Locale: en-US
 ### [Resolve-DnsQuery](Resolve-DnsQuery.md)
 {{ Fill in the Synopsis }}
 
+### [Resolve-DnsQueryRest](Resolve-DnsQueryRest.md)
+{{ Fill in the Synopsis }}
+
 ### [Save-MailMessage](Save-MailMessage.md)
 {{ Fill in the Synopsis }}
 
