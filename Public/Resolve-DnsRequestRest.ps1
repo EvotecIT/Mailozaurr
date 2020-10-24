@@ -54,7 +54,7 @@
                 Name       = $Answer.Name
                 Count      = $Answer.Type
                 TimeToLive = $Answer.TTL
-                Text       = $Answer.data
+                Text       = $Answer.data.TrimStart('"').TrimEnd('"')
             }
         }
     }

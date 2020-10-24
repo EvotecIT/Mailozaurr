@@ -14,6 +14,8 @@ Describe 'Find-MxRecord' {
         $DNS[0].MX | Should -Be 'evotec-pl.mail.protection.outlook.com'
         $DNS[1].Name | Should -Be 'evotec.xyz'
         $DNS[1].MX | Should -Be 'evotec-xyz.mail.protection.outlook.com'
+        $DNS[0].QueryServer | Should -Be '1.1.1.1:53'
+        $DNS[1].QueryServer | Should -Be '1.1.1.1:53'
     }
     It 'Given 2 domains it should return two records using HTTPS GOOGLE' {
         $DNS = Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Google
@@ -22,6 +24,8 @@ Describe 'Find-MxRecord' {
         $DNS[0].MX | Should -Be 'evotec-pl.mail.protection.outlook.com'
         $DNS[1].Name | Should -Be 'evotec.xyz'
         $DNS[1].MX | Should -Be 'evotec-xyz.mail.protection.outlook.com'
+        $DNS[0].QueryServer | Should -Be 'dns.google.com'
+        $DNS[1].QueryServer | Should -Be 'dns.google.com'
     }
     It 'Given 2 domains it should return two records using HTTPS Cloudflare' {
         $DNS = Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare
@@ -30,5 +34,7 @@ Describe 'Find-MxRecord' {
         $DNS[0].MX | Should -Be 'evotec-pl.mail.protection.outlook.com'
         $DNS[1].Name | Should -Be 'evotec.xyz'
         $DNS[1].MX | Should -Be 'evotec-xyz.mail.protection.outlook.com'
+        $DNS[0].QueryServer | Should -Be 'cloudflare-dns.com'
+        $DNS[1].QueryServer | Should -Be 'cloudflare-dns.com'
     }
 }
