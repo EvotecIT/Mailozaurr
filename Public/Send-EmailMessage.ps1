@@ -1,91 +1,167 @@
 ﻿function Send-EmailMessage {
     <#
     .SYNOPSIS
-    Short description
+    The Send-EmailMessage cmdlet sends an email message from within PowerShell.
 
     .DESCRIPTION
-    Long description
+    The Send-EmailMessage cmdlet sends an email message from within PowerShell. It replaces Send-MailMessage by Microsoft which is deprecated.
 
     .PARAMETER Server
-    Parameter description
+    Specifies the name of the SMTP server that sends the email message.
 
     .PARAMETER Port
-    Parameter description
+    Specifies an alternate port on the SMTP server. The default value is 587.
 
     .PARAMETER From
-    Parameter description
+    This parameter specifies the sender's email address.
 
     .PARAMETER ReplyTo
-    Parameter description
+    This property indicates the reply address. If you don't set this property, the Reply address is same as From address.
 
     .PARAMETER Cc
-    Parameter description
+    Specifies the email addresses to which a carbon copy (CC) of the email message is sent.
 
     .PARAMETER Bcc
-    Parameter description
+    Specifies the email addresses that receive a copy of the mail but are not listed as recipients of the message.
 
     .PARAMETER To
-    Parameter description
+    Specifies the recipient's email address. If there are multiple recipients, separate their addresses with a comma (,)
 
     .PARAMETER Subject
-    Parameter description
+    The Subject parameter isn't required. This parameter specifies the subject of the email message.
 
     .PARAMETER Priority
-    Parameter description
+    Specifies the priority of the email message. Normal is the default. The acceptable values for this parameter are Normal, High, and Low.
 
     .PARAMETER Encoding
-    Parameter description
+    Specifies the type of encoding for the target file. It's recommended to not change it.
+
+    The acceptable values for this parameter are as follows:
+
+    default:
+    ascii: Uses the encoding for the ASCII (7-bit) character set.
+    bigendianunicode: Encodes in UTF-16 format using the big-endian byte order.
+    oem: Uses the default encoding for MS-DOS and console programs.
+    unicode: Encodes in UTF-16 format using the little-endian byte order.
+    utf7: Encodes in UTF-7 format.
+    utf8: Encodes in UTF-8 format.
+    utf32: Encodes in UTF-32 format.
 
     .PARAMETER DeliveryNotificationOption
-    Parameter description
+    Specifies the delivery notification options for the email message. You can specify multiple values. None is the default value. The alias for this parameter is DNO. The delivery notifications are sent to the address in the From parameter. Multiple options can be chosen.
 
     .PARAMETER DeliveryStatusNotificationType
-    Parameter description
+    Specifies delivery status notification type. Options are Full, HeadersOnly, Unspecified
 
     .PARAMETER Credential
-    Parameter description
+    Specifies a user account that has permission to perform this action. The default is the current user.
+    Type a user name, such as User01 or Domain01\User01. Or, enter a PSCredential object, such as one from the Get-Credential cmdlet.
+    Credentials are stored in a PSCredential object and the password is stored as a SecureString.
+
+    Credential parameter is also use to securely pass tokens/api keys for Graph API/oAuth2/SendGrid
 
     .PARAMETER Username
-    Parameter description
+    Specifies UserName to use to login to server
 
     .PARAMETER Password
-    Parameter description
+    Specifies Password to use to login to server. This is ClearText option and should not be used.
 
     .PARAMETER SecureSocketOptions
-    Parameter description
+    Specifies secure socket option: None, Auto, StartTls, StartTlsWhenAvailable, SslOnConnect. Default is Auto.
 
     .PARAMETER UseSsl
-    Parameter description
+    Specifies using StartTLS option. It's recommended to leave it disabled and use SecureSocketOptions which should take care of all security needs
 
     .PARAMETER HTML
-    Parameter description
+    HTML content to send email
 
     .PARAMETER Text
-    Parameter description
+    Text content to send email. With SMTP one can define both HTML and Text. For SendGrid and Office 365 Graph API only HTML or Text will be used with HTML having priority
 
     .PARAMETER Attachment
-    Parameter description
+    Specifies the path and file names of files to be attached to the email message.
 
     .PARAMETER Timeout
-    Parameter description
+    Maximum time to wait to send an email via SMTP
 
     .PARAMETER oAuth2
-    Parameter description
+    Send email via oAuth2
 
     .PARAMETER Graph
-    Parameter description
+    Send email via Office 365 Graph API
+
+    .PARAMETER SendGrid
+    Send email via SendGrid API
 
     .PARAMETER DoNotSaveToSentItems
-    Parameter description
+    Do not save email to SentItems when sending with Office 365 Graph API
 
     .PARAMETER Email
-    Parameter description
+    Compatibility parameter for Send-Email cmdlet from PSSharedGoods
 
     .PARAMETER Suppress
-    Parameter description
+    Do not display summary in [PSCustomObject]
 
     .EXAMPLE
-    An example
+    if (-not $MailCredentials) {
+        $MailCredentials = Get-Credential
+    }
+
+    Send-EmailMessage -From @{ Name = 'Przemysław Kłys'; Email = 'przemyslaw.klys@test.pl' } -To 'przemyslaw.klys@test.pl' `
+        -Server 'smtp.office365.com' -SecureSocketOptions Auto -Credential $MailCredentials -HTML $Body -DeliveryNotificationOption OnSuccess -Priority High `
+        -Subject 'This is another test email'
+
+    .EXAMPLE
+    if (-not $MailCredentials) {
+        $MailCredentials = Get-Credential
+    }
+    # this is simple replacement (drag & drop to Send-MailMessage)
+    Send-EmailMessage -To 'przemyslaw.klys@test.pl' -Subject 'Test' -Body 'test me' -SmtpServer 'smtp.office365.com' -From 'przemyslaw.klys@test.pl' `
+        -Attachments "$PSScriptRoot\..\README.MD" -Cc 'przemyslaw.klys@test.pl' -Priority High -Credential $MailCredentials `
+        -UseSsl -Port 587 -Verbose
+
+    .EXAMPLE
+    # Use SendGrid Api
+    $Credential = ConvertTo-SendGridCredential -ApiKey 'YourKey'
+
+    Send-EmailMessage -From 'przemyslaw.klys@evo.cool' `
+        -To 'przemyslaw.klys@evotec.pl', 'evotectest@gmail.com' `
+        -Body 'test me Przemysław Kłys' `
+        -Priority High `
+        -Subject 'This is another test email' `
+        -SendGrid `
+        -Credential $Credential `
+        -Verbose
+
+    .EXAMPLE
+    # It seems larger HTML is not supported. Online makes sure it uses less libraries inline
+    # it may be related to not escaping chars properly for JSON, may require investigation
+    $Body = EmailBody {
+        EmailText -Text 'This is my text'
+        EmailTable -DataTable (Get-Process | Select-Object -First 5 -Property Name, Id, PriorityClass, CPU, Product)
+    } -Online
+
+    # Credentials for Graph
+    $ClientID = '0fb383f1'
+    $DirectoryID = 'ceb371f6'
+    $ClientSecret = 'VKDM_'
+
+    $Credential = ConvertTo-GraphCredential -ClientID $ClientID -ClientSecret $ClientSecret -DirectoryID $DirectoryID
+
+    # Sending email
+    Send-EmailMessage -From @{ Name = 'Przemysław Kłys'; Email = 'przemyslaw.klys@test1.pl' } -To 'przemyslaw.klys@test.pl' `
+        -Credential $Credential -HTML $Body -Subject 'This is another test email 1' -Graph -Verbose -Priority High
+
+    .EXAMPLE
+    # Using OAuth2 for Office 365
+    $ClientID = '4c1197dd-53'
+    $TenantID = 'ceb371f6-87'
+
+    $CredentialOAuth2 = Connect-oAuthO365 -ClientID $ClientID -TenantID $TenantID
+
+    Send-EmailMessage -From @{ Name = 'Przemysław Kłys'; Email = 'test@evotec.pl' } -To 'test@evotec.pl' `
+        -Server 'smtp.office365.com' -HTML $Body -Text $Text -DeliveryNotificationOption OnSuccess -Priority High `
+        -Subject 'This is another test email' -SecureSocketOptions Auto -Credential $CredentialOAuth2 -oAuth2
 
     .NOTES
     General notes
@@ -106,42 +182,49 @@
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
+        [Parameter(ParameterSetName = 'SendGrid')]
         [object] $From,
 
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
+        [Parameter(ParameterSetName = 'SendGrid')]
         [string] $ReplyTo,
 
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
+        [Parameter(ParameterSetName = 'SendGrid')]
         [string[]] $Cc,
 
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
+        [Parameter(ParameterSetName = 'SendGrid')]
         [string[]] $Bcc,
 
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
+        [Parameter(ParameterSetName = 'SendGrid')]
         [string[]] $To,
 
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
+        [Parameter(ParameterSetName = 'SendGrid')]
         [string] $Subject,
 
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
+        [Parameter(ParameterSetName = 'SendGrid')]
         [alias('Importance')][ValidateSet('Low', 'Normal', 'High')][string] $Priority,
 
         [Parameter(ParameterSetName = 'ClearText')]
@@ -160,8 +243,9 @@
         [MailKit.Net.Smtp.DeliveryStatusNotificationType] $DeliveryStatusNotificationType,
 
         [Parameter(ParameterSetName = 'oAuth')]
-        [Parameter(ParameterSetName = 'Graph')]
+        [Parameter(ParameterSetName = 'Graph', Mandatory)]
         [Parameter(ParameterSetName = 'Compatibility')]
+        [Parameter(ParameterSetName = 'SendGrid', Mandatory)]
         [pscredential] $Credential,
 
         [Parameter(ParameterSetName = 'ClearText')]
@@ -184,18 +268,21 @@
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
+        [Parameter(ParameterSetName = 'SendGrid')]
         [alias('Body')][string[]] $HTML,
 
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
+        [Parameter(ParameterSetName = 'SendGrid')]
         [string[]] $Text,
 
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
+        [Parameter(ParameterSetName = 'SendGrid')]
         [alias('Attachments')][string[]] $Attachment,
 
         [Parameter(ParameterSetName = 'ClearText')]
@@ -209,6 +296,9 @@
         [Parameter(ParameterSetName = 'Graph')]
         [switch] $Graph,
 
+        [Parameter(ParameterSetName = 'SendGrid')]
+        [switch] $SendGrid,
+
         [Parameter(ParameterSetName = 'Graph')]
         [switch] $DoNotSaveToSentItems,
 
@@ -221,6 +311,7 @@
         [Parameter(ParameterSetName = 'Compatibility')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Grouped')]
+        [Parameter(ParameterSetName = 'SendGrid')]
         [switch] $Suppress
     )
     if ($Email) {
@@ -288,6 +379,7 @@
             $Authorization = ConvertFrom-OAuth2Credential -Credential $Credential
             $SaslMechanismOAuth2 = [MailKit.Security.SaslMechanismOAuth2]::new($Authorization.UserName, $Authorization.Token)
         } elseif ($Graph.IsPresent) {
+            # Sending email via Office 365 Graph
             $sendGraphMailMessageSplat = @{
                 From                 = $From
                 To                   = $To
@@ -304,6 +396,23 @@
             }
             Remove-EmptyValue -Hashtable $sendGraphMailMessageSplat
             return Send-GraphMailMessage @sendGraphMailMessageSplat
+        } elseif ($SendGrid.IsPresent) {
+            # Sending email via SendGrid
+            $sendGraphMailMessageSplat = @{
+                From       = $From
+                To         = $To
+                Cc         = $CC
+                Bcc        = $Bcc
+                Subject    = $Subject
+                HTML       = $HTML
+                Text       = $Text
+                Attachment = $Attachment
+                Credential = $Credential
+                Priority   = $Priority
+                ReplyTo    = $ReplyTo
+            }
+            Remove-EmptyValue -Hashtable $sendGraphMailMessageSplat
+            return Send-SendGridMailMessage @sendGraphMailMessageSplat
         } else {
             $SmtpCredentials = $Credential
         }
