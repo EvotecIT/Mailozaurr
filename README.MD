@@ -70,6 +70,7 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 ## Changelog
 
 - 0.0.10 - Unreleased
+  - `Send-EmailMessage` - fix for Graph where attachments where not attached and nobody reported
   - `Send-EmailMessage` - updated error messages with tips what could be wrong
   - `Send-EmailMessage` - updated ErrorAction Stop in few places for those that prefer errors
   - `Send-EmailMessage` - added basic support for SendGrid with parameter `-SendGrid`
