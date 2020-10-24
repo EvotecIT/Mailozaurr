@@ -93,6 +93,9 @@
     .PARAMETER SendGrid
     Send email via SendGrid API
 
+    .PARAMETER SeparateTo
+    Option separates each To field into separate emails (sent as one query). Supported by SendGrid only! BCC/CC are skipped when this mode is used.
+
     .PARAMETER DoNotSaveToSentItems
     Do not save email to SentItems when sending with Office 365 Graph API
 
@@ -299,6 +302,9 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [switch] $SendGrid,
 
+        [Parameter(ParameterSetName = 'SendGrid')]
+        [switch] $SeparateTo,
+
         [Parameter(ParameterSetName = 'Graph')]
         [switch] $DoNotSaveToSentItems,
 
@@ -392,7 +398,7 @@
                 Credential           = $Credential
                 Priority             = $Priority
                 ReplyTo              = $ReplyTo
-                DoNotSaveToSentItems = $DoNotSaveToSentItems
+                DoNotSaveToSentItems = $DoNotSaveToSentItems.IsPresent
             }
             Remove-EmptyValue -Hashtable $sendGraphMailMessageSplat
             return Send-GraphMailMessage @sendGraphMailMessageSplat
@@ -410,6 +416,7 @@
                 Credential = $Credential
                 Priority   = $Priority
                 ReplyTo    = $ReplyTo
+                SeparateTo = $SeparateTo.IsPresent
             }
             Remove-EmptyValue -Hashtable $sendGraphMailMessageSplat
             return Send-SendGridMailMessage @sendGraphMailMessageSplat
