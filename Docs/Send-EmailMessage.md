@@ -42,10 +42,17 @@ Send-EmailMessage [-Server <String>] [-Port <Int32>] [-From <Object>] [-ReplyTo 
  [-Confirm] [<CommonParameters>]
 ```
 
+### SendGrid
+```
+Send-EmailMessage [-From <Object>] [-ReplyTo <String>] [-Cc <String[]>] [-Bcc <String[]>] [-To <String[]>]
+ [-Subject <String>] [-Priority <String>] -Credential <PSCredential> [-HTML <String[]>] [-Text <String[]>]
+ [-Attachment <String[]>] [-SendGrid] [-Suppress] [-WhatIf] [-Confirm] [<CommonParameters>]
+```
+
 ### Graph
 ```
 Send-EmailMessage [-From <Object>] [-ReplyTo <String>] [-Cc <String[]>] [-Bcc <String[]>] [-To <String[]>]
- [-Subject <String>] [-Priority <String>] [-Credential <PSCredential>] [-HTML <String[]>] [-Text <String[]>]
+ [-Subject <String>] [-Priority <String>] -Credential <PSCredential> [-HTML <String[]>] [-Text <String[]>]
  [-Attachment <String[]>] [-Graph] [-DoNotSaveToSentItems] [-Suppress] [-WhatIf] [-Confirm]
  [<CommonParameters>]
 ```
@@ -102,7 +109,7 @@ Parameter description
 
 ```yaml
 Type: Object
-Parameter Sets: Compatibility, oAuth, ClearText, Graph
+Parameter Sets: Compatibility, oAuth, ClearText, SendGrid, Graph
 Aliases:
 
 Required: False
@@ -117,7 +124,7 @@ Parameter description
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, oAuth, ClearText, Graph
+Parameter Sets: Compatibility, oAuth, ClearText, SendGrid, Graph
 Aliases:
 
 Required: False
@@ -132,7 +139,7 @@ Accept wildcard characters: False
 
 ```yaml
 Type: String[]
-Parameter Sets: Compatibility, oAuth, ClearText, Graph
+Parameter Sets: Compatibility, oAuth, ClearText, SendGrid, Graph
 Aliases:
 
 Required: False
@@ -147,7 +154,7 @@ Parameter description
 
 ```yaml
 Type: String[]
-Parameter Sets: Compatibility, oAuth, ClearText, Graph
+Parameter Sets: Compatibility, oAuth, ClearText, SendGrid, Graph
 Aliases:
 
 Required: False
@@ -162,7 +169,7 @@ Parameter description
 
 ```yaml
 Type: String[]
-Parameter Sets: Compatibility, oAuth, ClearText, Graph
+Parameter Sets: Compatibility, oAuth, ClearText, SendGrid, Graph
 Aliases:
 
 Required: False
@@ -177,7 +184,7 @@ Parameter description
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, oAuth, ClearText, Graph
+Parameter Sets: Compatibility, oAuth, ClearText, SendGrid, Graph
 Aliases:
 
 Required: False
@@ -192,7 +199,7 @@ Parameter description
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, oAuth, ClearText, Graph
+Parameter Sets: Compatibility, oAuth, ClearText, SendGrid, Graph
 Aliases: Importance
 
 Required: False
@@ -253,10 +260,22 @@ Accept wildcard characters: False
 
 ```yaml
 Type: PSCredential
-Parameter Sets: Compatibility, oAuth, Graph
+Parameter Sets: Compatibility, oAuth
 Aliases:
 
 Required: False
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+```yaml
+Type: PSCredential
+Parameter Sets: SendGrid, Graph
+Aliases:
+
+Required: True
 Position: Named
 Default value: None
 Accept pipeline input: False
@@ -329,7 +348,7 @@ Parameter description
 
 ```yaml
 Type: String[]
-Parameter Sets: Compatibility, oAuth, ClearText, Graph
+Parameter Sets: Compatibility, oAuth, ClearText, SendGrid, Graph
 Aliases: Body
 
 Required: False
@@ -344,7 +363,7 @@ Parameter description
 
 ```yaml
 Type: String[]
-Parameter Sets: Compatibility, oAuth, ClearText, Graph
+Parameter Sets: Compatibility, oAuth, ClearText, SendGrid, Graph
 Aliases:
 
 Required: False
@@ -359,7 +378,7 @@ Accept wildcard characters: False
 
 ```yaml
 Type: String[]
-Parameter Sets: Compatibility, oAuth, ClearText, Graph
+Parameter Sets: Compatibility, oAuth, ClearText, SendGrid, Graph
 Aliases: Attachments
 
 Required: False
@@ -405,6 +424,21 @@ Parameter description
 ```yaml
 Type: SwitchParameter
 Parameter Sets: Graph
+Aliases:
+
+Required: False
+Position: Named
+Default value: False
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -SendGrid
+{{ Fill SendGrid Description }}
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: SendGrid
 Aliases:
 
 Required: False
