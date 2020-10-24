@@ -29,6 +29,21 @@
                 value = if ($HTML) { $HTML } else { $Text }
             }
         )
+        attachments      = @(
+            foreach ($A in $Attachment) {
+                $ItemInformation = Get-Item -Path $A
+                if ($ItemInformation) {
+                    $File = [system.io.file]::ReadAllBytes($A)
+                    $Bytes = [System.Convert]::ToBase64String($File)
+                    @{
+                        'filename'    = $ItemInformation.Name
+                        #'type'  = 'text/plain'
+                        'content'     = $Bytes
+                        'disposition' = 'attachment' # inline or attachment
+                    }
+                }
+            }
+        )
     }
 
     if ($ReplyTo) {
@@ -119,26 +134,26 @@
     }
     # This is to make sure data doesn't flood with attachments content
     if ($VerbosePreference) {
-        <#
-        if ($Message.message.attachments) {
-            $Message.message.attachments | ForEach-Object {
-                if ($_.contentBytes.Length -ge 10) {
-                    $_.contentBytes = -join ($_.contentBytes.Substring(0, 10), 'ContentIsTrimmed')
+        # Trims attachments content
+        if ($SendGridMessage.attachments) {
+            $SendGridMessage.attachments | ForEach-Object {
+                if ($_.content.Length -ge 10) {
+                    $_.content = -join ($_.content.Substring(0, 10), 'ContentIsTrimmed')
                 } else {
-                    $_.contentBytes = -join ($_.contentBytes, 'ContentIsTrimmed')
+                    $_.content = -join ($_.content, 'ContentIsTrimmed')
                 }
 
             }
         }
-        If ($Message.message.body.content) {
-            if ($Message.message.body.content.Length -gt 10) {
-                $Message.message.body.content = -join ($Message.message.body.content.Substring(0, 10), 'ContentIsTrimmed')
+        # Trims body content
+        If ($SendGridMessage.content.value) {
+            if ($SendGridMessage.content[0].value.Length -gt 10) {
+                $SendGridMessage.content[0].value = -join ($SendGridMessage.content[0].value.Substring(0, 10), 'ContentIsTrimmed')
             } else {
-                $Message.message.body.content = -join ($Message.message.body.content, 'ContentIsTrimmed')
+                $SendGridMessage.content[0].value = -join ($SendGridMessage.content[0].value, 'ContentIsTrimmed')
             }
 
         }
-        #>
         $TrimmedBody = $SendGridMessage | ConvertTo-Json -Depth 5
         Write-Verbose "Message content: $TrimmedBody"
     }
