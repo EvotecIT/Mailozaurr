@@ -10,4 +10,7 @@ Send-EmailMessage -From 'przemyslaw.klys@evo.cool' `
     -Subject '😒💖 This is another test email 我' `
     -SendGrid `
     -Credential $Credential `
-    -Verbose
+    -Verbose -WhatIf
+
+Send-EmailMessage -From @{ Name = 'Przemysław Kłys'; Email = 'przemyslaw.klys@test.pl' } -To 'przemyslaw.klys@test.pl' -Credential $Credential -Text 'MyTest' -Priority High `
+    -Subject 'This is another test email' -WhatIf -SendGrid -Verbose
