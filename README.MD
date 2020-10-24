@@ -39,6 +39,31 @@ Finally since `Resolve-DNSName` is Windows specific I'm using:
 
 This started with a single goal to replace `Send-MailMessage` which is depracated/obsolete with something more modern, but since MailKit and MimeKit have lots of options why not build on that?
 
+## Features
+
+- Send Email (`Send-EmailMessage`) using:
+  - [x] SMTP with standard password
+  - [x] SMTP with oAuth2 Office 365
+  - [x] SMTP with oAuth2 Google Mail
+  - [x] SMTP with SendGrid
+  - [x] SendGrid API
+  - [x] Office 365 Graph API
+- POP3
+  - [x] Connect to POP3
+  - [x] Get POP3 Emails
+  - [x] Save POP3 Emails
+- IMAP
+  - [x] Connect to IMAP
+  - [x] Get IMAP Folder
+  - [ ] Get Messages (you have to your own work to get what you need). Needs improvements!
+- DNS Checks via TCP/UDP, but also via HTTPS using Cloudflare/Google providers
+  - [x] DKIM Reporting (`Find-DKIMRecord`)
+  - [x] MX Reporting (`Find-MXRecord`)
+  - [x] DMARC Reporting (`Find-DMARCRecord`)
+  - [x] SPF Reporting (`Find-SPFRecord`)
+
+Many more... but I am too lazy to name them
+
 ## Documentation
 
 While I didn't spent much time creating WIKI, working on Get-Help documentation, I did write blog articles that should help you get started.
