@@ -47,6 +47,8 @@ While I didn't spent much time creating WIKI, working on Get-Help documentation,
 
 You can also utilize Examples which should help to understand use cases. Of course it would be great having pretty help so if you can help me out feel free to submit PR's.
 
+Keep in mind PSSharedGoods is only required for development. When you use this module from PowerShellGallery it's not installed as everything is merged.
+
 ## To install
 
 ```powershell
@@ -70,6 +72,7 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 - 0.0.10 - Unreleased
   - `Send-EmailMessage` - updated error messages with tips what could be wrong
   - `Send-EmailMessage` - updated ErrorAction Stop in few places for those that prefer errors
+  - `Send-EmailMessage` - added basic support for SendGrid with parameter `-SendGrid`
   - `Find-MXRecord` - updated with `DNSProvider` (`Cloudflare`/`Google`) for calls over HTTPS
   - `Find-SPFRecord` - updated with `DNSProvider` (`Cloudflare`/`Google`) for calls over HTTPS
   - `Find-DKIMRecord` - updated with `DNSProvider` (`Cloudflare`/`Google`) for calls over HTTPS

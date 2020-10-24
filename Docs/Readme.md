@@ -29,6 +29,9 @@ Locale: en-US
 ### [ConvertTo-OAuth2Credential](ConvertTo-OAuth2Credential.md)
 {{ Fill in the Synopsis }}
 
+### [ConvertTo-SendGridCredential](ConvertTo-SendGridCredential.md)
+{{ Fill in the Synopsis }}
+
 ### [Disconnect-IMAP](Disconnect-IMAP.md)
 {{ Fill in the Synopsis }}
 
