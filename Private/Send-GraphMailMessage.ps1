@@ -55,9 +55,9 @@ function Send-GraphMailMessage {
             )
             attachments   = @(
                 foreach ($A in $Attachment) {
-                    $ItemInformation = Get-Item -Path $FilePath
+                    $ItemInformation = Get-Item -Path $A
                     if ($ItemInformation) {
-                        $File = [system.io.file]::ReadAllBytes($FilePath)
+                        $File = [system.io.file]::ReadAllBytes($A)
                         $Bytes = [System.Convert]::ToBase64String($File)
                         @{
                             '@odata.type'  = '#microsoft.graph.fileAttachment'
@@ -117,7 +117,7 @@ function Send-GraphMailMessage {
                 else {
                     $_.contentBytes = -join ($_.contentBytes, 'ContentIsTrimmed')
                 }
-                
+
             }
         }
         If ($Message.message.body.content) {
@@ -127,7 +127,7 @@ function Send-GraphMailMessage {
             else {
                 $Message.message.body.content = -join ($Message.message.body.content, 'ContentIsTrimmed')
             }
-            
+
         }
         $TrimmedBody = $Message | ConvertTo-Json -Depth 5
         Write-Verbose "Message content: $TrimmedBody"
