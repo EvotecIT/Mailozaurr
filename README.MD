@@ -56,13 +56,17 @@ This started with a single goal to replace `Send-MailMessage` which is depracate
   - [x] Connect to IMAP
   - [x] Get IMAP Folder
   - [ ] Get Messages (you have to your own work to get what you need). Needs improvements!
+- Office 365 Graph API
+  - [x] Get Mail Folders
+  - [x] Get Mail Messages
+  - [x] Save Mail Messages
 - DNS Checks via TCP/UDP, but also via HTTPS using Cloudflare/Google providers
   - [x] DKIM Reporting (`Find-DKIMRecord`)
   - [x] MX Reporting (`Find-MXRecord`)
   - [x] DMARC Reporting (`Find-DMARCRecord`)
   - [x] SPF Reporting (`Find-SPFRecord`)
-
-Many more... but I am too lazy to name them
+- Email Validation
+  - [x] Test Email Address for errors
 
 ## Documentation
 

@@ -46,7 +46,7 @@ Send-EmailMessage [-Server <String>] [-Port <Int32>] [-From <Object>] [-ReplyTo 
 ```
 Send-EmailMessage [-From <Object>] [-ReplyTo <String>] [-Cc <String[]>] [-Bcc <String[]>] [-To <String[]>]
  [-Subject <String>] [-Priority <String>] -Credential <PSCredential> [-HTML <String[]>] [-Text <String[]>]
- [-Attachment <String[]>] [-SendGrid] [-Suppress] [-WhatIf] [-Confirm] [<CommonParameters>]
+ [-Attachment <String[]>] [-SendGrid] [-SeparateTo] [-Suppress] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ### Graph
@@ -435,6 +435,21 @@ Accept wildcard characters: False
 
 ### -SendGrid
 {{ Fill SendGrid Description }}
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: SendGrid
+Aliases:
+
+Required: False
+Position: Named
+Default value: False
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -SeparateTo
+Option separates each To field into separate emails (sent as one query). Supported by SendGrid only! BCC/CC are skipped when this mode is used.
 
 ```yaml
 Type: SwitchParameter
