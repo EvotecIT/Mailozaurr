@@ -44,6 +44,9 @@ Locale: en-US
 ### [Find-DMARCRecord](Find-DMARCRecord.md)
 {{ Fill in the Synopsis }}
 
+### [Find-DNSBL](Find-DNSBL.md)
+{{ Fill in the Synopsis }}
+
 ### [Find-MxRecord](Find-MxRecord.md)
 {{ Fill in the Synopsis }}
 

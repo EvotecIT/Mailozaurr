@@ -65,6 +65,7 @@ This started with a single goal to replace `Send-MailMessage` which is depracate
   - [x] MX Reporting (`Find-MXRecord`)
   - [x] DMARC Reporting (`Find-DMARCRecord`)
   - [x] SPF Reporting (`Find-SPFRecord`)
+  - [x] DNSBL Reporting (`Find-DNSBL`)
 - Email Validation
   - [x] Test Email Address for errors
 
@@ -107,6 +108,7 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
   - `Find-SPFRecord` - updated with `DNSProvider` (`Cloudflare`/`Google`) for calls over HTTPS
   - `Find-DKIMRecord` - updated with `DNSProvider` (`Cloudflare`/`Google`) for calls over HTTPS
   - `Find-DMARCRecord` - updated with `DNSProvider` (`Cloudflare`/`Google`) for calls over HTTPS
+  - `Find-DNSBL` - added, same options as above
   - `Resolve-DNSRequestRest` - Added just in case
 - 0.0.9 - 2020.08.11
   - DNS Records
