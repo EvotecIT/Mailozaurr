@@ -11,6 +11,8 @@ $Configuration = @{
 
         LibrariesCore     = 'Lib\Core'
         LibrariesDefault  = 'Lib\Default'
+        #LibrariesCore     = 'Lib\Standard'
+        #LibrariesDefault  = 'Lib\Standard'
 
         Manifest          = @{
             # Version number of this module.
@@ -36,9 +38,9 @@ $Configuration = @{
 
             ProjectUri                 = 'https://github.com/EvotecIT/MailoZaurr'
 
-            #RequiredModules      = @(
-            #    @{ ModuleName = 'PSSharedGoods'; ModuleVersion = "Latest"; Guid = 'ee272aa8-baaa-4edf-9f45-b6d6f7d844fe' }
-            #)
+            RequiredModules            = @(
+                @{ ModuleName = 'PSSharedGoods'; ModuleVersion = "Latest"; Guid = 'ee272aa8-baaa-4edf-9f45-b6d6f7d844fe' }
+            )
             ExternalModuleDependencies = @(
                 'Microsoft.PowerShell.Management'
                 'Microsoft.PowerShell.Security'
@@ -157,10 +159,10 @@ $Configuration = @{
             Verbose         = $false
         }
         PublishModule      = @{  # requires Enable to be on to process all of that
-            Enabled      = $true
+            Enabled      = $false
             Prerelease   = ''
             RequireForce = $false
-            GitHub       = $true
+            GitHub       = $false
         }
     }
 }

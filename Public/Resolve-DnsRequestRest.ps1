@@ -26,12 +26,12 @@
     #>
     [cmdletBinding()]
     param(
+        [alias('Query')][Parameter(Mandatory, Position = 0)][string] $Name,
+        [Parameter(Mandatory, Position = 1)][string] $Type,
         [ValidateSet('Cloudflare', 'Google')][string] $DNSProvider = 'Cloudflare',
-        [alias('Query')][Parameter(Mandatory)][string] $Name,
-        [Parameter(Mandatory)][DnsQueryType] $Type,
         [switch] $All
     )
-    if ($Type -eq [DnsQueryType]::PTR) {
+    if ($Type -eq 'PTR') {
         $Name = $Name -replace '^(\d+)\.(\d+)\.(\d+)\.(\d+)$', '$4.$3.$2.$1.in-addr.arpa'
     }
     if ($DNSProvider -eq 'Cloudflare') {
@@ -40,7 +40,7 @@
         $Q = Invoke-RestMethod -Uri "https://dns.google.com/resolve?name=$Name&type=$Type"
     }
     $Answers = foreach ($Answer in $Q.Answer) {
-        if ($Type -eq [DnsQueryType]::MX) {
+        if ($Type -eq 'MX') {
             $Data = $Answer.data -split ' '
             [PSCustomObject] @{
                 Name       = $Answer.Name
@@ -48,6 +48,13 @@
                 TimeToLive = $Answer.TTL
                 Exchange   = $Data[1]
                 Preference = $Data[0]
+            }
+        } elseif ($Type -eq 'A') {
+            [PSCustomObject] @{
+                Name       = $Answer.Name
+                Count      = $Answer.Type
+                TimeToLive = $Answer.TTL
+                Address    = $Answer.data #.TrimStart('"').TrimEnd('"')
             }
         } else {
             [PSCustomObject] @{
@@ -67,3 +74,5 @@
         $Answers
     }
 }
+
+Register-ArgumentCompleter -CommandName Resolve-DnsQueryRest -ParameterName Type -ScriptBlock $Script:DNSQueryTypes
