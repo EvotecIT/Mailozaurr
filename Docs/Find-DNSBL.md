@@ -8,7 +8,7 @@ schema: 2.0.0
 # Find-DNSBL
 
 ## SYNOPSIS
-{{ Fill in the Synopsis }}
+Searches DNSBL if particular IP is blocked on DNSBL.
 
 ## SYNTAX
 
@@ -28,21 +28,34 @@ Find-DNSBL -IP <String[]> [-BlockListServers <String[]>] [-All] [-DNSProvider <S
 ```
 
 ## DESCRIPTION
-{{ Fill in the Description }}
+Searches DNSBL if particular IP is blocked on DNSBL.
 
 ## EXAMPLES
 
-### Example 1
-```powershell
-PS C:\> {{ Add example code here }}
+### EXAMPLE 1
+```
+Find-DNSBL -IP '89.74.48.96' | Format-Table
 ```
 
-{{ Add example description here }}
+### EXAMPLE 2
+```
+Find-DNSBL -IP '89.74.48.96', '89.74.48.97', '89.74.48.98' | Format-Table
+```
+
+### EXAMPLE 3
+```
+Find-DNSBL -IP '89.74.48.96' -DNSServer 1.1.1.1 | Format-Table
+```
+
+### EXAMPLE 4
+```
+Find-DNSBL -IP '89.74.48.96' -DNSProvider Cloudflare | Format-Table
+```
 
 ## PARAMETERS
 
 ### -IP
-{{ Fill IP Description }}
+IP to check if it exists on DNSBL
 
 ```yaml
 Type: String[]
@@ -57,7 +70,7 @@ Accept wildcard characters: False
 ```
 
 ### -BlockListServers
-{{ Fill BlockListServers Description }}
+Provide your own blocklist of servers
 
 ```yaml
 Type: String[]
@@ -66,13 +79,14 @@ Aliases:
 
 Required: False
 Position: Named
-Default value: None
+Default value: $Script:BlockList
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
 ### -All
-{{ Fill All Description }}
+Return All entries.
+By default it returns only those on DNSBL.
 
 ```yaml
 Type: SwitchParameter
@@ -81,13 +95,14 @@ Aliases:
 
 Required: False
 Position: Named
-Default value: None
+Default value: False
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
 ### -DNSServer
-{{ Fill DNSServer Description }}
+Allows to choose DNS IP address to ask for DNS query.
+By default uses system ones.
 
 ```yaml
 Type: String
@@ -121,11 +136,9 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-### None
-
 ## OUTPUTS
 
-### System.Object
 ## NOTES
+General notes
 
 ## RELATED LINKS

@@ -8,7 +8,7 @@ schema: 2.0.0
 # Resolve-DnsQueryRest
 
 ## SYNOPSIS
-{{ Fill in the Synopsis }}
+Provides basic DNS Query via HTTPS
 
 ## SYNTAX
 
@@ -17,21 +17,19 @@ Resolve-DnsQueryRest [-Name] <String> [-Type] <String> [-DNSProvider <String>] [
 ```
 
 ## DESCRIPTION
-{{ Fill in the Description }}
+Provides basic DNS Query via HTTPS - tested only for use cases within Mailozaurr
 
 ## EXAMPLES
 
-### Example 1
-```powershell
-PS C:\> {{ Add example code here }}
+### EXAMPLE 1
 ```
-
-{{ Add example description here }}
+Resolve-DnsQueryRest -Name 'evotec.pl' -Type TXT -DNSProvider Cloudflare
+```
 
 ## PARAMETERS
 
 ### -Name
-{{ Fill Name Description }}
+Name/DomainName to query DNS
 
 ```yaml
 Type: String
@@ -46,7 +44,7 @@ Accept wildcard characters: False
 ```
 
 ### -Type
-{{ Fill Type Description }}
+Type of a query A, PTR, MX and so on
 
 ```yaml
 Type: String
@@ -61,7 +59,8 @@ Accept wildcard characters: False
 ```
 
 ### -DNSProvider
-Allows to choose DNS Provider that will be used for HTTPS based DNS query (Cloudlare or Google). Default is Cloudflare
+Allows to choose DNS Provider that will be used for HTTPS based DNS query (Cloudlare or Google).
+Default is Cloudflare
 
 ```yaml
 Type: String
@@ -76,7 +75,7 @@ Accept wildcard characters: False
 ```
 
 ### -All
-{{ Fill All Description }}
+Returns full output rather than just custom, translated data
 
 ```yaml
 Type: SwitchParameter
@@ -85,7 +84,7 @@ Aliases:
 
 Required: False
 Position: Named
-Default value: None
+Default value: False
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
@@ -95,11 +94,9 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-### None
-
 ## OUTPUTS
 
-### System.Object
 ## NOTES
+General notes
 
 ## RELATED LINKS

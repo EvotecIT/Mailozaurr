@@ -8,7 +8,7 @@ schema: 2.0.0
 # Find-DKIMRecord
 
 ## SYNOPSIS
-{{ Fill in the Synopsis }}
+Queries DNS to provide DKIM information
 
 ## SYNTAX
 
@@ -18,21 +18,35 @@ Find-DKIMRecord [-DomainName] <Array> [-Selector <String>] [-DnsServer <String>]
 ```
 
 ## DESCRIPTION
-{{ Fill in the Description }}
+Queries DNS to provide DKIM information
 
 ## EXAMPLES
 
-### Example 1
-```powershell
-PS C:\> {{ Add example code here }}
+### EXAMPLE 1
+```
+# Standard way
 ```
 
-{{ Add example description here }}
+Find-DKIMRecord -DomainName 'evotec.pl', 'evotec.xyz' | Format-Table *
+
+### EXAMPLE 2
+```
+# Https way via Cloudflare
+```
+
+Find-DKIMRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare | Format-Table *
+
+### EXAMPLE 3
+```
+# Https way via Google
+```
+
+Find-DKIMRecord -DomainName 'evotec.pl', 'evotec.xyz' -Selector 'selector1' -DNSProvider Google | Format-Table *
 
 ## PARAMETERS
 
 ### -DomainName
-{{ Fill DomainName Description }}
+Name/DomainName to query for DKIM record
 
 ```yaml
 Type: Array
@@ -47,7 +61,8 @@ Accept wildcard characters: False
 ```
 
 ### -Selector
-{{ Fill Selector Description }}
+Selector name.
+Default: selector1
 
 ```yaml
 Type: String
@@ -56,13 +71,14 @@ Aliases:
 
 Required: False
 Position: Named
-Default value: None
+Default value: Selector1
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
 ### -DnsServer
-{{ Fill DnsServer Description }}
+Allows to choose DNS IP address to ask for DNS query.
+By default uses system ones.
 
 ```yaml
 Type: String
@@ -92,7 +108,7 @@ Accept wildcard characters: False
 ```
 
 ### -AsHashTable
-{{ Fill AsHashTable Description }}
+Returns Hashtable instead of PSCustomObject
 
 ```yaml
 Type: SwitchParameter
@@ -101,13 +117,13 @@ Aliases:
 
 Required: False
 Position: Named
-Default value: None
+Default value: False
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
 ### -AsObject
-{{ Fill AsObject Description }}
+Returns an object rather than string based represantation for name servers (for easier display purposes)
 
 ```yaml
 Type: SwitchParameter
@@ -116,7 +132,7 @@ Aliases:
 
 Required: False
 Position: Named
-Default value: None
+Default value: False
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
@@ -126,11 +142,9 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-### System.String[]
-
 ## OUTPUTS
 
-### System.Object
 ## NOTES
+General notes
 
 ## RELATED LINKS

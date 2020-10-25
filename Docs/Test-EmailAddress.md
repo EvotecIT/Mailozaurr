@@ -8,7 +8,7 @@ schema: 2.0.0
 # Test-EmailAddress
 
 ## SYNOPSIS
-{{ Fill in the Synopsis }}
+Checks if email address matches conditions to be valid email address.
 
 ## SYNTAX
 
@@ -17,21 +17,29 @@ Test-EmailAddress [-EmailAddress] <String[]> [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-{{ Fill in the Description }}
+Checks if email address matches conditions to be valid email address.
 
 ## EXAMPLES
 
-### Example 1
-```powershell
-PS C:\> {{ Add example code here }}
+### EXAMPLE 1
+```
+Test-EmailAddress -EmailAddress 'przemyslaw.klys@test'
 ```
 
-{{ Add example description here }}
+### EXAMPLE 2
+```
+Test-EmailAddress -EmailAddress 'przemyslaw.klys@test.pl'
+```
+
+### EXAMPLE 3
+```
+Test-EmailAddress -EmailAddress 'przemyslaw.klys@test','przemyslaw.klys@test.pl'
+```
 
 ## PARAMETERS
 
 ### -EmailAddress
-{{ Fill EmailAddress Description }}
+EmailAddress to check
 
 ```yaml
 Type: String[]
@@ -50,11 +58,9 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-### System.String[]
-
 ## OUTPUTS
 
-### System.Object
 ## NOTES
+General notes
 
 ## RELATED LINKS

@@ -8,7 +8,7 @@ schema: 2.0.0
 # Find-MxRecord
 
 ## SYNOPSIS
-{{ Fill in the Synopsis }}
+Queries DNS to provide MX information
 
 ## SYNTAX
 
@@ -18,21 +18,56 @@ Find-MxRecord [-DomainName] <Array> [-DnsServer <String>] [-DNSProvider <String>
 ```
 
 ## DESCRIPTION
-{{ Fill in the Description }}
+Queries DNS to provide MX information
 
 ## EXAMPLES
 
-### Example 1
-```powershell
-PS C:\> {{ Add example code here }}
+### EXAMPLE 1
+```
+# Standard way
 ```
 
-{{ Add example description here }}
+Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' | Format-Table *
+
+### EXAMPLE 2
+```
+# Https way via Cloudflare
+```
+
+Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare | Format-Table *
+
+### EXAMPLE 3
+```
+# Https way via Google
+```
+
+Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Google | Format-Table *
+
+### EXAMPLE 4
+```
+# Standard way with ResolvePTR
+```
+
+Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -ResolvePTR | Format-Table *
+
+### EXAMPLE 5
+```
+# Https way via Cloudflare with ResolvePTR
+```
+
+Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare -ResolvePTR | Format-Table *
+
+### EXAMPLE 6
+```
+# Https way via Google with ResolvePTR
+```
+
+Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Google -ResolvePTR | Format-Table *
 
 ## PARAMETERS
 
 ### -DomainName
-{{ Fill DomainName Description }}
+Name/DomainName to query for MX record
 
 ```yaml
 Type: Array
@@ -47,7 +82,8 @@ Accept wildcard characters: False
 ```
 
 ### -DnsServer
-{{ Fill DnsServer Description }}
+Allows to choose DNS IP address to ask for DNS query.
+By default uses system ones.
 
 ```yaml
 Type: String
@@ -77,7 +113,7 @@ Accept wildcard characters: False
 ```
 
 ### -ResolvePTR
-{{ Fill ResolvePTR Description }}
+Parameter description
 
 ```yaml
 Type: SwitchParameter
@@ -86,13 +122,13 @@ Aliases:
 
 Required: False
 Position: Named
-Default value: None
+Default value: False
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
 ### -AsHashTable
-{{ Fill AsHashTable Description }}
+Returns Hashtable instead of PSCustomObject
 
 ```yaml
 Type: SwitchParameter
@@ -101,13 +137,13 @@ Aliases:
 
 Required: False
 Position: Named
-Default value: None
+Default value: False
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
 ### -Separate
-{{ Fill Separate Description }}
+Returns each MX record separatly
 
 ```yaml
 Type: SwitchParameter
@@ -116,13 +152,13 @@ Aliases:
 
 Required: False
 Position: Named
-Default value: None
+Default value: False
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
 ### -AsObject
-{{ Fill AsObject Description }}
+Returns an object rather than string based represantation for name servers (for easier display purposes)
 
 ```yaml
 Type: SwitchParameter
@@ -131,7 +167,7 @@ Aliases:
 
 Required: False
 Position: Named
-Default value: None
+Default value: False
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
@@ -141,11 +177,9 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-### System.String[]
-
 ## OUTPUTS
 
-### System.Object
 ## NOTES
+General notes
 
 ## RELATED LINKS
