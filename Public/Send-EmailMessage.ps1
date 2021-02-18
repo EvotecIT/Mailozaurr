@@ -72,6 +72,9 @@
     .PARAMETER UseSsl
     Specifies using StartTLS option. It's recommended to leave it disabled and use SecureSocketOptions which should take care of all security needs
 
+    .PARAMETER SkipCertificateRevocation
+    Specifies to skip certificate revocation check
+
     .PARAMETER HTML
     HTML content to send email
 
@@ -266,6 +269,11 @@
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $UseSsl,
+
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Compatibility')]
+        [switch] $SkipCertificateRevocation,
 
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
@@ -482,6 +490,9 @@
 
     ### SMTP Part Below
     $SmtpClient = [MySmtpClient]::new()
+    if ($SkipCertificateRevocation) {
+        $SmtpClient.CheckCertificateRevocation = $false
+    }
     if ($DeliveryNotificationOption) {
         # This requires custom class MySmtpClient
         $SmtpClient.DeliveryNotificationOption = $DeliveryNotificationOption
