@@ -99,6 +99,8 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 
 ## Changelog
 
+- 0.0.11
+  - Added `SkipCertificateRevocation` to `Send-EmailMessage` [#13](https://github.com/EvotecIT/Mailozaurr/issues/13)
 - 0.0.10 - 2020.10.25
   - `Send-EmailMessage` - fix for Graph where attachments where not attached and nobody reported
   - `Send-EmailMessage` - updated error messages with tips what could be wrong
