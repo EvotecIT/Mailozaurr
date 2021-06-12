@@ -102,7 +102,7 @@ function Find-MxRecord {
                         ErrorAction = 'SilentlyContinue'
                     }
                     if ($DNSProvider) {
-                        (Resolve-DnsQueryRest @Splat -DNSProvider $DnsProvider) | ForEach-Object { $_.Text }
+                        (Resolve-DnsQueryRest @Splat -DNSProvider $DnsProvider) | ForEach-Object { $_.Address }
                     } else {
                         if ($DnsServer) {
                             $Splat['Server'] = $DnsServer
