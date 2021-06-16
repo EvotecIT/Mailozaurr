@@ -82,7 +82,7 @@ Accept wildcard characters: False
 Type: QueryType
 Parameter Sets: (All)
 Aliases:
-Accepted values: A, NS, MD, MF, CNAME, SOA, MB, MG, MR, NULL, WKS, PTR, HINFO, MINFO, MX, TXT, RP, AFSDB, AAAA, SRV, DS, SSHFP, RRSIG, NSEC, DNSKEY, TLSA, SPF, AXFR, ANY, URI, CAA
+Accepted values: A, NS, MD, MF, CNAME, SOA, MB, MG, MR, NULL, WKS, PTR, HINFO, MINFO, MX, TXT, RP, AFSDB, AAAA, SRV, SSHFP, RRSIG, AXFR, ANY, URI, CAA
 
 Required: True
 Position: 1
