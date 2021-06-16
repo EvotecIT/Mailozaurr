@@ -576,6 +576,12 @@
                     SentTo = $MailSentTo
                 }
             }
+        } else {
+            [PSCustomObject] @{
+                Status = $false
+                Error  = 'Email not sent (WhatIf)'
+                SentTo = $MailSentTo
+            }
         }
     } catch {
         if ($PSBoundParameters.ErrorAction -eq 'Stop') {
