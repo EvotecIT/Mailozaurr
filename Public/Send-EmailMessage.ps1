@@ -577,10 +577,12 @@
                 }
             }
         } else {
-            [PSCustomObject] @{
-                Status = $false
-                Error  = 'Email not sent (WhatIf)'
-                SentTo = $MailSentTo
+            if (-not $Suppress) {
+                [PSCustomObject] @{
+                    Status = $false
+                    Error  = 'Email not sent (WhatIf)'
+                    SentTo = $MailSentTo
+                }
             }
         }
     } catch {

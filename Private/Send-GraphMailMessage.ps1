@@ -89,6 +89,14 @@ function Send-GraphMailMessage {
                     SentFrom = $FromField
                 }
             }
+        } else {
+            if (-not $Suppress) {
+                [PSCustomObject] @{
+                    Status = $false
+                    Error  = 'Email not sent (WhatIf)'
+                    SentTo = $MailSentTo
+                }
+            }
         }
     } catch {
         if ($PSBoundParameters.ErrorAction -eq 'Stop') {
@@ -111,20 +119,18 @@ function Send-GraphMailMessage {
     if ($VerbosePreference) {
         if ($Message.message.attachments) {
             $Message.message.attachments | ForEach-Object {
-                if($_.contentBytes.Length -ge 10){
+                if ($_.contentBytes.Length -ge 10) {
                     $_.contentBytes = -join ($_.contentBytes.Substring(0, 10), 'ContentIsTrimmed')
-                }
-                else {
+                } else {
                     $_.contentBytes = -join ($_.contentBytes, 'ContentIsTrimmed')
                 }
 
             }
         }
         If ($Message.message.body.content) {
-            if($Message.message.body.content.Length -gt 10){
+            if ($Message.message.body.content.Length -gt 10) {
                 $Message.message.body.content = -join ($Message.message.body.content.Substring(0, 10), 'ContentIsTrimmed')
-            }
-            else {
+            } else {
                 $Message.message.body.content = -join ($Message.message.body.content, 'ContentIsTrimmed')
             }
 
