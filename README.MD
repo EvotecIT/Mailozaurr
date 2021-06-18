@@ -99,7 +99,7 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 
 ## Changelog
 
-- 0.0.11
+- 0.0.11 - 2021.06.18
   - Added `SkipCertificateRevocation` to `Send-EmailMessage` [#13](https://github.com/EvotecIT/Mailozaurr/issues/13)
   - 🐛 Fixed PTR records in `Find-MXRecord` when using HTTPS
   - Small improvement to `Send-EmailMessage` returning object when using `WhatIf`
