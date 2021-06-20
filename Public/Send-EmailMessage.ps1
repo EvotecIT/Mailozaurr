@@ -108,6 +108,9 @@
     .PARAMETER Suppress
     Do not display summary in [PSCustomObject]
 
+    .PARAMETER AsSecureString
+    Informs command that password provided is secure string, rather than clear text
+
     .EXAMPLE
     if (-not $MailCredentials) {
         $MailCredentials = Get-Credential
@@ -174,16 +177,19 @@
     #>
     [cmdletBinding(DefaultParameterSetName = 'Compatibility', SupportsShouldProcess)]
     param(
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [alias('SmtpServer')][string] $Server,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [int] $Port = 587,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -191,6 +197,7 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [object] $From,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -198,6 +205,7 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [string] $ReplyTo,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -205,6 +213,7 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [string[]] $Cc,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -212,6 +221,7 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [string[]] $Bcc,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -219,6 +229,7 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [string[]] $To,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -226,6 +237,7 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [string] $Subject,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -233,16 +245,19 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [alias('Importance')][ValidateSet('Low', 'Normal', 'High')][string] $Priority,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [ValidateSet('ASCII', 'BigEndianUnicode', 'Default', 'Unicode', 'UTF32', 'UTF7', 'UTF8')][string] $Encoding = 'Default',
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [ValidateSet('None', 'OnSuccess', 'OnFailure', 'Delay', 'Never')][string[]] $DeliveryNotificationOption,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -254,27 +269,33 @@
         [Parameter(ParameterSetName = 'SendGrid', Mandatory)]
         [pscredential] $Credential,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [string] $Username,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [string] $Password,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [MailKit.Security.SecureSocketOptions] $SecureSocketOptions = [MailKit.Security.SecureSocketOptions]::Auto,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $UseSsl,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $SkipCertificateRevocation,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -282,6 +303,7 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [alias('Body')][string[]] $HTML,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -289,6 +311,7 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [string[]] $Text,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -296,6 +319,7 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [alias('Attachments')][string[]] $Attachment,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -306,6 +330,9 @@
 
         [Parameter(ParameterSetName = 'Graph')]
         [switch] $Graph,
+
+        [Parameter(ParameterSetName = 'SecureString')]
+        [switch] $AsSecureString,
 
         [Parameter(ParameterSetName = 'SendGrid')]
         [switch] $SendGrid,
@@ -320,6 +347,7 @@
         [Parameter(ParameterSetName = 'Grouped')]
         [alias('EmailParameters')][System.Collections.IDictionary] $Email,
 
+        [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -431,6 +459,15 @@
         } else {
             $SmtpCredentials = $Credential
         }
+    } elseif ($Username -and $Password -and $AsSecureString) {
+        # Convert to SecureString
+        try {
+            $secStringPassword = ConvertTo-SecureString -ErrorAction Stop -String $Password
+            $SmtpCredentials = [System.Management.Automation.PSCredential]::new($UserName, $secStringPassword)
+        } catch {
+            Write-Warning "Send-EmailMessage - Couldn't translate secure string to password. Error $(_.Exception.Message)"
+            return
+        }
     } elseif ($Username -and $Password) {
         #void Authenticate(string userName, string password, System.Threading.CancellationToken cancellationToken)
     }
@@ -522,7 +559,7 @@
             }
         }
     }
-    if ($Credential) {
+    if ($SmtpCredentials) {
         if ($oAuth2.IsPresent) {
             $SmtpClient.Authenticate($SaslMechanismOAuth2)
         } elseif ($Graph.IsPresent) {
