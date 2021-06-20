@@ -465,7 +465,7 @@
             $secStringPassword = ConvertTo-SecureString -ErrorAction Stop -String $Password
             $SmtpCredentials = [System.Management.Automation.PSCredential]::new($UserName, $secStringPassword)
         } catch {
-            Write-Warning "Send-EmailMessage - Couldn't translate secure string to password. Error $(_.Exception.Message)"
+            Write-Warning "Send-EmailMessage - Couldn't translate secure string to password. Error $($_.Exception.Message)"
             return
         }
     } elseif ($Username -and $Password) {
