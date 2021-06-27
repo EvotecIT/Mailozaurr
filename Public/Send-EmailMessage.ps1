@@ -75,6 +75,9 @@
     .PARAMETER SkipCertificateRevocation
     Specifies to skip certificate revocation check
 
+    .PARAMETER SkipCertificateValidatation
+    Specifies to skip certficate validation. Useful when using IP Address or self-generated certificates.
+
     .PARAMETER HTML
     HTML content to send email
 
@@ -294,6 +297,12 @@
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $SkipCertificateRevocation,
+
+        [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'ClearText')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Compatibility')]
+        [switch] $SkipCertificateValidatation,
 
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'ClearText')]
@@ -530,6 +539,11 @@
     if ($SkipCertificateRevocation) {
         $SmtpClient.CheckCertificateRevocation = $false
     }
+    if ($SkipCertificateValidatation) {
+        $CertificateCallback = [Net.ServicePointManager]::ServerCertificateValidationCallback
+        [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
+        #$SmtpClient.ServerCertificateValidationCallback = [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
+    }
     if ($DeliveryNotificationOption) {
         # This requires custom class MySmtpClient
         $SmtpClient.DeliveryNotificationOption = $DeliveryNotificationOption
@@ -543,13 +557,18 @@
     }
     try {
         $SmtpClient.Connect($Server, $Port, $SecureSocketOptions)
+        # Assign back certificate callback
+        [Net.ServicePointManager]::ServerCertificateValidationCallback = $CertificateCallback
     } catch {
+        # Assign back certificate callback
+        [Net.ServicePointManager]::ServerCertificateValidationCallback = $CertificateCallback
+
         if ($PSBoundParameters.ErrorAction -eq 'Stop') {
             Write-Error $_
             return
         } else {
             Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
-            Write-Warning "Send-EmailMessage - Possible issue: Port? ($Port was used), Using SSL? ($SecureSocketOptions was used)"
+            Write-Warning "Send-EmailMessage - Possible issue: Port? ($Port was used), Using SSL? ($SecureSocketOptions was used). You can also try SkipCertificateValidation or SkipCertificateRevocation. "
             if (-not $Suppress) {
                 return [PSCustomObject] @{
                     Status = $False
