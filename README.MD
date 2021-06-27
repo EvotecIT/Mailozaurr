@@ -99,7 +99,7 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 
 ## Changelog
 
-- 0.0.13
+- 0.0.13 - 2021.06.27
   - Added `SkipCertificateValidatation` to `Send-EmailMessage`
   - Downgraded `MailKit/MimeKit 2.12.0`
 - 0.0.12 - 2021.06.20
