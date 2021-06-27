@@ -99,6 +99,9 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 
 ## Changelog
 
+- 0.0.13
+  - Added `SkipCertificateValidatation` to `Send-EmailMessage`
+  - Downgraded `MailKit/MimeKit 2.12.0`
 - 0.0.12 - 2021.06.20
   - Added `AsSecureString` to `Send-EmailMessage` which allows to provide `-AsSecureString -Username 'przemyslaw.klys@domain.pl' -Password $secStringPassword`
 - 0.0.11 - 2021.06.18
