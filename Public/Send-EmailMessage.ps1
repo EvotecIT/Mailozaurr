@@ -581,7 +581,23 @@
     }
     if ($SmtpCredentials) {
         if ($oAuth2.IsPresent) {
-            $SmtpClient.Authenticate($SaslMechanismOAuth2)
+            try {
+                $SmtpClient.Authenticate($SaslMechanismOAuth2)
+            } catch {
+                if ($PSBoundParameters.ErrorAction -eq 'Stop') {
+                    Write-Error $_
+                    return
+                } else {
+                    Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
+                    if (-not $Suppress) {
+                        return [PSCustomObject] @{
+                            Status = $False
+                            Error  = $($_.Exception.Message)
+                            SentTo = $MailSentTo
+                        }
+                    }
+                }
+            }
         } elseif ($Graph.IsPresent) {
             # This is not going to happen is graph is used
         } else {
