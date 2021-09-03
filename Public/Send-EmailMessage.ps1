@@ -429,6 +429,7 @@
         if ($oAuth2.IsPresent) {
             $Authorization = ConvertFrom-OAuth2Credential -Credential $Credential
             $SaslMechanismOAuth2 = [MailKit.Security.SaslMechanismOAuth2]::new($Authorization.UserName, $Authorization.Token)
+            $SmtpCredentials = $Credential
         } elseif ($Graph.IsPresent) {
             # Sending email via Office 365 Graph
             $sendGraphMailMessageSplat = @{
