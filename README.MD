@@ -99,6 +99,8 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 
 ## Changelog
 
+- 0.0.17
+  - Fixes `oAuth2` [#17](https://github.com/EvotecIT/Mailozaurr/issues/17)
 - 0.0.16 - 2021.07.23
   - Moved Class.MySmtpClient to be loaded from separate file via dot sourcing - hopefully fixes [#16](https://github.com/EvotecIT/Mailozaurr/issues/16)
 - 0.0.15 - 2021.07.18
