@@ -24,7 +24,17 @@ function Connect-oAuthO365 {
     $Options.TenantId = $TenantID
     $Options.RedirectUri = $RedirectUri
 
-    $PublicClientApplication = [Microsoft.Identity.Client.PublicClientApplicationBuilder]::CreateWithApplicationOptions($Options).Build()
+    try {
+        $PublicClientApplication = [Microsoft.Identity.Client.PublicClientApplicationBuilder]::CreateWithApplicationOptions($Options).Build()
+    } catch {
+        if ($PSBoundParameters.ErrorAction -eq 'Stop') {
+            Write-Error $_
+            return
+        } else {
+            Write-Warning "Connect-oAuthO365 - Error: $($_.Exception.Message)"
+            return
+        }
+    }
 
     # https://www.powershellgallery.com/packages/MSAL.PS/4.2.1.1/Content/Get-MsalToken.ps1
     # Here we should implement something for Silent Token
