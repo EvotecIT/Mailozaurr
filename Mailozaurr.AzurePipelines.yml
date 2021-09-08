@@ -1,5 +1,5 @@
 jobs:
-  - job: Windows_2016_PowerShell_5.1
+  - job: Windows_2016_PowerShell_5
     pool:
       vmImage: vs2017-win2016
     steps:
@@ -18,7 +18,7 @@ jobs:
         displayName: "Run Mailozaurr Tests on Windows"
 
 
-  - job: Linux (Ubuntu)
+  - job: Linux_Ubuntu
 
     pool:
       vmImage: ubuntu-latest
