@@ -1,5 +1,5 @@
 jobs:
-  - job: Build_PS_Win2016
+  - job: Windows 2016 / PowerShell 5.1
     pool:
       vmImage: vs2017-win2016
     steps:
@@ -8,15 +8,25 @@ jobs:
           .\Mailozaurr.Tests.ps1 -Verbose
         displayName: "Run Mailozaurr Tests on Windows"
 
-  - job: Build_PSCore_Ubuntu1604
+  - job: Windows 2016 / PowerShell 7
+    pool:
+      vmImage: vs2017-win2016
+    steps:
+      - script: |
+          pwsh -c Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck
+          pwsh -c .\Mailozaurr.Tests.ps1 -Verbose
+        displayName: "Run Mailozaurr Tests on Windows"
+
+
+  - job: Linux (Ubuntu)
 
     pool:
-      vmImage: ubuntu-16.04
+      vmImage: ubuntu-latest
 
     steps:
       - script: |
-          curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-          curl https://packages.microsoft.com/config/ubuntu/16.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list
+          curl -sSL https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft-prod.list
+          curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
           sudo apt-get update
           sudo apt-get install -y powershell
         displayName: "Install PowerShell Core"
@@ -25,7 +35,7 @@ jobs:
           pwsh -c '.\Mailozaurr.Tests.ps1'
         displayName: "Run Mailozaurr Tests on Linux"
 
-  - job: Build_PSCore_MacOS1013
+  - job: MacOS
     pool:
       vmImage: macOS-latest
     steps:
@@ -33,7 +43,7 @@ jobs:
           brew update
           brew tap caskroom/cask
           brew install mono-libgdiplus
-          brew cask install powershell
+          brew install --cask powershell
         displayName: "Install PowerShell 7"
 
       - script: |
