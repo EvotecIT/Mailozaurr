@@ -13,8 +13,8 @@ jobs:
       vmImage: vs2017-win2016
     steps:
       - script: |
-          pwsh -c Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck
-          pwsh -c .\Mailozaurr.Tests.ps1 -Verbose
+          pwsh -c 'Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck'
+          pwsh -c '.\Mailozaurr.Tests.ps1 -Verbose'
         displayName: "Run Mailozaurr Tests on Windows"
 
 
