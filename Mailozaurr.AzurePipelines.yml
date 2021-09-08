@@ -1,23 +1,21 @@
 jobs:
-  - job: Windows_2016_PowerShell_5
+  - job: Windows_PowerShell_5
     pool:
-      vmImage: vs2017-win2016
+      vmImage: windows-latest
     steps:
       - powershell: |
           Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck
           .\Mailozaurr.Tests.ps1 -Verbose
-        displayName: "Run Mailozaurr Tests on Windows PowerShell 5.1"
+        displayName: "Run Tests on Windows PowerShell 5.1"
 
-  - job: Windows_2016_PowerShell_7
+  - job: Windows_PowerShell_7
     pool:
-      vmImage: vs2017-win2016
+      vmImage: windows-latest
     steps:
-      - script: |
-          pwsh -c 'Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck'
-        displayName: "Install PESTER"
-      - script: |
-          pwsh -c '.\Mailozaurr.Tests.ps1 -Verbose'
-        displayName: "Run Mailozaurr Tests on Windows PowerShell 7"
+      - pwsh: 'Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck'
+        displayName: "Update PESTER"
+      - pwsh: '.\Mailozaurr.Tests.ps1 -Verbose'
+        displayName: "Run Tests on Windows PowerShell 7"
 
 
   - job: Linux_Ubuntu
@@ -33,9 +31,8 @@ jobs:
           sudo apt-get install -y powershell
         displayName: "Install PowerShell Core"
 
-      - script: |
-          pwsh -c '.\Mailozaurr.Tests.ps1'
-        displayName: "Run Mailozaurr Tests on Linux"
+      - powershell: '.\Mailozaurr.Tests.ps1'
+        displayName: "Run Tests on Linux"
 
   - job: MacOS
     pool:
@@ -48,6 +45,5 @@ jobs:
           brew install --cask powershell
         displayName: "Install PowerShell 7"
 
-      - script: |
-          pwsh -c '.\Mailozaurr.Tests.ps1'
-        displayName: "Run Mailozaurr Tests on MacOs"
+      - powershell: '.\Mailozaurr.Tests.ps1'
+        displayName: "Run Tests on MacOs"
