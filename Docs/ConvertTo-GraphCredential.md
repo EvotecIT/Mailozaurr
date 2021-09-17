@@ -12,8 +12,14 @@ schema: 2.0.0
 
 ## SYNTAX
 
+### ClearText (Default)
 ```
-ConvertTo-GraphCredential [-ClientID] <String> [-ClientSecret] <String> [-DirectoryID] <String>
+ConvertTo-GraphCredential -ClientID <String> -ClientSecret <String> -DirectoryID <String> [<CommonParameters>]
+```
+
+### Encrypted
+```
+ConvertTo-GraphCredential -ClientID <String> -ClientSecretEncrypted <String> -DirectoryID <String>
  [<CommonParameters>]
 ```
 
@@ -40,7 +46,7 @@ Parameter Sets: (All)
 Aliases:
 
 Required: True
-Position: 0
+Position: Named
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -51,11 +57,26 @@ Accept wildcard characters: False
 
 ```yaml
 Type: String
-Parameter Sets: (All)
+Parameter Sets: ClearText
 Aliases:
 
 Required: True
-Position: 1
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ClientSecretEncrypted
+{{ Fill ClientSecretEncrypted Description }}
+
+```yaml
+Type: String
+Parameter Sets: Encrypted
+Aliases:
+
+Required: True
+Position: Named
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -70,7 +91,7 @@ Parameter Sets: (All)
 Aliases:
 
 Required: True
-Position: 2
+Position: Named
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
