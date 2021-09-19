@@ -11,6 +11,7 @@ $Configuration = @{
 
         LibrariesCore     = 'Lib\Core'
         LibrariesDefault  = 'Lib\Default'
+
         #LibrariesCore     = 'Lib\Standard'
         #LibrariesDefault  = 'Lib\Standard'
 
@@ -148,21 +149,23 @@ $Configuration = @{
             SignMerged          = $true
             CreateFileCatalog   = $false # not working
             Releases            = $true
-            LibrarySeparateFile = $true
+            LibrarySeparateFile = $false
+            LibraryDotSource    = $true
+            ClassesDotSource    = $true
             ReleasesUnpacked    = $false
             RefreshPSD1Only     = $false
         }
         BuildDocumentation = $true
         ImportModules      = @{
-            Self            = $true
+            Self            = $false
             RequiredModules = $false
             Verbose         = $false
         }
         PublishModule      = @{  # requires Enable to be on to process all of that
-            Enabled      = $false
+            Enabled      = $true
             Prerelease   = ''
             RequireForce = $false
-            GitHub       = $false
+            GitHub       = $true
         }
     }
 }
