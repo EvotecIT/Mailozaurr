@@ -99,8 +99,9 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 
 ## Changelog
 
-- 0.0.17
+- 0.0.17 - 2021.09.19
   - Upgraded `MailKit/Mimekit` `2.15.0`
+  - Upgraded `DNSClient` to `1.5.0`
   - Fixes `oAuth2` [#17](https://github.com/EvotecIT/Mailozaurr/issues/17)
   - Removed wrong parameterset from `Send-EmailMessage`
   - Improved `ConvertTo-GraphCredential` to support encrypted graph client secret.
