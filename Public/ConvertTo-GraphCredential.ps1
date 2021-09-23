@@ -15,7 +15,7 @@ function ConvertTo-GraphCredential {
     # Convert to SecureString
     Try {
         if ($ClientSecretEncrypted) {
-            $EncryptedToken = $ClientSecretEncrypted | ConvertTo-SecureString -ErrorAction Stop
+            $EncryptedToken = ConvertTo-SecureString -String $ClientSecretEncrypted -ErrorAction Stop
         } else {
             $EncryptedToken = ConvertTo-SecureString -String $ClientSecret -AsPlainText -Force -ErrorAction Stop
         }
