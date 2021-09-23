@@ -102,15 +102,29 @@ function Send-GraphMailMessage {
         if ($PSBoundParameters.ErrorAction -eq 'Stop') {
             Write-Error $_
             return
+        }
+        $RestError = $_.ErrorDetails.Message
+        $RestMessage = $_.Exception.Message
+        if ($RestError) {
+            try {
+                $ErrorMessage = ConvertFrom-Json -InputObject $RestError -ErrorAction Stop
+                $ErrorText = $ErrorMessage.error.message
+                # Write-Warning -Message "Invoke-Graph - [$($ErrorMessage.error.code)] $($ErrorMessage.error.message), exception: $($_.Exception.Message)"
+                Write-Warning -Message "Send-GraphMailMessage - Error: $($RestMessage) $($ErrorText)"
+            } catch {
+                $ErrorText = ''
+                Write-Warning -Message "Send-GraphMailMessage - Error: $($RestMessage)"
+            }
         } else {
-            $ErrorDetails = $_.ErrorDetails.Message | ConvertFrom-Json
-            Write-Warning "Send-GraphMailMessage - Error: $($_.Exception.Message)"
-            Write-Warning "Send-GraphMailMessage - Error details: $($ErrorDetails.Error.Message)"
+            Write-Warning -Message "Send-GraphMailMessage - Error: $($_.Exception.Message)"
+        }
+        if ($_.ErrorDetails.RecommendedAction) {
+            Write-Warning -Message "Send-GraphMailMessage - Recommended action: $RecommendedAction"
         }
         if (-not $Suppress) {
             [PSCustomObject] @{
                 Status   = $False
-                Error    = -join ( $($_.Exception.Message), ' details: ', $($ErrorDetails.Error.Message))
+                Error    = if ($RestError) { "$($RestMessage) $($ErrorText)" }  else { $RestMessage }
                 SentTo   = $MailSentTo
                 SentFrom = $FromField
             }
