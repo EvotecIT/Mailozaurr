@@ -99,6 +99,8 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 
 ## Changelog
 
+- 0.0.19 - 2021.12.25
+  - Fixes encoding for Send-EmailMessage wen using GraphApi (forces UTF8)
 - 0.0.18 - 2021.09.23
   - Improved error handling of `Send-EmailMessage` when sending with GraphApi
 - 0.0.17 - 2021.09.19
