@@ -80,7 +80,7 @@ function Send-GraphMailMessage {
     $FromField = ConvertTo-GraphAddress -From $From -LimitedFrom
     Try {
         if ($PSCmdlet.ShouldProcess("$MailSentTo", 'Send-EmailMessage')) {
-            $null = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/users/$FromField/sendMail" -Headers $Authorization -Method POST -Body $Body -ContentType 'application/json' -ErrorAction Stop
+            $null = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/users/$FromField/sendMail" -Headers $Authorization -Method POST -Body $Body -ContentType 'application/json; charset=UTF-8' -ErrorAction Stop
             if (-not $Suppress) {
                 [PSCustomObject] @{
                     Status   = $True
