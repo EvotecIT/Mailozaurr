@@ -99,6 +99,31 @@ That's it. Whenever there's a new version, you run the command, and you can enjo
 
 ## Changelog
 
+- 0.0.20
+  - Added support for using `Get-MsalToken` instead of built-in token creation for GraphApi
+
+```powershell
+# creating body for HTML
+$Body = EmailBody {
+    New-HTMLText -Text "this is my test"
+    New-HTMLText -Text "Łączy nas piłka"
+}
+
+# Generating token using Get-MsalToken
+$getMsalTokenSplat = @{
+    ClientId     = '0fb383f1'
+    ClientSecret = 'VKDM_' | ConvertTo-SecureString -AsPlainText
+    Authority    = 'https://login.microsoftonline.com/ceb371f6'
+}
+$MsalToken = Get-MsalToken @getMsalTokenSplat
+
+# Converting it to Credentials object (so that Send-EmailMessage can use it)
+$Credential = ConvertTo-GraphCredential -MsalToken $MsalToken.AccessToken
+
+# sending email
+Send-EmailMessage -From 'przemyslaw.klys@something.pl' -To 'przemyslaw.klys@something.else' -Credential $Credential -HTML $Body -Subject 'This is another test email 2' -Graph -Verbose -Priority Low -DoNotSaveToSentItems
+```
+
 - 0.0.19 - 2021.12.25
   - Fixes encoding for Send-EmailMessage wen using GraphApi (forces UTF8)
 - 0.0.18 - 2021.09.23

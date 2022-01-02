@@ -15,8 +15,11 @@ function Get-MailMessage {
     } else {
         return
     }
-    $Authorization = Connect-O365Graph -ApplicationID $AuthorizationData.ClientID -ApplicationKey $AuthorizationData.ClientSecret -TenantDomain $AuthorizationData.DirectoryID -Resource https://graph.microsoft.com
-
+    if ($AuthorizationData.ClientID -eq 'MSAL') {
+        $Authorization = Connect-O365GraphMSAL -ApplicationKey $AuthorizationData.ClientSecret
+    } else {
+        $Authorization = Connect-O365Graph -ApplicationID $AuthorizationData.ClientID -ApplicationKey $AuthorizationData.ClientSecret -TenantDomain $AuthorizationData.DirectoryID -Resource https://graph.microsoft.com
+    }
     $Uri = "/users/$UserPrincipalName/messages"
     $Addon = '?'
     if ($Property) {
