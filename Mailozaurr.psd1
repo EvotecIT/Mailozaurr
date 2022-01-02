@@ -12,7 +12,7 @@
     PowerShellVersion    = '5.1'
     PrivateData          = @{
         PSData = @{
-            Tags                       = @('Windows', 'MacOS', 'Linux', 'Mail', 'Email', 'MX', 'SPF', 'DMARC', 'DKIM')
+            Tags                       = @('Windows', 'MacOS', 'Linux', 'Mail', 'Email', 'MX', 'SPF', 'DMARC', 'DKIM', 'GraphApi', 'SendGrid', 'Graph', 'IMAP', 'POP3')
             ProjectUri                 = 'https://github.com/EvotecIT/MailoZaurr'
             IconUri                    = 'https://evotec.xyz/wp-content/uploads/2020/07/MailoZaurr.png'
             ExternalModuleDependencies = @('Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Security', 'Microsoft.PowerShell.Utility')
