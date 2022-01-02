@@ -23,6 +23,16 @@ ConvertTo-GraphCredential -ClientID <String> -ClientSecretEncrypted <String> -Di
  [<CommonParameters>]
 ```
 
+### MsalToken
+```
+ConvertTo-GraphCredential -MsalToken <String> [<CommonParameters>]
+```
+
+### MsalTokenEncrypted
+```
+ConvertTo-GraphCredential -MsalTokenEncrypted <String> [<CommonParameters>]
+```
+
 ## DESCRIPTION
 {{ Fill in the Description }}
 
@@ -42,7 +52,7 @@ PS C:\> {{ Add example code here }}
 
 ```yaml
 Type: String
-Parameter Sets: (All)
+Parameter Sets: ClearText, Encrypted
 Aliases:
 
 Required: True
@@ -87,8 +97,38 @@ Accept wildcard characters: False
 
 ```yaml
 Type: String
-Parameter Sets: (All)
+Parameter Sets: ClearText, Encrypted
 Aliases:
+
+Required: True
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MsalToken
+{{ Fill MsalToken Description }}
+
+```yaml
+Type: String
+Parameter Sets: MsalToken
+Aliases: Token
+
+Required: True
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MsalTokenEncrypted
+{{ Fill MsalTokenEncrypted Description }}
+
+```yaml
+Type: String
+Parameter Sets: MsalTokenEncrypted
+Aliases: TokenEncrypted
 
 Required: True
 Position: Named
