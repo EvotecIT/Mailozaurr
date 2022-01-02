@@ -4,7 +4,7 @@
   - Added support for using `Get-MsalToken` instead of built-in token creation for GraphApi
 
 ```powershell
-# creating body for HTML
+# creating body for HTML using PSWriteHTML
 $Body = EmailBody {
     New-HTMLText -Text "this is my test"
     New-HTMLText -Text "Łączy nas piłka"
