@@ -358,7 +358,37 @@
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Grouped')]
         [Parameter(ParameterSetName = 'SendGrid')]
-        [switch] $Suppress
+        [switch] $Suppress,
+
+        [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Compatibility')]
+        [string[]] $LogPath,
+
+        [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Compatibility')]
+        [switch] $LogTimestamps,
+
+        [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Compatibility')]
+        [string] $LogTimestampsFormat = "yyyy-MM-dd HH:mm:ss:fff",
+
+        [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Compatibility')]
+        [switch] $LogSecrets,
+
+        [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Compatibility')]
+        [string] $LogClientPrefix,
+
+        [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Compatibility')]
+        [string] $LogServerPrefix
     )
     if ($Email) {
         # Following code makes sure both formats are accepted.
@@ -531,7 +561,25 @@
     $Message.Body = $BodyBuilder.ToMessageBody()
 
     ### SMTP Part Below
-    $SmtpClient = [MySmtpClient]::new()
+
+    if ($LogPath){
+        $ProtocolLogger = [MailKit.ProtocolLogger]::new($LogPath)
+        $ProtocolLogger.LogTimestamps = $LogTimestamps.IsPresent
+        $ProtocolLogger.RedactSecrets = -not $LogSecrets.IsPresent
+        if ($LogTimestampsFormat) {
+            $ProtocolLogger.TimestampFormat = $LogTimestampsFormat
+        }
+        if ($PSBoundParameters.Keys.Contains('LogServerPrefix')) {
+            $ProtocolLogger.ServerPrefix = $LogServerPrefix
+        }
+        if ($PSBoundParameters.Keys.Contains('LogClientPrefix')) {
+            $ProtocolLogger.ClientPrefix = $LogClientPrefix
+        }
+        $SmtpClient = [MySmtpClientWithLogger]::new($ProtocolLogger)
+    } else {
+        $SmtpClient = [MySmtpClient]::new()
+    }
+
     if ($SkipCertificateRevocation) {
         $SmtpClient.CheckCertificateRevocation = $false
     }

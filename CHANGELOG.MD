@@ -1,6 +1,10 @@
 ﻿### Mailozaurr ChangeLog
 
-#### - 0.0.20
+#### - 0.0.21 - 2022.01.07
+  - Added support for logging in the `Send-EmailMessage` for SMTP to allow for debugging.
+    - By adding `LogPath $PSScriptRoot\Output\Log1.txt` log file will be created with full information
+    - Parameters such as `LogSecrets`, `LogTimeStamps`, `LogTimeStampsFormat` and `LogClientPrefix`,`LogServerPrefix` are available
+#### - 0.0.20 - 2022.01.02
   - Added support for using `Get-MsalToken` instead of built-in token creation for GraphApi
 
 ```powershell
