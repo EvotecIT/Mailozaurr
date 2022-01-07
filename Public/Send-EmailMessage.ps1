@@ -373,7 +373,7 @@
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
-        [string] $LogTimestampsFormat = "yyyy-MM-dd HH:mm:ss:fff",
+        [string] $LogTimeStampsFormat = "yyyy-MM-dd HH:mm:ss:fff",
 
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
@@ -566,8 +566,8 @@
         $ProtocolLogger = [MailKit.ProtocolLogger]::new($LogPath)
         $ProtocolLogger.LogTimestamps = $LogTimestamps.IsPresent
         $ProtocolLogger.RedactSecrets = -not $LogSecrets.IsPresent
-        if ($LogTimestampsFormat) {
-            $ProtocolLogger.TimestampFormat = $LogTimestampsFormat
+        if ($LogTimeStampsFormat) {
+            $ProtocolLogger.TimestampFormat = $LogTimeStampsFormat
         }
         if ($PSBoundParameters.Keys.Contains('LogServerPrefix')) {
             $ProtocolLogger.ServerPrefix = $LogServerPrefix
