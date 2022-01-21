@@ -2,8 +2,10 @@
 
 #### - 0.0.22 - 2021.01.21
   - Upgraded `MailKit\MimeKit` to 3.1.0
-  - Added support to save MimeMessage in `Send-Emailmessage` using `MimeMessagePath`
-  - Fixed `Cloudflare DNS calls` for `Find-DMARCRecord`,`Find-DKIMRecord`
+  - Added support to save MimeMessage in `Send-EmailMessage` using `MimeMessagePath`
+  - Fixed `Cloudflare DNS calls` for `Find-DMARCRecord`,`Find-DKIMRecord`, `Find-MXRecord`, `Find-SPFRecord`, `Find-DNSBNL`
+  - Updated docs
+  - More output fields on `Send-EmailMessage`
 
 #### - 0.0.21 - 2022.01.07
   - Added support for logging in the `Send-EmailMessage` for SMTP to allow for debugging.
