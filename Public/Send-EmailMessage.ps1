@@ -390,6 +390,7 @@
         [Parameter(ParameterSetName = 'Compatibility')]
         [string] $LogServerPrefix
     )
+    $StopWatch = [system.diagnostics.stopwatch]::StartNew()
     if ($Email) {
         # Following code makes sure both formats are accepted.
         if ($Email.EmailTo) {
@@ -470,6 +471,7 @@
                 Priority             = $Priority
                 ReplyTo              = $ReplyTo
                 DoNotSaveToSentItems = $DoNotSaveToSentItems.IsPresent
+                StopWatch            = $StopWatch
             }
             Remove-EmptyValue -Hashtable $sendGraphMailMessageSplat
             return Send-GraphMailMessage @sendGraphMailMessageSplat
@@ -488,6 +490,7 @@
                 Priority   = $Priority
                 ReplyTo    = $ReplyTo
                 SeparateTo = $SeparateTo.IsPresent
+                StopWatch  = $StopWatch
             }
             Remove-EmptyValue -Hashtable $sendGraphMailMessageSplat
             return Send-SendGridMailMessage @sendGraphMailMessageSplat
@@ -506,8 +509,6 @@
     } elseif ($Username -and $Password) {
         #void Authenticate(string userName, string password, System.Threading.CancellationToken cancellationToken)
     }
-
-
 
     $Message = [MimeKit.MimeMessage]::new()
 
@@ -615,9 +616,14 @@
             Write-Warning "Send-EmailMessage - Possible issue: Port? ($Port was used), Using SSL? ($SecureSocketOptions was used). You can also try SkipCertificateValidation or SkipCertificateRevocation. "
             if (-not $Suppress) {
                 return [PSCustomObject] @{
-                    Status = $False
-                    Error  = $($_.Exception.Message)
-                    SentTo = $MailSentTo
+                    Status        = $False
+                    Error         = $($_.Exception.Message)
+                    SentTo        = $MailSentTo
+                    SentFrom      = $From
+                    Message       = ''
+                    TimeToExecute = $StopWatch.Elapsed
+                    Server        = $Server
+                    Port          = $Port
                 }
             }
         }
@@ -634,9 +640,14 @@
                     Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
                     if (-not $Suppress) {
                         return [PSCustomObject] @{
-                            Status = $False
-                            Error  = $($_.Exception.Message)
-                            SentTo = $MailSentTo
+                            Status        = $False
+                            Error         = $($_.Exception.Message)
+                            SentTo        = $MailSentTo
+                            SentFrom      = $From
+                            Message       = ''
+                            TimeToExecute = $StopWatch.Elapsed
+                            Server        = $Server
+                            Port          = $Port
                         }
                     }
                 }
@@ -654,9 +665,14 @@
                     Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
                     if (-not $Suppress) {
                         return [PSCustomObject] @{
-                            Status = $False
-                            Error  = $($_.Exception.Message)
-                            SentTo = $MailSentTo
+                            Status        = $False
+                            Error         = $($_.Exception.Message)
+                            SentTo        = $MailSentTo
+                            SentFrom      = $From
+                            Message       = ''
+                            TimeToExecute = $StopWatch.Elapsed
+                            Server        = $Server
+                            Port          = $Port
                         }
                     }
                 }
@@ -673,9 +689,14 @@
                 Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
                 if (-not $Suppress) {
                     return [PSCustomObject] @{
-                        Status = $False
-                        Error  = $($_.Exception.Message)
-                        SentTo = $MailSentTo
+                        Status        = $False
+                        Error         = $($_.Exception.Message)
+                        SentTo        = $MailSentTo
+                        SentFrom      = $From
+                        Message       = ''
+                        TimeToExecute = $StopWatch.Elapsed
+                        Server        = $Server
+                        Port          = $Port
                     }
                 }
             }
@@ -687,19 +708,27 @@
             $OutputMessage = $SmtpClient.Send($Message)
             if (-not $Suppress) {
                 [PSCustomObject] @{
-                    Status  = $True
-                    Error   = ''
-                    SentTo  = $MailSentTo
-                    Message = $OutputMessage
+                    Status        = $True
+                    Error         = ''
+                    SentTo        = $MailSentTo
+                    SentFrom      = $From
+                    Message       = $OutputMessage
+                    TimeToExecute = $StopWatch.Elapsed
+                    Server        = $Server
+                    Port          = $Port
                 }
             }
         } else {
             if (-not $Suppress) {
                 [PSCustomObject] @{
-                    Status  = $false
-                    Error   = 'Email not sent (WhatIf)'
-                    SentTo  = $MailSentTo
-                    Message = ''
+                    Status        = $false
+                    Error         = 'Email not sent (WhatIf)'
+                    SentTo        = $MailSentTo
+                    SentFrom      = $From
+                    Message       = ''
+                    TimeToExecute = $StopWatch.Elapsed
+                    Server        = $Server
+                    Port          = $Port
                 }
             }
         }
@@ -712,12 +741,17 @@
         }
         if (-not $Suppress) {
             [PSCustomObject] @{
-                Status  = $False
-                Error   = $($_.Exception.Message)
-                SentTo  = $MailSentTo
-                Message = ''
+                Status        = $False
+                Error         = $($_.Exception.Message)
+                SentTo        = $MailSentTo
+                SentFrom      = $From
+                Message       = ''
+                TimeToExecute = $StopWatch.Elapsed
+                Server        = $Server
+                Port          = $Port
             }
         }
     }
     $SmtpClient.Disconnect($true)
+    $StopWatch.Stop()
 }

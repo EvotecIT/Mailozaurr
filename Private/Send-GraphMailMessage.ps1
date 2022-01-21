@@ -12,7 +12,8 @@ function Send-GraphMailMessage {
         [alias('Attachments')][string[]] $Attachment,
         [PSCredential] $Credential,
         [alias('Importance')][ValidateSet('Low', 'Normal', 'High')][string] $Priority,
-        [switch] $DoNotSaveToSentItems
+        [switch] $DoNotSaveToSentItems,
+        [System.Diagnostics.Stopwatch] $StopWatch
     )
     if ($Credential) {
         $AuthorizationData = ConvertFrom-GraphCredential -Credential $Credential
@@ -87,18 +88,23 @@ function Send-GraphMailMessage {
             $null = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/users/$FromField/sendMail" -Headers $Authorization -Method POST -Body $Body -ContentType 'application/json; charset=UTF-8' -ErrorAction Stop
             if (-not $Suppress) {
                 [PSCustomObject] @{
-                    Status   = $True
-                    Error    = ''
-                    SentTo   = $MailSentTo
-                    SentFrom = $FromField
+                    Status        = $True
+                    Error         = ''
+                    SentTo        = $MailSentTo
+                    SentFrom      = $FromField
+                    Message       = ''
+                    TimeToExecute = $StopWatch.Elapsed
                 }
             }
         } else {
             if (-not $Suppress) {
                 [PSCustomObject] @{
-                    Status = $false
-                    Error  = 'Email not sent (WhatIf)'
-                    SentTo = $MailSentTo
+                    Status        = $false
+                    Error         = 'Email not sent (WhatIf)'
+                    SentTo        = $MailSentTo
+                    SentFrom      = $FromField
+                    Message       = ''
+                    TimeToExecute = $StopWatch.Elapsed
                 }
             }
         }
@@ -127,10 +133,12 @@ function Send-GraphMailMessage {
         }
         if (-not $Suppress) {
             [PSCustomObject] @{
-                Status   = $False
-                Error    = if ($RestError) { "$($RestMessage) $($ErrorText)" }  else { $RestMessage }
-                SentTo   = $MailSentTo
-                SentFrom = $FromField
+                Status        = $False
+                Error         = if ($RestError) { "$($RestMessage) $($ErrorText)" }  else { $RestMessage }
+                SentTo        = $MailSentTo
+                SentFrom      = $FromField
+                Message       = ''
+                TimeToExecute = $StopWatch.Elapsed
             }
         }
     }
