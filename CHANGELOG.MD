@@ -1,5 +1,10 @@
 ﻿### Mailozaurr ChangeLog
 
+#### - 0.0.22 - 2021.01.21
+  - Upgraded `MailKit\MimeKit` to 3.1.0
+  - Added support to save MimeMessage in `Send-Emailmessage` using `MimeMessagePath`
+  - Fixed `Cloudflare DNS calls` for `Find-DMARCRecord`,`Find-DKIMRecord`
+
 #### - 0.0.21 - 2022.01.07
   - Added support for logging in the `Send-EmailMessage` for SMTP to allow for debugging.
     - By adding `LogPath $PSScriptRoot\Output\Log1.txt` log file will be created with full information
