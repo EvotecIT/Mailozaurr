@@ -22,7 +22,7 @@
             if ($_.Name -and $_.Email) {
                 $SmtpTo = [MimeKit.MailboxAddress]::new($_.Name, $_.Email)
             } elseif ($_.Email) {
-                $SmtpTo = [MimeKit.MailboxAddress]::new($_.Email)
+                $SmtpTo = [MimeKit.MailboxAddress]::new($_.Email, $_.Email)
             }
         }
         $SmtpTo
