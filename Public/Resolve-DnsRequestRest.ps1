@@ -35,7 +35,7 @@
         $Name = $Name -replace '^(\d+)\.(\d+)\.(\d+)\.(\d+)$', '$4.$3.$2.$1.in-addr.arpa'
     }
     if ($DNSProvider -eq 'Cloudflare') {
-        $Q = Invoke-RestMethod -Uri "https://cloudflare-dns.com/dns-query?ct=application/dns-json&name=$Name&type=$Type"
+        $Q = Invoke-RestMethod -Uri "https://cloudflare-dns.com/dns-query?name=$Name&type=$Type" -Headers @{ accept = 'application/dns-json' }
     } else {
         $Q = Invoke-RestMethod -Uri "https://dns.google.com/resolve?name=$Name&type=$Type"
     }

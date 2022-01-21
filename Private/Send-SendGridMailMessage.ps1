@@ -12,7 +12,8 @@
         [alias('Attachments')][string[]] $Attachment,
         [PSCredential] $Credential,
         [alias('Importance')][ValidateSet('Low', 'Normal', 'High')][string] $Priority,
-        [switch] $SeparateTo
+        [switch] $SeparateTo,
+        [System.Diagnostics.Stopwatch] $StopWatch
     )
     # https://sendgrid.api-docs.io/v3.0/mail-send/v3-mail-send
     if ($Credential) {
@@ -104,10 +105,12 @@
             $null = Invoke-RestMethod @InvokeRestMethodParams
             if (-not $Suppress) {
                 [PSCustomObject] @{
-                    Status   = $True
-                    Error    = ''
-                    SentTo   = $MailSentList
-                    SentFrom = $SendGridMessage.From.Email
+                    Status        = $True
+                    Error         = ''
+                    SentTo        = $MailSentList
+                    SentFrom      = $SendGridMessage.From.Email
+                    Message       = ''
+                    TimeToExecute = $StopWatch.Elapsed
                 }
             }
         }
@@ -126,10 +129,12 @@
         }
         if (-not $Suppress) {
             [PSCustomObject] @{
-                Status   = $False
-                Error    = -join ( $($_.Exception.Message), $ErrorDetails)
-                SentTo   = $MailSentTo
-                SentFrom = $SendGridMessage.From.Email
+                Status        = $False
+                Error         = -join ( $($_.Exception.Message), $ErrorDetails)
+                SentTo        = $MailSentTo
+                SentFrom      = $SendGridMessage.From.Email
+                Message       = ''
+                TimeToExecute = $StopWatch.Elapsed
             }
         }
     }
