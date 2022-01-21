@@ -96,6 +96,9 @@
     .PARAMETER Graph
     Send email via Office 365 Graph API
 
+    .PARAMETER AsSecureString
+    Informs command that password provided is secure string, rather than clear text
+
     .PARAMETER SendGrid
     Send email via SendGrid API
 
@@ -111,8 +114,23 @@
     .PARAMETER Suppress
     Do not display summary in [PSCustomObject]
 
-    .PARAMETER AsSecureString
-    Informs command that password provided is secure string, rather than clear text
+    .PARAMETER LogPath
+    When defined save the communication with server to file
+
+    .PARAMETER LogTimestamps
+    Configures whether log should use timestamps
+
+    .PARAMETER LogTimeStampsFormat
+    Configures the format of the timestamps in the log file.
+
+    .PARAMETER LogSecrets
+    Configures whether log should include secrets
+
+    .PARAMETER LogClientPrefix
+    Sets log prefix for client to specific value.
+
+    .PARAMETER LogServerPrefix
+    Sets log prefix for server to specific value.
 
     .PARAMETER MimeMessagePath
     Adds ability to save email message to file for troubleshooting purposes
