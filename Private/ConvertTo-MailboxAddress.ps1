@@ -13,7 +13,7 @@
     #>
     foreach ($_ in $MailboxAddress) {
         if ($_ -is [string]) {
-            $SmtpTo = [MimeKit.MailboxAddress]::new("$_")
+            $SmtpTo = [MimeKit.MailboxAddress]::new("$_", "$_")
         } elseif ($_ -is [System.Collections.IDictionary]) {
             $SmtpTo = [MimeKit.MailboxAddress]::new($_.Name, $_.Email)
         } elseif ($_ -is [MimeKit.MailboxAddress]) {
