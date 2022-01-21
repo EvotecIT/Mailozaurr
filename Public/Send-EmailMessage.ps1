@@ -114,6 +114,9 @@
     .PARAMETER AsSecureString
     Informs command that password provided is secure string, rather than clear text
 
+    .PARAMETER MimeMessagePath
+    Adds ability to save email message to file for troubleshooting purposes
+
     .EXAMPLE
     if (-not $MailCredentials) {
         $MailCredentials = Get-Credential
@@ -388,7 +391,12 @@
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
-        [string] $LogServerPrefix
+        [string] $LogServerPrefix,
+
+        [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Compatibility')]
+        [string] $MimeMessagePath
     )
     $StopWatch = [system.diagnostics.stopwatch]::StartNew()
     if ($Email) {
@@ -753,5 +761,8 @@
         }
     }
     $SmtpClient.Disconnect($true)
+    if ($MimeMessagePath) {
+        $Message.WriteTo($MimeMessagePath)
+    }
     $StopWatch.Stop()
 }
