@@ -562,7 +562,7 @@
 
     ### SMTP Part Below
 
-    if ($LogPath){
+    if ($LogPath) {
         $ProtocolLogger = [MailKit.ProtocolLogger]::new($LogPath)
         $ProtocolLogger.LogTimestamps = $LogTimestamps.IsPresent
         $ProtocolLogger.RedactSecrets = -not $LogSecrets.IsPresent
@@ -684,20 +684,22 @@
     $SmtpClient.Timeout = $Timeout
     try {
         if ($PSCmdlet.ShouldProcess("$MailSentTo", 'Send-EmailMessage')) {
-            $SmtpClient.Send($Message)
+            $OutputMessage = $SmtpClient.Send($Message)
             if (-not $Suppress) {
                 [PSCustomObject] @{
-                    Status = $True
-                    Error  = ''
-                    SentTo = $MailSentTo
+                    Status  = $True
+                    Error   = ''
+                    SentTo  = $MailSentTo
+                    Message = $OutputMessage
                 }
             }
         } else {
             if (-not $Suppress) {
                 [PSCustomObject] @{
-                    Status = $false
-                    Error  = 'Email not sent (WhatIf)'
-                    SentTo = $MailSentTo
+                    Status  = $false
+                    Error   = 'Email not sent (WhatIf)'
+                    SentTo  = $MailSentTo
+                    Message = ''
                 }
             }
         }
@@ -710,9 +712,10 @@
         }
         if (-not $Suppress) {
             [PSCustomObject] @{
-                Status = $False
-                Error  = $($_.Exception.Message)
-                SentTo = $MailSentTo
+                Status  = $False
+                Error   = $($_.Exception.Message)
+                SentTo  = $MailSentTo
+                Message = ''
             }
         }
     }
