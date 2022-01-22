@@ -33,7 +33,7 @@ $Configuration = @{
             # Minimum version of the Windows PowerShell engine required by this module
             PowerShellVersion          = '5.1'
             # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
-            Tags                       = @('Windows', 'MacOS', 'Linux', 'Mail', 'Email', 'MX', 'SPF', 'DMARC', 'DKIM')
+            Tags                       = @('Windows', 'MacOS', 'Linux', 'Mail', 'Email', 'MX', 'SPF', 'DMARC', 'DKIM', 'GraphApi', 'SendGrid', 'Graph', 'IMAP', 'POP3')
 
             IconUri                    = 'https://evotec.xyz/wp-content/uploads/2020/07/MailoZaurr.png'
 
@@ -162,10 +162,10 @@ $Configuration = @{
             Verbose         = $false
         }
         PublishModule      = @{  # requires Enable to be on to process all of that
-            Enabled      = $true
+            Enabled      = $false
             Prerelease   = ''
             RequireForce = $false
-            GitHub       = $true
+            GitHub       = $false
         }
     }
 }
