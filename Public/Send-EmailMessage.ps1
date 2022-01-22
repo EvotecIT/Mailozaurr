@@ -117,6 +117,12 @@
     .PARAMETER LogPath
     When defined save the communication with server to file
 
+    .PARAMETER LogObject
+    When defined save the communication with server to object as message property
+
+    .PARAMETER LogConsole
+    When defined display the communication with server to console
+
     .PARAMETER LogTimestamps
     Configures whether log should use timestamps
 
@@ -134,6 +140,9 @@
 
     .PARAMETER MimeMessagePath
     Adds ability to save email message to file for troubleshooting purposes
+
+    .PARAMETER LocalDomain
+    Specifies the local domain name.
 
     .EXAMPLE
     if (-not $MailCredentials) {
@@ -389,6 +398,16 @@
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
+        [switch] $LogConsole,
+
+        [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Compatibility')]
+        [switch] $LogObject,
+
+        [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $LogTimestamps,
 
         [Parameter(ParameterSetName = 'SecureString')]
@@ -414,7 +433,12 @@
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
-        [string] $MimeMessagePath
+        [string] $MimeMessagePath,
+
+        [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'oAuth')]
+        [Parameter(ParameterSetName = 'Compatibility')]
+        [string] $LocalDomain
     )
     $StopWatch = [system.diagnostics.stopwatch]::StartNew()
     if ($Email) {
@@ -588,9 +612,16 @@
     $Message.Body = $BodyBuilder.ToMessageBody()
 
     ### SMTP Part Below
-
-    if ($LogPath) {
-        $ProtocolLogger = [MailKit.ProtocolLogger]::new($LogPath)
+    $OutputMessage = $null
+    if ($LogPath -or $LogConsole -or $LogObject) {
+        if ($LogPath) {
+            $ProtocolLogger = [MailKit.ProtocolLogger]::new($LogPath)
+        } elseif ($LogConsole) {
+            $ProtocolLogger = [MailKit.ProtocolLogger]::new([System.Console]::OpenStandardOutput())
+        } else {
+            $Stream = [System.IO.MemoryStream]::new()
+            $ProtocolLogger = [MailKit.ProtocolLogger]::new($Stream)
+        }
         $ProtocolLogger.LogTimestamps = $LogTimestamps.IsPresent
         $ProtocolLogger.RedactSecrets = -not $LogSecrets.IsPresent
         if ($LogTimeStampsFormat) {
@@ -606,7 +637,9 @@
     } else {
         $SmtpClient = [MySmtpClient]::new()
     }
-
+    if ($LocalDomain) {
+        $SmtpClient.LocalDomain = $LocalDomain
+    }
     if ($SkipCertificateRevocation) {
         $SmtpClient.CheckCertificateRevocation = $false
     }
@@ -641,12 +674,15 @@
             Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
             Write-Warning "Send-EmailMessage - Possible issue: Port? ($Port was used), Using SSL? ($SecureSocketOptions was used). You can also try SkipCertificateValidation or SkipCertificateRevocation. "
             if (-not $Suppress) {
+                if ($LogObject) {
+                    $OutputMessage = [System.Text.Encoding]::ASCII.GetString($stream.ToArray());
+                }
                 return [PSCustomObject] @{
                     Status        = $False
                     Error         = $($_.Exception.Message)
                     SentTo        = $MailSentTo
                     SentFrom      = $From
-                    Message       = ''
+                    Message       = $OutputMessage
                     TimeToExecute = $StopWatch.Elapsed
                     Server        = $Server
                     Port          = $Port
@@ -665,12 +701,15 @@
                 } else {
                     Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
                     if (-not $Suppress) {
+                        if ($LogObject) {
+                            $OutputMessage = [System.Text.Encoding]::ASCII.GetString($stream.ToArray());
+                        }
                         return [PSCustomObject] @{
                             Status        = $False
                             Error         = $($_.Exception.Message)
                             SentTo        = $MailSentTo
                             SentFrom      = $From
-                            Message       = ''
+                            Message       = $OutputMessage
                             TimeToExecute = $StopWatch.Elapsed
                             Server        = $Server
                             Port          = $Port
@@ -690,12 +729,15 @@
                 } else {
                     Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
                     if (-not $Suppress) {
+                        if ($LogObject) {
+                            $OutputMessage = [System.Text.Encoding]::ASCII.GetString($stream.ToArray());
+                        }
                         return [PSCustomObject] @{
                             Status        = $False
                             Error         = $($_.Exception.Message)
                             SentTo        = $MailSentTo
                             SentFrom      = $From
-                            Message       = ''
+                            Message       = $OutputMessage
                             TimeToExecute = $StopWatch.Elapsed
                             Server        = $Server
                             Port          = $Port
@@ -714,12 +756,15 @@
             } else {
                 Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
                 if (-not $Suppress) {
+                    if ($LogObject) {
+                        $OutputMessage = [System.Text.Encoding]::ASCII.GetString($stream.ToArray());
+                    }
                     return [PSCustomObject] @{
                         Status        = $False
                         Error         = $($_.Exception.Message)
                         SentTo        = $MailSentTo
                         SentFrom      = $From
-                        Message       = ''
+                        Message       = $OutputMessage
                         TimeToExecute = $StopWatch.Elapsed
                         Server        = $Server
                         Port          = $Port
@@ -733,6 +778,9 @@
         if ($PSCmdlet.ShouldProcess("$MailSentTo", 'Send-EmailMessage')) {
             $OutputMessage = $SmtpClient.Send($Message)
             if (-not $Suppress) {
+                if ($LogObject) {
+                    $OutputMessage = [System.Text.Encoding]::ASCII.GetString($stream.ToArray());
+                }
                 [PSCustomObject] @{
                     Status        = $True
                     Error         = ''
@@ -746,12 +794,15 @@
             }
         } else {
             if (-not $Suppress) {
+                if ($LogObject) {
+                    $OutputMessage = [System.Text.Encoding]::ASCII.GetString($stream.ToArray());
+                }
                 [PSCustomObject] @{
                     Status        = $false
                     Error         = 'Email not sent (WhatIf)'
                     SentTo        = $MailSentTo
                     SentFrom      = $From
-                    Message       = ''
+                    Message       = $OutputMessage
                     TimeToExecute = $StopWatch.Elapsed
                     Server        = $Server
                     Port          = $Port
@@ -766,12 +817,15 @@
             Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
         }
         if (-not $Suppress) {
+            if ($LogObject) {
+                $OutputMessage = [System.Text.Encoding]::ASCII.GetString($stream.ToArray());
+            }
             [PSCustomObject] @{
                 Status        = $False
                 Error         = $($_.Exception.Message)
                 SentTo        = $MailSentTo
                 SentFrom      = $From
-                Message       = ''
+                Message       = $OutputMessage
                 TimeToExecute = $StopWatch.Elapsed
                 Server        = $Server
                 Port          = $Port
