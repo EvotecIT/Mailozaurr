@@ -615,7 +615,15 @@
     $OutputMessage = $null
     if ($LogPath -or $LogConsole -or $LogObject) {
         if ($LogPath) {
-            $ProtocolLogger = [MailKit.ProtocolLogger]::new($LogPath)
+            # we make sure to set it to false, just in case user provided both
+            $LogObject = $false
+            # if protocol logger fails to save, we need to do something with it
+            try {
+                $ProtocolLogger = [MailKit.ProtocolLogger]::new($LogPath)
+            } catch {
+                Write-Warning -Message "Send-EmailMessage - Couldn't create protocol logger with $LogPath. Error $($_.Exception.Message.Replace([System.Environment]::NewLine, " ")). Using console output instead."
+                $ProtocolLogger = [MailKit.ProtocolLogger]::new([System.Console]::OpenStandardOutput())
+            }
         } elseif ($LogConsole) {
             $ProtocolLogger = [MailKit.ProtocolLogger]::new([System.Console]::OpenStandardOutput())
         } else {
