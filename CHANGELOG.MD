@@ -1,5 +1,7 @@
 ﻿### Mailozaurr ChangeLog
 
+#### - 0.0.24 - 2021.01.24
+  - Improved logging logic for `Send-EmailMessage`
 #### - 0.0.23 - 2021.01.22
   - Added option to `Send-EmailMessage` to specify the `LocalDomain` to be able to troubleshoot issue [#1314](https://github.com/jstedfast/MailKit/issues/1314)
   - Added option to `Send-EmailMessage` - `LogConsole` and `LogObject` which joins `LogPath` in saving whole conversation to console, or to final object as Message property
