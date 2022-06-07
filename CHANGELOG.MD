@@ -1,4 +1,8 @@
-﻿### Mailozaurr ChangeLog
+﻿#### - 0.0.25 - 2022.06.07
+- Updated `MailKit`
+- Updated `MimeKit`
+- Added missing libraries so that the project can work on more systems without installing higher version of .NET Framework
+- Added tests for SMTP with Auth and Graph API
 
 #### - 0.0.24 - 2021.01.24
   - Improved logging logic for `Send-EmailMessage`
