@@ -15,8 +15,6 @@
         }
 
         $Output = Send-EmailMessage @sendEmailMessageSplat -ErrorAction Stop
-
-        $Output.Status | Should -Be $false
         $Output.Error | Should -Be 'Email not sent (WhatIf)'
         $Output.SentTo | Should -Be 'testing@test.pl, test@gmail.com'
         $Output.SentFrom.Email | Should -Be 'test@evotec.pl'
@@ -24,6 +22,7 @@
         $Output.Message | Should -Be $null
         $Output.Server | Should -Be 'smtp.office365.com'
         $Output.Port | Should -Be '587'
+        $Output.Status | Should -Be $false
     }
     It 'Send email using given parameters (Graph)' {
         # Credentials for Graph
@@ -47,24 +46,21 @@
             DoNotSaveToSentItems = $true
             WhatIf               = $true
         }
-
-        $GraphOutput.Status | Should -Be $False
+        $GraphOutput = Send-EmailMessage @sendEmailMessageSplat
         $GraphOutput.Error | Should -Be 'Email not sent (WhatIf)'
         $GraphOutput.SentTo | Should -Be 'newemail@domain.pl'
         $GraphOutput.SentFrom | Should -Be 'random@domain.pl'
         $GraphOutput.Message | Should -Be ''
-
-        $GraphOutput = Send-EmailMessage @sendEmailMessageSplat
-
+        $GraphOutput.Status | Should -Be $False
     }
     It 'Send email using given parameters (SMTP no TLS, no login/password)' {
         $Output = Send-EmailMessage -From 'test@evotec.pl' -To 'mailozaurr@evotec.pl' -Server 'smtp.freesmtpservers.com' -Port 25 -Body 'test me 🤣😍😒💖✨🎁 Przemysław Kłys' -Subject '😒💖 This is another test email 我' -Verbose
-        $Output.Status | Should -Be $true
         $Output.Error | Should -Be ''
         $Output.SentTo | Should -Be 'mailozaurr@evotec.pl'
         $Output.SentFrom | Should -Be 'test@evotec.pl'
         $Output.Message | Should -Be 'OK'
         $Output.Server | Should -Be 'smtp.freesmtpservers.com'
         $Output.Port | Should -Be 25
+        $Output.Status | Should -Be $true
     }
 }
