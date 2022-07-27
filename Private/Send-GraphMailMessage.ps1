@@ -119,7 +119,6 @@ function Send-GraphMailMessage {
             try {
                 $ErrorMessage = ConvertFrom-Json -InputObject $RestError -ErrorAction Stop
                 $ErrorText = $ErrorMessage.error.message
-                # Write-Warning -Message "Invoke-Graph - [$($ErrorMessage.error.code)] $($ErrorMessage.error.message), exception: $($_.Exception.Message)"
                 Write-Warning -Message "Send-GraphMailMessage - Error: $($RestMessage) $($ErrorText)"
             } catch {
                 $ErrorText = ''
