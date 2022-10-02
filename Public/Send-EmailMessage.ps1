@@ -211,19 +211,19 @@
     [cmdletBinding(DefaultParameterSetName = 'Compatibility', SupportsShouldProcess)]
     param(
         [Parameter(ParameterSetName = 'SecureString')]
-
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [alias('SmtpServer')][string] $Server,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [int] $Port = 587,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -231,7 +231,7 @@
         [object] $From,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -239,7 +239,7 @@
         [string] $ReplyTo,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -247,7 +247,7 @@
         [string[]] $Cc,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -255,6 +255,7 @@
         [string[]] $Bcc,
 
         [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -262,6 +263,7 @@
         [string[]] $To,
 
         [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -269,25 +271,30 @@
         [string] $Subject,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [Parameter(ParameterSetName = 'SendGrid')]
-        [alias('Importance')][ValidateSet('Low', 'Normal', 'High')][string] $Priority,
+        [alias('Importance')][ValidateSet('Low', 'Normal', 'High')]
+        [string] $Priority,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
-        [ValidateSet('ASCII', 'BigEndianUnicode', 'Default', 'Unicode', 'UTF32', 'UTF7', 'UTF8')][string] $Encoding = 'Default',
+        [ValidateSet('ASCII', 'BigEndianUnicode', 'Default', 'Unicode', 'UTF32', 'UTF7', 'UTF8')]
+        [string] $Encoding = 'Default',
 
         [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
-        [ValidateSet('None', 'OnSuccess', 'OnFailure', 'Delay', 'Never')][string[]] $DeliveryNotificationOption,
+        [ValidateSet('None', 'OnSuccess', 'OnFailure', 'Delay', 'Never')]
+        [string[]] $DeliveryNotificationOption,
 
         [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [MailKit.Net.Smtp.DeliveryStatusNotificationType] $DeliveryStatusNotificationType,
@@ -302,35 +309,34 @@
         [string] $Username,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
         [string] $Password,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [MailKit.Security.SecureSocketOptions] $SecureSocketOptions = [MailKit.Security.SecureSocketOptions]::Auto,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $UseSsl,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $SkipCertificateRevocation,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $SkipCertificateValidatation,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -338,7 +344,7 @@
         [alias('Body')][string[]] $HTML,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -346,7 +352,7 @@
         [string[]] $Text,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -354,7 +360,7 @@
         [alias('Attachments')][string[]] $Attachment,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [int] $Timeout = 12000,
@@ -377,12 +383,15 @@
         [Parameter(ParameterSetName = 'Graph')]
         [switch] $DoNotSaveToSentItems,
 
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
+        [switch]$IntergratedAuth,
+
         # Different feature set
         [Parameter(ParameterSetName = 'Grouped')]
         [alias('EmailParameters')][System.Collections.IDictionary] $Email,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -391,26 +400,31 @@
         [switch] $Suppress,
 
         [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [string[]] $LogPath,
 
         [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $LogConsole,
 
         [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $LogObject,
 
         [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $LogTimestamps,
 
         [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [string] $LogTimeStampsFormat = "yyyy-MM-dd HH:mm:ss:fff",
@@ -421,21 +435,25 @@
         [switch] $LogSecrets,
 
         [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [string] $LogClientPrefix,
 
         [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [string] $LogServerPrefix,
 
         [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [string] $MimeMessagePath,
 
         [Parameter(ParameterSetName = 'SecureString')]
+        [Parameter(ParameterSetName = 'IntergratedAuth')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [string] $LocalDomain
@@ -447,25 +465,26 @@
             $EmailParameters = $Email.Clone()
         } else {
             $EmailParameters = @{
-                EmailFrom                   = $Email.From
-                EmailTo                     = $Email.To
-                EmailCC                     = $Email.CC
-                EmailBCC                    = $Email.BCC
-                EmailReplyTo                = $Email.ReplyTo
-                EmailServer                 = $Email.Server
-                EmailServerPassword         = $Email.Password
-                EmailServerPasswordAsSecure = $Email.PasswordAsSecure
-                EmailServerPasswordFromFile = $Email.PasswordFromFile
-                EmailServerPort             = $Email.Port
-                EmailServerLogin            = $Email.Login
-                EmailServerEnableSSL        = $Email.EnableSsl
-                EmailEncoding               = $Email.Encoding
-                EmailEncodingSubject        = $Email.EncodingSubject
-                EmailEncodingBody           = $Email.EncodingBody
-                EmailSubject                = $Email.Subject
-                EmailPriority               = $Email.Priority
-                EmailDeliveryNotifications  = $Email.DeliveryNotifications
-                EmailUseDefaultCredentials  = $Email.UseDefaultCredentials
+                EmailFrom                           = $Email.From
+                EmailTo                             = $Email.To
+                EmailCC                             = $Email.CC
+                EmailBCC                            = $Email.BCC
+                EmailReplyTo                        = $Email.ReplyTo
+                EmailServer                         = $Email.Server
+                EmailServerPassword                 = $Email.Password
+                EmailServerPasswordAsSecure         = $Email.PasswordAsSecure
+                EmailServerPasswordFromFile         = $Email.PasswordFromFile
+                EmailServerPort                     = $Email.Port
+                EmailServerLogin                    = $Email.Login
+                EmailServerEnableSSL                = $Email.EnableSsl
+                EmailEncoding                       = $Email.Encoding
+                EmailEncodingSubject                = $Email.EncodingSubject
+                EmailEncodingBody                   = $Email.EncodingBody
+                EmailSubject                        = $Email.Subject
+                EmailPriority                       = $Email.Priority
+                EmailDeliveryNotifications          = $Email.DeliveryNotifications
+                EmailUseDefaultCredentials          = $Email.UseDefaultCredentials
+                EmailUseIntergratedAuthentication   = $Email.IntergratedAuth
             }
         }
         $From = $EmailParameters.EmailFrom
@@ -558,6 +577,8 @@
         }
     } elseif ($Username -and $Password) {
         #void Authenticate(string userName, string password, System.Threading.CancellationToken cancellationToken)
+    } elseif ($IntergratedAuth) {
+        $SmtpCredentials = [saslMechanismNtlmIntegrated]::new()
     }
 
     $Message = [MimeKit.MimeMessage]::new()
@@ -727,6 +748,8 @@
             }
         } elseif ($Graph.IsPresent) {
             # This is not going to happen is graph is used
+        } elseif  ($IntergratedAuth) {
+            $SmtpClient.Authenticate($SmtpCredentials)
         } else {
             try {
                 $SmtpClient.Authenticate($SmtpEncoding, $SmtpCredentials, [System.Threading.CancellationToken]::None)
