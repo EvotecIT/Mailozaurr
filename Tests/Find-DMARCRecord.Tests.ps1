@@ -3,7 +3,7 @@
         $DNS = Find-DMARCRecord -DomainName 'evotec.pl', 'evotec.xyz'
         $DNS.Count | Should -Be 2
         $DNS[0].Name | Should -Be 'evotec.pl'
-        $DNS[0].DMARC | Should -Be 'v=DMARC1;p=none;rua=mailto:dmarc_agg@vali.email;sp=none;aspf=s;'
+        $DNS[0].DMARC | Should -Be 'v=DMARC1; p=reject; rua=mailto:dmarc_agg@vali.email; adkim=s; aspf=s;'
         $DNS[1].Name | Should -Be 'evotec.xyz'
         $DNS[1].DMARC | Should -Be ''
     }
@@ -11,7 +11,7 @@
         $DNS = Find-DMARCRecord -DomainName 'evotec.pl', 'evotec.xyz' -DnsServer 1.1.1.1
         $DNS.Count | Should -Be 2
         $DNS[0].Name | Should -Be 'evotec.pl'
-        $DNS[0].DMARC | Should -Be 'v=DMARC1;p=none;rua=mailto:dmarc_agg@vali.email;sp=none;aspf=s;'
+        $DNS[0].DMARC | Should -Be 'v=DMARC1; p=reject; rua=mailto:dmarc_agg@vali.email; adkim=s; aspf=s;'
         $DNS[1].Name | Should -Be 'evotec.xyz'
         $DNS[1].DMARC | Should -Be ''
         $DNS[0].QueryServer | Should -Be '1.1.1.1:53'
@@ -21,7 +21,7 @@
         $DNS = Find-DMARCRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Google
         $DNS.Count | Should -Be 2
         $DNS[0].Name | Should -Be 'evotec.pl'
-        $DNS[0].DMARC | Should -Be 'v=DMARC1;p=none;rua=mailto:dmarc_agg@vali.email;sp=none;aspf=s;'
+        $DNS[0].DMARC | Should -Be 'v=DMARC1; p=reject; rua=mailto:dmarc_agg@vali.email; adkim=s; aspf=s;'
         $DNS[1].Name | Should -Be 'evotec.xyz'
         $DNS[1].DMARC | Should -Be ''
         $DNS[0].QueryServer | Should -Be 'dns.google.com'
@@ -31,7 +31,7 @@
         $DNS = Find-DMARCRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare
         $DNS.Count | Should -Be 2
         $DNS[0].Name | Should -Be 'evotec.pl'
-        $DNS[0].DMARC | Should -Be 'v=DMARC1;p=none;rua=mailto:dmarc_agg@vali.email;sp=none;aspf=s;'
+        $DNS[0].DMARC | Should -Be 'v=DMARC1; p=reject; rua=mailto:dmarc_agg@vali.email; adkim=s; aspf=s;'
         $DNS[1].Name | Should -Be 'evotec.xyz'
         $DNS[1].DMARC | Should -Be ''
         $DNS[0].QueryServer | Should -Be 'cloudflare-dns.com'
