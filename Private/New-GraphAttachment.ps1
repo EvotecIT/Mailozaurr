@@ -12,9 +12,18 @@
 		$StopWatchAttachment = [System.Diagnostics.Stopwatch]::StartNew()
 		Write-Verbose -Message "New-GraphAttachment - Uploading attachment '$Attachment'"
 		$UploadSession = "https://graph.microsoft.com/v1.0/users('" + $FromField + "')/messages/" + $DraftMessage.id + "/attachments/createUploadSession"
-		$fileStream = [System.IO.StreamReader]::new($Attachment)
-		$FileSize = $fileStream.BaseStream.Length
-		$FileName = [System.IO.Path]::GetFileName($Attachment)
+		try {
+			$FileStream = [System.IO.StreamReader]::new($Attachment)
+			$FileSize = $FileStream.BaseStream.Length
+			$FileName = [System.IO.Path]::GetFileName($Attachment)
+		} catch {
+			if ($PSBoundParameters.ErrorAction -eq 'Stop') {
+				throw
+			} else {
+				Write-Warning "New-GraphAttachment - Error reading attachment: $($_.Exception.Message) $ErrorDetails"
+			}
+			continue
+		}
 		$File = @{
 			"AttachmentItem" = [ordered] @{
 				"attachmentType" = "file"
@@ -24,28 +33,45 @@
 		}
 		$FileJson = $File | ConvertTo-Json -Depth 2
 
-		$Results = Invoke-RestMethod -Method POST -Uri $UploadSession -Headers $Authorization -Body $FileJson -ContentType 'application/json; charset=UTF-8' -UserAgent "Mailozaurr"
+		try {
+			$Results = Invoke-RestMethod -Method POST -Uri $UploadSession -Headers $Authorization -Body $FileJson -ContentType 'application/json; charset=UTF-8' -UserAgent "Mailozaurr" -ErrorAction Stop
+		} catch {
+			if ($PSBoundParameters.ErrorAction -eq 'Stop') {
+				throw
+			} else {
+				Write-Warning "New-GraphAttachment - Error creating upload session: $($_.Exception.Message) $ErrorDetails"
+			}
+			continue
+		}
 		$UploadUrl = $Results.uploadUrl
-		if ($UploadChunkSize -gt $fileStream.BaseStream.Length) {
-			$UploadChunkSize = $fileStream.BaseStream.Length
+		if ($UploadChunkSize -gt $FileStream.BaseStream.Length) {
+			$UploadChunkSize = $FileStream.BaseStream.Length
 		}
 		$FileOffsetStart = 0
 		$FileBuffer = [byte[]]::new($UploadChunkSize)
 		do {
-			$FileChunkByteCount = $fileStream.BaseStream.Read($FileBuffer, 0, $FileBuffer.Length)
-			$FileOffsetEnd = $fileStream.BaseStream.Position - 1
+			$FileChunkByteCount = $FileStream.BaseStream.Read($FileBuffer, 0, $FileBuffer.Length)
+			$FileOffsetEnd = $FileStream.BaseStream.Position - 1
 			if ($FileChunkByteCount -gt 0) {
 				$UploadRangeHeader = "bytes " + $FileOffsetStart + "-" + $FileOffsetEnd + "/" + $FileSize
-				$FileOffsetStart = $fileStream.BaseStream.Position
+				$FileOffsetStart = $FileStream.BaseStream.Position
 				$BinaryContent = [System.Net.Http.ByteArrayContent]::new($FileBuffer, 0, $FileChunkByteCount)
 				$FileBuffer = [byte[]]::new($UploadChunkSize)
 				$Headers = @{
 					"Content-Range"  = $UploadRangeHeader
 					"AnrchorMailbox" = $FromField
 				}
-				$Results = Invoke-RestMethod -Method PUT -Uri $UploadUrl -Headers $Headers -Body $BinaryContent.ReadAsByteArrayAsync().Result -ContentType "application/octet-stream" -UserAgent "Mailozaurr" -Verbose:$false
+				try {
+					$Results = Invoke-RestMethod -Method PUT -Uri $UploadUrl -Headers $Headers -Body $BinaryContent.ReadAsByteArrayAsync().Result -ContentType "application/octet-stream" -UserAgent "Mailozaurr" -Verbose:$false
+				} catch {
+					if ($PSBoundParameters.ErrorAction -eq 'Stop') {
+						throw
+					} else {
+						Write-Warning "New-GraphAttachment - Error sending bytes to upload session: $($_.Exception.Message) $ErrorDetails"
+					}
+					break
+				}
 			}
-
 		} while ($FileChunkByteCount -ne 0)
 
 		$Authorization.Remove('AnchorMailbox')

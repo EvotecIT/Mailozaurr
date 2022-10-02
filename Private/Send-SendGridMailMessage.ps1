@@ -124,7 +124,7 @@
         }
         # And here we process error
         if ($PSBoundParameters.ErrorAction -eq 'Stop') {
-            Write-Error $_
+            throw
         } else {
             Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message) $ErrorDetails"
         }
