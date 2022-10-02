@@ -4,6 +4,7 @@
 - Add support to `Send-EmailMessage` for attachments **4MB** to **150MB** in size for Microsoft Graph. Before it would only send attachments up to **4MB** in size. Detects size automatically and uses the appropriate API endpoint.
 - Add `RequestReadReceipt` support to `Send-EmailMessage` for Microsoft Graph to request a read receipt from the recipient.
 - Add `RequestDeliveryReceipt` switch to `Send-EmailMessage` for Microsoft Graph to request a delivery receipt. SMTP uses `DeliveryNotificationOption` and `DeliveryStatusNotificationType`.
+- Require `Send-EmailMessage` to have From field [#33](https://github.com/EvotecIT/Mailozaurr/issues/33)
 
 #### - 0.0.25 - 2022.06.07
 - Updated `MailKit`
