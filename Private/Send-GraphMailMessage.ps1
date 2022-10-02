@@ -13,7 +13,10 @@ function Send-GraphMailMessage {
         [PSCredential] $Credential,
         [alias('Importance')][ValidateSet('Low', 'Normal', 'High')][string] $Priority,
         [switch] $DoNotSaveToSentItems,
-        [System.Diagnostics.Stopwatch] $StopWatch
+        [switch] $RequestReadReceipt,
+        [switch] $RequestDeliveryReceipt,
+        [System.Diagnostics.Stopwatch] $StopWatch,
+        [switch] $Suppress
     )
     if ($Credential) {
         $AuthorizationData = ConvertFrom-GraphCredential -Credential $Credential
@@ -40,106 +43,46 @@ function Send-GraphMailMessage {
     $Message = [ordered] @{
         # https://docs.microsoft.com/en-us/graph/api/resources/message?view=graph-rest-1.0
         message         = [ordered] @{
-            subject       = $Subject
-            body          = $Body
-            from          = ConvertTo-GraphAddress -From $From
-            toRecipients  = @(
+            subject                    = $Subject
+            body                       = $Body
+            from                       = ConvertTo-GraphAddress -From $From
+            toRecipients               = @(
                 ConvertTo-GraphAddress -MailboxAddress $To
             )
-            ccRecipients  = @(
+            ccRecipients               = @(
                 ConvertTo-GraphAddress -MailboxAddress $CC
             )
-            bccRecipients = @(
+            bccRecipients              = @(
                 ConvertTo-GraphAddress -MailboxAddress $BCC
             )
             #sender                 = @(
             #    ConvertTo-GraphAddress -MailboxAddress $From
             #)
-            replyTo       = @(
+            replyTo                    = @(
                 ConvertTo-GraphAddress -MailboxAddress $ReplyTo
             )
-            attachments   = @(
-                foreach ($A in $Attachment) {
-                    $ItemInformation = Get-Item -Path $A
-                    if ($ItemInformation) {
-                        $File = [system.io.file]::ReadAllBytes($A)
-                        $Bytes = [System.Convert]::ToBase64String($File)
-                        @{
-                            '@odata.type'  = '#microsoft.graph.fileAttachment'
-                            'name'         = $ItemInformation.Name
-                            #'contentType'  = 'text/plain'
-                            'contentBytes' = $Bytes
-                        }
-                    }
-                }
-            )
-            importance    = $Priority
-            #isReadReceiptRequested     = $true
-            #isDeliveryReceiptRequested = $true
+            importance                 = $Priority
+            isReadReceiptRequested     = $RequestReadReceipt.IsPresent
+            isDeliveryReceiptRequested = $RequestDeliveryReceipt.IsPresent
         }
         saveToSentItems = -not $DoNotSaveToSentItems.IsPresent
     }
     $MailSentTo = -join ($To -join ',', $CC -join ', ', $Bcc -join ', ')
-    Remove-EmptyValue -Hashtable $Message -Recursive -Rerun 2
-    $Body = $Message | ConvertTo-Json -Depth 5
     $FromField = ConvertTo-GraphAddress -From $From -LimitedFrom
-    Try {
-        if ($PSCmdlet.ShouldProcess("$MailSentTo", 'Send-EmailMessage')) {
-            $null = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/users/$FromField/sendMail" -Headers $Authorization -Method POST -Body $Body -ContentType 'application/json; charset=UTF-8' -ErrorAction Stop
-            if (-not $Suppress) {
-                [PSCustomObject] @{
-                    Status        = $True
-                    Error         = ''
-                    SentTo        = $MailSentTo
-                    SentFrom      = $FromField
-                    Message       = ''
-                    TimeToExecute = $StopWatch.Elapsed
-                }
-            }
-        } else {
-            if (-not $Suppress) {
-                [PSCustomObject] @{
-                    Status        = $false
-                    Error         = 'Email not sent (WhatIf)'
-                    SentTo        = $MailSentTo
-                    SentFrom      = $FromField
-                    Message       = ''
-                    TimeToExecute = $StopWatch.Elapsed
-                }
-            }
+    Remove-EmptyValue -Hashtable $Message -Recursive -Rerun 2
+
+    if ($Attachment -and (IsLargerThan -FilePath $Attachment -Size 3000000)) {
+        $BodyDraft = $Message.Message | ConvertTo-Json -Depth 5
+        $DraftMessage = New-GraphDraftMessage -Body $BodyDraft -MailSentTo $MailSentTo -Authorization $Authorization -FromField $FromField
+        $null = New-GraphAttachment -DraftMessage $DraftMessage -FromField $FromField -Attachments $Attachment -Authorization $Authorization
+        Send-GraphMailMessageDraft -DraftMessage $DraftMessage -Authorization $Authorization -FromField $FromField -StopWatch $StopWatch -Suppress:$Suppress -MailSentTo $MailSentTo
+    } else {
+        # No attachments or attachments are under 4MB
+        if ($Attachment) {
+            $Message['message']['attachments'] = @(ConvertTo-GraphAttachment -Attachment $Attachment)
         }
-    } catch {
-        if ($PSBoundParameters.ErrorAction -eq 'Stop') {
-            Write-Error $_
-            return
-        }
-        $RestError = $_.ErrorDetails.Message
-        $RestMessage = $_.Exception.Message
-        if ($RestError) {
-            try {
-                $ErrorMessage = ConvertFrom-Json -InputObject $RestError -ErrorAction Stop
-                $ErrorText = $ErrorMessage.error.message
-                Write-Warning -Message "Send-GraphMailMessage - Error: $($RestMessage) $($ErrorText)"
-            } catch {
-                $ErrorText = ''
-                Write-Warning -Message "Send-GraphMailMessage - Error: $($RestMessage)"
-            }
-        } else {
-            Write-Warning -Message "Send-GraphMailMessage - Error: $($_.Exception.Message)"
-        }
-        if ($_.ErrorDetails.RecommendedAction) {
-            Write-Warning -Message "Send-GraphMailMessage - Recommended action: $RecommendedAction"
-        }
-        if (-not $Suppress) {
-            [PSCustomObject] @{
-                Status        = $False
-                Error         = if ($RestError) { "$($RestMessage) $($ErrorText)" }  else { $RestMessage }
-                SentTo        = $MailSentTo
-                SentFrom      = $FromField
-                Message       = ''
-                TimeToExecute = $StopWatch.Elapsed
-            }
-        }
+        $Body = $Message | ConvertTo-Json -Depth 5
+        New-GraphSendMessage -Body $Body -StopWatch $StopWatch -MailSentTo $MailSentTo -Authorization $Authorization -FromField $FromField -Suppress:$Suppress
     }
     if ($VerbosePreference) {
         if ($Message.message.attachments) {
