@@ -13,7 +13,8 @@
         [PSCredential] $Credential,
         [alias('Importance')][ValidateSet('Low', 'Normal', 'High')][string] $Priority,
         [switch] $SeparateTo,
-        [System.Diagnostics.Stopwatch] $StopWatch
+        [System.Diagnostics.Stopwatch] $StopWatch,
+        [switch] $Suppress
     )
     # https://sendgrid.api-docs.io/v3.0/mail-send/v3-mail-send
     if ($Credential) {
