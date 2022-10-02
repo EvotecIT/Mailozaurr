@@ -1,4 +1,4 @@
-﻿#### 0.9.0 - 2022.10.01
+﻿#### 0.9.0 - 2022.10.02
 - Fix `Suppress` for sending emails via SendGrid
 - Fix `Suppress` for sending emails via Microsoft Graph
 - Add support to `Send-EmailMessage` for attachments **4MB** to **150MB** in size for Microsoft Graph. Before it would only send attachments up to **4MB** in size. Detects size automatically and uses the appropriate API endpoint.
@@ -7,7 +7,7 @@
 - Require `Send-EmailMessage` to have From field [#33](https://github.com/EvotecIT/Mailozaurr/issues/33)
 - Warn if attachment in `Send-EmailMessage` doesn't exists, no error is thrown [#34](https://github.com/EvotecIT/Mailozaurr/issues/34)
 - Fixes special chars issue in file names [#26](https://github.com/EvotecIT/Mailozaurr/issues/26)
-- 
+-
 
 #### 0.0.25 - 2022.06.07
 - Updated `MailKit`
