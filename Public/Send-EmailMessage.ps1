@@ -144,6 +144,12 @@
     .PARAMETER LocalDomain
     Specifies the local domain name.
 
+    .PARAMETER RequestReadReceipt
+    Specifies whether to request a read receipt for the email message when using Microsoft Graph API (Graph switch)
+
+    .PARAMETER RequestDeliveryReceipt
+    Specifies whether to request a delivery receipt for the email message when using Microsoft Graph API (Graph switch)
+
     .EXAMPLE
     if (-not $MailCredentials) {
         $MailCredentials = Get-Credential
@@ -363,6 +369,12 @@
         [alias('oAuth')][switch] $oAuth2,
 
         [Parameter(ParameterSetName = 'Graph')]
+        [switch] $RequestReadReceipt,
+
+        [Parameter(ParameterSetName = 'Graph')]
+        [switch] $RequestDeliveryReceipt,
+
+        [Parameter(ParameterSetName = 'Graph')]
         [switch] $Graph,
 
         [Parameter(ParameterSetName = 'SecureString')]
@@ -509,19 +521,22 @@
         } elseif ($Graph.IsPresent) {
             # Sending email via Office 365 Graph
             $sendGraphMailMessageSplat = @{
-                From                 = $From
-                To                   = $To
-                Cc                   = $CC
-                Bcc                  = $Bcc
-                Subject              = $Subject
-                HTML                 = $HTML
-                Text                 = $Text
-                Attachment           = $Attachment
-                Credential           = $Credential
-                Priority             = $Priority
-                ReplyTo              = $ReplyTo
-                DoNotSaveToSentItems = $DoNotSaveToSentItems.IsPresent
-                StopWatch            = $StopWatch
+                From                   = $From
+                To                     = $To
+                Cc                     = $CC
+                Bcc                    = $Bcc
+                Subject                = $Subject
+                HTML                   = $HTML
+                Text                   = $Text
+                Attachment             = $Attachment
+                Credential             = $Credential
+                Priority               = $Priority
+                ReplyTo                = $ReplyTo
+                DoNotSaveToSentItems   = $DoNotSaveToSentItems.IsPresent
+                StopWatch              = $StopWatch
+                Suppress               = $Suppress.IsPresent
+                RequestReadReceipt     = $RequestReadReceipt.IsPresent
+                RequestDeliveryReceipt = $RequestDeliveryReceipt.IsPresent
             }
             Remove-EmptyValue -Hashtable $sendGraphMailMessageSplat
             return Send-GraphMailMessage @sendGraphMailMessageSplat
@@ -541,6 +556,7 @@
                 ReplyTo    = $ReplyTo
                 SeparateTo = $SeparateTo.IsPresent
                 StopWatch  = $StopWatch
+                Suppress   = $Suppress.IsPresent
             }
             Remove-EmptyValue -Hashtable $sendGraphMailMessageSplat
             return Send-SendGridMailMessage @sendGraphMailMessageSplat
