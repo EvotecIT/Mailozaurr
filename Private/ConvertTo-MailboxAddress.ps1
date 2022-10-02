@@ -5,7 +5,11 @@
     )
     foreach ($_ in $MailboxAddress) {
         if ($_ -is [string]) {
-            $SmtpTo = [MimeKit.MailboxAddress]::new("$_", "$_")
+            if ($_ -notlike "*<*>*") {
+                $SmtpTo = [MimeKit.MailboxAddress]::new("$_", "$_")
+            } else {
+                $SmtpTo = [MimeKit.MailboxAddress] $_
+            }
         } elseif ($_ -is [System.Collections.IDictionary]) {
             $SmtpTo = [MimeKit.MailboxAddress]::new($_.Name, $_.Email)
         } elseif ($_ -is [MimeKit.MailboxAddress]) {

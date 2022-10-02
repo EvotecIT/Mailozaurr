@@ -13,7 +13,8 @@
         [PSCredential] $Credential,
         [alias('Importance')][ValidateSet('Low', 'Normal', 'High')][string] $Priority,
         [switch] $SeparateTo,
-        [System.Diagnostics.Stopwatch] $StopWatch
+        [System.Diagnostics.Stopwatch] $StopWatch,
+        [switch] $Suppress
     )
     # https://sendgrid.api-docs.io/v3.0/mail-send/v3-mail-send
     if ($Credential) {
@@ -32,7 +33,7 @@
         )
         attachments      = @(
             foreach ($A in $Attachment) {
-                $ItemInformation = Get-Item -Path $A
+                $ItemInformation = Get-Item -LiteralPath $A
                 if ($ItemInformation) {
                     $File = [system.io.file]::ReadAllBytes($A)
                     $Bytes = [System.Convert]::ToBase64String($File)
@@ -123,7 +124,7 @@
         }
         # And here we process error
         if ($PSBoundParameters.ErrorAction -eq 'Stop') {
-            Write-Error $_
+            throw
         } else {
             Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message) $ErrorDetails"
         }
