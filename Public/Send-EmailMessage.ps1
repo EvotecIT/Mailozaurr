@@ -228,16 +228,14 @@
         [Parameter(ParameterSetName = 'Compatibility')]
         [int] $Port = 587,
 
-        [Parameter(ParameterSetName = 'SecureString')]
-
-        [Parameter(ParameterSetName = 'oAuth')]
-        [Parameter(ParameterSetName = 'Graph')]
-        [Parameter(ParameterSetName = 'Compatibility')]
-        [Parameter(ParameterSetName = 'SendGrid')]
+        [Parameter(Mandatory, ParameterSetName = 'SecureString')]
+        [Parameter(Mandatory, ParameterSetName = 'oAuth')]
+        [Parameter(Mandatory, ParameterSetName = 'Graph')]
+        [Parameter(Mandatory, ParameterSetName = 'Compatibility')]
+        [Parameter(Mandatory, ParameterSetName = 'SendGrid')]
         [object] $From,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -245,7 +243,6 @@
         [string] $ReplyTo,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -253,7 +250,6 @@
         [string[]] $Cc,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
