@@ -6,6 +6,7 @@
 - Add `RequestDeliveryReceipt` switch to `Send-EmailMessage` for Microsoft Graph to request a delivery receipt. SMTP uses `DeliveryNotificationOption` and `DeliveryStatusNotificationType`.
 - Require `Send-EmailMessage` to have From field [#33](https://github.com/EvotecIT/Mailozaurr/issues/33)
 - Warn if attachment in `Send-EmailMessage` doesn't exists, no error is thrown [#34](https://github.com/EvotecIT/Mailozaurr/issues/34)
+- Fixes special chars issue in file names [#26](https://github.com/EvotecIT/Mailozaurr/issues/26)
 
 #### - 0.0.25 - 2022.06.07
 - Updated `MailKit`
