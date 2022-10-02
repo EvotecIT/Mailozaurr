@@ -33,7 +33,7 @@
         )
         attachments      = @(
             foreach ($A in $Attachment) {
-                $ItemInformation = Get-Item -Path $A
+                $ItemInformation = Get-Item -LiteralPath $A
                 if ($ItemInformation) {
                     $File = [system.io.file]::ReadAllBytes($A)
                     $Bytes = [System.Convert]::ToBase64String($File)

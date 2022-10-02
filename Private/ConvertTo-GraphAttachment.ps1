@@ -5,7 +5,7 @@
     )
     foreach ($A in $Attachment) {
         try {
-            $ItemInformation = Get-Item -Path $A -ErrorAction Stop
+            $ItemInformation = Get-Item -LiteralPath $A -ErrorAction Stop
         } catch {
             Write-Warning -Message "ConvertTo-GraphAttachment: Attachment '$A' processing error. Error: $($_.Exception.Message)"
         }

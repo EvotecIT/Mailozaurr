@@ -7,7 +7,7 @@
     $AttachmentsSize = 0
     foreach ($A in $FilePath) {
         try {
-            $ItemInformation = Get-Item -Path $A -ErrorAction Stop
+            $ItemInformation = Get-Item -LiteralPath $A -ErrorAction Stop
             $AttachmentsSize += $ItemInformation.Length
         } catch {
             Write-Warning -Message "ConvertTo-GraphAttachment: Attachment '$A' processing error. Error: $($_.Exception.Message)"
