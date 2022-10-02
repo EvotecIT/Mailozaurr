@@ -5,27 +5,33 @@
         [alias('ReplyTo')][object] $From,
         [switch] $LimitedFrom
     )
-    foreach ($_ in $MailboxAddress) {
-        if ($_ -is [string]) {
-            if ($_) {
-                @{ email = $_ }
+    foreach ($E in $MailboxAddress) {
+        if ($E -is [string]) {
+            if ($E) {
+                if ($E -notlike "*<*>*") {
+                    @{ email = $E }
+                } else {
+                    # supports 'User01 <user01@fabrikam.com>'
+                    $Mailbox = [MimeKit.MailboxAddress] $E
+                    @{ email = $Mailbox.Address }
+                }
             }
-        } elseif ($_ -is [System.Collections.IDictionary]) {
-            if ($_.Email) {
-                @{ email = $_.Email }
+        } elseif ($E -is [System.Collections.IDictionary]) {
+            if ($E.Email) {
+                @{ email = $E.Email }
             }
-        } elseif ($_ -is [MimeKit.MailboxAddress]) {
-            if ($_.Address) {
-                @{ email = $_.Address }
+        } elseif ($E -is [MimeKit.MailboxAddress]) {
+            if ($E.Address) {
+                @{ email = $E.Address }
             }
         } else {
-            if ($_.Name -and $_.Email) {
+            if ($E.Name -and $E.Email) {
                 @{
-                    email = $_.Email
-                    name  = $_.Name
+                    email = $E.Email
+                    name  = $E.Name
                 }
-            } elseif ($_.Email) {
-                @{ email = $_.Email }
+            } elseif ($E.Email) {
+                @{ email = $E.Email }
             }
         }
     }
@@ -44,6 +50,24 @@
                     email = $From.Email
                     name  = $From.Name
                 }
+            }
+        } elseif ($From -is [MimeKit.MailboxAddress]) {
+            if ($LimitedFrom) {
+                $From.Address
+            } else {
+                @{
+                    email = $From.Address
+                    name  = $From.Name
+                }
+            }
+        } else {
+            if ($From.Email) {
+                @{
+                    email = $From.Email
+                    name  = $From.Name
+                }
+            } elseif ($From.Email) {
+                @{ email = $From.Email }
             }
         }
     }

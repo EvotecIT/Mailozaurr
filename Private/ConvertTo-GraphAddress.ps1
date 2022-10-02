@@ -5,42 +5,52 @@ function ConvertTo-GraphAddress {
         [object] $From,
         [switch] $LimitedFrom
     )
-    foreach ($_ in $MailboxAddress) {
-        if ($_ -is [string]) {
-            if ($_) {
-                @{
-                    emailAddress = @{
-                        address = $_
+    foreach ($E in $MailboxAddress) {
+        if ($E -is [string]) {
+            if ($E) {
+                if ($E -notlike "*<*>*") {
+                    @{
+                        emailAddress = @{
+                            address = $E
+                        }
+                    }
+                } else {
+                    # supports 'User01 <user01@fabrikam.com>'
+                    $Mailbox = [MimeKit.MailboxAddress] $E
+                    @{
+                        emailAddress = @{
+                            address = $Mailbox.Address
+                        }
                     }
                 }
             }
-        } elseif ($_ -is [System.Collections.IDictionary]) {
-            if ($_.Email) {
+        } elseif ($E -is [System.Collections.IDictionary]) {
+            if ($E.Email) {
                 @{
                     emailAddress = @{
-                        address = $_.Email
+                        address = $E.Email
                     }
                 }
             }
-        } elseif ($_ -is [MimeKit.MailboxAddress]) {
-            if ($_.Address) {
+        } elseif ($E -is [MimeKit.MailboxAddress]) {
+            if ($E.Address) {
                 @{
                     emailAddress = @{
-                        address = $_.Address
+                        address = $E.Address
                     }
                 }
             }
         } else {
-            if ($_.Name -and $_.Email) {
+            if ($E.Name -and $E.Email) {
                 @{
                     emailAddress = @{
-                        address = $_.Email
+                        address = $E.Email
                     }
                 }
-            } elseif ($_.Email) {
+            } elseif ($E.Email) {
                 @{
                     emailAddress = @{
-                        address = $_.Email
+                        address = $E.Email
                     }
                 }
 
@@ -49,12 +59,26 @@ function ConvertTo-GraphAddress {
     }
     if ($From) {
         if ($From -is [string]) {
-            if ($LimitedFrom) {
-                $From
+            if ($From -notlike "*<*>*") {
+                if ($LimitedFrom) {
+                    $From
+                } else {
+                    @{
+                        emailAddress = @{
+                            address = $From
+                        }
+                    }
+                }
             } else {
-                @{
-                    emailAddress = @{
-                        address = $From
+                # supports 'User01 <user01@fabrikam.com>'
+                $Mailbox = [MimeKit.MailboxAddress] $From
+                if ($LimitedFrom) {
+                    $Mailbox.Address
+                } else {
+                    @{
+                        emailAddress = @{
+                            address = $Mailbox.Address
+                        }
                     }
                 }
             }
@@ -66,6 +90,28 @@ function ConvertTo-GraphAddress {
                     emailAddress = @{
                         address = $From.Name
                         #name    = $From.Name
+                    }
+                }
+            }
+        } elseif ($From -is [MimeKit.MailboxAddress]) {
+            if ($LimitedFrom) {
+                $From.Address
+            } else {
+                @{
+                    emailAddress = @{
+                        address = $From.Address
+                    }
+                }
+            }
+        } else {
+            if ($From.Email) {
+                if ($LimitedFrom) {
+                    $From.Email
+                } else {
+                    @{
+                        emailAddress = @{
+                            address = $From.Email
+                        }
                     }
                 }
             }
