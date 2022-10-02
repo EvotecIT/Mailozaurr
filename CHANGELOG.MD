@@ -1,4 +1,11 @@
-﻿#### - 0.0.25 - 2022.06.07
+﻿#### 0.0.26
+- Fix `Suppress` for sending emails via SendGrid
+- Fix `Suppress` for sending emails via Microsoft Graph
+- Add support to `Send-EmailMessage` for attachments **4MB** to **150MB** in size for Microsoft Graph. Before it would only send attachments up to **4MB** in size. Detects size automatically and uses the appropriate API endpoint.
+- Add `RequestReadReceipt` support to `Send-EmailMessage` for Microsoft Graph to request a read receipt from the recipient.
+- Add `RequestDeliveryReceipt` switch to `Send-EmailMessage` for Microsoft Graph to request a delivery receipt. SMTP uses `DeliveryNotificationOption` and `DeliveryStatusNotificationType`.
+
+#### - 0.0.25 - 2022.06.07
 - Updated `MailKit`
 - Updated `MimeKit`
 - Added missing libraries so that the project can work on more systems without installing higher version of .NET Framework
