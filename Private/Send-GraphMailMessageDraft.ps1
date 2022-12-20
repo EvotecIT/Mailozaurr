@@ -6,13 +6,18 @@
         [string] $FromField,
         [System.Collections.IDictionary] $Authorization,
         [switch] $Suppress,
-        [PSCustomObject] $DraftMessage
+        [PSCustomObject] $DraftMessage,
+        [switch] $MgGraphRequest
 
     )
     Try {
         if ($PSCmdlet.ShouldProcess("$MailSentTo", 'Send-EmailMessage')) {
             $Uri = "https://graph.microsoft.com/v1.0/users('" + $FromField + "')/messages/" + $DraftMessage.id + "/send"
-            $null = Invoke-RestMethod -Uri $Uri -Headers $Authorization -Method POST -ContentType 'application/json; charset=UTF-8' -ErrorAction Stop
+            if ($MgGraphRequest) {
+                $null = Invoke-MgGraphRequest -Method POST -Uri $Uri -ContentType 'application/json; charset=UTF-8' -ErrorAction Stop
+            } else {
+                $null = Invoke-RestMethod -Uri $Uri -Headers $Authorization -Method POST -ContentType 'application/json; charset=UTF-8' -ErrorAction Stop
+            }
             if (-not $Suppress) {
                 [PSCustomObject] @{
                     Status        = $True

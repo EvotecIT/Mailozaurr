@@ -16,17 +16,22 @@ function Send-GraphMailMessage {
         [switch] $RequestReadReceipt,
         [switch] $RequestDeliveryReceipt,
         [System.Diagnostics.Stopwatch] $StopWatch,
-        [switch] $Suppress
+        [switch] $Suppress,
+        [switch] $MgGraphRequest
     )
-    if ($Credential) {
+    if ($MgGraphRequest) {
+        # it's already connected
+    } elseif ($Credential) {
         $AuthorizationData = ConvertFrom-GraphCredential -Credential $Credential
     } else {
         return
     }
-    if ($AuthorizationData.ClientID -eq 'MSAL') {
-        $Authorization = Connect-O365GraphMSAL -ApplicationKey $AuthorizationData.ClientSecret
-    } else {
-        $Authorization = Connect-O365Graph -ApplicationID $AuthorizationData.ClientID -ApplicationKey $AuthorizationData.ClientSecret -TenantDomain $AuthorizationData.DirectoryID -Resource https://graph.microsoft.com
+    if ($AuthorizationData) {
+        if ($AuthorizationData.ClientID -eq 'MSAL') {
+            $Authorization = Connect-O365GraphMSAL -ApplicationKey $AuthorizationData.ClientSecret
+        } else {
+            $Authorization = Connect-O365Graph -ApplicationID $AuthorizationData.ClientID -ApplicationKey $AuthorizationData.ClientSecret -TenantDomain $AuthorizationData.DirectoryID -Resource https://graph.microsoft.com
+        }
     }
     $Body = @{}
     if ($HTML) {
@@ -73,16 +78,16 @@ function Send-GraphMailMessage {
 
     if ($Attachment -and (IsLargerThan -FilePath $Attachment -Size 3000000)) {
         $BodyDraft = $Message.Message | ConvertTo-Json -Depth 5
-        $DraftMessage = New-GraphDraftMessage -Body $BodyDraft -MailSentTo $MailSentTo -Authorization $Authorization -FromField $FromField
-        $null = New-GraphAttachment -DraftMessage $DraftMessage -FromField $FromField -Attachments $Attachment -Authorization $Authorization
-        Send-GraphMailMessageDraft -DraftMessage $DraftMessage -Authorization $Authorization -FromField $FromField -StopWatch $StopWatch -Suppress:$Suppress -MailSentTo $MailSentTo
+        $DraftMessage = New-GraphDraftMessage -Body $BodyDraft -MailSentTo $MailSentTo -Authorization $Authorization -FromField $FromField -MgGraphRequest:$MgGraphRequest.IsPresent
+        $null = New-GraphAttachment -DraftMessage $DraftMessage -FromField $FromField -Attachments $Attachment -Authorization $Authorization -MgGraphRequest:$MgGraphRequest.IsPresent
+        Send-GraphMailMessageDraft -DraftMessage $DraftMessage -Authorization $Authorization -FromField $FromField -StopWatch $StopWatch -Suppress:$Suppress -MailSentTo $MailSentTo -MgGraphRequest:$MgGraphRequest.IsPresent
     } else {
         # No attachments or attachments are under 4MB
         if ($Attachment) {
             $Message['message']['attachments'] = @(ConvertTo-GraphAttachment -Attachment $Attachment)
         }
         $Body = $Message | ConvertTo-Json -Depth 5
-        New-GraphSendMessage -Body $Body -StopWatch $StopWatch -MailSentTo $MailSentTo -Authorization $Authorization -FromField $FromField -Suppress:$Suppress
+        New-GraphSendMessage -Body $Body -StopWatch $StopWatch -MailSentTo $MailSentTo -Authorization $Authorization -FromField $FromField -Suppress:$Suppress -MgGraphRequest:$MgGraphRequest.IsPresent
     }
     if ($VerbosePreference) {
         if ($Message.message.attachments) {

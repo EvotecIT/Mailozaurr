@@ -1,4 +1,31 @@
-﻿#### 0.9.0 - 2022.10.02
+﻿#### 1.0.0 - 2022.12.20
+- Add support for sending emails with graph using Delegated permissions. It uses Microsoft.Graph.Authentication module and `MgGraphRequest` switch on `Send-EmailMessage`.
+
+```powershell
+Import-Module Mailozaurr
+Import-Module Microsoft.Graph.Authentication -Force
+
+# this shows how to send email using combination of Mailozaurr and Microsoft.Graph to use Connect-MgGraph to authorize
+$Body = EmailBody {
+    New-HTMLText -Text "This is test of Connect-MGGraph functionality"
+}
+
+# authorize via Connect-MgGraph with delegated rights or any other supported method
+Connect-MgGraph -Scopes Mail.Send
+
+# sending email
+$sendEmailMessageSplat = @{
+    From           = 'przemyslaw.klys@test.pl'
+    To             = 'przemyslaw.klys@test.pl'
+    HTML           = $Body
+    Subject        = 'This tests email as delegated'
+    MgGraphRequest = $true
+    Verbose        = $true
+}
+Send-EmailMessage @sendEmailMessageSplat
+```
+
+#### 0.9.0 - 2022.10.02
 - Fix `Suppress` for sending emails via SendGrid
 - Fix `Suppress` for sending emails via Microsoft Graph
 - Add support to `Send-EmailMessage` for attachments **4MB** to **150MB** in size for Microsoft Graph. Before it would only send attachments up to **4MB** in size. Detects size automatically and uses the appropriate API endpoint.

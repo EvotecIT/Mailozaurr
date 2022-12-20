@@ -1,7 +1,5 @@
 ﻿Import-Module $PSScriptRoot\..\Mailozaurr.psd1 -Force
 
-# It seems larger HTML is not supported. Online makes sure it uses less libraries inline
-# it may be related to not escaping chars properly for JSON, may require investigation
 $Body = EmailBody {
     EmailText -Text 'This is my text'
     EmailTable -DataTable (Get-Process | Select-Object -First 5 -Property Name, Id, PriorityClass, CPU, Product)
