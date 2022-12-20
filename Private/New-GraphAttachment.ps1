@@ -4,7 +4,8 @@
 		[PSCustomObject] $DraftMessage,
 		[string] $FromField,
 		[System.Collections.IDictionary] $Authorization,
-		[string[]] $Attachments
+		[string[]] $Attachments,
+		[switch] $MgGraphRequest
 	)
 	[Int32] $UploadChunkSize = 9000000 # 9MB chunks
 	$Authorization['AnchorMailbox'] = $FromField
@@ -34,7 +35,11 @@
 		$FileJson = $File | ConvertTo-Json -Depth 2
 
 		try {
-			$Results = Invoke-RestMethod -Method POST -Uri $UploadSession -Headers $Authorization -Body $FileJson -ContentType 'application/json; charset=UTF-8' -UserAgent "Mailozaurr" -ErrorAction Stop
+			if ($MgGraphRequest) {
+				$Results = Invoke-MgGraphRequest -Uri $UploadSession -Method POST -Body $FileJson -ErrorAction Stop -ContentType 'application/json; charset=UTF-8' -UserAgent "Mailozaurr"
+			} else {
+				$Results = Invoke-RestMethod -Method POST -Uri $UploadSession -Headers $Authorization -Body $FileJson -ContentType 'application/json; charset=UTF-8' -UserAgent "Mailozaurr" -ErrorAction Stop
+			}
 		} catch {
 			if ($PSBoundParameters.ErrorAction -eq 'Stop') {
 				throw
@@ -62,7 +67,11 @@
 					"AnrchorMailbox" = $FromField
 				}
 				try {
-					$Results = Invoke-RestMethod -Method PUT -Uri $UploadUrl -Headers $Headers -Body $BinaryContent.ReadAsByteArrayAsync().Result -ContentType "application/octet-stream" -UserAgent "Mailozaurr" -Verbose:$false
+					if ($MgGraphRequest) {
+						$Results = Invoke-MgGraphRequest -Uri $UploadUrl -Method PUT -Body $BinaryContent.ReadAsByteArrayAsync().Result -ErrorAction Stop -ContentType 'application/octet-stream' -UserAgent "Mailozaurr" -Verbose:$false
+					} else {
+						$Results = Invoke-RestMethod -Method PUT -Uri $UploadUrl -Headers $Headers -Body $BinaryContent.ReadAsByteArrayAsync().Result -ContentType "application/octet-stream" -UserAgent "Mailozaurr" -Verbose:$false
+					}
 				} catch {
 					if ($PSBoundParameters.ErrorAction -eq 'Stop') {
 						throw
@@ -79,18 +88,3 @@
 		Write-Verbose -Message "New-GraphAttachment - Attachment '$Attachment' uploaded in $($StopWatchAttachment.Elapsed.TotalSeconds) seconds"
 	}
 }
-
-<#
-POST https://graph.microsoft.com/v1.0/me/messages/AAMkAGUwNjQ4ZjIxLTQ3Y2YtNDViMi1iZjc4LTMA=/attachments/createUploadSession
-Content-type: application/json
-
-{
-  "AttachmentItem": {
-    "attachmentType": "file",
-    "name": "scenary",
-    "size": 7208534,
-    "isInline": true,
-    "contentId": "my_inline_picture"
-  }
-}
-#>

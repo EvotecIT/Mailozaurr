@@ -96,6 +96,10 @@
     .PARAMETER Graph
     Send email via Office 365 Graph API
 
+    .PARAMETER MgGraphRequest
+    Send email via Microsoft Graph API using Invoke-MgGraphRequest internally.
+    This allows to use Connect-MgGraph to authenticate and then use Send-EmailMessage without any additional parameters.
+
     .PARAMETER AsSecureString
     Informs command that password provided is secure string, rather than clear text
 
@@ -231,6 +235,7 @@
         [Parameter(Mandatory, ParameterSetName = 'SecureString')]
         [Parameter(Mandatory, ParameterSetName = 'oAuth')]
         [Parameter(Mandatory, ParameterSetName = 'Graph')]
+        [Parameter(Mandatory, ParameterSetName = 'MgGraphRequest')]
         [Parameter(Mandatory, ParameterSetName = 'Compatibility')]
         [Parameter(Mandatory, ParameterSetName = 'SendGrid')]
         [object] $From,
@@ -238,6 +243,7 @@
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
+        [Parameter(ParameterSetName = 'MgGraphRequest')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [Parameter(ParameterSetName = 'SendGrid')]
         [string] $ReplyTo,
@@ -245,6 +251,7 @@
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
+        [Parameter(ParameterSetName = 'MgGraphRequest')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [Parameter(ParameterSetName = 'SendGrid')]
         [string[]] $Cc,
@@ -252,6 +259,7 @@
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
+        [Parameter(ParameterSetName = 'MgGraphRequest')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [Parameter(ParameterSetName = 'SendGrid')]
         [string[]] $Bcc,
@@ -259,6 +267,7 @@
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
+        [Parameter(ParameterSetName = 'MgGraphRequest')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [Parameter(ParameterSetName = 'SendGrid')]
         [string[]] $To,
@@ -266,20 +275,20 @@
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
+        [Parameter(ParameterSetName = 'MgGraphRequest')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [Parameter(ParameterSetName = 'SendGrid')]
         [string] $Subject,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
+        [Parameter(ParameterSetName = 'MgGraphRequest')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [Parameter(ParameterSetName = 'SendGrid')]
         [alias('Importance')][ValidateSet('Low', 'Normal', 'High')][string] $Priority,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [ValidateSet('ASCII', 'BigEndianUnicode', 'Default', 'Unicode', 'UTF32', 'UTF7', 'UTF8')][string] $Encoding = 'Default',
@@ -295,68 +304,62 @@
         [MailKit.Net.Smtp.DeliveryStatusNotificationType] $DeliveryStatusNotificationType,
 
         [Parameter(ParameterSetName = 'oAuth')]
-        [Parameter(ParameterSetName = 'Graph', Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'Compatibility')]
-        [Parameter(ParameterSetName = 'SendGrid', Mandatory)]
+        [Parameter(Mandatory, ParameterSetName = 'SendGrid')]
         [pscredential] $Credential,
 
         [Parameter(ParameterSetName = 'SecureString')]
         [string] $Username,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
         [string] $Password,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [MailKit.Security.SecureSocketOptions] $SecureSocketOptions = [MailKit.Security.SecureSocketOptions]::Auto,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $UseSsl,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $SkipCertificateRevocation,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $SkipCertificateValidatation,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
+        [Parameter(ParameterSetName = 'MgGraphRequest')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [Parameter(ParameterSetName = 'SendGrid')]
         [alias('Body')][string[]] $HTML,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
+        [Parameter(ParameterSetName = 'MgGraphRequest')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [Parameter(ParameterSetName = 'SendGrid')]
         [string[]] $Text,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
+        [Parameter(ParameterSetName = 'MgGraphRequest')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [Parameter(ParameterSetName = 'SendGrid')]
         [alias('Attachments')][string[]] $Attachment,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [int] $Timeout = 12000,
@@ -365,13 +368,19 @@
         [alias('oAuth')][switch] $oAuth2,
 
         [Parameter(ParameterSetName = 'Graph')]
+        [Parameter(ParameterSetName = 'MgGraphRequest')]
         [switch] $RequestReadReceipt,
 
         [Parameter(ParameterSetName = 'Graph')]
+        [Parameter(ParameterSetName = 'MgGraphRequest')]
         [switch] $RequestDeliveryReceipt,
 
         [Parameter(ParameterSetName = 'Graph')]
+        [Parameter(ParameterSetName = 'MgGraphRequest')]
         [switch] $Graph,
+
+        [Parameter(ParameterSetName = 'MgGraphRequest')]
+        [switch] $MgGraphRequest,
 
         [Parameter(ParameterSetName = 'SecureString')]
         [switch] $AsSecureString,
@@ -383,6 +392,7 @@
         [switch] $SeparateTo,
 
         [Parameter(ParameterSetName = 'Graph')]
+        [Parameter(ParameterSetName = 'MgGraphRequest')]
         [switch] $DoNotSaveToSentItems,
 
         # Different feature set
@@ -390,10 +400,10 @@
         [alias('EmailParameters')][System.Collections.IDictionary] $Email,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [Parameter(ParameterSetName = 'Graph')]
+        [Parameter(ParameterSetName = 'MgGraphRequest')]
         [Parameter(ParameterSetName = 'Grouped')]
         [Parameter(ParameterSetName = 'SendGrid')]
         [switch] $Suppress,
@@ -506,6 +516,28 @@
                 return
             }
         }
+    }
+    if ($MgGraphRequest) {
+        $sendGraphMailMessageSplat = @{
+            From                   = $From
+            To                     = $To
+            Cc                     = $CC
+            Bcc                    = $Bcc
+            Subject                = $Subject
+            HTML                   = $HTML
+            Text                   = $Text
+            Attachment             = $Attachment
+            MgGraphRequest         = $MgGraphRequest
+            Priority               = $Priority
+            ReplyTo                = $ReplyTo
+            DoNotSaveToSentItems   = $DoNotSaveToSentItems.IsPresent
+            StopWatch              = $StopWatch
+            Suppress               = $Suppress.IsPresent
+            RequestReadReceipt     = $RequestReadReceipt.IsPresent
+            RequestDeliveryReceipt = $RequestDeliveryReceipt.IsPresent
+        }
+        Remove-EmptyValue -Hashtable $sendGraphMailMessageSplat
+        return Send-GraphMailMessage @sendGraphMailMessageSplat
     }
 
     # lets define credentials early on, because if it's Graph we use different way to send emails
