@@ -17,7 +17,7 @@ $Configuration = @{
 
         Manifest          = @{
             # Version number of this module.
-            ModuleVersion              = '0.9.0'
+            ModuleVersion              = '0.9.X'
             # Supported PSEditions
             CompatiblePSEditions       = @('Desktop', 'Core')
             # ID used to uniquely identify this module
