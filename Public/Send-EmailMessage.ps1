@@ -696,9 +696,7 @@
         $SmtpClient.CheckCertificateRevocation = $false
     }
     if ($SkipCertificateValidatation) {
-        $CertificateCallback = [Net.ServicePointManager]::ServerCertificateValidationCallback
-        [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
-        #$SmtpClient.ServerCertificateValidationCallback = [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }
+        $SmtpClient.ServerCertificateValidationCallback = { $true }
     }
     if ($DeliveryNotificationOption) {
         # This requires custom class MySmtpClient
@@ -713,12 +711,7 @@
     }
     try {
         $SmtpClient.Connect($Server, $Port, $SecureSocketOptions)
-        # Assign back certificate callback
-        [Net.ServicePointManager]::ServerCertificateValidationCallback = $CertificateCallback
     } catch {
-        # Assign back certificate callback
-        [Net.ServicePointManager]::ServerCertificateValidationCallback = $CertificateCallback
-
         if ($PSBoundParameters.ErrorAction -eq 'Stop') {
             Write-Error $_
             return
