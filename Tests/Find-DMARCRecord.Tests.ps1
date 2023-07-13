@@ -5,7 +5,7 @@
         $DNS[0].Name | Should -Be 'evotec.pl'
         $DNS[0].DMARC | Should -Be 'v=DMARC1; p=reject; rua=mailto:7kkoc19n@ag.eu.dmarcian.com; adkim=s; aspf=s;'
         $DNS[1].Name | Should -Be 'evotec.xyz'
-        $DNS[1].DMARC | Should -Be ''
+        $DNS[1].DMARC | Should -Be 'v=DMARC1; p=reject; rua=mailto:7kkoc19n@ag.eu.dmarcian.com'
     }
     It 'Given 2 domains it should return two records using specific server' {
         $DNS = Find-DMARCRecord -DomainName 'evotec.pl', 'evotec.xyz' -DnsServer 1.1.1.1
@@ -13,7 +13,7 @@
         $DNS[0].Name | Should -Be 'evotec.pl'
         $DNS[0].DMARC | Should -Be 'v=DMARC1; p=reject; rua=mailto:7kkoc19n@ag.eu.dmarcian.com; adkim=s; aspf=s;'
         $DNS[1].Name | Should -Be 'evotec.xyz'
-        $DNS[1].DMARC | Should -Be ''
+        $DNS[1].DMARC | Should -Be 'v=DMARC1; p=reject; rua=mailto:7kkoc19n@ag.eu.dmarcian.com'
         $DNS[0].QueryServer | Should -Be '1.1.1.1:53'
         $DNS[1].QueryServer | Should -Be '1.1.1.1:53'
     }
@@ -23,7 +23,7 @@
         $DNS[0].Name | Should -Be 'evotec.pl'
         $DNS[0].DMARC | Should -Be 'v=DMARC1; p=reject; rua=mailto:7kkoc19n@ag.eu.dmarcian.com; adkim=s; aspf=s;'
         $DNS[1].Name | Should -Be 'evotec.xyz'
-        $DNS[1].DMARC | Should -Be ''
+        $DNS[1].DMARC | Should -Be 'v=DMARC1; p=reject; rua=mailto:7kkoc19n@ag.eu.dmarcian.com'
         $DNS[0].QueryServer | Should -Be 'dns.google.com'
         $DNS[1].QueryServer | Should -Be 'dns.google.com'
     }
@@ -33,7 +33,7 @@
         $DNS[0].Name | Should -Be 'evotec.pl'
         $DNS[0].DMARC | Should -Be 'v=DMARC1; p=reject; rua=mailto:7kkoc19n@ag.eu.dmarcian.com; adkim=s; aspf=s;'
         $DNS[1].Name | Should -Be 'evotec.xyz'
-        $DNS[1].DMARC | Should -Be ''
+        $DNS[1].DMARC | Should -Be 'v=DMARC1; p=reject; rua=mailto:7kkoc19n@ag.eu.dmarcian.com'
         $DNS[0].QueryServer | Should -Be 'cloudflare-dns.com'
         $DNS[1].QueryServer | Should -Be 'cloudflare-dns.com'
     }
