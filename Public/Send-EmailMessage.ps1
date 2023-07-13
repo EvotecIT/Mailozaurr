@@ -100,6 +100,11 @@
     Send email via Microsoft Graph API using Invoke-MgGraphRequest internally.
     This allows to use Connect-MgGraph to authenticate and then use Send-EmailMessage without any additional parameters.
 
+    .PARAMETER AuthType
+    The authentication type to use with the credentials provided.
+    The default 'Default' will use the default mechanism in MimeKit.
+    The value 'Windows' will use Windows authentication types (Kerberos/NTLM) (Windows only).
+
     .PARAMETER AsSecureString
     Informs command that password provided is secure string, rather than clear text
 
@@ -382,6 +387,9 @@
         [Parameter(ParameterSetName = 'MgGraphRequest')]
         [switch] $MgGraphRequest,
 
+        [ValidateSet('Default', 'Windows')]
+        [string] $AuthType = 'Default',
+
         [Parameter(ParameterSetName = 'SecureString')]
         [switch] $AsSecureString,
 
@@ -588,20 +596,32 @@
             }
             Remove-EmptyValue -Hashtable $sendGraphMailMessageSplat
             return Send-SendGridMailMessage @sendGraphMailMessageSplat
-        } else {
-            $SmtpCredentials = $Credential
         }
-    } elseif ($Username -and $Password -and $AsSecureString) {
+    } elseif ($Username -and $Password -and ($AsSecureString -or $AuthType -eq 'Windows')) {
         # Convert to SecureString
         try {
             $secStringPassword = ConvertTo-SecureString -ErrorAction Stop -String $Password
-            $SmtpCredentials = [System.Management.Automation.PSCredential]::new($UserName, $secStringPassword)
+            $Credential = [System.Management.Automation.PSCredential]::new($UserName, $secStringPassword)
         } catch {
             Write-Warning "Send-EmailMessage - Couldn't translate secure string to password. Error $($_.Exception.Message)"
             return
         }
     } elseif ($Username -and $Password) {
         #void Authenticate(string userName, string password, System.Threading.CancellationToken cancellationToken)
+    } elseif ($AuthType -eq 'Windows') {
+        $SmtpCredentials = [SaslMechanismWindowsAuth]::new($null, $null, $Server)
+    }
+
+    if (-not $SmtpCredentials -and $Credential) {
+        if ($AuthType -eq 'Default') {
+            $SmtpCredentials = $Credential
+        }
+        else {
+            $SmtpCredentials = [SaslMechanismWindowsAuth]::new(
+                $Credential.UserName,
+                $Credential.GetNetworkCredential().Password,
+                $Server)
+        }
     }
 
     $Message = [MimeKit.MimeMessage]::new()
@@ -773,7 +793,11 @@
             # This is not going to happen is graph is used
         } else {
             try {
-                $SmtpClient.Authenticate($SmtpEncoding, $SmtpCredentials, [System.Threading.CancellationToken]::None)
+                if ($SmtpCredentials -is [MailKit.Security.SaslMechanism]) {
+                    $SmtpClient.Authenticate($SmtpCredentials)
+                } else {
+                    $SmtpClient.Authenticate($SmtpEncoding, $SmtpCredentials, [System.Threading.CancellationToken]::None)
+                }
             } catch {
                 if ($PSBoundParameters.ErrorAction -eq 'Stop') {
                     Write-Error $_
