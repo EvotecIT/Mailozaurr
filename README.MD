@@ -74,6 +74,7 @@ This started with a single goal to replace `Send-MailMessage` which is depracate
 While I didn't spent much time creating WIKI, working on Get-Help documentation, I did write blog articles that should help you get started.
 
 - [x] [Mailozaurr – New mail toolkit (SMTP, IMAP, POP3) with support for oAuth 2.0 and GraphApi for PowerShell](https://evotec.xyz/mailozaurr-new-mail-toolkit-smtp-imap-pop3-with-support-for-oauth-2-0-and-graphapi-for-powershell/)
+- [x] [Easy way to send emails using Microsoft Graph API (Office 365) with PowerShell](https://evotec.xyz/easy-way-to-send-emails-using-microsoft-graph-api-office-365-with-powershell/)
 
 You can also utilize Examples which should help to understand use cases. Of course it would be great having pretty help so if you can help me out feel free to submit PR's.
 
