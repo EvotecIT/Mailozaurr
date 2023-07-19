@@ -1,4 +1,7 @@
-﻿#### 1.0.0 - 2022.12.20
+﻿#### 1.0.1 - 2023.07.19
+- Updated `Microsoft.Identity.Client.dll` to 4.44 to match `ExchangeOnlineManagement` module
+
+#### 1.0.0 - 2022.12.20
 - Add support for sending emails with graph using Delegated permissions. It uses Microsoft.Graph.Authentication module and `MgGraphRequest` switch on `Send-EmailMessage`.
 
 ```powershell
