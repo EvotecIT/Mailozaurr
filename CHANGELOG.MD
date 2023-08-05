@@ -4,6 +4,7 @@
 - Added `SkipCertificateValidation` to `Connect-POP3`
 - Added `SkipCertificateRevocation` to `Connect-IMAP`
 - Added `SkipCertificateRevocation` to `Connect-POP3`
+- Use simpler certificate validation callback by @jborean93 in https://github.com/EvotecIT/Mailozaurr/pull/42
 
 #### 1.0.1 - 2023.07.19
 - Updated `Microsoft.Identity.Client.dll` to 4.44 to match `ExchangeOnlineManagement` module
