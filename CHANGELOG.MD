@@ -1,4 +1,11 @@
-﻿#### 1.0.1 - 2023.07.19
+﻿#### 1.0.2 - 2023.08.05
+- Rename `SkipCertificateValidatation` to `SkipCertificateValidation` in `Send-EmailMessage` (typo fix)
+- Added `SkipCertificateValidation` to `Connect-IMAP`
+- Added `SkipCertificateValidation` to `Connect-POP3`
+- Added `SkipCertificateRevocation` to `Connect-IMAP`
+- Added `SkipCertificateRevocation` to `Connect-POP3`
+
+#### 1.0.1 - 2023.07.19
 - Updated `Microsoft.Identity.Client.dll` to 4.44 to match `ExchangeOnlineManagement` module
 
 #### 1.0.0 - 2022.12.20
