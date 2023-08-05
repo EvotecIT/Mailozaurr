@@ -1,0 +1,167 @@
+diff --git a/NSspi/Contexts/ClientContext.cs b/NSspi/Contexts/ClientContext.cs
+index 7bb4f05..94fc840 100644
+--- a/NSspi/Contexts/ClientContext.cs
++++ b/NSspi/Contexts/ClientContext.cs
+@@ -1,4 +1,6 @@
+ ∩╗┐using System;
++using System.Collections.Generic;
++using System.Linq;
+ using NSspi.Buffers;
+ using NSspi.Credentials;
+ 
+@@ -57,7 +59,7 @@ namespace NSspi.Contexts
+         /// is not null, it must be sent to the server.
+         /// A status of 'Continue' indicates that the output token should be sent to the server and
+         /// a response should be anticipated.</returns>
+-        public SecurityStatus Init( byte[] serverToken, out byte[] outToken )
++        public SecurityStatus Init( byte[] serverToken, out byte[] outToken, byte[] channelBinding )
+         {
+             TimeStamp rawExpiry = new TimeStamp();
+ 
+@@ -67,7 +69,8 @@ namespace NSspi.Contexts
+             SecureBufferAdapter outAdapter;
+ 
+             SecureBuffer serverBuffer;
+-            SecureBufferAdapter serverAdapter;
++            SecureBuffer channelBindingBuffer;
++            SecureBufferAdapter inAdapter;
+ 
+             if( this.Disposed )
+             {
+@@ -89,10 +92,19 @@ namespace NSspi.Contexts
+                 BufferType.Token
+             );
+ 
++            List<SecureBuffer> inBuffers = new List<SecureBuffer>();
+             serverBuffer = null;
+             if( serverToken != null )
+             {
+                 serverBuffer = new SecureBuffer( serverToken, BufferType.Token );
++                inBuffers.Add(serverBuffer);
++            }
++
++            channelBindingBuffer = null;
++            if ( channelBinding != null )
++            {
++                channelBindingBuffer = new SecureBuffer( channelBinding, BufferType.ChannelBindings );
++                inBuffers.Add(channelBindingBuffer);
+             }
+ 
+             // Some notes on handles and invoking InitializeSecurityContext
+@@ -111,6 +123,7 @@ namespace NSspi.Contexts
+             //  - So in the end, on a 64-bit machine, we're passing a 64-bit value (the pointer to the struct) that
+             //    points to 128 bits of memory (the struct itself) for where to write the handle numbers.
+             using( outAdapter = new SecureBufferAdapter( outTokenBuffer ) )
++            using( inAdapter = new SecureBufferAdapter( inBuffers.ToArray() ) )
+             {
+                 if( this.ContextHandle.IsInvalid )
+                 {
+@@ -121,7 +134,7 @@ namespace NSspi.Contexts
+                         this.requestedAttribs,
+                         0,
+                         SecureBufferDataRep.Network,
+-                        IntPtr.Zero,
++                        inAdapter.Handle,
+                         0,
+                         ref this.ContextHandle.rawHandle,
+                         outAdapter.Handle,
+@@ -131,23 +144,20 @@ namespace NSspi.Contexts
+                 }
+                 else
+                 {
+-                    using( serverAdapter = new SecureBufferAdapter( serverBuffer ) )
+-                    {
+-                        status = ContextNativeMethods.InitializeSecurityContext_2(
+-                            ref this.Credential.Handle.rawHandle,
+-                            ref this.ContextHandle.rawHandle,
+-                            this.serverPrinc,
+-                            this.requestedAttribs,
+-                            0,
+-                            SecureBufferDataRep.Network,
+-                            serverAdapter.Handle,
+-                            0,
+-                            ref this.ContextHandle.rawHandle,
+-                            outAdapter.Handle,
+-                            ref this.finalAttribs,
+-                            ref rawExpiry
+-                        );
+-                    }
++                    status = ContextNativeMethods.InitializeSecurityContext_2(
++                        ref this.Credential.Handle.rawHandle,
++                        ref this.ContextHandle.rawHandle,
++                        this.serverPrinc,
++                        this.requestedAttribs,
++                        0,
++                        SecureBufferDataRep.Network,
++                        inAdapter.Handle,
++                        0,
++                        ref this.ContextHandle.rawHandle,
++                        outAdapter.Handle,
++                        ref this.finalAttribs,
++                        ref rawExpiry
++                    );
+                 }
+             }
+ 
+diff --git a/NSspi/Contexts/Context.cs b/NSspi/Contexts/Context.cs
+index 67525bd..25c8596 100644
+--- a/NSspi/Contexts/Context.cs
++++ b/NSspi/Contexts/Context.cs
+@@ -412,6 +412,44 @@ namespace NSspi.Contexts
+             return result;
+         }
+ 
++        public byte[] DecryptStream( byte[] input )
++        {
++            SecPkgContext_Sizes sizes;
++
++            SecureBuffer streamBuffer;
++            SecureBuffer dataBuffer;
++            SecureBufferAdapter adapter;
++
++            SecurityStatus status;
++            byte[] result = null;
++            CheckLifecycle();
++
++            streamBuffer = new SecureBuffer( new byte[input.Length], BufferType.Stream );
++            dataBuffer = new SecureBuffer( new byte[0], BufferType.Data );
++
++            Array.Copy(input, 0, streamBuffer.Buffer, 0, input.Length);
++
++            using( adapter = new SecureBufferAdapter( new[] { streamBuffer, dataBuffer } ) )
++            {
++                status = ContextNativeMethods.SafeDecryptMessage(
++                    this.ContextHandle,
++                    0,
++                    adapter,
++                    0
++                );
++
++                if( status != SecurityStatus.OK )
++                {
++                    throw new SSPIException( "Failed to encrypt message", status );
++                }
++
++                result = new byte[adapter.bufferCarrier[1].Count];
++                Marshal.Copy(adapter.bufferCarrier[1].Buffer, result, 0, result.Length);
++
++                return result;
++            }
++        }
++
+         /// <summary>
+         /// Signs the message using the context's session key.
+         /// </summary>
+diff --git a/NSspi/SecureBuffer/SecureBufferAdapter.cs b/NSspi/SecureBuffer/SecureBufferAdapter.cs
+index 7da36a2..e6670f3 100644
+--- a/NSspi/SecureBuffer/SecureBufferAdapter.cs
++++ b/NSspi/SecureBuffer/SecureBufferAdapter.cs
+@@ -93,7 +93,7 @@ namespace NSspi.Buffers
+         /// <summary>
+         /// An array of the native buffers.
+         /// </summary>
+-        private SecureBufferInternal[] bufferCarrier;
++        internal SecureBufferInternal[] bufferCarrier;
+ 
+         /// <summary>
+         /// Initializes a SecureBufferAdapter to carry a single buffer to the native api.
