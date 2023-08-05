@@ -15,6 +15,15 @@
         [Parameter(ParameterSetName = 'ClearText', Mandatory)][string] $UserName,
         [Parameter(ParameterSetName = 'ClearText', Mandatory)][string] $Password,
 
+        [Parameter(ParameterSetName = 'oAuth2')]
+        [Parameter(ParameterSetName = 'Credential')]
+        [Parameter(ParameterSetName = 'ClearText')]
+        [switch] $SkipCertificateRevocation,
+
+        [Parameter(ParameterSetName = 'oAuth2')]
+        [Parameter(ParameterSetName = 'Credential')]
+        [Parameter(ParameterSetName = 'ClearText')]
+        [switch] $SkipCertificateValidation,
 
         [Parameter(ParameterSetName = 'oAuth2', Mandatory)]
         [Parameter(ParameterSetName = 'Credential')][System.Management.Automation.PSCredential] $Credential,
@@ -39,6 +48,14 @@
         Write-Warning "Connect-POP - Unable to connect $($_.Exception.Message)"
         return
     }
+
+    if ($SkipCertificateRevocation) {
+        $Client.CheckCertificateRevocation = $false
+    }
+    if ($SkipCertificateValidation) {
+        $Client.ServerCertificateValidationCallback = { $true }
+    }
+
     <#
     void Connect(string host, int port, MailKit.Security.SecureSocketOptions options, System.Threading.CancellationToken cancellationToken)
     void Connect(System.Net.Sockets.Socket socket, string host, int port, MailKit.Security.SecureSocketOptions options, System.Threading.CancellationToken cancellationToken)
