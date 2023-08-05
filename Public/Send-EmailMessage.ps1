@@ -333,7 +333,7 @@
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
-        [switch] $SkipCertificateValidatation,
+        [alias('SkipCertificateValidatation')][switch] $SkipCertificateValidation,
 
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
