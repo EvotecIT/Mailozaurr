@@ -1,4 +1,9 @@
-﻿#### 1.0.2 - 2023.08.05
+﻿#### 1.1.0 - Preview1
+- Different way to build module and load depenedencies
+- Removal of DLLs from source codes
+- Small updates to DLLs
+
+#### 1.0.2 - 2023.08.05
 - Rename `SkipCertificateValidatation` to `SkipCertificateValidation` in `Send-EmailMessage` (typo fix)
 - Added `SkipCertificateValidation` to `Connect-IMAP`
 - Added `SkipCertificateValidation` to `Connect-POP3`
