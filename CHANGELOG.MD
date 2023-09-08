@@ -1,4 +1,8 @@
-﻿#### 1.1.0 - Preview1
+﻿#### 1.1.0 - Preview2
+- Update to DLLs to latest versions
+- Removes some unnessecary DLLs
+
+#### 1.1.0 - Preview1
 - Different way to build module and load depenedencies
 - Removal of DLLs from source codes
 - Small updates to DLLs
