@@ -39,11 +39,14 @@ public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemb
         } else if (args.Name.StartsWith("System.Text.Encoding.CodePages,")) {
             string binPath = Path.Combine(Path.GetDirectoryName(typeof(OnModuleImportAndRemove).Assembly.Location), "System.Text.Encoding.CodePages.dll");
             return Assembly.LoadFile(binPath);
-        } else if (args.Name.StartsWith("System.IO.Packaging,")) {
-            string binPath = Path.Combine(Path.GetDirectoryName(typeof(OnModuleImportAndRemove).Assembly.Location), "System.IO.Packaging");
+        } else if (args.Name.StartsWith("BouncyCastle.Cryptography,")) {
+            string binPath = Path.Combine(Path.GetDirectoryName(typeof(OnModuleImportAndRemove).Assembly.Location), "BouncyCastle.Cryptography.dll");
             return Assembly.LoadFile(binPath);
-        } else if (args.Name.StartsWith("DocumentFormat.OpenXml,")) {
-            string binPath = Path.Combine(Path.GetDirectoryName(typeof(OnModuleImportAndRemove).Assembly.Location), "DocumentFormat.OpenXml.dll");
+        } else if (args.Name.StartsWith("Newtonsoft.Json,")) {
+            string binPath = Path.Combine(Path.GetDirectoryName(typeof(OnModuleImportAndRemove).Assembly.Location), "Newtonsoft.Json.dll");
+            return Assembly.LoadFile(binPath);
+        } else if (args.Name.StartsWith("Microsoft.Identity.Client,")) {
+            string binPath = Path.Combine(Path.GetDirectoryName(typeof(OnModuleImportAndRemove).Assembly.Location), "Microsoft.Identity.Client.dll");
             return Assembly.LoadFile(binPath);
         }
         return null;
