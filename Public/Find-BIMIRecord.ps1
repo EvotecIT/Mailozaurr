@@ -1,10 +1,10 @@
 ﻿function Find-BIMIRecord {
     <#
     .SYNOPSIS
-    Short description
+    Queries DNS to provide BIMI information
 
     .DESCRIPTION
-    Long description
+    Queries DNS to provide BIMI information
 
     .PARAMETER DomainName
     Name/DomainName to query for DMARC record
@@ -22,7 +22,13 @@
     Returns an object rather than string based represantation for name servers (for easier display purposes)
 
     .EXAMPLE
-    An example
+    Find-BIMIRecord -DomainName 'mxtoolbox.com' -DNSProvider Google | Format-Table
+
+    .EXAMPLE
+    Find-BIMIRecord -DomainName 'google.com' -DNSProvider Cloudflare | Format-Table
+
+    .EXAMPLE
+    Find-BIMIRecord -DomainName 'mxtoolbox.com' | Format-Table
 
     .NOTES
     General notes
