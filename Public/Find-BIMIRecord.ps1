@@ -7,7 +7,7 @@
     Queries DNS to provide BIMI information
 
     .PARAMETER DomainName
-    Name/DomainName to query for DMARC record
+    Name/DomainName to query for BIMI record
 
     .PARAMETER DnsServer
     Allows to choose DNS IP address to ask for DNS query. By default uses system ones.
@@ -88,7 +88,7 @@
                     Name        = $D
                     Count       = 0
                     TimeToLive  = ''
-                    TLSRPT      = ''
+                    BIMI        = ''
                     QueryServer = ''
                 }
                 Write-Warning -Message "Find-BIMIRecord - $_"
