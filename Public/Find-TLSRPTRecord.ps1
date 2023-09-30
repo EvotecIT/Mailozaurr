@@ -22,7 +22,13 @@
     Returns an object rather than string based represantation for name servers (for easier display purposes)
 
     .EXAMPLE
-    An example
+    Find-TLSRPTRecord -DomainName 'evotec.xyz' -DNSProvider Cloudflare
+
+    .EXAMPLE
+    Find-TLSRPTRecord -DomainName 'evotec.xyz' -DNSProvider
+
+    .EXAMPLE
+    Find-TLSRPTRecord -DomainName 'evotec.xyz'
 
     .NOTES
     SMTP TLS Reporting (TLS-RPT) is a standard that enables the reporting of issues in TLS connectivity
