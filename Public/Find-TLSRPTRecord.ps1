@@ -1,25 +1,25 @@
 ﻿function Find-TLSRPTRecord {
     <#
     .SYNOPSIS
-    Short description
+    Queries DNS to provide TLS-RPT information
 
     .DESCRIPTION
-
+    Queries DNS to provide TLS-RPT information
 
     .PARAMETER DomainName
-    Parameter description
+    Name/DomainName to query for DMARC record
 
     .PARAMETER DnsServer
-    Parameter description
+    Allows to choose DNS IP address to ask for DNS query. By default uses system ones.
 
     .PARAMETER DNSProvider
-    Parameter description
+    Allows to choose DNS Provider that will be used for HTTPS based DNS query (Cloudlare or Google)
 
     .PARAMETER AsHashTable
-    Parameter description
+    Returns Hashtable instead of PSCustomObject
 
     .PARAMETER AsObject
-    Parameter description
+    Returns an object rather than string based represantation for name servers (for easier display purposes)
 
     .EXAMPLE
     An example
