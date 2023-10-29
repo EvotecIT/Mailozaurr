@@ -26,7 +26,7 @@ Build-Module -ModuleName 'Mailozaurr' {
 
         ProjectUri           = 'https://github.com/EvotecIT/MailoZaurr'
 
-        PreReleaseTag          = 'Preview2'
+        PreReleaseTag        = 'Preview3'
     }
     New-ConfigurationManifest @Manifest
     # Add standard module dependencies (directly, but can be used with loop as well)
@@ -38,7 +38,9 @@ Build-Module -ModuleName 'Mailozaurr' {
     # Keep in mind it has it's limits when "copying" functions such as it should not depend on DLLs or other external files
     New-ConfigurationModule -Type ApprovedModule -Name 'PSSharedGoods', 'PSWriteColor', 'Connectimo', 'PSUnifi', 'PSWebToolbox', 'PSMyPassword'
 
-    New-ConfigurationModuleSkip -IgnoreModuleName 'Microsoft.Graph.Authentication'
+    New-ConfigurationModuleSkip -IgnoreModuleName 'Microsoft.Graph.Authentication' -IgnoreFunc @(
+        'Resolve-DnsName'
+    )
 
     $ConfigurationFormat = [ordered] @{
         RemoveComments                              = $false
@@ -110,6 +112,6 @@ Build-Module -ModuleName 'Mailozaurr' {
     #New-ConfigurationTest -TestsPath "$PSScriptRoot\..\Tests" -Enable
 
     # global options for publishing to github/psgallery
-    New-ConfigurationPublish -Type PowerShellGallery -FilePath 'C:\Support\Important\PowerShellGalleryAPI.txt' -Enabled:$true
+    #New-ConfigurationPublish -Type PowerShellGallery -FilePath 'C:\Support\Important\PowerShellGalleryAPI.txt' -Enabled:$true
     #New-ConfigurationPublish -Type GitHub -FilePath 'C:\Support\Important\GitHubAPI.txt' -UserName 'EvotecIT' -Enabled:$true
 } -ExitCode
