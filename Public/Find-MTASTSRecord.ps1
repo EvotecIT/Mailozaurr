@@ -51,7 +51,7 @@
             } elseif ($Domain -is [System.Collections.IDictionary]) {
                 $D = $Domain.DomainName
                 if (-not $D) {
-                    Write-Warning -Message 'Find-BIMIRecord - property DomainName is required when passing Array of Hashtables'
+                    Write-Warning -Message 'Find-MTASTSRecord - property DomainName is required when passing Array of Hashtables'
                 }
             }
             $Splat = @{
@@ -78,7 +78,7 @@
                 if ($DNSRecordAnswers.Count -eq 1) {
                     $Url = "https://mta-sts.$D/.well-known/mta-sts.txt"
                     try {
-                        $Response = Invoke-RestMethod -Uri $Url
+                        $Response = Invoke-RestMethod -Uri $Url -ErrorAction Stop
                         $ResponseData = $Response.Trim() -split "`r`n"
                         foreach ($Data in $ResponseData) {
                             if ($Data.StartsWith("version: ")) {
@@ -134,7 +134,7 @@
                     TimeToLive  = ''
                     QueryServer = ''
                 }
-                Write-Warning -Message "Find-BIMIRecord - $_"
+                Write-Warning -Message "Find-MTASTSRecord - Error: $($_.Exception.Message)"
             }
             if ($AsHashTable) {
                 $MailRecord
