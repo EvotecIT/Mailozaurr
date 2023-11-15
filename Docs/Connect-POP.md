@@ -13,19 +13,19 @@ schema: 2.0.0
 ## SYNTAX
 
 ### ClearText
-```
+```powershell
 Connect-POP [-Server <String>] [-Port <Int32>] -UserName <String> -Password <String>
  [-Options <SecureSocketOptions>] [-TimeOut <Int32>] [<CommonParameters>]
 ```
 
 ### Credential
-```
+```powershell
 Connect-POP [-Server <String>] [-Port <Int32>] [-Credential <PSCredential>] [-Options <SecureSocketOptions>]
  [-TimeOut <Int32>] [<CommonParameters>]
 ```
 
 ### oAuth2
-```
+```powershell
 Connect-POP [-Server <String>] [-Port <Int32>] -Credential <PSCredential> [-Options <SecureSocketOptions>]
  [-TimeOut <Int32>] [-oAuth2] [<CommonParameters>]
 ```

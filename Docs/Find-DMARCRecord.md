@@ -12,7 +12,7 @@ Queries DNS to provide DMARC information
 
 ## SYNTAX
 
-```
+```powershell
 Find-DMARCRecord [-DomainName] <Array> [-DnsServer <String>] [-DNSProvider <String>] [-AsHashTable] [-AsObject]
  [<CommonParameters>]
 ```
@@ -23,19 +23,19 @@ Queries DNS to provide DMARC information
 ## EXAMPLES
 
 ### EXAMPLE 1
-```
+```powershell
 # Standard way
 Find-DMARCRecord -DomainName 'evotec.pl', 'evotec.xyz' | Format-Table *
 ```
 
 ### EXAMPLE 2
-```
+```powershell
 # Https way via Cloudflare
 Find-DMARCRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare | Format-Table *
 ```
 
 ### EXAMPLE 3
-```
+```powershell
 # Https way via Google
 Find-DMARCRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Google | Format-Table *
 ```

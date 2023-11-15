@@ -12,7 +12,7 @@ schema: 2.0.0
 
 ## SYNTAX
 
-```
+```powershell
 Get-IMAPFolder [[-Client] <IDictionary>] [[-FolderAccess] <FolderAccess>] [<CommonParameters>]
 ```
 

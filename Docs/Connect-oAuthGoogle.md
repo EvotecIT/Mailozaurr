@@ -12,7 +12,7 @@ schema: 2.0.0
 
 ## SYNTAX
 
-```
+```powershell
 Connect-oAuthGoogle [-GmailAccount] <String> [-ClientID] <String> [-ClientSecret] <String>
  [[-Scope] <String[]>] [<CommonParameters>]
 ```

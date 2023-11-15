@@ -12,7 +12,7 @@ schema: 2.0.0
 
 ## SYNTAX
 
-```
+```powershell
 Disconnect-IMAP [[-Client] <IDictionary>] [<CommonParameters>]
 ```
 

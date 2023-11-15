@@ -12,7 +12,7 @@ Provides basic DNS Query via HTTPS
 
 ## SYNTAX
 
-```
+```powershell
 Resolve-DnsQueryRest [-Name] <String> [-Type] <String> [-DNSProvider <String>] [-All] [<CommonParameters>]
 ```
 
@@ -22,7 +22,7 @@ Provides basic DNS Query via HTTPS - tested only for use cases within Mailozaurr
 ## EXAMPLES
 
 ### EXAMPLE 1
-```
+```powershell
 Resolve-DnsQueryRest -Name 'evotec.pl' -Type TXT -DNSProvider Cloudflare
 ```
 

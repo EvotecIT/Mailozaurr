@@ -13,17 +13,17 @@ Searches DNSBL if particular IP is blocked on DNSBL.
 ## SYNTAX
 
 ### Default (Default)
-```
+```powershell
 Find-DNSBL -IP <String[]> [-BlockListServers <String[]>] [-All] [<CommonParameters>]
 ```
 
 ### DNSServer
-```
+```powershell
 Find-DNSBL -IP <String[]> [-BlockListServers <String[]>] [-All] [-DNSServer <String>] [<CommonParameters>]
 ```
 
 ### DNSProvider
-```
+```powershell
 Find-DNSBL -IP <String[]> [-BlockListServers <String[]>] [-All] [-DNSProvider <String>] [<CommonParameters>]
 ```
 
@@ -33,22 +33,22 @@ Searches DNSBL if particular IP is blocked on DNSBL.
 ## EXAMPLES
 
 ### EXAMPLE 1
-```
+```powershell
 Find-DNSBL -IP '89.74.48.96' | Format-Table
 ```
 
 ### EXAMPLE 2
-```
+```powershell
 Find-DNSBL -IP '89.74.48.96', '89.74.48.97', '89.74.48.98' | Format-Table
 ```
 
 ### EXAMPLE 3
-```
+```powershell
 Find-DNSBL -IP '89.74.48.96' -DNSServer 1.1.1.1 | Format-Table
 ```
 
 ### EXAMPLE 4
-```
+```powershell
 Find-DNSBL -IP '89.74.48.96' -DNSProvider Cloudflare | Format-Table
 ```
 

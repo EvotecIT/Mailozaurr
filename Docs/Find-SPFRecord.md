@@ -12,7 +12,7 @@ Queries DNS to provide SPF information
 
 ## SYNTAX
 
-```
+```powershell
 Find-SPFRecord [-DomainName] <Array> [-DnsServer <String>] [-DNSProvider <String>] [-AsHashTable] [-AsObject]
  [<CommonParameters>]
 ```
@@ -23,19 +23,19 @@ Queries DNS to provide SPF information
 ## EXAMPLES
 
 ### EXAMPLE 1
-```
+```powershell
 # Standard way
 Find-SPFRecord -DomainName 'evotec.pl', 'evotec.xyz' | Format-Table *
 ```
 
 ### EXAMPLE 2
-```
+```powershell
 # Https way via Cloudflare
 Find-SPFRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare | Format-Table *
 ```
 
 ### EXAMPLE 3
-```
+```powershell
 # Https way via Google
 Find-SPFRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Google | Format-Table *
 ```

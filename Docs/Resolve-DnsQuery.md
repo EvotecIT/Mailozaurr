@@ -12,7 +12,7 @@ schema: 2.0.0
 
 ## SYNTAX
 
-```
+```powershell
 Resolve-DnsQuery [-Name] <String> [-Type] <QueryType> [[-Server] <String>] [-All] [<CommonParameters>]
 ```
 

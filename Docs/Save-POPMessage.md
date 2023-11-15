@@ -12,7 +12,7 @@ schema: 2.0.0
 
 ## SYNTAX
 
-```
+```powershell
 Save-POPMessage [[-Client] <IDictionary>] [-Index] <Int32> [-Path] <String> [<CommonParameters>]
 ```
 

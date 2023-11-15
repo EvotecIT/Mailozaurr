@@ -12,7 +12,7 @@ schema: 2.0.0
 
 ## SYNTAX
 
-```
+```powershell
 Connect-oAuthO365 [[-Login] <String>] [-ClientID] <String> [-TenantID] <String> [[-RedirectUri] <Uri>]
  [[-Scopes] <String[]>] [<CommonParameters>]
 ```

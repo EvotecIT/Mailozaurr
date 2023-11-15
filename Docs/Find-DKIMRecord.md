@@ -12,7 +12,7 @@ Queries DNS to provide DKIM information
 
 ## SYNTAX
 
-```
+```powershell
 Find-DKIMRecord [-DomainName] <Array> [-Selector <String>] [-DnsServer <String>] [-DNSProvider <String>]
  [-AsHashTable] [-AsObject] [<CommonParameters>]
 ```
@@ -23,19 +23,19 @@ Queries DNS to provide DKIM information
 ## EXAMPLES
 
 ### EXAMPLE 1
-```
+```powershell
 # Standard way
 Find-DKIMRecord -DomainName 'evotec.pl', 'evotec.xyz' | Format-Table *
 ```
 
 ### EXAMPLE 2
-```
+```powershell
 # Https way via Cloudflare
 Find-DKIMRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare | Format-Table *
 ```
 
 ### EXAMPLE 3
-```
+```powershell
 # Https way via Google
 Find-DKIMRecord -DomainName 'evotec.pl', 'evotec.xyz' -Selector 'selector1' -DNSProvider Google | Format-Table *
 ```

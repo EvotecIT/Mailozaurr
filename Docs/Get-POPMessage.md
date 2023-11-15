@@ -12,7 +12,7 @@ schema: 2.0.0
 
 ## SYNTAX
 
-```
+```powershell
 Get-POPMessage [[-Client] <IDictionary>] [[-Index] <Int32>] [[-Count] <Int32>] [-All] [<CommonParameters>]
 ```
 

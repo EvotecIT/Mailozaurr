@@ -12,7 +12,7 @@ schema: 2.0.0
 
 ## SYNTAX
 
-```
+```powershell
 ConvertTo-SendGridCredential [-ApiKey] <String> [<CommonParameters>]
 ```
 

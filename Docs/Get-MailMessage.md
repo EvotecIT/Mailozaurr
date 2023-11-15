@@ -12,7 +12,7 @@ schema: 2.0.0
 
 ## SYNTAX
 
-```
+```powershell
 Get-MailMessage [[-UserPrincipalName] <String>] [[-Credential] <PSCredential>] [-All] [[-Limit] <Int32>]
  [[-Property] <String[]>] [[-Filter] <String>] [<CommonParameters>]
 ```

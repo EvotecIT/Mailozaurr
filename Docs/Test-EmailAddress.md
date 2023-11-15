@@ -12,7 +12,7 @@ Checks if email address matches conditions to be valid email address.
 
 ## SYNTAX
 
-```
+```powershell
 Test-EmailAddress [-EmailAddress] <String[]> [<CommonParameters>]
 ```
 
@@ -22,17 +22,17 @@ Checks if email address matches conditions to be valid email address.
 ## EXAMPLES
 
 ### EXAMPLE 1
-```
+```powershell
 Test-EmailAddress -EmailAddress 'przemyslaw.klys@test'
 ```
 
 ### EXAMPLE 2
-```
+```powershell
 Test-EmailAddress -EmailAddress 'przemyslaw.klys@test.pl'
 ```
 
 ### EXAMPLE 3
-```
+```powershell
 Test-EmailAddress -EmailAddress 'przemyslaw.klys@test','przemyslaw.klys@test.pl'
 ```
 

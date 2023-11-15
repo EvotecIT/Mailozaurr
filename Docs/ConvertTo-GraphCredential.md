@@ -13,23 +13,23 @@ schema: 2.0.0
 ## SYNTAX
 
 ### ClearText (Default)
-```
+```powershell
 ConvertTo-GraphCredential -ClientID <String> -ClientSecret <String> -DirectoryID <String> [<CommonParameters>]
 ```
 
 ### Encrypted
-```
+```powershell
 ConvertTo-GraphCredential -ClientID <String> -ClientSecretEncrypted <String> -DirectoryID <String>
  [<CommonParameters>]
 ```
 
 ### MsalToken
-```
+```powershell
 ConvertTo-GraphCredential -MsalToken <String> [<CommonParameters>]
 ```
 
 ### MsalTokenEncrypted
-```
+```powershell
 ConvertTo-GraphCredential -MsalTokenEncrypted <String> [<CommonParameters>]
 ```
 

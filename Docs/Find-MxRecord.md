@@ -12,7 +12,7 @@ Queries DNS to provide MX information
 
 ## SYNTAX
 
-```
+```powershell
 Find-MxRecord [-DomainName] <Array> [-DnsServer <String>] [-DNSProvider <String>] [-ResolvePTR] [-AsHashTable]
  [-Separate] [-AsObject] [<CommonParameters>]
 ```
@@ -23,37 +23,37 @@ Queries DNS to provide MX information
 ## EXAMPLES
 
 ### EXAMPLE 1
-```
+```powershell
 # Standard way
 Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' | Format-Table *
 ```
 
 ### EXAMPLE 2
-```
+```powershell
 # Https way via Cloudflare
 Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare | Format-Table *
 ```
 
 ### EXAMPLE 3
-```
+```powershell
 # Https way via Google
 Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Google | Format-Table *
 ```
 
 ### EXAMPLE 4
-```
+```powershell
 # Standard way with ResolvePTR
 Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -ResolvePTR | Format-Table *
 ```
 
 ### EXAMPLE 5
-```
+```powershell
 # Https way via Cloudflare with ResolvePTR
 Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare -ResolvePTR | Format-Table *
 ```
 
 ### EXAMPLE 6
-```
+```powershell
 # Https way via Google with ResolvePTR
 Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Google -ResolvePTR | Format-Table *
 ```

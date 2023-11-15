@@ -13,7 +13,7 @@ The Send-EmailMessage cmdlet sends an email message from within PowerShell.
 ## SYNTAX
 
 ### Compatibility (Default)
-```
+```powershell
 Send-EmailMessage [-Server <String>] [-Port <Int32>] [-From <Object>] [-ReplyTo <String>] [-Cc <String[]>]
  [-Bcc <String[]>] [-To <String[]>] [-Subject <String>] [-Priority <String>] [-Encoding <String>]
  [-DeliveryNotificationOption <String[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>]
@@ -23,7 +23,7 @@ Send-EmailMessage [-Server <String>] [-Port <Int32>] [-From <Object>] [-ReplyTo 
 ```
 
 ### oAuth
-```
+```powershell
 Send-EmailMessage [-Server <String>] [-Port <Int32>] [-From <Object>] [-ReplyTo <String>] [-Cc <String[]>]
  [-Bcc <String[]>] [-To <String[]>] [-Subject <String>] [-Priority <String>] [-Encoding <String>]
  [-DeliveryNotificationOption <String[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>]
@@ -33,7 +33,7 @@ Send-EmailMessage [-Server <String>] [-Port <Int32>] [-From <Object>] [-ReplyTo 
 ```
 
 ### ClearText
-```
+```powershell
 Send-EmailMessage [-Server <String>] [-Port <Int32>] [-From <Object>] [-ReplyTo <String>] [-Cc <String[]>]
  [-Bcc <String[]>] [-To <String[]>] [-Subject <String>] [-Priority <String>] [-Encoding <String>]
  [-DeliveryNotificationOption <String[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>]
@@ -43,14 +43,14 @@ Send-EmailMessage [-Server <String>] [-Port <Int32>] [-From <Object>] [-ReplyTo 
 ```
 
 ### SendGrid
-```
+```powershell
 Send-EmailMessage [-From <Object>] [-ReplyTo <String>] [-Cc <String[]>] [-Bcc <String[]>] [-To <String[]>]
  [-Subject <String>] [-Priority <String>] -Credential <PSCredential> [-HTML <String[]>] [-Text <String[]>]
  [-Attachment <String[]>] [-SendGrid] [-SeparateTo] [-Suppress] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ### Graph
-```
+```powershell
 Send-EmailMessage [-From <Object>] [-ReplyTo <String>] [-Cc <String[]>] [-Bcc <String[]>] [-To <String[]>]
  [-Subject <String>] [-Priority <String>] -Credential <PSCredential> [-HTML <String[]>] [-Text <String[]>]
  [-Attachment <String[]>] [-Graph] [-DoNotSaveToSentItems] [-Suppress] [-WhatIf] [-Confirm]
@@ -58,7 +58,7 @@ Send-EmailMessage [-From <Object>] [-ReplyTo <String>] [-Cc <String[]>] [-Bcc <S
 ```
 
 ### Grouped
-```
+```powershell
 Send-EmailMessage [-Email <IDictionary>] [-Suppress] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
@@ -69,7 +69,7 @@ It replaces Send-MailMessage by Microsoft which is deprecated.
 ## EXAMPLES
 
 ### EXAMPLE 1
-```
+```powershell
 if (-not $MailCredentials) {
     $MailCredentials = Get-Credential
 }
@@ -80,7 +80,7 @@ Send-EmailMessage -From @{ Name = 'Przemysław Kłys'; Email = 'przemyslaw.klys@
 ```
 
 ### EXAMPLE 2
-```
+```powershell
 if (-not $MailCredentials) {
     $MailCredentials = Get-Credential
 }
@@ -91,7 +91,7 @@ Send-EmailMessage -To 'przemyslaw.klys@test.pl' -Subject 'Test' -Body 'test me' 
 ```
 
 ### EXAMPLE 3
-```
+```powershell
 # Use SendGrid Api
 $Credential = ConvertTo-SendGridCredential -ApiKey 'YourKey'
 
@@ -106,7 +106,7 @@ Send-EmailMessage -From 'przemyslaw.klys@evo.cool' \`
 ```
 
 ### EXAMPLE 4
-```
+```powershell
 # It seems larger HTML is not supported. Online makes sure it uses less libraries inline
 # it may be related to not escaping chars properly for JSON, may require investigation
 $Body = EmailBody {
@@ -127,7 +127,7 @@ Send-EmailMessage -From @{ Name = 'Przemysław Kłys'; Email = 'przemyslaw.klys@
 ```
 
 ### EXAMPLE 5
-```
+```powershell
 # Using OAuth2 for Office 365
 $ClientID = '4c1197dd-53'
 $TenantID = 'ceb371f6-87'
