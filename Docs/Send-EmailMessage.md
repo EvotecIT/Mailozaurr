@@ -84,6 +84,7 @@ Send-EmailMessage -From @{ Name = 'Przemysław Kłys'; Email = 'przemyslaw.klys@
 if (-not $MailCredentials) {
     $MailCredentials = Get-Credential
 }
+
 # this is simple replacement (drag & drop to Send-MailMessage)
 Send-EmailMessage -To 'przemyslaw.klys@test.pl' -Subject 'Test' -Body 'test me' -SmtpServer 'smtp.office365.com' -From 'przemyslaw.klys@test.pl' \`
     -Attachments "$PSScriptRoot\README.MD" -Cc 'przemyslaw.klys@test.pl' -Priority High -Credential $MailCredentials \`
