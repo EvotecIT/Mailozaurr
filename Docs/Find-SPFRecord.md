@@ -25,23 +25,20 @@ Queries DNS to provide SPF information
 ### EXAMPLE 1
 ```
 # Standard way
-```
-
 Find-SPFRecord -DomainName 'evotec.pl', 'evotec.xyz' | Format-Table *
+```
 
 ### EXAMPLE 2
 ```
 # Https way via Cloudflare
-```
-
 Find-SPFRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare | Format-Table *
+```
 
 ### EXAMPLE 3
 ```
 # Https way via Google
-```
-
 Find-SPFRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Google | Format-Table *
+```
 
 ## PARAMETERS
 

@@ -25,44 +25,38 @@ Queries DNS to provide MX information
 ### EXAMPLE 1
 ```
 # Standard way
-```
-
 Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' | Format-Table *
+```
 
 ### EXAMPLE 2
 ```
 # Https way via Cloudflare
-```
-
 Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare | Format-Table *
+```
 
 ### EXAMPLE 3
 ```
 # Https way via Google
-```
-
 Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Google | Format-Table *
+```
 
 ### EXAMPLE 4
 ```
 # Standard way with ResolvePTR
-```
-
 Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -ResolvePTR | Format-Table *
+```
 
 ### EXAMPLE 5
 ```
 # Https way via Cloudflare with ResolvePTR
-```
-
 Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare -ResolvePTR | Format-Table *
+```
 
 ### EXAMPLE 6
 ```
 # Https way via Google with ResolvePTR
-```
-
 Find-MxRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Google -ResolvePTR | Format-Table *
+```
 
 ## PARAMETERS
 

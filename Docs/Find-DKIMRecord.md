@@ -25,23 +25,20 @@ Queries DNS to provide DKIM information
 ### EXAMPLE 1
 ```
 # Standard way
-```
-
 Find-DKIMRecord -DomainName 'evotec.pl', 'evotec.xyz' | Format-Table *
+```
 
 ### EXAMPLE 2
 ```
 # Https way via Cloudflare
-```
-
 Find-DKIMRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare | Format-Table *
+```
 
 ### EXAMPLE 3
 ```
 # Https way via Google
-```
-
 Find-DKIMRecord -DomainName 'evotec.pl', 'evotec.xyz' -Selector 'selector1' -DNSProvider Google | Format-Table *
+```
 
 ## PARAMETERS
 

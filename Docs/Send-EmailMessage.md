@@ -71,32 +71,28 @@ It replaces Send-MailMessage by Microsoft which is deprecated.
 ### EXAMPLE 1
 ```
 if (-not $MailCredentials) {
-```
-
-$MailCredentials = Get-Credential
+    $MailCredentials = Get-Credential
 }
 
 Send-EmailMessage -From @{ Name = 'Przemysław Kłys'; Email = 'przemyslaw.klys@test.pl' } -To 'przemyslaw.klys@test.pl' \`
     -Server 'smtp.office365.com' -SecureSocketOptions Auto -Credential $MailCredentials -HTML $Body -DeliveryNotificationOption OnSuccess -Priority High \`
     -Subject 'This is another test email'
+```
 
 ### EXAMPLE 2
 ```
 if (-not $MailCredentials) {
-```
-
-$MailCredentials = Get-Credential
+    $MailCredentials = Get-Credential
 }
 # this is simple replacement (drag & drop to Send-MailMessage)
 Send-EmailMessage -To 'przemyslaw.klys@test.pl' -Subject 'Test' -Body 'test me' -SmtpServer 'smtp.office365.com' -From 'przemyslaw.klys@test.pl' \`
     -Attachments "$PSScriptRoot\README.MD" -Cc 'przemyslaw.klys@test.pl' -Priority High -Credential $MailCredentials \`
     -UseSsl -Port 587 -Verbose
+```
 
 ### EXAMPLE 3
 ```
 # Use SendGrid Api
-```
-
 $Credential = ConvertTo-SendGridCredential -ApiKey 'YourKey'
 
 Send-EmailMessage -From 'przemyslaw.klys@evo.cool' \`
@@ -107,12 +103,11 @@ Send-EmailMessage -From 'przemyslaw.klys@evo.cool' \`
     -SendGrid \`
     -Credential $Credential \`
     -Verbose
+```
 
 ### EXAMPLE 4
 ```
 # It seems larger HTML is not supported. Online makes sure it uses less libraries inline
-```
-
 # it may be related to not escaping chars properly for JSON, may require investigation
 $Body = EmailBody {
     EmailText -Text 'This is my text'
@@ -129,12 +124,11 @@ $Credential = ConvertTo-GraphCredential -ClientID $ClientID -ClientSecret $Clien
 # Sending email
 Send-EmailMessage -From @{ Name = 'Przemysław Kłys'; Email = 'przemyslaw.klys@test1.pl' } -To 'przemyslaw.klys@test.pl' \`
     -Credential $Credential -HTML $Body -Subject 'This is another test email 1' -Graph -Verbose -Priority High
+```
 
 ### EXAMPLE 5
 ```
 # Using OAuth2 for Office 365
-```
-
 $ClientID = '4c1197dd-53'
 $TenantID = 'ceb371f6-87'
 
@@ -143,6 +137,7 @@ $CredentialOAuth2 = Connect-oAuthO365 -ClientID $ClientID -TenantID $TenantID
 Send-EmailMessage -From @{ Name = 'Przemysław Kłys'; Email = 'test@evotec.pl' } -To 'test@evotec.pl' \`
     -Server 'smtp.office365.com' -HTML $Body -Text $Text -DeliveryNotificationOption OnSuccess -Priority High \`
     -Subject 'This is another test email' -SecureSocketOptions Auto -Credential $CredentialOAuth2 -oAuth2
+```
 
 ## PARAMETERS
 
