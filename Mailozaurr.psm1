@@ -122,7 +122,11 @@ $FoundErrors = @(
 
 if ($FoundErrors.Count -gt 0) {
     $ModuleName = (Get-ChildItem $PSScriptRoot\*.psd1).BaseName
-    Write-Warning "Importing module $ModuleName failed. Fix errors before continuing."
+    if ($FoundErrors -contains $true) {
+        Write-Warning "Importing module $ModuleName failed. Fix errors before continuing."
+    } else {
+        Write-Warning "Importing module $ModuleName completed with warnings. Some output to console during import. Please fix this."
+    }
     break
 }
 
