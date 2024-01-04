@@ -6,7 +6,8 @@ function Invoke-O365Graph {
         [alias('Authorization')][System.Collections.IDictionary] $Headers,
         [validateset('GET', 'DELETE', 'POST')][string] $Method = 'GET',
         [string] $ContentType = 'application/json',
-        [switch] $FullUri
+        [switch] $FullUri,
+        [switch] $MgGraphRequest
     )
     $RestSplat = @{
         Headers     = $Headers
@@ -19,10 +20,16 @@ function Invoke-O365Graph {
         $RestSplat.Uri = -join ($PrimaryUri, $Uri)
     }
     try {
-        $OutputQuery = Invoke-RestMethod @RestSplat -Verbose:$false
+        if ($MgGraphRequest) {
+            $OutputQuery = Invoke-MgGraphRequest @RestSplat -Verbose:$false
+        } else {
+            $OutputQuery = Invoke-RestMethod @RestSplat -Verbose:$false
+        }
         if ($Method -eq 'GET') {
             if ($OutputQuery.value) {
-                $OutputQuery.value
+                foreach ($Mail in $OutputQuery.value) {
+                    [PSCustomObject] $Mail
+                }
             }
             if ($OutputQuery.'@odata.nextLink') {
                 $RestSplat.Uri = $OutputQuery.'@odata.nextLink'
