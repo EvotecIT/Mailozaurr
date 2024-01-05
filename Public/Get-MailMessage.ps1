@@ -1,12 +1,62 @@
 function Get-MailMessage {
+    <#
+    .SYNOPSIS
+    Short description
+
+    .DESCRIPTION
+    Long description
+
+    .PARAMETER UserPrincipalName
+    UserPrincipalName of the mailbox to get mails from
+
+    .PARAMETER Credential
+    Credential parameter is used to securely pass tokens/api keys for Graph API
+
+    .PARAMETER All
+    Parameter description
+
+    .PARAMETER Limit
+    Parameter description
+
+    .PARAMETER Property
+    Property parameter is used to select which properties to return.
+    You can use any of the following properties:
+    'createdDateTime', 'lastModifiedDateTime', 'changeKey', 'categories', 'receivedDateTime',
+    'sentDateTime', 'hasAttachments', 'internetMessageId', 'subject', 'bodyPreview', 'importance',
+    'parentFolderId', 'conversationId', 'conversationIndex', 'isDeliveryReceiptRequested',
+    'isReadReceiptRequested', 'isRead', 'isDraft', 'webLink', 'inferenceClassification',
+    'body', 'sender', 'from', 'toRecipients', 'ccRecipients', 'bccRecipients', 'replyTo', 'flag'
+
+    You can also leave it empty to get default properties as returned by Graph API
+
+    .PARAMETER Filter
+    Filter parameter is used to filter results.
+
+    .PARAMETER MgGraphRequest
+    Forces using Invoke-MgGraphRequest internally.
+    This allows to use Connect-MgGraph to authenticate and then use Get-MailMessage without any additional parameters.
+
+    .EXAMPLE
+    An example
+
+    .NOTES
+    Filtering using Graph API is quite complicated. You can find more information here:
+    - https://learn.microsoft.com/en-us/graph/filter-query-parameter?tabs=http
+
+    #>
     [cmdletBinding()]
     param(
-        [string] $UserPrincipalName,
+        [Parameter(Mandatory)][string] $UserPrincipalName,
         [PSCredential] $Credential,
         [switch] $All,
         [int] $Limit = 10,
         [ValidateSet(
-            'createdDateTime', 'lastModifiedDateTime', 'changeKey', 'categories', 'receivedDateTime', 'sentDateTime', 'hasAttachments', 'internetMessageId', 'subject', 'bodyPreview', 'importance', 'parentFolderId', 'conversationId', 'conversationIndex', 'isDeliveryReceiptRequested', 'isReadReceiptRequested', 'isRead', 'isDraft', 'webLink', 'inferenceClassification', 'body', 'sender', 'from', 'toRecipients', 'ccRecipients', 'bccRecipients', 'replyTo', 'flag')
+            'createdDateTime', 'lastModifiedDateTime', 'changeKey', 'categories', 'receivedDateTime',
+            'sentDateTime', 'hasAttachments', 'internetMessageId', 'subject', 'bodyPreview', 'importance',
+            'parentFolderId', 'conversationId', 'conversationIndex', 'isDeliveryReceiptRequested',
+            'isReadReceiptRequested', 'isRead', 'isDraft', 'webLink', 'inferenceClassification',
+            'body', 'sender', 'from', 'toRecipients', 'ccRecipients', 'bccRecipients', 'replyTo', 'flag'
+        )
         ][string[]] $Property,
         [string] $Filter,
         [switch] $MgGraphRequest
