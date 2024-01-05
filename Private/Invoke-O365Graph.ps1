@@ -33,7 +33,7 @@ function Invoke-O365Graph {
             }
             if ($OutputQuery.'@odata.nextLink') {
                 $RestSplat.Uri = $OutputQuery.'@odata.nextLink'
-                $MoreData = Invoke-O365Graph @RestSplat -FullUri
+                $MoreData = Invoke-O365Graph @RestSplat -FullUri -MgGraphRequest:$MgGraphRequest.IsPresent
                 if ($MoreData) {
                     $MoreData
                 }
