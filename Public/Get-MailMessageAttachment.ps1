@@ -1,16 +1,46 @@
 ﻿function Get-MailMessageAttachment {
+    <#
+    .SYNOPSIS
+    Get mail message attachment from Office 365 Graph API using UserPrincipalName and MessageId
+
+    .DESCRIPTION
+    Get mail message attachment from Office 365 Graph API using UserPrincipalName and MessageId
+    Usually should be used with Get-MailMessage to get MessageId.
+
+    .PARAMETER UserPrincipalName
+    UserPrincipalName of the mailbox to get attachments from
+
+    .PARAMETER Id
+    MessageId of the message to get attachments from
+
+    .PARAMETER Credential
+    Credential parameter is used to securely pass tokens/api keys for Graph API
+
+    .PARAMETER Property
+    Property parameter is used to select which properties to return.
+    By default if Path is specified, the file is saved and the file object is returned.
+    However if Path is not specified, the data is returned from Graph API.
+
+    .PARAMETER MgGraphRequest
+    Forces using Invoke-MgGraphRequest internally.
+    This allows to use Connect-MgGraph to authenticate and then use Get-MailMessageAttachment without any additional parameters.
+
+    .PARAMETER Path
+    Path parameter is used to specify where to save the attachment.
+
+    .EXAMPLE
+    
+
+    .NOTES
+    General notes
+    #>
     [CmdletBinding()]
     param(
-        [string] $UserPrincipalName,
+        [Parameter(Mandatory)][string] $UserPrincipalName,
+        [Parameter(Mandatory)][alias('MessageID')][string] $Id,
         [PSCredential] $Credential,
-        [switch] $All,
-        [int] $Limit = 10,
-        [ValidateSet(
-            'createdDateTime', 'lastModifiedDateTime', 'changeKey', 'categories', 'receivedDateTime', 'sentDateTime', 'hasAttachments', 'internetMessageId', 'subject', 'bodyPreview', 'importance', 'parentFolderId', 'conversationId', 'conversationIndex', 'isDeliveryReceiptRequested', 'isReadReceiptRequested', 'isRead', 'isDraft', 'webLink', 'inferenceClassification', 'body', 'sender', 'from', 'toRecipients', 'ccRecipients', 'bccRecipients', 'replyTo', 'flag')
-        ][string[]] $Property,
-        [string] $Filter,
+        [string[]] $Property,
         [switch] $MgGraphRequest,
-        [string] $Id,
         [string] $Path
     )
 
@@ -43,11 +73,9 @@
     $Uri = Join-UriQuery @joinUriQuerySplat
 
     Write-Verbose "Get-MailMessageAttachment - Executing $Uri"
-    $OutputData = if ($All) {
-        Invoke-O365Graph -Headers $Authorization -Uri $Uri -Method GET -MGGraphRequest:$MgGraphRequest.IsPresent -FullUri
-    } else {
-        Invoke-O365Graph -Headers $Authorization -Uri $Uri -Method GET -MGGraphRequest:$MgGraphRequest.IsPresent -FullUri | Select-Object -First $Limit
-    }
+
+    Invoke-O365Graph -Headers $Authorization -Uri $Uri -Method GET -MGGraphRequest:$MgGraphRequest.IsPresent -FullUri
+
     if ($OutputData) {
         foreach ($Data in $OutputData) {
             if ($Data.contentBytes -and $Path) {
