@@ -14,13 +14,16 @@
     .EXAMPLE
     Get-IPGeolocation -IPAddress '1.1.1.1'
 
+    .EXAMPLE
+    Get-IPGeolocation -IPAddress '1.1.1.1', '1.1.1.2'
+
     .NOTES
     Due to free API usage it's not possible to query API using HTTPS.
 
     #>
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)][string] $IPAddress,
+        [Parameter(Mandatory)][string[]] $IPAddress,
         [ValidateSet(
             'status', 'message', 'continent', 'continentCode', 'country', 'countryCode', 'region', 'regionName', 'city', 'district',
             'zip', 'lat', 'lon', 'timezone', 'offset', 'currency', 'isp', 'org', 'as', 'asname', 'reverse', 'mobile', 'proxy', 'hosting', 'query'
@@ -31,39 +34,40 @@
     if (-not $Script:CachedGEO -or $Force.IsPresent) {
         $Script:CachedGEO = [ordered] @{}
     }
-
-    $QueryParameters = [ordered] @{
-        fields = $Fields
-    }
-    Remove-EmptyValue -Hashtable $QueryParameters
-    $Uri = Join-UriQuery -BaseUri 'http://ip-api.com/json' -QueryParameter $QueryParameters -RelativeOrAbsoluteUri $IPAddress
-
-    #$Result = Invoke-RestMethod -Uri $Uri -Method Get -ErrorAction Stop
-    if (-not $Script:CachedGEO[$IPAddress]) {
-        Write-Verbose -Message "Get-IPGeolocation - Querying API for $IPAddress"
-        if ($Script:GeoHeaders -and $Script:GeoHeaders.Date -and $Script:GeoHeaders.Date.AddSeconds(60) -gt [DateTime]::Now) {
-            if ($Script:GeoHeaders.Headers.'X-Rl' -le 0) {
-                $TimeToSleep = $Script:GeoHeaders.Headers.'X-Ttl' + 1
-                Write-Warning -Message "Get-IPGeolocation - API limit reached. Waiting $TimeToSleep seconds."
-                Start-Sleep -Seconds $TimeToSleep
-            }
+    foreach ($IP in $IPAddress) {
+        $QueryParameters = [ordered] @{
+            fields = $Fields
         }
-        try {
-            $Result = Invoke-WebRequest -Uri $Uri -Method Get -ErrorAction Stop -UseBasicParsing -Verbose:$false
-            $Script:GeoHeaders = [ordered] @{
-                Date    = [DateTime]::Now
-                Headers = $Result.Headers
+        Remove-EmptyValue -Hashtable $QueryParameters
+        $Uri = Join-UriQuery -BaseUri 'http://ip-api.com/json' -QueryParameter $QueryParameters -RelativeOrAbsoluteUri $IP
+
+        #$Result = Invoke-RestMethod -Uri $Uri -Method Get -ErrorAction Stop
+        if (-not $Script:CachedGEO[$IP]) {
+            Write-Verbose -Message "Get-IPGeolocation - Querying API for $IP"
+            if ($Script:GeoHeaders -and $Script:GeoHeaders.Date -and $Script:GeoHeaders.Date.AddSeconds(60) -gt [DateTime]::Now) {
+                if ($Script:GeoHeaders.Headers.'X-Rl' -le 0) {
+                    $TimeToSleep = $Script:GeoHeaders.Headers.'X-Ttl' + 1
+                    Write-Warning -Message "Get-IPGeolocation - API limit reached. Waiting $TimeToSleep seconds."
+                    Start-Sleep -Seconds $TimeToSleep
+                }
             }
-            $ResultJSON = $Result.Content | ConvertFrom-Json -ErrorAction Stop
-            if ($ResultJSON) {
-                $Script:CachedGEO[$IPAddress] = $ResultJSON
-                $ResultJSON
+            try {
+                $Result = Invoke-WebRequest -Uri $Uri -Method Get -ErrorAction Stop -UseBasicParsing -Verbose:$false
+                $Script:GeoHeaders = [ordered] @{
+                    Date    = [DateTime]::Now
+                    Headers = $Result.Headers
+                }
+                $ResultJSON = $Result.Content | ConvertFrom-Json -ErrorAction Stop
+                if ($ResultJSON) {
+                    $Script:CachedGEO[$IP] = $ResultJSON
+                    $ResultJSON
+                }
+            } catch {
+                Write-Warning -Message "Get-IPGeolocation - Couldn't query API for $IP. Error: $($_.Exception.Message)"
             }
-        } catch {
-            Write-Warning -Message "Get-IPGeolocation - Couldn't query API for $IPAddress. Error: $($_.Exception.Message)"
+        } else {
+            Write-Verbose -Message "Get-IPGeolocation - Using cached data for $IP"
+            $Script:CachedGEO[$IP]
         }
-    } else {
-        Write-Verbose -Message "Get-IPGeolocation - Using cached data for $IPAddress"
-        $Script:CachedGEO[$IPAddress]
     }
 }
