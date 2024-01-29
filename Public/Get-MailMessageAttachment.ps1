@@ -29,7 +29,7 @@
     Path parameter is used to specify where to save the attachment.
 
     .EXAMPLE
-    
+
 
     .NOTES
     General notes
@@ -60,7 +60,6 @@
     }
 
     $QueryParameters = [ordered] @{
-        filter = $Filter
         select = $Property -join ','
     }
     $joinUriQuerySplat = @{
@@ -74,7 +73,7 @@
 
     Write-Verbose "Get-MailMessageAttachment - Executing $Uri"
 
-    Invoke-O365Graph -Headers $Authorization -Uri $Uri -Method GET -MGGraphRequest:$MgGraphRequest.IsPresent -FullUri
+    $OutputData = Invoke-O365Graph -Headers $Authorization -Uri $Uri -Method GET -MGGraphRequest:$MgGraphRequest.IsPresent -FullUri
 
     if ($OutputData) {
         foreach ($Data in $OutputData) {
