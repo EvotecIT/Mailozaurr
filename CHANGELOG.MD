@@ -1,11 +1,24 @@
-﻿#### 1.1.0 - Preview2
+﻿#### 1.1.0
 - Update to DLLs to latest versions
 - Removes some unnessecary DLLs
-
-#### 1.1.0 - Preview1
 - Different way to build module and load depenedencies
 - Removal of DLLs from source codes
 - Small updates to DLLs
+- Add new DLLs
+- Added `ConvertFrom-EmlToMsg` to convert EML files to MSG files
+- Added `Import-MailFile` to import MSG files to PowerShell
+- Added `Get-MailMessage`
+- Added `Get-MailMessageAttachment`
+- Added `Find-BIMIRecord`
+- Added `Find-CAARecord`
+- Added `Find-DANERecord`
+- Added `Find-MTASTSRecord`
+- Added `Find-O365OpenIDRecord`
+- Added `Find-SecurityTxtRecord`
+- Added `Find-TLSRPTRecord`
+- Added `Get-DMARCData` to read DMARC data from XML files
+- Added `Find-IPGeolocation` to get IP Geolocation data
+- Small improvments to error handling
 
 #### 1.0.2 - 2023.08.05
 - Rename `SkipCertificateValidatation` to `SkipCertificateValidation` in `Send-EmailMessage` (typo fix)
