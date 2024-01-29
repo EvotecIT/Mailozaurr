@@ -45,6 +45,11 @@ function Invoke-O365Graph {
         $RestError = $_.ErrorDetails.Message
         if ($RestError) {
             try {
+                $RestError -split '\r\n' | ForEach-Object {
+                    if ($_ -match '^{') {
+                        $RestError = $_
+                    }
+                }
                 $ErrorMessage = ConvertFrom-Json -InputObject $RestError
                 $ErrorMy = -join ('JSON Error:' , $ErrorMessage.error.code, ' ', $ErrorMessage.error.message, ' Additional Error: ', $_.Exception.Message)
                 Write-Warning $ErrorMy
