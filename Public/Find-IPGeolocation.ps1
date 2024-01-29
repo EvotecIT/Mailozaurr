@@ -1,4 +1,4 @@
-﻿function Get-IPGeolocation {
+﻿function Find-IPGeolocation {
     <#
     .SYNOPSIS
     Get IP Geolocation information from ip-api.com
@@ -12,15 +12,16 @@
     Parameter description
 
     .EXAMPLE
-    Get-IPGeolocation -IPAddress '1.1.1.1'
+    Find-IPGeolocation -IPAddress '1.1.1.1'
 
     .EXAMPLE
-    Get-IPGeolocation -IPAddress '1.1.1.1', '1.1.1.2'
+    Find-IPGeolocation -IPAddress '1.1.1.1', '1.1.1.2'
 
     .NOTES
     Due to free API usage it's not possible to query API using HTTPS.
 
     #>
+    [alias('Get-IPGeolocation')]
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string[]] $IPAddress,
@@ -43,7 +44,7 @@
 
         #$Result = Invoke-RestMethod -Uri $Uri -Method Get -ErrorAction Stop
         if (-not $Script:CachedGEO[$IP]) {
-            Write-Verbose -Message "Get-IPGeolocation - Querying API for $IP"
+            Write-Verbose -Message "Find-IPGeolocation - Querying API for $IP"
             if ($Script:GeoHeaders -and $Script:GeoHeaders.Date -and $Script:GeoHeaders.Date.AddSeconds(60) -gt [DateTime]::Now) {
                 if ($Script:GeoHeaders.Headers.'X-Rl' -le 0) {
                     $TimeToSleep = $Script:GeoHeaders.Headers.'X-Ttl' + 1
@@ -63,10 +64,10 @@
                     $ResultJSON
                 }
             } catch {
-                Write-Warning -Message "Get-IPGeolocation - Couldn't query API for $IP. Error: $($_.Exception.Message)"
+                Write-Warning -Message "Find-IPGeolocation - Couldn't query API for $IP. Error: $($_.Exception.Message)"
             }
         } else {
-            Write-Verbose -Message "Get-IPGeolocation - Using cached data for $IP"
+            Write-Verbose -Message "Find-IPGeolocation - Using cached data for $IP"
             $Script:CachedGEO[$IP]
         }
     }
