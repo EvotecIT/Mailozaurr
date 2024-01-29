@@ -6,7 +6,7 @@
 - Small updates to DLLs
 - Add new DLLs
 - Added `ConvertFrom-EmlToMsg` to convert EML files to MSG files
-- Added `Import-MailFile` to import MSG files to PowerShell
+- Added `Import-MailFile` to import MSG/EML files to PowerShell Object
 - Added `Get-MailMessage`
 - Added `Get-MailMessageAttachment`
 - Added `Find-BIMIRecord`
