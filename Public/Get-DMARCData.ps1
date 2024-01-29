@@ -1,4 +1,20 @@
 ﻿function Get-DMARCData {
+    <#
+    .SYNOPSIS
+    Read DMARC report file and return data in PowerShell object
+
+    .DESCRIPTION
+    Read DMARC report file and return data in PowerShell object
+
+    .PARAMETER Path
+    Path to the DMARC report file
+
+    .EXAMPLE
+    Get-DMARCData -Path 'C:\Temp\DMARC\report.xml'
+
+    .NOTES
+    General notes
+    #>
     [CmdletBinding()]
     param(
         [parameter(Mandatory)][alias('FilePath')][string] $Path
