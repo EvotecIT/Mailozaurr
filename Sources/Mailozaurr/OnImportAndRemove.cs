@@ -5,15 +5,15 @@ using System.Reflection;
 
 public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemblyCleanup {
     public void OnImport() {
-#if FRAMEWORK
+        //#if FRAMEWORK
         AppDomain.CurrentDomain.AssemblyResolve += MyResolveEventHandler;
-#endif
+        //#endif
     }
 
     public void OnRemove(PSModuleInfo module) {
-#if FRAMEWORK
+        //#if FRAMEWORK
         AppDomain.CurrentDomain.AssemblyResolve -= MyResolveEventHandler;
-#endif
+        //#endif
     }
 
     private static Assembly MyResolveEventHandler(object sender, ResolveEventArgs args) {
