@@ -35,7 +35,10 @@ public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemb
     }
 
     private bool IsNetFramework() {
-        return System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription.StartsWith(".NET Framework", StringComparison.OrdinalIgnoreCase);
+        // Get the version of the CLR
+        Version clrVersion = System.Environment.Version;
+        // Check if the CLR version is 4.x.x.x
+        return clrVersion.Major == 4;
     }
 
     private bool IsNetCore() {
