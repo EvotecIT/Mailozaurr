@@ -1,4 +1,4 @@
-﻿#### 1.1.0
+﻿#### 2.0.0
 - Update to DLLs to latest versions
 - Removes some unnessecary DLLs
 - Different way to build module and load depenedencies
