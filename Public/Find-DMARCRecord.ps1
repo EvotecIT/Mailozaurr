@@ -63,7 +63,7 @@ function Find-DMARCRecord {
             'sp'    = 'SubdomainPolicy'
             'rua'   = 'AggregateReportURI'
             'ruf'   = 'ForensicReportURI'
-            'pct'   = 'Percent'
+            'pct'   = 'Percent' # This Value is the percentage of email to be surveyed and reported back to the domain owner.
             'adkim' = 'DKIMAlignmentMode'
             'aspf'  = 'SPFAlignmentMode'
             'ri'    = 'ReportInterval'
@@ -98,7 +98,7 @@ function Find-DMARCRecord {
                 if (-not $AsObject) {
                     $MailRecord = [ordered] @{
                         Name        = $D
-                        Count       = $DNSRecordAnswers.Count
+                        #Count       = $DNSRecordAnswers.Count
                         TimeToLive  = $DNSRecordAnswers.TimeToLive -join '; '
                         DMARC       = $DNSRecordAnswers.Text -join '; '
                         QueryServer = $DNSRecord.NameServer -join '; '
@@ -106,7 +106,7 @@ function Find-DMARCRecord {
                 } else {
                     $MailRecord = [ordered] @{
                         Name        = $D
-                        Count       = $DNSRecordAnswers.Count
+                        #Count       = $DNSRecordAnswers.Count
                         TimeToLive  = $DNSRecordAnswers.TimeToLive
                         DMARC       = $DNSRecordAnswers.Text
                         QueryServer = $DNSRecord.NameServer
@@ -127,8 +127,64 @@ function Find-DMARCRecord {
                     $KeyValuePair = $setting -split '='
                     $Key = $KeyValuePair[0].Trim()
                     $Value = $KeyValuePair[1]
+                    # Translate 's' to 'Strict mode' and 'r' to 'Relaxed mode' for 'adkim' and 'aspf'
+                    if ($Key -eq 'adkim' -or $Key -eq 'aspf') {
+                        switch ($Value) {
+                            's' { $Value = 'Strict mode' }
+                            'r' { $Value = 'Relaxed mode' }
+                        }
+                    } elseif ($Key -eq 'fo') {
+                        # Translate values for 'fo'
+                        $foValues = $Value -split ':'
+                        $translatedFoValues = @()
+                        foreach ($foValue in $foValues) {
+                            switch ($foValue) {
+                                '0' { $translatedFoValues += 'Generate report if all mechanisms fail (0)' }
+                                '1' { $translatedFoValues += 'Generate report if any mechanism fails (1)' }
+                                'd' { $translatedFoValues += 'Generate report if DKIM test fails (d)' }
+                                's' { $translatedFoValues += 'Generate report if SPF test fails (s)' }
+                            }
+                        }
+                        $Value = $translatedFoValues -join ', '
+                    } elseif ($Key -eq 'ri') {
+                        $ValueInSeconds = [int]$Value
+                        if ($ValueInSeconds -ge 86400 -and $ValueInSeconds % 86400 -eq 0) {
+                            $ValueInDays = $ValueInSeconds / 86400
+                            $Value = "$ValueInDays day(s)"
+                        } elseif ($ValueInSeconds -ge 3600 -and $ValueInSeconds % 3600 -eq 0) {
+                            $ValueInHours = $ValueInSeconds / 3600
+                            $Value = "$ValueInHours hour(s)"
+                        } else {
+                            $Value = "$ValueInSeconds second(s)"
+                        }
+                    }
                     # Add the key-value pair to the hashtable
                     $DMARCSettingsHashTable[$Key] = $Value
+                }
+                # Check if 'adkim' and 'aspf' are defined in the DMARC record
+                if (-not $DMARCSettingsHashTable['adkim']) {
+                    # If 'adkim' is not defined, set it to 'Relaxed (default)'
+                    $DMARCSettingsHashTable['adkim'] = 'Relaxed (default)'
+                }
+                if (-not $DMARCSettingsHashTable['aspf']) {
+                    # If 'aspf' is not defined, set it to 'Relaxed (default)'
+                    $DMARCSettingsHashTable['aspf'] = 'Relaxed (default)'
+                }
+                # Check if 'pct' is defined in the DMARC record
+                if (-not $DMARCSettingsHashTable['pct']) {
+                    # If 'pct' is not defined, set it to 100
+                    # as per the DMARC specification
+                    $DMARCSettingsHashTable['pct'] = '100'
+                }
+                # Check if 'fo' is defined in the DMARC record
+                if ($DMARCSettingsHashTable.Keys -notcontains 'fo') {
+                    # If 'fo' is not defined, set it to 'Generate report if all mechanisms fail (default)'
+                    $DMARCSettingsHashTable['fo'] = 'Generate report if all mechanisms fail (default - 0)'
+                }
+                # Check if 'ri' is defined in the DMARC record
+                if ($DMARCSettingsHashTable.Keys -notcontains 'ri') {
+                    # If 'ri' is not defined, set it to '1 day (default)'
+                    $DMARCSettingsHashTable['ri'] = '1 day (default)'
                 }
                 foreach ($Tag in $DMARCTags.Keys) {
                     # If the tag is in the DMARC record, add its value to the MailRecord
@@ -182,7 +238,7 @@ function Find-DMARCRecord {
             } catch {
                 $MailRecord = [ordered] @{
                     Name        = $D
-                    Count       = 0
+                    #Count       = 0
                     TimeToLive  = ''
                     DMARC       = ''
                     QueryServer = ''
