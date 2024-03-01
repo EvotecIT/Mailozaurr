@@ -44,6 +44,32 @@ function Find-DMARCRecord {
         [switch] $AsHashTable,
         [switch] $AsObject
     )
+    begin {
+        # $DMARCTagsNames = [ordered] @{
+        #     'v'     = 'Protocol version'
+        #     'p'     = 'Policy for the domain'
+        #     'sp'    = 'Policy for subdomains'
+        #     'rua'   = 'Reporting URI of aggregate reports'
+        #     'ruf'   = 'Reporting URI of forensic reports'
+        #     'pct'   = 'Percentage of messages subjected to filtering'
+        #     'adkim' = 'Alignment mode for DKIM'
+        #     'aspf'  = 'Alignment mode for SPF'
+        #     'ri'    = 'Reporting interval'
+        #     'fo'    = 'Failure reporting options'
+        # }
+        $DMARCTags = [ordered] @{
+            'v'     = 'ProtocolVersion'
+            'p'     = 'Policy'
+            'sp'    = 'SubdomainPolicy'
+            'rua'   = 'AggregateReportURI'
+            'ruf'   = 'ForensicReportURI'
+            'pct'   = 'Percent'
+            'adkim' = 'DKIMAlignmentMode'
+            'aspf'  = 'SPFAlignmentMode'
+            'ri'    = 'ReportInterval'
+            'fo'    = 'FailureOptions'
+        }
+    }
     process {
         foreach ($Domain in $DomainName) {
             if ($Domain -is [string]) {
@@ -86,6 +112,73 @@ function Find-DMARCRecord {
                         QueryServer = $DNSRecord.NameServer
                     }
                 }
+                $MailRecord['PolicyAdvisory'] = "Domain has NO DMARC record. This domain is at risk to being abused."
+                $MailRecord['SubdomainPolicyAdvisory'] = $null
+
+                # Split the DMARC record into an array of settings
+                $DMARCSettings = $MailRecord.DMARC -split ';'
+
+                # # Initialize an empty hashtable to store the settings
+                $DMARCSettingsHashTable = [ordered] @{}
+
+                # Loop through each setting
+                foreach ($setting in $DMARCSettings) {
+                    # Split the setting into a key-value pair
+                    $KeyValuePair = $setting -split '='
+                    $Key = $KeyValuePair[0].Trim()
+                    $Value = $KeyValuePair[1]
+                    # Add the key-value pair to the hashtable
+                    $DMARCSettingsHashTable[$Key] = $Value
+                }
+                foreach ($Tag in $DMARCTags.Keys) {
+                    # If the tag is in the DMARC record, add its value to the MailRecord
+                    if ($DMARCSettingsHashTable[$Tag]) {
+                        if ($Tag -eq 'rua' -or $Tag -eq 'ruf') {
+                            if ($Tag -eq 'rua') {
+                                $MailRecord['AggregateReportEmail'] = $null
+                                $MailRecord['AggregateReportHTTP'] = $null
+                            } else {
+                                $MailRecord['ForensicReportEmail'] = $null
+                                $MailRecord['ForensicReportHTTP'] = $null
+                            }
+                            if ($DMARCSettingsHashTable[$Tag] -match '^mailto:') {
+                                # Check if the value starts with 'mailto:'
+                                $Key = if ($Tag -eq 'rua') { 'AggregateReportEmail' } else { 'ForensicReportEmail' }
+                                $MailRecord[$Key] = $DMARCSettingsHashTable[$Tag].Replace('mailto:', '') -split ','
+                            } elseif ($DMARCSettingsHashTable[$Tag] -match '^http:') {
+                                # Check if the value starts with 'http:'
+                                $Key = if ($Tag -eq 'rua') { 'AggregateReportHTTP' } else { 'ForensicReportHTTP' }
+                                $MailRecord[$Key] = $DMARCSettingsHashTable[$Tag] -split ','
+                            }
+                        } else {
+                            $MailRecord[$DMARCTags[$Tag]] = $DMARCSettingsHashTable[$Tag]
+                        }
+                    } else {
+                        $MailRecord[$DMARCTags[$tag]] = $null
+                    }
+                }
+                switch ($MailRecord.Policy) {
+                    'none' {
+                        $MailRecord['PolicyAdvisory'] = "Domain has a DMARC policy (p=none), but the DMARC policy does not prevent abuse."
+                    }
+                    'quarantine' {
+                        $MailRecord['PolicyAdvisory'] = "Domain has a DMARC policy (p=quarantine), and will prevent abuse of domain, but finally should be set to p=reject."
+                    }
+                    'reject' {
+                        $MailRecord['PolicyAdvisory'] = "Domain has a DMARC policy (p=reject), and will prevent abuse of domain."
+                    }
+                }
+                switch ($MailRecord.SubdomainPolicy) {
+                    'none' {
+                        $MailRecord['SubdomainPolicyAdvisory'] = " Subdomain has a DMARC policy (sp=none), but the DMARC policy does not prevent abuse."
+                    }
+                    'quarantine' {
+                        $MailRecord['SubdomainPolicyAdvisory'] = " Subdomain has a DMARC policy (sp=quarantine), and will prevent abuse of domain, but finally should be set to sp=reject."
+                    }
+                    'reject' {
+                        $MailRecord['SubdomainPolicyAdvisory'] = " Subdomain has a DMARC policy (sp=reject), and will prevent abuse of your domain."
+                    }
+                }
             } catch {
                 $MailRecord = [ordered] @{
                     Name        = $D
@@ -93,8 +186,22 @@ function Find-DMARCRecord {
                     TimeToLive  = ''
                     DMARC       = ''
                     QueryServer = ''
+                    Advisory    = "No DMARC record found."
                 }
-                Write-Warning "Find-DMARCRecord - $_"
+                foreach ($Tag in $DMARCTags.Keys) {
+                    if ($Tag -eq 'rua' -or $Tag -eq 'ruf') {
+                        if ($Tag -eq 'rua') {
+                            $MailRecord['AggregateReportEmail'] = $null
+                            $MailRecord['AggregateReportHTTP'] = $null
+                        } else {
+                            $MailRecord['ForensicReportEmail'] = $null
+                            $MailRecord['ForensicReportHTTP'] = $null
+                        }
+                    } else {
+                        $MailRecord[$DMARCTags[$Tag]] = $null
+                    }
+                }
+                Write-Warning "Find-DMARCRecord - Error $_"
             }
             if ($AsHashTable) {
                 $MailRecord
