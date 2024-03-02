@@ -16,6 +16,8 @@
 - Added `Find-O365OpenIDRecord`
 - Added `Find-SecurityTxtRecord`
 - Added `Find-TLSRPTRecord`
+- Added `Find-DNSSECRecord`
+- Improve `Find-DMARCRecord` to return more data
 - Added `Get-DMARCData` to read DMARC data from XML files
 - Added `Find-IPGeolocation` to get IP Geolocation data
 - Small improvments to error handling
