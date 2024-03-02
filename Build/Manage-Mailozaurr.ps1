@@ -4,7 +4,7 @@ Import-Module PSPublishModule -Force
 Build-Module -ModuleName 'Mailozaurr' {
     # Usual defaults as per standard module
     $Manifest = [ordered] @{
-        ModuleVersion        = '1.1.0'
+        ModuleVersion        = '2.0.0'
         # Supported PSEditions
         CompatiblePSEditions = @('Desktop', 'Core')
         # ID used to uniquely identify this module
@@ -51,7 +51,7 @@ Build-Module -ModuleName 'Mailozaurr' {
         PlaceOpenBraceIgnoreOneLineBlock            = $false
 
         PlaceCloseBraceEnable                       = $true
-        PlaceCloseBraceNewLineAfter                 = $true
+        PlaceCloseBraceNewLineAfter                 = $false
         PlaceCloseBraceIgnoreOneLineBlock           = $false
         PlaceCloseBraceNoEmptyLineBefore            = $true
 
@@ -99,6 +99,8 @@ Build-Module -ModuleName 'Mailozaurr' {
         NETProjectName                    = 'Mailozaurr'
         NETConfiguration                  = 'Release'
         NETFramework                      = 'netstandard2.0', 'net472'
+        NETHandleAssemblyWithSameName     = $true
+        #NETMergeLibraryDebugging          = $true
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
