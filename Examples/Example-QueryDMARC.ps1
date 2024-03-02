@@ -1,7 +1,10 @@
 ﻿Import-Module $PSScriptRoot\..\Mailozaurr.psd1 -Force
 
 # Standard way
-Find-DMARCRecord -DomainName 'evotec.pl', 'evotec.xyz' | Format-Table *
+Find-DMARCRecord -DomainName 'evotec.pl', 'evotec.xyz' | Format-List *
+
+# Standard way
+Find-DMARCRecord -DomainName 'microsoft.com', 'google.com' | Format-List *
 
 # Https way via Cloudflare
 Find-DMARCRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare | Format-Table *
