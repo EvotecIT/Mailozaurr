@@ -1,4 +1,4 @@
-﻿#### 2.0.0
+﻿#### 2.0.0 - Preview 4 - 2024.03.04
 - Update to DLLs to latest versions
 - Removes some unnessecary DLLs
 - Different way to build module and load depenedencies
@@ -20,7 +20,7 @@
 - Improve `Find-DMARCRecord` to return more data
 - Added `Get-DMARCData` to read DMARC data from XML files
 - Added `Find-IPGeolocation` to get IP Geolocation data
-- Small improvments to error handling
+- Small improvements to error handling
 
 #### 1.0.2 - 2023.08.05
 - Rename `SkipCertificateValidatation` to `SkipCertificateValidation` in `Send-EmailMessage` (typo fix)
