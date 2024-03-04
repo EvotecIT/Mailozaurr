@@ -14,13 +14,13 @@
 	<ItemGroup>
 		<PackageReference Include="DnsClient" Version="1.7.0" />
 		<PackageReference Include="EmailValidation" Version="1.0.10" />
-		<PackageReference Include="Google.Apis.Auth" Version="1.66.0" />
-		<PackageReference Include="MailKit" Version="4.3.0" />
-		<PackageReference Include="Microsoft.Identity.Client" Version="4.56.0" />
-		<PackageReference Include="MimeKit" Version="4.3.0" />
+		<PackageReference Include="Google.Apis.Auth" Version="1.67.0" />
+		<PackageReference Include="MailKit" Version="4.4.0" />
+		<PackageReference Include="Microsoft.Identity.Client" Version="4.59.0" />
+		<PackageReference Include="MimeKit" Version="4.4.0" />
 		<PackageReference Include="MsgKit" Version="2.7.2" />
 		<!-- <PackageReference Include="MsgReader" Version="5.5.5" /> -->
-		<PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all"  />
+		<PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
 	</ItemGroup>
 
 	<PropertyGroup Condition=" '$(TargetFramework)' == 'net472' ">

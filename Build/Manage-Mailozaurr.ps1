@@ -26,7 +26,7 @@ Build-Module -ModuleName 'Mailozaurr' {
 
         ProjectUri           = 'https://github.com/EvotecIT/MailoZaurr'
 
-        PreReleaseTag        = 'Preview3'
+        PreReleaseTag        = 'Preview4'
     }
     New-ConfigurationManifest @Manifest
     # Add standard module dependencies (directly, but can be used with loop as well)
