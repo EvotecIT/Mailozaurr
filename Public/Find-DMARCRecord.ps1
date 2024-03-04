@@ -226,13 +226,13 @@ function Find-DMARCRecord {
                 }
                 switch ($MailRecord.SubdomainPolicy) {
                     'none' {
-                        $MailRecord['SubdomainPolicyAdvisory'] = " Subdomain has a DMARC policy (sp=none), but the DMARC policy does not prevent abuse."
+                        $MailRecord['SubdomainPolicyAdvisory'] = "Subdomain has a DMARC policy (sp=none), but the DMARC policy does not prevent abuse."
                     }
                     'quarantine' {
-                        $MailRecord['SubdomainPolicyAdvisory'] = " Subdomain has a DMARC policy (sp=quarantine), and will prevent abuse of domain, but finally should be set to sp=reject."
+                        $MailRecord['SubdomainPolicyAdvisory'] = "Subdomain has a DMARC policy (sp=quarantine), and will prevent abuse of domain, but finally should be set to sp=reject."
                     }
                     'reject' {
-                        $MailRecord['SubdomainPolicyAdvisory'] = " Subdomain has a DMARC policy (sp=reject), and will prevent abuse of your domain."
+                        $MailRecord['SubdomainPolicyAdvisory'] = "Subdomain has a DMARC policy (sp=reject), and will prevent abuse of your domain."
                     }
                 }
             } catch {
