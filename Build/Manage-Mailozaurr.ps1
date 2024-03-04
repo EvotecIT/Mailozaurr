@@ -1,9 +1,10 @@
-﻿Import-Module C:\Support\GitHub\PSPublishModule\PSPublishModule.psd1 -Force
+﻿# Install-Module PSPublishModule -Force
+Import-Module PSPublishModule -Force
 
 Build-Module -ModuleName 'Mailozaurr' {
     # Usual defaults as per standard module
     $Manifest = [ordered] @{
-        ModuleVersion        = '1.0.X'
+        ModuleVersion        = '2.0.0'
         # Supported PSEditions
         CompatiblePSEditions = @('Desktop', 'Core')
         # ID used to uniquely identify this module
@@ -25,6 +26,7 @@ Build-Module -ModuleName 'Mailozaurr' {
 
         ProjectUri           = 'https://github.com/EvotecIT/MailoZaurr'
 
+        PreReleaseTag        = 'Preview4'
     }
     New-ConfigurationManifest @Manifest
     # Add standard module dependencies (directly, but can be used with loop as well)
@@ -36,7 +38,9 @@ Build-Module -ModuleName 'Mailozaurr' {
     # Keep in mind it has it's limits when "copying" functions such as it should not depend on DLLs or other external files
     New-ConfigurationModule -Type ApprovedModule -Name 'PSSharedGoods', 'PSWriteColor', 'Connectimo', 'PSUnifi', 'PSWebToolbox', 'PSMyPassword'
 
-    New-ConfigurationModuleSkip -IgnoreModuleName 'Microsoft.Graph.Authentication'
+    New-ConfigurationModuleSkip -IgnoreModuleName 'Microsoft.Graph.Authentication' -IgnoreFunc @(
+        'Resolve-DnsName'
+    )
 
     $ConfigurationFormat = [ordered] @{
         RemoveComments                              = $false
@@ -47,7 +51,7 @@ Build-Module -ModuleName 'Mailozaurr' {
         PlaceOpenBraceIgnoreOneLineBlock            = $false
 
         PlaceCloseBraceEnable                       = $true
-        PlaceCloseBraceNewLineAfter                 = $true
+        PlaceCloseBraceNewLineAfter                 = $false
         PlaceCloseBraceIgnoreOneLineBlock           = $false
         PlaceCloseBraceNoEmptyLineBefore            = $true
 
@@ -83,7 +87,26 @@ Build-Module -ModuleName 'Mailozaurr' {
 
     New-ConfigurationImportModule -ImportSelf #-ImportRequiredModules
 
-    New-ConfigurationBuild -DotSourceLibraries -DotSourceClasses -MergeModuleOnBuild -Enable -SignModule -DeleteTargetModuleBeforeBuild -CertificateThumbprint '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703' -MergeFunctionsFromApprovedModules
+
+    $newConfigurationBuildSplat = @{
+        Enable                            = $true
+        SignModule                        = $true
+        MergeModuleOnBuild                = $true
+        MergeFunctionsFromApprovedModules = $true
+        CertificateThumbprint             = '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703'
+        ResolveBinaryConflicts            = $true
+        ResolveBinaryConflictsName        = 'Mailozaurr'
+        NETProjectName                    = 'Mailozaurr'
+        NETConfiguration                  = 'Release'
+        NETFramework                      = 'netstandard2.0', 'net472'
+        NETHandleAssemblyWithSameName     = $true
+        #NETMergeLibraryDebugging          = $true
+        DotSourceLibraries                = $true
+        DotSourceClasses                  = $true
+        DeleteTargetModuleBeforeBuild     = $true
+    }
+
+    New-ConfigurationBuild @newConfigurationBuildSplat #-DotSourceLibraries -DotSourceClasses -MergeModuleOnBuild -Enable -SignModule -DeleteTargetModuleBeforeBuild -CertificateThumbprint '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703' -MergeFunctionsFromApprovedModules
 
     New-ConfigurationArtefact -Type Unpacked -Enable -Path "$PSScriptRoot\..\Artefacts" -RequiredModulesPath "$PSScriptRoot\..\Artefacts\Modules"
     New-ConfigurationArtefact -Type Packed -Enable -Path "$PSScriptRoot\..\Releases" -IncludeTagName

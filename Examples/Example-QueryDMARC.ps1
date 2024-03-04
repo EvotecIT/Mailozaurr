@@ -3,6 +3,9 @@
 # Standard way
 Find-DMARCRecord -DomainName 'evotec.pl', 'evotec.xyz' | Format-Table *
 
+# Standard way
+Find-DMARCRecord -DomainName 'microsoft.com', 'google.com' | Format-Table *
+
 # Https way via Cloudflare
 Find-DMARCRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare | Format-Table *
 

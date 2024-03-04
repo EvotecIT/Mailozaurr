@@ -1,7 +1,7 @@
 ﻿Import-Module $PSScriptRoot\..\Mailozaurr.psd1 -Force
 
 # Standard way
-Find-SPFRecord -DomainName 'evotec.pl', 'evotec.xyz' | Format-Table *
+Find-SPFRecord -DomainName 'evotec.pl', 'evotec.xyz' | Format-List *
 
 # Https way via Cloudflare
 Find-SPFRecord -DomainName 'evotec.pl', 'evotec.xyz' -DNSProvider Cloudflare | Format-Table *
