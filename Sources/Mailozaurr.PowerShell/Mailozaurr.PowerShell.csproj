@@ -17,6 +17,10 @@
 		<PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
 	</ItemGroup>
 
+	<Target Name="RemoveFilesAfterBuild" AfterTargets="Build">
+		<Delete Files="$(OutDir)System.Management.Automation.dll" />
+	</Target>
+
 	<ItemGroup>
 		<ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
 	</ItemGroup>
