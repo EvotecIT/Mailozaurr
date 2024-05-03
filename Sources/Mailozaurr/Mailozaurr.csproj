@@ -27,6 +27,11 @@
 		<Using Include="MailKit" />
 		<Using Include="MailKit.Net.Smtp" />
 		<Using Include="MimeKit" />
+		<Using Include="MailKit.Security" />
+		<Using Include="MailKit.Net.Pop3" />
+		<Using Include="MailKit.Net.Imap" />
+		<Using Include="MailKit.Net" />
+		<Using Include="System.Collections" />
 	</ItemGroup>
 
 </Project>

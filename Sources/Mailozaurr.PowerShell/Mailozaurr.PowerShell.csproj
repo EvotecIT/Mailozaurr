@@ -29,4 +29,14 @@
 		<DefineConstants>$(DefineConstants);FRAMEWORK</DefineConstants>
 	</PropertyGroup>
 
+	<ItemGroup>
+		<Using Include = "System.Collections" />
+		<Using Include = "System.Management.Automation" />
+		<Using Include = "System.Threading.Tasks" />
+		<Using Include = "Mailozaurr" />
+		<Using Include = "System.Collections.Concurrent" />
+		<Using Include = "System.Threading" />
+		<Using Include = "System" />
+	</ItemGroup>
+
 </Project>
