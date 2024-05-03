@@ -95,10 +95,10 @@ Build-Module -ModuleName 'Mailozaurr' {
         MergeFunctionsFromApprovedModules = $true
         CertificateThumbprint             = '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703'
         ResolveBinaryConflicts            = $true
-        ResolveBinaryConflictsName        = 'Mailozaurr'
-        NETProjectName                    = 'Mailozaurr'
+        ResolveBinaryConflictsName        = 'Mailozaurr.PowerShell'
+        NETProjectName                    = 'Mailozaurr.PowerShell'
         NETConfiguration                  = 'Release'
-        NETFramework                      = 'netstandard2.0', 'net472'
+        NETFramework                      = 'net7.0', 'net472'
         NETHandleAssemblyWithSameName     = $true
         #NETMergeLibraryDebugging          = $true
         DotSourceLibraries                = $true
