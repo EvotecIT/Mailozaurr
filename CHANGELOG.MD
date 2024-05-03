@@ -19,6 +19,13 @@
   - `Find-CAARecord`
   - `Find-DNSSECRecord`
 - Replaced `Test-EmailAddress` function with `Test-EmailAddress` binary cmdlet
+- Improvements to  `Send-EmailMessage`
+  - Removed `Email`/`EmailParameters` parameters as they are not needed, and legacy
+  - Added `DeliveryNotificationOption` as an enum instead of strings
+  - Internal improvements
+    - Dispose() of SmtpClient in the end
+    - Replaced PowerShell classes with C# version
+    - Moved some PowerShell code to C# for better performance and simpler logic
 
 #### 2.0.0 - Preview 4 - 2024.03.04
 - Update to DLLs to latest versions

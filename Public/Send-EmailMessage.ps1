@@ -296,7 +296,7 @@
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
-        [ValidateSet('None', 'OnSuccess', 'OnFailure', 'Delay', 'Never')][string[]] $DeliveryNotificationOption,
+        [Mailozaurr.DeliveryNotification[]] $DeliveryNotificationOption,
 
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
@@ -395,16 +395,11 @@
         [Parameter(ParameterSetName = 'MgGraphRequest')]
         [switch] $DoNotSaveToSentItems,
 
-        # Different feature set
-        [Parameter(ParameterSetName = 'Grouped')]
-        [alias('EmailParameters')][System.Collections.IDictionary] $Email,
-
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [Parameter(ParameterSetName = 'Graph')]
         [Parameter(ParameterSetName = 'MgGraphRequest')]
-        [Parameter(ParameterSetName = 'Grouped')]
         [Parameter(ParameterSetName = 'SendGrid')]
         [switch] $Suppress,
 
@@ -459,64 +454,17 @@
         [string] $LocalDomain
     )
     $StopWatch = [system.diagnostics.stopwatch]::StartNew()
-    if ($Email) {
-        # Following code makes sure both formats are accepted.
-        if ($Email.EmailTo) {
-            $EmailParameters = $Email.Clone()
-        } else {
-            $EmailParameters = @{
-                EmailFrom                   = $Email.From
-                EmailTo                     = $Email.To
-                EmailCC                     = $Email.CC
-                EmailBCC                    = $Email.BCC
-                EmailReplyTo                = $Email.ReplyTo
-                EmailServer                 = $Email.Server
-                EmailServerPassword         = $Email.Password
-                EmailServerPasswordAsSecure = $Email.PasswordAsSecure
-                EmailServerPasswordFromFile = $Email.PasswordFromFile
-                EmailServerPort             = $Email.Port
-                EmailServerLogin            = $Email.Login
-                EmailServerEnableSSL        = $Email.EnableSsl
-                EmailEncoding               = $Email.Encoding
-                EmailEncodingSubject        = $Email.EncodingSubject
-                EmailEncodingBody           = $Email.EncodingBody
-                EmailSubject                = $Email.Subject
-                EmailPriority               = $Email.Priority
-                EmailDeliveryNotifications  = $Email.DeliveryNotifications
-                EmailUseDefaultCredentials  = $Email.UseDefaultCredentials
-            }
-        }
-        $From = $EmailParameters.EmailFrom
-        $To = $EmailParameters.EmailTo
-        $Cc = $EmailParameters.EmailCC
-        $Bcc = $EmailParameters.EmailBCC
-        $ReplyTo = $EmailParameters.EmailReplyTo
-        $Server = $EmailParameters.EmailServer
-        $Password = $EmailParameters.EmailServerPassword
-        # $EmailServerPasswordAsSecure = $EmailParameters.EmailServerPasswordAsSecure
-        # $EmailServerPasswordFromFile = $EmailParameters.EmailServerPasswordFromFile
-        $Port = $EmailParameters.EmailServerPort
-        $Username = $EmailParameters.EmailServerLogin
-        #$UseSsl = $EmailParameters.EmailServerEnableSSL
-        $Encoding = $EmailParameters.EmailEncoding
-        #$EncodingSubject = $EmailParameters.EmailEncodingSubject
-        $Encoding = $EmailParameters.EmailEncodingBody
-        $Subject = $EmailParameters.EmailSubject
-        $Priority = $EmailParameters.EmailPriority
-        $DeliveryNotificationOption = $EmailParameters.EmailDeliveryNotifications
-        #$EmailUseDefaultCredentials = $EmailParameters.EmailUseDefaultCredentials
 
-    } else {
-        if ($null -eq $To -and $null -eq $Bcc -and $null -eq $Cc) {
-            if ($PSBoundParameters.ErrorAction -eq 'Stop') {
-                Write-Error 'At least one To, CC or BCC is required.'
-                return
-            } else {
-                Write-Warning 'Send-EmailMessage - At least one To, CC or BCC is required.'
-                return
-            }
+    if ($null -eq $To -and $null -eq $Bcc -and $null -eq $Cc) {
+        if ($PSBoundParameters.ErrorAction -eq 'Stop') {
+            Write-Error 'At least one To, CC or BCC is required.'
+            return
+        } else {
+            Write-Warning 'Send-EmailMessage - At least one To, CC or BCC is required.'
+            return
         }
     }
+
     if ($MgGraphRequest) {
         $sendGraphMailMessageSplat = @{
             From                   = $From
@@ -604,111 +552,62 @@
         #void Authenticate(string userName, string password, System.Threading.CancellationToken cancellationToken)
     }
 
-    $Message = [MimeKit.MimeMessage]::new()
-
-    # Doing translation for compatibility with Send-MailMessage
-    if ($Priority -eq 'High') {
-        $Message.Priority = [MimeKit.MessagePriority]::Urgent
-    } elseif ($Priority -eq 'Low') {
-        $Message.Priority = [MimeKit.MessagePriority]::NonUrgent
-    } else {
-        $Message.Priority = [MimeKit.MessagePriority]::Normal
-    }
-
-    [MimeKit.InternetAddress] $SmtpFrom = ConvertTo-MailboxAddress -MailboxAddress $From
-    $Message.From.Add($SmtpFrom)
-
-    if ($To) {
-        [MimeKit.InternetAddress[]] $SmtpTo = ConvertTo-MailboxAddress -MailboxAddress $To
-        $Message.To.AddRange($SmtpTo)
-    }
-    if ($Cc) {
-        [MimeKit.InternetAddress[]] $SmtpCC = ConvertTo-MailboxAddress -MailboxAddress $Cc
-        $Message.Cc.AddRange($SmtpCC)
-    }
-    if ($Bcc) {
-        [MimeKit.InternetAddress[]] $SmtpBcc = ConvertTo-MailboxAddress -MailboxAddress $Bcc
-        $Message.Bcc.AddRange($SmtpBcc)
-    }
-    if ($ReplyTo) {
-        [MimeKit.InternetAddress] $SmtpReplyTo = ConvertTo-MailboxAddress -MailboxAddress $ReplyTo
-        $Message.ReplyTo.Add($SmtpReplyTo)
-    }
     $MailSentTo = -join ($To -join ',', $CC -join ', ', $Bcc -join ', ')
-    if ($Subject) {
-        $Message.Subject = $Subject
-    }
 
     [System.Text.Encoding] $SmtpEncoding = [System.Text.Encoding]::$Encoding
 
-    $BodyBuilder = [MimeKit.BodyBuilder]::new()
-    if ($HTML) {
-        $BodyBuilder.HtmlBody = $HTML
-    }
-    if ($Text) {
-        $BodyBuilder.TextBody = $Text
-    }
-    if ($Attachment) {
-        foreach ($A in $Attachment) {
-            $null = $BodyBuilder.Attachments.Add($A)
-        }
-    }
-    $Message.Body = $BodyBuilder.ToMessageBody()
 
-    ### SMTP Part Below
-    $OutputMessage = $null
+    [Mailozaurr.Settings]::Verbose = $True
+    [Mailozaurr.Settings]::Error = $True
+    [Mailozaurr.Settings]::Warning = $True
+
+%    $OutputMessage = $null
     if ($LogPath -or $LogConsole -or $LogObject) {
-        if ($LogPath) {
-            # we make sure to set it to false, just in case user provided both
-            $LogObject = $false
-            # if protocol logger fails to save, we need to do something with it
-            try {
-                $ProtocolLogger = [MailKit.ProtocolLogger]::new($LogPath)
-            } catch {
-                Write-Warning -Message "Send-EmailMessage - Couldn't create protocol logger with $LogPath. Error $($_.Exception.Message.Replace([System.Environment]::NewLine, " ")). Using console output instead."
-                $ProtocolLogger = [MailKit.ProtocolLogger]::new([System.Console]::OpenStandardOutput())
-            }
-        } elseif ($LogConsole) {
-            $ProtocolLogger = [MailKit.ProtocolLogger]::new([System.Console]::OpenStandardOutput())
-        } else {
-            $Stream = [System.IO.MemoryStream]::new()
-            $ProtocolLogger = [MailKit.ProtocolLogger]::new($Stream)
-        }
-        $ProtocolLogger.LogTimestamps = $LogTimestamps.IsPresent
-        $ProtocolLogger.RedactSecrets = -not $LogSecrets.IsPresent
-        if ($LogTimeStampsFormat) {
-            $ProtocolLogger.TimestampFormat = $LogTimeStampsFormat
-        }
-        if ($PSBoundParameters.Keys.Contains('LogServerPrefix')) {
-            $ProtocolLogger.ServerPrefix = $LogServerPrefix
-        }
-        if ($PSBoundParameters.Keys.Contains('LogClientPrefix')) {
-            $ProtocolLogger.ClientPrefix = $LogClientPrefix
-        }
-        $SmtpClient = [MySmtpClientWithLogger]::new($ProtocolLogger)
+        $ProtocolLogger = [Mailozaurr.LoggingConfigurator]::ConfigureLogging($LogPath, $LogConsole, $LogObject, $LogTimestamps, $LogSecrets, $LogTimeStampsFormat, $LogClientPrefix, $LogServerPrefix)
+        $SmtpClient = [Mailozaurr.Smtp]::new($ProtocolLogger)
     } else {
-        $SmtpClient = [MySmtpClient]::new()
+        $SmtpClient = [Mailozaurr.Smtp]::new()
     }
+
+    $SmtpClient.ErrorAction = $PSBoundParameters.ErrorAction
+    $SmtpClient.From = $From
+    $SmtpClient.To = $To
+    $SmtpClient.Cc = $Cc
+    $SmtpClient.Bcc = $Bcc
+    $SmtpClient.ReplyTo = $ReplyTo
+    $SmtpClient.Subject = $Subject
+    $SmtpClient.Priority = $Priority
+
+    $SmtpClient.HtmlBody = $HTML
+    $SmtpClient.TextBody = $Text
+    $SmtpClient.Attachments = $Attachment
+    $SmtpClient.CreateMessage()
+
     if ($LocalDomain) {
         $SmtpClient.LocalDomain = $LocalDomain
     }
-    if ($SkipCertificateRevocation) {
-        $SmtpClient.CheckCertificateRevocation = $false
-    }
+
+    $SmtpClient.CheckCertificateRevocation = -not $SkipCertificateRevocation.IsPresent
+
     if ($SkipCertificateValidatation) {
         $SmtpClient.ServerCertificateValidationCallback = { $true }
     }
-    if ($DeliveryNotificationOption) {
-        # This requires custom class MySmtpClient
-        $SmtpClient.DeliveryNotificationOption = $DeliveryNotificationOption
-    }
+
+    $SmtpClient.DeliveryNotificationOption = $DeliveryNotificationOption
+
+    $SmtpClient.Timeout = $Timeout
+
     if ($DeliveryStatusNotificationType) {
         $SmtpClient.DeliveryStatusNotificationType = $DeliveryStatusNotificationType
     }
-    if ($UseSsl) {
-        # By default Auto is used, but if someone wants UseSSL that's fine too
-        $SecureSocketOptions = [MailKit.Security.SecureSocketOptions]::StartTls
+
+    $Status = $SmtpClient.Connect($Server, $Port, $SecureSocketOptions, $UseSsl)
+    if (-not $Status.Status) {
+        if (-not $Suppress) {
+            return $Status
+        }
     }
+    <#
     try {
         $SmtpClient.Connect($Server, $Port, $SecureSocketOptions)
     } catch {
@@ -735,6 +634,7 @@
             }
         }
     }
+    #>
     if ($SmtpCredentials) {
         if ($oAuth2.IsPresent) {
             try {
@@ -762,8 +662,6 @@
                     }
                 }
             }
-        } elseif ($Graph.IsPresent) {
-            # This is not going to happen is graph is used
         } else {
             try {
                 $SmtpClient.Authenticate($SmtpEncoding, $SmtpCredentials, [System.Threading.CancellationToken]::None)
@@ -818,13 +716,12 @@
             }
         }
     }
-    $SmtpClient.Timeout = $Timeout
     try {
         if ($PSCmdlet.ShouldProcess("$MailSentTo", 'Send-EmailMessage')) {
-            $OutputMessage = $SmtpClient.Send($Message)
+            $OutputMessage = $SmtpClient.Send($SmtpClient.Message)
             if (-not $Suppress) {
                 if ($LogObject) {
-                    $OutputMessage = [System.Text.Encoding]::ASCII.GetString($stream.ToArray());
+                    $OutputMessage = [System.Text.Encoding]::ASCII.GetString($ProtocolLogger.Stream.ToArray());
                 }
                 [PSCustomObject] @{
                     Status        = $True
@@ -840,7 +737,7 @@
         } else {
             if (-not $Suppress) {
                 if ($LogObject) {
-                    $OutputMessage = [System.Text.Encoding]::ASCII.GetString($stream.ToArray());
+                    $OutputMessage = [System.Text.Encoding]::ASCII.GetString($ProtocolLogger.Stream.ToArray());
                 }
                 [PSCustomObject] @{
                     Status        = $false
@@ -863,7 +760,7 @@
         }
         if (-not $Suppress) {
             if ($LogObject) {
-                $OutputMessage = [System.Text.Encoding]::ASCII.GetString($stream.ToArray());
+                $OutputMessage = [System.Text.Encoding]::ASCII.GetString($ProtocolLogger.Stream.ToArray());
             }
             [PSCustomObject] @{
                 Status        = $False
@@ -879,7 +776,8 @@
     }
     $SmtpClient.Disconnect($true)
     if ($MimeMessagePath) {
-        $Message.WriteTo($MimeMessagePath)
+        $SmtpClient.SaveMessage($MimeMessagePath)
     }
+    $SmtpClient.Dispose()
     $StopWatch.Stop()
 }
