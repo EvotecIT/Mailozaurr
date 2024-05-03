@@ -1,4 +1,26 @@
-﻿#### 2.0.0 - Preview 4 - 2024.03.04
+﻿#### 2.0.0 - Preview 5
+- Removed `Resolve-DnsQuery` => moved to DnsClientX, which uses it's own library
+- Removed `Resolve-DnsRequestRest` => moved to DnsClientX, which uses it's own library
+- Removed all functions related to DNS (will be moved to DomainDetective module)
+  - `Find-MXRecord`
+  - `Find-SPFRecord`
+  - `Find-DKIMRecord`
+  - `Find-DMARCRecord`
+  - `Find-DNSBL`
+  - `Find-DNSSECRecord`
+  - `Find-CAARecord`
+  - `Find-BIMIRecord`
+  - `Find-MTASTSRecord`
+  - `Find-O365OpenIDRecord`
+  - `Find-SecurityTxtRecord`
+  - `Find-TLSRPTRecord`
+  - `Find-IPGeolocation`
+  - `Find-DANERecord`
+  - `Find-CAARecord`
+  - `Find-DNSSECRecord`
+- Replaced `Test-EmailAddress` function with `Test-EmailAddress` binary cmdlet
+
+#### 2.0.0 - Preview 4 - 2024.03.04
 - Update to DLLs to latest versions
 - Removes some unnessecary DLLs
 - Different way to build module and load depenedencies
