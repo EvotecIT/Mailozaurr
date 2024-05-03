@@ -17,8 +17,8 @@ $AssemblyFolders = Get-ChildItem -Path $PSScriptRoot\Lib -Directory -ErrorAction
 
 # Lets find which libraries we need to load
 if ($Development) {
-    #$Framework = 'Core'
-    #$FrameworkNet = 'Default'
+    $Framework = 'Core'
+    $FrameworkNet = 'Default'
 } else {
     $Default = $false
     $Core = $false
