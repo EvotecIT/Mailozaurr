@@ -568,19 +568,6 @@
     if ($Credential) {
         $Status = $SmtpClient.Authenticate($Credential, $oAuth2.IsPresent)
     } else {
-        # if ($AsSecureString) {
-        #     try {
-        #         $secStringPassword = ConvertTo-SecureString -ErrorAction Stop -String $Password
-        #         $SmtpCredentials = [System.Management.Automation.PSCredential]::new($UserName, $secStringPassword)
-        #     } catch {
-        #         Write-Warning "Send-EmailMessage - Couldn't translate secure string to password. Error $($_.Exception.Message)"
-        #         return
-        #     }
-        #     $Status = $SmtpClient.Authenticate($SmtpCredentials, $false)
-        # } else {
-        #     $Status = $SmtpClient.Authenticate($UserName, $Password, $AsSecureString.IsPresent)
-        # }
-
         $Status = $SmtpClient.Authenticate($UserName, $Password, $AsSecureString.IsPresent)
     }
 
