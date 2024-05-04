@@ -486,89 +486,55 @@
         }
         Remove-EmptyValue -Hashtable $sendGraphMailMessageSplat
         return Send-GraphMailMessage @sendGraphMailMessageSplat
-    }
-
-    # lets define credentials early on, because if it's Graph we use different way to send emails
-    if ($Credential) {
-        if ($oAuth2.IsPresent) {
-            $Authorization = ConvertFrom-OAuth2Credential -Credential $Credential
-            $SaslMechanismOAuth2 = [MailKit.Security.SaslMechanismOAuth2]::new($Authorization.UserName, $Authorization.Token)
-            $SmtpCredentials = $Credential
-        } elseif ($Graph.IsPresent) {
-            # Sending email via Office 365 Graph
-            $sendGraphMailMessageSplat = @{
-                From                   = $From
-                To                     = $To
-                Cc                     = $CC
-                Bcc                    = $Bcc
-                Subject                = $Subject
-                HTML                   = $HTML
-                Text                   = $Text
-                Attachment             = $Attachment
-                Credential             = $Credential
-                Priority               = $Priority
-                ReplyTo                = $ReplyTo
-                DoNotSaveToSentItems   = $DoNotSaveToSentItems.IsPresent
-                StopWatch              = $StopWatch
-                Suppress               = $Suppress.IsPresent
-                RequestReadReceipt     = $RequestReadReceipt.IsPresent
-                RequestDeliveryReceipt = $RequestDeliveryReceipt.IsPresent
-            }
-            Remove-EmptyValue -Hashtable $sendGraphMailMessageSplat
-            return Send-GraphMailMessage @sendGraphMailMessageSplat
-        } elseif ($SendGrid.IsPresent) {
-            # Sending email via SendGrid
-            $sendGraphMailMessageSplat = @{
-                From       = $From
-                To         = $To
-                Cc         = $CC
-                Bcc        = $Bcc
-                Subject    = $Subject
-                HTML       = $HTML
-                Text       = $Text
-                Attachment = $Attachment
-                Credential = $Credential
-                Priority   = $Priority
-                ReplyTo    = $ReplyTo
-                SeparateTo = $SeparateTo.IsPresent
-                StopWatch  = $StopWatch
-                Suppress   = $Suppress.IsPresent
-            }
-            Remove-EmptyValue -Hashtable $sendGraphMailMessageSplat
-            return Send-SendGridMailMessage @sendGraphMailMessageSplat
-        } else {
-            $SmtpCredentials = $Credential
+    } elseif ($Graph.IsPresent) {
+        # Sending email via Office 365 Graph
+        $sendGraphMailMessageSplat = @{
+            From                   = $From
+            To                     = $To
+            Cc                     = $CC
+            Bcc                    = $Bcc
+            Subject                = $Subject
+            HTML                   = $HTML
+            Text                   = $Text
+            Attachment             = $Attachment
+            Credential             = $Credential
+            Priority               = $Priority
+            ReplyTo                = $ReplyTo
+            DoNotSaveToSentItems   = $DoNotSaveToSentItems.IsPresent
+            StopWatch              = $StopWatch
+            Suppress               = $Suppress.IsPresent
+            RequestReadReceipt     = $RequestReadReceipt.IsPresent
+            RequestDeliveryReceipt = $RequestDeliveryReceipt.IsPresent
         }
-    } elseif ($Username -and $Password -and $AsSecureString) {
-        # Convert to SecureString
-        try {
-            $secStringPassword = ConvertTo-SecureString -ErrorAction Stop -String $Password
-            $SmtpCredentials = [System.Management.Automation.PSCredential]::new($UserName, $secStringPassword)
-        } catch {
-            Write-Warning "Send-EmailMessage - Couldn't translate secure string to password. Error $($_.Exception.Message)"
-            return
+        Remove-EmptyValue -Hashtable $sendGraphMailMessageSplat
+        return Send-GraphMailMessage @sendGraphMailMessageSplat
+    } elseif ($SendGrid.IsPresent) {
+        # Sending email via SendGrid
+        $sendGraphMailMessageSplat = @{
+            From       = $From
+            To         = $To
+            Cc         = $CC
+            Bcc        = $Bcc
+            Subject    = $Subject
+            HTML       = $HTML
+            Text       = $Text
+            Attachment = $Attachment
+            Credential = $Credential
+            Priority   = $Priority
+            ReplyTo    = $ReplyTo
+            SeparateTo = $SeparateTo.IsPresent
+            StopWatch  = $StopWatch
+            Suppress   = $Suppress.IsPresent
         }
-    } elseif ($Username -and $Password) {
-        #void Authenticate(string userName, string password, System.Threading.CancellationToken cancellationToken)
+        Remove-EmptyValue -Hashtable $sendGraphMailMessageSplat
+        return Send-SendGridMailMessage @sendGraphMailMessageSplat
     }
-
-    $MailSentTo = -join ($To -join ',', $CC -join ', ', $Bcc -join ', ')
-
-    [System.Text.Encoding] $SmtpEncoding = [System.Text.Encoding]::$Encoding
-
 
     [Mailozaurr.Settings]::Verbose = $True
     [Mailozaurr.Settings]::Error = $True
     [Mailozaurr.Settings]::Warning = $True
 
-%    $OutputMessage = $null
-    if ($LogPath -or $LogConsole -or $LogObject) {
-        $ProtocolLogger = [Mailozaurr.LoggingConfigurator]::ConfigureLogging($LogPath, $LogConsole, $LogObject, $LogTimestamps, $LogSecrets, $LogTimeStampsFormat, $LogClientPrefix, $LogServerPrefix)
-        $SmtpClient = [Mailozaurr.Smtp]::new($ProtocolLogger)
-    } else {
-        $SmtpClient = [Mailozaurr.Smtp]::new()
-    }
-
+    $SmtpClient = [Mailozaurr.Smtp]::new($LogPath, $LogConsole, $LogObject, $LogTimestamps, $LogSecrets, $LogTimeStampsFormat, $LogClientPrefix, $LogServerPrefix)
     $SmtpClient.ErrorAction = $PSBoundParameters.ErrorAction
     $SmtpClient.From = $From
     $SmtpClient.To = $To
@@ -577,29 +543,20 @@
     $SmtpClient.ReplyTo = $ReplyTo
     $SmtpClient.Subject = $Subject
     $SmtpClient.Priority = $Priority
-
     $SmtpClient.HtmlBody = $HTML
     $SmtpClient.TextBody = $Text
     $SmtpClient.Attachments = $Attachment
-    $SmtpClient.CreateMessage()
-
-    if ($LocalDomain) {
-        $SmtpClient.LocalDomain = $LocalDomain
-    }
-
+    $SmtpClient.LocalDomain = $LocalDomain
+    $SmtpClient.DeliveryNotificationOption = $DeliveryNotificationOption
+    $SmtpClient.Timeout = $Timeout
     $SmtpClient.CheckCertificateRevocation = -not $SkipCertificateRevocation.IsPresent
-
     if ($SkipCertificateValidatation) {
         $SmtpClient.ServerCertificateValidationCallback = { $true }
     }
-
-    $SmtpClient.DeliveryNotificationOption = $DeliveryNotificationOption
-
-    $SmtpClient.Timeout = $Timeout
-
     if ($DeliveryStatusNotificationType) {
         $SmtpClient.DeliveryStatusNotificationType = $DeliveryStatusNotificationType
     }
+    $SmtpClient.CreateMessage()
 
     $Status = $SmtpClient.Connect($Server, $Port, $SecureSocketOptions, $UseSsl)
     if (-not $Status.Status) {
@@ -607,177 +564,38 @@
             return $Status
         }
     }
-    <#
-    try {
-        $SmtpClient.Connect($Server, $Port, $SecureSocketOptions)
-    } catch {
-        if ($PSBoundParameters.ErrorAction -eq 'Stop') {
-            Write-Error $_
-            return
-        } else {
-            Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
-            Write-Warning "Send-EmailMessage - Possible issue: Port? ($Port was used), Using SSL? ($SecureSocketOptions was used). You can also try SkipCertificateValidation or SkipCertificateRevocation. "
-            if (-not $Suppress) {
-                if ($LogObject) {
-                    $OutputMessage = [System.Text.Encoding]::ASCII.GetString($stream.ToArray());
-                }
-                return [PSCustomObject] @{
-                    Status        = $False
-                    Error         = $($_.Exception.Message)
-                    SentTo        = $MailSentTo
-                    SentFrom      = $From
-                    Message       = $OutputMessage
-                    TimeToExecute = $StopWatch.Elapsed
-                    Server        = $Server
-                    Port          = $Port
-                }
-            }
-        }
+
+    if ($Credential) {
+        $Status = $SmtpClient.Authenticate($Credential, $oAuth2.IsPresent)
+    } else {
+        # if ($AsSecureString) {
+        #     try {
+        #         $secStringPassword = ConvertTo-SecureString -ErrorAction Stop -String $Password
+        #         $SmtpCredentials = [System.Management.Automation.PSCredential]::new($UserName, $secStringPassword)
+        #     } catch {
+        #         Write-Warning "Send-EmailMessage - Couldn't translate secure string to password. Error $($_.Exception.Message)"
+        #         return
+        #     }
+        #     $Status = $SmtpClient.Authenticate($SmtpCredentials, $false)
+        # } else {
+        #     $Status = $SmtpClient.Authenticate($UserName, $Password, $AsSecureString.IsPresent)
+        # }
+
+        $Status = $SmtpClient.Authenticate($UserName, $Password, $AsSecureString.IsPresent)
     }
-    #>
-    if ($SmtpCredentials) {
-        if ($oAuth2.IsPresent) {
-            try {
-                $SmtpClient.Authenticate($SaslMechanismOAuth2)
-            } catch {
-                if ($PSBoundParameters.ErrorAction -eq 'Stop') {
-                    Write-Error $_
-                    return
-                } else {
-                    Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
-                    if (-not $Suppress) {
-                        if ($LogObject) {
-                            $OutputMessage = [System.Text.Encoding]::ASCII.GetString($stream.ToArray());
-                        }
-                        return [PSCustomObject] @{
-                            Status        = $False
-                            Error         = $($_.Exception.Message)
-                            SentTo        = $MailSentTo
-                            SentFrom      = $From
-                            Message       = $OutputMessage
-                            TimeToExecute = $StopWatch.Elapsed
-                            Server        = $Server
-                            Port          = $Port
-                        }
-                    }
-                }
-            }
-        } else {
-            try {
-                $SmtpClient.Authenticate($SmtpEncoding, $SmtpCredentials, [System.Threading.CancellationToken]::None)
-            } catch {
-                if ($PSBoundParameters.ErrorAction -eq 'Stop') {
-                    Write-Error $_
-                    return
-                } else {
-                    Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
-                    if (-not $Suppress) {
-                        if ($LogObject) {
-                            $OutputMessage = [System.Text.Encoding]::ASCII.GetString($stream.ToArray());
-                        }
-                        return [PSCustomObject] @{
-                            Status        = $False
-                            Error         = $($_.Exception.Message)
-                            SentTo        = $MailSentTo
-                            SentFrom      = $From
-                            Message       = $OutputMessage
-                            TimeToExecute = $StopWatch.Elapsed
-                            Server        = $Server
-                            Port          = $Port
-                        }
-                    }
-                }
-            }
-        }
-    } elseif ($UserName -and $Password) {
-        try {
-            $SmtpClient.Authenticate($UserName, $Password, [System.Threading.CancellationToken]::None)
-        } catch {
-            if ($PSBoundParameters.ErrorAction -eq 'Stop') {
-                Write-Error $_
-                return
-            } else {
-                Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
-                if (-not $Suppress) {
-                    if ($LogObject) {
-                        $OutputMessage = [System.Text.Encoding]::ASCII.GetString($stream.ToArray());
-                    }
-                    return [PSCustomObject] @{
-                        Status        = $False
-                        Error         = $($_.Exception.Message)
-                        SentTo        = $MailSentTo
-                        SentFrom      = $From
-                        Message       = $OutputMessage
-                        TimeToExecute = $StopWatch.Elapsed
-                        Server        = $Server
-                        Port          = $Port
-                    }
-                }
-            }
-        }
-    }
-    try {
-        if ($PSCmdlet.ShouldProcess("$MailSentTo", 'Send-EmailMessage')) {
-            $OutputMessage = $SmtpClient.Send($SmtpClient.Message)
-            if (-not $Suppress) {
-                if ($LogObject) {
-                    $OutputMessage = [System.Text.Encoding]::ASCII.GetString($ProtocolLogger.Stream.ToArray());
-                }
-                [PSCustomObject] @{
-                    Status        = $True
-                    Error         = ''
-                    SentTo        = $MailSentTo
-                    SentFrom      = $From
-                    Message       = $OutputMessage
-                    TimeToExecute = $StopWatch.Elapsed
-                    Server        = $Server
-                    Port          = $Port
-                }
-            }
-        } else {
-            if (-not $Suppress) {
-                if ($LogObject) {
-                    $OutputMessage = [System.Text.Encoding]::ASCII.GetString($ProtocolLogger.Stream.ToArray());
-                }
-                [PSCustomObject] @{
-                    Status        = $false
-                    Error         = 'Email not sent (WhatIf)'
-                    SentTo        = $MailSentTo
-                    SentFrom      = $From
-                    Message       = $OutputMessage
-                    TimeToExecute = $StopWatch.Elapsed
-                    Server        = $Server
-                    Port          = $Port
-                }
-            }
-        }
-    } catch {
-        if ($PSBoundParameters.ErrorAction -eq 'Stop') {
-            Write-Error $_
-            return
-        } else {
-            Write-Warning "Send-EmailMessage - Error: $($_.Exception.Message)"
-        }
+
+    if (-not $Status.Status) {
         if (-not $Suppress) {
-            if ($LogObject) {
-                $OutputMessage = [System.Text.Encoding]::ASCII.GetString($ProtocolLogger.Stream.ToArray());
-            }
-            [PSCustomObject] @{
-                Status        = $False
-                Error         = $($_.Exception.Message)
-                SentTo        = $MailSentTo
-                SentFrom      = $From
-                Message       = $OutputMessage
-                TimeToExecute = $StopWatch.Elapsed
-                Server        = $Server
-                Port          = $Port
-            }
+            return $Status
         }
     }
-    $SmtpClient.Disconnect($true)
-    if ($MimeMessagePath) {
-        $SmtpClient.SaveMessage($MimeMessagePath)
+
+    $Status = $SmtpClient.Send()
+    if (-not $Suppress) {
+        $Status
     }
+
+    $SmtpClient.Disconnect()
+    $SmtpClient.SaveMessage($MimeMessagePath)
     $SmtpClient.Dispose()
-    $StopWatch.Stop()
 }
