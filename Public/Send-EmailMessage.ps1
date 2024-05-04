@@ -550,12 +550,15 @@
     $SmtpClient.DeliveryNotificationOption = $DeliveryNotificationOption
     $SmtpClient.Timeout = $Timeout
     $SmtpClient.CheckCertificateRevocation = -not $SkipCertificateRevocation.IsPresent
+
     if ($SkipCertificateValidatation) {
         $SmtpClient.ServerCertificateValidationCallback = { $true }
     }
+
     if ($DeliveryStatusNotificationType) {
         $SmtpClient.DeliveryStatusNotificationType = $DeliveryStatusNotificationType
     }
+    
     $SmtpClient.CreateMessage()
 
     $Status = $SmtpClient.Connect($Server, $Port, $SecureSocketOptions, $UseSsl)
