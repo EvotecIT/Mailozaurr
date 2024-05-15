@@ -29,12 +29,17 @@
 	<ItemGroup>
 		<Using Include="MailKit" />
 		<Using Include="MailKit.Net.Smtp" />
-		<Using Include="MimeKit" />
 		<Using Include="MailKit.Security" />
 		<Using Include="MailKit.Net.Pop3" />
 		<Using Include="MailKit.Net.Imap" />
 		<Using Include="MailKit.Net" />
+		<Using Include="MimeKit" />
+		<Using Include="MimeKit.Cryptography" />
+		<Using Include="System" />
 		<Using Include="System.Collections" />
+		<Using Include="System.Collections.Generic" />
+		<Using Include="System.IO" />
+		<Using Include="System.Linq" />
 	</ItemGroup>
 
 </Project>
