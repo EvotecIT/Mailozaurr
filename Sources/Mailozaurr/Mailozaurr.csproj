@@ -11,6 +11,7 @@
 		<LangVersion>latest</LangVersion>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -19,7 +20,9 @@
 		<PackageReference Include="MailKit" Version="4.5.0" />
 		<PackageReference Include="MimeKit" Version="4.5.0" />
 		<PackageReference Include="MsgKit" Version="2.8.0" />
-		<PackageReference Include="Microsoft.Identity.Client" Version="4.60.3" />
+		<PackageReference Include="Microsoft.Identity.Client" Version="4.61.0" />
+		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+		<PackageReference Include="System.Data.SQLite" Version="1.0.118" />
 		<!-- <PackageReference Include="MsgReader" Version="5.5.5" /> -->
 	</ItemGroup>
 
