@@ -349,37 +349,6 @@ public class Smtp {
         }
     }
 
-
-    //public SmtpResult MultipartSignFromStore(string certificateThumbprint, string pfxPassword) {
-    //    // Load the certificate from the Windows Certificate Store
-    //    X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
-    //    store.Open(OpenFlags.ReadOnly);
-
-    //    X509Certificate2Collection certificates = store.Certificates.Find(X509FindType.FindByThumbprint, certificateThumbprint, false);
-
-    //    store.Close();
-
-    //    if (certificates.Count > 0) {
-    //        // Export the certificate to a PFX file
-    //        byte[] pfxData = certificates[0].Export(X509ContentType.Pfx, pfxPassword);
-
-    //        // Import the certificate from the PFX data
-    //        X509Certificate2 certificate = new X509Certificate2(pfxData, pfxPassword, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
-
-    //        // Sign the email with the certificate
-    //        //using (var ctx = new DefaultSecureMimeContext()) {
-    //        //    var signer = new CmsSigner(certificate) {
-    //        //        DigestAlgorithm = DigestAlgorithm.Sha1
-    //        //    };
-    //        //    Message.Body = MultipartSigned.Create(ctx, signer, Message.Body);
-    //        //}
-    //        return MultipartSign(certificate);
-    //    } else {
-    //        throw new Exception("Certificate not found in the store.");
-    //    }
-    //}
-
-
     public void Pkcs7Sign(string pfxFilePath, string password) {
         X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
         Pkcs7Sign(certificate);
