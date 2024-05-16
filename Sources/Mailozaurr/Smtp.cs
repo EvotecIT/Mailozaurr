@@ -131,14 +131,9 @@ public class Smtp {
         string? logTimestampsFormat = null, string? logServerPrefix = null, string? logClientPrefix = null,
         bool logOverwrite = false) {
         Logging = new LoggingConfigurator();
-        Logging.ConfigureLogging(logPath, logConsole, logObject, logTimestamps, logSecrets, logTimestampsFormat,
-                       logServerPrefix, logClientPrefix, logOverwrite);
+        Logging.ConfigureLogging(logPath, logConsole, logObject, logTimestamps, logSecrets, logTimestampsFormat, logServerPrefix, logClientPrefix, logOverwrite);
         Client = Logging.ProtocolLogger == null ? new ClientSmtp() : new ClientSmtp(Logging.ProtocolLogger);
         stopwatch = Stopwatch.StartNew();
-
-
-        //MySecureMimeContext.DatabasePath = "C:\\Temp\\certdb.sqlite";
-        //CryptographyContext.Register(typeof(MySecureMimeContext));
     }
 
     public void CreateMessage() {
@@ -151,6 +146,14 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// Connect to the SMTP server using the provided server and port.
+    /// </summary>
+    /// <param name="server"></param>
+    /// <param name="port"></param>
+    /// <param name="secureSocketOptions"></param>
+    /// <param name="useSsl"></param>
+    /// <returns></returns>
     public SmtpResult Connect(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false) {
         Server = server;
         Port = port;
@@ -173,6 +176,12 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// Authenticate using the provided credentials.
+    /// </summary>
+    /// <param name="Credentials"></param>
+    /// <param name="isOAuth"></param>
+    /// <returns></returns>
     public SmtpResult Authenticate(ICredentials Credentials, bool isOAuth = false) {
         try {
             if (isOAuth) {
@@ -196,6 +205,24 @@ public class Smtp {
                 throw;
             }
             return new SmtpResult(false, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Authenticate using the default credentials of the current user.
+    /// </summary>
+    /// <returns></returns>
+    public SmtpResult AuthenticateDefaultCredentials() {
+        try {
+            var mechanism = new SaslMechanismNtlmIntegrated();
+            Client.Authenticate(mechanism);
+            return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, Logging);
+        } catch (Exception ex) {
+            Settings.Logger.WriteWarning($"Send-EmailMessage - Could not authenticate using default credentials. Error: {ex.Message}");
+            if (ErrorAction == ActionPreference.Stop) {
+                throw;
+            }
+            return new SmtpResult(false, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, "Could not authenticate using default credentials.");
         }
     }
 
@@ -228,6 +255,10 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// Send the email message.
+    /// </summary>
+    /// <returns></returns>
     public SmtpResult Send() {
         try {
             Client.Send(Message);
@@ -349,12 +380,12 @@ public class Smtp {
         }
     }
 
-    public void Pkcs7Sign(string pfxFilePath, string password) {
+    public SmtpResult Pkcs7Sign(string pfxFilePath, string password) {
         X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
-        Pkcs7Sign(certificate);
+        return Pkcs7Sign(certificate);
     }
 
-    public void Pkcs7Sign(string certificateThumbprint) {
+    public SmtpResult Pkcs7Sign(string certificateThumbprint) {
         // Load the certificate from the Windows Certificate Store
         X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
         store.Open(OpenFlags.ReadOnly);
@@ -365,9 +396,12 @@ public class Smtp {
 
         if (certificates.Count > 0) {
             // Use the certificate directly from the store to sign the email
-            Pkcs7Sign(certificates[0]);
+            return Pkcs7Sign(certificates[0]);
         } else {
-            throw new Exception("Certificate not found in the store.");
+            if (ErrorAction == ActionPreference.Stop) {
+                throw new Exception("Certificate not found in the store.");
+            }
+            return new SmtpResult(true, EmailAction.SMimeSignaturePKCS7, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, "Certificate not found in the store.");
         }
     }
 
