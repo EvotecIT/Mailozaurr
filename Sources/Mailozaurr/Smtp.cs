@@ -5,6 +5,14 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography.X509Certificates;
 
+using Org.BouncyCastle.Bcpg.OpenPgp;
+using Org.BouncyCastle.Bcpg;
+using Org.BouncyCastle.Security;
+using MimeKit.Cryptography;
+using Org.BouncyCastle.Crypto.Signers;
+using PgpCore;
+using System.Text;
+
 namespace Mailozaurr;
 
 public class Smtp {
@@ -139,6 +147,8 @@ public class Smtp {
 
         //MySecureMimeContext.DatabasePath = "C:\\Temp\\certdb.sqlite";
         //CryptographyContext.Register(typeof(MySecureMimeContext));
+
+        CryptographyContext.Register(typeof(MyGnuPGContext));
     }
 
     public void CreateMessage() {
@@ -430,4 +440,125 @@ public class Smtp {
         return new SmtpResult(true, EmailAction.SMimeSignAndEncrypt, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, Logging);
     }
 
+    public void EncryptPgp(MimeMessage message) {
+        // encrypt our message body using our custom GnuPG cryptography context
+        using (var ctx = new MyGnuPGContext()) {
+            // Note: this assumes that each of the recipients has a PGP key associated
+            // with their email address in the user's public keyring.
+            // 
+            // If this is not the case, you can use SecureMailboxAddresses instead of
+            // normal MailboxAddresses which would allow you to specify the fingerprint
+            // of their PGP keys. You could also choose to use one of the Encrypt()
+            // overloads that take a list of PgpPublicKeys.
+            Message.Body = MultipartEncrypted.Encrypt(ctx, Message.To.Mailboxes, Message.Body);
+        }
+    }
+
+    public void SignPgp() {
+        // digitally sign our message body using our custom GnuPG cryptography context
+        using (var ctx = new MyGnuPGContext()) {
+            // Note: this assumes that the Sender address has an S/MIME signing certificate
+            // and private key with an X.509 Subject Email identifier that matches the
+            // sender's email address.
+            // 
+            // If this is not the case, you can use a SecureMailboxAddress instead of a
+            // normal MailboxAddress which would allow you to specify the fingerprint
+            // of the sender's private PGP key. You could also choose to use one of the
+            // Create() overloads that take a PgpSecretKey, instead.
+            var sender = Message.From.Mailboxes.FirstOrDefault();
+
+            Message.Body = MultipartSigned.Create(ctx, sender, DigestAlgorithm.Sha1, Message.Body);
+        }
+    }
+
+    public void SignPgp(PgpSecretKey key) {
+        // digitally sign our message body using our custom GnuPG cryptography context
+        using (var ctx = new MyGnuPGContext()) {
+            Message.Body = MultipartSigned.Create(ctx, key, DigestAlgorithm.Sha1, Message.Body);
+        }
+    }
+
+
+    //public SmtpResult EncryptPgp(string publicKeyPath, string privateKeyPath, string passPhrase) {
+    //    try {
+    //        byte[] encryptedData;
+    //        using (MemoryStream outputStream = new MemoryStream())
+    //        using (Stream publicKeyStream = File.OpenRead(publicKeyPath))
+    //        using (Stream privateKeyStream = File.OpenRead(privateKeyPath))
+    //        using (MemoryStream messageStream = new MemoryStream()) {
+    //            Message.Body.WriteTo(messageStream);
+    //            messageStream.Position = 0;
+
+    //            EncryptionKeys encryptionKeys = new EncryptionKeys(publicKeyStream, privateKeyStream, passPhrase);
+    //            PGP pgp = new PGP(encryptionKeys);
+    //            pgp.EncryptStreamAndSign(messageStream, outputStream, false, true);
+
+    //            // Convert the outputStream to a byte array
+    //            encryptedData = outputStream.ToArray();
+    //        }
+
+    //        // Create a new MemoryStream from the byte array
+    //        MemoryStream encryptedStream = new MemoryStream(encryptedData);
+    //        // Create a new MimePart with the encrypted data
+    //        var encryptedPart = new MimePart("application", "octet-stream") {
+    //            Content = new MimeContent(encryptedStream, ContentEncoding.Default),
+    //            ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+    //            ContentTransferEncoding = ContentEncoding.Base64,
+    //            FileName = "encrypted.pgp"
+    //        };
+
+    //        // Create a new MimeMessage with the encrypted part as the body
+    //        //    var encryptedMessage = new MimeMessage();
+    //        //encryptedMessage.Body = encryptedPart;
+
+    //        // Assign the encrypted message back to the Message property
+    //        Message.Body = encryptedPart;
+
+    //        return new SmtpResult(true, EmailAction.PgpEncrypt, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, Logging);
+    //    } catch (Exception ex) {
+    //        return new SmtpResult(false, EmailAction.PgpEncrypt, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, ex.Message);
+    //    }
+    //}
+
+    //public SmtpResult SignPgp(string publicKeyPath, string privateKeyPath, string passPhrase) {
+    //    try {
+    //        byte[] signedData;
+    //        using (MemoryStream outputStream = new MemoryStream())
+    //        using (Stream publicKeyStream = File.OpenRead(publicKeyPath))
+    //        using (Stream privateKeyStream = File.OpenRead(privateKeyPath))
+    //        using (MemoryStream messageStream = new MemoryStream()) {
+    //            Message.Body.WriteTo(messageStream);
+    //            messageStream.Position = 0;
+
+    //            EncryptionKeys encryptionKeys = new EncryptionKeys(publicKeyStream, privateKeyStream, passPhrase);
+    //            PGP pgp = new PGP(encryptionKeys);
+    //            pgp.SignStream(messageStream, outputStream, true);
+
+    //            // Convert the outputStream to a byte array
+    //            signedData = outputStream.ToArray();
+    //        }
+
+    //        // Create a new MemoryStream from the byte array
+    //        MemoryStream signedStream = new MemoryStream(signedData);
+    //        // Create a new MimePart with the signed data
+    //        var signedPart = new MimePart("application", "octet-stream") {
+    //            Content = new MimeContent(signedStream, ContentEncoding.Default),
+    //            ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+    //            ContentTransferEncoding = ContentEncoding.Base64,
+    //            FileName = "signed.pgp"
+    //        };
+
+    //        // Create a multipart/mixed container to hold the original message body and the signature
+    //        var multipart = new Multipart("mixed");
+    //        multipart.Add(Message.Body);
+    //        multipart.Add(signedPart);
+
+    //        // Replace the body of the existing MimeMessage with the multipart container
+    //        Message.Body = multipart;
+
+    //        return new SmtpResult(true, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, Logging);
+    //    } catch (Exception ex) {
+    //        return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, ex.Message);
+    //    }
+    //}
 }
