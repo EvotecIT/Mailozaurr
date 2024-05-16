@@ -172,6 +172,9 @@
     Specifies the thumbprint of the certificate to use for signing or encrypting the email message.
     You can use this or CertificatePath and CertificatePassword
 
+    .PARAMETER UseDefaultCredentials
+    Specifies to use default credentials for SMTP server (uses current user credentials)
+
     .EXAMPLE
     if (-not $MailCredentials) {
         $MailCredentials = Get-Credential
