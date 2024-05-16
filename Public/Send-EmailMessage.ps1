@@ -154,6 +154,24 @@
     .PARAMETER RequestDeliveryReceipt
     Specifies whether to request a delivery receipt for the email message when using Microsoft Graph API (Graph switch)
 
+    .PARAMETER SignOrEncrypt
+    Specifies whether to sign or encrypt the email message. Options are SMIMESign, SMIMESignPkcs7, SMIMEEncrypt, SMIMESignAndEncrypt
+
+    .PARAMETER CertificatePath
+    Specifies the path to the certificate file (PFX)
+    You can use this and CertificatePassword or CertificateThumbprint
+
+    .PARAMETER CertificatePassword
+    Specifies the password for the certificate file. Can be clear text or EncryptedString.
+    You can use this and CertificatePath or CertificateThumbprint
+
+    .PARAMETER CertificatePasswordAsSecureString
+    Specifies that the password for the certificate file is a SecureString
+
+    .PARAMETER CertificateThumbprint
+    Specifies the thumbprint of the certificate to use for signing or encrypting the email message.
+    You can use this or CertificatePath and CertificatePassword
+
     .EXAMPLE
     if (-not $MailCredentials) {
         $MailCredentials = Get-Credential
@@ -221,17 +239,18 @@
     [cmdletBinding(DefaultParameterSetName = 'Compatibility', SupportsShouldProcess)]
     param(
         [Parameter(ParameterSetName = 'SecureString')]
-
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [alias('SmtpServer')][string] $Server,
 
         [Parameter(ParameterSetName = 'SecureString')]
-
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [int] $Port = 587,
 
+        [Parameter(Mandatory, ParameterSetName = 'DefaultCredentials')]
         [Parameter(Mandatory, ParameterSetName = 'SecureString')]
         [Parameter(Mandatory, ParameterSetName = 'oAuth')]
         [Parameter(Mandatory, ParameterSetName = 'Graph')]
@@ -240,6 +259,7 @@
         [Parameter(Mandatory, ParameterSetName = 'SendGrid')]
         [object] $From,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -248,6 +268,7 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [string] $ReplyTo,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -256,6 +277,7 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [string[]] $Cc,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -264,6 +286,7 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [string[]] $Bcc,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -272,6 +295,7 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [string[]] $To,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -280,6 +304,7 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [string] $Subject,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -288,16 +313,19 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [alias('Importance')][ValidateSet('Low', 'Normal', 'High')][string] $Priority,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [ValidateSet('ASCII', 'BigEndianUnicode', 'Default', 'Unicode', 'UTF32', 'UTF7', 'UTF8')][string] $Encoding = 'Default',
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [Mailozaurr.DeliveryNotification[]] $DeliveryNotificationOption,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -315,26 +343,31 @@
         [Parameter(ParameterSetName = 'SecureString')]
         [string] $Password,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [MailKit.Security.SecureSocketOptions] $SecureSocketOptions = [MailKit.Security.SecureSocketOptions]::Auto,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $UseSsl,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $SkipCertificateRevocation,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [alias('SkipCertificateValidatation')][switch] $SkipCertificateValidation,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -343,6 +376,7 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [alias('Body')][string[]] $HTML,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -351,6 +385,7 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [string[]] $Text,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Graph')]
@@ -359,6 +394,7 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [alias('Attachments')][string[]] $Attachment,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -395,6 +431,7 @@
         [Parameter(ParameterSetName = 'MgGraphRequest')]
         [switch] $DoNotSaveToSentItems,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
@@ -403,55 +440,79 @@
         [Parameter(ParameterSetName = 'SendGrid')]
         [switch] $Suppress,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [string[]] $LogPath,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $LogConsole,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $LogObject,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $LogTimestamps,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [string] $LogTimeStampsFormat = "yyyy-MM-dd HH:mm:ss:fff",
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [switch] $LogSecrets,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [string] $LogClientPrefix,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [string] $LogServerPrefix,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
         [string] $MimeMessagePath,
 
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
-        [string] $LocalDomain
+        [string] $LocalDomain,
+
+        [Parameter(ParameterSetName = 'DefaultCredentials')]
+        [switch] $UseDefaultCredentials,
+
+        [ValidateSet(
+            'SMIMESign',
+            'SMIMESignPkcs7',
+            'SMIMEEncrypt',
+            'SMIMESignAndEncrypt'
+        )][string] $SignOrEncrypt,
+        [string] $CertificatePath,
+        [string] $CertificatePassword,
+        [switch] $CertificatePasswordAsSecureString,
+        [string] $CertificateThumbprint
     )
     $StopWatch = [system.diagnostics.stopwatch]::StartNew()
 
@@ -558,8 +619,6 @@
     if ($DeliveryStatusNotificationType) {
         $SmtpClient.DeliveryStatusNotificationType = $DeliveryStatusNotificationType
     }
-    
-    $SmtpClient.CreateMessage()
 
     $Status = $SmtpClient.Connect($Server, $Port, $SecureSocketOptions, $UseSsl)
     if (-not $Status.Status) {
@@ -568,7 +627,44 @@
         }
     }
 
-    if ($Credential) {
+    $SmtpClient.CreateMessage()
+
+    if ($SignOrEncrypt) {
+        if ($SignOrEncrypt -eq 'SMIMESign') {
+            if ($CertificateThumbprint) {
+                $Status = $SmtpClient.Sign($CertificateThumbprint)
+            } elseif ($CertificatePath -and $CertificatePassword) {
+                $Status = $SmtpClient.Sign($CertificatePath, $CertificatePassword, $CertificatePasswordAsSecureString.IsPresent)
+            }
+        } elseif ($SignOrEncrypt -eq 'SMIMESignPkcs7') {
+            if ($CertificateThumbprint) {
+                $Status = $SmtpClient.Pkcs7Sign($CertificateThumbprint)
+            } elseif ($CertificatePath -and $CertificatePassword) {
+                $Status = $SmtpClient.Pkcs7Sign($CertificatePath, $CertificatePassword, $CertificatePasswordAsSecureString.IsPresent)
+            }
+        } elseif ($SignOrEncrypt -eq 'SMIMEEncrypt') {
+            if ($CertificateThumbprint) {
+                $Status = $SmtpClient.Encrypt($CertificateThumbprint)
+            } elseif ($CertificatePath -and $CertificatePassword) {
+                $Status = $SmtpClient.Encrypt($CertificatePath, $CertificatePassword, $CertificatePasswordAsSecureString.IsPresent)
+            }
+        } elseif ($SignOrEncrypt -eq 'SMIMESignAndEncrypt') {
+            if ($CertificateThumbprint) {
+                $Status = $SmtpClient.SignAndEncrypt($CertificateThumbprint)
+            } elseif ($CertificatePath -and $CertificatePassword) {
+                $Status = $SmtpClient.SignAndEncrypt($CertificatePath, $CertificatePassword, $CertificatePasswordAsSecureString.IsPresent)
+            }
+        }
+        if (-not $Status.Status) {
+            if (-not $Suppress) {
+                return $Status
+            }
+        }
+    }
+
+    if ($UseDefaultCredentials) {
+        $Status = $SmtpClient.AuthenticateDefaultCredentials()
+    } elseif ($Credential) {
         $Status = $SmtpClient.Authenticate($Credential, $oAuth2.IsPresent)
     } else {
         $Status = $SmtpClient.Authenticate($UserName, $Password, $AsSecureString.IsPresent)
