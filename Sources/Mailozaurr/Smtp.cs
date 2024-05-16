@@ -209,7 +209,7 @@ public class Smtp {
     }
 
     /// <summary>
-    /// Authenticate using the default credentials of the current user.
+    /// Authenticate using the default credentials of the current user (NTLM)
     /// </summary>
     /// <returns></returns>
     public SmtpResult AuthenticateDefaultCredentials() {
@@ -226,9 +226,8 @@ public class Smtp {
         }
     }
 
-    public SmtpResult Authenticate(string username, string password, bool isSecureString) {
+    public string ConvertSecureStringToPlainString(string password, bool isSecureString) {
         if (isSecureString) {
-
             // Convert the encrypted string back to a SecureString
             SecureString securePassword = SecureStringHelper.Unprotect(password);
 
@@ -236,11 +235,30 @@ public class Smtp {
             IntPtr unmanagedString = IntPtr.Zero;
             try {
                 unmanagedString = Marshal.SecureStringToGlobalAllocUnicode(securePassword);
-                password = Marshal.PtrToStringUni(unmanagedString);
+                return Marshal.PtrToStringUni(unmanagedString);
             } finally {
                 Marshal.ZeroFreeGlobalAllocUnicode(unmanagedString);
             }
         }
+        return password;
+    }
+
+    public SmtpResult Authenticate(string username, string password, bool isSecureString) {
+        //if (isSecureString) {
+
+        //    // Convert the encrypted string back to a SecureString
+        //    SecureString securePassword = SecureStringHelper.Unprotect(password);
+
+        //    // Convert the SecureString to a plain string
+        //    IntPtr unmanagedString = IntPtr.Zero;
+        //    try {
+        //        unmanagedString = Marshal.SecureStringToGlobalAllocUnicode(securePassword);
+        //        password = Marshal.PtrToStringUni(unmanagedString);
+        //    } finally {
+        //        Marshal.ZeroFreeGlobalAllocUnicode(unmanagedString);
+        //    }
+        //}
+        password = ConvertSecureStringToPlainString(password, isSecureString);
         try {
             Client.Authenticate(username, password);
             Settings.Logger.WriteVerbose($"Send-EmailMessage - Authenticated as {username}");
@@ -284,7 +302,8 @@ public class Smtp {
         stopwatch.Stop();
     }
 
-    public SmtpResult Encrypt(string pfxFilePath, string password) {
+    public SmtpResult Encrypt(string pfxFilePath, string password, bool isSecureString) {
+        password = ConvertSecureStringToPlainString(password, isSecureString);
         X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
         return Encrypt(certificate);
     }
@@ -334,7 +353,7 @@ public class Smtp {
         return new SmtpResult(true, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, Logging);
     }
 
-    public SmtpResult MultipartSign(X509Certificate2 certificate) {
+    public SmtpResult Sign(X509Certificate2 certificate) {
         MimeMessage message = Message;
         // digitally sign our message body using our custom S/MIME cryptography context
         //Exception calling "MultipartSignFromStore" with "1" argument(s): "SQLite is not available. Install the System.Data.SQLite nuget package."
@@ -358,12 +377,13 @@ public class Smtp {
         return new SmtpResult(true, EmailAction.SMimeSignature, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, Logging);
     }
 
-    public SmtpResult MultipartSign(string pfxFilePath, string password) {
+    public SmtpResult Sign(string pfxFilePath, string password, bool isSecureString) {
+        password = ConvertSecureStringToPlainString(password, isSecureString);
         X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
-        return MultipartSign(certificate);
+        return Sign(certificate);
     }
 
-    public SmtpResult MultipartSign(string certificateThumbprint) {
+    public SmtpResult Sign(string certificateThumbprint) {
         // Load the certificate from the Windows Certificate Store
         X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
         store.Open(OpenFlags.ReadOnly);
@@ -374,13 +394,14 @@ public class Smtp {
 
         if (certificates.Count > 0) {
             // Use the certificate directly from the store to sign the email
-            return MultipartSign(certificates[0]);
+            return Sign(certificates[0]);
         } else {
             throw new Exception("Certificate not found in the store.");
         }
     }
 
-    public SmtpResult Pkcs7Sign(string pfxFilePath, string password) {
+    public SmtpResult Pkcs7Sign(string pfxFilePath, string password, bool isSecureString) {
+        password = ConvertSecureStringToPlainString(password, isSecureString);
         X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
         return Pkcs7Sign(certificate);
     }
@@ -404,7 +425,6 @@ public class Smtp {
             return new SmtpResult(true, EmailAction.SMimeSignaturePKCS7, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, "Certificate not found in the store.");
         }
     }
-
 
     public SmtpResult Pkcs7Sign(X509Certificate2 certificate) {
         try {
@@ -432,9 +452,14 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// S/MIME Sign and encrypt the email using the provided certificate thumbprint.
+    /// </summary>
+    /// <param name="certificateThumbprint"></param>
+    /// <returns></returns>
     public SmtpResult SignAndEncrypt(string certificateThumbprint) {
         // Sign the email
-        SmtpResult signResult = MultipartSign(certificateThumbprint);
+        SmtpResult signResult = Sign(certificateThumbprint);
         if (!signResult.Status) {
             return signResult;
         }
@@ -448,15 +473,22 @@ public class Smtp {
         return new SmtpResult(true, EmailAction.SMimeSignAndEncrypt, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, Logging);
     }
 
-    public SmtpResult SignAndEncrypt(string pfxFilePath, string password) {
+    /// <summary>
+    /// S/MIME Sign and encrypt the email using the provided PFX file and password.
+    /// </summary>
+    /// <param name="pfxFilePath"></param>
+    /// <param name="password"></param>
+    /// <param name="isSecureString"></param>
+    /// <returns></returns>
+    public SmtpResult SignAndEncrypt(string pfxFilePath, string password, bool isSecureString) {
         // Sign the email
-        SmtpResult signResult = MultipartSign(pfxFilePath, password);
+        SmtpResult signResult = Sign(pfxFilePath, password, isSecureString);
         if (!signResult.Status) {
             return signResult;
         }
 
         // Encrypt the signed email
-        SmtpResult encryptResult = Encrypt(pfxFilePath, password);
+        SmtpResult encryptResult = Encrypt(pfxFilePath, password, isSecureString);
         if (!encryptResult.Status) {
             return encryptResult;
         }
