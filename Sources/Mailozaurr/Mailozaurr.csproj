@@ -15,7 +15,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="EmailValidation" Version="1.0.10" />
+		<PackageReference Include="EmailValidation" Version="1.2.0" />
 		<PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
 		<PackageReference Include="MailKit" Version="4.5.0" />
 		<PackageReference Include="MimeKit" Version="4.5.0" />

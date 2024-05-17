@@ -1,6 +1,8 @@
 ﻿// ReSharper disable StringLiteralTypo
 using System;
 
+using EmailValidation;
+
 namespace Mailozaurr;
 
 public static class Validator {
@@ -3768,7 +3770,7 @@ public static class Validator {
     /// <returns>
     ///   <c>true</c> if [is disposable email] [the specified email]; otherwise, <c>false</c>.
     /// </returns>
-    public static bool IsDisposableEmail(string email) {
+    private static bool IsDisposableEmail(string email) {
         var domain = email.Split('@').Last();
         return IsDisposableDomain(domain);
     }
@@ -3780,7 +3782,7 @@ public static class Validator {
     /// <returns>
     ///   <c>true</c> if [is disposable domain] [the specified domain]; otherwise, <c>false</c>.
     /// </returns>
-    public static bool IsDisposableDomain(string domain) {
+    private static bool IsDisposableDomain(string domain) {
         var normalizedDomain = domain.Trim().ToLowerInvariant();
         return DisposableDomains.Contains(normalizedDomain);
     }
@@ -3795,7 +3797,7 @@ public static class Validator {
     public static ValidatedEmail ValidateEmail(string emailAddress, bool allowInternational = false, bool allowTopLevelDomains = false) {
         bool isDisposable = false;
         try {
-            var isValid = EmailValidation.EmailValidator.Validate(emailAddress, allowTopLevelDomains, allowInternational);
+            var isValid = EmailValidator.TryValidate(emailAddress, allowTopLevelDomains, allowInternational, out EmailValidationError errorReason);
             if (isValid) {
                 isDisposable = IsDisposableEmail(emailAddress);
             }
@@ -3803,6 +3805,9 @@ public static class Validator {
                 EmailAddress = emailAddress,
                 IsValid = isValid,
                 IsDisposable = isDisposable,
+                Reason = errorReason.Code,
+                ReasonTokenIndex = errorReason.TokenIndex,
+                ReasonErrorIndex = errorReason.ErrorIndex,
                 Error = ""
             };
         } catch (Exception ex) {
@@ -3810,6 +3815,7 @@ public static class Validator {
                 EmailAddress = emailAddress,
                 IsValid = false,
                 IsDisposable = false,
+                Reason = EmailValidationError.None.Code,
                 Error = ex.Message
             };
         }
