@@ -3,40 +3,59 @@
 	<PropertyGroup>
 		<Company>Evotec</Company>
 		<Authors>Przemyslaw Klys</Authors>
-		<VersionPrefix>1.0.0</VersionPrefix>
+		<VersionPrefix>2.0.0</VersionPrefix>
 		<TargetFrameworks>net472;netstandard2.0;net6.0;net7.0;net8.0</TargetFrameworks>
 		<AssemblyName>Mailozaurr.PowerShell</AssemblyName>
 
 		<Copyright>(c) 2011 - 2022 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
 		<LangVersion>latest</LangVersion>
-
-		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
+	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
 	</ItemGroup>
 
-	<Target Name="RemoveFilesAfterBuild" AfterTargets="Build">
-		<Delete Files="$(OutDir)System.Management.Automation.dll" />
-	</Target>
+    <!-- Make sure the output DLL's from library are included in the output -->
+    <PropertyGroup>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    </PropertyGroup>
 
-	<ItemGroup>
-		<ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
-	</ItemGroup>
+    <!-- We need to remove PowerShell conflicting libraries as it will break output -->
+    <Target Name="RemoveFilesAfterBuild" AfterTargets="Build">
+        <Delete Files="$(OutDir)System.Management.Automation.dll" />
+        <Delete Files="$(OutDir)System.Management.dll" />
+    </Target>
+
 
 	<PropertyGroup Condition=" '$(TargetFramework)' == 'net472' ">
 		<DefineConstants>$(DefineConstants);FRAMEWORK</DefineConstants>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<Using Include = "System.Collections" />
-		<Using Include = "System.Management.Automation" />
-		<Using Include = "System.Threading.Tasks" />
-		<Using Include = "Mailozaurr" />
-		<Using Include = "System.Collections.Concurrent" />
-		<Using Include = "System.Threading" />
-		<Using Include = "System" />
+		<Using Include="Mailozaurr" />
+		<Using Include="System.Collections" />
+		<Using Include="System.Management.Automation" />
+		<Using Include="System.Threading.Tasks" />
+		<Using Include="System.Collections.Concurrent" />
+		<Using Include="System.Threading" />
+		<Using Include="System" />
 	</ItemGroup>
 
+
+	<PropertyGroup>
+		<!-- This is needed for XmlDoc2CmdletDoc to generate a PowerShell documentation file. -->
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- This is needed for XmlDoc2CmdletDoc to generate a PowerShell documentation file. -->
+		<PackageReference Include="MatejKafka.XmlDoc2CmdletDoc" Version="0.4.2">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+	</ItemGroup>
 </Project>
