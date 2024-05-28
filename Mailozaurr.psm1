@@ -111,7 +111,7 @@ $FoundErrors = @(
     }
     Foreach ($Import in @($Assembly)) {
         try {
-            #Write-Verbose -Message $Import.FullName
+            # Write-Warning -Message $Import.FullName
             Add-Type -Path $Import.Fullname -ErrorAction Stop
         } catch [System.Reflection.ReflectionTypeLoadException] {
             Write-Warning "Processing $($Import.Name) Exception: $($_.Exception.Message)"
