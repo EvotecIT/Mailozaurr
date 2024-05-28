@@ -67,9 +67,13 @@ public class Smtp {
         set => Client.Priority = value;
     }
 
-    public List<DeliveryNotification>? DeliveryNotificationOption {
+    public DeliveryNotification[]? DeliveryNotificationOption {
         get => Client.DeliveryNotificationOption;
-        set => Client.DeliveryNotificationOption = value;
+        set {
+            if (value != null) {
+                Client.DeliveryNotificationOption = value;
+            }
+        }
     }
 
     public int Timeout {
@@ -82,10 +86,30 @@ public class Smtp {
         set => Client.CheckCertificateRevocation = value;
     }
 
+    //public bool SkipCertificateValidation {
+    //    get
+    //    {
+
+    //    };
+    //    set
+    //    {
+
+    //    };
+    //}
+
     public string LocalDomain {
         get => Client.LocalDomain;
         set {
             if (value != "") Client.LocalDomain = value;
+        }
+    }
+
+    public DeliveryStatusNotificationType? DeliveryStatusNotificationType {
+        get => Client.DeliveryStatusNotificationType;
+        set {
+            if (value != null) {
+                Client.DeliveryStatusNotificationType = value.Value;
+            }
         }
     }
 
@@ -103,7 +127,7 @@ public class Smtp {
     public string SentTo => Client.SentTo;
     public string SentFrom => Client.SentFrom;
 
-    private readonly Stopwatch stopwatch;
+    public readonly Stopwatch Stopwatch;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Smtp"/> class, with optional logging configuration.
@@ -112,7 +136,7 @@ public class Smtp {
     public Smtp(LoggingConfigurator? logging = null) {
         Logging = logging;
         Client = logging?.ProtocolLogger == null ? new ClientSmtp() : new ClientSmtp(logging.ProtocolLogger);
-        stopwatch = Stopwatch.StartNew();
+        Stopwatch = Stopwatch.StartNew();
     }
 
     /// <summary>
@@ -130,10 +154,12 @@ public class Smtp {
     public Smtp(string logPath, bool logConsole, bool logObject, bool logTimestamps, bool logSecrets,
         string? logTimestampsFormat = null, string? logServerPrefix = null, string? logClientPrefix = null,
         bool logOverwrite = false) {
+
+        LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Logging configuration: Path: {logPath}, Console: {logConsole}, Object: {logObject}, Timestamps: {logTimestamps}, Secrets: {logSecrets}, TimestampsFormat: {logTimestampsFormat}, ServerPrefix: {logServerPrefix}, ClientPrefix: {logClientPrefix}, Overwrite: {logOverwrite}");
         Logging = new LoggingConfigurator();
         Logging.ConfigureLogging(logPath, logConsole, logObject, logTimestamps, logSecrets, logTimestampsFormat, logServerPrefix, logClientPrefix, logOverwrite);
         Client = Logging.ProtocolLogger == null ? new ClientSmtp() : new ClientSmtp(Logging.ProtocolLogger);
-        stopwatch = Stopwatch.StartNew();
+        Stopwatch = Stopwatch.StartNew();
     }
 
     public void CreateMessage() {
@@ -164,15 +190,15 @@ public class Smtp {
                 secureSocketOptions = SecureSocketOptions.StartTls;
             }
             Client.Connect(server, port, secureSocketOptions);
-            Settings.Logger.WriteVerbose($"Connected to {server} on {port} port using SSL: {secureSocketOptions}");
-            return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, stopwatch.Elapsed, "");
+            LoggingMessages.Logger.WriteVerbose($"Connected to {server} on {port} port using SSL: {secureSocketOptions}");
+            return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "");
         } catch (Exception ex) {
-            Settings.Logger.WriteWarning($"Send-EmailMessage - Error: {ex.Message}");
-            Settings.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Port? ({port} was used), Using SSL? ({secureSocketOptions}, was used). You can also try 'SkipCertificateValidation' or 'SkipCertificateRevocation'.");
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during connect: {ex.Message}");
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Port? ({port} was used), Using SSL? ({secureSocketOptions}, was used). You can also try 'SkipCertificateValidation' or 'SkipCertificateRevocation'.");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
-            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, server, port, stopwatch.Elapsed, ex.Message);
+            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "", ex.Message);
         }
     }
 
@@ -190,21 +216,21 @@ public class Smtp {
                     var (userName, token) = Helpers.ConvertFromOAuth2Credential(networkCredential);
                     var oauth2 = new SaslMechanismOAuth2(userName, token);
                     Client.Authenticate(oauth2);
-                    Settings.Logger.WriteVerbose($"Send-EmailMessage - Authenticated using OAuth");
+                    //  Settings.Logger.WriteVerbose($"Send-EmailMessage - Authenticated using OAuth");
                 }
-                Settings.Logger.WriteVerbose($"Send-EmailMessage - Authenticated using OAuth");
+                LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Authenticated using oAuth");
             } else {
                 Client.Authenticate(Credentials);
-                Settings.Logger.WriteVerbose($"Send-EmailMessage - Authenticated using ICredentials");
+                //  Settings.Logger.WriteVerbose($"Send-EmailMessage - Authenticated using ICredentials");
             }
-            return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, Logging);
+            return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (Exception ex) {
-            Settings.Logger.WriteWarning($"Send-EmailMessage - Error: {ex.Message}");
-            Settings.Logger.WriteWarning($"Send-EmailMessage - Possible issue: OAuth? ({isOAuth} was used), ICredentials? ({Credentials}, was used).");
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during authentication (oAuth): {ex.Message}");
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: OAuth? ({isOAuth} was used), ICredentials? ({Credentials}, was used).");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
-            return new SmtpResult(false, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, ex.Message);
+            return new SmtpResult(false, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
         }
     }
 
@@ -216,13 +242,14 @@ public class Smtp {
         try {
             var mechanism = new SaslMechanismNtlmIntegrated();
             Client.Authenticate(mechanism);
-            return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, Logging);
+            LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Authenticated using default credentials");
+            return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (Exception ex) {
-            Settings.Logger.WriteWarning($"Send-EmailMessage - Could not authenticate using default credentials. Error: {ex.Message}");
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Could not authenticate using default credentials. Error: {ex.Message}");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
-            return new SmtpResult(false, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, "Could not authenticate using default credentials.");
+            return new SmtpResult(false, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", "Could not authenticate using default credentials.");
         }
     }
 
@@ -244,32 +271,18 @@ public class Smtp {
     }
 
     public SmtpResult Authenticate(string username, string password, bool isSecureString) {
-        //if (isSecureString) {
-
-        //    // Convert the encrypted string back to a SecureString
-        //    SecureString securePassword = SecureStringHelper.Unprotect(password);
-
-        //    // Convert the SecureString to a plain string
-        //    IntPtr unmanagedString = IntPtr.Zero;
-        //    try {
-        //        unmanagedString = Marshal.SecureStringToGlobalAllocUnicode(securePassword);
-        //        password = Marshal.PtrToStringUni(unmanagedString);
-        //    } finally {
-        //        Marshal.ZeroFreeGlobalAllocUnicode(unmanagedString);
-        //    }
-        //}
         password = ConvertSecureStringToPlainString(password, isSecureString);
         try {
             Client.Authenticate(username, password);
-            Settings.Logger.WriteVerbose($"Send-EmailMessage - Authenticated as {username}");
-            return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, Logging);
+            LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Authenticated as {username}");
+            return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (Exception ex) {
-            Settings.Logger.WriteWarning($"Send-EmailMessage - Error: {ex.Message}");
-            Settings.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Username? ({username} was used), Password?.");
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during authentication: {ex.Message}");
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Username? ({username} was used), Password?.");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
-            return new SmtpResult(false, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, ex.Message);
+            return new SmtpResult(false, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
         }
     }
 
@@ -280,26 +293,27 @@ public class Smtp {
     public SmtpResult Send() {
         try {
             Client.Send(Message);
-            Settings.Logger.WriteVerbose($"Send-EmailMessage - Sent email to {SentTo}");
-            return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, Logging);
+            LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Sent email to {SentTo}");
+            return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (Exception ex) {
-            Settings.Logger.WriteWarning($"Send-EmailMessage - Error: {ex.Message}");
-            Settings.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Message? ({Message} was used).");
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending: {ex.Message}");
+            //LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Message? ({Message} was used).");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
-            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, ex.Message);
+            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
         }
     }
 
     public void Disconnect() {
         Client.Disconnect(true);
-        stopwatch.Stop();
+        Stopwatch.Stop();
     }
 
     public void Dispose() {
+        Disconnect();
         Client.Dispose();
-        stopwatch.Stop();
+        Stopwatch.Stop();
     }
 
     public SmtpResult Encrypt(string pfxFilePath, string password, bool isSecureString) {
@@ -324,7 +338,7 @@ public class Smtp {
             if (ErrorAction == ActionPreference.Stop) {
                 throw new Exception("Certificate not found in the store.");
             }
-            return new SmtpResult(true, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, "Certificate not found in the store.");
+            return new SmtpResult(true, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "Certificate not found in the store.");
         }
     }
 
@@ -340,17 +354,17 @@ public class Smtp {
                 // Encrypt the message body with the certificate
                 message.Body = ApplicationPkcs7Mime.Encrypt(ctx, recipients, message.Body);
             } catch (Exception ex) {
-                Settings.Logger.WriteWarning($"Send-EmailMessage - Error: {ex.Message}");
-                Settings.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Certificate? ({certificate.Thumbprint} was used).");
+                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during encryption: {ex.Message}");
+                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Certificate? ({certificate.Thumbprint} was used).");
                 if (ErrorAction == ActionPreference.Stop) {
                     throw;
                 }
-                return new SmtpResult(false, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, ex.Message);
+                return new SmtpResult(false, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
             }
         }
 
         Message = message;
-        return new SmtpResult(true, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, Logging);
+        return new SmtpResult(true, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
     }
 
     public SmtpResult Sign(X509Certificate2 certificate) {
@@ -363,18 +377,17 @@ public class Smtp {
                     DigestAlgorithm = DigestAlgorithm.Sha1
                 };
                 message.Body = MultipartSigned.Create(ctx, signer, message.Body);
-
             } catch (Exception ex) {
-                Settings.Logger.WriteWarning($"Send-EmailMessage - Error: {ex.Message}");
-                Settings.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Certificate? ({certificate.Thumbprint} was used).");
+                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during signing: {ex.Message}");
+                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Certificate? ({certificate.Thumbprint} was used).");
                 if (ErrorAction == ActionPreference.Stop) {
                     throw;
                 }
-                return new SmtpResult(false, EmailAction.SMimeSignature, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, ex.Message);
+                return new SmtpResult(false, EmailAction.SMimeSignature, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
             }
         }
         Message = message;
-        return new SmtpResult(true, EmailAction.SMimeSignature, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, Logging);
+        return new SmtpResult(true, EmailAction.SMimeSignature, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
     }
 
     public SmtpResult Sign(string pfxFilePath, string password, bool isSecureString) {
@@ -422,7 +435,7 @@ public class Smtp {
             if (ErrorAction == ActionPreference.Stop) {
                 throw new Exception("Certificate not found in the store.");
             }
-            return new SmtpResult(true, EmailAction.SMimeSignaturePKCS7, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, "Certificate not found in the store.");
+            return new SmtpResult(true, EmailAction.SMimeSignaturePKCS7, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", "Certificate not found in the store.");
         }
     }
 
@@ -441,14 +454,14 @@ public class Smtp {
             }
 
             Message = message;
-            return new SmtpResult(true, EmailAction.SMimeSignaturePKCS7, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, Logging);
+            return new SmtpResult(true, EmailAction.SMimeSignaturePKCS7, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (Exception ex) {
-            Settings.Logger.WriteWarning($"Send-EmailMessage - Error: {ex.Message}");
-            Settings.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Certificate? ({certificate.Thumbprint} was used).");
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error: {ex.Message}");
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Certificate? ({certificate.Thumbprint} was used).");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
-            return new SmtpResult(false, EmailAction.SMimeSignaturePKCS7, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, ex.Message);
+            return new SmtpResult(false, EmailAction.SMimeSignaturePKCS7, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
         }
     }
 
@@ -470,7 +483,7 @@ public class Smtp {
             return encryptResult;
         }
 
-        return new SmtpResult(true, EmailAction.SMimeSignAndEncrypt, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, Logging);
+        return new SmtpResult(true, EmailAction.SMimeSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
     }
 
     /// <summary>
@@ -493,7 +506,37 @@ public class Smtp {
             return encryptResult;
         }
 
-        return new SmtpResult(true, EmailAction.SMimeSignAndEncrypt, SentTo, SentFrom, Server, Port, stopwatch.Elapsed, Logging);
+        return new SmtpResult(true, EmailAction.SMimeSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
     }
 
+    public SmtpResult Encrypt(EmailActionEncryption emailActionEncryption, string pfxFilePath, string password, bool isSecureString) {
+        switch (emailActionEncryption) {
+            case EmailActionEncryption.SMIMESign:
+                return Sign(pfxFilePath, password, isSecureString);
+            case EmailActionEncryption.SMIMESignPkcs7:
+                return Pkcs7Sign(pfxFilePath, password, isSecureString);
+            case EmailActionEncryption.SMIMEEncrypt:
+                return Encrypt(pfxFilePath, password, isSecureString);
+            case EmailActionEncryption.SMIMESignAndEncrypt:
+                return SignAndEncrypt(pfxFilePath, password, isSecureString);
+            default:
+                // user did not specify an encryption type, we skip things
+                return new SmtpResult(true, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", "EmailActionEncryption None");
+        }
+    }
+    public SmtpResult Encrypt(EmailActionEncryption emailActionEncryption, string certificateThumbprint) {
+        switch (emailActionEncryption) {
+            case EmailActionEncryption.SMIMESign:
+                return Sign(certificateThumbprint);
+            case EmailActionEncryption.SMIMESignPkcs7:
+                return Pkcs7Sign(certificateThumbprint);
+            case EmailActionEncryption.SMIMEEncrypt:
+                return Encrypt(certificateThumbprint);
+            case EmailActionEncryption.SMIMESignAndEncrypt:
+                return SignAndEncrypt(certificateThumbprint);
+            default:
+                // user did not specify an encryption type, we skip things
+                return new SmtpResult(true, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", "EmailActionEncryption None");
+        }
+    }
 }
