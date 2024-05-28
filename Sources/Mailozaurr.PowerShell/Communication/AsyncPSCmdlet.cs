@@ -10,13 +10,15 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
         Debug,
         Information,
         Progress,
+        ShouldProcess,
     }
 
     private CancellationTokenSource _cancelSource = new();
 
-    private BlockingCollection<(object?, PipelineType)>? _currentPipe;
+    private BlockingCollection<(object?, PipelineType)>? _currentOutPipe;
+    private BlockingCollection<object?>? _currentReplyPipe;
 
-    protected CancellationToken CancelToken { get => _cancelSource.Token; }
+    protected internal CancellationToken CancelToken { get => _cancelSource.Token; }
 
     protected override void BeginProcessing()
         => RunBlockInAsync(BeginProcessingAsync);
@@ -40,18 +42,22 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
         => _cancelSource?.Cancel();
 
     private void RunBlockInAsync(Func<Task> task) {
-        using BlockingCollection<(object?, PipelineType)> pipe = new();
+        using BlockingCollection<(object?, PipelineType)> outPipe = new();
+        using BlockingCollection<object?> replyPipe = new();
         Task blockTask = Task.Run(async () => {
             try {
-                _currentPipe = pipe;
+                _currentOutPipe = outPipe;
+                _currentReplyPipe = replyPipe;
                 await task();
             } finally {
-                _currentPipe = null;
-                pipe.CompleteAdding();
+                _currentOutPipe = null;
+                _currentReplyPipe = null;
+                outPipe.CompleteAdding();
+                replyPipe.CompleteAdding();
             }
         });
 
-        foreach ((object? data, PipelineType pipelineType) in pipe.GetConsumingEnumerable()) {
+        foreach ((object? data, PipelineType pipelineType) in outPipe.GetConsumingEnumerable()) {
             switch (pipelineType) {
                 case PipelineType.Output:
                     base.WriteObject(data);
@@ -84,48 +90,60 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable {
                 case PipelineType.Progress:
                     base.WriteProgress((ProgressRecord)data!);
                     break;
+
+                case PipelineType.ShouldProcess:
+                    (string target, string action) = (ValueTuple<string, string>)data!;
+                    bool res = base.ShouldProcess(target, action);
+                    replyPipe.Add(res);
+                    break;
             }
         }
 
         blockTask.GetAwaiter().GetResult();
     }
 
+    public new bool ShouldProcess(string target, string action) {
+        ThrowIfStopped();
+        _currentOutPipe?.Add(((target, action), PipelineType.ShouldProcess));
+        return (bool)_currentReplyPipe?.Take(CancelToken)!;
+    }
+
     public new void WriteObject(object? sendToPipeline) => WriteObject(sendToPipeline, false);
 
     public new void WriteObject(object? sendToPipeline, bool enumerateCollection) {
         ThrowIfStopped();
-        _currentPipe?.Add(
+        _currentOutPipe?.Add(
             (sendToPipeline, enumerateCollection ? PipelineType.OutputEnumerate : PipelineType.Output));
     }
 
     public new void WriteError(ErrorRecord errorRecord) {
         ThrowIfStopped();
-        _currentPipe?.Add((errorRecord, PipelineType.Error));
+        _currentOutPipe?.Add((errorRecord, PipelineType.Error));
     }
 
     public new void WriteWarning(string message) {
         ThrowIfStopped();
-        _currentPipe?.Add((message, PipelineType.Warning));
+        _currentOutPipe?.Add((message, PipelineType.Warning));
     }
 
     public new void WriteVerbose(string message) {
         ThrowIfStopped();
-        _currentPipe?.Add((message, PipelineType.Verbose));
+        _currentOutPipe?.Add((message, PipelineType.Verbose));
     }
 
     public new void WriteDebug(string message) {
         ThrowIfStopped();
-        _currentPipe?.Add((message, PipelineType.Debug));
+        _currentOutPipe?.Add((message, PipelineType.Debug));
     }
 
     public new void WriteInformation(InformationRecord informationRecord) {
         ThrowIfStopped();
-        _currentPipe?.Add((informationRecord, PipelineType.Information));
+        _currentOutPipe?.Add((informationRecord, PipelineType.Information));
     }
 
     public new void WriteProgress(ProgressRecord progressRecord) {
         ThrowIfStopped();
-        _currentPipe?.Add((progressRecord, PipelineType.Progress));
+        _currentOutPipe?.Add((progressRecord, PipelineType.Progress));
     }
 
     internal void ThrowIfStopped() {
