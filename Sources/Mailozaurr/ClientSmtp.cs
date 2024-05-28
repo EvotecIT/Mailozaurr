@@ -12,7 +12,7 @@ public partial class ClientSmtp : SmtpClient {
     public object? ReplyTo { get; set; }
     public MimeMessage Message { get; set; }
     public MessagePriority Priority { get; set; }
-    public List<DeliveryNotification>? DeliveryNotificationOption { get; set; } = new List<DeliveryNotification>();
+    public DeliveryNotification[]? DeliveryNotificationOption { get; set; }
     public string SentTo {
         get {
             var addresses = new List<string>();
@@ -77,7 +77,7 @@ public partial class ClientSmtp : SmtpClient {
     private void AddAddressesToMessage(MimeMessage message) {
         var fromAddresses = ConvertToMailboxAddress(From).ToList();
         if (fromAddresses.Any()) {
-            Settings.Logger.WriteVerbose("Adding from address to message: {0}", fromAddresses.First());
+            LoggingMessages.Logger.WriteVerbose("Adding from address to message: {0}", fromAddresses.First());
             message.From.Add(fromAddresses.First());
         }
 
@@ -102,7 +102,7 @@ public partial class ClientSmtp : SmtpClient {
     }
 
     private void SetMessagePriority(MimeMessage message) {
-        Settings.Logger.WriteVerbose("Setting message priority to {0}", Priority);
+        LoggingMessages.Logger.WriteVerbose("Setting message priority to {0}", Priority);
         switch (Priority) {
             case MessagePriority.High:
                 message.Priority = MimeKit.MessagePriority.Urgent;
@@ -134,7 +134,6 @@ public partial class ClientSmtp : SmtpClient {
 
     public void SaveMessage(string path) {
         Message.WriteTo(path);
-        //Message.Dispose();
     }
 
     private IEnumerable<MailboxAddress> ConvertToMailboxAddress(object input) {
