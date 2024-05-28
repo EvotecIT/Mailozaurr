@@ -7,7 +7,7 @@
 		<TargetFrameworks>net472;netstandard2.0;net6.0;net7.0;net8.0</TargetFrameworks>
 		<AssemblyName>Mailozaurr.PowerShell</AssemblyName>
 
-		<Copyright>(c) 2011 - 2022 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
+		<Copyright>(c) 2011 - 2024 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
 		<LangVersion>latest</LangVersion>
 	</PropertyGroup>
 
@@ -19,16 +19,16 @@
 		<PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
 	</ItemGroup>
 
-    <!-- Make sure the output DLL's from library are included in the output -->
-    <PropertyGroup>
-        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    </PropertyGroup>
+	<!-- Make sure the output DLL's from library are included in the output -->
+	<PropertyGroup>
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+	</PropertyGroup>
 
-    <!-- We need to remove PowerShell conflicting libraries as it will break output -->
-    <Target Name="RemoveFilesAfterBuild" AfterTargets="Build">
-        <Delete Files="$(OutDir)System.Management.Automation.dll" />
-        <Delete Files="$(OutDir)System.Management.dll" />
-    </Target>
+	<!-- We need to remove PowerShell conflicting libraries as it will break output -->
+	<Target Name="RemoveFilesAfterBuild" AfterTargets="Build">
+		<Delete Files="$(OutDir)System.Management.Automation.dll" />
+		<Delete Files="$(OutDir)System.Management.dll" />
+	</Target>
 
 
 	<PropertyGroup Condition=" '$(TargetFramework)' == 'net472' ">
@@ -43,6 +43,11 @@
 		<Using Include="System.Collections.Concurrent" />
 		<Using Include="System.Threading" />
 		<Using Include="System" />
+		<Using Include="System.Collections.Generic" />
+		<Using Include="System.Linq" />
+		<Using Include="System.Text" />
+		<Using Include="System.IO" />
+		<Using Include="System.Net" />
 	</ItemGroup>
 
 
