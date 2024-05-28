@@ -447,7 +447,7 @@
         [Parameter(ParameterSetName = 'SecureString')]
         [Parameter(ParameterSetName = 'oAuth')]
         [Parameter(ParameterSetName = 'Compatibility')]
-        [string[]] $LogPath,
+        [string] $LogPath,
 
         [Parameter(ParameterSetName = 'DefaultCredentials')]
         [Parameter(ParameterSetName = 'SecureString')]
@@ -506,12 +506,7 @@
         [Parameter(ParameterSetName = 'DefaultCredentials')]
         [switch] $UseDefaultCredentials,
 
-        [ValidateSet(
-            'SMIMESign',
-            'SMIMESignPkcs7',
-            'SMIMEEncrypt',
-            'SMIMESignAndEncrypt'
-        )][string] $SignOrEncrypt,
+        [Mailozaurr.EmailActionEncryption] $SignOrEncrypt = [Mailozaurr.EmailActionEncryption]::None,
         [string] $CertificatePath,
         [string] $CertificatePassword,
         [switch] $CertificatePasswordAsSecureString,
@@ -594,97 +589,147 @@
         return Send-SendGridMailMessage @sendGraphMailMessageSplat
     }
 
-    [Mailozaurr.Settings]::Verbose = $True
-    [Mailozaurr.Settings]::Error = $True
-    [Mailozaurr.Settings]::Warning = $True
+    #Initialize-Mailozaurr
+    # $SmtpClient = [Mailozaurr.Smtp]::new($LogPath, $LogConsole, $LogObject, $LogTimestamps, $LogSecrets, $LogTimeStampsFormat, $LogClientPrefix, $LogServerPrefix)
 
-    $SmtpClient = [Mailozaurr.Smtp]::new($LogPath, $LogConsole, $LogObject, $LogTimestamps, $LogSecrets, $LogTimeStampsFormat, $LogClientPrefix, $LogServerPrefix)
-    $SmtpClient.ErrorAction = $PSBoundParameters.ErrorAction
-    $SmtpClient.From = $From
-    $SmtpClient.To = $To
-    $SmtpClient.Cc = $Cc
-    $SmtpClient.Bcc = $Bcc
-    $SmtpClient.ReplyTo = $ReplyTo
-    $SmtpClient.Subject = $Subject
-    $SmtpClient.Priority = $Priority
-    $SmtpClient.HtmlBody = $HTML
-    $SmtpClient.TextBody = $Text
-    $SmtpClient.Attachments = $Attachment
-    $SmtpClient.LocalDomain = $LocalDomain
-    $SmtpClient.DeliveryNotificationOption = $DeliveryNotificationOption
-    $SmtpClient.Timeout = $Timeout
-    $SmtpClient.CheckCertificateRevocation = -not $SkipCertificateRevocation.IsPresent
-
-    if ($SkipCertificateValidatation) {
-        $SmtpClient.ServerCertificateValidationCallback = { $true }
+    $sendEmailMessageTemporarySplat = @{
+        LogPath                           = $LogPath
+        LogConsole                        = $LogConsole
+        LogObject                         = $LogObject
+        LogTimestamps                     = $LogTimestamps
+        LogSecrets                        = $LogSecrets
+        LogTimeStampsFormat               = $LogTimeStampsFormat
+        LogClientPrefix                   = $LogClientPrefix
+        LogServerPrefix                   = $LogServerPrefix
+        Server                            = $Server
+        Port                              = $Port
+        SecureSocketOptions               = $SecureSocketOptions
+        UseSsl                            = $UseSsl
+        From                              = $From
+        To                                = $To
+        Cc                                = $Cc
+        Bcc                               = $Bcc
+        ReplyTo                           = $ReplyTo
+        Subject                           = $Subject
+        Priority                          = $Priority
+        HtmlBody                          = $HTML
+        TextBody                          = $Text
+        Attachments                       = $Attachment
+        LocalDomain                       = $LocalDomain
+        DeliveryNotificationOption        = $DeliveryNotificationOption
+        Timeout                           = $Timeout
+        SkipCertificateRevocation         = $SkipCertificateRevocation.IsPresent
+        DeliveryStatusNotificationType    = $DeliveryStatusNotificationType
+        SignOrEncrypt                     = $SignOrEncrypt
+        CertificatePath                   = $CertificatePath
+        CertificatePassword               = $CertificatePassword
+        CertificatePasswordAsSecureString = $CertificatePasswordAsSecureString.IsPresent
+        CertificateThumbprint             = $CertificateThumbprint
+        #SkipCertificateValidatation       = $SkipCertificateValidation.IsPresent
     }
 
-    if ($DeliveryStatusNotificationType) {
-        $SmtpClient.DeliveryStatusNotificationType = $DeliveryStatusNotificationType
+    if ($PSBoundParameters.ErrorAction) {
+        $sendEmailMessageTemporarySplat['ErrorAction'] = $PSBoundParameters.ErrorAction
     }
-
-    $Status = $SmtpClient.Connect($Server, $Port, $SecureSocketOptions, $UseSsl)
-    if (-not $Status.Status) {
-        if (-not $Suppress) {
-            return $Status
-        }
-    }
-
-    $SmtpClient.CreateMessage()
-
-    if ($SignOrEncrypt) {
-        if ($SignOrEncrypt -eq 'SMIMESign') {
-            if ($CertificateThumbprint) {
-                $Status = $SmtpClient.Sign($CertificateThumbprint)
-            } elseif ($CertificatePath -and $CertificatePassword) {
-                $Status = $SmtpClient.Sign($CertificatePath, $CertificatePassword, $CertificatePasswordAsSecureString.IsPresent)
-            }
-        } elseif ($SignOrEncrypt -eq 'SMIMESignPkcs7') {
-            if ($CertificateThumbprint) {
-                $Status = $SmtpClient.Pkcs7Sign($CertificateThumbprint)
-            } elseif ($CertificatePath -and $CertificatePassword) {
-                $Status = $SmtpClient.Pkcs7Sign($CertificatePath, $CertificatePassword, $CertificatePasswordAsSecureString.IsPresent)
-            }
-        } elseif ($SignOrEncrypt -eq 'SMIMEEncrypt') {
-            if ($CertificateThumbprint) {
-                $Status = $SmtpClient.Encrypt($CertificateThumbprint)
-            } elseif ($CertificatePath -and $CertificatePassword) {
-                $Status = $SmtpClient.Encrypt($CertificatePath, $CertificatePassword, $CertificatePasswordAsSecureString.IsPresent)
-            }
-        } elseif ($SignOrEncrypt -eq 'SMIMESignAndEncrypt') {
-            if ($CertificateThumbprint) {
-                $Status = $SmtpClient.SignAndEncrypt($CertificateThumbprint)
-            } elseif ($CertificatePath -and $CertificatePassword) {
-                $Status = $SmtpClient.SignAndEncrypt($CertificatePath, $CertificatePassword, $CertificatePasswordAsSecureString.IsPresent)
-            }
-        }
-        if (-not $Status.Status) {
-            if (-not $Suppress) {
-                return $Status
-            }
-        }
-    }
-
     if ($UseDefaultCredentials) {
-        $Status = $SmtpClient.AuthenticateDefaultCredentials()
+        $sendEmailMessageTemporarySplat['UseDefaultCredentials'] = $true
     } elseif ($Credential) {
-        $Status = $SmtpClient.Authenticate($Credential, $oAuth2.IsPresent)
+        $sendEmailMessageTemporarySplat['Credential'] = $Credential
+        $sendEmailMessageTemporarySplat['oAuth2'] = $oAuth2.IsPresent
     } else {
-        $Status = $SmtpClient.Authenticate($UserName, $Password, $AsSecureString.IsPresent)
+        $sendEmailMessageTemporarySplat['UserName'] = $UserName
+        $sendEmailMessageTemporarySplat['Password'] = $Password
+        $sendEmailMessageTemporarySplat['AsSecureString'] = $AsSecureString.IsPresent
     }
 
-    if (-not $Status.Status) {
-        if (-not $Suppress) {
-            return $Status
-        }
-    }
+    $SmtpClient = Send-EmailMessageTemporary @sendEmailMessageTemporarySplat
+    $SmtpClient
+    # $SmtpClient.ErrorAction = $PSBoundParameters.ErrorAction
+    # $SmtpClient.From = $From
+    # $SmtpClient.To = $To
+    # $SmtpClient.Cc = $Cc
+    # $SmtpClient.Bcc = $Bcc
+    # $SmtpClient.ReplyTo = $ReplyTo
+    # $SmtpClient.Subject = $Subject
+    # $SmtpClient.Priority = $Priority
+    # $SmtpClient.HtmlBody = $HTML
+    # $SmtpClient.TextBody = $Text
+    # $SmtpClient.Attachments = $Attachment
+    # $SmtpClient.LocalDomain = $LocalDomain
+    # $SmtpClient.DeliveryNotificationOption = $DeliveryNotificationOption
+    # $SmtpClient.Timeout = $Timeout
+    # $SmtpClient.CheckCertificateRevocation = -not $SkipCertificateRevocation.IsPresent
 
-    $Status = $SmtpClient.Send()
-    if (-not $Suppress) {
-        $Status
-    }
+    # if ($SkipCertificateValidatation) {
+    #     $SmtpClient.ServerCertificateValidationCallback = { $true }
+    # }
 
-    $SmtpClient.Disconnect()
-    $SmtpClient.SaveMessage($MimeMessagePath)
-    $SmtpClient.Dispose()
+    # if ($DeliveryStatusNotificationType) {
+    #     $SmtpClient.DeliveryStatusNotificationType = $DeliveryStatusNotificationType
+    # }
+
+    # $Status = $SmtpClient.Connect($Server, $Port, $SecureSocketOptions, $UseSsl)
+    # if (-not $Status.Status) {
+    #     if (-not $Suppress) {
+    #         return $Status
+    #     }
+    # }
+
+    # $SmtpClient.CreateMessage()
+
+    # if ($SignOrEncrypt) {
+    #     if ($SignOrEncrypt -eq 'SMIMESign') {
+    #         if ($CertificateThumbprint) {
+    #             $Status = $SmtpClient.Sign($CertificateThumbprint)
+    #         } elseif ($CertificatePath -and $CertificatePassword) {
+    #             $Status = $SmtpClient.Sign($CertificatePath, $CertificatePassword, $CertificatePasswordAsSecureString.IsPresent)
+    #         }
+    #     } elseif ($SignOrEncrypt -eq 'SMIMESignPkcs7') {
+    #         if ($CertificateThumbprint) {
+    #             $Status = $SmtpClient.Pkcs7Sign($CertificateThumbprint)
+    #         } elseif ($CertificatePath -and $CertificatePassword) {
+    #             $Status = $SmtpClient.Pkcs7Sign($CertificatePath, $CertificatePassword, $CertificatePasswordAsSecureString.IsPresent)
+    #         }
+    #     } elseif ($SignOrEncrypt -eq 'SMIMEEncrypt') {
+    #         if ($CertificateThumbprint) {
+    #             $Status = $SmtpClient.Encrypt($CertificateThumbprint)
+    #         } elseif ($CertificatePath -and $CertificatePassword) {
+    #             $Status = $SmtpClient.Encrypt($CertificatePath, $CertificatePassword, $CertificatePasswordAsSecureString.IsPresent)
+    #         }
+    #     } elseif ($SignOrEncrypt -eq 'SMIMESignAndEncrypt') {
+    #         if ($CertificateThumbprint) {
+    #             $Status = $SmtpClient.SignAndEncrypt($CertificateThumbprint)
+    #         } elseif ($CertificatePath -and $CertificatePassword) {
+    #             $Status = $SmtpClient.SignAndEncrypt($CertificatePath, $CertificatePassword, $CertificatePasswordAsSecureString.IsPresent)
+    #         }
+    #     }
+    #     if (-not $Status.Status) {
+    #         if (-not $Suppress) {
+    #             return $Status
+    #         }
+    #     }
+    # }
+
+    # if ($UseDefaultCredentials) {
+    #     $Status = $SmtpClient.AuthenticateDefaultCredentials()
+    # } elseif ($Credential) {
+    #     $Status = $SmtpClient.Authenticate($Credential, $oAuth2.IsPresent)
+    # } else {
+    #     $Status = $SmtpClient.Authenticate($UserName, $Password, $AsSecureString.IsPresent)
+    # }
+
+    # if (-not $Status.Status) {
+    #     if (-not $Suppress) {
+    #         return $Status
+    #     }
+    # }
+
+    # $Status = $SmtpClient.Send()
+    # if (-not $Suppress) {
+    #     $Status
+    # }
+
+    # $SmtpClient.Disconnect()
+    # $SmtpClient.SaveMessage($MimeMessagePath)
+    # $SmtpClient.Dispose()
 }
