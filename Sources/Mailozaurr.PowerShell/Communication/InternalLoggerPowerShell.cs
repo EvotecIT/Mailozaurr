@@ -1,5 +1,4 @@
-namespace Mailozaurr.PowerShell;
-
+﻿namespace Mailozaurr.PowerShell;
 /// <summary>
 /// This class allow connecting to the InternalLogger class of ADPlayground and act on events from it in different streams
 /// </summary>
@@ -133,7 +132,7 @@ public class InternalLoggerPowerShell {
     }
 
     private void WriteInformation(string message) {
-        InformationRecord informationRecord = new InformationRecord(message, "DnsClientX");
+        InformationRecord informationRecord = new InformationRecord(message, "Mailozaurr");
         // Write to PowerShell information stream
         _writeInformationAction?.Invoke(informationRecord);
     }
