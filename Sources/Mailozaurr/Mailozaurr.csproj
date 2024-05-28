@@ -6,7 +6,6 @@
 		<VersionPrefix>1.0.0</VersionPrefix>
 		<TargetFrameworks>net472;netstandard2.0;net6.0;net7.0;net8.0</TargetFrameworks>
 		<AssemblyName>Mailozaurr</AssemblyName>
-
 		<Copyright>(c) 2011 - 2022 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
 		<LangVersion>latest</LangVersion>
 		<ImplicitUsings>enable</ImplicitUsings>
@@ -17,14 +16,14 @@
 	<ItemGroup>
 		<PackageReference Include="EmailValidation" Version="1.2.0" />
 		<PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
-		<PackageReference Include="MailKit" Version="4.5.0" />
-		<PackageReference Include="MimeKit" Version="4.5.0" />
+		<PackageReference Include="MailKit" Version="4.6.0" />
+		<PackageReference Include="MimeKit" Version="4.6.0" />
 		<PackageReference Include="MsgKit" Version="2.8.0" />
 		<PackageReference Include="Microsoft.Identity.Client" Version="4.61.0" />
 		<PackageReference Include="NSspi" Version="0.3.1" />
 		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
 		<PackageReference Include="System.Data.SQLite" Version="1.0.118" />
-		<!-- <PackageReference Include="MsgReader" Version="5.5.5" /> -->
+		<PackageReference Include="MsgReader" Version="5.5.5" />
 	</ItemGroup>
 
 	<ItemGroup>
