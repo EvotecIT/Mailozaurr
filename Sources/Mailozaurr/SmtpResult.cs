@@ -14,6 +14,7 @@ public class SmtpResult {
     public TimeSpan TimeToExecute { get; set; }
     public string Server { get; set; }
     public int Port { get; set; }
+    public string? Error { get; set; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SmtpResult"/> class.
@@ -26,7 +27,7 @@ public class SmtpResult {
     /// <param name="port">The port.</param>
     /// <param name="timeToExecute">The time to execute.</param>
     /// <param name="outputMessage">The output message.</param>
-    public SmtpResult(bool status, EmailAction emailAction, string sentTo, string sentFrom, string server, int port, TimeSpan timeToExecute, string? outputMessage = null) {
+    public SmtpResult(bool status, EmailAction emailAction, string sentTo, string sentFrom, string server, int port, TimeSpan timeToExecute, string? outputMessage = null, string? error = null) {
         Status = status;
         SentTo = sentTo;
         SentFrom = sentFrom;
@@ -35,6 +36,7 @@ public class SmtpResult {
         TimeToExecute = timeToExecute;
         Message = outputMessage;
         EmailAction = emailAction;
+        Error = error;
     }
 
     /// <summary>
