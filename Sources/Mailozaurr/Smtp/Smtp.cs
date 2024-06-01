@@ -134,9 +134,9 @@ public class Smtp {
     /// </summary>
     /// <param name="logging">The logging.</param>
     public Smtp(LoggingConfigurator? logging = null) {
+        Stopwatch = Stopwatch.StartNew();
         Logging = logging;
         Client = logging?.ProtocolLogger == null ? new ClientSmtp() : new ClientSmtp(logging.ProtocolLogger);
-        Stopwatch = Stopwatch.StartNew();
     }
 
     /// <summary>

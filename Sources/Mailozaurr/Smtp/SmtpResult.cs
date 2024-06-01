@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace Mailozaurr;
 
 /// <summary>
@@ -15,7 +13,6 @@ public class SmtpResult {
     public string Server { get; set; }
     public int Port { get; set; }
     public string? Error { get; set; }
-
     /// <summary>
     /// Initializes a new instance of the <see cref="SmtpResult"/> class.
     /// </summary>
