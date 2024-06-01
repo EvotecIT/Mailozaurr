@@ -24,6 +24,7 @@
 		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
 		<PackageReference Include="System.Data.SQLite" Version="1.0.118" />
 		<PackageReference Include="MsgReader" Version="5.5.8" />
+		<PackageReference Include="System.Text.Json" Version="8.0.3" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -36,6 +37,11 @@
 		<Using Include="MimeKit" />
 		<Using Include="MimeKit.Cryptography" />
 		<Using Include="System" />
+		<Using Include="System.Net" />
+		<Using Include="System.Net.Http" />
+		<Using Include="System.Text" />
+		<Using Include="System.Text.Json" />
+		<Using Include="System.Text.Json.Serialization" />
 		<Using Include="System.Collections" />
 		<Using Include="System.Collections.Generic" />
 		<Using Include="System.IO" />
