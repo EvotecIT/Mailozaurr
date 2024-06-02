@@ -1,8 +1,10 @@
-﻿namespace Mailozaurr.PowerShell;
+﻿using System.Diagnostics;
+
+namespace Mailozaurr.PowerShell;
 
 [Cmdlet(VerbsCommunications.Send, "EmailMessage", DefaultParameterSetName = "Compatibility", SupportsShouldProcess = true)]
 [CmdletBinding()]
-public sealed class CmdletSendEmailMessage : AsyncPSCmdlet {
+public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "SecureString")]
     [Parameter(Mandatory = true, ParameterSetName = "oAuth")]
     [Parameter(Mandatory = true, ParameterSetName = "Compatibility")]
@@ -282,7 +284,7 @@ public sealed class CmdletSendEmailMessage : AsyncPSCmdlet {
 
     private ActionPreference errorAction;
 
-    protected override Task BeginProcessingAsync() {
+    protected override void BeginProcessing() {
         // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
         var internalLogger = new InternalLogger();
         var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
@@ -298,10 +300,9 @@ public sealed class CmdletSendEmailMessage : AsyncPSCmdlet {
                 errorAction = actionPreference;
             }
         }
-        return Task.CompletedTask;
     }
 
-    protected override Task ProcessRecordAsync() {
+    protected override void ProcessRecord() {
         if (SendGrid) {
             SendGridClient sendGrid = new SendGridClient();
             sendGrid.From = From;
@@ -354,84 +355,59 @@ public sealed class CmdletSendEmailMessage : AsyncPSCmdlet {
                 if (!Suppress) {
                     WriteObject(Status);
                 }
-                return Task.CompletedTask;
+
+                return;
             }
             Status = graph.SendMessageAsync().GetAwaiter().GetResult();
             if (!Status.Status) {
                 if (!Suppress) {
                     WriteObject(Status);
                 }
-                return Task.CompletedTask;
+                return;
             }
 
         } else if (MgGraphRequest) {
-            //SmtpClient.RequestReadReceipt = RequestReadReceipt;
-            //SmtpClient.RequestDeliveryReceipt = RequestDeliveryReceipt;
-            //SmtpClient.DoNotSaveToSentItems = DoNotSaveToSentItems;
-
             Graph graph = new Graph();
             graph.From = From.ToString();
             graph.To = To;
             graph.Cc = Cc;
             graph.Bcc = Bcc;
-
-
             graph.ReplyTo = ReplyTo;
             graph.Subject = Subject;
-
-
             graph.DoNotSaveToSentItems = DoNotSaveToSentItems;
-
-
-
             graph.ErrorAction = errorAction;
             graph.RequestReadReceipt = RequestReadReceipt;
             graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
-
-
             graph.HTML = string.Join("", HTML);
             graph.ContentType = "HTML";
 
             graph.CreateMessage();
 
-            //var powerShell = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
-            //powerShell.AddScript("Invoke-MgGraphRequest");
-
             var parameters = new Hashtable {
                 { "Method", "POST" },
-                { "Uri", "https://graph.microsoft.com/v1.0/me/sendMail" },
+                { "Uri", $"v1.0/users/{From}/sendMail" },
                 { "ContentType", "application/json; charset=UTF-8"},
                 { "Body", graph.MessageJson }
             };
-
 
             // Invoke the cmdlet.
             var powerShell = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
             powerShell.AddCommand("Invoke-MgGraphRequest");
             powerShell.AddParameters(parameters);
-            var result = powerShell.Invoke();
-
-
-            Console.WriteLine("I'm here 3");
-
-            // Handle the result.
-            if (result.Count > 0) {
-                // If the cmdlet returned a result, write it to the output.
-                WriteObject(result[0]);
-            } else {
-                // If the cmdlet did not return a result, write a success message to the output.
-                WriteObject("Email sent successfully.");
+            try {
+                var result = powerShell.Invoke();
+                if (!Suppress) {
+                    WriteObject(new SmtpResult(true, EmailAction.Send, graph.SentTo, graph.SentFrom, "GraphAPI", 0, graph.Stopwatch.Elapsed, "", ""));
+                }
+            } catch (Exception ex) {
+                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending using Graph Api (MgGraphRequest): {ex.Message}");
+                if (errorAction == ActionPreference.Stop) {
+                    throw;
+                }
+                if (!Suppress) {
+                    WriteObject(new SmtpResult(false, EmailAction.Send, graph.SentTo, graph.SentFrom, "GraphAPI", 0, graph.Stopwatch.Elapsed, "", ex.Message));
+                }
             }
-
-            //var Status = graph.SendMessageAsync().GetAwaiter().GetResult();
-            //if (!Status.Status) {
-            //    if (!Suppress) {
-            //        WriteObject(Status);
-            //    }
-            //    return Task.CompletedTask;
-            //}
-
-
         } else {
             Smtp SmtpClient = new Smtp(LogPath, LogConsole, LogObject, LogTimestamps, LogSecrets, LogTimeStampsFormat, LogClientPrefix, LogServerPrefix);
             SmtpClient.From = From;
@@ -464,7 +440,7 @@ public sealed class CmdletSendEmailMessage : AsyncPSCmdlet {
                 }
 
                 SmtpClient.Dispose();
-                return Task.CompletedTask;
+                return;
             }
 
             SmtpClient.CreateMessage();
@@ -484,7 +460,7 @@ public sealed class CmdletSendEmailMessage : AsyncPSCmdlet {
                     }
 
                     SmtpClient.Dispose();
-                    return Task.CompletedTask;
+                    return;
                 }
             }
 
@@ -504,7 +480,7 @@ public sealed class CmdletSendEmailMessage : AsyncPSCmdlet {
                 }
 
                 SmtpClient.Dispose();
-                return Task.CompletedTask;
+                return;
             }
 
             if (ShouldProcess(SmtpClient.SentTo, "Sending email message")) {
@@ -523,6 +499,6 @@ public sealed class CmdletSendEmailMessage : AsyncPSCmdlet {
             // Disconnect & Dispose
             SmtpClient.Dispose();
         }
-        return Task.CompletedTask;
+        return;
     }
 }
