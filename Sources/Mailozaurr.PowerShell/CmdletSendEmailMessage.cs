@@ -346,8 +346,9 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
             graph.HTML = string.Join("", HTML);
             graph.ContentType = "HTML";
+            graph.Attachments = Attachment;
+            graph.CreateAttachments();
 
-            graph.CreateMessage();
             NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
             graph.Authenticate(networkCredential);
             var Status = graph.ConnectO365GraphAsync().GetAwaiter().GetResult();
@@ -355,17 +356,19 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 if (!Suppress) {
                     WriteObject(Status);
                 }
-
                 return;
             }
-            Status = graph.SendMessageAsync().GetAwaiter().GetResult();
+            if (graph.IsLargerAttachment) {
+                Status = graph.SendMessageDraftAsync().GetAwaiter().GetResult();
+            } else {
+                Status = graph.SendMessageAsync().GetAwaiter().GetResult();
+            }
             if (!Status.Status) {
                 if (!Suppress) {
                     WriteObject(Status);
                 }
                 return;
             }
-
         } else if (MgGraphRequest) {
             Graph graph = new Graph();
             graph.From = From.ToString();
@@ -499,6 +502,5 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             // Disconnect & Dispose
             SmtpClient.Dispose();
         }
-        return;
     }
 }
