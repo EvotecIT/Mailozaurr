@@ -19,11 +19,11 @@
 		<PackageReference Include="MailKit" Version="4.6.0" />
 		<PackageReference Include="MimeKit" Version="4.6.0" />
 		<PackageReference Include="MsgKit" Version="2.8.0" />
-		<PackageReference Include="Microsoft.Identity.Client" Version="4.61.1" />
+		<PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
 		<PackageReference Include="NSspi" Version="0.3.1" />
 		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
 		<PackageReference Include="System.Data.SQLite" Version="1.0.118" />
-		<PackageReference Include="MsgReader" Version="5.5.8" />
+		<PackageReference Include="MsgReader" Version="5.6.0" />
 		<PackageReference Include="System.Text.Json" Version="8.0.3" />
 	</ItemGroup>
 
