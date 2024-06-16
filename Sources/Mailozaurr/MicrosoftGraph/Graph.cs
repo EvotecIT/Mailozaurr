@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Net.Http;
 using System.Net.Http.Headers;
 
 namespace Mailozaurr;
@@ -297,11 +298,34 @@ public class Graph {
         // Create the draft message using the new method
         var draftMessage = await CreateDraftMessageAsync();
 
-        if (draftMessage != null && Attachments?.Length > 0) {
-            // Upload attachments to the draft message
-            await UploadAttachmentsAsync(draftMessage);
-        }
+        // Upload attachments to the draft message
+        await UploadAttachmentsAsync(draftMessage);
 
+        // Send the draft message
+        return await SendDraftMessage(draftMessage);
+
+        //var sendRequestUri = $"https://graph.microsoft.com/v1.0/users/{MessageContainer.Message.From.Email.Address}/messages/{draftMessage.Id}/send";
+        //var sendRequest = new HttpRequestMessage(HttpMethod.Post, sendRequestUri);
+
+        //// Add the authorization header
+        //sendRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
+
+        //// Send the HTTP request for sending the draft message
+        //var sendResponse = await _client.SendAsync(sendRequest);
+
+        //// If the status code indicates success, return a successful result
+        //if (sendResponse.IsSuccessStatusCode) {
+        //    return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, sendResponse.StatusCode.ToString(), "");
+        //}
+
+        //// If the status code indicates an error, throw an exception with the content
+        //var sendContent = await sendResponse.Content.ReadAsStringAsync();
+        //var sendError = JsonSerializer.Deserialize<GraphApiError>(sendContent);
+        //var sendErrorMessage = $"Error code: {sendError.Error.Code}, message: {sendError.Error.Message}, request ID: {sendError.Error.InnerError.RequestId}, date: {sendError.Error.InnerError.Date}";
+        //throw new HttpRequestException(sendErrorMessage);
+    }
+
+    public async Task<SmtpResult> SendDraftMessage(GraphMessage draftMessage) {
         // Send the draft message
         var sendRequestUri = $"https://graph.microsoft.com/v1.0/users/{MessageContainer.Message.From.Email.Address}/messages/{draftMessage.Id}/send";
         var sendRequest = new HttpRequestMessage(HttpMethod.Post, sendRequestUri);
@@ -367,58 +391,113 @@ public class Graph {
     }
 
 
+    public async Task<TemporaryGraphAttachment> CreateGraphAttachment(string attachmentPath) {
+        var fileName = Path.GetFileName(attachmentPath);
+        var fileSize = new FileInfo(attachmentPath).Length;
+
+        // Create an upload session
+
+        var attachmentItem = new AttachmentItem("file", fileName, fileSize);
+
+        var attachmentItemWrapper = new AttachmentItemWrapper(attachmentItem);
+        var attachmentItemJson = JsonSerializer.Serialize(attachmentItemWrapper);
+
+        var content = await PrepareByteArrayContentForUpload(attachmentPath, 9000000);
+
+        return new TemporaryGraphAttachment() {
+            Json = attachmentItemJson,
+            ListByteArrayContent = content
+        };
+    }
+
+    public async Task<string> CreateUploadSession(GraphMessage draftMessage, string attachmentItemJson) {
+        var uploadSessionUrl = $"https://graph.microsoft.com/v1.0/users('{SentFrom}')/messages/{draftMessage.Id}/attachments/createUploadSession";
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
+        var uploadSessionResponse = await _client.PostAsync(uploadSessionUrl, new StringContent(attachmentItemJson, Encoding.UTF8, "application/json"));
+        var uploadSessionContent = await uploadSessionResponse.Content.ReadAsStringAsync();
+
+        // {"error":{"code":"InvalidAuthenticationToken","message":"Access token is empty.","innerError":{"date":"2024-06-15T09:51:54","request-id":"4a43e743-e897-4758-8d7d-21858c198e1d","client-request-id":"4a43e743-e897-4758-8d7d-21858c198e1d"}}}
+        //Console.WriteLine(uploadSessionContent);
+        var uploadSessionResult = JsonSerializer.Deserialize<UploadSessionResult>(uploadSessionContent);
+
+        var uploadUrl = uploadSessionResult?.UploadUrl ?? throw new InvalidOperationException("Upload URL not found.");
+        return uploadUrl;
+    }
+
+    public async Task SendFile(string uploadUrl, ByteArrayContent byteArrayContent) {
+        var requestMessage = new HttpRequestMessage(HttpMethod.Put, uploadUrl) {
+            Content = byteArrayContent
+        };
+        requestMessage.Headers.Add("AnchorMailbox", SentFrom); // This is correctly added to HttpRequestMessage
+        _client.DefaultRequestHeaders.Authorization = null;
+        var uploadChunkResponse = await _client.SendAsync(requestMessage);
+        if (!uploadChunkResponse.IsSuccessStatusCode) {
+            // Handle upload error
+            Console.WriteLine(uploadChunkResponse);
+            return;
+        }
+    }
+
+    /// <summary>
+    /// 9000000 = 9MB
+    /// </summary>
+    /// <param name="filePath"></param>
+    /// <param name="chunkSize"></param>
+    /// <returns></returns>
+    public async Task<List<ByteArrayContent>> PrepareByteArrayContentForUpload(string filePath, int chunkSize = 9000000) {
+        var fileContents = new List<ByteArrayContent>();
+        var fileSize = new FileInfo(filePath).Length;
+
+        using var fileStream = new FileStream(filePath, FileMode.Open);
+        var buffer = new byte[chunkSize];
+        int bytesRead;
+        while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0) {
+            var contentRange = $"bytes 0-{bytesRead - 1}/{fileSize}";
+            var byteArrayContent = new ByteArrayContent(buffer, 0, bytesRead);
+            byteArrayContent.Headers.Add("Content-Range", contentRange);
+            fileContents.Add(byteArrayContent);
+        }
+
+        return fileContents;
+    }
+
     public async Task UploadAttachmentsAsync(GraphMessage draftMessage) {
-        foreach (var attachmentPath in Attachments) {
-            var fileName = Path.GetFileName(attachmentPath);
-            var fileSize = new FileInfo(attachmentPath).Length;
+        if (Attachments?.Length > 0) {
+            foreach (var attachmentPath in Attachments) {
+                var fileSize = new FileInfo(attachmentPath).Length;
 
-            // Create an upload session
-            var uploadSessionUrl = $"https://graph.microsoft.com/v1.0/users('{MessageContainer.Message.From.Email.Address}')/messages/{draftMessage.Id}/attachments/createUploadSession";
+                var attachmentItemJson = await CreateGraphAttachment(attachmentPath);
 
-            var attachmentItem = new AttachmentItem("file", fileName, fileSize);
+                var uploadUrl = await CreateUploadSession(draftMessage, attachmentItemJson.Json);
+                //Console.WriteLine(uploadUrl);
 
-            var attachmentItemWrapper = new AttachmentItemWrapper(attachmentItem);
-            var attachmentItemJson = JsonSerializer.Serialize(attachmentItemWrapper);
+                // Upload the file in chunks
+                //const int chunkSize = 9000000; // 9 MB
+                //using var fileStream = new FileStream(attachmentPath, FileMode.Open);
+                //var buffer = new byte[chunkSize];
+                //int bytesRead;
+                //while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0) {
+                //    var contentRange = $"bytes 0-{bytesRead - 1}/{fileSize}";
+                //    var byteArrayContent = new ByteArrayContent(buffer, 0, bytesRead);
+                //    byteArrayContent.Headers.Add("Content-Range", contentRange); // Add Content-Range header to the HttpContent
+                //    await SendFile(uploadUrl, byteArrayContent);
+                //}
 
-            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
-
-            var uploadSessionResponse = await _client.PostAsync(uploadSessionUrl, new StringContent(attachmentItemJson, Encoding.UTF8, "application/json"));
-
-            var uploadSessionContent = await uploadSessionResponse.Content.ReadAsStringAsync();
-
-            // {"error":{"code":"InvalidAuthenticationToken","message":"Access token is empty.","innerError":{"date":"2024-06-15T09:51:54","request-id":"4a43e743-e897-4758-8d7d-21858c198e1d","client-request-id":"4a43e743-e897-4758-8d7d-21858c198e1d"}}}
-            //Console.WriteLine(uploadSessionContent);
-            var uploadSessionResult = JsonSerializer.Deserialize<UploadSessionResult>(uploadSessionContent);
-
-            var uploadUrl = uploadSessionResult?.UploadUrl ?? throw new InvalidOperationException("Upload URL not found.");
-
-            // Upload the file in chunks
-            const int chunkSize = 9000000; // 9 MB
-            using var fileStream = new FileStream(attachmentPath, FileMode.Open);
-            var buffer = new byte[chunkSize];
-            int bytesRead;
-            while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0) {
-                var contentRange = $"bytes 0-{bytesRead - 1}/{fileSize}";
-                var byteArrayContent = new ByteArrayContent(buffer, 0, bytesRead);
-                byteArrayContent.Headers.Add("Content-Range", contentRange); // Add Content-Range header to the HttpContent
-
-                Console.WriteLine(uploadUrl);
-
-                var requestMessage = new HttpRequestMessage(HttpMethod.Put, uploadUrl) {
-                    Content = byteArrayContent
-                };
-                requestMessage.Headers.Add("AnchorMailbox", SentFrom); // This is correctly added to HttpRequestMessage
-                _client.DefaultRequestHeaders.Authorization = null;
-                var uploadChunkResponse = await _client.SendAsync(requestMessage);
-                if (!uploadChunkResponse.IsSuccessStatusCode) {
-                    // Handle upload error
-                    Console.WriteLine(uploadChunkResponse);
-                    break;
-                }
+                await SendFileChunks(uploadUrl, attachmentItemJson.ListByteArrayContent);
             }
         }
     }
 
+    public async Task SendFileChunks(string uploadUrl, List<ByteArrayContent> fileChunks) {
+        foreach (var chunk in fileChunks) {
+            await SendFile(uploadUrl, chunk);
+        }
+    }
+}
+
+public class TemporaryGraphAttachment {
+    public string Json { get; set; }
+    public List<ByteArrayContent> ListByteArrayContent { get; set; }
 }
 
 public class AttachmentItemWrapper {
