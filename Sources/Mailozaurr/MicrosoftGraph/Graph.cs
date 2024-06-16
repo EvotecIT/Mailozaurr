@@ -303,26 +303,6 @@ public class Graph {
 
         // Send the draft message
         return await SendDraftMessage(draftMessage);
-
-        //var sendRequestUri = $"https://graph.microsoft.com/v1.0/users/{MessageContainer.Message.From.Email.Address}/messages/{draftMessage.Id}/send";
-        //var sendRequest = new HttpRequestMessage(HttpMethod.Post, sendRequestUri);
-
-        //// Add the authorization header
-        //sendRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
-
-        //// Send the HTTP request for sending the draft message
-        //var sendResponse = await _client.SendAsync(sendRequest);
-
-        //// If the status code indicates success, return a successful result
-        //if (sendResponse.IsSuccessStatusCode) {
-        //    return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, sendResponse.StatusCode.ToString(), "");
-        //}
-
-        //// If the status code indicates an error, throw an exception with the content
-        //var sendContent = await sendResponse.Content.ReadAsStringAsync();
-        //var sendError = JsonSerializer.Deserialize<GraphApiError>(sendContent);
-        //var sendErrorMessage = $"Error code: {sendError.Error.Code}, message: {sendError.Error.Message}, request ID: {sendError.Error.InnerError.RequestId}, date: {sendError.Error.InnerError.Date}";
-        //throw new HttpRequestException(sendErrorMessage);
     }
 
     public async Task<SmtpResult> SendDraftMessage(GraphMessage draftMessage) {
@@ -462,24 +442,10 @@ public class Graph {
     public async Task UploadAttachmentsAsync(GraphMessage draftMessage) {
         if (Attachments?.Length > 0) {
             foreach (var attachmentPath in Attachments) {
-                //var fileSize = new FileInfo(attachmentPath).Length;
 
                 var attachmentItemJson = await CreateGraphAttachment(attachmentPath);
 
                 var uploadUrl = await CreateUploadSession(draftMessage, attachmentItemJson.Json);
-                //Console.WriteLine(uploadUrl);
-
-                // Upload the file in chunks
-                //const int chunkSize = 9000000; // 9 MB
-                //using var fileStream = new FileStream(attachmentPath, FileMode.Open);
-                //var buffer = new byte[chunkSize];
-                //int bytesRead;
-                //while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0) {
-                //    var contentRange = $"bytes 0-{bytesRead - 1}/{fileSize}";
-                //    var byteArrayContent = new ByteArrayContent(buffer, 0, bytesRead);
-                //    byteArrayContent.Headers.Add("Content-Range", contentRange); // Add Content-Range header to the HttpContent
-                //    await SendFile(uploadUrl, byteArrayContent);
-                //}
 
                 await SendFileChunks(uploadUrl, attachmentItemJson.Content);
             }
