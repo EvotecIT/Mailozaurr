@@ -236,12 +236,12 @@ public class Graph {
 
         }
 
-        var statusCode = response.EnsureSuccessStatusCode();
+        //var statusCode = response.EnsureSuccessStatusCode();
         //LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Got status code: {statusCode}");
 
         try {
             var content = await response.Content.ReadAsStringAsync();
-            var authorization = JsonSerializer.Deserialize<Authorization>(content);
+            var authorization = JsonSerializer.Deserialize<GraphAuthorization>(content);
             //LoggingMessages.Logger.WriteVerbose($"AccessToken {authorization.AccessToken}");
             //LoggingMessages.Logger.WriteVerbose($"TokenType {authorization.TokenType}");
             AccessToken = authorization.AccessToken;
@@ -391,22 +391,20 @@ public class Graph {
     }
 
 
-    public async Task<TemporaryGraphAttachment> CreateGraphAttachment(string attachmentPath) {
+    public async Task<GraphAttachmentPlaceHolder> CreateGraphAttachment(string attachmentPath) {
         var fileName = Path.GetFileName(attachmentPath);
         var fileSize = new FileInfo(attachmentPath).Length;
 
-        // Create an upload session
+        var attachmentItem = new GraphAttachmentItem("file", fileName, fileSize);
 
-        var attachmentItem = new AttachmentItem("file", fileName, fileSize);
-
-        var attachmentItemWrapper = new AttachmentItemWrapper(attachmentItem);
+        var attachmentItemWrapper = new GraphAttachmentItemWrapper(attachmentItem);
         var attachmentItemJson = JsonSerializer.Serialize(attachmentItemWrapper);
 
         var content = await PrepareByteArrayContentForUpload(attachmentPath, 9000000);
 
-        return new TemporaryGraphAttachment() {
+        return new GraphAttachmentPlaceHolder() {
             Json = attachmentItemJson,
-            ListByteArrayContent = content
+            Content = content
         };
     }
 
@@ -418,7 +416,7 @@ public class Graph {
 
         // {"error":{"code":"InvalidAuthenticationToken","message":"Access token is empty.","innerError":{"date":"2024-06-15T09:51:54","request-id":"4a43e743-e897-4758-8d7d-21858c198e1d","client-request-id":"4a43e743-e897-4758-8d7d-21858c198e1d"}}}
         //Console.WriteLine(uploadSessionContent);
-        var uploadSessionResult = JsonSerializer.Deserialize<UploadSessionResult>(uploadSessionContent);
+        var uploadSessionResult = JsonSerializer.Deserialize<GraphUploadSessionResult>(uploadSessionContent);
 
         var uploadUrl = uploadSessionResult?.UploadUrl ?? throw new InvalidOperationException("Upload URL not found.");
         return uploadUrl;
@@ -444,7 +442,7 @@ public class Graph {
     /// <param name="filePath"></param>
     /// <param name="chunkSize"></param>
     /// <returns></returns>
-    public async Task<List<ByteArrayContent>> PrepareByteArrayContentForUpload(string filePath, int chunkSize = 9000000) {
+    private async Task<List<ByteArrayContent>> PrepareByteArrayContentForUpload(string filePath, int chunkSize = 9000000) {
         var fileContents = new List<ByteArrayContent>();
         var fileSize = new FileInfo(filePath).Length;
 
@@ -464,7 +462,7 @@ public class Graph {
     public async Task UploadAttachmentsAsync(GraphMessage draftMessage) {
         if (Attachments?.Length > 0) {
             foreach (var attachmentPath in Attachments) {
-                var fileSize = new FileInfo(attachmentPath).Length;
+                //var fileSize = new FileInfo(attachmentPath).Length;
 
                 var attachmentItemJson = await CreateGraphAttachment(attachmentPath);
 
@@ -483,7 +481,7 @@ public class Graph {
                 //    await SendFile(uploadUrl, byteArrayContent);
                 //}
 
-                await SendFileChunks(uploadUrl, attachmentItemJson.ListByteArrayContent);
+                await SendFileChunks(uploadUrl, attachmentItemJson.Content);
             }
         }
     }
@@ -492,167 +490,5 @@ public class Graph {
         foreach (var chunk in fileChunks) {
             await SendFile(uploadUrl, chunk);
         }
-    }
-}
-
-public class TemporaryGraphAttachment {
-    public string Json { get; set; }
-    public List<ByteArrayContent> ListByteArrayContent { get; set; }
-}
-
-public class AttachmentItemWrapper {
-    [JsonPropertyName("AttachmentItem")]
-    public AttachmentItem AttachmentItem { get; set; }
-
-    public AttachmentItemWrapper(AttachmentItem attachmentItem) {
-        AttachmentItem = attachmentItem;
-    }
-}
-
-public class UploadSessionResult {
-    [JsonPropertyName("uploadUrl")]
-    public string UploadUrl { get; set; }
-}
-
-public class AttachmentItem {
-    [JsonPropertyName("attachmentType")]
-    public string AttachmentType { get; set; }
-
-    [JsonPropertyName("name")]
-    public string Name { get; set; }
-
-    [JsonPropertyName("size")]
-    public long Size { get; set; }
-
-    public AttachmentItem(string attachmentType, string name, long size) {
-        AttachmentType = attachmentType;
-        Name = name;
-        Size = size;
-    }
-}
-
-
-public class GraphMessageContainer {
-    [JsonPropertyName("message")]
-    public GraphMessage Message { get; set; }
-    [JsonPropertyName("saveToSentItems")]
-    public bool SaveToSentItems { get; set; }
-}
-
-public class GraphMessage {
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    [JsonPropertyName("id")]
-    public string Id { get; set; }
-    [JsonPropertyName("from")]
-    public GraphEmailAddress From { get; set; }
-
-    [JsonPropertyName("toRecipients")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public List<GraphEmailAddress>? To { get; set; }
-
-    [JsonPropertyName("ccRecipients")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public List<GraphEmailAddress>? Cc { get; set; }
-
-    [JsonPropertyName("bccRecipients")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public List<GraphEmailAddress>? Bcc { get; set; }
-
-    [JsonPropertyName("replyTo")]
-    public List<GraphEmailAddress>? ReplyTo { get; set; }
-
-    [JsonPropertyName("subject")]
-    public string Subject { get; set; }
-
-    [JsonPropertyName("body")]
-    public GraphContent Body { get; set; }
-
-    [JsonPropertyName("importance")]
-    public string Importance { get; set; }
-
-    [JsonPropertyName("isReadReceiptRequested")]
-    public bool IsReadReceiptRequested { get; set; }
-
-    [JsonPropertyName("isDeliveryReceiptRequested")]
-    public bool IsDeliveryReceiptRequested { get; set; }
-
-    [JsonPropertyName("attachments")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public List<GraphAttachment>? Attachments { get; set; }
-
-}
-
-public class GraphEmailAddress {
-    [JsonPropertyName("emailAddress")]
-    public GraphEmail Email { get; set; }
-}
-
-public class GraphEmail {
-    [JsonPropertyName("address")]
-    public string Address { get; set; }
-}
-
-public class GraphContent {
-    [JsonPropertyName("contentType")]
-    public string Type { get; set; } = "Text";
-
-    [JsonPropertyName("content")]
-    public string Content { get; set; } = "";
-}
-
-public class Authorization {
-    [JsonPropertyName("token_type")]
-    public string TokenType { get; set; }
-
-    [JsonPropertyName("access_token")]
-    public string AccessToken { get; set; }
-}
-
-public class GraphApiError {
-    [JsonPropertyName("error")]
-    public GraphApiErrorDetail Error { get; set; }
-}
-
-public class GraphApiErrorDetail {
-    [JsonPropertyName("code")]
-    public string Code { get; set; }
-
-    [JsonPropertyName("message")]
-    public string Message { get; set; }
-
-    [JsonPropertyName("innerError")]
-    public GraphApiInnerError InnerError { get; set; }
-}
-
-public class GraphApiInnerError {
-    [JsonPropertyName("request-id")]
-    public string RequestId { get; set; }
-
-    [JsonPropertyName("client-request-id")]
-    public string ClientRequestId { get; set; }
-
-    [JsonPropertyName("date")]
-    public DateTime Date { get; set; }
-}
-
-public class GraphAttachment {
-    [JsonPropertyName("@odata.type")]
-    public string ODataType { get; set; } = "#microsoft.graph.fileAttachment";
-
-    [JsonPropertyName("name")]
-    public string Name { get; set; }
-
-    [JsonPropertyName("contentBytes")]
-    public string ContentBytes { get; set; }
-
-    public static GraphAttachment FromFile(string filePath) {
-        var fileInfo = new FileInfo(filePath);
-        var fileBytes = File.ReadAllBytes(filePath);
-        var fileContentBase64 = Convert.ToBase64String(fileBytes);
-
-        return new GraphAttachment {
-            Name = fileInfo.Name,
-            ContentBytes = fileContentBase64
-        };
     }
 }
