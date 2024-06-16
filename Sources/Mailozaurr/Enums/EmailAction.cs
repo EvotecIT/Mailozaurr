@@ -9,5 +9,7 @@ public enum EmailAction {
     SMimeSignAndEncrypt,
     PgpSign,
     PgpEncrypt,
-    Send
+    Send,
+    SendDraftMessage,
+    SendAttachment
 }
