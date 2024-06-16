@@ -20,6 +20,8 @@ public class Graph {
     /// </summary>
     public List<GraphAttachment> ConvertedAttachments { get; set; } = new List<GraphAttachment>();
 
+    public List<GraphAttachmentPlaceHolder> AttachmentsPlaceHolders { get; set; } = new List<GraphAttachmentPlaceHolder>();
+
     /// <summary>
     /// Array of file paths to the attachments.
     /// </summary>
@@ -332,15 +334,16 @@ public class Graph {
         // Create the draft message
         CreateMessage();
 
+        //var options = new JsonSerializerOptions() {
+        //    WriteIndented = true
+        //};
+
+        //// Serialize only the GraphMessage to a JSON string, excluding the SaveToSentItems property
+        //var messageJson = JsonSerializer.Serialize(MessageContainer.Message, options);
+
+        var messageJson = CreateDraft();
+
         var draftRequestUri = $"https://graph.microsoft.com/v1.0/users/{MessageContainer.Message.From.Email.Address}/mailfolders/drafts/messages";
-
-        var options = new JsonSerializerOptions() {
-            WriteIndented = true
-        };
-
-        // Serialize only the GraphMessage to a JSON string, excluding the SaveToSentItems property
-        var messageJson = JsonSerializer.Serialize(MessageContainer.Message, options);
-
         var draftRequest = new HttpRequestMessage(HttpMethod.Post, draftRequestUri) {
             Content = new StringContent(messageJson, Encoding.UTF8, "application/json")
         };
@@ -370,6 +373,25 @@ public class Graph {
         return draftMessage;
     }
 
+    public string CreateDraftForMg() {
+        // Create the draft message
+        CreateMessage();
+        var messageJson = CreateDraft();
+        return messageJson;
+    }
+
+    public string CreateDraft() {
+        CreateMessage();
+
+        var options = new JsonSerializerOptions() {
+            WriteIndented = true
+        };
+
+        // Serialize only the GraphMessage to a JSON string, excluding the SaveToSentItems property
+        var messageJson = JsonSerializer.Serialize(MessageContainer.Message, options);
+        return messageJson;
+    }
+
 
     public async Task<GraphAttachmentPlaceHolder> CreateGraphAttachment(string attachmentPath) {
         var fileName = Path.GetFileName(attachmentPath);
@@ -384,7 +406,9 @@ public class Graph {
 
         return new GraphAttachmentPlaceHolder() {
             Json = attachmentItemJson,
-            Content = content
+            Content = content,
+            FileSize = fileSize,
+            FileName = fileName
         };
     }
 
@@ -400,20 +424,6 @@ public class Graph {
 
         var uploadUrl = uploadSessionResult?.UploadUrl ?? throw new InvalidOperationException("Upload URL not found.");
         return uploadUrl;
-    }
-
-    public async Task SendFile(string uploadUrl, ByteArrayContent byteArrayContent) {
-        var requestMessage = new HttpRequestMessage(HttpMethod.Put, uploadUrl) {
-            Content = byteArrayContent
-        };
-        requestMessage.Headers.Add("AnchorMailbox", SentFrom); // This is correctly added to HttpRequestMessage
-        _client.DefaultRequestHeaders.Authorization = null;
-        var uploadChunkResponse = await _client.SendAsync(requestMessage);
-        if (!uploadChunkResponse.IsSuccessStatusCode) {
-            // Handle upload error
-            Console.WriteLine(uploadChunkResponse);
-            return;
-        }
     }
 
     /// <summary>
@@ -452,9 +462,32 @@ public class Graph {
         }
     }
 
+    public async Task PrepareAttachments() {
+        if (Attachments?.Length > 0) {
+            foreach (var attachmentPath in Attachments) {
+                var attachmentItemJson = await CreateGraphAttachment(attachmentPath);
+                AttachmentsPlaceHolders.Add(attachmentItemJson);
+            }
+        }
+    }
+
     public async Task SendFileChunks(string uploadUrl, List<ByteArrayContent> fileChunks) {
         foreach (var chunk in fileChunks) {
             await SendFile(uploadUrl, chunk);
+        }
+    }
+
+    public async Task SendFile(string uploadUrl, ByteArrayContent byteArrayContent) {
+        var requestMessage = new HttpRequestMessage(HttpMethod.Put, uploadUrl) {
+            Content = byteArrayContent
+        };
+        requestMessage.Headers.Add("AnchorMailbox", SentFrom); // This is correctly added to HttpRequestMessage
+        _client.DefaultRequestHeaders.Authorization = null;
+        var uploadChunkResponse = await _client.SendAsync(requestMessage);
+        if (!uploadChunkResponse.IsSuccessStatusCode) {
+            // Handle upload error
+            Console.WriteLine(uploadChunkResponse);
+            return;
         }
     }
 }

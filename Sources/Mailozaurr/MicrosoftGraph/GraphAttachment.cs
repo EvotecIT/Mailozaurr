@@ -3,6 +3,8 @@
 public class GraphAttachmentPlaceHolder {
     public string Json { get; set; }
     public List<ByteArrayContent> Content { get; set; }
+    public long FileSize { get; set; }
+    public string FileName { get; set; }
 }
 
 public class GraphAttachmentItemWrapper {

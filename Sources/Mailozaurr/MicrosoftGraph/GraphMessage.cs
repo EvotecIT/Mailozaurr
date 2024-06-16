@@ -27,6 +27,7 @@ public class GraphMessage {
     public List<GraphEmailAddress>? Bcc { get; set; }
 
     [JsonPropertyName("replyTo")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<GraphEmailAddress>? ReplyTo { get; set; }
 
     [JsonPropertyName("subject")]
@@ -36,7 +37,8 @@ public class GraphMessage {
     public GraphContent Body { get; set; }
 
     [JsonPropertyName("importance")]
-    public string Importance { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Importance { get; set; }
 
     [JsonPropertyName("isReadReceiptRequested")]
     public bool IsReadReceiptRequested { get; set; }
