@@ -15,4 +15,14 @@ public static class Helpers {
         return new NetworkCredential(userName, secStringPassword);
     }
 
+    public static string CredentialToApiKey(ICredentials credentials) {
+        string apiKey;
+        try {
+            var networkCredential = credentials as NetworkCredential;
+            apiKey = networkCredential.Password;
+        } catch (Exception ex) {
+            apiKey = "";
+        }
+        return apiKey;
+    }
 }
