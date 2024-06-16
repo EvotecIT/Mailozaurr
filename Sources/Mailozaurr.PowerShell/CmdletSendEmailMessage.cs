@@ -23,6 +23,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     [Parameter(Mandatory = true, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = true, ParameterSetName = "SendGrid")]
+    [Parameter(Mandatory = true, ParameterSetName = "EmailProviders")]
     public Object From { get; set; }
 
     [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
@@ -32,6 +33,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
+    [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
     public string ReplyTo { get; set; }
 
     [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
@@ -41,6 +43,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
+    [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
     public object[] Cc { get; set; }
 
     [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
@@ -50,6 +53,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
+    [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
     public object[] Bcc { get; set; }
 
     [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
@@ -59,6 +63,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
+    [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
     public object[] To { get; set; }
 
     [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
@@ -68,6 +73,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
+    [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
     public string Subject { get; set; }
 
     [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
@@ -77,6 +83,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
     [Parameter(Mandatory = false, ParameterSetName = "Graph")]
     [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
+    [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
     [Alias("Importance")]
     public MessagePriority Priority { get; set; }
 
@@ -101,6 +108,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
 
     [Parameter(Mandatory = true, ParameterSetName = "Graph")]
     [Parameter(Mandatory = true, ParameterSetName = "SendGrid")]
+    [Parameter(Mandatory = true, ParameterSetName = "EmailProviders")]
     public PSCredential Credential { get; set; }
 
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
@@ -141,6 +149,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
+    [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
     [Alias("Body", "HtmlBody")]
     public string[] HTML { get; set; }
 
@@ -151,6 +160,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
+    [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
     [Alias("TextBody")]
     public string[] Text { get; set; }
 
@@ -161,6 +171,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
+    [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
     [Alias("Attachments")]
     public string[]? Attachment { get; set; }
 
@@ -280,6 +291,9 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     public string CertificateThumbprint { get; set; }
 
+    [Parameter(Mandatory = true, ParameterSetName = "EmailProviders")]
+    public EmailProvider EmailProvider { get; set; }
+
     private ActionPreference errorAction;
 
     protected override void BeginProcessing() {
@@ -301,7 +315,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     }
 
     protected override void ProcessRecord() {
-        if (SendGrid) {
+        if (SendGrid || EmailProvider == EmailProvider.SendGrid) {
             SendGridClient sendGrid = new SendGridClient();
             sendGrid.From = From;
             if (Bcc != null) sendGrid.Bcc = Bcc.ToList();
@@ -326,9 +340,15 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 }
             } else {
                 if (!Suppress) {
-                    WriteObject(new SmtpResult(false, EmailAction.Send, sendGrid.SentTo, sendGrid.SentFrom, "SendGridApi", 0, sendGrid.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
+                    WriteObject(new SmtpResult(false, EmailAction.Send, sendGrid.SentTo, sendGrid.SentFrom,
+                        "SendGridApi", 0, sendGrid.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
                 }
             }
+
+        } else if (EmailProvider == EmailProvider.Mailgun) {
+            NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
+
+            //MailgunClient mailgun = new MailgunClient(networkCredential, From, To, Cc, Bcc, Subject, Text, HTML);
 
         } else if (Graph) {
             Graph graph = new Graph();
@@ -382,13 +402,19 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             graph.CreateAttachments();
             if (graph.IsLargerAttachment) {
                 // create draft message
-                var draftMessage = graph.CreateDraftMessageAsync().GetAwaiter().GetResult();
-
+                var json = graph.CreateDraftForMg();
+                var draftMessageId = InvokeMgGraphRequestPOST1($"v1.0/users/{graph.From}/mailfolders/drafts/messages", EmailAction.SendDraftMessage, json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+                graph.PrepareAttachments().GetAwaiter().GetResult();
                 // Upload attachments to the draft message
-                graph.UploadAttachmentsAsync(draftMessage).GetAwaiter().GetResult();
-
-
-                InvokeMgGraphRequest($"v1.0/users/{From}/messages/{draftMessage.Id}/send", EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+                foreach (var attachment in graph.AttachmentsPlaceHolders) {
+                    var uploadUrl = InvokeMgGraphRequestPOST($"v1.0/users('{graph.SentFrom}')/messages/{draftMessageId}/attachments/createUploadSession", EmailAction.Send, attachment.Json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+                    if (uploadUrl != "") {
+                        InvokeMgGraphRequestPUT(uploadUrl, EmailAction.SendAttachment, attachment, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+                    } else {
+                        LoggingMessages.Logger.WriteVerbose("Bro?");
+                    }
+                }
+                InvokeMgGraphRequest($"https://graph.microsoft.com/v1.0/users('{graph.SentFrom}')/messages/{draftMessageId}/send", EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
             } else {
                 graph.CreateMessage();
                 InvokeMgGraphRequest($"v1.0/users/{From}/sendMail", EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
@@ -521,5 +547,116 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 WriteObject(new SmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message));
             }
         }
+    }
+
+    private void InvokeMgGraphRequestPUT(string uri, EmailAction action, GraphAttachmentPlaceHolder attachment, string sentFrom, string sentTo, TimeSpan elapsed) {
+        foreach (var body in attachment.Content) {
+            var parameters = new Hashtable {
+                { "Method", "PUT" },
+                { "Uri", uri },
+                { "ContentType", "application/json; charset=UTF-8" },
+                { "Body",  body.ReadAsByteArrayAsync().Result },
+                { "Headers", new Hashtable {
+                         { "Content-Range", body.Headers.ContentRange },
+                        // { "AnchorMailbox", sentFrom }
+                    }
+                }
+            };
+
+            var powerShell = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
+            powerShell.AddCommand("Invoke-MgGraphRequest");
+            powerShell.AddParameters(parameters);
+            try {
+                var results = powerShell.Invoke();
+            } catch (Exception ex) {
+                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending using Graph Api (MgGraphRequest): {ex.Message}");
+                if (errorAction == ActionPreference.Stop) {
+                    throw;
+                }
+
+                if (!Suppress) {
+                    WriteObject(new SmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message));
+                }
+            }
+        }
+    }
+
+
+    private string InvokeMgGraphRequestPOST(string uri, EmailAction action, string jsonBody, string sentFrom, string sentTo, TimeSpan elapsed) {
+        var parameters = new Hashtable {
+            { "Method", "POST" },
+            { "Uri", uri },
+            { "ContentType", "application/json; charset=UTF-8"},
+            { "Body", jsonBody }
+        };
+
+        var powerShell = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
+        powerShell.AddCommand("Invoke-MgGraphRequest");
+        powerShell.AddParameters(parameters);
+        try {
+            var results = powerShell.Invoke();
+            if (results.Count > 0) {
+                // Assuming the first result contains the property you're interested in
+                var result = results[0];
+                //var result = results[0];
+                if (result.BaseObject is IDictionary dictionary && dictionary.Contains("uploadUrl")) {
+                    return dictionary["uploadUrl"].ToString();
+                } else {
+                    // Handle the case where the property is not present
+                    throw new InvalidOperationException("The result does not contain an 'uploadUrl' property.");
+                }
+            } else {
+                // Handle the case where no results were returned
+                throw new InvalidOperationException("No results were returned from the Invoke-MgGraphRequest command.");
+            }
+        } catch (Exception ex) {
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending using Graph Api (MgGraphRequest): {ex.Message}");
+            if (errorAction == ActionPreference.Stop) {
+                throw;
+            }
+            if (!Suppress) {
+                WriteObject(new SmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message));
+            }
+        }
+
+        return "";
+    }
+
+    private string InvokeMgGraphRequestPOST1(string uri, EmailAction action, string jsonBody, string sentFrom, string sentTo, TimeSpan elapsed) {
+        var parameters = new Hashtable {
+            { "Method", "POST" },
+            { "Uri", uri },
+            { "ContentType", "application/json; charset=UTF-8"},
+            { "Body", jsonBody }
+        };
+        var powerShell = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
+        powerShell.AddCommand("Invoke-MgGraphRequest");
+        powerShell.AddParameters(parameters);
+        try {
+            var results = powerShell.Invoke();
+            if (results.Count > 0) {
+                // Assuming the first result contains the property you're interested in
+                var result = results[0];
+                if (result.BaseObject is IDictionary dictionary && dictionary.Contains("id")) {
+                    return dictionary["id"].ToString();
+                } else {
+                    // Handle the case where the property is not present
+                    throw new InvalidOperationException("The result does not contain an 'id' property.");
+                }
+            } else {
+                // Handle the case where no results were returned
+                throw new InvalidOperationException("No results were returned from the Invoke-MgGraphRequest command.");
+            }
+        } catch (Exception ex) {
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending using Graph Api (MgGraphRequest): {ex.Message}");
+            if (errorAction == ActionPreference.Stop) {
+                throw;
+            }
+            if (!Suppress) {
+                WriteObject(new SmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message));
+            }
+        }
+
+        return "";
     }
 }
