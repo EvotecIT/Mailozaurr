@@ -1,5 +1,10 @@
 ﻿namespace Mailozaurr;
 
+public class GraphAttachmentPlaceHolder {
+    public string Json { get; set; }
+    public List<ByteArrayContent> Content { get; set; }
+}
+
 public class GraphAttachmentItemWrapper {
     [JsonPropertyName("AttachmentItem")]
     public GraphAttachmentItem AttachmentItem { get; set; }
