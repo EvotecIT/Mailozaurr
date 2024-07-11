@@ -36,7 +36,9 @@ Build-Module -ModuleName 'Mailozaurr' {
     # Keep in mind it has it's limits when "copying" functions such as it should not depend on DLLs or other external files
     New-ConfigurationModule -Type ApprovedModule -Name 'PSSharedGoods', 'PSWriteColor', 'Connectimo', 'PSUnifi', 'PSWebToolbox', 'PSMyPassword'
 
-    New-ConfigurationModuleSkip -IgnoreModuleName 'Microsoft.Graph.Authentication'
+    New-ConfigurationModuleSkip -IgnoreModuleName 'Microsoft.Graph.Authentication' -IgnoreFunc @(
+        'Resolve-DnsName'
+    )
 
     $ConfigurationFormat = [ordered] @{
         RemoveComments                              = $false
@@ -83,7 +85,25 @@ Build-Module -ModuleName 'Mailozaurr' {
 
     New-ConfigurationImportModule -ImportSelf #-ImportRequiredModules
 
-    New-ConfigurationBuild -DotSourceLibraries -DotSourceClasses -MergeModuleOnBuild -Enable -SignModule -DeleteTargetModuleBeforeBuild -CertificateThumbprint '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703' -MergeFunctionsFromApprovedModules
+    $newConfigurationBuildSplat = @{
+        Enable                            = $true
+        SignModule                        = $true
+        MergeModuleOnBuild                = $true
+        MergeFunctionsFromApprovedModules = $true
+        CertificateThumbprint             = '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703'
+        ResolveBinaryConflicts            = $true
+        ResolveBinaryConflictsName        = 'Mailozaurr.PowerShell'
+        NETProjectName                    = 'Mailozaurr.PowerShell'
+        NETConfiguration                  = 'Release'
+        NETFramework                      = 'net6.0', 'net472'
+        NETHandleAssemblyWithSameName     = $true
+        #NETMergeLibraryDebugging          = $true
+        DotSourceLibraries                = $true
+        DotSourceClasses                  = $true
+        DeleteTargetModuleBeforeBuild     = $true
+    }
+
+    New-ConfigurationBuild @newConfigurationBuildSplat
 
     New-ConfigurationArtefact -Type Unpacked -Enable -Path "$PSScriptRoot\..\Artefacts" -RequiredModulesPath "$PSScriptRoot\..\Artefacts\Modules"
     New-ConfigurationArtefact -Type Packed -Enable -Path "$PSScriptRoot\..\Releases" -IncludeTagName
