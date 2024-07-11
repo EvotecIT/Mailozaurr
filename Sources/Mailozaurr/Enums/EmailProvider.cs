@@ -4,4 +4,9 @@ public enum EmailProvider {
     Mailgun,
     //MailChimp,
     //AmazonSES,
+    //Moosend,
+    //Postmark,
+    //Brevo (Sendinblue),
+    //MessageBird (SparkPost),
+    //MailerSend
 }
