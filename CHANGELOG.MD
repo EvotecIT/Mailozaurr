@@ -1,4 +1,57 @@
-﻿#### 1.0.2 - 2023.08.05
+﻿#### 2.0.0 - Preview 5
+- Removed `Resolve-DnsQuery` => moved to DnsClientX, which uses it's own library
+- Removed `Resolve-DnsRequestRest` => moved to DnsClientX, which uses it's own library
+- Removed all functions related to DNS (will be moved to DomainDetective module)
+  - `Find-MXRecord`
+  - `Find-SPFRecord`
+  - `Find-DKIMRecord`
+  - `Find-DMARCRecord`
+  - `Find-DNSBL`
+  - `Find-DNSSECRecord`
+  - `Find-CAARecord`
+  - `Find-BIMIRecord`
+  - `Find-MTASTSRecord`
+  - `Find-O365OpenIDRecord`
+  - `Find-SecurityTxtRecord`
+  - `Find-TLSRPTRecord`
+  - `Find-IPGeolocation`
+  - `Find-DANERecord`
+  - `Find-CAARecord`
+  - `Find-DNSSECRecord`
+- Replaced `Test-EmailAddress` function with `Test-EmailAddress` binary cmdlet
+- Improvements to  `Send-EmailMessage`
+  - Removed `Email`/`EmailParameters` parameters as they are not needed, and legacy
+  - Added `DeliveryNotificationOption` as an enum instead of strings
+  - Internal improvements
+    - Dispose() of SmtpClient in the end
+    - Replaced PowerShell classes with C# version
+    - Moved some PowerShell code to C# for better performance and simpler logic
+
+#### 2.0.0 - Preview 4 - 2024.03.04
+- Update to DLLs to latest versions
+- Removes some unnessecary DLLs
+- Different way to build module and load depenedencies
+- Removal of DLLs from source codes
+- Small updates to DLLs
+- Add new DLLs
+- Added `ConvertFrom-EmlToMsg` to convert EML files to MSG files
+- Added `Import-MailFile` to import MSG/EML files to PowerShell Object
+- Added `Get-MailMessage`
+- Added `Get-MailMessageAttachment`
+- Added `Find-BIMIRecord`
+- Added `Find-CAARecord`
+- Added `Find-DANERecord`
+- Added `Find-MTASTSRecord`
+- Added `Find-O365OpenIDRecord`
+- Added `Find-SecurityTxtRecord`
+- Added `Find-TLSRPTRecord`
+- Added `Find-DNSSECRecord`
+- Improve `Find-DMARCRecord` to return more data
+- Added `Get-DMARCData` to read DMARC data from XML files
+- Added `Find-IPGeolocation` to get IP Geolocation data
+- Small improvements to error handling
+
+#### 1.0.2 - 2023.08.05
 - Rename `SkipCertificateValidatation` to `SkipCertificateValidation` in `Send-EmailMessage` (typo fix)
 - Added `SkipCertificateValidation` to `Connect-IMAP`
 - Added `SkipCertificateValidation` to `Connect-POP3`

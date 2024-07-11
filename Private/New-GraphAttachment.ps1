@@ -64,7 +64,7 @@
 				$FileBuffer = [byte[]]::new($UploadChunkSize)
 				$Headers = @{
 					"Content-Range"  = $UploadRangeHeader
-					"AnrchorMailbox" = $FromField
+					"AnchorMailbox" = $FromField
 				}
 				try {
 					if ($MgGraphRequest) {

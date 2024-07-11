@@ -6,7 +6,8 @@ function Invoke-O365Graph {
         [alias('Authorization')][System.Collections.IDictionary] $Headers,
         [validateset('GET', 'DELETE', 'POST')][string] $Method = 'GET',
         [string] $ContentType = 'application/json',
-        [switch] $FullUri
+        [switch] $FullUri,
+        [switch] $MgGraphRequest
     )
     $RestSplat = @{
         Headers     = $Headers
@@ -19,14 +20,20 @@ function Invoke-O365Graph {
         $RestSplat.Uri = -join ($PrimaryUri, $Uri)
     }
     try {
-        $OutputQuery = Invoke-RestMethod @RestSplat -Verbose:$false
+        if ($MgGraphRequest) {
+            $OutputQuery = Invoke-MgGraphRequest @RestSplat -Verbose:$false
+        } else {
+            $OutputQuery = Invoke-RestMethod @RestSplat -Verbose:$false
+        }
         if ($Method -eq 'GET') {
             if ($OutputQuery.value) {
-                $OutputQuery.value
+                foreach ($Mail in $OutputQuery.value) {
+                    [PSCustomObject] $Mail
+                }
             }
             if ($OutputQuery.'@odata.nextLink') {
                 $RestSplat.Uri = $OutputQuery.'@odata.nextLink'
-                $MoreData = Invoke-O365Graph @RestSplat -FullUri
+                $MoreData = Invoke-O365Graph @RestSplat -FullUri -MgGraphRequest:$MgGraphRequest.IsPresent
                 if ($MoreData) {
                     $MoreData
                 }
@@ -38,6 +45,11 @@ function Invoke-O365Graph {
         $RestError = $_.ErrorDetails.Message
         if ($RestError) {
             try {
+                $RestError -split '\r\n' | ForEach-Object {
+                    if ($_ -match '^{') {
+                        $RestError = $_
+                    }
+                }
                 $ErrorMessage = ConvertFrom-Json -InputObject $RestError
                 $ErrorMy = -join ('JSON Error:' , $ErrorMessage.error.code, ' ', $ErrorMessage.error.message, ' Additional Error: ', $_.Exception.Message)
                 Write-Warning $ErrorMy
