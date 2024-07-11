@@ -13,8 +13,10 @@ public class MailgunClient : IDisposable {
     /// </summary>
     private string EmailDomain {
         get {
-            var emailInformation = From.Split("@");
-            return emailInformation[1];
+            //var emailInformation = From.Split("@");
+            //return emailInformation[1];
+            // TODO - Implement this
+            return "";
         }
     }
 
@@ -54,7 +56,8 @@ public class MailgunClient : IDisposable {
         _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", basicauth);
 
         var formData = new Dictionary<string, string> {
-                { "from", From },
+            // TODO - Implement the rest of the form data
+                //{ "from", From },
                 { "to", string.Join(",", To) },
                 { "subject", Subject },
                 { "text", BodyText },
