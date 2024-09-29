@@ -97,7 +97,6 @@ Build-Module -ModuleName 'Mailozaurr' {
         NETConfiguration                  = 'Release'
         NETFramework                      = 'net6.0', 'net472'
         NETHandleAssemblyWithSameName     = $true
-        #NETMergeLibraryDebugging          = $true
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
