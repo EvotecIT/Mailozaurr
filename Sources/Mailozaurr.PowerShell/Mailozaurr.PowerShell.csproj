@@ -1,52 +1,69 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<PropertyGroup>
-		<Company>Evotec</Company>
-		<Authors>Przemyslaw Klys</Authors>
-		<VersionPrefix>1.0.0</VersionPrefix>
-		<TargetFrameworks>net472;netstandard2.0;net6.0;net7.0;net8.0</TargetFrameworks>
-		<AssemblyName>Mailozaurr.PowerShell</AssemblyName>
+    <PropertyGroup>
+        <Company>Evotec</Company>
+        <Authors>Przemyslaw Klys</Authors>
+        <VersionPrefix>1.0.0</VersionPrefix>
+        <TargetFrameworks>net472;netstandard2.0;net6.0;net7.0;net8.0</TargetFrameworks>
+        <AssemblyName>Mailozaurr.PowerShell</AssemblyName>
 
-		<Copyright>(c) 2011 - 2024 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
-		<LangVersion>latest</LangVersion>
-	</PropertyGroup>
+        <Copyright>(c) 2011 - 2024 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
+        <LangVersion>latest</LangVersion>
+    </PropertyGroup>
 
-	<ItemGroup>
-		<ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
-	</ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
+    </ItemGroup>
 
-	<ItemGroup>
-		<PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
-	</ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
+        <PackageReference Include="System.Management" Version="7.0.2" PrivateAssets="all" />
+    </ItemGroup>
 
-	<!-- Make sure the output DLL's from library are included in the output -->
-	<PropertyGroup>
-		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-	</PropertyGroup>
+    <!-- Make sure the output DLL's from library are included in the output -->
+    <PropertyGroup>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    </PropertyGroup>
 
-	<!-- We need to remove PowerShell conflicting libraries as it will break output -->
-	<Target Name="RemoveFilesAfterBuild" AfterTargets="Build">
-		<Delete Files="$(OutDir)System.Management.Automation.dll" />
-		<Delete Files="$(OutDir)System.Management.dll" />
-	</Target>
+    <!-- We need to remove PowerShell conflicting libraries as it will break output -->
+    <!-- <Target Name="RemoveFilesAfterBuild" AfterTargets="Build;Publish">
+        <Delete Files="$(OutDir)System.Management.Automation.dll" />
+        <Delete Files="$(OutDir)System.Management.dll" />
+        <Delete Files="$(OutDir)runtimes/win/lib/net6.0/System.Management.dll" />
+    </Target> -->
 
+    <!-- <ItemGroup>
+        <None Update="runtimes/win/lib/net6.0/System.Management.dll">
+            <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+            <ExcludeFromPublish>true</ExcludeFromPublish>
+        </None>
+        <None Update="runtimes\win\lib\net6.0\System.Management.dll">
+            <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+            <ExcludeFromPublish>true</ExcludeFromPublish>
+        </None>
+    </ItemGroup> -->
 
-	<PropertyGroup Condition=" '$(TargetFramework)' == 'net472' ">
-		<DefineConstants>$(DefineConstants);FRAMEWORK</DefineConstants>
-	</PropertyGroup>
+    <!-- <ItemGroup Condition=" '$(TargetFramework)' == 'net6.0' ">
+        <PackageReference Include="System.Management" Version="7.0.2" PrivateAssets="all" />
+    </ItemGroup> -->
 
-	<ItemGroup>
-		<Using Include="Mailozaurr" />
-		<Using Include="System.Collections" />
-		<Using Include="System.Management.Automation" />
-		<Using Include="System.Threading.Tasks" />
-		<Using Include="System.Collections.Concurrent" />
-		<Using Include="System.Threading" />
-		<Using Include="System" />
-		<Using Include="System.Collections.Generic" />
-		<Using Include="System.Linq" />
-		<Using Include="System.Text" />
-		<Using Include="System.IO" />
-		<Using Include="System.Net" />
-	</ItemGroup>
+    <PropertyGroup Condition=" '$(TargetFramework)' == 'net472' ">
+        <DefineConstants>$(DefineConstants);FRAMEWORK</DefineConstants>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Using Include="Mailozaurr" />
+        <Using Include="System.Collections" />
+        <Using Include="System.Management.Automation" PrivateAssets="all" />
+        <Using Include="System.Management" PrivateAssets="all" />
+        <Using Include="System.Threading.Tasks" />
+        <Using Include="System.Collections.Concurrent" />
+        <Using Include="System.Threading" />
+        <Using Include="System" />
+        <Using Include="System.Collections.Generic" />
+        <Using Include="System.Linq" />
+        <Using Include="System.Text" />
+        <Using Include="System.IO" />
+        <Using Include="System.Net" />
+    </ItemGroup>
 </Project>
