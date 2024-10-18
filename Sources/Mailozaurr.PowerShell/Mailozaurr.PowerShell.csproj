@@ -58,7 +58,7 @@
 
 	<ItemGroup>
 		<!-- This is needed for XmlDoc2CmdletDoc to generate a PowerShell documentation file. -->
-		<PackageReference Include="MatejKafka.XmlDoc2CmdletDoc" Version="0.5.1">
+		<PackageReference Include="MatejKafka.XmlDoc2CmdletDoc" Version="0.6.0">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
