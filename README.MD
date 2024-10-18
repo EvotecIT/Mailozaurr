@@ -30,8 +30,8 @@ This project has 2 branches:
 
 This **V2** branch uses following libraries:
 
-- [MailKit](https://github.com/jstedfast/MailKit)
-- [MimeKit](https://github.com/jstedfast/MimeKit)
+- [MailKit](https://github.com/jstedfast/MailKit) - licensed MIT
+- [MimeKit](https://github.com/jstedfast/MimeKit) - licensed MIT
 - [MsgKit](https://github.com/Sicos1977/MsgKit) - licensed MIT
 - [MsgReader](https://github.com/Sicos1977/MSGReader) - licensed MIT
 
