@@ -17,8 +17,8 @@
 		<PackageReference Include="DnsClient" Version="1.8.0" />
 		<PackageReference Include="EmailValidation" Version="1.2.0" />
 		<PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
-		<PackageReference Include="MailKit" Version="4.7.0" />
-		<PackageReference Include="MimeKit" Version="4.7.1" />
+		<PackageReference Include="MailKit" Version="4.8.0" />
+		<PackageReference Include="MimeKit" Version="4.8.0" />
 		<PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
 	</ItemGroup>
 
