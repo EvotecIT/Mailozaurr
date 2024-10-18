@@ -22,9 +22,18 @@
 
 Mailozaurr is a PowerShell module that aims to provide SMTP, POP3, IMAP and few other ways to interact with Email. Underneath it uses MimeKit and MailKit and EmailValidation libraries written by Jeffrey Stedfast.
 
+This project has 2 branches:
+- `v1-legacy` - this is the old version of the module. It's working, it's stable and has been around for a while. It's written entirely in PowerShell, and has nice features. It will be maintained until v2 is ready.
+- `v2-speedygonzales` - this is the new version of the module. It's a complete rewrite. It's written in C#, and slowly all functions from V1 will be replaced by their C# alternative. It's faster, and has couple of new features. It's still in development, but it's already usable.
+  - Removed **DNS** functions as they are moved to [DnsClientX](https://github.com/EvotecIT/DnsClientX) module
+  - Removed **EmailValidation/SPF/DKIM/DMARC/MX/DMARC** functions as they are moved to [DomainDetective](https://github.com/EvotecIT/DomainDetective) module
+
+This **V2** branch uses following libraries:
+
 - [MailKit](https://github.com/jstedfast/MailKit)
 - [MimeKit](https://github.com/jstedfast/MimeKit)
-- [EmailValidation](https://github.com/jstedfast/EmailValidation)
+- [MsgKit](https://github.com/Sicos1977/MsgKit) - licensed MIT
+- [MsgReader](https://github.com/Sicos1977/MSGReader) - licensed MIT
 
 For oAuth2 it also requires some Microsoft and Google libraries that are also bundled in
 
@@ -33,9 +42,9 @@ For oAuth2 it also requires some Microsoft and Google libraries that are also bu
 - [Google.Apis.Core](https://www.nuget.org/packages/Google.Apis.Core)
 - [Google.Apis.Auth](https://www.nuget.org/packages/Google.Apis.Auth)
 
-Finally since `Resolve-DNSName` is Windows specific I'm using:
+Additional dependencies due to features added
 
-- [DnsClient.NET](https://github.com/MichaCo/DnsClient.NET)
+- [System.DataSQLite](https://system.data.sqlite.org/)
 
 This started with a single goal to replace `Send-MailMessage` which is depracated/obsolete with something more modern, but since MailKit and MimeKit have lots of options why not build on that?
 
