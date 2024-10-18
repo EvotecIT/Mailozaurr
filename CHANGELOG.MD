@@ -1,4 +1,11 @@
-﻿#### 1.0.2 - 2023.08.05
+﻿#### 1.0.3 - 2024.10.18
+
+##### What's Changed
+* Bump DLLs to most recent versions before 2.0 by @PrzemyslawKlys in https://github.com/EvotecIT/Mailozaurr/pull/57
+
+**Full Changelog**: https://github.com/EvotecIT/Mailozaurr/compare/v1.0.2...v1.0.3
+
+#### 1.0.2 - 2023.08.05
 - Rename `SkipCertificateValidatation` to `SkipCertificateValidation` in `Send-EmailMessage` (typo fix)
 - Added `SkipCertificateValidation` to `Connect-IMAP`
 - Added `SkipCertificateValidation` to `Connect-POP3`
