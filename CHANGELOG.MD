@@ -1,4 +1,9 @@
-﻿#### 1.0.3 - 2024.10.18
+﻿#### 1.0.4 - 2024.10.29
+
+##### What's Changed
+- Removed single dependency, which should solve [#58](https://github.com/EvotecIT/Mailozaurr/issues/58)
+
+#### 1.0.3 - 2024.10.18
 
 ##### What's Changed
 * Bump DLLs to most recent versions before 2.0 by @PrzemyslawKlys in https://github.com/EvotecIT/Mailozaurr/pull/57
