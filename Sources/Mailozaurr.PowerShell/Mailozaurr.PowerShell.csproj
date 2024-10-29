@@ -18,6 +18,7 @@
     <ItemGroup>
         <PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
         <PackageReference Include="System.Management" Version="7.0.2" PrivateAssets="all" />
+        <PackageReference Include="System.CodeDom" Version="7.0.0" PrivateAssets="all" />
     </ItemGroup>
 
     <!-- Make sure the output DLL's from library are included in the output -->
