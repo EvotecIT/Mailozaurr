@@ -122,6 +122,19 @@ You can also utilize Examples which should help to understand use cases. Of cour
 
 Keep in mind PSSharedGoods is only required for development. When you use this module from PowerShellGallery it's not installed as everything is merged.
 
+### Limiting access to mailboxes (Microsoft Graph API)
+
+Microsoft Graph API requires `Send.Mail` permission to send emails. In some cases `Mail.ReadWrite` permission is also required when the size of email is above 4MB.
+If the application is registered in Azure AD (Entra ID) without any additional configuration, it will have access to all mailboxes in the organization.
+To limit access to specific mailboxes, you need to use Application Access Policy.
+This is a feature that allows you to limit access to specific mailboxes. You can read more about it [here](https://learn.microsoft.com/en-us/graph/auth-limit-mailbox-access).
+
+Following permissions (as shown on the screenshot) are required to send emails using Microsoft Graph API.
+
+![Microsoft Graph Permissions](https://raw.githubusercontent.com/EvotecIT/Mailozaurr/refs/heads/v2-speedygonzales/Docs/Images/MicrosoftGraphPermissions.png)
+
+The rest of the permissins is not required and is there for other features that Microsoft Graph provides.
+
 ## To install
 
 ```powershell
