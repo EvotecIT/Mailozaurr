@@ -1,4 +1,17 @@
-﻿#### 1.0.4 - 2024.10.29
+﻿#### 1.0.5 - 2025.05.16
+
+##### What's new
+
+- Updated net 6.0 to 8.0
+- Bump EmailValidation to 1.3.0 from 1.2.0
+- Bump Google.Apis.Auth to 1.69.0 from 1.68.0
+- Bump MailKit to 4.12.0 from 4.8.0
+- Bump MimeKit to 4.12.0 from 4.8.0
+- Bump Microsoft.Identity.Client to 4.66.1 from 4.61.3
+
+**Full Changelog**: https://github.com/EvotecIT/Mailozaurr/compare/v1.0.4...v1.0.5
+
+#### 1.0.4 - 2024.10.29
 
 ##### What's Changed
 - Removed single dependency, which should solve [#58](https://github.com/EvotecIT/Mailozaurr/issues/58)
