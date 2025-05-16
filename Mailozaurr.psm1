@@ -15,7 +15,7 @@ if ($AssemblyFolders.BaseName -contains 'Standard') {
     }
 }
 $FoundErrors = @(
-    Foreach ($Import in @($Assembly)) {
+    foreach ($Import in @($Assembly)) {
         try {
             Add-Type -Path $Import.Fullname -ErrorAction Stop
         } catch [System.Reflection.ReflectionTypeLoadException] {
@@ -37,10 +37,10 @@ $FoundErrors = @(
         }
     }
     #Dot source the files
-    Foreach ($Import in @($Private + $Public + $Classes + $Enums)) {
-        Try {
+    foreach ($Import in @($Private + $Public + $Classes + $Enums)) {
+        try {
             . $Import.Fullname
-        } Catch {
+        } catch {
             Write-Error -Message "Failed to import functions from $($import.Fullname): $_"
             $true
         }

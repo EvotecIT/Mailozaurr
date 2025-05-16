@@ -95,7 +95,7 @@ Build-Module -ModuleName 'Mailozaurr' {
         ResolveBinaryConflictsName        = 'Mailozaurr.PowerShell'
         NETProjectName                    = 'Mailozaurr.PowerShell'
         NETConfiguration                  = 'Release'
-        NETFramework                      = 'net6.0', 'net472'
+        NETFramework                      = 'net8.0', 'net472'
         NETHandleAssemblyWithSameName     = $true
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
