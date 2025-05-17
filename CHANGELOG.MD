@@ -1,4 +1,12 @@
-﻿#### 1.0.5 - 2025.05.16
+﻿#### 1.0.6 - 2025.05.17
+
+##### What's new
+- Fixes [Adding attachment >3 MB not possible if no client secret is used](https://github.com/EvotecIT/Mailozaurr/issues/55) in #64
+- Fixes [When path to attachment is empty error should be handled better when using Graph](https://github.com/EvotecIT/Mailozaurr/issues/54) in #64
+
+**Full Changelog**: https://github.com/EvotecIT/Mailozaurr/compare/v1.0.4...v1.0.6
+
+#### 1.0.5 - 2025.05.16
 
 ##### What's new
 
