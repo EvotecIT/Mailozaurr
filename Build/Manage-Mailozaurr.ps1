@@ -28,7 +28,7 @@ Build-Module -ModuleName 'Mailozaurr' {
     }
     New-ConfigurationManifest @Manifest
     # Add standard module dependencies (directly, but can be used with loop as well)
-    New-ConfigurationModule -Type RequiredModule -Name 'PSSharedGoods' -Guid 'Auto' -Version 'Latest'
+    New-ConfigurationModule -Type RequiredModule -Name 'PSSharedGoods' -Guid 'Auto' -Version '0.0.307'
     # Add external module dependencies, using loop for simplicity
     New-ConfigurationModule -Type ExternalModule -Name 'Microsoft.PowerShell.Utility', 'Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Security'
     # Add approved modules, that can be used as a dependency, but only when specific function from those modules is used
