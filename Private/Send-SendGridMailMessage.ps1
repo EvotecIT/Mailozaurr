@@ -19,6 +19,10 @@
     # https://sendgrid.api-docs.io/v3.0/mail-send/v3-mail-send
     if ($Credential) {
         $AuthorizationData = ConvertFrom-OAuth2Credential -Credential $Credential
+        if (-not $AuthorizationData) {
+            Write-Warning "Send-EmailMessage - Error: Unable to convert credentials to SendGrid API authorization data."
+            return
+        }
     } else {
         return
     }
@@ -153,7 +157,7 @@
             }
         }
         # Trims body content
-        If ($SendGridMessage.content.value) {
+        if ($SendGridMessage.content.value) {
             if ($SendGridMessage.content[0].value.Length -gt 10) {
                 $SendGridMessage.content[0].value = -join ($SendGridMessage.content[0].value.Substring(0, 10), 'ContentIsTrimmed')
             } else {
