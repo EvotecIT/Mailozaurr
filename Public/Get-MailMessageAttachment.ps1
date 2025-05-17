@@ -52,11 +52,7 @@
         } else {
             return
         }
-        if ($AuthorizationData.ClientID -eq 'MSAL') {
-            $Authorization = Connect-O365GraphMSAL -ApplicationKey $AuthorizationData.ClientSecret
-        } else {
-            $Authorization = Connect-O365Graph -ApplicationID $AuthorizationData.ClientID -ApplicationKey $AuthorizationData.ClientSecret -TenantDomain $AuthorizationData.DirectoryID -Resource https://graph.microsoft.com
-        }
+        $Authorization = Connect-O365Graph -ApplicationID $AuthorizationData.ClientID -ApplicationKey $AuthorizationData.ClientSecret -TenantDomain $AuthorizationData.DirectoryID -Resource https://graph.microsoft.com
     }
 
     $QueryParameters = [ordered] @{

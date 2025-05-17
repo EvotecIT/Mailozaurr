@@ -6,15 +6,6 @@ function Connect-O365Graph {
         [string] $TenantDomain,
         [ValidateSet('https://manage.office.com', 'https://graph.microsoft.com')] $Resource = 'https://manage.office.com'
     )
-    # https://dzone.com/articles/getting-access-token-for-microsoft-graph-using-oau-1
-
-    #$Scope = @(
-    #'https://outlook.office.com/IMAP.AccessAsUser.All',
-    # 'https://outlook.office.com/POP.AccessAsUser.All',
-    #    'https://outlook.office.com/Mail.Send'
-    #    'https://outlook.office.com/User.Read'
-    #)
-
     $Body = @{
         grant_type    = 'client_credentials'
         resource      = $Resource
