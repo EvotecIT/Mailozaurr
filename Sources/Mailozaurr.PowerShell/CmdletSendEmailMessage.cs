@@ -346,10 +346,10 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             }
 
         } else if (EmailProvider == EmailProvider.Mailgun) {
+            WriteVerbose("Mailgun provide is not ready yet");
+            return;
             NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
-
             //MailgunClient mailgun = new MailgunClient(networkCredential, From, To, Cc, Bcc, Subject, Text, HTML);
-
         } else if (Graph) {
             Graph graph = new Graph();
             graph.From = From.ToString();
