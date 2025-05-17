@@ -1,7 +1,7 @@
 ﻿function Get-IMAPFolder {
     [cmdletBinding()]
     param(
-        [System.Collections.IDictionary] $Client,
+        [Mailozaurr.PowerShell.ImapConnectionInfo] $Client,
         [MailKit.FolderAccess] $FolderAccess = [MailKit.FolderAccess]::ReadOnly
     )
     if ($Client) {

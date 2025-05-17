@@ -2,7 +2,7 @@
     [alias('Get-POP3Message')]
     [cmdletBinding()]
     param(
-        [Parameter()][System.Collections.IDictionary] $Client,
+        [Parameter()][Mailozaurr.PowerShell.PopConnectionInfo] $Client,
         [int] $Index,
         [int] $Count = 1,
         [switch] $All

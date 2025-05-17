@@ -2,7 +2,7 @@
     [alias('Save-POP3Message')]
     [cmdletBinding()]
     param(
-        [Parameter()][System.Collections.IDictionary] $Client,
+        [Parameter()][Mailozaurr.PowerShell.PopConnectionInfo] $Client,
         [Parameter(Mandatory)][int] $Index,
         [Parameter(Mandatory)][string] $Path #,
         # [int] $Count = 1,

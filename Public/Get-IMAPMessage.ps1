@@ -1,7 +1,7 @@
 ﻿function Get-IMAPMessage {
     [cmdletBinding()]
     param(
-        [Parameter()][System.Collections.IDictionary] $Client,
+        [Parameter()][Mailozaurr.PowerShell.ImapConnectionInfo] $Client,
         [MailKit.FolderAccess] $FolderAccess = [MailKit.FolderAccess]::ReadOnly
     )
     if ($Client) {
