@@ -12,6 +12,10 @@ function Get-MailMessage {
     )
     if ($Credential) {
         $AuthorizationData = ConvertFrom-GraphCredential -Credential $Credential
+        if (-not $AuthorizationData) {
+            Write-Warning "Get-MailMessage - Error: Unable to convert credentials to Graph API authorization data."
+            return
+        }
     } else {
         return
     }

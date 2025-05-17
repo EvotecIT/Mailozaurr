@@ -30,6 +30,9 @@ function Send-GraphMailMessage {
             } else {
                 $Authorization = Connect-O365Graph -ApplicationID $AuthorizationData.ClientID -ApplicationKey $AuthorizationData.ClientSecret -TenantDomain $AuthorizationData.DirectoryID -Resource https://graph.microsoft.com
             }
+        } else {
+            Write-Warning "Send-GraphMailMessage - Error: Unable to convert credentials to Graph API authorization data."
+            return
         }
     } else {
         return
