@@ -1,7 +1,7 @@
 ﻿# to speed up development adding direct path to binaries, instead of the the Lib folder
 $Development = $true
 $DevelopmentPath = "$PSScriptRoot\Sources\Mailozaurr.PowerShell\bin\Debug"
-$DevelopmentFolderCore = "net7.0"
+$DevelopmentFolderCore = "net8.0"
 $DevelopmentFolderDefault = "net472"
 $BinaryModules = @(
     "Mailozaurr.PowerShell.dll"
