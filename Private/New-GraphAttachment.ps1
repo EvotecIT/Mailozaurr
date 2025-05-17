@@ -68,7 +68,7 @@
 				}
 				try {
 					if ($MgGraphRequest) {
-						$Results = Invoke-MgGraphRequest -Uri $UploadUrl -Method PUT -Body $BinaryContent.ReadAsByteArrayAsync().Result -ErrorAction Stop -ContentType 'application/octet-stream' -UserAgent "Mailozaurr" -Verbose:$false
+						$Results = Invoke-MgGraphRequest -Uri $UploadUrl -Headers $Headers -Method PUT -Body $BinaryContent.ReadAsByteArrayAsync().Result -ErrorAction Stop -ContentType 'application/octet-stream' -UserAgent "Mailozaurr" -Verbose:$false
 					} else {
 						$Results = Invoke-RestMethod -Method PUT -Uri $UploadUrl -Headers $Headers -Body $BinaryContent.ReadAsByteArrayAsync().Result -ContentType "application/octet-stream" -UserAgent "Mailozaurr" -Verbose:$false
 					}

@@ -21,17 +21,18 @@ function Send-GraphMailMessage {
     )
     if ($MgGraphRequest) {
         # it's already connected
+        $Authorization = [ordered] @{}
     } elseif ($Credential) {
         $AuthorizationData = ConvertFrom-GraphCredential -Credential $Credential
+        if ($AuthorizationData) {
+            if ($AuthorizationData.ClientID -eq 'MSAL') {
+                $Authorization = Connect-O365GraphMSAL -ApplicationKey $AuthorizationData.ClientSecret
+            } else {
+                $Authorization = Connect-O365Graph -ApplicationID $AuthorizationData.ClientID -ApplicationKey $AuthorizationData.ClientSecret -TenantDomain $AuthorizationData.DirectoryID -Resource https://graph.microsoft.com
+            }
+        }
     } else {
         return
-    }
-    if ($AuthorizationData) {
-        if ($AuthorizationData.ClientID -eq 'MSAL') {
-            $Authorization = Connect-O365GraphMSAL -ApplicationKey $AuthorizationData.ClientSecret
-        } else {
-            $Authorization = Connect-O365Graph -ApplicationID $AuthorizationData.ClientID -ApplicationKey $AuthorizationData.ClientSecret -TenantDomain $AuthorizationData.DirectoryID -Resource https://graph.microsoft.com
-        }
     }
     $Body = @{}
     if ($HTML) {
@@ -60,9 +61,6 @@ function Send-GraphMailMessage {
             bccRecipients              = @(
                 ConvertTo-GraphAddress -MailboxAddress $BCC
             )
-            #sender                 = @(
-            #    ConvertTo-GraphAddress -MailboxAddress $From
-            #)
             replyTo                    = @(
                 ConvertTo-GraphAddress -MailboxAddress $ReplyTo
             )
@@ -100,7 +98,7 @@ function Send-GraphMailMessage {
 
             }
         }
-        If ($Message.message.body.content) {
+        if ($Message.message.body.content) {
             if ($Message.message.body.content.Length -gt 10) {
                 $Message.message.body.content = -join ($Message.message.body.content.Substring(0, 10), 'ContentIsTrimmed')
             } else {
