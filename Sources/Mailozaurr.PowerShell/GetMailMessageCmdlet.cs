@@ -2,7 +2,6 @@ using System.Management.Automation;
 using Mailozaurr;
 using System.Linq;
 using System.Collections.Generic;
-using System.Text.Json;
 
 namespace Mailozaurr.PowerShell {
     [Cmdlet(VerbsCommon.Get, "MailMessage")]
@@ -47,46 +46,8 @@ namespace Mailozaurr.PowerShell {
             var task = MicrosoftGraphUtils.GetMailMessagesAsync(cred, UserPrincipalName, Property, Filter, Limit);
             task.Wait();
             foreach (var dict in task.Result) {
-                WriteObject(ConvertDictionaryToPSObject(dict));
+                WriteObject(PSObject.AsPSObject(dict));
             }
-        }
-
-        private static object ConvertJsonElementToPSObject(JsonElement element) {
-            switch (element.ValueKind) {
-                case JsonValueKind.Object:
-                    var dict = new Dictionary<string, object>();
-                    foreach (var prop in element.EnumerateObject())
-                        dict[prop.Name] = ConvertJsonElementToPSObject(prop.Value);
-                    return PSObject.AsPSObject(dict);
-                case JsonValueKind.Array:
-                    var list = new List<object>();
-                    foreach (var item in element.EnumerateArray())
-                        list.Add(ConvertJsonElementToPSObject(item));
-                    return list.ToArray();
-                case JsonValueKind.String:
-                    return element.GetString();
-                case JsonValueKind.Number:
-                    if (element.TryGetInt64(out var l)) return l;
-                    if (element.TryGetDouble(out var d)) return d;
-                    return element.GetRawText();
-                case JsonValueKind.True:
-                case JsonValueKind.False:
-                    return element.GetBoolean();
-                case JsonValueKind.Null:
-                default:
-                    return null;
-            }
-        }
-
-        private static PSObject ConvertDictionaryToPSObject(Dictionary<string, object> dict) {
-            var result = new Dictionary<string, object>();
-            foreach (var kvp in dict) {
-                if (kvp.Value is JsonElement je)
-                    result[kvp.Key] = ConvertJsonElementToPSObject(je);
-                else
-                    result[kvp.Key] = kvp.Value;
-            }
-            return PSObject.AsPSObject(result);
         }
     }
 }

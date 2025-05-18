@@ -187,6 +187,33 @@ namespace Mailozaurr {
             return result;
         }
 
+        private static object ConvertJsonElementToNativeObject(JsonElement element) {
+            switch (element.ValueKind) {
+                case JsonValueKind.Object:
+                    var dict = new Dictionary<string, object>();
+                    foreach (var prop in element.EnumerateObject())
+                        dict[prop.Name] = ConvertJsonElementToNativeObject(prop.Value);
+                    return dict;
+                case JsonValueKind.Array:
+                    var list = new List<object>();
+                    foreach (var item in element.EnumerateArray())
+                        list.Add(ConvertJsonElementToNativeObject(item));
+                    return list.ToArray();
+                case JsonValueKind.String:
+                    return element.GetString();
+                case JsonValueKind.Number:
+                    if (element.TryGetInt64(out var l)) return l;
+                    if (element.TryGetDouble(out var d)) return d;
+                    return element.GetRawText();
+                case JsonValueKind.True:
+                case JsonValueKind.False:
+                    return element.GetBoolean();
+                case JsonValueKind.Null:
+                default:
+                    return null;
+            }
+        }
+
         public static async Task<List<Dictionary<string, object>>> GetMailMessagesAsync(GraphCredential credential, string userPrincipalName, IEnumerable<string> properties = null, string filter = null, int? limit = null) {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
@@ -199,8 +226,8 @@ namespace Mailozaurr {
             var messages = new List<Dictionary<string, object>>();
             if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
                 foreach (var item in valueElement.EnumerateArray()) {
-                    var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(item.GetRawText());
-                    messages.Add(dict);
+                    var native = ConvertJsonElementToNativeObject(item) as Dictionary<string, object>;
+                    messages.Add(native);
                     if (limit.HasValue && messages.Count >= limit.Value) break;
                 }
             }
