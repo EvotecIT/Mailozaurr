@@ -1,18 +1,9 @@
 using Microsoft.Identity.Client;
-using System;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
-using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Util.Store;
 
-namespace Mailozaurr.Authentication;
-
-public class OAuthCredential {
-    public string UserName { get; set; }
-    public string AccessToken { get; set; }
-}
+namespace Mailozaurr;
 
 public static class OAuthHelpers {
     public static async Task<OAuthCredential> AcquireO365TokenInteractiveAsync(
