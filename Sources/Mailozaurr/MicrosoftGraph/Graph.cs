@@ -1,7 +1,4 @@
-﻿using System.Diagnostics;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using Mailozaurr.Logging;
+﻿using System.Net.Http.Headers;
 
 namespace Mailozaurr;
 
