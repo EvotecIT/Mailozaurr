@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace Mailozaurr.Logging;
+namespace Mailozaurr;
 
 /// <summary>
 /// Collects log entries in a thread-safe queue for later emission by PowerShell cmdlets.

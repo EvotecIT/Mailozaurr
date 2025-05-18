@@ -1,4 +1,4 @@
-namespace Mailozaurr.Logging;
+namespace Mailozaurr;
 
 /// <summary>
 /// Represents the type of a log entry for use in cmdlet and client logging.
