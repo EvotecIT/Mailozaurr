@@ -1,42 +1,46 @@
 ﻿namespace Mailozaurr.PowerShell;
 
 /// <summary>
-/// <para type="synopsis">Checks if an email address is valid.</para>
-/// <para type="description">This cmdlet checks if an email address is valid. It takes an array of email addresses as input and checks each one. The cmdlet can also check if an email address is a valid international email address or if it has a top level domain.</para>
+/// <para type="synopsis">Validates one or more email addresses for format and standards compliance.</para>
+/// <para type="description">The <c>Test-EmailAddress</c> cmdlet checks if one or more email addresses are valid according to standard email address rules. Supports validation for international addresses and top-level domains. Returns validation results for each address.</para>
 /// <example>
-/// <para>Check if an email address is valid</para>
-/// <code>Test-EmailAddress -EmailAddress "test@example.com"</code>
+///   <summary>Check if an email address is valid</summary>
+///   <code>Test-EmailAddress -EmailAddress "test@example.com"</code>
 /// </example>
 /// <example>
-/// <para>Check if an email address is valid using pipeline input</para>
-/// <code>"test@example.com" | Test-EmailAddress</code>
+///   <summary>Check if an email address is valid using pipeline input</summary>
+///   <code>"test@example.com" | Test-EmailAddress</code>
 /// </example>
 /// <example>
-/// <para>Check if an email address is a valid international email address</para>
-/// <code>Test-EmailAddress -EmailAddress "test@example.com" -AllowInternational</code>
+///   <summary>Check if an email address is a valid international email address</summary>
+///   <code>Test-EmailAddress -EmailAddress "test@exámple.com" -AllowInternational</code>
 /// </example>
 /// <example>
-/// <para>Check if an email address is valid with a top level domain</para>
-/// <code>Test-EmailAddress -EmailAddress "test@example" -AllowTopLevelDomains</code>
+///   <summary>Check if an email address is valid with a top level domain</summary>
+///   <code>Test-EmailAddress -EmailAddress "test@email" -AllowTopLevelDomains</code>
 /// </example>
+/// <remarks>
+/// Use this cmdlet to validate email addresses before sending, importing, or processing them in automation scenarios.
+/// </remarks>
+/// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
 [Cmdlet(VerbsDiagnostic.Test, "EmailAddress")]
 public sealed class CmdletTestEmailAddress : AsyncPSCmdlet {
 
     /// <summary>
-    /// <para type="description">Specifies the email addresses to check. This parameter accepts an array of strings and is mandatory.</para>
+    /// <para type="description">Specifies the email addresses to check. Accepts an array of strings. This parameter is mandatory.</para>
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
     public string[] EmailAddress;
 
     /// <summary>
-    /// <para type="description">If this parameter is set, the cmdlet will use the newer international email standards to validate the email addresses.</para>
+    /// <para type="description">If set, the cmdlet will use the newer international email standards to validate the email addresses.</para>
     /// </summary>
     [Parameter(Mandatory = false, Position = 1)]
     public SwitchParameter AllowInternational { get; set; }
 
     /// <summary>
-    /// <para type="description">If this parameter is set, the cmdlet will allow top level domains in the email addresses (such as test@email).</para>
+    /// <para type="description">If set, the cmdlet will allow top level domains in the email addresses (such as test@email).</para>
     /// </summary>
     [Parameter(Mandatory = false, Position = 2)]
     public SwitchParameter AllowTopLevelDomains { get; set; }
@@ -44,8 +48,7 @@ public sealed class CmdletTestEmailAddress : AsyncPSCmdlet {
     private InternalLogger _logger;
 
     /// <summary>
-    /// <para type="description">This method is called once for each cmdlet in the pipeline when the pipeline starts executing.</para>
-    /// <para type="description">It initializes the logger to be able to see verbose, warning, debug, error, progress, and information messages.</para>
+    /// Initializes the logger for verbose, warning, debug, error, progress, and information messages.
     /// </summary>
     protected override Task BeginProcessingAsync() {
         // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
@@ -55,8 +58,7 @@ public sealed class CmdletTestEmailAddress : AsyncPSCmdlet {
     }
 
     /// <summary>
-    /// <para type="description">This method is called once for each input record. It processes each email address and checks if it is valid.</para>
-    /// <para type="description">The results are written to the output pipeline.</para>
+    /// Processes each email address and checks if it is valid. Writes results to the output pipeline.
     /// </summary>
     protected override async Task ProcessRecordAsync() {
         foreach (var email in EmailAddress) {
