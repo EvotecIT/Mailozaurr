@@ -1,12 +1,12 @@
 ﻿@{
     AliasesToExport      = @('Connect-POP3', 'Disconnect-POP3', 'Get-POP3Message', 'Save-POP3Message')
     Author               = 'Przemyslaw Klys'
-    CmdletsToExport      = @('Connect-IMAP', 'Connect-POP', 'ConvertFrom-EmlToMsg', 'Disconnect-IMAP', 'Disconnect-POP', 'Get-IMAPFolder', 'Get-IMAPMessage', 'Get-POPMessage', 'Import-MailFile', 'Save-POPMessage', 'Send-EmailMessage', 'Test-EmailAddress', 'ConvertTo-GraphCredential', 'ConvertTo-OAuth2Credential', 'ConvertTo-SendGridCredential', 'Get-MailFolder', 'Get-MailMessageAttachment', 'Get-MailMessage', 'Save-MailMessage')
+    CmdletsToExport      = @('Connect-IMAP', 'Connect-OAuthGoogle', 'Connect-OAuthO365', 'Connect-POP', 'ConvertFrom-EmlToMsg', 'Disconnect-IMAP', 'Disconnect-POP', 'Get-IMAPFolder', 'Get-IMAPMessage', 'Get-MailFolder', 'Get-MailMessage', 'Get-MailMessageAttachment', 'Get-POPMessage', 'Import-MailFile', 'Save-MailMessage', 'Save-POPMessage', 'Send-EmailMessage', 'Test-EmailAddress', 'ConvertTo-GraphCredential', 'ConvertTo-OAuth2Credential', 'ConvertTo-SendGridCredential')
     CompanyName          = 'Evotec'
     CompatiblePSEditions = @('Desktop', 'Core')
     Copyright            = '(c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.'
     Description          = 'Mailozaurr is a PowerShell module that aims to provide SMTP, POP3, IMAP and few other ways to interact with Email. Underneath it uses MimeKit and MailKit and EmailValidation libraries written by Jeffrey Stedfast.            '
-    FunctionsToExport    = @('Connect-oAuthGoogle', 'Connect-oAuthO365')
+    FunctionsToExport    = @()
     GUID                 = '2b0ea9f1-3ff1-4300-b939-106d5da608fa'
     ModuleVersion        = '2.0.0'
     PowerShellVersion    = '5.1'
