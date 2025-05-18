@@ -1,8 +1,4 @@
-﻿using System.Diagnostics;
-using System.Collections.Concurrent;
-using Mailozaurr.Logging;
-
-namespace Mailozaurr;
+﻿namespace Mailozaurr;
 
 /// <summary>
 /// A client for sending emails using the SendGrid API.
@@ -110,7 +106,7 @@ public class SendGridClient {
     /// <summary>
     /// Gets the email address of the sender of the email.
     /// </summary>
-    public string SentFrom => From.ToString();
+    public string SentFrom => Helpers.GetEmailAddress(From);
 
     /// <summary>
     /// Gets or sets the log collector for this client.
