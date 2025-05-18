@@ -1,4 +1,6 @@
 ﻿using System.Diagnostics;
+using System.Collections.Concurrent;
+using Mailozaurr.Logging;
 
 namespace Mailozaurr;
 
@@ -111,6 +113,11 @@ public class SendGridClient {
     public string SentFrom => From.ToString();
 
     /// <summary>
+    /// Gets or sets the log collector for this client.
+    /// </summary>
+    public LogCollector LogCollector { get; set; } = new();
+
+    /// <summary>
     /// Initializes a new instance of the SendGridClient class.
     /// </summary>
     public SendGridClient() {
@@ -187,7 +194,7 @@ public class SendGridClient {
             var networkCredential = Credentials as NetworkCredential;
             apiKey = networkCredential.Password;
         } catch (Exception ex) {
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending using SendGrid: {ex.Message}");
+            LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SendGrid: {ex.Message}");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
@@ -198,10 +205,10 @@ public class SendGridClient {
 
         try {
             var response = await _client.SendAsync(request);
-            LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Sent email to {SentTo} using SendGrid");
+            LogCollector.LogVerbose($"Send-EmailMessage - Sent email to {SentTo} using SendGrid");
             return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, response.EnsureSuccessStatusCode().ToString());
         } catch (Exception ex) {
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending using SendGrid: {ex.Message}");
+            LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SendGrid: {ex.Message}");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
