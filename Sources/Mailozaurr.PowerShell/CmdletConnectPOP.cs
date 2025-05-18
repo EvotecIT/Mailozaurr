@@ -81,8 +81,11 @@ public sealed class CmdletConnectPOP : AsyncPSCmdlet {
         if (client.IsConnected) {
             try {
                 if (ParameterSetName == "oAuth2" && oAuth2.IsPresent) {
-                    // oAuth2 authentication (user must provide a valid SASL mechanism)
-                    throw new NotImplementedException("oAuth2 authentication is not implemented in this cmdlet. Use a SASL mechanism.");
+                    // oAuth2 authentication using SASL
+                    var username = Credential.UserName;
+                    var token = new System.Net.NetworkCredential("", Credential.Password).Password;
+                    var sasl = new MailKit.Security.SaslMechanismOAuth2(username, token);
+                    await client.AuthenticateAsync(sasl);
                 } else if (ParameterSetName == "ClearText" && !string.IsNullOrEmpty(UserName) && !string.IsNullOrEmpty(Password)) {
                     await client.AuthenticateAsync(UserName, Password);
                 } else if (Credential != null) {
