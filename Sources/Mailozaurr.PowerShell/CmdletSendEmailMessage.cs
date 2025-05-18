@@ -1,4 +1,6 @@
-﻿namespace Mailozaurr.PowerShell;
+﻿using Mailozaurr.Logging;
+
+namespace Mailozaurr.PowerShell;
 
 /// <summary>
 /// <para type="synopsis">Sends an email message using SMTP, SendGrid, or Microsoft Graph from within PowerShell. Replaces the deprecated Send-MailMessage.</para>
@@ -492,10 +494,14 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             }
         }
     }
-
+    /// <summary>
+    /// Process the record.
+    /// </summary>
     protected override void ProcessRecord() {
         if (SendGrid || EmailProvider == EmailProvider.SendGrid) {
+            var logCollector = new LogCollector();
             SendGridClient sendGrid = new SendGridClient();
+            sendGrid.LogCollector = logCollector;
             sendGrid.From = From;
             if (Bcc != null) sendGrid.Bcc = Bcc.ToList();
             if (Cc != null) sendGrid.Cc = Cc.ToList();
@@ -514,6 +520,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             sendGrid.CreateMessage();
             if (ShouldProcess(sendGrid.SentTo, "Sending email message via SendGrid")) {
                 var result = sendGrid.SendEmailAsync().GetAwaiter().GetResult();
+                LogEmitter.EmitLogs(logCollector, this);
                 if (!Suppress) {
                     WriteObject(result);
                 }
@@ -523,7 +530,6 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                         "SendGridApi", 0, sendGrid.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
                 }
             }
-
         } else if (EmailProvider == EmailProvider.Mailgun) {
             WriteVerbose("Mailgun provide is not ready yet");
             return;
