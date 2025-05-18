@@ -1,7 +1,9 @@
 ﻿Import-Module $PSScriptRoot\..\Mailozaurr.psd1 -Force
 
 # Use SendGrid Api
-$Credential = ConvertTo-SendGridCredential -ApiKey 'SG.q'
+$Key = Get-Content -Raw -Path "C:\Support\Important\SendGrid.txt"
+
+$Credential = ConvertTo-SendGridCredential -ApiKey $Key
 
 Send-EmailMessage -From 'przemyslaw.klys@evo.cool' `
     -To 'przemyslaw.klys@evotec.pl', 'evotectest@gmail.com' `
@@ -10,7 +12,7 @@ Send-EmailMessage -From 'przemyslaw.klys@evo.cool' `
     -Subject '😒💖 This is another test email 我' `
     -SendGrid `
     -Credential $Credential `
-    -Verbose -WhatIf
+    -Verbose
 
-Send-EmailMessage -From @{ Name = 'Przemysław Kłys'; Email = 'przemyslaw.klys@test.pl' } -To 'przemyslaw.klys@test.pl' -Credential $Credential -Text 'MyTest' -Priority High `
-    -Subject 'This is another test email' -WhatIf -SendGrid -Verbose
+Send-EmailMessage -From @{ Name = 'Przemysław Kłys'; Email = 'przemyslaw.klys@evo.cool' } -To 'przemyslaw.klys@evotec.pl' -Credential $Credential -Text 'MyTest' -Priority High `
+    -Subject 'Second test email' -SendGrid -Verbose

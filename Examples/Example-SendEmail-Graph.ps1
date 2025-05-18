@@ -6,16 +6,16 @@ $Body = EmailBody {
 } -Online
 
 # Credentials for Graph
-$ClientID = '0fb383f1'
-$DirectoryID = 'ceb371f6'
-$ClientSecret = 'VKDM_'
+$ClientID = 'f8f134f3-78c7-48f4-a371-5d6eefa447cd'
+$DirectoryID = 'ceb371f6-8745-4876-a040-69f2d10a9d1a'
+$ClientSecret = Get-Content -Raw -Path "C:\Support\Important\Secretf8f134f3-78c7-48f4-a371-5d6eefa447cd.txt"
 
 $Credential = ConvertTo-GraphCredential -ClientID $ClientID -ClientSecret $ClientSecret -DirectoryID $DirectoryID
 
 # Sending email
-Send-EmailMessage -From @{ Name = 'Przemysław Kłys'; Email = 'przemyslaw.klys@test1.pl' } -To 'przemyslaw.klys@test.pl' `
+Send-EmailMessage -From @{ Name = 'Przemysław Kłys'; Email = 'przemyslaw.klys@evotec.pl' } -To 'przemyslaw.klys@evotec.pl' `
     -Credential $Credential -HTML $Body -Subject 'This is another test email 1' -Graph -Verbose -Priority High
 
 # sending email with From as string (it won't matter for Exchange )
-Send-EmailMessage -From 'przemyslaw.klys@test1.pl' -To 'przemyslaw.klys@test2.pl' `
+Send-EmailMessage -From 'przemyslaw.klys@evotec.pl' -To 'przemyslaw.klys@evotec.pl' `
     -Credential $Credential -HTML $Body -Subject 'This is another test email 2' -Graph -Verbose -Priority Low
