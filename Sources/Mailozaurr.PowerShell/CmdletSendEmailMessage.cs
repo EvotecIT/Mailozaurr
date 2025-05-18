@@ -1,6 +1,4 @@
-﻿using Mailozaurr.Logging;
-
-namespace Mailozaurr.PowerShell;
+﻿namespace Mailozaurr.PowerShell;
 
 /// <summary>
 /// <para type="synopsis">Sends an email message using SMTP, SendGrid, or Microsoft Graph from within PowerShell. Replaces the deprecated Send-MailMessage.</para>
@@ -63,7 +61,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = true, ParameterSetName = "SendGrid")]
     [Parameter(Mandatory = true, ParameterSetName = "EmailProviders")]
-    public Object From { get; set; }
+    public object From { get; set; }
 
     /// <summary>
     /// <para>Specifies the reply-to address for the email. If not set, defaults to the From address.</para>
@@ -477,6 +475,9 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
 
     private ActionPreference errorAction;
 
+    /// <summary>
+    /// Begin block
+    /// </summary>
     protected override void BeginProcessing() {
         // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
         var internalLogger = new InternalLogger();
@@ -498,11 +499,12 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     /// Process the record.
     /// </summary>
     protected override void ProcessRecord() {
+        var (fromEmail, fromName) = Helpers.GetEmailAndName(From);
         if (SendGrid || EmailProvider == EmailProvider.SendGrid) {
             var logCollector = new LogCollector();
             SendGridClient sendGrid = new SendGridClient();
             sendGrid.LogCollector = logCollector;
-            sendGrid.From = From;
+            sendGrid.From = Helpers.GetFromObject(fromEmail, fromName);
             if (Bcc != null) sendGrid.Bcc = Bcc.ToList();
             if (Cc != null) sendGrid.Cc = Cc.ToList();
             if (To != null) sendGrid.To = To.ToList();
@@ -526,8 +528,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 }
             } else {
                 if (!Suppress) {
-                    WriteObject(new SmtpResult(false, EmailAction.Send, sendGrid.SentTo, sendGrid.SentFrom,
-                        "SendGridApi", 0, sendGrid.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
+                    WriteObject(new SmtpResult(false, EmailAction.Send, sendGrid.SentTo, sendGrid.SentFrom, "SendGridApi", 0, sendGrid.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
                 }
             }
         } else if (EmailProvider == EmailProvider.Mailgun) {
@@ -537,7 +538,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             //MailgunClient mailgun = new MailgunClient(networkCredential, From, To, Cc, Bcc, Subject, Text, HTML);
         } else if (Graph) {
             Graph graph = new Graph();
-            graph.From = From.ToString();
+            graph.From = Helpers.GetFromObject(fromEmail, fromName);
             graph.To = To;
             graph.Cc = Cc;
             graph.Bcc = Bcc;
@@ -559,6 +560,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 if (!Suppress) {
                     WriteObject(Status);
                 }
+                LogEmitter.EmitLogs(graph.LogCollector, this);
                 return;
             }
             if (graph.IsLargerAttachment) {
@@ -569,9 +571,10 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             if (!Suppress) {
                 WriteObject(Status);
             }
+            LogEmitter.EmitLogs(graph.LogCollector, this);
         } else if (MgGraphRequest) {
             Graph graph = new Graph();
-            graph.From = From.ToString();
+            graph.From = Helpers.GetFromObject(fromEmail, fromName);
             graph.To = To;
             graph.Cc = Cc;
             graph.Bcc = Bcc;
@@ -596,17 +599,19 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                     if (uploadUrl != "") {
                         InvokeMgGraphRequestPUT(uploadUrl, EmailAction.SendAttachment, attachment, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
                     } else {
-                        LoggingMessages.Logger.WriteVerbose("Bro?");
+                        graph.LogCollector.LogVerbose("PlaceHolders not working?");
                     }
                 }
                 InvokeMgGraphRequest($"https://graph.microsoft.com/v1.0/users('{graph.SentFrom}')/messages/{draftMessageId}/send", EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+                LogEmitter.EmitLogs(graph.LogCollector, this);
             } else {
                 graph.CreateMessage();
-                InvokeMgGraphRequest($"v1.0/users/{From}/sendMail", EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+                InvokeMgGraphRequest($"v1.0/users/{fromEmail}/sendMail", EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+                LogEmitter.EmitLogs(graph.LogCollector, this);
             }
         } else {
             Smtp SmtpClient = new Smtp(LogPath, LogConsole, LogObject, LogTimestamps, LogSecrets, LogTimeStampsFormat, LogClientPrefix, LogServerPrefix);
-            SmtpClient.From = From;
+            SmtpClient.From = Helpers.GetFromObject(fromEmail, fromName);
             SmtpClient.ReplyTo = ReplyTo;
             SmtpClient.Cc = Cc;
             SmtpClient.Bcc = Bcc;
