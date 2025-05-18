@@ -177,6 +177,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "Graph")]
     [Parameter(Mandatory = true, ParameterSetName = "SendGrid")]
     [Parameter(Mandatory = true, ParameterSetName = "EmailProviders")]
+    [Parameter(Mandatory = true, ParameterSetName = "oAuth")]
     public PSCredential Credential { get; set; }
 
     /// <summary>
