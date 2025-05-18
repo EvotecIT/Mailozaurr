@@ -1,6 +1,3 @@
-using System;
-using System.Management.Automation;
-using System.Threading.Tasks;
 using MailKit.Net.Pop3;
 using MailKit.Security;
 using System.Security;
