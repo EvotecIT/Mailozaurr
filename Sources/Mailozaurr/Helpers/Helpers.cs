@@ -2,6 +2,7 @@
 using System.Security;
 
 namespace Mailozaurr;
+
 public static class Helpers {
     public static (string UserName, string Token) ConvertFromOAuth2Credential(NetworkCredential credential) {
         return (credential.UserName, credential.Password);
@@ -24,5 +25,22 @@ public static class Helpers {
             apiKey = "";
         }
         return apiKey;
+    }
+
+    public static string GetEmailAddress(object from) {
+        if (from is string s) {
+            return s;
+        }
+        if (from is IDictionary<string, object> dict && dict.ContainsKey("Email")) {
+            return dict["Email"]?.ToString();
+        }
+        return from?.ToString() ?? string.Empty;
+    }
+
+    public static object GetFromObject(string email, string name) {
+        if (!string.IsNullOrEmpty(name)) {
+            return new Dictionary<string, object> { { "Name", name }, { "Email", email } };
+        }
+        return email;
     }
 }
