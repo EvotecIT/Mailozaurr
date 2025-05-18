@@ -43,4 +43,16 @@ public static class Helpers {
         }
         return email;
     }
+
+    public static (string Email, string Name) GetEmailAndName(object from) {
+        if (from is string s) {
+            return (s, null);
+        }
+        if (from is IDictionary dict) {
+            var email = dict.Contains("Email") ? dict["Email"]?.ToString() : null;
+            var name = dict.Contains("Name") ? dict["Name"]?.ToString() : null;
+            return (email, name);
+        }
+        return (from?.ToString(), null);
+    }
 }
