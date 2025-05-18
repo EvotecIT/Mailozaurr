@@ -289,7 +289,9 @@ public class Graph {
             }
             // If the status code indicates an error, throw an exception with the content.
             var error = JsonSerializer.Deserialize<GraphApiError>(content);
-            var errorMessage = $"Error code: {error.Error.Code}, message: {error.Error.Message}, request ID: {error.Error.InnerError.RequestId}, date: {error.Error.InnerError.Date}";
+            var errorMessage = (error == null || error.Error == null || error.Error.InnerError == null)
+                ? $"Unknown error: {content}"
+                : $"Error code: {error.Error.Code}, message: {error.Error.Message}, request ID: {error.Error.InnerError.RequestId}, date: {error.Error.InnerError.Date}";
             throw new HttpRequestException(errorMessage);
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
@@ -330,7 +332,9 @@ public class Graph {
         // If the status code indicates an error, throw an exception with the content
         var sendContent = await sendResponse.Content.ReadAsStringAsync();
         var sendError = JsonSerializer.Deserialize<GraphApiError>(sendContent);
-        var sendErrorMessage = $"Error code: {sendError.Error.Code}, message: {sendError.Error.Message}, request ID: {sendError.Error.InnerError.RequestId}, date: {sendError.Error.InnerError.Date}";
+        var sendErrorMessage = (sendError == null || sendError.Error == null || sendError.Error.InnerError == null)
+            ? $"Unknown error: {sendContent}"
+            : $"Error code: {sendError.Error.Code}, message: {sendError.Error.Message}, request ID: {sendError.Error.InnerError.RequestId}, date: {sendError.Error.InnerError.Date}";
         throw new HttpRequestException(sendErrorMessage);
     }
 
@@ -363,7 +367,9 @@ public class Graph {
 
         if (!draftResponse.IsSuccessStatusCode) {
             var error = JsonSerializer.Deserialize<GraphApiError>(draftContent);
-            var errorMessage = error != null ? $"Error code: {error.Error.Code}, message: {error.Error.Message}" : "Unknown error";
+            var errorMessage = (error == null || error.Error == null)
+                ? $"Unknown error: {draftContent}"
+                : $"Error code: {error.Error.Code}, message: {error.Error.Message}";
             throw new HttpRequestException(errorMessage);
         }
 
