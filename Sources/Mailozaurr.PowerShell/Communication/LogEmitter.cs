@@ -1,5 +1,3 @@
-using Mailozaurr.Logging;
-
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
@@ -17,16 +15,16 @@ public static class LogEmitter {
     public static void EmitLogs(LogCollector collector, PSCmdlet cmdlet) {
         while (collector.Logs.TryDequeue(out var log)) {
             switch (log.Type) {
-                case Mailozaurr.Logging.LogType.Warning:
+                case LogType.Warning:
                     cmdlet.WriteWarning(log.Message);
                     break;
-                case Mailozaurr.Logging.LogType.Error:
+                case LogType.Error:
                     cmdlet.WriteError(new ErrorRecord(new Exception(log.Message), "SendGridError", ErrorCategory.NotSpecified, null));
                     break;
-                case Mailozaurr.Logging.LogType.Verbose:
+                case LogType.Verbose:
                     cmdlet.WriteVerbose(log.Message);
                     break;
-                case Mailozaurr.Logging.LogType.Information:
+                case LogType.Information:
                     cmdlet.WriteInformation(log.Message, new string[0]);
                     break;
             }
