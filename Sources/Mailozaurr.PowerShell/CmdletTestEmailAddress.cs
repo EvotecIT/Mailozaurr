@@ -31,7 +31,7 @@ public sealed class CmdletTestEmailAddress : AsyncPSCmdlet {
     /// <para type="description">Specifies the email addresses to check. Accepts an array of strings. This parameter is mandatory.</para>
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
-    public string[] EmailAddress;
+    public string[]? EmailAddress;
 
     /// <summary>
     /// <para type="description">If set, the cmdlet will use the newer international email standards to validate the email addresses.</para>

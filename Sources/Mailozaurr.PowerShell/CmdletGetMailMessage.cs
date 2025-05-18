@@ -28,32 +28,32 @@ public class CmdletGetMailMessage : PSCmdlet {
     /// <para type="description">Specifies the user principal name (email address) whose mail messages will be retrieved.</para>
     /// </summary>
     [Parameter(Mandatory = true)]
-    public string UserPrincipalName { get; set; }
+    public string? UserPrincipalName { get; set; }
     /// <summary>
     /// <para type="description">Specifies the client ID for Microsoft Graph authentication.</para>
     /// </summary>
     [Parameter]
-    public string ClientId { get; set; }
+    public string? ClientId { get; set; }
     /// <summary>
     /// <para type="description">Specifies the client secret for Microsoft Graph authentication.</para>
     /// </summary>
     [Parameter]
-    public string ClientSecret { get; set; }
+    public string? ClientSecret { get; set; }
     /// <summary>
     /// <para type="description">Specifies the directory (tenant) ID for Microsoft Graph authentication.</para>
     /// </summary>
     [Parameter]
-    public string DirectoryId { get; set; }
+    public string? DirectoryId { get; set; }
     /// <summary>
     /// <para type="description">Specifies the properties to retrieve for each mail message.</para>
     /// </summary>
     [Parameter]
-    public string[] Property { get; set; }
+    public string[]? Property { get; set; }
     /// <summary>
     /// <para type="description">Specifies an OData filter string to filter the mail messages.</para>
     /// </summary>
     [Parameter]
-    public string Filter { get; set; }
+    public string? Filter { get; set; }
     /// <summary>
     /// <para type="description">Specifies the maximum number of mail messages to retrieve.</para>
     /// </summary>
@@ -63,7 +63,7 @@ public class CmdletGetMailMessage : PSCmdlet {
     /// <para type="description">Specifies a PSCredential object for Microsoft Graph authentication. Username should be in the format clientid@directoryid.</para>
     /// </summary>
     [Parameter]
-    public PSCredential Credential { get; set; }
+    public PSCredential? Credential { get; set; }
 
     /// <summary>
     /// Retrieves mail messages for the specified user via Microsoft Graph API.

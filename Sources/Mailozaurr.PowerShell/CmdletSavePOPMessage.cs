@@ -24,7 +24,7 @@ public sealed class CmdletSavePOPMessage : AsyncPSCmdlet {
     /// <para type="description">The <see cref="PopConnectionInfo"/> object representing the active POP3 connection. This is the object returned by <c>Connect-POP</c>.</para>
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
-    public PopConnectionInfo Client { get; set; }
+    public PopConnectionInfo? Client { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the index of the message to save.</para>
@@ -36,7 +36,7 @@ public sealed class CmdletSavePOPMessage : AsyncPSCmdlet {
     /// <para type="description">Specifies the path where the message will be saved.</para>
     /// </summary>
     [Parameter(Mandatory = true, Position = 2)]
-    public string Path { get; set; }
+    public string? Path { get; set; }
 
     /// <summary>
     /// Saves the specified POP3 message to disk at the given path.

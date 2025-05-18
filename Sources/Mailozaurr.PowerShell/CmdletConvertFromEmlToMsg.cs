@@ -23,14 +23,14 @@ public sealed class CmdletConvertFromEmlToMsg : AsyncPSCmdlet {
     /// <para type="description">Specifies the paths to the EML files to convert. Accepts an array of strings. This parameter is mandatory.</para>
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
-    public string[] InputPath;
+    public string[]? InputPath;
 
     /// <summary>
     /// <para type="description">Specifies the folder where the converted MSG files will be saved. This parameter is mandatory.</para>
     /// </summary>
     [Alias("OutputPath")]
     [Parameter(Mandatory = true, Position = 1)]
-    public string OutputFolder { get; set; }
+    public string? OutputFolder { get; set; }
 
     /// <summary>
     /// <para type="description">If set, the cmdlet will overwrite existing MSG files without prompting.</para>

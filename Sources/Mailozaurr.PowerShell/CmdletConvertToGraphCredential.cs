@@ -27,26 +27,26 @@ public class CmdletConvertToGraphCredential: PSCmdlet {
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "ClearText")]
     [Parameter(Mandatory = true, ParameterSetName = "Encrypted")]
-    public string ClientId { get; set; }
+    public string? ClientId { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the client secret in clear text. Use only with the ClearText parameter set.</para>
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "ClearText")]
-    public string ClientSecret { get; set; }
+    public string? ClientSecret { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the client secret in encrypted form. Use only with the Encrypted parameter set.</para>
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "Encrypted")]
-    public string ClientSecretEncrypted { get; set; }
+    public string? ClientSecretEncrypted { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the directory (tenant) ID for Microsoft Graph authentication.</para>
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "ClearText")]
     [Parameter(Mandatory = true, ParameterSetName = "Encrypted")]
-    public string DirectoryId { get; set; }
+    public string? DirectoryId { get; set; }
 
     /// <summary>
     /// Creates a PSCredential object for Microsoft Graph authentication.

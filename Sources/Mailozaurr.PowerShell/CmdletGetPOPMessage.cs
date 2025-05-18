@@ -28,7 +28,7 @@ public sealed class CmdletGetPOPMessage : AsyncPSCmdlet {
     /// <para type="description">The <see cref="PopConnectionInfo"/> object representing the active POP3 connection. This is the object returned by <c>Connect-POP</c>.</para>
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
-    public PopConnectionInfo Client { get; set; }
+    public PopConnectionInfo? Client { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the index of the first message to retrieve. Default is 0 (the first message).</para>

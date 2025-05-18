@@ -38,7 +38,7 @@ public sealed class CmdletConnectPOP : AsyncPSCmdlet {
     [Parameter(ParameterSetName = "Credential")]
     [Parameter(ParameterSetName = "ClearText")]
     [Parameter(Mandatory = true)]
-    public string Server { get; set; }
+    public string? Server { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the port to use for the POP3 connection. Default is 995 (POPS).</para>
@@ -52,20 +52,20 @@ public sealed class CmdletConnectPOP : AsyncPSCmdlet {
     /// <para type="description">Specifies the username for clear text authentication. Required for the ClearText parameter set.</para>
     /// </summary>
     [Parameter(ParameterSetName = "ClearText", Mandatory = true)]
-    public string UserName { get; set; }
+    public string? UserName { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the password for clear text authentication. Required for the ClearText parameter set.</para>
     /// </summary>
     [Parameter(ParameterSetName = "ClearText", Mandatory = true)]
-    public string Password { get; set; }
+    public string? Password { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies a PSCredential object for authentication. Used for OAuth2 or standard credential-based authentication.</para>
     /// </summary>
     [Parameter(ParameterSetName = "oAuth2")]
     [Parameter(ParameterSetName = "Credential")]
-    public PSCredential Credential { get; set; }
+    public PSCredential? Credential { get; set; }
 
     /// <summary>
     /// <para type="description">Skips certificate revocation checks during the connection. Useful for environments with limited certificate infrastructure.</para>

@@ -29,7 +29,7 @@ public sealed class CmdletImportMailFile : AsyncPSCmdlet {
     /// </summary>
     [Parameter(Mandatory = true, Position = 0)]
     [Alias("FilePath", "Path")]
-    public string InputPath { get; set; }
+    public string? InputPath { get; set; }
 
     /// <summary>
     /// Imports the specified mail file and returns its contents as a message object.

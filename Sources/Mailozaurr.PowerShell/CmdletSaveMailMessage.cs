@@ -21,12 +21,12 @@ public class CmdletSaveMailMessage : PSCmdlet {
     /// <para type="description">Specifies the <see cref="GraphEmailMessage"/> objects to save. Accepts pipeline input.</para>
     /// </summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true)]
-    public GraphEmailMessage[] Message { get; set; }
+    public GraphEmailMessage[]? Message { get; set; }
     /// <summary>
     /// <para type="description">Specifies the path where the messages will be saved.</para>
     /// </summary>
     [Parameter(Mandatory = true)]
-    public string Path { get; set; }
+    public string? Path { get; set; }
 
     /// <summary>
     /// Saves the specified mail messages to disk at the given path.

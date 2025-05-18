@@ -24,31 +24,31 @@ public class CmdletConnectOAuthO365 : PSCmdlet {
     /// <para type="description">Specifies the login (user principal name) for the Office 365 account. Optional; if not provided, interactive login is used.</para>
     /// </summary>
     [Parameter(Mandatory = false)]
-    public string Login { get; set; }
+    public string? Login { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the OAuth2 client ID from Azure AD App Registration.</para>
     /// </summary>
     [Parameter(Mandatory = true)]
-    public string ClientID { get; set; }
+    public string? ClientID { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the Azure AD tenant ID (Directory ID).</para>
     /// </summary>
     [Parameter(Mandatory = true)]
-    public string TenantID { get; set; }
+    public string? TenantID { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the redirect URI for the OAuth2 flow. Default is the recommended Microsoft URI.</para>
     /// </summary>
     [Parameter(Mandatory = false)]
-    public string RedirectUri { get; set; } = "https://login.microsoftonline.com/common/oauth2/nativeclient";
+    public string? RedirectUri { get; set; } = "https://login.microsoftonline.com/common/oauth2/nativeclient";
 
     /// <summary>
     /// <para type="description">Specifies the OAuth2 scopes to request. Default includes IMAP, POP, and SMTP permissions.</para>
     /// </summary>
     [Parameter(Mandatory = false)]
-    public string[] Scopes { get; set; } = new[] {
+    public string[]? Scopes { get; set; } = new[] {
         "email",
         "offline_access",
         "https://outlook.office.com/IMAP.AccessAsUser.All",

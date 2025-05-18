@@ -23,31 +23,31 @@ public class CmdletConnectOAuthGoogle : PSCmdlet {
     /// <para type="description">Specifies the Gmail account (email address) to authenticate.</para>
     /// </summary>
     [Parameter(Mandatory = true)]
-    public string GmailAccount { get; set; }
+    public string? GmailAccount { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the OAuth2 client ID from the Google Developer Console.</para>
     /// </summary>
     [Parameter(Mandatory = true)]
-    public string ClientID { get; set; }
+    public string? ClientID { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the OAuth2 client secret from the Google Developer Console.</para>
     /// </summary>
     [Parameter(Mandatory = true)]
-    public string ClientSecret { get; set; }
+    public string? ClientSecret { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the OAuth2 scopes to request. Default is "https://mail.google.com/".</para>
     /// </summary>
     [Parameter(Mandatory = false)]
-    public string[] Scope { get; set; } = new[] { "https://mail.google.com/" };
+    public string[]? Scope { get; set; } = new[] { "https://mail.google.com/" };
 
     /// <summary>
     /// Performs the interactive OAuth2 authentication and returns a PSCredential with the access token.
     /// </summary>
     protected override void ProcessRecord() {
-        Mailozaurr.OAuthCredential cred = null;
+        OAuthCredential? cred = null;
         try {
             cred = Task.Run(() => Mailozaurr.OAuthHelpers.AcquireGoogleTokenInteractiveAsync(GmailAccount, ClientID, ClientSecret, Scope)).GetAwaiter().GetResult();
         } catch (System.Exception ex) {

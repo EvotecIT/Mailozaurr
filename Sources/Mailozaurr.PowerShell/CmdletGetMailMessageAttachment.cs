@@ -23,32 +23,32 @@ public class CmdletGetMailMessageAttachment : PSCmdlet {
     /// <para type="description">Specifies the user principal name (email address) whose mail message attachments will be retrieved.</para>
     /// </summary>
     [Parameter(Mandatory = true)]
-    public string UserPrincipalName { get; set; }
+    public string? UserPrincipalName { get; set; }
     /// <summary>
     /// <para type="description">Specifies the message ID for which attachments will be retrieved.</para>
     /// </summary>
     [Parameter(Mandatory = true)]
-    public string MessageId { get; set; }
+    public string? MessageId { get; set; }
     /// <summary>
     /// <para type="description">Specifies the client ID for Microsoft Graph authentication.</para>
     /// </summary>
     [Parameter]
-    public string ClientId { get; set; }
+    public string? ClientId { get; set; }
     /// <summary>
     /// <para type="description">Specifies the client secret for Microsoft Graph authentication.</para>
     /// </summary>
     [Parameter]
-    public string ClientSecret { get; set; }
+    public string? ClientSecret { get; set; }
     /// <summary>
     /// <para type="description">Specifies the directory (tenant) ID for Microsoft Graph authentication.</para>
     /// </summary>
     [Parameter]
-    public string DirectoryId { get; set; }
+    public string? DirectoryId { get; set; }
     /// <summary>
     /// <para type="description">Specifies the properties to retrieve for each attachment.</para>
     /// </summary>
     [Parameter]
-    public string[] Property { get; set; }
+    public string[]? Property { get; set; }
 
     /// <summary>
     /// Retrieves attachments for the specified mail message via Microsoft Graph API.

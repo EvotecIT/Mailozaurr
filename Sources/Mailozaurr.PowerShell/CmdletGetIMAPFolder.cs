@@ -24,7 +24,7 @@ public sealed class CmdletGetIMAPFolder : AsyncPSCmdlet {
     /// <para type="description">The <see cref="ImapConnectionInfo"/> object representing the active IMAP connection. This is the object returned by <c>Connect-IMAP</c>.</para>
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
-    public ImapConnectionInfo Client { get; set; }
+    public ImapConnectionInfo? Client { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the folder access mode (ReadOnly or ReadWrite). Default is ReadOnly.</para>

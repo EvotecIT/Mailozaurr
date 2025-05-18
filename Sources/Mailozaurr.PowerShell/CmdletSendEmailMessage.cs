@@ -39,7 +39,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = true, ParameterSetName = "DefaultCredentials")]
     [Alias("SmtpServer")]
-    public string Server { get; set; }
+    public string? Server { get; set; }
 
     /// <summary>
     /// <para>Specifies the port to use on the SMTP server. The default is 587.</para>
@@ -61,7 +61,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = true, ParameterSetName = "SendGrid")]
     [Parameter(Mandatory = true, ParameterSetName = "EmailProviders")]
-    public object From { get; set; }
+    public object? From { get; set; }
 
     /// <summary>
     /// <para>Specifies the reply-to address for the email. If not set, defaults to the From address.</para>
@@ -74,7 +74,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
     [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
-    public string ReplyTo { get; set; }
+    public string? ReplyTo { get; set; }
 
     /// <summary>
     /// <para>Specifies the email addresses to which a carbon copy (CC) of the email message is sent.</para>
@@ -87,7 +87,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
     [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
-    public object[] Cc { get; set; }
+    public object[]? Cc { get; set; }
 
     /// <summary>
     /// <para>Specifies the email addresses that receive a blind carbon copy (BCC) of the email message.</para>
@@ -100,7 +100,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
     [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
-    public object[] Bcc { get; set; }
+    public object[]? Bcc { get; set; }
 
     /// <summary>
     /// <para>Specifies the recipient email addresses. Accepts a single address or an array of addresses.</para>
@@ -113,7 +113,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
     [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
-    public object[] To { get; set; }
+    public object[]? To { get; set; }
 
     /// <summary>
     /// <para>Specifies the subject of the email message.</para>
@@ -126,7 +126,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
     [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
-    public string Subject { get; set; }
+    public string? Subject { get; set; }
 
     /// <summary>
     /// <para>Specifies the priority of the email message. Acceptable values are Normal, High, and Low.</para>
@@ -151,7 +151,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     [ValidateSet("ASCII", "BigEndianUnicode", "Default", "Unicode", "UTF32", "UTF7", "UTF8")]
-    public string Encoding { get; set; } = "Default";
+    public string? Encoding { get; set; } = "Default";
 
     /// <summary>
     /// <para>Specifies the delivery notification options for the email message. Multiple options can be chosen.</para>
@@ -178,19 +178,19 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "SendGrid")]
     [Parameter(Mandatory = true, ParameterSetName = "EmailProviders")]
     [Parameter(Mandatory = true, ParameterSetName = "oAuth")]
-    public PSCredential Credential { get; set; }
+    public PSCredential? Credential { get; set; }
 
     /// <summary>
     /// <para>Specifies the username for SMTP authentication. Used with Password.</para>
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
-    public string Username { get; set; }
+    public string? Username { get; set; }
 
     /// <summary>
     /// <para>Specifies the password for SMTP authentication. Used with Username. Can be clear text or secure string.</para>
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
-    public string Password { get; set; }
+    public string? Password { get; set; }
 
     /// <summary>
     /// <para>Specifies the secure socket options for SMTP connection. Options: None, Auto, StartTls, StartTlsWhenAvailable, SslOnConnect. Default is Auto.</para>
@@ -241,7 +241,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
     [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
     [Alias("Body", "HtmlBody")]
-    public string[] HTML { get; set; }
+    public string[]? HTML { get; set; }
 
     /// <summary>
     /// <para>Specifies the plain text body of the email message. Alias: TextBody.</para>
@@ -255,7 +255,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
     [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
     [Alias("TextBody")]
-    public string[] Text { get; set; }
+    public string[]? Text { get; set; }
 
     /// <summary>
     /// <para>Specifies file paths to attach to the email message. Alias: Attachments.</para>
@@ -355,7 +355,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     /// <para>Specifies the path to save the communication log with the server.</para>
     /// </summary>
     [Parameter(Mandatory = false)]
-    public string LogPath { get; set; }
+    public string? LogPath { get; set; }
 
     /// <summary>
     /// <para>Enables logging of communication with the server to the console.</para>
@@ -385,19 +385,19 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     /// <para>Specifies the format for timestamps in the log file.</para>
     /// </summary>
     [Parameter(Mandatory = false)]
-    public string LogTimeStampsFormat { get; set; }
+    public string? LogTimeStampsFormat { get; set; }
 
     /// <summary>
     /// <para>Sets the log prefix for the server.</para>
     /// </summary>
     [Parameter(Mandatory = false)]
-    public string LogServerPrefix { get; set; }
+    public string? LogServerPrefix { get; set; }
 
     /// <summary>
     /// <para>Sets the log prefix for the client.</para>
     /// </summary>
     [Parameter(Mandatory = false)]
-    public string LogClientPrefix { get; set; }
+    public string? LogClientPrefix { get; set; }
 
     /// <summary>
     /// <para>Saves the email message to a file for troubleshooting purposes.</para>
@@ -406,7 +406,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
     [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
-    public string MimeMessagePath { get; set; }
+    public string? MimeMessagePath { get; set; }
 
     /// <summary>
     /// <para>Specifies the local domain name for the SMTP client.</para>
@@ -415,7 +415,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
     [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
-    public string LocalDomain { get; set; }
+    public string? LocalDomain { get; set; }
 
     /// <summary>
     /// <para>Enables the use of default credentials for SMTP authentication.</para>
@@ -439,7 +439,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
     [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
-    public string CertificatePath { get; set; }
+    public string? CertificatePath { get; set; }
 
     /// <summary>
     /// <para>Specifies the password for the certificate used in signing or encrypting the email.</para>
@@ -448,7 +448,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
     [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
-    public string CertificatePassword { get; set; }
+    public string? CertificatePassword { get; set; }
 
     /// <summary>
     /// <para>Indicates that the certificate password is provided as a SecureString.</para>
@@ -466,7 +466,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
     [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
-    public string CertificateThumbprint { get; set; }
+    public string? CertificateThumbprint { get; set; }
 
     /// <summary>
     /// <para>Specifies the email provider to use (e.g., SendGrid, Mailgun, etc.).</para>
@@ -517,7 +517,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             sendGrid.Attachment = Attachment;
             sendGrid.SeparateTo = SeparateTo;
             sendGrid.ErrorAction = errorAction;
-            NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
+            NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
             sendGrid.Credentials = networkCredential;
             // create JSON message
             sendGrid.CreateMessage();
@@ -535,7 +535,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
         } else if (EmailProvider == EmailProvider.Mailgun) {
             WriteVerbose("Mailgun provide is not ready yet");
             return;
-            NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
+            NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
             //MailgunClient mailgun = new MailgunClient(networkCredential, From, To, Cc, Bcc, Subject, Text, HTML);
         } else if (Graph) {
             Graph graph = new Graph();
@@ -554,7 +554,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             graph.Attachments = Attachment;
             graph.CreateAttachments();
 
-            NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
+            NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
             graph.Authenticate(networkCredential);
             var Status = graph.ConnectO365GraphAsync().GetAwaiter().GetResult();
             if (!Status.Status) {
