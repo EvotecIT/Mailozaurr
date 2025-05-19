@@ -26,7 +26,7 @@ Build-Module -ModuleName 'Mailozaurr' {
 
         ProjectUri           = 'https://github.com/EvotecIT/MailoZaurr'
 
-        PreReleaseTag        = 'Preview4'
+        PreReleaseTag        = 'Preview5'
     }
     New-ConfigurationManifest @Manifest
     # Add standard module dependencies (directly, but can be used with loop as well)
@@ -98,12 +98,14 @@ Build-Module -ModuleName 'Mailozaurr' {
         ResolveBinaryConflictsName        = 'Mailozaurr.PowerShell'
         NETProjectName                    = 'Mailozaurr.PowerShell'
         NETConfiguration                  = 'Release'
-        NETFramework                      = 'net7.0', 'net472'
+        NETFramework                      = 'net8.0', 'net472'
         NETHandleAssemblyWithSameName     = $true
         #NETMergeLibraryDebugging          = $true
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
+
+        RefreshPSD1Only                   = $true
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat #-DotSourceLibraries -DotSourceClasses -MergeModuleOnBuild -Enable -SignModule -DeleteTargetModuleBeforeBuild -CertificateThumbprint '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703' -MergeFunctionsFromApprovedModules

@@ -1,4 +1,5 @@
 ﻿namespace Mailozaurr;
+
 /// <summary>
 /// Internal logger that allows to write to console, error or wherever else is needed
 /// </summary>
@@ -6,73 +7,81 @@ public class InternalLogger {
     private readonly object _lock = new object();
 
     /// <summary>
-    /// Define Verbose message event
+    /// Occurs when a verbose message is logged.
     /// </summary>
     public event EventHandler<LogEventArgs> OnVerboseMessage;
 
     /// <summary>
-    /// Define Warning message event
+    /// Occurs when a warning message is logged.
     /// </summary>
     public event EventHandler<LogEventArgs> OnWarningMessage;
 
     /// <summary>
-    /// Define Error message event
+    /// Occurs when an error message is logged.
     /// </summary>
     public event EventHandler<LogEventArgs> OnErrorMessage;
 
     /// <summary>
-    /// Define Debug message event
+    /// Occurs when a debug message is logged.
     /// </summary>
     public event EventHandler<LogEventArgs> OnDebugMessage;
 
     /// <summary>
-    /// Define Progress message event
+    /// Occurs when a progress message is logged.
     /// </summary>
     public event EventHandler<LogEventArgs> OnProgressMessage;
 
     /// <summary>
-    /// Define Information message event
+    /// Occurs when an information message is logged.
     /// </summary>
     public event EventHandler<LogEventArgs> OnInformationMessage;
 
     /// <summary>
-    /// If true, will write verbose messages to console
+    /// Gets or sets a value indicating whether verbose messages should be logged.
     /// </summary>
     public bool IsVerbose { get; set; }
 
     /// <summary>
-    /// If true, will write error messages to console
+    /// Gets or sets a value indicating whether error messages should be logged.
     /// </summary>
     public bool IsError { get; set; }
 
     /// <summary>
-    /// If true, will write warning messages to console
+    /// Gets or sets a value indicating whether warning messages should be logged.
     /// </summary>
     public bool IsWarning { get; set; }
 
     /// <summary>
-    /// If true, will write debug messages to console
+    /// Gets or sets a value indicating whether debug messages should be logged.
     /// </summary>
     public bool IsDebug { get; set; }
 
     /// <summary>
-    /// If true, will write information messages to console
+    /// Gets or sets a value indicating whether information messages should be logged.
     /// </summary>
     public bool IsInformation { get; set; }
 
     /// <summary>
-    /// if true, will write progress messages to console
+    /// Gets or sets a value indicating whether progress messages should be logged.
     /// </summary>
     public bool IsProgress { get; set; }
 
     /// <summary>
-    /// Initialize logger
+    /// Initializes a new instance of the <see cref="InternalLogger"/> class.
     /// </summary>
-    /// <param name="isVerbose"></param>
+    /// <param name="isVerbose">If set to <c>true</c>, verbose messages will be logged.</param>
     public InternalLogger(bool isVerbose = false) {
         IsVerbose = isVerbose;
     }
 
+    /// <summary>
+    /// Writes a progress message to the console and invokes the OnProgressMessage event.
+    /// </summary>
+    /// <param name="activity">The activity being logged.</param>
+    /// <param name="currentOperation">The current operation being logged.</param>
+    /// <param name="percentCompleted">The percentage of the operation that is completed.</param>
+    /// <param name="currentSteps">The current step of the operation (optional).</param>
+    /// <param name="totalSteps">The total steps of the operation (optional).</param>
     public void WriteProgress(string activity, string currentOperation, int percentCompleted, int? currentSteps = null, int? totalSteps = null) {
         lock (_lock) {
             OnProgressMessage?.Invoke(this, new LogEventArgs(activity, currentOperation, currentSteps, totalSteps, totalSteps));
@@ -86,6 +95,10 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>
+    /// Writes an error message to the console and invokes the OnErrorMessage event.
+    /// </summary>
+    /// <param name="message">The error message to be logged.</param>
     public void WriteError(string message) {
         lock (_lock) {
             OnErrorMessage?.Invoke(this, new LogEventArgs(message));
@@ -95,6 +108,11 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>
+    /// Writes a formatted error message to the console and invokes the OnErrorMessage event.
+    /// </summary>
+    /// <param name="message">The error message to be logged, with format items.</param>
+    /// <param name="args">An array of objects to write using format.</param>
     public void WriteError(string message, params object[] args) {
         lock (_lock) {
             OnErrorMessage?.Invoke(this, new LogEventArgs(string.Format(message, args)));
@@ -104,6 +122,10 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>
+    /// Writes a warning message to the console and invokes the OnWarningMessage event.
+    /// </summary>
+    /// <param name="message">The warning message to be logged.</param>
     public void WriteWarning(string message) {
         lock (_lock) {
             OnWarningMessage?.Invoke(this, new LogEventArgs(message));
@@ -113,6 +135,11 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>
+    /// Writes a formatted warning message to the console and invokes the OnWarningMessage event.
+    /// </summary>
+    /// <param name="message">The warning message to be logged, with format items.</param>
+    /// <param name="args">An array of objects to write using format.</param>
     public void WriteWarning(string message, params object[] args) {
         lock (_lock) {
             OnWarningMessage?.Invoke(this, new LogEventArgs(string.Format(message, args)));
@@ -122,6 +149,10 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>
+    /// Writes a verbose message to the console and invokes the OnVerboseMessage event.
+    /// </summary>
+    /// <param name="message">The verbose message to be logged.</param>
     public void WriteVerbose(string message) {
         lock (_lock) {
             OnVerboseMessage?.Invoke(this, new LogEventArgs(message));
@@ -131,6 +162,11 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>
+    /// Writes a formatted verbose message to the console and invokes the OnVerboseMessage event.
+    /// </summary>
+    /// <param name="message">The verbose message to be logged, with format items.</param>
+    /// <param name="args">An array of objects to write using format.</param>
     public void WriteVerbose(string message, params object[] args) {
         lock (_lock) {
             OnVerboseMessage?.Invoke(this, new LogEventArgs(message, args));
@@ -140,6 +176,11 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>
+    /// Writes a debug message to the console and invokes the OnDebugMessage event.
+    /// </summary>
+    /// <param name="message">The debug message to be logged.</param>
+    /// <param name="args">An array of objects to write using format.</param>
     public void WriteDebug(string message, params object[] args) {
         lock (_lock) {
             OnDebugMessage?.Invoke(this, new LogEventArgs(message, args));
@@ -149,6 +190,11 @@ public class InternalLogger {
         }
     }
 
+    /// <summary>
+    /// Writes an information message to the console and invokes the OnInformationMessage event.
+    /// </summary>
+    /// <param name="message">The information message to be logged.</param>
+    /// <param name="args">An array of objects to write using format.</param>
     public void WriteInformation(string message, params object[] args) {
         lock (_lock) {
             OnInformationMessage?.Invoke(this, new LogEventArgs(message, args));
@@ -159,6 +205,10 @@ public class InternalLogger {
     }
 }
 
+/// <summary>
+/// Represents the arguments for a log event.
+/// </summary>
+/// <seealso cref="System.EventArgs" />
 public class LogEventArgs : EventArgs {
     /// <summary>
     /// Progress percentage
@@ -195,19 +245,42 @@ public class LogEventArgs : EventArgs {
     /// </summary>
     public string Message { get; set; }
 
+    /// <summary>
+    /// Gets or sets the arguments.
+    /// </summary>
+    /// <value>
+    /// The arguments.
+    /// </value>
     public object[] Args { get; set; }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LogEventArgs"/> class.
+    /// </summary>
+    /// <param name="message">The message.</param>
+    /// <param name="args">The arguments.</param>
     public LogEventArgs(string message, object[] args) {
         Message = message;
         Args = args;
         FullMessage = string.Format(message, args);
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LogEventArgs"/> class.
+    /// </summary>
+    /// <param name="message">The message.</param>
     public LogEventArgs(string message) {
         Message = message;
         FullMessage = message;
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LogEventArgs"/> class.
+    /// </summary>
+    /// <param name="activity">The activity.</param>
+    /// <param name="currentOperation">The current operation.</param>
+    /// <param name="currentSteps">The current steps.</param>
+    /// <param name="totalSteps">The total steps.</param>
+    /// <param name="percentage">The percentage.</param>
     public LogEventArgs(string activity, string currentOperation, int? currentSteps, int? totalSteps, int? percentage) {
         ProgressActivity = activity;
         ProgressCurrentOperation = currentOperation;

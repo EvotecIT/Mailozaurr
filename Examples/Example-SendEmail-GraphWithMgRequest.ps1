@@ -7,12 +7,12 @@ $Body = EmailBody {
 }
 
 # authorize via Connect-MgGraph with delegated rights or any other supported method
-Connect-MgGraph -Scopes Mail.Send
+Connect-MgGraph -Scopes Mail.Send -NoWelcome
 
 # sending email
 $sendEmailMessageSplat = @{
-    From           = 'przemyslaw.klys@test.pl'
-    To             = 'przemyslaw.klys@test.pl'
+    From           = 'przemyslaw.klys@evotec.pl'
+    To             = 'przemyslaw.klys@evotec.pl'
     HTML           = $Body
     Subject        = 'This tests email as delegated'
     MgGraphRequest = $true

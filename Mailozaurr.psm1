@@ -1,7 +1,7 @@
 ﻿# to speed up development adding direct path to binaries, instead of the the Lib folder
 $Development = $true
 $DevelopmentPath = "$PSScriptRoot\Sources\Mailozaurr.PowerShell\bin\Debug"
-$DevelopmentFolderCore = "net7.0"
+$DevelopmentFolderCore = "net8.0"
 $DevelopmentFolderDefault = "net472"
 $BinaryModules = @(
     "Mailozaurr.PowerShell.dll"
@@ -109,7 +109,7 @@ $FoundErrors = @(
             }
         }
     }
-    Foreach ($Import in @($Assembly)) {
+    foreach ($Import in @($Assembly)) {
         try {
             # Write-Warning -Message $Import.FullName
             Add-Type -Path $Import.Fullname -ErrorAction Stop
@@ -132,10 +132,10 @@ $FoundErrors = @(
         }
     }
     #Dot source the files
-    Foreach ($Import in @($Classes + $Enums + $Private + $Public)) {
-        Try {
+    foreach ($Import in @($Classes + $Enums + $Private + $Public)) {
+        try {
             . $Import.Fullname
-        } Catch {
+        } catch {
             Write-Error -Message "Failed to import functions from $($import.Fullname): $_"
             $true
         }

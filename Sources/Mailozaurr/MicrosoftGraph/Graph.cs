@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-using System.Net.Http;
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 
 namespace Mailozaurr;
 
@@ -28,9 +26,13 @@ public class Graph {
     public string[]? Attachments { get; set; }
 
     /// <summary>
-    /// Gets or sets the email address of the sender.
+    /// Gets or sets the sender. Can be a string (email) or a dictionary with Name and Email.
+    ///
+    /// Note: The display name ("Name") for the sender is controlled by Office 365 and may not reflect the value you provide here.
+    /// Office 365 will use the mailbox's configured display name for the sender, regardless of what is set in the payload.
+    /// The email address must be used for API calls and authentication.
     /// </summary>
-    public string From { get; set; }
+    public object From { get; set; }
 
     /// <summary>
     /// Gets or sets the email address to reply to.
@@ -105,7 +107,7 @@ public class Graph {
     /// <summary>
     /// The email address that the message was sent from.
     /// </summary>
-    public string SentFrom => From;
+    public string SentFrom => Helpers.GetEmailAddress(From);
 
     /// <summary>
     /// A comma-separated list of email addresses that the message was sent to.
@@ -136,12 +138,15 @@ public class Graph {
     /// </summary>
     public bool RequestDeliveryReceipt { get; set; }
 
+    public LogCollector LogCollector { get; set; } = new();
+
     /// <summary>
     /// Initializes a new instance of the Graph class.
     /// </summary>
     public Graph() {
         Stopwatch = Stopwatch.StartNew();
         _client = new HttpClient();
+        if (LogCollector == null) LogCollector = new();
     }
 
     public void CreateAttachments() {
@@ -160,7 +165,9 @@ public class Graph {
     }
 
     public void CreateMessage() {
-        // Convert the GraphMessage to a JSON string.
+        // Note: The display name for the sender is controlled by Office 365 and may not reflect the value you provide here.
+        // Office 365 will use the mailbox's configured display name for the sender, regardless of what is set in the payload.
+        // Always use the email address for API calls and authentication.
         MessageContainer = new GraphMessageContainer {
             Message = new GraphMessage {
                 From = ConvertToGraphEmailAddress(From),
@@ -179,7 +186,6 @@ public class Graph {
             MessageContainer.Message.Attachments = ConvertedAttachments;
         }
 
-        // Convert the GraphMessage to a JSON string.
         var options = new JsonSerializerOptions() {
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
             //WriteIndented = true
@@ -202,16 +208,15 @@ public class Graph {
         if (email == null) {
             return null;
         }
-
-        return new GraphEmailAddress { Email = new GraphEmail { Address = email.ToString() } };
+        var address = Helpers.GetEmailAddress(email);
+        return new GraphEmailAddress { Email = new GraphEmail { Address = address } };
     }
 
     private List<GraphEmailAddress>? ConvertToGraphEmailAddress(object[]? emails) {
         if (emails == null) {
             return null;
         }
-
-        return emails.Select(email => new GraphEmailAddress { Email = new GraphEmail { Address = email.ToString() } }).ToList();
+        return emails.Select(email => new GraphEmailAddress { Email = new GraphEmail { Address = Helpers.GetEmailAddress(email) } }).ToList();
     }
 
     public async Task<SmtpResult> ConnectO365GraphAsync() {
@@ -230,7 +235,7 @@ public class Graph {
         try {
             response = await _client.PostAsync($"https://login.microsoftonline.com/{TenantDomain}/oauth2/token", new FormUrlEncodedContent(body));
         } catch (Exception ex) {
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during connection using Graph API: {ex.Message}");
+            LogCollector.LogWarning($"Send-EmailMessage - Error during connection using Graph API: {ex.Message}");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
@@ -250,7 +255,7 @@ public class Graph {
             TokenType = authorization.TokenType;
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", "");
         } catch (Exception ex) {
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during connection using Graph API: {ex.Message}");
+            LogCollector.LogWarning($"Send-EmailMessage - Error during connection using Graph API: {ex.Message}");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
@@ -261,8 +266,7 @@ public class Graph {
     public async Task<SmtpResult> SendMessageAsync() {
         // create message
         CreateMessage();
-
-        LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Sending email via Graph API");
+        LogCollector.LogVerbose("Send-EmailMessage - Sending email via Graph API");
         // Create the HTTP request.
         var requestUri = "https://graph.microsoft.com/v1.0/users/" + MessageContainer.Message.From.Email.Address + "/sendMail";
         var request = new HttpRequestMessage(HttpMethod.Post, requestUri) {
@@ -285,10 +289,12 @@ public class Graph {
             }
             // If the status code indicates an error, throw an exception with the content.
             var error = JsonSerializer.Deserialize<GraphApiError>(content);
-            var errorMessage = $"Error code: {error.Error.Code}, message: {error.Error.Message}, request ID: {error.Error.InnerError.RequestId}, date: {error.Error.InnerError.Date}";
+            var errorMessage = (error == null || error.Error == null || error.Error.InnerError == null)
+                ? $"Unknown error: {content}"
+                : $"Error code: {error.Error.Code}, message: {error.Error.Message}, request ID: {error.Error.InnerError.RequestId}, date: {error.Error.InnerError.Date}";
             throw new HttpRequestException(errorMessage);
         } catch (Exception ex) {
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
+            LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
@@ -326,7 +332,9 @@ public class Graph {
         // If the status code indicates an error, throw an exception with the content
         var sendContent = await sendResponse.Content.ReadAsStringAsync();
         var sendError = JsonSerializer.Deserialize<GraphApiError>(sendContent);
-        var sendErrorMessage = $"Error code: {sendError.Error.Code}, message: {sendError.Error.Message}, request ID: {sendError.Error.InnerError.RequestId}, date: {sendError.Error.InnerError.Date}";
+        var sendErrorMessage = (sendError == null || sendError.Error == null || sendError.Error.InnerError == null)
+            ? $"Unknown error: {sendContent}"
+            : $"Error code: {sendError.Error.Code}, message: {sendError.Error.Message}, request ID: {sendError.Error.InnerError.RequestId}, date: {sendError.Error.InnerError.Date}";
         throw new HttpRequestException(sendErrorMessage);
     }
 
@@ -359,7 +367,9 @@ public class Graph {
 
         if (!draftResponse.IsSuccessStatusCode) {
             var error = JsonSerializer.Deserialize<GraphApiError>(draftContent);
-            var errorMessage = error != null ? $"Error code: {error.Error.Code}, message: {error.Error.Message}" : "Unknown error";
+            var errorMessage = (error == null || error.Error == null)
+                ? $"Unknown error: {draftContent}"
+                : $"Error code: {error.Error.Code}, message: {error.Error.Message}";
             throw new HttpRequestException(errorMessage);
         }
 

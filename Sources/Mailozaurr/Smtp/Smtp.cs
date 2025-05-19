@@ -125,7 +125,7 @@ public class Smtp {
     public ActionPreference? ErrorAction { get; set; }
 
     public string SentTo => Client.SentTo;
-    public string SentFrom => Client.SentFrom;
+    public string SentFrom => Helpers.GetEmailAddress(From);
 
     public readonly Stopwatch Stopwatch;
 

@@ -1,5 +1,6 @@
 ﻿namespace Mailozaurr;
 public enum EmailProvider {
+    None,
     SendGrid,
     Mailgun,
     //MailChimp,

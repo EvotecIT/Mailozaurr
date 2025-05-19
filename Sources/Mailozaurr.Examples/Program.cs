@@ -2,4 +2,4 @@
 
 Console.WriteLine("Hello, World!");
 
-var client = new ClientSmtp();
+var client = new ClientSmtp(); ;
