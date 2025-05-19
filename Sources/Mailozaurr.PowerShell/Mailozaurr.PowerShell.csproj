@@ -30,11 +30,6 @@
         <Delete Files="$(OutDir)System.Management.dll" />
     </Target>
 
-
-    <PropertyGroup Condition=" '$(TargetFramework)' == 'net472' ">
-        <DefineConstants>$(DefineConstants);FRAMEWORK</DefineConstants>
-    </PropertyGroup>
-
     <ItemGroup>
         <Using Include="Mailozaurr" />
         <Using Include="System.Collections" />
@@ -50,7 +45,6 @@
         <Using Include="System.Net" />
         <Using Include="System.Diagnostics" />
     </ItemGroup>
-
 
     <PropertyGroup>
         <!-- This is needed for XmlDoc2CmdletDoc to generate a PowerShell documentation file. -->
