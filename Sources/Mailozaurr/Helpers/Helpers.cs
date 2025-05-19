@@ -44,7 +44,7 @@ public static class Helpers {
         return email;
     }
 
-    public static (string Email, string Name) GetEmailAndName(object from) {
+    public static (string Email, string? Name) GetEmailAndName(object from) {
         if (from is string s) {
             return (s, null);
         }
