@@ -29,18 +29,6 @@ Build-Module -ModuleName 'Mailozaurr' {
         PreReleaseTag        = 'Preview5'
     }
     New-ConfigurationManifest @Manifest
-    # Add standard module dependencies (directly, but can be used with loop as well)
-    New-ConfigurationModule -Type RequiredModule -Name 'PSSharedGoods' -Guid 'Auto' -Version 'Latest'
-    # Add external module dependencies, using loop for simplicity
-    New-ConfigurationModule -Type ExternalModule -Name 'Microsoft.PowerShell.Utility', 'Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Security'
-    # Add approved modules, that can be used as a dependency, but only when specific function from those modules is used
-    # And on that time only that function and dependant functions will be copied over
-    # Keep in mind it has it's limits when "copying" functions such as it should not depend on DLLs or other external files
-    New-ConfigurationModule -Type ApprovedModule -Name 'PSSharedGoods', 'PSWriteColor', 'Connectimo', 'PSUnifi', 'PSWebToolbox', 'PSMyPassword'
-
-    New-ConfigurationModuleSkip -IgnoreModuleName 'Microsoft.Graph.Authentication' -IgnoreFunc @(
-        'Resolve-DnsName'
-    )
 
     $ConfigurationFormat = [ordered] @{
         RemoveComments                              = $false
@@ -105,7 +93,7 @@ Build-Module -ModuleName 'Mailozaurr' {
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
 
-        RefreshPSD1Only                   = $true
+        #RefreshPSD1Only                   = $true
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat #-DotSourceLibraries -DotSourceClasses -MergeModuleOnBuild -Enable -SignModule -DeleteTargetModuleBeforeBuild -CertificateThumbprint '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703' -MergeFunctionsFromApprovedModules
