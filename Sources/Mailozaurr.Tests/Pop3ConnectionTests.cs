@@ -1,12 +1,9 @@
 using Xunit;
 
-namespace Mailozaurr.Tests
-{
-    public class Pop3ConnectionTests
-    {
+namespace Mailozaurr.Tests {
+    public class Pop3ConnectionTests {
         [Fact]
-        public void Pop3_Connect_WithValidCredentials_Succeeds()
-        {
+        public void Pop3_Connect_WithValidCredentials_Succeeds() {
             // Arrange
             // TODO: Setup valid POP3 credentials
 
@@ -18,8 +15,7 @@ namespace Mailozaurr.Tests
         }
 
         [Fact]
-        public void Pop3_Connect_WithInvalidCredentials_Fails()
-        {
+        public void Pop3_Connect_WithInvalidCredentials_Fails() {
             // Arrange
             // TODO: Setup invalid POP3 credentials
 
@@ -31,8 +27,7 @@ namespace Mailozaurr.Tests
         }
 
         [Fact]
-        public void Pop3_Connect_WithTimeout_Fails()
-        {
+        public void Pop3_Connect_WithTimeout_Fails() {
             // Arrange
             // TODO: Setup POP3 connection with forced timeout
 
@@ -44,8 +39,7 @@ namespace Mailozaurr.Tests
         }
 
         [Fact]
-        public void Pop3_FetchMessageList_Succeeds()
-        {
+        public void Pop3_FetchMessageList_Succeeds() {
             // Arrange
             // TODO: Setup valid POP3 connection
 

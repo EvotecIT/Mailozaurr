@@ -3,13 +3,10 @@ using Mailozaurr;
 using System.Net;
 using System.Threading.Tasks;
 
-namespace Mailozaurr.Tests
-{
-    public class SendEmailBasicTests
-    {
+namespace Mailozaurr.Tests {
+    public class SendEmailBasicTests {
         [Fact]
-        public void SendEmail_Smtp_WithValidInput_Succeeds()
-        {
+        public void SendEmail_Smtp_WithValidInput_Succeeds() {
             // Arrange
             var smtp = new Smtp();
             smtp.From = "sender@example.com";
@@ -27,8 +24,7 @@ namespace Mailozaurr.Tests
         }
 
         [Fact]
-        public async Task SendEmail_SendGrid_WithValidInput_Succeeds()
-        {
+        public async Task SendEmail_SendGrid_WithValidInput_Succeeds() {
             // Arrange
             var sendGrid = new SendGridClient();
             sendGrid.From = "sender@example.com";
@@ -47,8 +43,7 @@ namespace Mailozaurr.Tests
         }
 
         [Fact]
-        public async Task SendEmail_Graph_WithValidInput_Succeeds()
-        {
+        public async Task SendEmail_Graph_WithValidInput_Succeeds() {
             // Arrange
             var graph = new Graph();
             graph.From = "sender@example.com";
@@ -67,8 +62,7 @@ namespace Mailozaurr.Tests
         }
 
         [Fact]
-        public void SendEmail_WithInvalidEmailAddress_Fails()
-        {
+        public void SendEmail_WithInvalidEmailAddress_Fails() {
             // Arrange
             // TODO: Setup email with invalid address
 
@@ -80,8 +74,7 @@ namespace Mailozaurr.Tests
         }
 
         [Fact]
-        public void SendEmail_WithMissingSubjectOrBody_Fails()
-        {
+        public void SendEmail_WithMissingSubjectOrBody_Fails() {
             // Arrange
             // TODO: Setup email with missing subject/body
 
@@ -93,8 +86,7 @@ namespace Mailozaurr.Tests
         }
 
         [Fact]
-        public void SendEmail_WithAttachment_Succeeds()
-        {
+        public void SendEmail_WithAttachment_Succeeds() {
             // Arrange
             // TODO: Setup email with attachment
 

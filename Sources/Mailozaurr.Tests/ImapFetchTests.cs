@@ -1,12 +1,9 @@
 using Xunit;
 
-namespace Mailozaurr.Tests
-{
-    public class ImapFetchTests
-    {
+namespace Mailozaurr.Tests {
+    public class ImapFetchTests {
         [Fact]
-        public void Imap_Fetch_WithValidMailbox_Succeeds()
-        {
+        public void Imap_Fetch_WithValidMailbox_Succeeds() {
             // Arrange
             // TODO: Setup valid IMAP mailbox
 
@@ -18,8 +15,7 @@ namespace Mailozaurr.Tests
         }
 
         [Fact]
-        public void Imap_Fetch_WithInvalidMailbox_Fails()
-        {
+        public void Imap_Fetch_WithInvalidMailbox_Fails() {
             // Arrange
             // TODO: Setup invalid IMAP mailbox
 
@@ -31,8 +27,7 @@ namespace Mailozaurr.Tests
         }
 
         [Fact]
-        public void Imap_Fetch_UnreadMessages_Succeeds()
-        {
+        public void Imap_Fetch_UnreadMessages_Succeeds() {
             // Arrange
             // TODO: Setup valid IMAP mailbox with unread messages
 
@@ -44,8 +39,7 @@ namespace Mailozaurr.Tests
         }
 
         [Fact]
-        public void Imap_Fetch_WithInvalidCredentials_Fails()
-        {
+        public void Imap_Fetch_WithInvalidCredentials_Fails() {
             // Arrange
             // TODO: Setup invalid IMAP credentials
 
