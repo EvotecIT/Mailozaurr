@@ -46,7 +46,7 @@ Additional dependencies due to features added
 
 - [System.DataSQLite](https://system.data.sqlite.org/)
 
-This started with a single goal to replace `Send-MailMessage` which is depracated/obsolete with something more modern, but since MailKit and MimeKit have lots of options why not build on that?
+This started with a single goal to replace `Send-MailMessage` which is deprecated/obsolete with something more modern, but since MailKit and MimeKit have lots of options why not build on that?
 
 ## Support This Project
 
@@ -133,7 +133,7 @@ Following permissions (as shown on the screenshot) are required to send emails u
 
 ![Microsoft Graph Permissions](https://raw.githubusercontent.com/EvotecIT/Mailozaurr/refs/heads/v2-speedygonzales/Docs/Images/MicrosoftGraphPermissions.png)
 
-The rest of the permissins is not required and is there for other features that Microsoft Graph provides.
+The rest of the permissions is not required and is there for other features that Microsoft Graph provides.
 
 ## To install
 
