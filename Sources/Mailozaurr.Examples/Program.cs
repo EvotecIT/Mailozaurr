@@ -1,5 +1,17 @@
-﻿using Mailozaurr;
+﻿using System.Threading.Tasks;
 
-Console.WriteLine("Hello, World!");
+class Program {
+    static async Task Main(string[] args) {
+        // Uncomment the example you want to run:
 
-var client = new ClientSmtp(); ;
+        // SendEmailGmail.Run();
+        await SendEmailGraphClientSecret.RunAsync();
+        // await SendEmailGraphCertificate.RunAsync();
+    }
+}
+
+// See individual example files for usage of Mailozaurr.
+// Examples:
+//   - SmtpGmailExample.cs
+//   - GraphClientSecretExample.cs
+//   - GraphCertificateExample.cs
