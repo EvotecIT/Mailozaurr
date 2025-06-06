@@ -107,7 +107,7 @@ Accept wildcard characters: False
 ```
 
 ### -AsObject
-Returns an object rather than string based represantation for name servers (for easier display purposes)
+Returns an object rather than string based representation for name servers (for easier display purposes)
 
 ```yaml
 Type: SwitchParameter
