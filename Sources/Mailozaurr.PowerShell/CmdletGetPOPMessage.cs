@@ -54,7 +54,7 @@ public sealed class CmdletGetPOPMessage : AsyncPSCmdlet {
     protected override Task ProcessRecordAsync() {
         if (Client != null && Client.Data != null) {
             if (All.IsPresent) {
-                var messages = Client.Data.GetMessages(Index, Count);
+                var messages = Client.Data.GetMessages(0, Client.Data.Count);
                 WriteObject(messages, true);
             } else {
                 if (Index < Client.Data.Count) {
