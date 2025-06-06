@@ -46,7 +46,7 @@ Additional dependencies due to features added
 
 - [System.DataSQLite](https://system.data.sqlite.org/)
 
-This started with a single goal to replace `Send-MailMessage` which is depracated/obsolete with something more modern, but since MailKit and MimeKit have lots of options why not build on that?
+This started with a single goal to replace `Send-MailMessage` which is deprecated/obsolete with something more modern, but since MailKit and MimeKit have lots of options why not build on that?
 
 ## Support This Project
 

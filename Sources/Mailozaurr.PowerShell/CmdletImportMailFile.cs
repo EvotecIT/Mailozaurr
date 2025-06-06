@@ -54,7 +54,7 @@ public sealed class CmdletImportMailFile : AsyncPSCmdlet {
                     WriteWarning($"Import-MailFile - File {InputPath} is not a .msg or .eml file.");
                 }
             } catch (System.Exception ex) {
-                WriteWarning($"Import-MailFile - File {InputPath} is not a .msg or .eml file or another error occured. Error: {ex.Message}");
+                WriteWarning($"Import-MailFile - File {InputPath} is not a .msg or .eml file or another error occurred. Error: {ex.Message}");
             }
         } else {
             WriteWarning($"Import-MailFile - File {InputPath} doesn't exist.");

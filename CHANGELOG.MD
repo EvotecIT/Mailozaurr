@@ -29,8 +29,8 @@
 
 #### 2.0.0 - Preview 4 - 2024.03.04
 - Update to DLLs to latest versions
-- Removes some unnessecary DLLs
-- Different way to build module and load depenedencies
+- Removes some unnecessary DLLs
+- Different way to build module and load dependencies
 - Removal of DLLs from source codes
 - Small updates to DLLs
 - Add new DLLs
