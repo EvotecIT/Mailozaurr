@@ -1,4 +1,6 @@
 ﻿Describe 'Send-EmailMessage' {
+    $Body = '<b>Test</b>'
+    $Text = 'Test'
     It 'Send email using given parameters (SMTP)' {
         $sendEmailMessageSplat = @{
             From                       = @{ Name = 'Przemysław Kłys'; Email = 'test@evotec.pl' }
