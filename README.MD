@@ -133,7 +133,7 @@ Following permissions (as shown on the screenshot) are required to send emails u
 
 ![Microsoft Graph Permissions](https://raw.githubusercontent.com/EvotecIT/Mailozaurr/refs/heads/v2-speedygonzales/Docs/Images/MicrosoftGraphPermissions.png)
 
-The rest of the permissins is not required and is there for other features that Microsoft Graph provides.
+The rest of the permissions is not required and is there for other features that Microsoft Graph provides.
 
 ## To install
 
