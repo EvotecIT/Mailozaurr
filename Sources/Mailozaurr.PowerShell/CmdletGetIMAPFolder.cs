@@ -39,13 +39,13 @@ public sealed class CmdletGetIMAPFolder : AsyncPSCmdlet {
         if (Client != null) {
             var folder = Client.Data.Inbox;
             folder.Open(FolderAccess);
-            WriteVerbose($"Get-IMAPMessage - Total messages {folder.Count}, Recent messages {folder.Recent}");
+            WriteVerbose($"Get-IMAPFolder - Total messages {folder.Count}, Recent messages {folder.Recent}");
             Client.Messages = folder;
             Client.Count = folder.Count;
             Client.Recent = folder.Recent;
             WriteObject(Client);
         } else {
-            WriteVerbose("Get-IMAPMessage - Client not connected?");
+            WriteVerbose("Get-IMAPFolder - Client not connected?");
         }
         return Task.CompletedTask;
     }
