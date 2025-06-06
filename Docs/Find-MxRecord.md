@@ -143,7 +143,7 @@ Accept wildcard characters: False
 ```
 
 ### -Separate
-Returns each MX record separatly
+Returns each MX record separately
 
 ```yaml
 Type: SwitchParameter
@@ -158,7 +158,7 @@ Accept wildcard characters: False
 ```
 
 ### -AsObject
-Returns an object rather than string based represantation for name servers (for easier display purposes)
+Returns an object rather than string based representation for name servers (for easier display purposes)
 
 ```yaml
 Type: SwitchParameter
