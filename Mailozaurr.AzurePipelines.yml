@@ -1,49 +1,294 @@
-jobs:
-  - job: Windows_PowerShell_5
+trigger: none
+pr: none
+
+variables:
+  buildConfiguration: 'Debug'
+  dotNetVersion: '8.x'
+
+stages:
+# .NET Testing Stage - Core functionality testing
+- stage: DotNetTests
+  displayName: '.NET Build & Test'
+  jobs:
+  - job: DotNet_Windows
+    displayName: '.NET Tests - Windows'
     pool:
-      vmImage: windows-latest
+      vmImage: 'windows-latest'
     steps:
+      - task: UseDotNet@2
+        displayName: 'Install .NET SDK'
+        inputs:
+          packageType: 'sdk'
+          version: $(dotNetVersion)
+
+      - task: DotNetCoreCLI@2
+        displayName: 'Restore .NET Dependencies'
+        inputs:
+          command: 'restore'
+          projects: 'Sources/Mailozaurr.sln'
+
+      - task: DotNetCoreCLI@2
+        displayName: 'Build .NET Solution'
+        inputs:
+          command: 'build'
+          projects: 'Sources/Mailozaurr.sln'
+          arguments: '--configuration $(buildConfiguration) --no-restore'
+
+      - task: DotNetCoreCLI@2
+        displayName: 'Run .NET Tests'
+        inputs:
+          command: 'test'
+          projects: 'Sources/Mailozaurr.sln'
+          arguments: '--configuration $(buildConfiguration) --no-build --logger trx --collect:"XPlat Code Coverage"'
+
+      - task: PublishTestResults@2
+        displayName: 'Publish .NET Test Results'
+        inputs:
+          testResultsFormat: 'VSTest'
+          testResultsFiles: '**/*.trx'
+          mergeTestResults: true
+        condition: succeededOrFailed()
+
+  - job: DotNet_Ubuntu
+    displayName: '.NET Tests - Ubuntu'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+      - task: UseDotNet@2
+        displayName: 'Install .NET SDK'
+        inputs:
+          packageType: 'sdk'
+          version: $(dotNetVersion)
+
+      - task: DotNetCoreCLI@2
+        displayName: 'Restore .NET Dependencies'
+        inputs:
+          command: 'restore'
+          projects: 'Sources/Mailozaurr.sln'
+
+      - task: DotNetCoreCLI@2
+        displayName: 'Build .NET Solution'
+        inputs:
+          command: 'build'
+          projects: 'Sources/Mailozaurr.sln'
+          arguments: '--configuration $(buildConfiguration) --no-restore'
+
+      - task: DotNetCoreCLI@2
+        displayName: 'Run .NET Tests'
+        inputs:
+          command: 'test'
+          projects: 'Sources/Mailozaurr.sln'
+          arguments: '--configuration $(buildConfiguration) --no-build --logger trx'
+
+  - job: DotNet_MacOS
+    displayName: '.NET Tests - macOS'
+    pool:
+      vmImage: 'macos-latest'
+    steps:
+      - task: UseDotNet@2
+        displayName: 'Install .NET SDK'
+        inputs:
+          packageType: 'sdk'
+          version: $(dotNetVersion)
+
+      - task: DotNetCoreCLI@2
+        displayName: 'Restore .NET Dependencies'
+        inputs:
+          command: 'restore'
+          projects: 'Sources/Mailozaurr.sln'
+
+      - task: DotNetCoreCLI@2
+        displayName: 'Build .NET Solution'
+        inputs:
+          command: 'build'
+          projects: 'Sources/Mailozaurr.sln'
+          arguments: '--configuration $(buildConfiguration) --no-restore'
+
+      - task: DotNetCoreCLI@2
+        displayName: 'Run .NET Tests'
+        inputs:
+          command: 'test'
+          projects: 'Sources/Mailozaurr.sln'
+          arguments: '--configuration $(buildConfiguration) --no-build --logger trx'
+
+# PowerShell Testing Stage - Module integration testing (independent of .NET stage)
+- stage: PowerShellTests
+  displayName: 'PowerShell Module Tests'
+  condition: always()
+  jobs:
+  - job: PowerShell_Windows_PS5
+    displayName: 'PowerShell 5.1 - Windows'
+    pool:
+      vmImage: 'windows-latest'
+    steps:
+      - task: UseDotNet@2
+        displayName: 'Install .NET SDK'
+        inputs:
+          packageType: 'sdk'
+          version: $(dotNetVersion)
+
+      - task: DotNetCoreCLI@2
+        displayName: 'Build .NET Solution'
+        inputs:
+          command: 'build'
+          projects: 'Sources/Mailozaurr.sln'
+          arguments: '--configuration $(buildConfiguration)'
+
       - powershell: |
-          Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck
-          .\Mailozaurr.Tests.ps1 -Verbose
-        displayName: "Run Tests on Windows PowerShell 5.1"
+          Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
+          Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+          Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+        displayName: "Install Required PowerShell Modules"
 
-  - job: Windows_PowerShell_7
+      - powershell: |
+          .\Mailozaurr.Tests.ps1
+        displayName: "Run PowerShell Tests (PS 5.1)"
+
+  - job: PowerShell_Windows_PS7
+    displayName: 'PowerShell 7 - Windows'
     pool:
-      vmImage: windows-latest
+      vmImage: 'windows-latest'
     steps:
-      - pwsh: 'Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck'
-        displayName: "Update PESTER"
-      - pwsh: '.\Mailozaurr.Tests.ps1 -Verbose'
-        displayName: "Run Tests on Windows PowerShell 7"
+      - task: UseDotNet@2
+        displayName: 'Install .NET SDK'
+        inputs:
+          packageType: 'sdk'
+          version: $(dotNetVersion)
 
+      - task: DotNetCoreCLI@2
+        displayName: 'Build .NET Solution'
+        inputs:
+          command: 'build'
+          projects: 'Sources/Mailozaurr.sln'
+          arguments: '--configuration $(buildConfiguration)'
 
-  - job: Linux_Ubuntu
+      - pwsh: |
+          Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
+          Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+          Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+        displayName: "Install Required PowerShell Modules"
 
+      - pwsh: |
+          .\Mailozaurr.Tests.ps1
+        displayName: "Run PowerShell Tests (PS 7)"
+
+  - job: PowerShell_Ubuntu
+    displayName: 'PowerShell 7 - Ubuntu'
     pool:
-      vmImage: ubuntu-latest
-
+      vmImage: 'ubuntu-latest'
     steps:
+      - task: UseDotNet@2
+        displayName: 'Install .NET SDK'
+        inputs:
+          packageType: 'sdk'
+          version: $(dotNetVersion)
+
       - script: |
-          curl -sSL https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft-prod.list
-          curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
+          curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+          curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list
           sudo apt-get update
           sudo apt-get install -y powershell
         displayName: "Install PowerShell Core"
 
-      - powershell: '.\Mailozaurr.Tests.ps1'
-        displayName: "Run Tests on Linux"
+      - task: DotNetCoreCLI@2
+        displayName: 'Build .NET Solution'
+        inputs:
+          command: 'build'
+          projects: 'Sources/Mailozaurr.sln'
+          arguments: '--configuration $(buildConfiguration)'
 
-  - job: MacOS
+      - task: PowerShell@2
+        displayName: 'Install Required PowerShell Modules'
+        inputs:
+          targetType: 'inline'
+          script: |
+            Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
+            Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+            Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+
+      - task: PowerShell@2
+        displayName: 'Run PowerShell Tests'
+        inputs:
+          targetType: 'filePath'
+          filePath: './Mailozaurr.Tests.ps1'
+
+  - job: PowerShell_MacOS
+    displayName: 'PowerShell 7 - macOS'
     pool:
-      vmImage: macOS-latest
+      vmImage: 'macos-latest'
     steps:
-      - script: |
-          brew update
-          brew tap caskroom/cask
-          brew install mono-libgdiplus
+      - task: UseDotNet@2
+        displayName: 'Install .NET SDK'
+        inputs:
+          packageType: 'sdk'
+          version: $(dotNetVersion)
+
+      - bash: |
           brew install --cask powershell
         displayName: "Install PowerShell 7"
 
-      - powershell: '.\Mailozaurr.Tests.ps1'
-        displayName: "Run Tests on MacOs"
+      - task: DotNetCoreCLI@2
+        displayName: 'Build .NET Solution'
+        inputs:
+          command: 'build'
+          projects: 'Sources/Mailozaurr.sln'
+          arguments: '--configuration $(buildConfiguration)'
+
+      - task: PowerShell@2
+        displayName: 'Install Required PowerShell Modules'
+        inputs:
+          targetType: 'inline'
+          script: |
+            Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)"
+            Install-Module -Name Pester -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+            Install-Module -Name PSWriteColor -Repository PSGallery -Force -SkipPublisherCheck -AllowClobber
+
+      - task: PowerShell@2
+        displayName: 'Run PowerShell Tests'
+        inputs:
+          targetType: 'filePath'
+          filePath: './Mailozaurr.Tests.ps1'
+
+# Packaging Stage - Only runs if .NET tests pass (PowerShell tests can fail)
+- stage: Package
+  displayName: 'Package Libraries'
+  dependsOn: DotNetTests
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/v2-speedygonzales'))
+  jobs:
+  - job: Package
+    displayName: 'Create Library Package'
+    pool:
+      vmImage: 'windows-latest'
+    steps:
+      - task: UseDotNet@2
+        displayName: 'Install .NET SDK'
+        inputs:
+          packageType: 'sdk'
+          version: $(dotNetVersion)
+
+      - task: DotNetCoreCLI@2
+        displayName: 'Build Release'
+        inputs:
+          command: 'build'
+          projects: 'Sources/Mailozaurr.sln'
+          arguments: '--configuration $(buildConfiguration)'
+
+      - powershell: |
+          if (-not (Test-Path "Libraries")) {
+              New-Item -Path "Libraries" -ItemType Directory -Force
+          }
+          $SourcePath = "Sources\Mailozaurr\bin\Release"
+          if (Test-Path $SourcePath) {
+              Copy-Item -Path "$SourcePath\*" -Destination "Libraries" -Recurse -Force
+              Write-Host "Copied .NET assemblies to Libraries directory"
+          }
+          Write-Host "PowerShell module packaging should be done via Build/Manage-Mailozaurr.ps1"
+        displayName: "Copy .NET Libraries"
+
+      - task: PublishBuildArtifacts@1
+        displayName: 'Publish .NET Libraries'
+        inputs:
+          PathtoPublish: 'Libraries'
+          ArtifactName: 'Mailozaurr-Libraries'
+          publishLocation: 'Container'
+
