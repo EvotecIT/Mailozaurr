@@ -1,4 +1,18 @@
-﻿#### 2.0.0 - Preview 5
+﻿#### 2.0.0 - Preview 6
+##### What's Changed
+* docs: fix permissions typo in README by @PrzemyslawKlys in https://github.com/EvotecIT/Mailozaurr/pull/66
+* fix: correct verbose message for Get-IMAPFolder by @PrzemyslawKlys in https://github.com/EvotecIT/Mailozaurr/pull/67
+* Update POP message retrieval by @PrzemyslawKlys in https://github.com/EvotecIT/Mailozaurr/pull/69
+* test: define sample body content for Send-EmailMessage by @PrzemyslawKlys in https://github.com/EvotecIT/Mailozaurr/pull/68
+* docs: fix spelling mistakes by @PrzemyslawKlys in https://github.com/EvotecIT/Mailozaurr/pull/72
+* Add tests for ConvertFromGraphCredential by @PrzemyslawKlys in https://github.com/EvotecIT/Mailozaurr/pull/71
+* Add GetEmailAddress unit tests by @PrzemyslawKlys in https://github.com/EvotecIT/Mailozaurr/pull/70
+* Futher improvements by @PrzemyslawKlys in https://github.com/EvotecIT/Mailozaurr/pull/73
+* Fix SMTP auth optional by @PrzemyslawKlys in https://github.com/EvotecIT/Mailozaurr/pull/76
+
+**Full Changelog**: https://github.com/EvotecIT/Mailozaurr/compare/v2.0.0-Preview5...v2.0.0-Preview6
+
+#### 2.0.0 - Preview 5
 - Removed `Resolve-DnsQuery` => moved to DnsClientX, which uses it's own library
 - Removed `Resolve-DnsRequestRest` => moved to DnsClientX, which uses it's own library
 - Removed all functions related to DNS (will be moved to DomainDetective module)
