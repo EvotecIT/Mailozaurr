@@ -4,10 +4,15 @@ Import-Module $PSScriptRoot\..\Mailozaurr.psd1 -Force
 $Key = Get-Content -Raw -Path "C:\Support\Important\Mailgun.txt"
 $Credential = ConvertTo-MailgunCredential -ApiKey $Key
 
-Send-EmailMessage -From 'sender@yourdomain.com' `
-    -To 'recipient@example.com' `
-    -Subject 'Mailgun Test' `
-    -Body 'Hello from Mailgun' `
-    -EmailProvider Mailgun `
-    -Credential $Credential `
-    -Verbose
+$sendEmailMessageSplat = @{
+    From          = 'postmaster@sandbox814085ede3524b939d4b7f518ef9877a.mailgun.org'
+    To            = 'przemyslaw.klys+mailgun@xxx.pl'
+    Subject       = 'Mailgun Test'
+    HTML          = 'Hello from Mailgun'
+    Credential    = $Credential
+    Verbose       = $true
+    EmailProvider = 'Mailgun'
+    WhatIf        = $false
+}
+
+Send-EmailMessage @sendEmailMessageSplat
