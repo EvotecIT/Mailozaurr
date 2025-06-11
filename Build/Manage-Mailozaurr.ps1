@@ -26,7 +26,7 @@ Build-Module -ModuleName 'Mailozaurr' {
 
         ProjectUri           = 'https://github.com/EvotecIT/MailoZaurr'
 
-        PreReleaseTag        = 'Preview5'
+        PreReleaseTag        = 'Preview6'
     }
     New-ConfigurationManifest @Manifest
 
@@ -92,7 +92,7 @@ Build-Module -ModuleName 'Mailozaurr' {
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
-
+        NETBinaryModuleDocumenation       = $true
         #RefreshPSD1Only                   = $true
     }
 
