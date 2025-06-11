@@ -666,14 +666,17 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 }
             }
 
-            // Authenticate
+            // Authenticate - skip when no credentials are provided
             if (UseDefaultCredentials) {
                 Status = SmtpClient.AuthenticateDefaultCredentials();
             } else if (Credential != null) {
                 NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
                 Status = SmtpClient.Authenticate(networkCredential, OAuth2);
-            } else {
+            } else if (!string.IsNullOrWhiteSpace(Username) || !string.IsNullOrWhiteSpace(Password)) {
                 Status = SmtpClient.Authenticate(Username, Password, AsSecureString);
+            } else {
+                LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
+                Status = new SmtpResult(true, EmailAction.Authenticate, SmtpClient.SentTo, SmtpClient.SentFrom, SmtpClient.Server, SmtpClient.Port, SmtpClient.Stopwatch.Elapsed, "Authentication skipped");
             }
 
             if (!Status.Status) {
