@@ -625,7 +625,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             SmtpClient.DeliveryStatusNotificationType = DeliveryStatusNotificationType;
 
             SmtpClient.CheckCertificateRevocation = !SkipCertificateRevocation;
-            // SmtpClient.SkipCertificateValidation = SkipCertificateValidation;
+            SmtpClient.SkipCertificateValidation = SkipCertificateValidation;
             if (HTML != null) SmtpClient.HtmlBody = string.Join("", HTML);
             if (Text != null) SmtpClient.TextBody = string.Join("", Text);
 
