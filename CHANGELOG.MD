@@ -1,4 +1,10 @@
-﻿#### 1.0.6 - 2025.05.17
+﻿#### 1.0.7 - 2025.06.11
+##### What's changed
+- Fixes [SkipCertificateValidatation does not seem to work](https://github.com/EvotecIT/Mailozaurr/issues/53)
+
+**Full Changelog**: https://github.com/EvotecIT/Mailozaurr/compare/v1.0.5...v1.0.7
+
+#### 1.0.6 - 2025.05.17
 
 ##### What's new
 - Fixes [Adding attachment >3 MB not possible if no client secret is used](https://github.com/EvotecIT/Mailozaurr/issues/55) in #64
