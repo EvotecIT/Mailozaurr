@@ -4,6 +4,7 @@ using System.Net.Security;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography.X509Certificates;
+using System.Threading;
 
 namespace Mailozaurr;
 
@@ -80,6 +81,12 @@ public class Smtp {
         get => Client.Timeout;
         set => Client.Timeout = value;
     }
+
+    public int RetryCount { get; set; } = 0;
+
+    public int RetryDelayMilliseconds { get; set; } = 0;
+
+    public double RetryDelayBackoff { get; set; } = 1.0;
 
     public bool CheckCertificateRevocation {
         get => Client.CheckCertificateRevocation;
@@ -291,18 +298,31 @@ public class Smtp {
     /// </summary>
     /// <returns></returns>
     public SmtpResult Send() {
-        try {
-            Client.Send(Message);
-            LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Sent email to {SentTo}");
-            return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
-        } catch (Exception ex) {
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending: {ex.Message}");
-            //LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Message? ({Message} was used).");
-            if (ErrorAction == ActionPreference.Stop) {
-                throw;
+        int attempts = 0;
+        Exception? lastException = null;
+        do {
+            try {
+                Client.Send(Message);
+                LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Sent email to {SentTo}");
+                return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+            } catch (Exception ex) {
+                lastException = ex;
+                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending: {ex.Message}");
+                if (attempts >= RetryCount) {
+                    if (ErrorAction == ActionPreference.Stop) {
+                        throw;
+                    }
+                    return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+                }
+                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+                if (delayMilliseconds > 0) {
+                    Thread.Sleep(TimeSpan.FromMilliseconds(delayMilliseconds));
+                }
             }
-            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
-        }
+            attempts++;
+        } while (attempts <= RetryCount);
+
+        return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", lastException?.Message);
     }
 
     public void Disconnect() {

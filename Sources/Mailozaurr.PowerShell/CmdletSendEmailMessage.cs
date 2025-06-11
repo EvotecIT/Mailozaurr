@@ -281,6 +281,24 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     public int Timeout { get; set; } = 12000;
 
     /// <summary>
+    /// <para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries).</para>
+    /// </summary>
+    [Parameter(Mandatory = false)]
+    public int RetryCount { get; set; } = 0;
+
+    /// <summary>
+    /// <para>Delay in milliseconds between retry attempts.</para>
+    /// </summary>
+    [Parameter(Mandatory = false)]
+    public int RetryDelayMilliseconds { get; set; } = 0;
+
+    /// <summary>
+    /// <para>Multiplicative backoff applied to the retry delay. Value of 1 disables backoff.</para>
+    /// </summary>
+    [Parameter(Mandatory = false)]
+    public double RetryDelayBackoff { get; set; } = 1.0;
+
+    /// <summary>
     /// <para>Enables sending email via OAuth2 authentication for SMTP.</para>
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
@@ -517,6 +535,9 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             sendGrid.Attachment = Attachment;
             sendGrid.SeparateTo = SeparateTo;
             sendGrid.ErrorAction = errorAction;
+            sendGrid.RetryCount = RetryCount;
+            sendGrid.RetryDelayMilliseconds = RetryDelayMilliseconds;
+            sendGrid.RetryDelayBackoff = RetryDelayBackoff;
             NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
             sendGrid.Credentials = networkCredential;
             // create JSON message
@@ -547,6 +568,9 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             graph.Subject = Subject;
             graph.DoNotSaveToSentItems = DoNotSaveToSentItems;
             graph.ErrorAction = errorAction;
+            graph.RetryCount = RetryCount;
+            graph.RetryDelayMilliseconds = RetryDelayMilliseconds;
+            graph.RetryDelayBackoff = RetryDelayBackoff;
             graph.RequestReadReceipt = RequestReadReceipt;
             graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
             graph.HTML = string.Join("", HTML);
@@ -583,6 +607,9 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             graph.Subject = Subject;
             graph.DoNotSaveToSentItems = DoNotSaveToSentItems;
             graph.ErrorAction = errorAction;
+            graph.RetryCount = RetryCount;
+            graph.RetryDelayMilliseconds = RetryDelayMilliseconds;
+            graph.RetryDelayBackoff = RetryDelayBackoff;
             graph.RequestReadReceipt = RequestReadReceipt;
             graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
             graph.HTML = string.Join("", HTML);
@@ -633,6 +660,9 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             SmtpClient.Timeout = Timeout;
 
             SmtpClient.ErrorAction = errorAction;
+            SmtpClient.RetryCount = RetryCount;
+            SmtpClient.RetryDelayMilliseconds = RetryDelayMilliseconds;
+            SmtpClient.RetryDelayBackoff = RetryDelayBackoff;
 
             // Connect
             var Status = SmtpClient.Connect(Server, Port, SecureSocketOptions, UseSsl);

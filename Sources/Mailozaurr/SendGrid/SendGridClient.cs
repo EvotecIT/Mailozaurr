@@ -85,6 +85,22 @@ public class SendGridClient {
     public ActionPreference? ErrorAction { get; set; }
 
     /// <summary>
+    /// Number of times to retry sending the message when an error occurs.
+    /// </summary>
+    public int RetryCount { get; set; } = 0;
+
+    /// <summary>
+    /// Delay in milliseconds between retry attempts.
+    /// </summary>
+    public int RetryDelayMilliseconds { get; set; } = 0;
+
+    /// <summary>
+    /// Factor used to increase the delay for each subsequent retry. A value of
+    /// 1 disables backoff.
+    /// </summary>
+    public double RetryDelayBackoff { get; set; } = 1.0;
+
+    /// <summary>
     /// Gets a string containing the email addresses of all recipients of the email.
     /// </summary>
     public string SentTo {
@@ -199,17 +215,31 @@ public class SendGridClient {
 
         request.Headers.Add("Authorization", $"Bearer {apiKey}");
 
-        try {
-            var response = await _client.SendAsync(request);
-            LogCollector.LogVerbose($"Send-EmailMessage - Sent email to {SentTo} using SendGrid");
-            return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, response.EnsureSuccessStatusCode().ToString());
-        } catch (Exception ex) {
-            LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SendGrid: {ex.Message}");
-            if (ErrorAction == ActionPreference.Stop) {
-                throw;
+        int attempts = 0;
+        Exception? lastException = null;
+        do {
+            try {
+                var response = await _client.SendAsync(request);
+                LogCollector.LogVerbose($"Send-EmailMessage - Sent email to {SentTo} using SendGrid");
+                return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, response.EnsureSuccessStatusCode().ToString());
+            } catch (Exception ex) {
+                lastException = ex;
+                LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SendGrid: {ex.Message}");
+                if (attempts >= RetryCount) {
+                    if (ErrorAction == ActionPreference.Stop) {
+                        throw;
+                    }
+                    return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, "", ex.Message);
+                }
+                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+                if (delayMilliseconds > 0) {
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds));
+                }
             }
-            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, "", ex.Message);
-        }
+            attempts++;
+        } while (attempts <= RetryCount);
+
+        return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, "", lastException?.Message);
     }
 
     /// <summary>
