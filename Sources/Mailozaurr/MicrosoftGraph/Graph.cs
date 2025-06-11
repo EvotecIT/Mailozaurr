@@ -21,9 +21,9 @@ public class Graph {
     public List<GraphAttachmentPlaceHolder> AttachmentsPlaceHolders { get; set; } = new List<GraphAttachmentPlaceHolder>();
 
     /// <summary>
-    /// Array of file paths to the attachments.
+    /// Collection of attachments which can be file paths or GraphAttachment objects.
     /// </summary>
-    public string[]? Attachments { get; set; }
+    public object[]? Attachments { get; set; }
 
     /// <summary>
     /// Gets or sets the sender. Can be a string (email) or a dictionary with Name and Email.
@@ -151,8 +151,14 @@ public class Graph {
 
     public void CreateAttachments() {
         if (Attachments != null && Attachments.Any()) {
-            // Convert file paths to GraphAttachment objects and add them to the Attachments list
-            ConvertedAttachments = Attachments.Select(path => GraphAttachment.FromFile(path)).ToList();
+            // Convert provided attachments into GraphAttachment objects
+            foreach (var item in Attachments) {
+                if (item is string path) {
+                    ConvertedAttachments.Add(GraphAttachment.FromFile(path));
+                } else if (item is GraphAttachment ga) {
+                    ConvertedAttachments.Add(ga);
+                }
+            }
 
             if (ConvertedAttachments.Sum(a => a.ContentBytes.Length) > 4000000) {
                 // Create a draft message if the total size of the attachments is larger than 4MB
@@ -460,23 +466,24 @@ public class Graph {
     }
 
     public async Task UploadAttachmentsAsync(GraphMessage draftMessage) {
-        if (Attachments?.Length > 0) {
+        if (Attachments != null && Attachments.Length > 0) {
             foreach (var attachmentPath in Attachments) {
-
-                var attachmentItemJson = await CreateGraphAttachment(attachmentPath);
-
-                var uploadUrl = await CreateUploadSession(draftMessage, attachmentItemJson.Json);
-
-                await SendFileChunks(uploadUrl, attachmentItemJson.Content);
+                if (attachmentPath is string path) {
+                    var attachmentItemJson = await CreateGraphAttachment(path);
+                    var uploadUrl = await CreateUploadSession(draftMessage, attachmentItemJson.Json);
+                    await SendFileChunks(uploadUrl, attachmentItemJson.Content);
+                }
             }
         }
     }
 
     public async Task PrepareAttachments() {
-        if (Attachments?.Length > 0) {
+        if (Attachments != null && Attachments.Length > 0) {
             foreach (var attachmentPath in Attachments) {
-                var attachmentItemJson = await CreateGraphAttachment(attachmentPath);
-                AttachmentsPlaceHolders.Add(attachmentItemJson);
+                if (attachmentPath is string path) {
+                    var attachmentItemJson = await CreateGraphAttachment(path);
+                    AttachmentsPlaceHolders.Add(attachmentItemJson);
+                }
             }
         }
     }

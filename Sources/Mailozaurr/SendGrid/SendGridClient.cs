@@ -47,7 +47,7 @@ public class SendGridClient {
     /// <summary>
     /// Gets or sets the paths of the files to be attached to the email.
     /// </summary>
-    public string[]? Attachment { get; set; }
+    public object[]? Attachment { get; set; }
 
     /// <summary>
     /// Gets or sets the subject of the email.
@@ -143,7 +143,16 @@ public class SendGridClient {
     /// </summary>
     public void CreateMessage() {
 
-        var attachments = Attachment?.Select(path => new SendGridAttachment(path)).ToList();
+        var attachments = new List<SendGridAttachment>();
+        if (Attachment != null) {
+            foreach (var item in Attachment) {
+                if (item is string p) {
+                    attachments.Add(new SendGridAttachment(p));
+                } else if (item is SendGridAttachment sg) {
+                    attachments.Add(sg);
+                }
+            }
+        }
 
         var personalizations = new List<SendGridPersonalization> {
                 new SendGridPersonalization {

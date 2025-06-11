@@ -4,7 +4,7 @@
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
         <VersionPrefix>2.0.0</VersionPrefix>
-        <TargetFrameworks>net472;netstandard2.0;net8.0;net9.0</TargetFrameworks>
+        <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
         <AssemblyName>Mailozaurr</AssemblyName>
         <Copyright>(c) 2011 - 2024 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
         <LangVersion>latest</LangVersion>
@@ -27,9 +27,6 @@
         <PackageReference Include="System.Text.Json" Version="8.0.5" />
     </ItemGroup>
 
-    <ItemGroup>
-        <ProjectReference Include="G:\Source\MSGReader1\MsgReaderCore\MsgReader.csproj" />
-    </ItemGroup>
 
     <ItemGroup>
         <Using Include="MailKit" />

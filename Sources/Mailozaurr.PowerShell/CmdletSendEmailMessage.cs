@@ -269,7 +269,17 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
     [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
     [Alias("Attachments")]
-    public string[]? Attachment { get; set; }
+    public object[]? Attachment { get; set; }
+
+    /// <summary>
+    /// <para>Specifies inline attachments for the email message.</para>
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
+    [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
+    [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
+    [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
+    [Alias("InlineAttachments")]
+    public object[]? InlineAttachment { get; set; }
 
     /// <summary>
     /// <para>Specifies the maximum time (in milliseconds) to wait for the SMTP operation to complete. Default is 12000.</para>
@@ -630,6 +640,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             if (Text != null) SmtpClient.TextBody = string.Join("", Text);
 
             SmtpClient.Attachments = Attachment?.ToList();
+            SmtpClient.InlineAttachments = InlineAttachment?.ToList();
             SmtpClient.Timeout = Timeout;
 
             SmtpClient.ErrorAction = errorAction;
