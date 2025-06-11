@@ -86,16 +86,18 @@ public class Smtp {
         set => Client.CheckCertificateRevocation = value;
     }
 
-    //public bool SkipCertificateValidation {
-    //    get
-    //    {
-
-    //    };
-    //    set
-    //    {
-
-    //    };
-    //}
+    private bool _skipCertificateValidation;
+    public bool SkipCertificateValidation {
+        get => _skipCertificateValidation;
+        set {
+            _skipCertificateValidation = value;
+            if (value) {
+                Client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+            } else {
+                Client.ServerCertificateValidationCallback = null;
+            }
+        }
+    }
 
     public string LocalDomain {
         get => Client.LocalDomain;
