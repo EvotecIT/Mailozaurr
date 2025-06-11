@@ -7,6 +7,7 @@ class Program {
         // SendEmailGmail.Run();
         await SendEmailGraphClientSecret.RunAsync();
         // await SendEmailGraphCertificate.RunAsync();
+        await SendEmailMailgun.RunAsync();
     }
 }
 
