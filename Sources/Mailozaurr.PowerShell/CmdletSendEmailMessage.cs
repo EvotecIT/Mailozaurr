@@ -291,6 +291,24 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     public int Timeout { get; set; } = 12000;
 
     /// <summary>
+    /// <para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries).</para>
+    /// </summary>
+    [Parameter(Mandatory = false)]
+    public int RetryCount { get; set; } = 0;
+
+    /// <summary>
+    /// <para>Delay in milliseconds between retry attempts.</para>
+    /// </summary>
+    [Parameter(Mandatory = false)]
+    public int RetryDelayMilliseconds { get; set; } = 0;
+
+    /// <summary>
+    /// <para>Multiplicative backoff applied to the retry delay. Value of 1 disables backoff.</para>
+    /// </summary>
+    [Parameter(Mandatory = false)]
+    public double RetryDelayBackoff { get; set; } = 1.0;
+
+    /// <summary>
     /// <para>Enables sending email via OAuth2 authentication for SMTP.</para>
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
@@ -527,6 +545,9 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             sendGrid.Attachment = Attachment;
             sendGrid.SeparateTo = SeparateTo;
             sendGrid.ErrorAction = errorAction;
+            sendGrid.RetryCount = RetryCount;
+            sendGrid.RetryDelayMilliseconds = RetryDelayMilliseconds;
+            sendGrid.RetryDelayBackoff = RetryDelayBackoff;
             NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
             sendGrid.Credentials = networkCredential;
             // create JSON message
@@ -543,10 +564,35 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 }
             }
         } else if (EmailProvider == EmailProvider.Mailgun) {
-            WriteVerbose("Mailgun provide is not ready yet");
-            return;
+            var logCollector = new LogCollector();
+            MailgunClient mailgun = new MailgunClient();
+            mailgun.LogCollector = logCollector;
+            mailgun.From = Helpers.GetFromObject(fromEmail, fromName);
+            if (Bcc != null) mailgun.Bcc = Bcc.ToList();
+            if (Cc != null) mailgun.Cc = Cc.ToList();
+            if (To != null) mailgun.To = To.ToList();
+            mailgun.ReplyTo = ReplyTo;
+            mailgun.Subject = Subject;
+            if (Text != null) mailgun.Text = string.Join("", Text);
+            if (HTML != null) mailgun.Html = string.Join("", HTML);
+            mailgun.Attachment = Attachment;
+            mailgun.ErrorAction = errorAction;
+            mailgun.RetryCount = RetryCount;
+            mailgun.RetryDelayMilliseconds = RetryDelayMilliseconds;
+            mailgun.RetryDelayBackoff = RetryDelayBackoff;
             NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
-            //MailgunClient mailgun = new MailgunClient(networkCredential, From, To, Cc, Bcc, Subject, Text, HTML);
+            mailgun.Credentials = networkCredential;
+            if (ShouldProcess(mailgun.SentTo, "Sending email message via Mailgun")) {
+                var result = mailgun.SendEmailAsync().GetAwaiter().GetResult();
+                LogEmitter.EmitLogs(logCollector, this);
+                if (!Suppress) {
+                    WriteObject(result);
+                }
+            } else {
+                if (!Suppress) {
+                    WriteObject(new SmtpResult(false, EmailAction.Send, mailgun.SentTo, mailgun.SentFrom, "MailgunApi", 0, mailgun.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
+                }
+            }
         } else if (Graph) {
             Graph graph = new Graph();
             graph.From = Helpers.GetFromObject(fromEmail, fromName);
@@ -557,6 +603,9 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             graph.Subject = Subject;
             graph.DoNotSaveToSentItems = DoNotSaveToSentItems;
             graph.ErrorAction = errorAction;
+            graph.RetryCount = RetryCount;
+            graph.RetryDelayMilliseconds = RetryDelayMilliseconds;
+            graph.RetryDelayBackoff = RetryDelayBackoff;
             graph.RequestReadReceipt = RequestReadReceipt;
             graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
             graph.HTML = string.Join("", HTML);
@@ -593,6 +642,9 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             graph.Subject = Subject;
             graph.DoNotSaveToSentItems = DoNotSaveToSentItems;
             graph.ErrorAction = errorAction;
+            graph.RetryCount = RetryCount;
+            graph.RetryDelayMilliseconds = RetryDelayMilliseconds;
+            graph.RetryDelayBackoff = RetryDelayBackoff;
             graph.RequestReadReceipt = RequestReadReceipt;
             graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
             graph.HTML = string.Join("", HTML);
@@ -635,7 +687,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             SmtpClient.DeliveryStatusNotificationType = DeliveryStatusNotificationType;
 
             SmtpClient.CheckCertificateRevocation = !SkipCertificateRevocation;
-            // SmtpClient.SkipCertificateValidation = SkipCertificateValidation;
+            SmtpClient.SkipCertificateValidation = SkipCertificateValidation;
             if (HTML != null) SmtpClient.HtmlBody = string.Join("", HTML);
             if (Text != null) SmtpClient.TextBody = string.Join("", Text);
 
@@ -644,6 +696,9 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             SmtpClient.Timeout = Timeout;
 
             SmtpClient.ErrorAction = errorAction;
+            SmtpClient.RetryCount = RetryCount;
+            SmtpClient.RetryDelayMilliseconds = RetryDelayMilliseconds;
+            SmtpClient.RetryDelayBackoff = RetryDelayBackoff;
 
             // Connect
             var Status = SmtpClient.Connect(Server, Port, SecureSocketOptions, UseSsl);

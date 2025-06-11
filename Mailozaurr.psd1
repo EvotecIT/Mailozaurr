@@ -1,7 +1,7 @@
 ﻿@{
     AliasesToExport      = @('Connect-POP3', 'Disconnect-POP3', 'Get-POP3Message', 'Save-POP3Message')
     Author               = 'Przemyslaw Klys'
-    CmdletsToExport      = @('Connect-IMAP', 'Connect-OAuthGoogle', 'Connect-OAuthO365', 'Connect-POP', 'ConvertFrom-EmlToMsg', 'ConvertTo-GraphCredential', 'ConvertTo-OAuth2Credential', 'ConvertTo-SendGridCredential', 'Disconnect-IMAP', 'Disconnect-POP', 'Get-IMAPFolder', 'Get-IMAPMessage', 'Get-MailFolder', 'Get-MailMessage', 'Get-MailMessageAttachment', 'Get-POPMessage', 'Import-MailFile', 'Save-MailMessage', 'Save-POPMessage', 'Send-EmailMessage', 'Test-EmailAddress')
+    CmdletsToExport      = @('Connect-IMAP', 'Connect-OAuthGoogle', 'Connect-OAuthO365', 'Connect-POP', 'ConvertFrom-EmlToMsg', 'ConvertTo-GraphCredential', 'ConvertTo-OAuth2Credential', 'ConvertTo-SendGridCredential', 'ConvertTo-MailgunCredential', 'Disconnect-IMAP', 'Disconnect-POP', 'Get-IMAPFolder', 'Get-IMAPMessage', 'Get-MailFolder', 'Get-MailMessage', 'Get-MailMessageAttachment', 'Get-POPMessage', 'Import-MailFile', 'Save-MailMessage', 'Save-POPMessage', 'Send-EmailMessage', 'Test-EmailAddress')
     CompanyName          = 'Evotec'
     CompatiblePSEditions = @('Desktop', 'Core')
     Copyright            = '(c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.'
