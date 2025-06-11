@@ -554,10 +554,35 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 }
             }
         } else if (EmailProvider == EmailProvider.Mailgun) {
-            WriteVerbose("Mailgun provide is not ready yet");
-            return;
+            var logCollector = new LogCollector();
+            MailgunClient mailgun = new MailgunClient();
+            mailgun.LogCollector = logCollector;
+            mailgun.From = Helpers.GetFromObject(fromEmail, fromName);
+            if (Bcc != null) mailgun.Bcc = Bcc.ToList();
+            if (Cc != null) mailgun.Cc = Cc.ToList();
+            if (To != null) mailgun.To = To.ToList();
+            mailgun.ReplyTo = ReplyTo;
+            mailgun.Subject = Subject;
+            if (Text != null) mailgun.Text = string.Join("", Text);
+            if (HTML != null) mailgun.Html = string.Join("", HTML);
+            mailgun.Attachment = Attachment;
+            mailgun.ErrorAction = errorAction;
+            mailgun.RetryCount = RetryCount;
+            mailgun.RetryDelayMilliseconds = RetryDelayMilliseconds;
+            mailgun.RetryDelayBackoff = RetryDelayBackoff;
             NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
-            //MailgunClient mailgun = new MailgunClient(networkCredential, From, To, Cc, Bcc, Subject, Text, HTML);
+            mailgun.Credentials = networkCredential;
+            if (ShouldProcess(mailgun.SentTo, "Sending email message via Mailgun")) {
+                var result = mailgun.SendEmailAsync().GetAwaiter().GetResult();
+                LogEmitter.EmitLogs(logCollector, this);
+                if (!Suppress) {
+                    WriteObject(result);
+                }
+            } else {
+                if (!Suppress) {
+                    WriteObject(new SmtpResult(false, EmailAction.Send, mailgun.SentTo, mailgun.SentFrom, "MailgunApi", 0, mailgun.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
+                }
+            }
         } else if (Graph) {
             Graph graph = new Graph();
             graph.From = Helpers.GetFromObject(fromEmail, fromName);
