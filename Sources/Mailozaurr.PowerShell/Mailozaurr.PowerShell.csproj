@@ -62,7 +62,7 @@
     <!-- Copy help documentation to publish output after publish -->
     <Target Name="CopyHelpDocumentationToPublishOutput" AfterTargets="Publish">
         <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll-Help.xml"
-              DestinationFiles="$(PublishDir)$(AssemblyName).dll-Help.xml"
-              Condition="Exists('$(OutputPath)$(AssemblyName).dll-Help.xml')" />
+            DestinationFiles="$(PublishDir)$(AssemblyName).dll-Help.xml"
+            Condition="Exists('$(OutputPath)$(AssemblyName).dll-Help.xml')" />
     </Target>
 </Project>
