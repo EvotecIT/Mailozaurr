@@ -100,6 +100,22 @@ public class Graph {
     public ActionPreference? ErrorAction { get; set; }
 
     /// <summary>
+    /// Number of times to retry sending the message when an error occurs.
+    /// </summary>
+    public int RetryCount { get; set; } = 0;
+
+    /// <summary>
+    /// Delay in milliseconds between retry attempts.
+    /// </summary>
+    public int RetryDelayMilliseconds { get; set; } = 0;
+
+    /// <summary>
+    /// Factor used to increase the delay for each subsequent retry. A value of
+    /// 1 disables backoff.
+    /// </summary>
+    public double RetryDelayBackoff { get; set; } = 1.0;
+
+    /// <summary>
     /// The type of token that was issued.
     /// </summary>
     public string TokenType { get; set; }
@@ -278,28 +294,38 @@ public class Graph {
         // Add the authorization header.
         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
 
-        try {
-            // Send the HTTP request.
-            var response = await _client.SendAsync(request);
-            // Read the response content.
-            var content = await response.Content.ReadAsStringAsync();
-            // If the status code indicates success, return a successful result.
-            if (response.IsSuccessStatusCode) {
-                return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, response.StatusCode.ToString(), "");
+        int attempts = 0;
+        Exception? lastException = null;
+        do {
+            try {
+                var response = await _client.SendAsync(request);
+                var content = await response.Content.ReadAsStringAsync();
+                if (response.IsSuccessStatusCode) {
+                    return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, response.StatusCode.ToString(), "");
+                }
+                var error = JsonSerializer.Deserialize<GraphApiError>(content);
+                var errorMessage = (error == null || error.Error == null || error.Error.InnerError == null)
+                    ? $"Unknown error: {content}"
+                    : $"Error code: {error.Error.Code}, message: {error.Error.Message}, request ID: {error.Error.InnerError.RequestId}, date: {error.Error.InnerError.Date}";
+                throw new HttpRequestException(errorMessage);
+            } catch (Exception ex) {
+                lastException = ex;
+                LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
+                if (attempts >= RetryCount) {
+                    if (ErrorAction == ActionPreference.Stop) {
+                        throw;
+                    }
+                    return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", ex.Message);
+                }
+                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+                if (delayMilliseconds > 0) {
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds));
+                }
             }
-            // If the status code indicates an error, throw an exception with the content.
-            var error = JsonSerializer.Deserialize<GraphApiError>(content);
-            var errorMessage = (error == null || error.Error == null || error.Error.InnerError == null)
-                ? $"Unknown error: {content}"
-                : $"Error code: {error.Error.Code}, message: {error.Error.Message}, request ID: {error.Error.InnerError.RequestId}, date: {error.Error.InnerError.Date}";
-            throw new HttpRequestException(errorMessage);
-        } catch (Exception ex) {
-            LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
-            if (ErrorAction == ActionPreference.Stop) {
-                throw;
-            }
-            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", ex.Message);
-        }
+            attempts++;
+        } while (attempts <= RetryCount);
+
+        return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", lastException?.Message);
     }
 
     public async Task<SmtpResult> SendMessageDraftAsync() {
@@ -309,8 +335,29 @@ public class Graph {
         // Upload attachments to the draft message
         await UploadAttachmentsAsync(draftMessage);
 
-        // Send the draft message
-        return await SendDraftMessage(draftMessage);
+        int attempts = 0;
+        Exception? lastException = null;
+        do {
+            try {
+                return await SendDraftMessage(draftMessage);
+            } catch (Exception ex) {
+                lastException = ex;
+                LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
+                if (attempts >= RetryCount) {
+                    if (ErrorAction == ActionPreference.Stop) {
+                        throw;
+                    }
+                    return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", ex.Message);
+                }
+                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+                if (delayMilliseconds > 0) {
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds));
+                }
+            }
+            attempts++;
+        } while (attempts <= RetryCount);
+
+        return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", lastException?.Message);
     }
 
     public async Task<SmtpResult> SendDraftMessage(GraphMessage draftMessage) {

@@ -9,6 +9,8 @@
 * Add GetEmailAddress unit tests by @PrzemyslawKlys in https://github.com/EvotecIT/Mailozaurr/pull/70
 * Futher improvements by @PrzemyslawKlys in https://github.com/EvotecIT/Mailozaurr/pull/73
 * Fix SMTP auth optional by @PrzemyslawKlys in https://github.com/EvotecIT/Mailozaurr/pull/76
+* feat: add `RetryCount` parameter to `Send-EmailMessage` allowing optional retries
+* feat: support configurable delay and exponential backoff via `RetryDelayMilliseconds` and `RetryDelayBackoff`
 
 **Full Changelog**: https://github.com/EvotecIT/Mailozaurr/compare/v2.0.0-Preview5...v2.0.0-Preview6
 
