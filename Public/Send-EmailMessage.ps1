@@ -75,7 +75,7 @@
     .PARAMETER SkipCertificateRevocation
     Specifies to skip certificate revocation check
 
-    .PARAMETER SkipCertificateValidatation
+    .PARAMETER SkipCertificateValidation
     Specifies to skip certficate validation. Useful when using IP Address or self-generated certificates.
 
     .PARAMETER HTML
@@ -695,7 +695,7 @@
     if ($SkipCertificateRevocation) {
         $SmtpClient.CheckCertificateRevocation = $false
     }
-    if ($SkipCertificateValidatation) {
+    if ($SkipCertificateValidation) {
         $SmtpClient.ServerCertificateValidationCallback = { $true }
     }
     if ($DeliveryNotificationOption) {
