@@ -25,6 +25,7 @@ public class MailgunClient : IDisposable {
     public string Text { get; set; } = string.Empty;
     public string Html { get; set; } = string.Empty;
     public string[]? Attachment { get; set; }
+    public string[]? InlineAttachment { get; set; }
 
     public LogCollector LogCollector { get; set; } = new();
     public int RetryCount { get; set; } = 0;
@@ -68,6 +69,14 @@ public class MailgunClient : IDisposable {
                 var fileContent = new ByteArrayContent(bytes);
                 fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                 content.Add(fileContent, "attachment", Path.GetFileName(path));
+            }
+        }
+        if (InlineAttachment != null) {
+            foreach (var path in InlineAttachment) {
+                var bytes = File.ReadAllBytes(path);
+                var fileContent = new ByteArrayContent(bytes);
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                content.Add(fileContent, "inline", Path.GetFileName(path));
             }
         }
         return content;

@@ -28,9 +28,14 @@ public class Smtp {
         set => Client.TextBody = value;
     }
 
-    public List<string>? Attachments {
+    public List<object>? Attachments {
         get => Client.Attachments;
         set => Client.Attachments = value;
+    }
+
+    public List<object>? InlineAttachments {
+        get => Client.InlineAttachments;
+        set => Client.InlineAttachments = value;
     }
 
     public object From {

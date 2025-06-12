@@ -1,10 +1,13 @@
-﻿namespace Mailozaurr;
+using MimeKit.Utils;
+
+namespace Mailozaurr;
 
 public partial class ClientSmtp : SmtpClient {
     public string Subject { get; set; } = string.Empty;
     public string HtmlBody { get; set; } = string.Empty;
     public string TextBody { get; set; } = string.Empty;
-    public List<string>? Attachments { get; set; } = new List<string>();
+    public List<object>? Attachments { get; set; } = new List<object>();
+    public List<object>? InlineAttachments { get; set; } = new List<object>();
     public object From { get; set; }
     public IEnumerable<object>? To { get; set; } = new List<object>();
     public IEnumerable<object>? Cc { get; set; } = new List<object>();
@@ -126,7 +129,38 @@ public partial class ClientSmtp : SmtpClient {
         }
         if (Attachments != null) {
             foreach (var attachment in Attachments) {
-                bodyBuilder.Attachments.Add(attachment);
+                switch (attachment) {
+                    case string path:
+                        bodyBuilder.Attachments.Add(path);
+                        break;
+                    case MimeEntity entity:
+                        bodyBuilder.Attachments.Add(entity);
+                        break;
+                }
+            }
+        }
+        if (InlineAttachments != null) {
+            foreach (var inline in InlineAttachments) {
+                MimeEntity? entity = null;
+                switch (inline) {
+                    case string path:
+                        var part = new MimePart(MimeTypes.GetMimeType(path)) {
+                            Content = new MimeContent(File.OpenRead(path)),
+                            FileName = Path.GetFileName(path),
+                            ContentId = Path.GetFileName(path),
+                            ContentDisposition = new ContentDisposition(ContentDisposition.Inline)
+                        };
+                        bodyBuilder.LinkedResources.Add(part);
+                        entity = part;
+                        break;
+                    case MimeEntity mime:
+                        bodyBuilder.LinkedResources.Add(mime);
+                        entity = mime;
+                        break;
+                }
+                if (entity is MimePart inlinePart && string.IsNullOrEmpty(inlinePart.ContentId)) {
+                    inlinePart.ContentId = MimeUtils.GenerateMessageId();
+                }
             }
         }
         message.Body = bodyBuilder.ToMessageBody();
