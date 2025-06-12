@@ -542,7 +542,9 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             if (Text != null) sendGrid.Text = string.Join("", Text);
             if (HTML != null) sendGrid.Html = string.Join("", HTML);
             sendGrid.Priority = Priority;
-            sendGrid.Attachment = Attachment;
+            if (Attachment != null) {
+                sendGrid.Attachment = Attachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
+            }
             sendGrid.SeparateTo = SeparateTo;
             sendGrid.ErrorAction = errorAction;
             sendGrid.RetryCount = RetryCount;
@@ -575,7 +577,12 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             mailgun.Subject = Subject;
             if (Text != null) mailgun.Text = string.Join("", Text);
             if (HTML != null) mailgun.Html = string.Join("", HTML);
-            mailgun.Attachment = Attachment;
+            if (Attachment != null) {
+                mailgun.Attachment = Attachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
+            }
+            if (InlineAttachment != null) {
+                mailgun.InlineAttachment = InlineAttachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
+            }
             mailgun.ErrorAction = errorAction;
             mailgun.RetryCount = RetryCount;
             mailgun.RetryDelayMilliseconds = RetryDelayMilliseconds;
