@@ -59,10 +59,6 @@
         </PackageReference>
     </ItemGroup>
 
-    <ItemGroup>
-        <ProjectReference Include="G:\Source\MSGReader1\MsgReaderCore\MsgReader.csproj" />
-    </ItemGroup>
-
     <!-- Copy help documentation to publish output after publish -->
     <Target Name="CopyHelpDocumentationToPublishOutput" AfterTargets="Publish">
         <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll-Help.xml"
