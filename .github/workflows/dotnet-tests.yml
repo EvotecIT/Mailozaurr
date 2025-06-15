@@ -65,6 +65,11 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      - name: Install Mono for .NET Framework tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mono-complete
+
       - name: Restore dependencies
         run: dotnet restore Sources/Mailozaurr.sln
 

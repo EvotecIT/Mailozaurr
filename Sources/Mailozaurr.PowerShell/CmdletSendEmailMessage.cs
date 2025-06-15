@@ -644,6 +644,15 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             graph.Attachments = Attachment;
             graph.CreateAttachments();
 
+            if (!ShouldProcess(graph.SentTo, "Sending email message via Graph")) {
+                LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
+                if (!Suppress) {
+                    WriteObject(new SmtpResult(false, EmailAction.Send, graph.SentTo, graph.SentFrom, "GraphAPI", 0, graph.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
+                }
+                LogEmitter.EmitLogs(graph.LogCollector, this);
+                return;
+            }
+
             NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
             graph.Authenticate(networkCredential);
             var Status = graph.ConnectO365GraphAsync().GetAwaiter().GetResult();
@@ -731,6 +740,14 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             SmtpClient.RetryDelayMilliseconds = RetryDelayMilliseconds;
             SmtpClient.RetryDelayBackoff = RetryDelayBackoff;
 
+            if (!ShouldProcess(SmtpClient.SentTo, "Sending email message")) {
+                LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
+                if (!Suppress) {
+                    WriteObject(new SmtpResult(false, EmailAction.Send, SmtpClient.SentTo, SmtpClient.SentFrom, Server, Port, TimeSpan.Zero, "", "Email not sent (WhatIf)"));
+                }
+                return;
+            }
+
             // Connect
             var Status = SmtpClient.Connect(Server, Port, SecureSocketOptions, UseSsl);
             if (!Status.Status) {
@@ -791,18 +808,14 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 return;
             }
 
-            if (ShouldProcess(SmtpClient.SentTo, "Sending email message")) {
-                // Send the message
-                Status = SmtpClient.Send();
-                if (!Suppress) {
-                    WriteObject(Status);
-                }
-
-                // Save the message
-                SmtpClient.SaveMessage(MimeMessagePath);
-            } else {
-                WriteObject(new SmtpResult(false, EmailAction.Send, SmtpClient.SentTo, SmtpClient.SentFrom, SmtpClient.Server, SmtpClient.Port, SmtpClient.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
+            // Send the message
+            Status = SmtpClient.Send();
+            if (!Suppress) {
+                WriteObject(Status);
             }
+
+            // Save the message
+            SmtpClient.SaveMessage(MimeMessagePath);
 
             // Disconnect & Dispose
             SmtpClient.Dispose();
