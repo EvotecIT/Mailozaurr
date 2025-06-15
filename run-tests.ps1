@@ -1,5 +1,12 @@
 $Failed = 0
 
+# Ensure compiled cmdlet assembly exists
+$dllPath = Join-Path $PSScriptRoot 'Sources/Mailozaurr.PowerShell/bin/Debug/net8.0/Mailozaurr.PowerShell.dll'
+if (-not (Test-Path $dllPath)) {
+    Write-Host "Building module for tests" -ForegroundColor Yellow
+    dotnet build "$PSScriptRoot/Sources/Mailozaurr.PowerShell/Mailozaurr.PowerShell.csproj" -c Debug > $null
+}
+
 function Assert-Equal([object]$Actual, [object]$Expected, [string]$Message) {
     if ($Actual -ne $Expected) {
         Write-Host "FAIL: $Message - Expected '$Expected' got '$Actual'"
