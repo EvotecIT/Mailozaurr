@@ -144,8 +144,12 @@ public partial class ClientSmtp : SmtpClient {
                 MimeEntity? entity = null;
                 switch (inline) {
                     case string path:
-                        var part = new MimePart(MimeTypes.GetMimeType(path)) {
-                            Content = new MimeContent(File.OpenRead(path)),
+                        // Read the file into memory so it can be removed immediately
+                        var bytes = File.ReadAllBytes(path);
+                        var ms = new MemoryStream(bytes);
+                        var part = new MimePart(MimeTypes.GetMimeType(path))
+                        {
+                            Content = new MimeContent(ms),
                             FileName = Path.GetFileName(path),
                             ContentId = Path.GetFileName(path),
                             ContentDisposition = new ContentDisposition(ContentDisposition.Inline)
