@@ -88,8 +88,9 @@ This will make sure the project has required libraries.
   - [x] SMTP with oAuth2 Office 365
   - [x] SMTP with oAuth2 Google Mail
   - [x] SMTP with SendGrid
-  - [x] SendGrid API
-  - [x] Office 365 Graph API
+- [x] SendGrid API
+- [x] Office 365 Graph API
+- [x] PGP/MIME encryption and signature verification
 - Optional retry logic for `Send-EmailMessage` via `-RetryCount`, `-RetryDelayMilliseconds` and `-RetryDelayBackoff`
 - POP3
   - [x] Connect to POP3
@@ -111,6 +112,20 @@ This will make sure the project has required libraries.
   - [x] DNSBL Reporting (`Find-DNSBL`)
 - Email Validation
   - [x] Test Email Address for errors
+
+### Using OpenPGP
+
+PGP/MIME encryption allows securing messages using public and private keys. To sign and encrypt a message provide paths to the public and secret key files:
+
+```powershell
+$pub = 'Examples/PGPKeys/mimekit.gpg.pub'
+$sec = 'Examples/PGPKeys/mimekit.gpg.sec'
+Send-EmailMessage -From 'mimekit@example.com' -To 'mimekit@example.com' \ 
+    -Server 'smtp.example.com' -Port 25 -Body 'Test' -Subject 'Test' \ 
+    -SignOrEncrypt PgpSignAndEncrypt -PublicKeyPath $pub -PrivateKeyPath $sec \ 
+    -PrivateKeyPassword 'no.secret'
+```
+
 
 ## Documentation
 

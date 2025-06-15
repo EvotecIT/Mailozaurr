@@ -6,4 +6,7 @@ public enum EmailActionEncryption {
     SMIMESignPkcs7,
     SMIMEEncrypt,
     SMIMESignAndEncrypt,
+    PGPSign,
+    PGPEncrypt,
+    PGPSignAndEncrypt,
 }
