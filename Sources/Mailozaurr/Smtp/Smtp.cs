@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
+using Org.BouncyCastle.Bcpg.OpenPgp;
 
 namespace Mailozaurr;
 
