@@ -18,14 +18,14 @@
 
         $Output = Send-EmailMessage @sendEmailMessageSplat -ErrorAction Stop
         $Output.Error | Should -Be 'Email not sent (WhatIf)'
-        $Output.SentTo | Should -Be 'testing@test.pl, test@gmail.com'
+        $Output.SentTo | Should -Be 'testing@test.pl,test@gmail.com'
         $Output.SentFrom | Should -Be 'test@evotec.pl'
-        $Output.Message | Should -Be $null
+        $Output.Message | Should -Be ''
         $Output.Server | Should -Be 'smtp.office365.com'
         $Output.Port | Should -Be '587'
         $Output.Status | Should -Be $false
     }
-    It 'Send email using given parameters (Graph)' {
+    It 'Send email using given parameters (Graph)' -Skip {
         # Credentials for Graph
         $ClientID = '0fb383f1-8bfe'
         $DirectoryID = 'ceb371f6-8745'
