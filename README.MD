@@ -103,14 +103,7 @@ This will make sure the project has required libraries.
   - [x] Get Mail Folders
   - [x] Get Mail Messages
   - [x] Save Mail Messages
-- DNS Checks via TCP/UDP, but also via HTTPS using Cloudflare/Google providers
-  - [x] DKIM Reporting (`Find-DKIMRecord`)
-  - [x] MX Reporting (`Find-MXRecord`)
-  - [x] DMARC Reporting (`Find-DMARCRecord`)
-  - [x] SPF Reporting (`Find-SPFRecord`)
-  - [x] DNSBL Reporting (`Find-DNSBL`)
-- Email Validation
-  - [x] Test Email Address for errors
+- DNS and email validation functionality is now provided by [DomainDetective](https://github.com/EvotecIT/DomainDetective)
 
 ## Documentation
 
