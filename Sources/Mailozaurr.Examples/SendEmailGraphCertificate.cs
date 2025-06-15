@@ -1,24 +1,39 @@
+using Mailozaurr;
+using System;
 using System.Threading.Tasks;
 
-// Microsoft Graph Certificate Authentication Example (NOT IMPLEMENTED)
-// This is a placeholder for future support in Mailozaurr.
-//
-// To implement certificate-based authentication, you would typically use Microsoft.Identity.Client
-// to acquire a token with a certificate, then set graph.AccessToken and graph.TokenType = "Bearer"
-// before calling SendMessageAsync().
-
 public static class SendEmailGraphCertificate {
-    // === CONFIGURATION ===
-    // string clientId = "your-client-id";
-    // string tenantId = "your-tenant-id";
-    // string certificatePath = "path-to-your.pfx";
-    // string certificatePassword = "your-cert-password";
-    // string sender = "sender@yourtenant.onmicrosoft.com";
-    // string recipient = "recipient@example.com";
-
-    // === EXAMPLE (PSEUDOCODE) ===
     public static async Task RunAsync() {
-        // Not implemented in Mailozaurr yet.
-        // See comments above for how this would be done with Microsoft.Identity.Client.
+        // === CONFIGURATION ===
+        string clientId = "your-client-id";
+        string tenantId = "your-tenant-id";
+        string certificatePath = "path-to-your.pfx";
+        string certificatePassword = "your-cert-password";
+        string sender = "sender@yourtenant.onmicrosoft.com";
+        string recipient = "recipient@example.com";
+
+        // === EXAMPLE ===
+        try {
+            var token = await OAuthHelpers.AcquireGraphCertificateTokenAsync(
+                clientId,
+                tenantId,
+                certificatePath,
+                certificatePassword);
+
+            var graph = new Graph();
+            graph.From = sender;
+            graph.To = new[] { recipient };
+            graph.Subject = "Test Email via Microsoft Graph (Certificate)";
+            graph.HTML = "<p>Hello from Mailozaurr via Microsoft Graph (Certificate)!</p>";
+            graph.AccessToken = token.AccessToken;
+            graph.TokenType = token.TokenType;
+
+            var sendResult = await graph.SendMessageAsync();
+            Console.WriteLine(sendResult.Status
+                ? "Graph (Certificate): Email sent!"
+                : $"Graph (Certificate): Failed: {sendResult.Error}");
+        } catch (Exception ex) {
+            Console.WriteLine($"Graph (Certificate) Example Error: {ex.Message}");
+        }
     }
 }
