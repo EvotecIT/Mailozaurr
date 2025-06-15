@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Mailozaurr.Tests {
     public class SendEmailBasicTests {
-        [Fact]
+        [Fact(Skip="Requires network access")]
         public void SendEmail_Smtp_WithValidInput_Succeeds() {
             // Arrange
             var smtp = new Smtp();
@@ -23,7 +23,7 @@ namespace Mailozaurr.Tests {
             Assert.True(result.Status, $"SMTP send failed: {result.Error}");
         }
 
-        [Fact]
+        [Fact(Skip="Requires network access")]
         public async Task SendEmail_SendGrid_WithValidInput_Succeeds() {
             // Arrange
             var sendGrid = new SendGridClient();
@@ -42,7 +42,7 @@ namespace Mailozaurr.Tests {
             Assert.True(result.Status, $"SendGrid send failed: {result.Error}");
         }
 
-        [Fact]
+        [Fact(Skip="Requires network access")]
         public async Task SendEmail_Graph_WithValidInput_Succeeds() {
             // Arrange
             var graph = new Graph();

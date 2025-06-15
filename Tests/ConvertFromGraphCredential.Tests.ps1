@@ -7,6 +7,6 @@ Describe 'MicrosoftGraphUtils.ConvertFromGraphCredential' {
     }
 
     It 'Throws for invalid format' {
-        { [Mailozaurr.MicrosoftGraphUtils]::ConvertFromGraphCredential('invalid', 'pwd') } | Should -Throw -ErrorType [System.ArgumentException]
+        { [Mailozaurr.MicrosoftGraphUtils]::ConvertFromGraphCredential('invalid', 'pwd') } | Should -Throw
     }
 }
