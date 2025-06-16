@@ -2,6 +2,8 @@ using Xunit;
 using Mailozaurr;
 using System.Net;
 using System.Threading.Tasks;
+using System.IO;
+using MimeKit;
 
 namespace Mailozaurr.Tests {
     public class SendEmailBasicTests {
@@ -64,37 +66,50 @@ namespace Mailozaurr.Tests {
         [Fact]
         public void SendEmail_WithInvalidEmailAddress_Fails() {
             // Arrange
-            // TODO: Setup email with invalid address
+            var result = Validator.ValidateEmail("invalid");
 
-            // Act
-            // TODO: Call send email
-
-            // Assert
-            Assert.True(true); // Placeholder for failure
+            // Act & Assert
+            Assert.False(result.IsValid);
         }
 
         [Fact]
         public void SendEmail_WithMissingSubjectOrBody_Fails() {
             // Arrange
-            // TODO: Setup email with missing subject/body
+            var smtp = new Smtp();
+            smtp.From = "a@b.com";
+            smtp.To = new object[] { "c@d.com" };
+            smtp.Subject = string.Empty;
+            smtp.TextBody = string.Empty;
+            smtp.CreateMessage();
 
             // Act
-            // TODO: Call send email
+            var subjectEmpty = string.IsNullOrEmpty(smtp.Message.Subject);
+            var bodyEmpty = smtp.Message.Body is TextPart part && string.IsNullOrEmpty(part.Text);
 
             // Assert
-            Assert.True(true); // Placeholder for failure
+            Assert.True(subjectEmpty || bodyEmpty);
         }
 
         [Fact]
         public void SendEmail_WithAttachment_Succeeds() {
             // Arrange
-            // TODO: Setup email with attachment
+            var tmp = Path.GetTempFileName();
+            File.WriteAllText(tmp, "data");
+            var smtp = new Smtp();
+            smtp.From = "a@b.com";
+            smtp.To = new object[] { "c@d.com" };
+            smtp.Subject = "test";
+            smtp.Attachments = new System.Collections.Generic.List<object> { tmp };
+            smtp.CreateMessage();
 
             // Act
-            // TODO: Call send email
+            var attachCount = smtp.Message.BodyParts
+                .OfType<MimePart>()
+                .Count(p => p.IsAttachment);
+            File.Delete(tmp);
 
             // Assert
-            Assert.True(true); // Placeholder for success
+            Assert.Equal(1, attachCount);
         }
     }
 }
