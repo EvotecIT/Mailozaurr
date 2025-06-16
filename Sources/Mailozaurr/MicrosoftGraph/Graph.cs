@@ -502,11 +502,13 @@ public class Graph {
         using var fileStream = new FileStream(filePath, FileMode.Open);
         var buffer = new byte[chunkSize];
         int bytesRead;
+        long offset = 0;
         while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0) {
-            var contentRange = $"bytes 0-{bytesRead - 1}/{fileSize}";
+            var contentRange = $"bytes {offset}-{offset + bytesRead - 1}/{fileSize}";
             var byteArrayContent = new ByteArrayContent(buffer, 0, bytesRead);
             byteArrayContent.Headers.Add("Content-Range", contentRange);
             fileContents.Add(byteArrayContent);
+            offset += bytesRead;
         }
 
         return fileContents;
