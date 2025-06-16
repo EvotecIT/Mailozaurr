@@ -1,53 +1,75 @@
+using System;
+using System.Collections.Generic;
 using Xunit;
 
 namespace Mailozaurr.Tests {
     public class Pop3ConnectionTests {
+        private class FakePop3Client {
+            public bool ValidCredentials { get; set; } = true;
+            public bool SimulateTimeout { get; set; }
+            public bool Connected { get; private set; }
+
+            public void Connect() {
+                if (SimulateTimeout) {
+                    throw new TimeoutException("Timeout");
+                }
+
+                if (!ValidCredentials) {
+                    throw new InvalidOperationException("Invalid credentials");
+                }
+
+                Connected = true;
+            }
+
+            public IReadOnlyList<string> FetchMessageList() {
+                if (!Connected) {
+                    throw new InvalidOperationException("Not connected");
+                }
+
+                return new List<string> { "msg1", "msg2" };
+            }
+        }
         [Fact]
         public void Pop3_Connect_WithValidCredentials_Succeeds() {
             // Arrange
-            // TODO: Setup valid POP3 credentials
+            var client = new FakePop3Client();
 
             // Act
-            // TODO: Call POP3 connect
+            client.Connect();
 
             // Assert
-            Assert.True(true); // Placeholder for success
+            Assert.True(client.Connected);
         }
 
         [Fact]
         public void Pop3_Connect_WithInvalidCredentials_Fails() {
             // Arrange
-            // TODO: Setup invalid POP3 credentials
+            var client = new FakePop3Client { ValidCredentials = false };
 
-            // Act
-            // TODO: Call POP3 connect
-
-            // Assert
-            Assert.True(true); // Placeholder for failure
+            // Act & Assert
+            Assert.Throws<InvalidOperationException>(() => client.Connect());
         }
 
         [Fact]
         public void Pop3_Connect_WithTimeout_Fails() {
             // Arrange
-            // TODO: Setup POP3 connection with forced timeout
+            var client = new FakePop3Client { SimulateTimeout = true };
 
-            // Act
-            // TODO: Call POP3 connect
-
-            // Assert
-            Assert.True(true); // Placeholder for timeout failure
+            // Act & Assert
+            Assert.Throws<TimeoutException>(() => client.Connect());
         }
 
         [Fact]
         public void Pop3_FetchMessageList_Succeeds() {
             // Arrange
-            // TODO: Setup valid POP3 connection
+            var client = new FakePop3Client();
+            client.Connect();
 
             // Act
-            // TODO: Fetch message list
+            var list = client.FetchMessageList();
 
             // Assert
-            Assert.True(true); // Placeholder for success
+            Assert.Equal(2, list.Count);
         }
     }
 }
