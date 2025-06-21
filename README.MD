@@ -99,7 +99,7 @@ This will make sure the project has required libraries.
 - IMAP
   - [x] Connect to IMAP
   - [x] Get IMAP Folder
-  - [ ] Get Messages (you have to your own work to get what you need). Needs improvements!
+  - [x] Get IMAP Messages
 - Office 365 Graph API
   - [x] Get Mail Folders
   - [x] Get Mail Messages
