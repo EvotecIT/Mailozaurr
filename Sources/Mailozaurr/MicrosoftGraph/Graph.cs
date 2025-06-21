@@ -196,7 +196,7 @@ public class Graph {
                 To = ConvertToGraphEmailAddress(To),
                 Cc = ConvertToGraphEmailAddress(Cc),
                 Bcc = ConvertToGraphEmailAddress(Bcc),
-                ReplyTo = string.IsNullOrEmpty(ReplyTo) ? null : ConvertToGraphEmailAddress([ReplyTo]),
+                ReplyTo = string.IsNullOrEmpty(ReplyTo) ? null : new List<GraphEmailAddress> { ConvertToGraphEmailAddress(ReplyTo)! },
                 Subject = Subject,
                 Body = new GraphContent { Content = HTML, Type = ContentType },
                 IsDeliveryReceiptRequested = RequestDeliveryReceipt,
