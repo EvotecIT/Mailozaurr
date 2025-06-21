@@ -2,6 +2,7 @@ using Microsoft.Identity.Client;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Util.Store;
+using System.Security.Cryptography.X509Certificates;
 
 namespace Mailozaurr;
 
@@ -57,6 +58,26 @@ public static class OAuthHelpers {
         return new OAuthCredential {
             UserName = credential.UserId,
             AccessToken = credential.Token.AccessToken
+        };
+    }
+
+    public static async Task<GraphAuthorization> AcquireGraphCertificateTokenAsync(
+        string clientId,
+        string tenantId,
+        string certificatePath,
+        string certificatePassword,
+        IEnumerable<string>? scopes = null) {
+        var certificate = new X509Certificate2(certificatePath, certificatePassword);
+        var app = ConfidentialClientApplicationBuilder
+            .Create(clientId)
+            .WithTenantId(tenantId)
+            .WithCertificate(certificate)
+            .Build();
+        scopes ??= new[] { "https://graph.microsoft.com/.default" };
+        var result = await app.AcquireTokenForClient(scopes).ExecuteAsync();
+        return new GraphAuthorization {
+            AccessToken = result.AccessToken,
+            TokenType = "Bearer"
         };
     }
 }
