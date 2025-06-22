@@ -9,12 +9,18 @@ using System.Linq;
 using System.IO;
 
 namespace Mailozaurr {
+    /// <summary>
+    /// Represents credentials required for Microsoft Graph authentication.
+    /// </summary>
     public class GraphCredential {
         public string ClientId { get; set; }
         public string DirectoryId { get; set; }
         public string ClientSecret { get; set; }
     }
 
+    /// <summary>
+    /// Simplified representation of an email message returned from Graph.
+    /// </summary>
     public class GraphEmailMessage {
         public string Id { get; set; }
         public string Subject { get; set; }
@@ -24,6 +30,9 @@ namespace Mailozaurr {
         // Add more properties as needed
     }
 
+    /// <summary>
+    /// Represents a file attachment from Microsoft Graph.
+    /// </summary>
     public class Attachment {
         public string Name { get; set; }
         public string ContentBytes { get; set; }

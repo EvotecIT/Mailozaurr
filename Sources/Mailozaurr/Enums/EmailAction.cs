@@ -1,5 +1,8 @@
 ﻿namespace Mailozaurr;
 
+/// <summary>
+/// Represents actions performed when sending or preparing an email.
+/// </summary>
 public enum EmailAction {
     Authenticate,
     Connect,
