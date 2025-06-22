@@ -274,7 +274,7 @@ public class Graph {
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
-            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, "", ex.Message);
+            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", ex.Message);
 
         }
 
@@ -294,7 +294,7 @@ public class Graph {
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
-            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, "", ex.Message);
+            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", ex.Message);
         }
     }
 
