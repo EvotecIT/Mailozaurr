@@ -148,7 +148,17 @@ public class SendGridClient {
         } else if (emailAddress is string emailString) {
             return new SendGridEmailAddress { Email = emailString };
         } else if (emailAddress is IDictionary<string, object> emailDict) {
-            return new SendGridEmailAddress { Email = emailDict["Email"] as string, Name = emailDict["Name"] as string };
+            if (!emailDict.ContainsKey("Email")) {
+                throw new ArgumentException("Dictionary is missing required key 'Email'.", nameof(emailAddress));
+            }
+
+            var emailValue = emailDict["Email"] as string;
+            if (string.IsNullOrEmpty(emailValue)) {
+                return null;
+            }
+
+            var nameValue = emailDict.ContainsKey("Name") ? emailDict["Name"] as string : null;
+            return new SendGridEmailAddress { Email = emailValue, Name = nameValue };
         } else {
             throw new ArgumentException($"email object type {emailAddress.GetType().Name} requires addition");
         }

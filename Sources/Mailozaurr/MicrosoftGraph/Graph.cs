@@ -551,12 +551,17 @@ public class Graph {
             Content = byteArrayContent
         };
         requestMessage.Headers.Add("AnchorMailbox", SentFrom); // This is correctly added to HttpRequestMessage
+        var originalAuthorization = _client.DefaultRequestHeaders.Authorization;
         _client.DefaultRequestHeaders.Authorization = null;
-        using var uploadChunkResponse = await _client.SendAsync(requestMessage);
-        if (!uploadChunkResponse.IsSuccessStatusCode) {
-            // Handle upload error
-            Console.WriteLine(uploadChunkResponse);
-            return;
+        try {
+            var uploadChunkResponse = await _client.SendAsync(requestMessage);
+            if (!uploadChunkResponse.IsSuccessStatusCode) {
+                // Handle upload error
+                Console.WriteLine(uploadChunkResponse);
+                return;
+            }
+        } finally {
+            _client.DefaultRequestHeaders.Authorization = originalAuthorization;
         }
     }
 }
