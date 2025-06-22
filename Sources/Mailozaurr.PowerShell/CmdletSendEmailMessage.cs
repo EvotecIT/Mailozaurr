@@ -312,6 +312,13 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     public double RetryDelayBackoff { get; set; } = 1.0;
 
     /// <summary>
+    /// <para>Specifies chunk size in bytes used for Graph attachment uploads. Default is 9MB.</para>
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "Graph")]
+    [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
+    public int ChunkSize { get; set; } = 9000000;
+
+    /// <summary>
     /// <para>Enables sending email via OAuth2 authentication for SMTP.</para>
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
@@ -429,6 +436,12 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     /// </summary>
     [Parameter(Mandatory = false)]
     public string? LogClientPrefix { get; set; }
+
+    /// <summary>
+    /// <para>Overwrites the existing log file when using <c>-LogPath</c>.</para>
+    /// </summary>
+    [Parameter(Mandatory = false)]
+    public SwitchParameter LogOverwrite { get; set; }
 
     /// <summary>
     /// <para>Saves the email message to a file for troubleshooting purposes.</para>
@@ -605,6 +618,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             }
         } else if (Graph) {
             Graph graph = new Graph();
+            graph.ChunkSize = ChunkSize;
             graph.From = Helpers.GetFromObject(fromEmail, fromName);
             graph.To = To;
             graph.Cc = Cc;
@@ -653,6 +667,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             LogEmitter.EmitLogs(graph.LogCollector, this);
         } else if (MgGraphRequest) {
             Graph graph = new Graph();
+            graph.ChunkSize = ChunkSize;
             graph.From = Helpers.GetFromObject(fromEmail, fromName);
             graph.To = To;
             graph.Cc = Cc;
@@ -692,7 +707,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 LogEmitter.EmitLogs(graph.LogCollector, this);
             }
         } else {
-            Smtp SmtpClient = new Smtp(LogPath, LogConsole, LogObject, LogTimestamps, LogSecrets, LogTimeStampsFormat, LogClientPrefix, LogServerPrefix);
+            Smtp SmtpClient = new Smtp(LogPath, LogConsole, LogObject, LogTimestamps, LogSecrets, LogTimeStampsFormat, LogServerPrefix, LogClientPrefix, LogOverwrite);
             SmtpClient.From = Helpers.GetFromObject(fromEmail, fromName);
             SmtpClient.ReplyTo = ReplyTo;
             SmtpClient.Cc = Cc;
