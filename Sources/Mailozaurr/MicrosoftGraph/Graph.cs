@@ -307,7 +307,7 @@ public class Graph {
         Exception? lastException = null;
         do {
             try {
-                var response = await _client.SendAsync(request);
+                using var response = await _client.SendAsync(request);
                 var content = await response.Content.ReadAsStringAsync();
                 if (response.IsSuccessStatusCode) {
                     return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, response.StatusCode.ToString(), "");
@@ -378,7 +378,7 @@ public class Graph {
         sendRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
 
         // Send the HTTP request for sending the draft message
-        var sendResponse = await _client.SendAsync(sendRequest);
+        using var sendResponse = await _client.SendAsync(sendRequest);
 
         // If the status code indicates success, return a successful result
         if (sendResponse.IsSuccessStatusCode) {
@@ -416,7 +416,7 @@ public class Graph {
         draftRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
 
         // Send the HTTP request for creating the draft message
-        var draftResponse = await _client.SendAsync(draftRequest);
+        using var draftResponse = await _client.SendAsync(draftRequest);
 
         // Read the response content
         var draftContent = await draftResponse.Content.ReadAsStringAsync();
@@ -552,7 +552,7 @@ public class Graph {
         };
         requestMessage.Headers.Add("AnchorMailbox", SentFrom); // This is correctly added to HttpRequestMessage
         _client.DefaultRequestHeaders.Authorization = null;
-        var uploadChunkResponse = await _client.SendAsync(requestMessage);
+        using var uploadChunkResponse = await _client.SendAsync(requestMessage);
         if (!uploadChunkResponse.IsSuccessStatusCode) {
             // Handle upload error
             Console.WriteLine(uploadChunkResponse);
