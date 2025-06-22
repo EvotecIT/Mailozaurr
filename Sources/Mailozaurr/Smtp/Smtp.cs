@@ -287,6 +287,20 @@ public class Smtp {
         return password;
     }
 
+    /// <summary>
+    /// Authenticate using the specified user name and password. After the
+    /// authentication attempt, the plain text value is either overwritten or
+    /// protected again to avoid leaving sensitive data in memory.
+    /// </summary>
+    /// <param name="username">The user name.</param>
+    /// <param name="password">
+    /// Password value. When <paramref name="isSecureString"/> is <c>true</c>, the
+    /// string is re-secured using <see cref="SecureStringHelper.Protect"/> after
+    /// authentication completes.
+    /// </param>
+    /// <param name="isSecureString">Indicates whether the password was
+    /// previously protected.</param>
+    /// <returns>An <see cref="SmtpResult"/> representing the outcome.</returns>
     public SmtpResult Authenticate(string username, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         try {
@@ -300,6 +314,13 @@ public class Smtp {
                 throw;
             }
             return new SmtpResult(false, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+        } finally {
+            if (isSecureString) {
+                using var securePwd = SecureStringHelper.FromPlainTextString(password);
+                password = SecureStringHelper.Protect(securePwd);
+            } else {
+                password = new string('\0', password.Length);
+            }
         }
     }
 
