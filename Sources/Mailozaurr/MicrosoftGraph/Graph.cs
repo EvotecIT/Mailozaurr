@@ -168,6 +168,9 @@ public class Graph {
         if (LogCollector == null) LogCollector = new();
     }
 
+    /// <summary>
+    /// Converts the <see cref="Attachments"/> collection into <see cref="GraphAttachment"/> instances.
+    /// </summary>
     public void CreateAttachments() {
         if (Attachments != null && Attachments.Any()) {
             // Convert provided attachments into GraphAttachment objects
@@ -189,6 +192,9 @@ public class Graph {
         }
     }
 
+    /// <summary>
+    /// Builds the <see cref="GraphMessageContainer"/> object that represents the email.
+    /// </summary>
     public void CreateMessage() {
         // Note: The display name for the sender is controlled by Office 365 and may not reflect the value you provide here.
         // Office 365 will use the mailbox's configured display name for the sender, regardless of what is set in the payload.
@@ -244,6 +250,10 @@ public class Graph {
         return emails.Select(email => new GraphEmailAddress { Email = new GraphEmail { Address = Helpers.GetEmailAddress(email) } }).ToList();
     }
 
+    /// <summary>
+    /// Authenticates to Microsoft Graph using client credentials and obtains an access token.
+    /// </summary>
+    /// <returns>The result of the connection attempt.</returns>
     public async Task<SmtpResult> ConnectO365GraphAsync() {
         string resource = "https://graph.microsoft.com";
         var body = new Dictionary<string, string> {
@@ -288,6 +298,10 @@ public class Graph {
         }
     }
 
+    /// <summary>
+    /// Sends the prepared message via the Graph API.
+    /// </summary>
+    /// <returns>The result of the send operation.</returns>
     public async Task<SmtpResult> SendMessageAsync() {
         // create message
         CreateMessage();
@@ -337,6 +351,10 @@ public class Graph {
         return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", lastException?.Message);
     }
 
+    /// <summary>
+    /// Sends a message by first creating a draft and then uploading attachments.
+    /// </summary>
+    /// <returns>The result of the send operation.</returns>
     public async Task<SmtpResult> SendMessageDraftAsync() {
         // Create the draft message using the new method
         var draftMessage = await CreateDraftMessageAsync();
@@ -369,6 +387,11 @@ public class Graph {
         return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", lastException?.Message);
     }
 
+    /// <summary>
+    /// Sends a previously created draft message.
+    /// </summary>
+    /// <param name="draftMessage">The draft message to send.</param>
+    /// <returns>The result of the send operation.</returns>
     public async Task<SmtpResult> SendDraftMessage(GraphMessage draftMessage) {
         // Send the draft message
         var sendRequestUri = $"https://graph.microsoft.com/v1.0/users/{MessageContainer.Message.From.Email.Address}/messages/{draftMessage.Id}/send";
@@ -394,6 +417,10 @@ public class Graph {
         throw new HttpRequestException(sendErrorMessage);
     }
 
+    /// <summary>
+    /// Creates a draft message on the server and returns the resulting <see cref="GraphMessage"/>.
+    /// </summary>
+    /// <returns>The created draft message.</returns>
     public async Task<GraphMessage> CreateDraftMessageAsync() {
         // Create the draft message
         CreateMessage();
@@ -439,6 +466,10 @@ public class Graph {
         return draftMessage;
     }
 
+    /// <summary>
+    /// Creates a draft message locally and returns its JSON representation.
+    /// </summary>
+    /// <returns>The JSON payload for the draft message.</returns>
     public string CreateDraftForMg() {
         // Create the draft message
         CreateMessage();
@@ -446,6 +477,10 @@ public class Graph {
         return messageJson;
     }
 
+    /// <summary>
+    /// Serializes the current message to JSON without saving it to the Sent Items folder.
+    /// </summary>
+    /// <returns>The JSON representation of the message.</returns>
     public string CreateDraft() {
         CreateMessage();
 
@@ -459,6 +494,11 @@ public class Graph {
     }
 
 
+    /// <summary>
+    /// Creates the metadata and content placeholders required for uploading a file attachment.
+    /// </summary>
+    /// <param name="attachmentPath">Path to the attachment file.</param>
+    /// <returns>The placeholder representing the attachment.</returns>
     public async Task<GraphAttachmentPlaceHolder> CreateGraphAttachment(string attachmentPath) {
         var fileName = Path.GetFileName(attachmentPath);
         var fileSize = new FileInfo(attachmentPath).Length;
@@ -478,6 +518,12 @@ public class Graph {
         };
     }
 
+    /// <summary>
+    /// Creates an upload session for a large attachment.
+    /// </summary>
+    /// <param name="draftMessage">The draft message the attachment belongs to.</param>
+    /// <param name="attachmentItemJson">The serialized attachment item.</param>
+    /// <returns>The upload session URL.</returns>
     public async Task<string> CreateUploadSession(GraphMessage draftMessage, string attachmentItemJson) {
         var uploadSessionUrl = $"https://graph.microsoft.com/v1.0/users('{SentFrom}')/messages/{draftMessage.Id}/attachments/createUploadSession";
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
@@ -517,6 +563,10 @@ public class Graph {
         return fileContents;
     }
 
+    /// <summary>
+    /// Uploads all attachments for the specified draft message.
+    /// </summary>
+    /// <param name="draftMessage">The draft message to attach the files to.</param>
     public async Task UploadAttachmentsAsync(GraphMessage draftMessage) {
         if (Attachments != null && Attachments.Length > 0) {
             foreach (var attachmentPath in Attachments) {
@@ -529,6 +579,9 @@ public class Graph {
         }
     }
 
+    /// <summary>
+    /// Prepares attachments for upload by creating placeholders.
+    /// </summary>
     public async Task PrepareAttachments() {
         if (Attachments != null && Attachments.Length > 0) {
             foreach (var attachmentPath in Attachments) {
@@ -540,12 +593,22 @@ public class Graph {
         }
     }
 
+    /// <summary>
+    /// Uploads all chunks of a file to the provided upload session URL.
+    /// </summary>
+    /// <param name="uploadUrl">The upload session URL.</param>
+    /// <param name="fileChunks">The file chunks to upload.</param>
     public async Task SendFileChunks(string uploadUrl, List<ByteArrayContent> fileChunks) {
         foreach (var chunk in fileChunks) {
             await SendFile(uploadUrl, chunk);
         }
     }
 
+    /// <summary>
+    /// Uploads a single file chunk to the Graph API.
+    /// </summary>
+    /// <param name="uploadUrl">The upload session URL.</param>
+    /// <param name="byteArrayContent">The chunk to send.</param>
     public async Task SendFile(string uploadUrl, ByteArrayContent byteArrayContent) {
         var requestMessage = new HttpRequestMessage(HttpMethod.Put, uploadUrl) {
             Content = byteArrayContent
