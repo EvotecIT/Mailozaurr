@@ -78,6 +78,11 @@ public class MailgunClient : IDisposable {
         if (!string.IsNullOrEmpty(Html)) content.Add(new StringContent(Html), "html");
         if (Attachment != null) {
             foreach (var path in Attachment) {
+                if (!File.Exists(path)) {
+                    LogCollector.LogWarning($"Send-EmailMessage - Attachment file not found: {path}");
+                    continue;
+                }
+
                 var bytes = File.ReadAllBytes(path);
                 var fileContent = new ByteArrayContent(bytes);
                 fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
@@ -86,6 +91,11 @@ public class MailgunClient : IDisposable {
         }
         if (InlineAttachment != null) {
             foreach (var path in InlineAttachment) {
+                if (!File.Exists(path)) {
+                    LogCollector.LogWarning($"Send-EmailMessage - Inline attachment file not found: {path}");
+                    continue;
+                }
+
                 var bytes = File.ReadAllBytes(path);
                 var fileContent = new ByteArrayContent(bytes);
                 fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
