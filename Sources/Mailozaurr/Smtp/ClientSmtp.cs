@@ -207,10 +207,11 @@ public partial class ClientSmtp : SmtpClient {
 
     private IEnumerable<MailboxAddress> ConvertToMailboxAddress(object input) {
         if (input is string str) {
-            if (!str.Contains("<>")) {
-                yield return new MailboxAddress(str, str);
+            var mailbox = MailboxAddress.Parse(str);
+            if (str.Contains('<') || str.Contains('>')) {
+                yield return mailbox;
             } else {
-                yield return MailboxAddress.Parse(str);
+                yield return new MailboxAddress(string.Empty, mailbox.Address);
             }
         } else if (input is IDictionary dict) {
             if (dict.Contains("Name") && dict.Contains("Email")) {
