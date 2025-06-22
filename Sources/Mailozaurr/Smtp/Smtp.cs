@@ -348,8 +348,9 @@ public class Smtp {
 
     public SmtpResult Encrypt(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
-        X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
-        return Encrypt(certificate);
+        using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
+            return Encrypt(certificate);
+        }
     }
 
     public SmtpResult Encrypt(string certificateThumbprint) {
@@ -422,8 +423,9 @@ public class Smtp {
 
     public SmtpResult Sign(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
-        X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
-        return Sign(certificate);
+        using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
+            return Sign(certificate);
+        }
     }
 
     public SmtpResult Sign(string certificateThumbprint) {
@@ -445,8 +447,9 @@ public class Smtp {
 
     public SmtpResult Pkcs7Sign(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
-        X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
-        return Pkcs7Sign(certificate);
+        using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
+            return Pkcs7Sign(certificate);
+        }
     }
 
     public SmtpResult Pkcs7Sign(string certificateThumbprint) {
