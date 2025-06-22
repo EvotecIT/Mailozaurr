@@ -24,6 +24,7 @@ public sealed class CmdletDisconnectPOP : AsyncPSCmdlet {
     /// <para type="description">The <see cref="PopConnectionInfo"/> object containing the MailKit POP3 client instance to disconnect. This is the object returned by <c>Connect-POP</c>.</para>
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
+    [ValidateNotNull]
     public PopConnectionInfo? Client { get; set; }
 
     /// <summary>

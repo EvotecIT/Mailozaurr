@@ -22,6 +22,7 @@ public class CmdletConvertToSendGridCredential : PSCmdlet {
     /// <para type="description">Specifies the SendGrid API key.</para>
     /// </summary>
     [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string? ApiKey { get; set; }
 
     /// <summary>

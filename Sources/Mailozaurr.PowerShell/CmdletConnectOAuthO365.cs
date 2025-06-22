@@ -30,12 +30,14 @@ public class CmdletConnectOAuthO365 : PSCmdlet {
     /// <para type="description">Specifies the OAuth2 client ID from Azure AD App Registration.</para>
     /// </summary>
     [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string? ClientID { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the Azure AD tenant ID (Directory ID).</para>
     /// </summary>
     [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string? TenantID { get; set; }
 
     /// <summary>

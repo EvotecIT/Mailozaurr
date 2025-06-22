@@ -38,6 +38,7 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
     [Parameter(ParameterSetName = "Credential")]
     [Parameter(ParameterSetName = "ClearText")]
     [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string Server { get; set; }
 
     /// <summary>
@@ -68,12 +69,14 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
     /// <para type="description">Specifies the username for clear text authentication. Required for the ClearText parameter set.</para>
     /// </summary>
     [Parameter(ParameterSetName = "ClearText", Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string UserName { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the password for clear text authentication. Required for the ClearText parameter set.</para>
     /// </summary>
     [Parameter(ParameterSetName = "ClearText", Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string Password { get; set; }
 
     /// <summary>

@@ -22,11 +22,13 @@ public class CmdletConvertToOAuth2Credential : PSCmdlet {
     /// <para type="description">Specifies the username for OAuth2 authentication.</para>
     /// </summary>
     [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string? UserName { get; set; }
     /// <summary>
     /// <para type="description">Specifies the OAuth2 access token.</para>
     /// </summary>
     [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string? Token { get; set; }
 
     /// <summary>

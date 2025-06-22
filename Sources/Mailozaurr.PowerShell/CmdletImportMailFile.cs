@@ -29,6 +29,7 @@ public sealed class CmdletImportMailFile : AsyncPSCmdlet {
     /// </summary>
     [Parameter(Mandatory = true, Position = 0)]
     [Alias("FilePath", "Path")]
+    [ValidateNotNullOrEmpty]
     public string? InputPath { get; set; }
 
     /// <summary>

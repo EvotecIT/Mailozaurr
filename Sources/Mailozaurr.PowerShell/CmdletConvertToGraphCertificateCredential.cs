@@ -19,15 +19,19 @@ using System.Threading.Tasks;
 [OutputType(typeof(PSCredential))]
 public class CmdletConvertToGraphCertificateCredential : PSCmdlet {
     [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string? ClientId { get; set; }
 
     [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string? TenantId { get; set; }
 
     [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string? CertificatePath { get; set; }
 
     [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string? CertificatePassword { get; set; }
 
     [Parameter]
