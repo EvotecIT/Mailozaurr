@@ -9,4 +9,8 @@ Describe 'MicrosoftGraphUtils.ConvertFromGraphCredential' {
     It 'Throws for invalid format' {
         { [Mailozaurr.MicrosoftGraphUtils]::ConvertFromGraphCredential('invalid', 'pwd') } | Should -Throw
     }
+
+    It 'Throws for invalid format with multiple @' {
+        { [Mailozaurr.MicrosoftGraphUtils]::ConvertFromGraphCredential('client@tenant@other', 'pwd') } | Should -Throw
+    }
 }
