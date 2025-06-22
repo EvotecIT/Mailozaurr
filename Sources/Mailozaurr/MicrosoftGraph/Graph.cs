@@ -301,7 +301,7 @@ public class Graph {
                 ? ex.Message
                 : $"{ex.Message} - {errorContent}";
 
-            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, errorContent, errorMessage);
+            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, errorContent, errorMessage);
         }
     }
 
