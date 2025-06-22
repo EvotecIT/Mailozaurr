@@ -119,6 +119,12 @@ public class Graph {
     public double RetryDelayBackoff { get; set; } = 1.0;
 
     /// <summary>
+    /// Size in bytes of the chunks used when uploading attachments. Defaults to
+    /// 9MB.
+    /// </summary>
+    public int ChunkSize { get; set; } = 9000000;
+
+    /// <summary>
     /// The type of token that was issued.
     /// </summary>
     public string TokenType { get; set; }
@@ -509,7 +515,7 @@ public class Graph {
         var attachmentItemWrapper = new GraphAttachmentItemWrapper(attachmentItem);
         var attachmentItemJson = JsonSerializer.Serialize(attachmentItemWrapper);
 
-        var content = await PrepareByteArrayContentForUpload(attachmentPath, 9000000);
+        var content = await PrepareByteArrayContentForUpload(attachmentPath, ChunkSize);
 
         return new GraphAttachmentPlaceHolder() {
             Json = attachmentItemJson,
