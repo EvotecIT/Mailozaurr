@@ -56,16 +56,28 @@ public class MailgunClient : IDisposable {
         }
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MailgunClient"/> class.
+    /// </summary>
     public MailgunClient() {
         Stopwatch = Stopwatch.StartNew();
         _client = new HttpClient();
     }
 
+    /// <summary>
+    /// Converts an address object into the format required by the Mailgun API.
+    /// </summary>
+    /// <param name="address">The address object to convert.</param>
+    /// <returns>The formatted address string.</returns>
     private static string ConvertAddress(object address) {
         var (email, name) = Helpers.GetEmailAndName(address);
         return string.IsNullOrEmpty(name) ? email : $"{name} <{email}>";
     }
 
+    /// <summary>
+    /// Builds the multipart HTTP content used for the Mailgun API request.
+    /// </summary>
+    /// <returns>The constructed multipart content.</returns>
     private MultipartFormDataContent CreateContent() {
         var content = new MultipartFormDataContent();
         content.Add(new StringContent(ConvertAddress(From)), "from");
@@ -105,6 +117,10 @@ public class MailgunClient : IDisposable {
         return content;
     }
 
+    /// <summary>
+    /// Sends the email using the Mailgun REST API.
+    /// </summary>
+    /// <returns>The result of the send operation.</returns>
     public async Task<SmtpResult> SendEmailAsync() {
         var url = $"https://api.mailgun.net/v3/{EmailDomain}/messages";
         var auth = Convert.ToBase64String(Encoding.ASCII.GetBytes($"api:{ApiKey}"));
@@ -138,6 +154,9 @@ public class MailgunClient : IDisposable {
         return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", lastException?.Message);
     }
 
+    /// <summary>
+    /// Releases resources used by the client.
+    /// </summary>
     public void Dispose() {
         _client.Dispose();
     }
