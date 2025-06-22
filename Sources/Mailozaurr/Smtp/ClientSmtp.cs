@@ -171,9 +171,10 @@ public partial class ClientSmtp : SmtpClient {
                 MimeEntity? entity = null;
                 switch (inline) {
                     case string path:
+                    {
                         // Read the file into memory so it can be removed immediately
                         var bytes = File.ReadAllBytes(path);
-                        var ms = new MemoryStream(bytes);
+                        using var ms = new MemoryStream(bytes);
                         var part = new MimePart(MimeTypes.GetMimeType(path))
                         {
                             Content = new MimeContent(ms),
@@ -184,6 +185,7 @@ public partial class ClientSmtp : SmtpClient {
                         bodyBuilder.LinkedResources.Add(part);
                         entity = part;
                         break;
+                    }
                     case MimeEntity mime:
                         bodyBuilder.LinkedResources.Add(mime);
                         entity = mime;
