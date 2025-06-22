@@ -45,14 +45,15 @@ namespace Mailozaurr {
         /// </summary>
         public static GraphCredential ConvertFromGraphCredential(string username, string password) {
             var parts = username.Split('@');
-            if (parts.Length == 2) {
-                return new GraphCredential {
-                    ClientId = parts[0],
-                    DirectoryId = parts[1],
-                    ClientSecret = password
-                };
+            if (parts.Length != 2) {
+                throw new ArgumentException("Invalid credential format. Expected 'clientid@directoryid'.");
             }
-            throw new ArgumentException("Invalid credential format. Expected 'clientid@directoryid'.");
+
+            return new GraphCredential {
+                ClientId = parts[0],
+                DirectoryId = parts[1],
+                ClientSecret = password
+            };
         }
 
         /// <summary>
