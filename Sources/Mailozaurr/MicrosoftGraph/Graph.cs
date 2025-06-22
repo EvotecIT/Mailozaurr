@@ -2,6 +2,9 @@
 
 namespace Mailozaurr;
 
+/// <summary>
+/// Helper class for sending messages via Microsoft Graph API.
+/// </summary>
 public class Graph {
     private readonly HttpClient _client;
     public string MessageJson = string.Empty;

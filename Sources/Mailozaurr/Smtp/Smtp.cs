@@ -8,6 +8,9 @@ using System.Threading;
 
 namespace Mailozaurr;
 
+/// <summary>
+/// High level wrapper around <see cref="ClientSmtp"/> that exposes convenient methods and retry logic.
+/// </summary>
 public class Smtp {
     public LoggingConfigurator? Logging;
 

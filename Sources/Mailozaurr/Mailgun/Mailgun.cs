@@ -13,20 +13,33 @@ public class MailgunClient : IDisposable {
     private string ApiKey => Helpers.CredentialToApiKey(Credentials);
     private string EmailDomain => Helpers.GetEmailAddress(From).Split('@')[1];
 
+    /// <summary>Credentials used to authenticate to the API.</summary>
     public ICredentials Credentials { get; set; }
+    /// <summary>Determines how errors are handled.</summary>
     public ActionPreference? ErrorAction { get; set; }
 
+    /// <summary>Primary recipients.</summary>
     public List<object> To { get; set; } = new();
+    /// <summary>Carbon copy recipients.</summary>
     public List<object> Cc { get; set; } = new();
+    /// <summary>Blind carbon copy recipients.</summary>
     public List<object> Bcc { get; set; } = new();
+    /// <summary>The sender address.</summary>
     public object From { get; set; }
+    /// <summary>Reply-to address.</summary>
     public object? ReplyTo { get; set; }
+    /// <summary>Message subject.</summary>
     public string? Subject { get; set; }
+    /// <summary>Plain text body.</summary>
     public string Text { get; set; } = string.Empty;
+    /// <summary>HTML body.</summary>
     public string Html { get; set; } = string.Empty;
+    /// <summary>File paths to include as attachments.</summary>
     public string[]? Attachment { get; set; }
+    /// <summary>File paths to include as inline attachments.</summary>
     public string[]? InlineAttachment { get; set; }
 
+    /// <summary>Collector used to store log entries.</summary>
     public LogCollector LogCollector { get; set; } = new();
     public int RetryCount { get; set; } = 0;
     public int RetryDelayMilliseconds { get; set; } = 0;

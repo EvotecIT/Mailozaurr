@@ -2,7 +2,17 @@
 
 namespace Mailozaurr;
 
+/// <summary>
+/// Provides helper methods for converting EML messages to MSG format.
+/// </summary>
 public static class EmailMessage {
+    /// <summary>
+    /// Converts one or more EML files to MSG format.
+    /// </summary>
+    /// <param name="emlFile">Paths to the EML files to convert.</param>
+    /// <param name="outputFolder">The folder where MSG files should be saved.</param>
+    /// <param name="force">If set to <c>true</c>, existing MSG files will be overwritten.</param>
+    /// <returns>A collection of conversion results for each processed file.</returns>
     public static IEnumerable<EmlConversionResult> ConvertEmlToMsg(string[] emlFile, string outputFolder, bool force) {
         LoggingMessages.Logger.WriteVerbose($"Converting {emlFile.Length} EML file(s) to MSG file(s)...");
         foreach (var eml in emlFile) {
@@ -13,6 +23,13 @@ public static class EmailMessage {
         }
     }
 
+    /// <summary>
+    /// Converts a single EML file to MSG format.
+    /// </summary>
+    /// <param name="emlFile">The input EML file.</param>
+    /// <param name="msgFile">The target MSG file.</param>
+    /// <param name="force">If set to <c>true</c>, an existing MSG file will be overwritten.</param>
+    /// <returns>The result of the conversion.</returns>
     public static EmlConversionResult ConvertEmlToMsg(FileInfo emlFile, FileInfo msgFile, bool force) {
         if (File.Exists(emlFile.FullName)) {
             LoggingMessages.Logger.WriteVerbose("Processing EML file: {0}", emlFile);

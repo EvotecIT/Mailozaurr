@@ -4,14 +4,23 @@ namespace Mailozaurr;
 /// Class that holds the result of the SMTP operation
 /// </summary>
 public class SmtpResult {
+    /// <summary>Whether the operation succeeded.</summary>
     public bool Status { get; set; }
+    /// <summary>The type of email action that was performed.</summary>
     public EmailAction EmailAction { get; set; }
+    /// <summary>The recipients the message was sent to.</summary>
     public string SentTo { get; set; }
+    /// <summary>The sender address.</summary>
     public string SentFrom { get; set; }
+    /// <summary>Optional message returned by the operation.</summary>
     public string? Message { get; set; }
+    /// <summary>Time taken to perform the action.</summary>
     public TimeSpan TimeToExecute { get; set; }
+    /// <summary>The server used to send the message.</summary>
     public string Server { get; set; }
+    /// <summary>The port used to connect.</summary>
     public int Port { get; set; }
+    /// <summary>Error information if the operation failed.</summary>
     public string? Error { get; set; }
     /// <summary>
     /// Initializes a new instance of the <see cref="SmtpResult"/> class.
