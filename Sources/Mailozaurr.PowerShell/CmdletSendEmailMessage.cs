@@ -39,6 +39,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = true, ParameterSetName = "DefaultCredentials")]
     [Alias("SmtpServer")]
+    [ValidateNotNullOrEmpty]
     public string? Server { get; set; }
 
     /// <summary>
@@ -61,6 +62,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = true, ParameterSetName = "SendGrid")]
     [Parameter(Mandatory = true, ParameterSetName = "EmailProviders")]
+    [ValidateNotNullOrEmpty]
     public object? From { get; set; }
 
     /// <summary>
@@ -178,6 +180,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "SendGrid")]
     [Parameter(Mandatory = true, ParameterSetName = "EmailProviders")]
     [Parameter(Mandatory = true, ParameterSetName = "oAuth")]
+    [ValidateNotNull]
     public PSCredential? Credential { get; set; }
 
     /// <summary>

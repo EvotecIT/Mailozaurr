@@ -23,11 +23,13 @@ public class CmdletGetMailMessageAttachment : PSCmdlet {
     /// <para type="description">Specifies the user principal name (email address) whose mail message attachments will be retrieved.</para>
     /// </summary>
     [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
     /// <summary>
     /// <para type="description">Specifies the message ID for which attachments will be retrieved.</para>
     /// </summary>
     [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string? MessageId { get; set; }
     /// <summary>
     /// <para type="description">Specifies the client ID for Microsoft Graph authentication.</para>

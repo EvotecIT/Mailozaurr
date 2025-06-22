@@ -27,6 +27,7 @@ public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
     /// <para type="description">The <see cref="ImapConnectionInfo"/> object representing the active IMAP connection. This is the object returned by <c>Connect-IMAP</c>.</para>
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
+    [ValidateNotNull]
     public ImapConnectionInfo? Client { get; set; }
 
     /// <summary>

@@ -27,18 +27,21 @@ public class CmdletConvertToGraphCredential: PSCmdlet {
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "ClearText")]
     [Parameter(Mandatory = true, ParameterSetName = "Encrypted")]
+    [ValidateNotNullOrEmpty]
     public string? ClientId { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the client secret in clear text. Use only with the ClearText parameter set.</para>
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "ClearText")]
+    [ValidateNotNullOrEmpty]
     public string? ClientSecret { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the client secret in encrypted form. Use only with the Encrypted parameter set.</para>
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "Encrypted")]
+    [ValidateNotNullOrEmpty]
     public string? ClientSecretEncrypted { get; set; }
 
     /// <summary>
@@ -46,6 +49,7 @@ public class CmdletConvertToGraphCredential: PSCmdlet {
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "ClearText")]
     [Parameter(Mandatory = true, ParameterSetName = "Encrypted")]
+    [ValidateNotNullOrEmpty]
     public string? DirectoryId { get; set; }
 
     /// <summary>

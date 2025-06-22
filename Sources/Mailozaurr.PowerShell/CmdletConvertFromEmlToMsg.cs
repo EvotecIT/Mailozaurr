@@ -23,6 +23,7 @@ public sealed class CmdletConvertFromEmlToMsg : AsyncPSCmdlet {
     /// <para type="description">Specifies the paths to the EML files to convert. Accepts an array of strings. This parameter is mandatory.</para>
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
+    [ValidateNotNullOrEmpty]
     public string[]? InputPath;
 
     /// <summary>
@@ -30,6 +31,7 @@ public sealed class CmdletConvertFromEmlToMsg : AsyncPSCmdlet {
     /// </summary>
     [Alias("OutputPath")]
     [Parameter(Mandatory = true, Position = 1)]
+    [ValidateNotNullOrEmpty]
     public string? OutputFolder { get; set; }
 
     /// <summary>
