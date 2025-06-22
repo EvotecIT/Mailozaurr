@@ -288,7 +288,7 @@ namespace Mailozaurr {
                         File.WriteAllText(filePath, content);
                     } catch (Exception ex) {
                         // Log or handle error
-                        Console.WriteLine($"SaveMailMessage - Couldn't save file to {filePath}. Error: {ex.Message}");
+                        LoggingMessages.Logger.WriteWarning($"SaveMailMessage - Couldn't save file to {filePath}. Error: {ex.Message}");
                     }
                 }
             }
@@ -305,7 +305,7 @@ namespace Mailozaurr {
                         File.WriteAllBytes(filePath, bytes);
                     } catch (Exception ex) {
                         // Log or handle error
-                        Console.WriteLine($"SaveAttachment - Couldn't save file to {filePath}. Error: {ex.Message}");
+                        LoggingMessages.Logger.WriteWarning($"SaveAttachment - Couldn't save file to {filePath}. Error: {ex.Message}");
                     }
                 }
             }
