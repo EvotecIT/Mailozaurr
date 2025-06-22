@@ -236,29 +236,40 @@ public class SendGridClient {
 
         int attempts = 0;
         Exception? lastException = null;
+        string? lastContent = null;
         do {
             try {
                 var response = await _client.SendAsync(request);
+                lastContent = await response.Content.ReadAsStringAsync();
                 LogCollector.LogVerbose($"Send-EmailMessage - Sent email to {SentTo} using SendGrid");
-                return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, response.EnsureSuccessStatusCode().ToString());
+
+                if (response.IsSuccessStatusCode) {
+                    return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, response.StatusCode.ToString());
+                }
+
+                var message = $"Status code {response.StatusCode}: {lastContent}";
+                lastException = new HttpRequestException(message);
+                LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SendGrid: {message}");
             } catch (Exception ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SendGrid: {ex.Message}");
-                if (attempts >= RetryCount) {
-                    if (ErrorAction == ActionPreference.Stop) {
-                        throw;
-                    }
-                    return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, "", ex.Message);
+            }
+
+            if (attempts >= RetryCount) {
+                if (ErrorAction == ActionPreference.Stop && lastException != null) {
+                    throw lastException;
                 }
-                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
-                if (delayMilliseconds > 0) {
-                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds));
-                }
+                return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
+            }
+
+            var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+            if (delayMilliseconds > 0) {
+                await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds));
             }
             attempts++;
         } while (attempts <= RetryCount);
 
-        return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, "", lastException?.Message);
+        return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
     }
 
     /// <summary>
