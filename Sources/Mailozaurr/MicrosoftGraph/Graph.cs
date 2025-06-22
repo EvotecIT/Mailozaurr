@@ -266,35 +266,36 @@ public class Graph {
         //LoggingMessages.Logger.WriteVerbose($"Application ID: {ApplicationID}");
         //LoggingMessages.Logger.WriteVerbose($"Tenant Domain: {TenantDomain}");
         //LoggingMessages.Logger.WriteVerbose($"Application Key {ApplicationKey}");
-        HttpResponseMessage response;
+        HttpResponseMessage? response = null;
         try {
             response = await _client.PostAsync($"https://login.microsoftonline.com/{TenantDomain}/oauth2/token", new FormUrlEncodedContent(body));
-        } catch (Exception ex) {
-            LogCollector.LogWarning($"Send-EmailMessage - Error during connection using Graph API: {ex.Message}");
-            if (ErrorAction == ActionPreference.Stop) {
-                throw;
-            }
-            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, "", ex.Message);
+            response.EnsureSuccessStatusCode();
 
-        }
-
-        //var statusCode = response.EnsureSuccessStatusCode();
-        //LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Got status code: {statusCode}");
-
-        try {
             var content = await response.Content.ReadAsStringAsync();
             var authorization = JsonSerializer.Deserialize<GraphAuthorization>(content);
-            //LoggingMessages.Logger.WriteVerbose($"AccessToken {authorization.AccessToken}");
-            //LoggingMessages.Logger.WriteVerbose($"TokenType {authorization.TokenType}");
             AccessToken = authorization.AccessToken;
             TokenType = authorization.TokenType;
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", "");
         } catch (Exception ex) {
+            var errorContent = string.Empty;
+            if (response != null) {
+                try {
+                    errorContent = await response.Content.ReadAsStringAsync();
+                } catch {
+                    // ignored
+                }
+            }
+
             LogCollector.LogWarning($"Send-EmailMessage - Error during connection using Graph API: {ex.Message}");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
-            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, "", ex.Message);
+
+            var errorMessage = string.IsNullOrEmpty(errorContent)
+                ? ex.Message
+                : $"{ex.Message} - {errorContent}";
+
+            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, errorContent, errorMessage);
         }
     }
 
