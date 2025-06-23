@@ -194,7 +194,11 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
     public string? Password { get; set; }
-
+    /// <summary>
+    /// <para>Specifies the SASL mechanism for authentication. Defaults to Plain.</para>
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
+    public AuthenticationMechanism AuthenticationMechanism { get; set; } = AuthenticationMechanism.Plain;
     /// <summary>
     /// <para>Specifies the secure socket options for SMTP connection. Options: None, Auto, StartTls, StartTlsWhenAvailable, SslOnConnect. Default is Auto.</para>
     /// </summary>
@@ -792,7 +796,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
                 Status = SmtpClient.Authenticate(networkCredential, OAuth2);
             } else if (!string.IsNullOrWhiteSpace(Username) || !string.IsNullOrWhiteSpace(Password)) {
-                Status = SmtpClient.Authenticate(Username, Password, AsSecureString);
+                Status = SmtpClient.Authenticate(Username, Password, AsSecureString, AuthenticationMechanism);
             } else {
                 LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
                 Status = new SmtpResult(true, EmailAction.Authenticate, SmtpClient.SentTo, SmtpClient.SentFrom, SmtpClient.Server, SmtpClient.Port, SmtpClient.Stopwatch.Elapsed, "Authentication skipped");

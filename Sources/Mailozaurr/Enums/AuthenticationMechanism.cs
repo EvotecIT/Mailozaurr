@@ -1,4 +1,4 @@
-namespace Mailozaurr;
+﻿namespace Mailozaurr;
 
 /// <summary>
 /// Supported SASL authentication mechanisms.
