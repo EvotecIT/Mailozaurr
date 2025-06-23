@@ -1,9 +1,6 @@
-using MailKit;
-using MailKit.Search;
 using MimeKit;
 using Mailozaurr;
 using System;
-using System.Collections.Generic;
 using System.Management.Automation;
 using System.Threading.Tasks;
 
@@ -112,57 +109,17 @@ public sealed class CmdletGetEmailMessage : AsyncPSCmdlet {
             return Task.CompletedTask;
         }
 
-        var client = ImapClient.Data;
-        IMailFolder folder = client.Inbox;
-        if (!string.IsNullOrEmpty(Folder)) {
-            try {
-                folder = client.GetFolder(Folder);
-            } catch {
-                try {
-                    folder = client.GetFolder(client.PersonalNamespaces[0]).GetSubfolder(Folder);
-                } catch {
-                    WriteWarning($"Get-EmailMessage - Folder '{Folder}' not found. Using Inbox.");
-                    folder = client.Inbox;
-                }
-            }
-        }
-
-        folder.Open(Delete.IsPresent ? FolderAccess.ReadWrite : FolderAccess.ReadOnly);
-
-        SearchQuery query = SearchQuery.All;
-        if (!All.IsPresent) {
-            if (!string.IsNullOrEmpty(Subject)) {
-                query = query.And(SearchQuery.SubjectContains(Subject));
-            }
-            if (!string.IsNullOrEmpty(FromContains)) {
-                query = query.And(SearchQuery.FromContains(FromContains));
-            }
-            if (!string.IsNullOrEmpty(ToContains)) {
-                query = query.And(SearchQuery.ToContains(ToContains));
-            }
-            if (Since.HasValue) {
-                query = query.And(SearchQuery.DeliveredAfter(Since.Value));
-            }
-            if (Before.HasValue) {
-                query = query.And(SearchQuery.DeliveredBefore(Before.Value));
-            }
-        }
-
-        var uids = folder.Search(query);
-        List<MimeMessage> messages = new();
-        foreach (var uid in uids) {
-            var msg = folder.GetMessage(uid);
-            if (Priority.HasValue && msg.Priority != ConvertPriority(Priority.Value)) {
-                continue;
-            }
-            messages.Add(msg);
-            if (Delete.IsPresent) {
-                folder.AddFlags(uid, MessageFlags.Deleted, true);
-            }
-        }
-        if (Delete.IsPresent && uids.Count > 0) {
-            folder.Expunge();
-        }
+        var messages = MessageFetcher.Fetch(
+            ImapClient.Data,
+            Folder,
+            Subject,
+            FromContains,
+            ToContains,
+            Priority,
+            Since,
+            Before,
+            All.IsPresent,
+            Delete.IsPresent);
 
         WriteObject(messages, true);
         return Task.CompletedTask;
@@ -174,66 +131,19 @@ public sealed class CmdletGetEmailMessage : AsyncPSCmdlet {
             return Task.CompletedTask;
         }
 
-        var client = PopClient.Data;
-        List<MimeMessage> messages = new();
-        for (int i = 0; i < client.Count; i++) {
-            var message = client.GetMessage(i);
-
-            if (!All.IsPresent) {
-                if (!string.IsNullOrEmpty(Subject)) {
-                    if (message.Subject == null || message.Subject.IndexOf(Subject, StringComparison.OrdinalIgnoreCase) < 0) {
-                        continue;
-                    }
-                }
-                if (!string.IsNullOrEmpty(FromContains)) {
-                    if (!AddressMatches(message.From, FromContains)) {
-                        continue;
-                    }
-                }
-                if (!string.IsNullOrEmpty(ToContains)) {
-                    if (!AddressMatches(message.To, ToContains)) {
-                        continue;
-                    }
-                }
-                var msgDate = message.Date.DateTime;
-                if (Since.HasValue && msgDate < Since.Value) {
-                    continue;
-                }
-                if (Before.HasValue && msgDate > Before.Value) {
-                    continue;
-                }
-                if (Priority.HasValue && message.Priority != ConvertPriority(Priority.Value)) {
-                    continue;
-                }
-            }
-
-            messages.Add(message);
-            if (Delete.IsPresent) {
-                client.DeleteMessage(i);
-            }
-        }
+        var messages = MessageFetcher.Fetch(
+            PopClient.Data,
+            Subject,
+            FromContains,
+            ToContains,
+            Priority,
+            Since,
+            Before,
+            All.IsPresent,
+            Delete.IsPresent);
 
         WriteObject(messages, true);
         return Task.CompletedTask;
     }
 
-    private static MimeKit.MessagePriority ConvertPriority(MessagePriority priority) {
-        return priority switch {
-            MessagePriority.High => MimeKit.MessagePriority.Urgent,
-            MessagePriority.Low => MimeKit.MessagePriority.NonUrgent,
-            _ => MimeKit.MessagePriority.Normal,
-        };
-    }
-
-    private static bool AddressMatches(InternetAddressList list, string filter) {
-        foreach (var addr in list.Mailboxes) {
-            if (addr.Address.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) {
-                return true;
-            }
-            if (!string.IsNullOrEmpty(addr.Name) && addr.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) {
-                return true;
-            }
-        }
-        return false;
-    }
 }
