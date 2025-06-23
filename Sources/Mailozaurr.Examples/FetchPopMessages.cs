@@ -17,9 +17,8 @@ public static class FetchPopMessages {
         await client.AuthenticateAsync(username, password);
         for (int i = 0; i < client.Count; i++) {
             MimeMessage msg = await client.GetMessageAsync(i);
-            if (msg.Date.UtcDateTime.Date != DateTime.UtcNow.Date)
-                continue;
             Console.WriteLine($"{msg.Date.LocalDateTime}: {msg.Subject}");
+            await client.DeleteMessageAsync(i);
         }
         await client.DisconnectAsync(true);
     }

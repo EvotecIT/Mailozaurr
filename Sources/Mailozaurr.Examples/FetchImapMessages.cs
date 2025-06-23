@@ -18,12 +18,16 @@ public static class FetchImapMessages {
         await client.ConnectAsync(server, 993, SecureSocketOptions.SslOnConnect);
         await client.AuthenticateAsync(username, password);
         var folder = client.GetFolder("Inbox/Reports");
-        await folder.OpenAsync(FolderAccess.ReadOnly);
-        var query = SearchQuery.SubjectContains("Monthly").And(SearchQuery.DeliveredAfter(DateTime.UtcNow.AddDays(-7)));
+        await folder.OpenAsync(FolderAccess.ReadWrite);
+        var query = SearchQuery.FromContains("microsoft.com").And(SearchQuery.HeaderContains("Importance", "High"));
         var uids = await folder.SearchAsync(query);
         foreach (var uid in uids) {
             MimeMessage msg = await folder.GetMessageAsync(uid);
             Console.WriteLine($"{msg.Date.LocalDateTime}: {msg.Subject}");
+            await folder.AddFlagsAsync(uid, MessageFlags.Deleted, true);
+        }
+        if (uids.Count > 0) {
+            await folder.ExpungeAsync();
         }
         await client.DisconnectAsync(true);
     }
