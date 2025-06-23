@@ -432,12 +432,10 @@ public class Smtp {
     /// <returns></returns>
     public SmtpResult Encrypt(string certificateThumbprint) {
         // Load the certificate from the Windows Certificate Store
-        X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+        using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
         store.Open(OpenFlags.ReadOnly);
 
         X509Certificate2Collection certificates = store.Certificates.Find(X509FindType.FindByThumbprint, certificateThumbprint, false);
-
-        store.Close();
 
         if (certificates.Count > 0) {
             // Use the certificate directly from the store to encrypt the email
@@ -529,12 +527,10 @@ public class Smtp {
     /// <returns></returns>
     public SmtpResult Sign(string certificateThumbprint) {
         // Load the certificate from the Windows Certificate Store
-        X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+        using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
         store.Open(OpenFlags.ReadOnly);
 
         X509Certificate2Collection certificates = store.Certificates.Find(X509FindType.FindByThumbprint, certificateThumbprint, false);
-
-        store.Close();
 
         if (certificates.Count > 0) {
             // Use the certificate directly from the store to sign the email
@@ -565,12 +561,10 @@ public class Smtp {
     /// <returns></returns>
     public SmtpResult Pkcs7Sign(string certificateThumbprint) {
         // Load the certificate from the Windows Certificate Store
-        X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+        using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
         store.Open(OpenFlags.ReadOnly);
 
         X509Certificate2Collection certificates = store.Certificates.Find(X509FindType.FindByThumbprint, certificateThumbprint, false);
-
-        store.Close();
 
         if (certificates.Count > 0) {
             // Use the certificate directly from the store to sign the email
