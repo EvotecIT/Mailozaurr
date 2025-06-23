@@ -2,6 +2,7 @@ using System.Management.Automation;
 using Mailozaurr;
 using System.Linq;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
 
@@ -23,7 +24,7 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "MailMessage")]
 [OutputType(typeof(PSObject))]
-public class CmdletGetMailMessage : PSCmdlet {
+public class CmdletGetMailMessage : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Specifies the user principal name (email address) whose mail messages will be retrieved.</para>
     /// </summary>
@@ -69,7 +70,7 @@ public class CmdletGetMailMessage : PSCmdlet {
     /// <summary>
     /// Retrieves mail messages for the specified user via Microsoft Graph API.
     /// </summary>
-    protected override void ProcessRecord() {
+    protected override async Task ProcessRecordAsync() {
         GraphCredential cred;
         if (Credential != null) {
             // Username is clientid@directoryid
@@ -87,9 +88,8 @@ public class CmdletGetMailMessage : PSCmdlet {
         } else {
             cred = new GraphCredential { ClientId = ClientId, ClientSecret = ClientSecret, DirectoryId = DirectoryId };
         }
-        var task = MicrosoftGraphUtils.GetMailMessagesAsync(cred, UserPrincipalName, Property, Filter, Limit);
-        task.Wait();
-        foreach (var dict in task.Result) {
+        var messages = await MicrosoftGraphUtils.GetMailMessagesAsync(cred, UserPrincipalName, Property, Filter, Limit);
+        foreach (var dict in messages) {
             WriteObject(PSObject.AsPSObject(dict));
         }
     }
