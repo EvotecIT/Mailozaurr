@@ -1,6 +1,7 @@
 using System.Management.Automation;
 using Mailozaurr;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
 
@@ -18,7 +19,7 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "MailMessageAttachment")]
 [OutputType(typeof(Attachment))]
-public class CmdletGetMailMessageAttachment : PSCmdlet {
+public class CmdletGetMailMessageAttachment : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Specifies the user principal name (email address) whose mail message attachments will be retrieved.</para>
     /// </summary>
@@ -55,11 +56,10 @@ public class CmdletGetMailMessageAttachment : PSCmdlet {
     /// <summary>
     /// Retrieves attachments for the specified mail message via Microsoft Graph API.
     /// </summary>
-    protected override void ProcessRecord() {
+    protected override async Task ProcessRecordAsync() {
         var cred = new GraphCredential { ClientId = ClientId, ClientSecret = ClientSecret, DirectoryId = DirectoryId };
-        var task = MicrosoftGraphUtils.GetMailMessageAttachmentsAsync(cred, UserPrincipalName, MessageId, Property);
-        task.Wait();
-        foreach (var att in task.Result) {
+        var attachments = await MicrosoftGraphUtils.GetMailMessageAttachmentsAsync(cred, UserPrincipalName, MessageId, Property);
+        foreach (var att in attachments) {
             WriteObject(att);
         }
     }
