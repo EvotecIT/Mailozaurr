@@ -40,6 +40,12 @@ namespace Mailozaurr {
     }
 
     public static class MicrosoftGraphUtils {
+        private static readonly HttpClient HttpClient;
+
+        static MicrosoftGraphUtils() {
+            HttpClient = new HttpClient();
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => HttpClient.Dispose();
+        }
         /// <summary>
         /// Converts a credential string (username@directory) and secret to a GraphCredential object.
         /// </summary>
@@ -60,28 +66,26 @@ namespace Mailozaurr {
         /// Connects to O365 Graph and returns the Authorization header value ("Bearer ...").
         /// </summary>
         public static async Task<string> ConnectO365GraphAsync(GraphCredential credential, string tenantDomain, string resource = "https://manage.office.com") {
-            using (var client = new HttpClient()) {
-                var body = new Dictionary<string, string>
-                {
-                    {"grant_type", "client_credentials"},
-                    {"resource", resource},
-                    {"client_id", credential.ClientId},
-                    {"client_secret", credential.ClientSecret}
-                };
-                var content = new FormUrlEncodedContent(body);
-                var url = $"https://login.microsoftonline.com/{tenantDomain}/oauth2/token";
-                var response = await client.PostAsync(url, content);
-                if (!response.IsSuccessStatusCode) {
-                    var error = await response.Content.ReadAsStringAsync();
-                    throw new Exception($"ConnectO365GraphAsync - Error: {error}");
-                }
-                var json = await response.Content.ReadAsStringAsync();
+            var body = new Dictionary<string, string>
+            {
+                {"grant_type", "client_credentials"},
+                {"resource", resource},
+                {"client_id", credential.ClientId},
+                {"client_secret", credential.ClientSecret}
+            };
+            var content = new FormUrlEncodedContent(body);
+            var url = $"https://login.microsoftonline.com/{tenantDomain}/oauth2/token";
+            var response = await HttpClient.PostAsync(url, content);
+            if (!response.IsSuccessStatusCode) {
+                var error = await response.Content.ReadAsStringAsync();
+                throw new Exception($"ConnectO365GraphAsync - Error: {error}");
+            }
+            var json = await response.Content.ReadAsStringAsync();
                 // Parse JSON for access_token and token_type
                 var token = System.Text.Json.JsonDocument.Parse(json);
                 var accessToken = token.RootElement.GetProperty("access_token").GetString();
                 var tokenType = token.RootElement.GetProperty("token_type").GetString();
-                return $"{tokenType} {accessToken}";
-            }
+            return $"{tokenType} {accessToken}";
         }
 
         /// <summary>
@@ -116,23 +120,21 @@ namespace Mailozaurr {
             string uri,
             IDictionary<string, string> headers = null,
             string body = null) {
-            using (var client = new HttpClient()) {
-                var request = new HttpRequestMessage(new HttpMethod(method), uri);
-                if (headers != null) {
-                    foreach (var kvp in headers) {
-                        request.Headers.TryAddWithoutValidation(kvp.Key, kvp.Value);
-                    }
+            var request = new HttpRequestMessage(new HttpMethod(method), uri);
+            if (headers != null) {
+                foreach (var kvp in headers) {
+                    request.Headers.TryAddWithoutValidation(kvp.Key, kvp.Value);
                 }
-                if (!string.IsNullOrEmpty(body) && (method == "POST" || method == "PUT" || method == "PATCH")) {
-                    request.Content = new StringContent(body, Encoding.UTF8, "application/json");
-                }
-                var response = await client.SendAsync(request);
-                var responseContent = await response.Content.ReadAsStringAsync();
-                if (!response.IsSuccessStatusCode) {
-                    throw new Exception($"InvokeGraphApiAsync - Error: {response.StatusCode} - {responseContent}");
-                }
-                return JsonDocument.Parse(responseContent);
             }
+            if (!string.IsNullOrEmpty(body) && (method == "POST" || method == "PUT" || method == "PATCH")) {
+                request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+            }
+            using var response = await HttpClient.SendAsync(request);
+            var responseContent = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode) {
+                throw new Exception($"InvokeGraphApiAsync - Error: {response.StatusCode} - {responseContent}");
+            }
+            return JsonDocument.Parse(responseContent);
         }
 
         /// <summary>
