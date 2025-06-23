@@ -179,10 +179,17 @@ public class Smtp {
         Stopwatch = Stopwatch.StartNew();
     }
 
+    /// <summary>
+    /// Creates the MIME message using the current property values.
+    /// </summary>
     public void CreateMessage() {
         Client.CreateMessage();
     }
 
+    /// <summary>
+    /// Saves the constructed message to the specified path.
+    /// </summary>
+    /// <param name="path">Destination file path.</param>
     public void SaveMessage(string path) {
         if (!string.IsNullOrEmpty(path)) {
             Client.SaveMessage(path);
@@ -270,6 +277,12 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// Returns the plain text password, decrypting it when <paramref name="isSecureString"/> is true.
+    /// </summary>
+    /// <param name="password">Password value.</param>
+    /// <param name="isSecureString">Indicates if the password is protected.</param>
+    /// <returns>The plain text password.</returns>
     public string ConvertSecureStringToPlainString(string password, bool isSecureString) {
         if (isSecureString) {
             // Convert the encrypted string back to a SecureString
@@ -356,17 +369,30 @@ public class Smtp {
         return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", lastException?.Message);
     }
 
+    /// <summary>
+    /// Disconnects from the SMTP server.
+    /// </summary>
     public void Disconnect() {
         Client.Disconnect(true);
         Stopwatch.Stop();
     }
 
+    /// <summary>
+    /// Releases the SMTP connection and associated resources.
+    /// </summary>
     public void Dispose() {
         Disconnect();
         Client.Dispose();
         Stopwatch.Stop();
     }
 
+    /// <summary>
+    /// S/MIME encrypt the message using a PFX certificate file.
+    /// </summary>
+    /// <param name="pfxFilePath">Path to the PFX file.</param>
+    /// <param name="password">Certificate password.</param>
+    /// <param name="isSecureString">Indicates if the password is protected.</param>
+    /// <returns></returns>
     public SmtpResult Encrypt(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
@@ -374,6 +400,11 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// S/MIME encrypt the message using a certificate from the store.
+    /// </summary>
+    /// <param name="certificateThumbprint">Certificate thumbprint.</param>
+    /// <returns></returns>
     public SmtpResult Encrypt(string certificateThumbprint) {
         // Load the certificate from the Windows Certificate Store
         X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
@@ -394,6 +425,11 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// S/MIME encrypt the message using the specified certificate instance.
+    /// </summary>
+    /// <param name="certificate">Certificate to encrypt with.</param>
+    /// <returns></returns>
     public SmtpResult Encrypt(X509Certificate2 certificate) {
         MimeMessage message = Message;
         // encrypt our message body using our custom S/MIME cryptography context
@@ -419,6 +455,11 @@ public class Smtp {
         return new SmtpResult(true, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
     }
 
+    /// <summary>
+    /// S/MIME sign the message using the specified certificate.
+    /// </summary>
+    /// <param name="certificate">Certificate used for signing.</param>
+    /// <returns></returns>
     public SmtpResult Sign(X509Certificate2 certificate) {
         MimeMessage message = Message;
         // digitally sign our message body using our custom S/MIME cryptography context
@@ -442,6 +483,13 @@ public class Smtp {
         return new SmtpResult(true, EmailAction.SMimeSignature, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
     }
 
+    /// <summary>
+    /// S/MIME sign the message using a PFX certificate file.
+    /// </summary>
+    /// <param name="pfxFilePath">Path to the PFX file.</param>
+    /// <param name="password">Certificate password.</param>
+    /// <param name="isSecureString">Indicates if the password is protected.</param>
+    /// <returns></returns>
     public SmtpResult Sign(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
@@ -449,6 +497,11 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// S/MIME sign the message using a certificate from the store.
+    /// </summary>
+    /// <param name="certificateThumbprint">Certificate thumbprint.</param>
+    /// <returns></returns>
     public SmtpResult Sign(string certificateThumbprint) {
         // Load the certificate from the Windows Certificate Store
         X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
@@ -466,6 +519,13 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// PKCS#7 sign the message using a PFX certificate file.
+    /// </summary>
+    /// <param name="pfxFilePath">Path to the PFX file.</param>
+    /// <param name="password">Certificate password.</param>
+    /// <param name="isSecureString">Indicates if the password is protected.</param>
+    /// <returns></returns>
     public SmtpResult Pkcs7Sign(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
@@ -473,6 +533,11 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// PKCS#7 sign the message using a certificate from the store.
+    /// </summary>
+    /// <param name="certificateThumbprint">Certificate thumbprint.</param>
+    /// <returns></returns>
     public SmtpResult Pkcs7Sign(string certificateThumbprint) {
         // Load the certificate from the Windows Certificate Store
         X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
@@ -493,6 +558,11 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// PKCS#7 sign the message using the specified certificate.
+    /// </summary>
+    /// <param name="certificate">Certificate used for signing.</param>
+    /// <returns></returns>
     public SmtpResult Pkcs7Sign(X509Certificate2 certificate) {
         try {
             MimeMessage message = Message;
@@ -563,6 +633,14 @@ public class Smtp {
         return new SmtpResult(true, EmailAction.SMimeSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
     }
 
+    /// <summary>
+    /// Performs the specified S/MIME action using a PFX certificate file.
+    /// </summary>
+    /// <param name="emailActionEncryption">The operation to perform.</param>
+    /// <param name="pfxFilePath">Path to the PFX file.</param>
+    /// <param name="password">Certificate password.</param>
+    /// <param name="isSecureString">Indicates if the password is protected.</param>
+    /// <returns></returns>
     public SmtpResult Encrypt(EmailActionEncryption emailActionEncryption, string pfxFilePath, string password, bool isSecureString) {
         switch (emailActionEncryption) {
             case EmailActionEncryption.SMIMESign:
@@ -578,6 +656,12 @@ public class Smtp {
                 return new SmtpResult(true, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", "EmailActionEncryption None");
         }
     }
+    /// <summary>
+    /// Performs the specified S/MIME action using a certificate from the store.
+    /// </summary>
+    /// <param name="emailActionEncryption">The operation to perform.</param>
+    /// <param name="certificateThumbprint">Certificate thumbprint.</param>
+    /// <returns></returns>
     public SmtpResult Encrypt(EmailActionEncryption emailActionEncryption, string certificateThumbprint) {
         switch (emailActionEncryption) {
             case EmailActionEncryption.SMIMESign:
