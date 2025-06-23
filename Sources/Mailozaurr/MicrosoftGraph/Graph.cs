@@ -124,6 +124,8 @@ public class Graph {
     /// </summary>
     public bool RetryAlways { get; set; } = false;
 
+    public string? WebhookUrl { get; set; }
+
     /// <summary>
     /// Size in bytes of the chunks used when uploading attachments. Defaults to
     /// 9MB.
@@ -341,7 +343,9 @@ public class Graph {
                 using var response = await _client.SendAsync(request);
                 var content = await response.Content.ReadAsStringAsync();
                 if (response.IsSuccessStatusCode) {
-                    return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, response.StatusCode.ToString(), "");
+                    var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, response.StatusCode.ToString(), "");
+                    await Helpers.PostWebhookAsync(WebhookUrl, okResult);
+                    return okResult;
                 }
                 var error = JsonSerializer.Deserialize<GraphApiError>(content);
                 var errorMessage = (error == null || error.Error == null || error.Error.InnerError == null)
@@ -355,7 +359,9 @@ public class Graph {
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }
-                    return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", ex.Message);
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", ex.Message);
+                    await Helpers.PostWebhookAsync(WebhookUrl, failResult);
+                    return failResult;
                 }
                 var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
                 if (delayMilliseconds > 0) {
@@ -365,7 +371,9 @@ public class Graph {
             attempts++;
         } while (attempts <= RetryCount);
 
-        return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", lastException?.Message);
+        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", lastException?.Message);
+        await Helpers.PostWebhookAsync(WebhookUrl, finalResult);
+        return finalResult;
     }
 
     /// <summary>
@@ -391,7 +399,9 @@ public class Graph {
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }
-                    return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", ex.Message);
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", ex.Message);
+                    await Helpers.PostWebhookAsync(WebhookUrl, failResult);
+                    return failResult;
                 }
                 var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
                 if (delayMilliseconds > 0) {
@@ -401,7 +411,9 @@ public class Graph {
             attempts++;
         } while (attempts <= RetryCount);
 
-        return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", lastException?.Message);
+        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", lastException?.Message);
+        await Helpers.PostWebhookAsync(WebhookUrl, finalResult);
+        return finalResult;
     }
 
     /// <summary>
@@ -422,7 +434,9 @@ public class Graph {
 
         // If the status code indicates success, return a successful result
         if (sendResponse.IsSuccessStatusCode) {
-            return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, sendResponse.StatusCode.ToString(), "");
+            var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, sendResponse.StatusCode.ToString(), "");
+            await Helpers.PostWebhookAsync(WebhookUrl, okResult);
+            return okResult;
         }
 
         // If the status code indicates an error, throw an exception with the content
@@ -431,7 +445,10 @@ public class Graph {
         var sendErrorMessage = (sendError == null || sendError.Error == null || sendError.Error.InnerError == null)
             ? $"Unknown error: {sendContent}"
             : $"Error code: {sendError.Error.Code}, message: {sendError.Error.Message}, request ID: {sendError.Error.InnerError.RequestId}, date: {sendError.Error.InnerError.Date}";
-        throw new HttpRequestException(sendErrorMessage);
+        var ex = new HttpRequestException(sendErrorMessage);
+        var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, sendContent, ex.Message);
+        await Helpers.PostWebhookAsync(WebhookUrl, failResult);
+        throw ex;
     }
 
     /// <summary>

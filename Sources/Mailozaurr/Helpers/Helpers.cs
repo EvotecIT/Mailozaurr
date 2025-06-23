@@ -1,5 +1,8 @@
 ﻿using System.Net;
+using System.Net.Http;
 using System.Security;
+using System.Text;
+using System.Text.Json;
 
 namespace Mailozaurr;
 
@@ -88,12 +91,13 @@ public static class Helpers {
     public static bool IsTransient(Exception ex) {
         switch (ex) {
             case HttpRequestException httpEx:
-    #if NET5_0_OR_GREATER
+                // HttpRequestException.StatusCode was introduced in .NET 5.0
+#if NET5_0_OR_GREATER
                 if (httpEx.StatusCode.HasValue) {
                     var code = (int)httpEx.StatusCode.Value;
                     return code >= 500 || code == 408 || code == 429;
                 }
-    #endif
+#endif
                 return true;
             case SmtpCommandException smtpEx:
                 var smtpCode = (int)smtpEx.StatusCode;
@@ -102,6 +106,20 @@ public static class Helpers {
                 return true;
             default:
                 return false;
+        }
+    }
+
+    public static async Task PostWebhookAsync(string? url, SmtpResult result) {
+        if (string.IsNullOrEmpty(url)) {
+            return;
+        }
+
+        try {
+            using var client = new HttpClient();
+            var json = JsonSerializer.Serialize(result);
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            await client.PostAsync(url, content);
+        } catch {
         }
     }
 }

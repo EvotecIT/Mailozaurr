@@ -106,6 +106,8 @@ public class SendGridClient {
     /// </summary>
     public bool RetryAlways { get; set; } = false;
 
+    public string? WebhookUrl { get; set; }
+
     /// <summary>
     /// Gets a string containing the email addresses of all recipients of the email.
     /// </summary>
@@ -235,7 +237,9 @@ public class SendGridClient {
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
-            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, "", ex.Message);
+            var credFail = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, "", ex.Message);
+            await Helpers.PostWebhookAsync(WebhookUrl, credFail);
+            return credFail;
         }
 
         request.Headers.Add("Authorization", $"Bearer {apiKey}");
@@ -250,7 +254,9 @@ public class SendGridClient {
                 LogCollector.LogVerbose($"Send-EmailMessage - Sent email to {SentTo} using SendGrid");
 
                 if (response.IsSuccessStatusCode) {
-                    return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, response.StatusCode.ToString());
+                    var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, response.StatusCode.ToString());
+                    await Helpers.PostWebhookAsync(WebhookUrl, okResult);
+                    return okResult;
                 }
 
                 var message = $"Status code {response.StatusCode}: {lastContent}";
@@ -263,7 +269,9 @@ public class SendGridClient {
                     if (ErrorAction == ActionPreference.Stop && lastException != null) {
                         throw lastException;
                     }
-                    return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
+                    await Helpers.PostWebhookAsync(WebhookUrl, failResult);
+                    return failResult;
                 }
 
                 var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
@@ -274,7 +282,9 @@ public class SendGridClient {
             attempts++;
         } while (attempts <= RetryCount);
 
-        return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
+        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
+        await Helpers.PostWebhookAsync(WebhookUrl, finalResult);
+        return finalResult;
     }
 
     /// <summary>
