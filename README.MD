@@ -128,6 +128,7 @@ While I didn't spent much time creating WIKI, working on Get-Help documentation,
 
 You can also utilize Examples which should help to understand use cases. Of course it would be great having pretty help so if you can help me out feel free to submit PR's.
 - [Example-SendEmail-SignEncrypt.ps1](Examples/Example-SendEmail-SignEncrypt.ps1) - sign and encrypt an email using SMTP.
+- [PGP documentation](Docs/PGP.md) - overview of OpenPGP support.
 
 -Some useful examples:
 - `Examples/Example-AcquireO365TokenInteractive.ps1` – demonstrates `Connect-OAuthO365`, `ConvertFrom-OAuth2Credential`, and using the token with `Send-EmailMessage`, IMAP, and POP3.
