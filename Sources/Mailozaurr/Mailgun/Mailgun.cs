@@ -45,6 +45,12 @@ public class MailgunClient : IDisposable {
     public int RetryDelayMilliseconds { get; set; } = 0;
     public double RetryDelayBackoff { get; set; } = 1.0;
 
+    /// <summary>
+    /// When set to <c>true</c> the client retries sending even if the
+    /// encountered error is not transient.
+    /// </summary>
+    public bool RetryAlways { get; set; } = false;
+
     public string SentFrom => Helpers.GetEmailAddress(From);
     public string SentTo {
         get {
@@ -142,7 +148,7 @@ public class MailgunClient : IDisposable {
             } catch (Exception ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Mailgun: {ex.Message}");
-                if (attempts >= RetryCount) {
+                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
                     if (ErrorAction == ActionPreference.Stop) throw;
                     return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", ex.Message);
                 }

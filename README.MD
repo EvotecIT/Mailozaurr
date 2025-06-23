@@ -90,10 +90,11 @@ This will make sure the project has required libraries.
   - [x] SMTP with SendGrid
   - [x] SendGrid API
   - [x] Office 365 Graph API
-- Optional retry logic for `Send-EmailMessage` via `-RetryCount`, `-RetryDelayMilliseconds` and `-RetryDelayBackoff`
-- POP3
-  - [x] Connect to POP3
-  - [x] Get POP3 Emails
+- Optional retry logic for `Send-EmailMessage` via `-RetryCount`, `-RetryDelayMilliseconds`, `-RetryDelayBackoff` and `-RetryAlways`.
+  Retries are only attempted for transient errors by default, but `-RetryAlways` forces retries on all errors.
+  - POP3
+    - [x] Connect to POP3
+    - [x] Get POP3 Emails
   - [x] Save POP3 Emails
 - IMAP
   - [x] Connect to IMAP

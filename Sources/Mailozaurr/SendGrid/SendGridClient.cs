@@ -101,6 +101,12 @@ public class SendGridClient {
     public double RetryDelayBackoff { get; set; } = 1.0;
 
     /// <summary>
+    /// If set to <c>true</c>, retries will occur even on non-transient
+    /// failures. Otherwise only transient errors trigger retries.
+    /// </summary>
+    public bool RetryAlways { get; set; } = false;
+
+    /// <summary>
     /// Gets a string containing the email addresses of all recipients of the email.
     /// </summary>
     public string SentTo {
@@ -253,18 +259,17 @@ public class SendGridClient {
             } catch (Exception ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SendGrid: {ex.Message}");
-            }
-
-            if (attempts >= RetryCount) {
-                if (ErrorAction == ActionPreference.Stop && lastException != null) {
-                    throw lastException;
+                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
+                    if (ErrorAction == ActionPreference.Stop && lastException != null) {
+                        throw lastException;
+                    }
+                    return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
                 }
-                return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
-            }
 
-            var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
-            if (delayMilliseconds > 0) {
-                await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds));
+                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+                if (delayMilliseconds > 0) {
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds));
+                }
             }
             attempts++;
         } while (attempts <= RetryCount);

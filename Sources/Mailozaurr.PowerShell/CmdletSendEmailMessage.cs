@@ -312,6 +312,13 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     public double RetryDelayBackoff { get; set; } = 1.0;
 
     /// <summary>
+    /// <para>When specified, retries are attempted regardless of the error
+    /// type. Without this switch, only transient errors are retried.</para>
+    /// </summary>
+    [Parameter(Mandatory = false)]
+    public SwitchParameter RetryAlways { get; set; }
+
+    /// <summary>
     /// <para>Specifies chunk size in bytes used for Graph attachment uploads. Default is 9MB.</para>
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "Graph")]
@@ -566,6 +573,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             sendGrid.RetryCount = RetryCount;
             sendGrid.RetryDelayMilliseconds = RetryDelayMilliseconds;
             sendGrid.RetryDelayBackoff = RetryDelayBackoff;
+            sendGrid.RetryAlways = RetryAlways.IsPresent;
             NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
             sendGrid.Credentials = networkCredential;
             // create JSON message
@@ -603,6 +611,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             mailgun.RetryCount = RetryCount;
             mailgun.RetryDelayMilliseconds = RetryDelayMilliseconds;
             mailgun.RetryDelayBackoff = RetryDelayBackoff;
+            mailgun.RetryAlways = RetryAlways.IsPresent;
             NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
             mailgun.Credentials = networkCredential;
             if (ShouldProcess(mailgun.SentTo, "Sending email message via Mailgun")) {
@@ -630,6 +639,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             graph.RetryCount = RetryCount;
             graph.RetryDelayMilliseconds = RetryDelayMilliseconds;
             graph.RetryDelayBackoff = RetryDelayBackoff;
+            graph.RetryAlways = RetryAlways.IsPresent;
             graph.RequestReadReceipt = RequestReadReceipt;
             graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
             graph.HTML = string.Join("", HTML);
@@ -733,6 +743,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             SmtpClient.RetryCount = RetryCount;
             SmtpClient.RetryDelayMilliseconds = RetryDelayMilliseconds;
             SmtpClient.RetryDelayBackoff = RetryDelayBackoff;
+            SmtpClient.RetryAlways = RetryAlways.IsPresent;
 
             if (!ShouldProcess(SmtpClient.SentTo, "Sending email message")) {
                 LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");

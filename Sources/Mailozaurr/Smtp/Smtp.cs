@@ -96,6 +96,12 @@ public class Smtp {
 
     public double RetryDelayBackoff { get; set; } = 1.0;
 
+    /// <summary>
+    /// Forces retries even when the encountered error is not considered
+    /// transient. By default retries occur only for transient failures.
+    /// </summary>
+    public bool RetryAlways { get; set; } = false;
+
     public bool CheckCertificateRevocation {
         get => Client.CheckCertificateRevocation;
         set => Client.CheckCertificateRevocation = value;
@@ -352,12 +358,13 @@ public class Smtp {
             } catch (Exception ex) {
                 lastException = ex;
                 LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending: {ex.Message}");
-                if (attempts >= RetryCount) {
+                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }
                     return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
                 }
+
                 var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
                 if (delayMilliseconds > 0) {
                     Thread.Sleep(TimeSpan.FromMilliseconds(delayMilliseconds));
