@@ -10,12 +10,18 @@ class Program {
         await SendEmailGraphClientSecret.RunAsync();
         // await SendEmailGraphCertificate.RunAsync();
         await SendEmailMailgun.RunAsync();
+        // await FetchImapMessages.RunAsync();
+        // await FetchPopMessages.RunAsync();
     }
 }
 
 // See individual example files for usage of Mailozaurr.
 // Examples:
-//   - SendEmailGmail.cs
+//   - SmtpGmailExample.cs
+//   - GraphClientSecretExample.cs
+//   - GraphCertificateExample.cs
+//   - FetchImapMessages.cs
+//   - FetchPopMessages.cs
 //   - SendEmailGraphClientSecret.cs
 //   - SendEmailGraphCertificate.cs
 //   - AcquireGoogleTokenInteractive.cs
