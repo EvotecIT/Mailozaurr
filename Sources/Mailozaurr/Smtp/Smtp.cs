@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Mailozaurr;
 
@@ -391,6 +392,45 @@ public class Smtp {
 
         var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", lastException?.Message);
         Helpers.PostWebhookAsync(WebhookUrl, finalResult).GetAwaiter().GetResult();
+        return finalResult;
+    }
+
+    /// <summary>
+    /// Send the email message asynchronously.
+    /// </summary>
+    /// <returns></returns>
+    public async Task<SmtpResult> SendAsync() {
+        int attempts = 0;
+        Exception? lastException = null;
+        do {
+            try {
+                await Client.SendAsync(Message);
+                LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Sent email to {SentTo}");
+                var result = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+                await Helpers.PostWebhookAsync(WebhookUrl, result);
+                return result;
+            } catch (Exception ex) {
+                lastException = ex;
+                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending: {ex.Message}");
+                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
+                    if (ErrorAction == ActionPreference.Stop) {
+                        throw;
+                    }
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+                    await Helpers.PostWebhookAsync(WebhookUrl, failResult);
+                    return failResult;
+                }
+
+                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+                if (delayMilliseconds > 0) {
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds));
+                }
+            }
+            attempts++;
+        } while (attempts <= RetryCount);
+
+        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", lastException?.Message);
+        await Helpers.PostWebhookAsync(WebhookUrl, finalResult);
         return finalResult;
     }
 
