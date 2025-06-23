@@ -231,6 +231,10 @@ public class Graph {
         //LoggingMessages.Logger.WriteVerbose(MessageJson);
     }
 
+    /// <summary>
+    /// Parses the provided credentials into client id, secret and tenant domain.
+    /// </summary>
+    /// <param name="Credentials">The credentials to parse.</param>
     public void Authenticate(ICredentials Credentials) {
         var networkCredential = Credentials as NetworkCredential;
         if (networkCredential != null) {

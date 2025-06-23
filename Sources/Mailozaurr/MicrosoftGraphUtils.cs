@@ -224,6 +224,9 @@ namespace Mailozaurr {
             }
         }
 
+        /// <summary>
+        /// Retrieves mail messages for the specified user.
+        /// </summary>
         public static async Task<List<Dictionary<string, object>>> GetMailMessagesAsync(GraphCredential credential, string userPrincipalName, IEnumerable<string> properties = null, string filter = null, int? limit = null) {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
@@ -244,6 +247,9 @@ namespace Mailozaurr {
             return messages;
         }
 
+        /// <summary>
+        /// Retrieves attachments for a specific message.
+        /// </summary>
         public static async Task<List<Attachment>> GetMailMessageAttachmentsAsync(GraphCredential credential, string userPrincipalName, string messageId, IEnumerable<string> properties = null) {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
@@ -262,6 +268,9 @@ namespace Mailozaurr {
             return attachments;
         }
 
+        /// <summary>
+        /// Lists mail folders for the specified user.
+        /// </summary>
         public static async Task<List<JsonElement>> GetMailFoldersAsync(GraphCredential credential, string userPrincipalName) {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
@@ -277,6 +286,9 @@ namespace Mailozaurr {
             return folders;
         }
 
+        /// <summary>
+        /// Saves the bodies of messages to disk as HTML files.
+        /// </summary>
         public static void SaveMailMessages(IEnumerable<GraphEmailMessage> messages, string path) {
             var resolvedPath = Path.GetFullPath(path);
             if (!Directory.Exists(resolvedPath)) Directory.CreateDirectory(resolvedPath);
@@ -295,6 +307,9 @@ namespace Mailozaurr {
             }
         }
 
+        /// <summary>
+        /// Saves attachments to the specified directory.
+        /// </summary>
         public static void SaveAttachments(IEnumerable<Attachment> attachments, string path) {
             var resolvedPath = Path.GetFullPath(path);
             if (!Directory.Exists(resolvedPath)) Directory.CreateDirectory(resolvedPath);
