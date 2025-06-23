@@ -115,8 +115,8 @@ While I didn't spent much time creating WIKI, working on Get-Help documentation,
 You can also utilize Examples which should help to understand use cases. Of course it would be great having pretty help so if you can help me out feel free to submit PR's.
 
 -Some useful examples:
-- `Examples/Example-AcquireO365TokenInteractive.ps1` – demonstrates `Connect-OAuthO365` and `ConvertFrom-OAuth2Credential`.
-- `Examples/Example-AcquireGoogleTokenInteractive.ps1` – demonstrates `Connect-OAuthGoogle` and `ConvertFrom-OAuth2Credential`.
+- `Examples/Example-AcquireO365TokenInteractive.ps1` – demonstrates `Connect-OAuthO365`, `ConvertFrom-OAuth2Credential`, and using the token with `Send-EmailMessage`, IMAP, and POP3.
+- `Examples/Example-AcquireGoogleTokenInteractive.ps1` – demonstrates `Connect-OAuthGoogle`, `ConvertFrom-OAuth2Credential`, and using the token with `Send-EmailMessage`, IMAP, and POP3.
 - `Sources/Mailozaurr.Examples/AcquireO365TokenInteractive.cs` – C# sample for `OAuthHelpers.AcquireO365TokenInteractiveAsync`.
 - `Sources/Mailozaurr.Examples/AcquireGoogleTokenInteractive.cs` – C# sample for `OAuthHelpers.AcquireGoogleTokenInteractiveAsync`.
 
