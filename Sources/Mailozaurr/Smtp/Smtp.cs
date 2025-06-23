@@ -320,10 +320,20 @@ public class Smtp {
     /// <param name="isSecureString">Indicates whether the password was
     /// previously protected.</param>
     /// <returns>An <see cref="SmtpResult"/> representing the outcome.</returns>
-    public SmtpResult Authenticate(string username, string password, bool isSecureString) {
+    public SmtpResult Authenticate(string username, string password, bool isSecureString, AuthenticationMechanism mechanism = AuthenticationMechanism.Plain) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         try {
-            Client.Authenticate(username, password);
+            switch (mechanism) {
+                case AuthenticationMechanism.CramMd5:
+                    Client.Authenticate(new SaslMechanismCramMd5(username, password));
+                    break;
+                case AuthenticationMechanism.Login:
+                    Client.Authenticate(new SaslMechanismLogin(username, password));
+                    break;
+                default:
+                    Client.Authenticate(new SaslMechanismPlain(username, password));
+                    break;
+            }
             LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Authenticated as {username}");
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (Exception ex) {
