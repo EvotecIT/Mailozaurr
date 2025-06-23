@@ -119,6 +119,12 @@ public class Graph {
     public double RetryDelayBackoff { get; set; } = 1.0;
 
     /// <summary>
+    /// Forces retries even when the encountered error is not classified as
+    /// transient.
+    /// </summary>
+    public bool RetryAlways { get; set; } = false;
+
+    /// <summary>
     /// Size in bytes of the chunks used when uploading attachments. Defaults to
     /// 9MB.
     /// </summary>
@@ -345,7 +351,7 @@ public class Graph {
             } catch (Exception ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
-                if (attempts >= RetryCount) {
+                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }
@@ -381,7 +387,7 @@ public class Graph {
             } catch (Exception ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
-                if (attempts >= RetryCount) {
+                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }

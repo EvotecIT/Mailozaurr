@@ -78,4 +78,30 @@ public static class Helpers {
         }
         return (from?.ToString(), null);
     }
+
+    /// <summary>
+    /// Determines whether the specified exception represents a transient error
+    /// that can be retried safely.
+    /// </summary>
+    /// <param name="ex">The exception to inspect.</param>
+    /// <returns><c>true</c> if the error is transient; otherwise <c>false</c>.</returns>
+    public static bool IsTransient(Exception ex) {
+        switch (ex) {
+            case HttpRequestException httpEx:
+    #if NET5_0_OR_GREATER
+                if (httpEx.StatusCode.HasValue) {
+                    var code = (int)httpEx.StatusCode.Value;
+                    return code >= 500 || code == 408 || code == 429;
+                }
+    #endif
+                return true;
+            case SmtpCommandException smtpEx:
+                var smtpCode = (int)smtpEx.StatusCode;
+                return smtpCode >= 400 && smtpCode < 500;
+            case SmtpProtocolException:
+                return true;
+            default:
+                return false;
+        }
+    }
 }
