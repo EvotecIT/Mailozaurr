@@ -74,3 +74,21 @@ Disconnect-POP3 -Client $pop
 $imap = Connect-IMAP -Server 'imap.example.com' -UserName 'user@example.com' -Password 'Pa55w0rd' -Port 993 -Options Auto
 Get-EmailMessage -ImapClient $imap -FromContains 'alerts@example.com' -Subject 'Server'
 Disconnect-IMAP -Client $imap
+
+
+# Example 16: Retrieve IMAP messages that have attachments
+$imap = Connect-IMAP -Server 'imap.example.com' -UserName 'user@example.com' -Password 'Pa55w0rd' -Port 993 -Options Auto
+Get-EmailMessage -ImapClient $imap -HasAttachment
+Disconnect-IMAP -Client $imap
+
+# Example 17: Retrieve IMAP messages from contoso.com with 'Report' in subject that have attachments
+$imap = Connect-IMAP -Server 'imap.example.com' -UserName 'user@example.com' -Password 'Pa55w0rd' -Port 993 -Options Auto
+Get-EmailMessage -ImapClient $imap -FromContains 'contoso.com' -Subject 'Report' -HasAttachment
+Disconnect-IMAP -Client $imap
+
+# Example 18: Retrieve Graph messages with attachments
+$ClientId = 'your-client-id'
+$ClientSecret = 'your-client-secret'
+$TenantId = 'your-tenant-id'
+$cred = ConvertTo-GraphCredential -ClientId $ClientId -ClientSecret $ClientSecret -DirectoryId $TenantId
+Get-EmailMessage -UserPrincipalName 'user@example.com' -Credential $cred -HasAttachment -Limit 5

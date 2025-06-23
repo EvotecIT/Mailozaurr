@@ -1,7 +1,10 @@
 using MimeKit;
 using Mailozaurr;
 using System;
+using System.Collections.Generic;
+using System.Collections;
 using System.Management.Automation;
+using System.Management.Automation.Runspaces;
 using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
@@ -40,6 +43,43 @@ public sealed class CmdletGetEmailMessage : AsyncPSCmdlet {
     [ValidateNotNull]
     public PopConnectionInfo? PopClient { get; set; }
 
+    [Parameter(Mandatory = true, ParameterSetName = "GraphCredential")]
+    [Parameter(Mandatory = true, ParameterSetName = "GraphConnection")]
+    [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
+    [ValidateNotNullOrEmpty]
+    public string? UserPrincipalName { get; set; }
+
+    [Parameter(Mandatory = true, ParameterSetName = "GraphCredential")]
+    [ValidateNotNull]
+    public PSCredential? Credential { get; set; }
+
+    [Parameter(Mandatory = true, ParameterSetName = "GraphConnection")]
+    [ValidateNotNull]
+    public GraphConnectionInfo? Connection { get; set; }
+
+    [Parameter(ParameterSetName = "GraphCredential")]
+    [Parameter(ParameterSetName = "GraphConnection")]
+    [Parameter(ParameterSetName = "MgGraphRequest")]
+    public string[]? Property { get; set; }
+
+    [Parameter(ParameterSetName = "GraphCredential")]
+    [Parameter(ParameterSetName = "GraphConnection")]
+    [Parameter(ParameterSetName = "MgGraphRequest")]
+    public string? Filter { get; set; }
+
+    [Parameter(ParameterSetName = "GraphCredential")]
+    [Parameter(ParameterSetName = "GraphConnection")]
+    [Parameter(ParameterSetName = "MgGraphRequest")]
+    public int? Limit { get; set; }
+
+    [Parameter(Mandatory = true, ParameterSetName = "GraphCredential")]
+    [Parameter(Mandatory = true, ParameterSetName = "GraphConnection")]
+    public SwitchParameter Graph { get; set; }
+
+    [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
+    public SwitchParameter MgGraphRequest { get; set; }
+
+
     /// <summary>
     /// <para type="description">IMAP folder to search. Defaults to Inbox if not specified.</para>
     /// </summary>
@@ -71,6 +111,12 @@ public sealed class CmdletGetEmailMessage : AsyncPSCmdlet {
     public MessagePriority? Priority { get; set; }
 
     /// <summary>
+    /// <para type="description">Only return messages that contain attachments.</para>
+    /// </summary>
+    [Parameter]
+    public SwitchParameter HasAttachment { get; set; }
+
+    /// <summary>
     /// <para type="description">If set, retrieves all messages ignoring other filters.</para>
     /// </summary>
     [Parameter]
@@ -99,6 +145,9 @@ public sealed class CmdletGetEmailMessage : AsyncPSCmdlet {
         return ParameterSetName switch {
             "IMAP" => ProcessImapAsync(),
             "POP" => ProcessPopAsync(),
+            "GraphCredential" => ProcessGraphAsync(GetGraphCredential()),
+            "GraphConnection" => ProcessGraphAsync(Connection!.Credential),
+            "MgGraphRequest" => ProcessMgGraphAsync(),
             _ => Task.CompletedTask
         };
     }
@@ -119,7 +168,8 @@ public sealed class CmdletGetEmailMessage : AsyncPSCmdlet {
             Since,
             Before,
             All.IsPresent,
-            Delete.IsPresent);
+            Delete.IsPresent,
+            HasAttachment.IsPresent);
 
         WriteObject(messages, true);
         return Task.CompletedTask;
@@ -140,10 +190,102 @@ public sealed class CmdletGetEmailMessage : AsyncPSCmdlet {
             Since,
             Before,
             All.IsPresent,
-            Delete.IsPresent);
+            Delete.IsPresent,
+            HasAttachment.IsPresent);
 
         WriteObject(messages, true);
         return Task.CompletedTask;
     }
 
+    private GraphCredential GetGraphCredential() => MicrosoftGraphUtils.ConvertFromGraphCredential(
+        Credential!.UserName,
+        Credential.GetNetworkCredential().Password);
+
+    private async Task ProcessGraphAsync(GraphCredential cred) {
+
+        var filters = new List<string>();
+        if (!All.IsPresent) {
+            if (!string.IsNullOrEmpty(Subject)) {
+                filters.Add($"contains(subject,'{Subject.Replace("'", "''")}')");
+            }
+            if (!string.IsNullOrEmpty(FromContains)) {
+                filters.Add($"contains(from/emailAddress/address,'{FromContains.Replace("'", "''")}')");
+            }
+            if (!string.IsNullOrEmpty(ToContains)) {
+                filters.Add($"toRecipients/any(r:contains(r/emailAddress/address,'{ToContains.Replace("'", "''")}'))");
+            }
+            if (Since.HasValue) {
+                filters.Add($"receivedDateTime ge {Since.Value.ToUniversalTime():yyyy-MM-ddTHH:mm:ssZ}");
+            }
+            if (Before.HasValue) {
+                filters.Add($"receivedDateTime le {Before.Value.ToUniversalTime():yyyy-MM-ddTHH:mm:ssZ}");
+            }
+        }
+        if (HasAttachment.IsPresent) {
+            filters.Add("hasAttachments eq true");
+        }
+        var filter = string.Join(" and ", filters);
+        if (!string.IsNullOrEmpty(Filter)) {
+            filter = string.IsNullOrEmpty(filter) ? Filter : $"{filter} and {Filter}";
+        }
+
+        var messages = await MicrosoftGraphUtils.GetMailMessagesAsync(
+            cred,
+            UserPrincipalName!,
+            Property,
+            filter,
+            Limit);
+
+        foreach (var msg in messages) {
+            WriteObject(PSObject.AsPSObject(msg));
+            if (Delete.IsPresent && msg.TryGetValue("id", out var idObj) && idObj is string id) {
+                await MicrosoftGraphUtils.DeleteMailMessageAsync(cred, UserPrincipalName!, id);
+            }
+        }
+    }
+
+
+    private Task ProcessMgGraphAsync() {
+        var filters = new List<string>();
+        if (!All.IsPresent) {
+            if (!string.IsNullOrEmpty(Subject)) {
+                filters.Add($"contains(subject,'{Subject.Replace("'", "''")}')");
+            }
+            if (!string.IsNullOrEmpty(FromContains)) {
+                filters.Add($"contains(from/emailAddress/address,'{FromContains.Replace("'", "''")}')");
+            }
+            if (!string.IsNullOrEmpty(ToContains)) {
+                filters.Add($"toRecipients/any(r:contains(r/emailAddress/address,'{ToContains.Replace("'", "''")}'))");
+            }
+            if (Since.HasValue) {
+                filters.Add($"receivedDateTime ge {Since.Value.ToUniversalTime():yyyy-MM-ddTHH:mm:ssZ}");
+            }
+            if (Before.HasValue) {
+                filters.Add($"receivedDateTime le {Before.Value.ToUniversalTime():yyyy-MM-ddTHH:mm:ssZ}");
+            }
+        }
+        if (HasAttachment.IsPresent) {
+            filters.Add("hasAttachments eq true");
+        }
+        var filter = string.Join(" and ", filters);
+        if (!string.IsNullOrEmpty(Filter)) {
+            filter = string.IsNullOrEmpty(filter) ? Filter : $"{filter} and {Filter}";
+        }
+
+        var query = new Dictionary<string, object>();
+        if (!string.IsNullOrEmpty(filter)) query["$filter"] = filter;
+        if (Property != null && Property.Length > 0) query["$select"] = string.Join(",", Property);
+        if (Limit.HasValue) query["$top"] = Limit.Value.ToString();
+        var uri = MicrosoftGraphUtils.JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{UserPrincipalName}/messages", query);
+
+        var parameters = new Hashtable { { "Method", "GET" }, { "Uri", uri } };
+        var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
+        ps.AddCommand("Invoke-MgGraphRequest");
+        ps.AddParameters(parameters);
+        var results = ps.Invoke();
+        foreach (var res in results) {
+            WriteObject(res);
+        }
+        return Task.CompletedTask;
+    }
 }

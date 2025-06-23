@@ -8,7 +8,7 @@ namespace Mailozaurr.PowerShell;
 /// <para type="description">The <c>Save-MailMessage</c> cmdlet saves one or more <see cref="GraphEmailMessage"/> objects to disk at the specified path. Use this to archive, export, or process messages retrieved from Microsoft Graph.</para>
 /// <example>
 ///   <summary>Save mail messages to a folder</summary>
-///   <code>Get-MailMessage ... | Save-MailMessage -Path "C:\Archive"</code>
+///   <code>Get-EmailMessage ... | Save-MailMessage -Path "C:\Archive"</code>
 /// </example>
 /// <remarks>
 /// Use this cmdlet to export or archive messages for backup, migration, or compliance scenarios.
@@ -22,7 +22,7 @@ public class CmdletSaveMailMessage : PSCmdlet {
     /// </summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true)]
     [ValidateNotNullOrEmpty]
-    public GraphEmailMessage[]? Message { get; set; }
+    public PSObject[]? Message { get; set; }
     /// <summary>
     /// <para type="description">Specifies the path where the messages will be saved.</para>
     /// </summary>
@@ -34,6 +34,15 @@ public class CmdletSaveMailMessage : PSCmdlet {
     /// Saves the specified mail messages to disk at the given path.
     /// </summary>
     protected override void ProcessRecord() {
-        MicrosoftGraphUtils.SaveMailMessages(Message, Path);
+        foreach (var m in Message) {
+            if (m.BaseObject is GraphEmailMessage gm) {
+                MicrosoftGraphUtils.SaveMailMessages(new[] { gm }, Path);
+            } else if (m.BaseObject is MimeKit.MimeMessage mm) {
+                var resolved = System.IO.Path.GetFullPath(Path);
+                if (!System.IO.Directory.Exists(resolved)) System.IO.Directory.CreateDirectory(resolved);
+                var file = System.IO.Path.Combine(resolved, System.IO.Path.ChangeExtension(System.IO.Path.GetRandomFileName(), "eml"));
+                mm.WriteTo(file);
+            }
+        }
     }
 }

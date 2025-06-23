@@ -328,5 +328,40 @@ namespace Mailozaurr {
                 }
             }
         }
+
+        /// <summary>
+        /// Moves a mail message to another folder.
+        /// </summary>
+        public static async Task MoveMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId, string destinationFolderId) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/messages/{messageId}/move");
+            var body = JsonSerializer.Serialize(new { destinationId = destinationFolderId });
+            await InvokeGraphApiAsync("POST", uri, headers, body);
+        }
+
+        /// <summary>
+        /// Sets the read state for a mail message.
+        /// </summary>
+        public static async Task SetMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId, bool isRead) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/messages/{messageId}");
+            var body = JsonSerializer.Serialize(new { isRead });
+            await InvokeGraphApiAsync("PATCH", uri, headers, body);
+        }
+
+        /// <summary>
+        /// Deletes a mail message.
+        /// </summary>
+        public static async Task DeleteMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/messages/{messageId}");
+            await InvokeGraphApiAsync("DELETE", uri, headers);
+        }
     }
 }

@@ -36,7 +36,8 @@ public static class MessageFetcher {
         DateTime? since = null,
         DateTime? before = null,
         bool all = false,
-        bool delete = false) {
+        bool delete = false,
+        bool hasAttachment = false) {
         IMailFolder mailFolder = client.Inbox;
         if (!string.IsNullOrEmpty(folder)) {
             try {
@@ -74,6 +75,9 @@ public static class MessageFetcher {
         var uids = mailFolder.Search(query);
         foreach (var uid in uids) {
             var msg = mailFolder.GetMessage(uid);
+            if (hasAttachment && !msg.Attachments.Any()) {
+                continue;
+            }
             if (priority.HasValue && msg.Priority != ConvertPriority(priority.Value)) {
                 continue;
             }
@@ -109,7 +113,8 @@ public static class MessageFetcher {
         DateTime? since = null,
         DateTime? before = null,
         bool all = false,
-        bool delete = false) {
+        bool delete = false,
+        bool hasAttachment = false) {
         for (int i = 0; i < client.Count; i++) {
             var message = client.GetMessage(i);
 
@@ -133,6 +138,10 @@ public static class MessageFetcher {
                 if (priority.HasValue && message.Priority != ConvertPriority(priority.Value)) {
                     continue;
                 }
+            }
+
+            if (hasAttachment && !message.Attachments.Any()) {
+                continue;
             }
 
             yield return message;
