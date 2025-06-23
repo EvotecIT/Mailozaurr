@@ -55,8 +55,7 @@ public class CmdletConnectOAuthGoogle : PSCmdlet {
             return;
         }
         if (cred != null) {
-            var secure = new System.Security.SecureString();
-            foreach (var c in cred.AccessToken) secure.AppendChar(c);
+            var secure = CredentialHelpers.ToSecureString(cred.AccessToken);
             var psCred = new PSCredential(cred.UserName, secure);
             WriteObject(psCred);
         }
