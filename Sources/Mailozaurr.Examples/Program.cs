@@ -8,6 +8,8 @@ class Program {
         await SendEmailGraphClientSecret.RunAsync();
         // await SendEmailGraphCertificate.RunAsync();
         await SendEmailMailgun.RunAsync();
+        // await FetchImapMessages.RunAsync();
+        // await FetchPopMessages.RunAsync();
     }
 }
 
@@ -16,3 +18,5 @@ class Program {
 //   - SmtpGmailExample.cs
 //   - GraphClientSecretExample.cs
 //   - GraphCertificateExample.cs
+//   - FetchImapMessages.cs
+//   - FetchPopMessages.cs
