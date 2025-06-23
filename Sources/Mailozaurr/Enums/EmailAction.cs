@@ -12,6 +12,7 @@ public enum EmailAction {
     SMimeSignAndEncrypt,
     PgpSign,
     PgpEncrypt,
+    PgpSignAndEncrypt,
     Send,
     SendDraftMessage,
     SendAttachment

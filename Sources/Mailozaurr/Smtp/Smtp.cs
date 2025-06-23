@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
+using Org.BouncyCastle.Bcpg.OpenPgp;
 using System.Threading.Tasks;
 
 namespace Mailozaurr;
@@ -690,6 +691,68 @@ public class Smtp {
         }
 
         return new SmtpResult(true, EmailAction.SMimeSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+    }
+
+    public SmtpResult PgpEncrypt(string publicKeyPath) {
+        MimeMessage message = Message;
+        using var ctx = new EphemeralOpenPgpContext();
+        using (var pub = File.OpenRead(publicKeyPath))
+            ctx.Import(pub);
+        var recipients = message.To.Mailboxes.Concat(message.Cc.Mailboxes).Concat(message.Bcc.Mailboxes).ToList();
+        try {
+            var keys = ctx.GetPublicKeys(recipients);
+            message.Body = MultipartEncrypted.Encrypt(ctx, keys, message.Body);
+        } catch (Exception ex) {
+            if (ErrorAction == ActionPreference.Stop) throw;
+            return new SmtpResult(false, EmailAction.PgpEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+        }
+        Message = message;
+        return new SmtpResult(true, EmailAction.PgpEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+    }
+
+    public SmtpResult PgpSign(string publicKeyPath, string privateKeyPath, string password, bool isSecureString) {
+        password = ConvertSecureStringToPlainString(password, isSecureString);
+        MimeMessage message = Message;
+        using var ctx = new EphemeralOpenPgpContext(password);
+        using (var pub = File.OpenRead(publicKeyPath))
+            ctx.Import(pub);
+        using (var sec = File.OpenRead(privateKeyPath))
+            ctx.Import(new PgpSecretKeyRingBundle(new Org.BouncyCastle.Bcpg.ArmoredInputStream(sec)));
+        try {
+            var signer = message.From.Mailboxes.First();
+            var signingKey = ctx.GetSigningKey(signer);
+            message.Body = MultipartSigned.Create(ctx, signingKey, DigestAlgorithm.Sha256, message.Body);
+            var signed = (MultipartSigned)message.Body;
+            var sigs = signed.Verify(ctx);
+            foreach (var sig in sigs)
+                sig.Verify();
+        } catch (Exception ex) {
+            if (ErrorAction == ActionPreference.Stop) throw;
+            return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+        }
+        Message = message;
+        return new SmtpResult(true, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+    }
+
+    public SmtpResult PgpSignAndEncrypt(string publicKeyPath, string privateKeyPath, string password, bool isSecureString) {
+        password = ConvertSecureStringToPlainString(password, isSecureString);
+        MimeMessage message = Message;
+        using var ctx = new EphemeralOpenPgpContext(password);
+        using (var pub = File.OpenRead(publicKeyPath))
+            ctx.Import(pub);
+        using (var sec = File.OpenRead(privateKeyPath))
+            ctx.Import(new PgpSecretKeyRingBundle(new Org.BouncyCastle.Bcpg.ArmoredInputStream(sec)));
+        var recipients = message.To.Mailboxes.Concat(message.Cc.Mailboxes).Concat(message.Bcc.Mailboxes).ToList();
+        try {
+            var signingKey = ctx.GetSigningKey(message.From.Mailboxes.First());
+            var encKeys = ctx.GetPublicKeys(recipients);
+            message.Body = MultipartEncrypted.SignAndEncrypt(ctx, signingKey, DigestAlgorithm.Sha256, EncryptionAlgorithm.Cast5, encKeys, message.Body);
+        } catch (Exception ex) {
+            if (ErrorAction == ActionPreference.Stop) throw;
+            return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+        }
+        Message = message;
+        return new SmtpResult(true, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
     }
 
     /// <summary>

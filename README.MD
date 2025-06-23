@@ -90,11 +90,11 @@ This will make sure the project has required libraries.
   - [x] SMTP with SendGrid
   - [x] SendGrid API
   - [x] Office 365 Graph API
-- Optional retry logic for `Send-EmailMessage` via `-RetryCount`, `-RetryDelayMilliseconds`, `-RetryDelayBackoff` and `-RetryAlways`.
-  Retries are only attempted for transient errors by default, but `-RetryAlways` forces retries on all errors.
-  - POP3
-    - [x] Connect to POP3
-    - [x] Get POP3 Emails
+  - [x] PGP/MIME encryption and signature verification
+  - Optional retry logic for `Send-EmailMessage` via `-RetryCount`, `-RetryDelayMilliseconds`, `-RetryDelayBackoff` and `-RetryAlways`.  Retries are only attempted for transient errors by default, but `-RetryAlways` forces retries on all errors.
+- POP3
+  - [x] Connect to POP3
+  - [x] Get POP3 Emails
   - [x] Save POP3 Emails
 - IMAP
   - [x] Connect to IMAP
@@ -106,6 +106,19 @@ This will make sure the project has required libraries.
   - [x] Save Mail Messages
 - DNS and email validation functionality is now provided by [DomainDetective](https://github.com/EvotecIT/DomainDetective)
 
+### Using OpenPGP
+
+PGP/MIME encryption allows securing messages using public and private keys. To sign and encrypt a message provide paths to the public and secret key files:
+
+```powershell
+$pub = 'Examples/PGPKeys/mimekit.gpg.pub'
+$sec = 'Examples/PGPKeys/mimekit.gpg.sec'
+Send-EmailMessage -From 'mimekit@example.com' -To 'mimekit@example.com' \ 
+    -Server 'smtp.example.com' -Port 25 -Body 'Test' -Subject 'Test' \ 
+    -SignOrEncrypt PgpSignAndEncrypt -PublicKeyPath $pub -PrivateKeyPath $sec \ 
+    -PrivateKeyPassword 'no.secret'
+```
+
 ## Documentation
 
 While I didn't spent much time creating WIKI, working on Get-Help documentation, I did write blog articles that should help you get started.
@@ -115,6 +128,8 @@ While I didn't spent much time creating WIKI, working on Get-Help documentation,
 
 You can also utilize Examples which should help to understand use cases. Of course it would be great having pretty help so if you can help me out feel free to submit PR's.
 - [Example-SendEmail-SignEncrypt.ps1](Examples/Example-SendEmail-SignEncrypt.ps1) - sign and encrypt an email using SMTP.
+- [Example-SendEmail-Pgp.ps1](Examples/Example-SendEmail-Pgp.ps1) - send a PGP encrypted email.
+- [PGP documentation](Docs/PGP.md) - overview of OpenPGP support.
 
 -Some useful examples:
 - `Examples/Example-AcquireO365TokenInteractive.ps1` – demonstrates `Connect-OAuthO365`, `ConvertFrom-OAuth2Credential`, and using the token with `Send-EmailMessage`, IMAP, and POP3.

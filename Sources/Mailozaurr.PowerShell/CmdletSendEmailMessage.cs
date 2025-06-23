@@ -523,6 +523,30 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     public string? CertificateThumbprint { get; set; }
 
+    [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
+    [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
+    [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
+    [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
+    public string? PublicKeyPath { get; set; }
+
+    [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
+    [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
+    [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
+    [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
+    public string? PrivateKeyPath { get; set; }
+
+    [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
+    [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
+    [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
+    [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
+    public string? PrivateKeyPassword { get; set; }
+
+    [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
+    [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
+    [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
+    [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
+    public bool PrivateKeyPasswordAsSecureString { get; set; }
+
     /// <summary>
     /// <para>Specifies the email provider to use (e.g., SendGrid, Mailgun, etc.).</para>
     /// </summary>
@@ -772,7 +796,13 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
 
             // Sign or Encrypt
             if (SignOrEncrypt != EmailActionEncryption.None) {
-                if (CertificateThumbprint != null) {
+                if (SignOrEncrypt == EmailActionEncryption.PGPEncrypt && PublicKeyPath != null) {
+                    Status = SmtpClient.PgpEncrypt(PublicKeyPath);
+                } else if (SignOrEncrypt == EmailActionEncryption.PGPSign && PublicKeyPath != null && PrivateKeyPath != null) {
+                    Status = SmtpClient.PgpSign(PublicKeyPath, PrivateKeyPath, PrivateKeyPassword ?? string.Empty, PrivateKeyPasswordAsSecureString);
+                } else if (SignOrEncrypt == EmailActionEncryption.PGPSignAndEncrypt && PublicKeyPath != null && PrivateKeyPath != null) {
+                    Status = SmtpClient.PgpSignAndEncrypt(PublicKeyPath, PrivateKeyPath, PrivateKeyPassword ?? string.Empty, PrivateKeyPasswordAsSecureString);
+                } else if (CertificateThumbprint != null) {
                     Status = SmtpClient.Encrypt(SignOrEncrypt, CertificateThumbprint);
                 } else if (CertificatePath != null && CertificatePassword != null) {
                     Status = SmtpClient.Encrypt(SignOrEncrypt, CertificatePath, CertificatePassword,
