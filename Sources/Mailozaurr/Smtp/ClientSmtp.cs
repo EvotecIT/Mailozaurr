@@ -228,7 +228,7 @@ public partial class ClientSmtp : SmtpClient {
                 }
             }
         } else {
-            throw new ArgumentException("Invalid input type for ConvertToMailboxAddress");
+            throw new ArgumentException($"Invalid input type for ConvertToMailboxAddress: {input}");
         }
     }
 
