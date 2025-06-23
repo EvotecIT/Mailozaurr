@@ -129,6 +129,7 @@ While I didn't spent much time creating WIKI, working on Get-Help documentation,
 You can also utilize Examples which should help to understand use cases. Of course it would be great having pretty help so if you can help me out feel free to submit PR's.
 - [Example-SendEmail-SignEncrypt.ps1](Examples/Example-SendEmail-SignEncrypt.ps1) - sign and encrypt an email using SMTP.
 - [Example-SendEmail-Pgp.ps1](Examples/Example-SendEmail-Pgp.ps1) - send a PGP encrypted email.
+- [Example-SendEmail-Attachments.ps1](Examples/Example-SendEmail-Attachments.ps1) - demonstrate file and in-memory attachments.
 - [PGP documentation](Docs/PGP.md) - overview of OpenPGP support.
 
 -Some useful examples:
@@ -136,6 +137,7 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - `Examples/Example-AcquireGoogleTokenInteractive.ps1` – demonstrates `Connect-OAuthGoogle`, `ConvertFrom-OAuth2Credential`, and using the token with `Send-EmailMessage`, IMAP, and POP3.
 - `Sources/Mailozaurr.Examples/AcquireO365TokenInteractive.cs` – C# sample for `OAuthHelpers.AcquireO365TokenInteractiveAsync`.
 - `Sources/Mailozaurr.Examples/AcquireGoogleTokenInteractive.cs` – C# sample for `OAuthHelpers.AcquireGoogleTokenInteractiveAsync`.
+- `Sources/Mailozaurr.Examples/SendEmailAttachments.cs` – C# sample demonstrating attachments and inline resources.
 
 Keep in mind PSSharedGoods is only required for development. When you use this module from PowerShellGallery it's not installed as everything is merged.
 
