@@ -39,6 +39,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = true, ParameterSetName = "DefaultCredentials")]
     [Alias("SmtpServer")]
+    [ValidateNotNullOrEmpty]
     public string? Server { get; set; }
 
     /// <summary>
@@ -61,6 +62,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = true, ParameterSetName = "SendGrid")]
     [Parameter(Mandatory = true, ParameterSetName = "EmailProviders")]
+    [ValidateNotNullOrEmpty]
     public object? From { get; set; }
 
     /// <summary>
@@ -178,6 +180,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "SendGrid")]
     [Parameter(Mandatory = true, ParameterSetName = "EmailProviders")]
     [Parameter(Mandatory = true, ParameterSetName = "oAuth")]
+    [ValidateNotNull]
     public PSCredential? Credential { get; set; }
 
     /// <summary>
@@ -191,7 +194,11 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
     public string? Password { get; set; }
-
+    /// <summary>
+    /// <para>Specifies the SASL mechanism for authentication. Defaults to Plain.</para>
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
+    public AuthenticationMechanism AuthenticationMechanism { get; set; } = AuthenticationMechanism.Plain;
     /// <summary>
     /// <para>Specifies the secure socket options for SMTP connection. Options: None, Auto, StartTls, StartTlsWhenAvailable, SslOnConnect. Default is Auto.</para>
     /// </summary>
@@ -307,6 +314,20 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     /// </summary>
     [Parameter(Mandatory = false)]
     public double RetryDelayBackoff { get; set; } = 1.0;
+
+    /// <summary>
+    /// <para>When specified, retries are attempted regardless of the error
+    /// type. Without this switch, only transient errors are retried.</para>
+    /// </summary>
+    [Parameter(Mandatory = false)]
+    public SwitchParameter RetryAlways { get; set; }
+
+    /// <summary>
+    /// <para>Specifies chunk size in bytes used for Graph attachment uploads. Default is 9MB.</para>
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "Graph")]
+    [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
+    public int ChunkSize { get; set; } = 9000000;
 
     /// <summary>
     /// <para>Enables sending email via OAuth2 authentication for SMTP.</para>
@@ -426,6 +447,12 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     /// </summary>
     [Parameter(Mandatory = false)]
     public string? LogClientPrefix { get; set; }
+
+    /// <summary>
+    /// <para>Overwrites the existing log file when using <c>-LogPath</c>.</para>
+    /// </summary>
+    [Parameter(Mandatory = false)]
+    public SwitchParameter LogOverwrite { get; set; }
 
     /// <summary>
     /// <para>Saves the email message to a file for troubleshooting purposes.</para>
@@ -574,6 +601,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             sendGrid.RetryCount = RetryCount;
             sendGrid.RetryDelayMilliseconds = RetryDelayMilliseconds;
             sendGrid.RetryDelayBackoff = RetryDelayBackoff;
+            sendGrid.RetryAlways = RetryAlways.IsPresent;
             NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
             sendGrid.Credentials = networkCredential;
             // create JSON message
@@ -611,6 +639,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             mailgun.RetryCount = RetryCount;
             mailgun.RetryDelayMilliseconds = RetryDelayMilliseconds;
             mailgun.RetryDelayBackoff = RetryDelayBackoff;
+            mailgun.RetryAlways = RetryAlways.IsPresent;
             NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
             mailgun.Credentials = networkCredential;
             if (ShouldProcess(mailgun.SentTo, "Sending email message via Mailgun")) {
@@ -626,6 +655,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             }
         } else if (Graph) {
             Graph graph = new Graph();
+            graph.ChunkSize = ChunkSize;
             graph.From = Helpers.GetFromObject(fromEmail, fromName);
             graph.To = To;
             graph.Cc = Cc;
@@ -637,6 +667,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             graph.RetryCount = RetryCount;
             graph.RetryDelayMilliseconds = RetryDelayMilliseconds;
             graph.RetryDelayBackoff = RetryDelayBackoff;
+            graph.RetryAlways = RetryAlways.IsPresent;
             graph.RequestReadReceipt = RequestReadReceipt;
             graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
             graph.HTML = string.Join("", HTML);
@@ -674,6 +705,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             LogEmitter.EmitLogs(graph.LogCollector, this);
         } else if (MgGraphRequest) {
             Graph graph = new Graph();
+            graph.ChunkSize = ChunkSize;
             graph.From = Helpers.GetFromObject(fromEmail, fromName);
             graph.To = To;
             graph.Cc = Cc;
@@ -713,7 +745,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 LogEmitter.EmitLogs(graph.LogCollector, this);
             }
         } else {
-            Smtp SmtpClient = new Smtp(LogPath, LogConsole, LogObject, LogTimestamps, LogSecrets, LogTimeStampsFormat, LogClientPrefix, LogServerPrefix);
+            Smtp SmtpClient = new Smtp(LogPath, LogConsole, LogObject, LogTimestamps, LogSecrets, LogTimeStampsFormat, LogServerPrefix, LogClientPrefix, LogOverwrite);
             SmtpClient.From = Helpers.GetFromObject(fromEmail, fromName);
             SmtpClient.ReplyTo = ReplyTo;
             SmtpClient.Cc = Cc;
@@ -739,6 +771,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             SmtpClient.RetryCount = RetryCount;
             SmtpClient.RetryDelayMilliseconds = RetryDelayMilliseconds;
             SmtpClient.RetryDelayBackoff = RetryDelayBackoff;
+            SmtpClient.RetryAlways = RetryAlways.IsPresent;
 
             if (!ShouldProcess(SmtpClient.SentTo, "Sending email message")) {
                 LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
@@ -793,7 +826,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
                 Status = SmtpClient.Authenticate(networkCredential, OAuth2);
             } else if (!string.IsNullOrWhiteSpace(Username) || !string.IsNullOrWhiteSpace(Password)) {
-                Status = SmtpClient.Authenticate(Username, Password, AsSecureString);
+                Status = SmtpClient.Authenticate(Username, Password, AsSecureString, AuthenticationMechanism);
             } else {
                 LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
                 Status = new SmtpResult(true, EmailAction.Authenticate, SmtpClient.SentTo, SmtpClient.SentFrom, SmtpClient.Server, SmtpClient.Port, SmtpClient.Stopwatch.Elapsed, "Authentication skipped");

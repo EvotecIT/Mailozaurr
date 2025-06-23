@@ -13,24 +13,45 @@ public class MailgunClient : IDisposable {
     private string ApiKey => Helpers.CredentialToApiKey(Credentials);
     private string EmailDomain => Helpers.GetEmailAddress(From).Split('@')[1];
 
+    /// <summary>Credentials used to authenticate to the API.</summary>
     public ICredentials Credentials { get; set; }
+    /// <summary>Determines how errors are handled.</summary>
     public ActionPreference? ErrorAction { get; set; }
 
+    /// <summary>Primary recipients.</summary>
     public List<object> To { get; set; } = new();
+    /// <summary>Carbon copy recipients.</summary>
     public List<object> Cc { get; set; } = new();
+    /// <summary>Blind carbon copy recipients.</summary>
     public List<object> Bcc { get; set; } = new();
+    /// <summary>The sender address.</summary>
     public object From { get; set; }
+    /// <summary>Reply-to address.</summary>
     public object? ReplyTo { get; set; }
+    /// <summary>Message subject.</summary>
     public string? Subject { get; set; }
+    /// <summary>Plain text body.</summary>
     public string Text { get; set; } = string.Empty;
+    /// <summary>HTML body.</summary>
     public string Html { get; set; } = string.Empty;
+    /// <summary>File paths to include as attachments.</summary>
     public string[]? Attachment { get; set; }
+    /// <summary>File paths to include as inline attachments.</summary>
     public string[]? InlineAttachment { get; set; }
 
+    /// <summary>Collector used to store log entries.</summary>
     public LogCollector LogCollector { get; set; } = new();
     public int RetryCount { get; set; } = 0;
     public int RetryDelayMilliseconds { get; set; } = 0;
     public double RetryDelayBackoff { get; set; } = 1.0;
+
+    /// <summary>
+    /// When set to <c>true</c> the client retries sending even if the
+    /// encountered error is not transient.
+    /// </summary>
+    public bool RetryAlways { get; set; } = false;
+
+    public string? WebhookUrl { get; set; }
 
     public string SentFrom => Helpers.GetEmailAddress(From);
     public string SentTo {
@@ -43,16 +64,28 @@ public class MailgunClient : IDisposable {
         }
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MailgunClient"/> class.
+    /// </summary>
     public MailgunClient() {
         Stopwatch = Stopwatch.StartNew();
         _client = new HttpClient();
     }
 
+    /// <summary>
+    /// Converts an address object into the format required by the Mailgun API.
+    /// </summary>
+    /// <param name="address">The address object to convert.</param>
+    /// <returns>The formatted address string.</returns>
     private static string ConvertAddress(object address) {
         var (email, name) = Helpers.GetEmailAndName(address);
         return string.IsNullOrEmpty(name) ? email : $"{name} <{email}>";
     }
 
+    /// <summary>
+    /// Builds the multipart HTTP content used for the Mailgun API request.
+    /// </summary>
+    /// <returns>The constructed multipart content.</returns>
     private MultipartFormDataContent CreateContent() {
         var content = new MultipartFormDataContent();
         content.Add(new StringContent(ConvertAddress(From)), "from");
@@ -65,6 +98,11 @@ public class MailgunClient : IDisposable {
         if (!string.IsNullOrEmpty(Html)) content.Add(new StringContent(Html), "html");
         if (Attachment != null) {
             foreach (var path in Attachment) {
+                if (!File.Exists(path)) {
+                    LogCollector.LogWarning($"Send-EmailMessage - Attachment file not found: {path}");
+                    continue;
+                }
+
                 var bytes = File.ReadAllBytes(path);
                 var fileContent = new ByteArrayContent(bytes);
                 fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
@@ -73,6 +111,11 @@ public class MailgunClient : IDisposable {
         }
         if (InlineAttachment != null) {
             foreach (var path in InlineAttachment) {
+                if (!File.Exists(path)) {
+                    LogCollector.LogWarning($"Send-EmailMessage - Inline attachment file not found: {path}");
+                    continue;
+                }
+
                 var bytes = File.ReadAllBytes(path);
                 var fileContent = new ByteArrayContent(bytes);
                 fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
@@ -82,6 +125,10 @@ public class MailgunClient : IDisposable {
         return content;
     }
 
+    /// <summary>
+    /// Sends the email using the Mailgun REST API.
+    /// </summary>
+    /// <returns>The result of the send operation.</returns>
     public async Task<SmtpResult> SendEmailAsync() {
         var url = $"https://api.mailgun.net/v3/{EmailDomain}/messages";
         var auth = Convert.ToBase64String(Encoding.ASCII.GetBytes($"api:{ApiKey}"));
@@ -96,25 +143,34 @@ public class MailgunClient : IDisposable {
                 request.Headers.Authorization = new AuthenticationHeaderValue("Basic", auth);
                 var response = await _client.SendAsync(request);
                 if (response.IsSuccessStatusCode) {
-                    return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, response.StatusCode.ToString(), "");
+                    var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, response.StatusCode.ToString(), "");
+                    await Helpers.PostWebhookAsync(WebhookUrl, okResult);
+                    return okResult;
                 }
                 var error = await response.Content.ReadAsStringAsync();
                 throw new HttpRequestException(error);
             } catch (Exception ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Mailgun: {ex.Message}");
-                if (attempts >= RetryCount) {
+                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
                     if (ErrorAction == ActionPreference.Stop) throw;
-                    return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", ex.Message);
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", ex.Message);
+                    await Helpers.PostWebhookAsync(WebhookUrl, failResult);
+                    return failResult;
                 }
                 var delay = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
                 if (delay > 0) await Task.Delay(TimeSpan.FromMilliseconds(delay));
             }
             attempts++;
         } while (attempts <= RetryCount);
-        return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", lastException?.Message);
+        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", lastException?.Message);
+        await Helpers.PostWebhookAsync(WebhookUrl, finalResult);
+        return finalResult;
     }
 
+    /// <summary>
+    /// Releases resources used by the client.
+    /// </summary>
     public void Dispose() {
         _client.Dispose();
     }

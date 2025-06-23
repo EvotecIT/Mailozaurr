@@ -1,4 +1,7 @@
 ﻿namespace Mailozaurr;
+/// <summary>
+/// Supported external email providers.
+/// </summary>
 public enum EmailProvider {
     None,
     SendGrid,
@@ -11,3 +14,4 @@ public enum EmailProvider {
     //MessageBird (SparkPost),
     //MailerSend
 }
+

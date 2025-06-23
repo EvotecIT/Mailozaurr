@@ -20,8 +20,10 @@
         <Using Include="Xunit" />
     </ItemGroup>
 
-    <ItemGroup>
+  <ItemGroup>
         <ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
-    </ItemGroup>
+        <ProjectReference Include="..\Mailozaurr.PowerShell\Mailozaurr.PowerShell.csproj" />
+        <ProjectReference Include="..\Mailozaurr.Examples\Mailozaurr.Examples.csproj" Condition=" '$(TargetFramework)' == 'net8.0' " />
+  </ItemGroup>
 
 </Project>

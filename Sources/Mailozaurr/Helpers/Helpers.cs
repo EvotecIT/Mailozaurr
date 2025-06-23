@@ -1,13 +1,26 @@
 ﻿using System.Net;
+using System.Net.Http;
 using System.Security;
+using System.Text;
+using System.Text.Json;
 
 namespace Mailozaurr;
 
+/// <summary>
+/// Utility methods used throughout the library.
+/// </summary>
 public static class Helpers {
+    /// <summary>Converts a credential into an OAuth token tuple.</summary>
+    /// <param name="credential">The credential containing the token.</param>
+    /// <returns>The username and token.</returns>
     public static (string UserName, string Token) ConvertFromOAuth2Credential(NetworkCredential credential) {
         return (credential.UserName, credential.Password);
     }
 
+    /// <summary>Creates a <see cref="NetworkCredential"/> from plain text.</summary>
+    /// <param name="userName">The user name.</param>
+    /// <param name="password">The password.</param>
+    /// <returns>The resulting credential.</returns>
     public static NetworkCredential ConvertFromPlainText(string userName, string password) {
         var secStringPassword = new SecureString();
         foreach (char c in password) {
@@ -16,6 +29,9 @@ public static class Helpers {
         return new NetworkCredential(userName, secStringPassword);
     }
 
+    /// <summary>Extracts the API key from a credential object.</summary>
+    /// <param name="credentials">Credential containing the key.</param>
+    /// <returns>The API key.</returns>
     public static string CredentialToApiKey(ICredentials credentials) {
         string apiKey;
         try {
@@ -27,6 +43,9 @@ public static class Helpers {
         return apiKey;
     }
 
+    /// <summary>Retrieves the email address string from various types of objects.</summary>
+    /// <param name="from">String or dictionary representation.</param>
+    /// <returns>The email address.</returns>
     public static string GetEmailAddress(object from) {
         if (from is string s) {
             return s;
@@ -37,6 +56,10 @@ public static class Helpers {
         return from?.ToString() ?? string.Empty;
     }
 
+    /// <summary>Creates an object representing the sender.</summary>
+    /// <param name="email">Email address.</param>
+    /// <param name="name">Display name.</param>
+    /// <returns>The object to be used as sender.</returns>
     public static object GetFromObject(string email, string name) {
         if (!string.IsNullOrEmpty(name)) {
             return new Dictionary<string, object> { { "Name", name }, { "Email", email } };
@@ -44,6 +67,9 @@ public static class Helpers {
         return email;
     }
 
+    /// <summary>Parses an object into an email and optional name.</summary>
+    /// <param name="from">String or dictionary representation.</param>
+    /// <returns>Tuple containing the email and name.</returns>
     public static (string Email, string? Name) GetEmailAndName(object from) {
         if (from is string s) {
             return (s, null);
@@ -54,5 +80,46 @@ public static class Helpers {
             return (email, name);
         }
         return (from?.ToString(), null);
+    }
+
+    /// <summary>
+    /// Determines whether the specified exception represents a transient error
+    /// that can be retried safely.
+    /// </summary>
+    /// <param name="ex">The exception to inspect.</param>
+    /// <returns><c>true</c> if the error is transient; otherwise <c>false</c>.</returns>
+    public static bool IsTransient(Exception ex) {
+        switch (ex) {
+            case HttpRequestException httpEx:
+                // HttpRequestException.StatusCode was introduced in .NET 5.0
+#if NET5_0_OR_GREATER
+                if (httpEx.StatusCode.HasValue) {
+                    var code = (int)httpEx.StatusCode.Value;
+                    return code >= 500 || code == 408 || code == 429;
+                }
+#endif
+                return true;
+            case SmtpCommandException smtpEx:
+                var smtpCode = (int)smtpEx.StatusCode;
+                return smtpCode >= 400 && smtpCode < 500;
+            case SmtpProtocolException:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    public static async Task PostWebhookAsync(string? url, SmtpResult result) {
+        if (string.IsNullOrEmpty(url)) {
+            return;
+        }
+
+        try {
+            using var client = new HttpClient();
+            var json = JsonSerializer.Serialize(result);
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            await client.PostAsync(url, content);
+        } catch {
+        }
     }
 }

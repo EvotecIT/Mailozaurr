@@ -9,12 +9,18 @@ using System.Linq;
 using System.IO;
 
 namespace Mailozaurr {
+    /// <summary>
+    /// Represents credentials required for Microsoft Graph authentication.
+    /// </summary>
     public class GraphCredential {
         public string ClientId { get; set; }
         public string DirectoryId { get; set; }
         public string ClientSecret { get; set; }
     }
 
+    /// <summary>
+    /// Simplified representation of an email message returned from Graph.
+    /// </summary>
     public class GraphEmailMessage {
         public string Id { get; set; }
         public string Subject { get; set; }
@@ -24,6 +30,9 @@ namespace Mailozaurr {
         // Add more properties as needed
     }
 
+    /// <summary>
+    /// Represents a file attachment from Microsoft Graph.
+    /// </summary>
     public class Attachment {
         public string Name { get; set; }
         public string ContentBytes { get; set; }
@@ -31,47 +40,52 @@ namespace Mailozaurr {
     }
 
     public static class MicrosoftGraphUtils {
+        private static readonly HttpClient HttpClient;
+
+        static MicrosoftGraphUtils() {
+            HttpClient = new HttpClient();
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => HttpClient.Dispose();
+        }
         /// <summary>
         /// Converts a credential string (username@directory) and secret to a GraphCredential object.
         /// </summary>
         public static GraphCredential ConvertFromGraphCredential(string username, string password) {
             var parts = username.Split('@');
-            if (parts.Length == 2) {
-                return new GraphCredential {
-                    ClientId = parts[0],
-                    DirectoryId = parts[1],
-                    ClientSecret = password
-                };
+            if (parts.Length != 2) {
+                throw new ArgumentException("Invalid credential format. Expected 'clientid@directoryid'.");
             }
-            throw new ArgumentException("Invalid credential format. Expected 'clientid@directoryid'.");
+
+            return new GraphCredential {
+                ClientId = parts[0],
+                DirectoryId = parts[1],
+                ClientSecret = password
+            };
         }
 
         /// <summary>
         /// Connects to O365 Graph and returns the Authorization header value ("Bearer ...").
         /// </summary>
         public static async Task<string> ConnectO365GraphAsync(GraphCredential credential, string tenantDomain, string resource = "https://manage.office.com") {
-            using (var client = new HttpClient()) {
-                var body = new Dictionary<string, string>
-                {
-                    {"grant_type", "client_credentials"},
-                    {"resource", resource},
-                    {"client_id", credential.ClientId},
-                    {"client_secret", credential.ClientSecret}
-                };
-                var content = new FormUrlEncodedContent(body);
-                var url = $"https://login.microsoftonline.com/{tenantDomain}/oauth2/token";
-                var response = await client.PostAsync(url, content);
-                if (!response.IsSuccessStatusCode) {
-                    var error = await response.Content.ReadAsStringAsync();
-                    throw new Exception($"ConnectO365GraphAsync - Error: {error}");
-                }
-                var json = await response.Content.ReadAsStringAsync();
+            var body = new Dictionary<string, string>
+            {
+                {"grant_type", "client_credentials"},
+                {"resource", resource},
+                {"client_id", credential.ClientId},
+                {"client_secret", credential.ClientSecret}
+            };
+            var content = new FormUrlEncodedContent(body);
+            var url = $"https://login.microsoftonline.com/{tenantDomain}/oauth2/token";
+            var response = await HttpClient.PostAsync(url, content);
+            if (!response.IsSuccessStatusCode) {
+                var error = await response.Content.ReadAsStringAsync();
+                throw new Exception($"ConnectO365GraphAsync - Error: {error}");
+            }
+            var json = await response.Content.ReadAsStringAsync();
                 // Parse JSON for access_token and token_type
                 var token = System.Text.Json.JsonDocument.Parse(json);
                 var accessToken = token.RootElement.GetProperty("access_token").GetString();
                 var tokenType = token.RootElement.GetProperty("token_type").GetString();
-                return $"{tokenType} {accessToken}";
-            }
+            return $"{tokenType} {accessToken}";
         }
 
         /// <summary>
@@ -106,23 +120,21 @@ namespace Mailozaurr {
             string uri,
             IDictionary<string, string> headers = null,
             string body = null) {
-            using (var client = new HttpClient()) {
-                var request = new HttpRequestMessage(new HttpMethod(method), uri);
-                if (headers != null) {
-                    foreach (var kvp in headers) {
-                        request.Headers.TryAddWithoutValidation(kvp.Key, kvp.Value);
-                    }
+            var request = new HttpRequestMessage(new HttpMethod(method), uri);
+            if (headers != null) {
+                foreach (var kvp in headers) {
+                    request.Headers.TryAddWithoutValidation(kvp.Key, kvp.Value);
                 }
-                if (!string.IsNullOrEmpty(body) && (method == "POST" || method == "PUT" || method == "PATCH")) {
-                    request.Content = new StringContent(body, Encoding.UTF8, "application/json");
-                }
-                var response = await client.SendAsync(request);
-                var responseContent = await response.Content.ReadAsStringAsync();
-                if (!response.IsSuccessStatusCode) {
-                    throw new Exception($"InvokeGraphApiAsync - Error: {response.StatusCode} - {responseContent}");
-                }
-                return JsonDocument.Parse(responseContent);
             }
+            if (!string.IsNullOrEmpty(body) && (method == "POST" || method == "PUT" || method == "PATCH")) {
+                request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+            }
+            using var response = await HttpClient.SendAsync(request);
+            var responseContent = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode) {
+                throw new Exception($"InvokeGraphApiAsync - Error: {response.StatusCode} - {responseContent}");
+            }
+            return JsonDocument.Parse(responseContent);
         }
 
         /// <summary>
@@ -214,6 +226,9 @@ namespace Mailozaurr {
             }
         }
 
+        /// <summary>
+        /// Retrieves mail messages for the specified user.
+        /// </summary>
         public static async Task<List<Dictionary<string, object>>> GetMailMessagesAsync(GraphCredential credential, string userPrincipalName, IEnumerable<string> properties = null, string filter = null, int? limit = null) {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
@@ -234,6 +249,9 @@ namespace Mailozaurr {
             return messages;
         }
 
+        /// <summary>
+        /// Retrieves attachments for a specific message.
+        /// </summary>
         public static async Task<List<Attachment>> GetMailMessageAttachmentsAsync(GraphCredential credential, string userPrincipalName, string messageId, IEnumerable<string> properties = null) {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
@@ -252,6 +270,9 @@ namespace Mailozaurr {
             return attachments;
         }
 
+        /// <summary>
+        /// Lists mail folders for the specified user.
+        /// </summary>
         public static async Task<List<JsonElement>> GetMailFoldersAsync(GraphCredential credential, string userPrincipalName) {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
@@ -267,6 +288,9 @@ namespace Mailozaurr {
             return folders;
         }
 
+        /// <summary>
+        /// Saves the bodies of messages to disk as HTML files.
+        /// </summary>
         public static void SaveMailMessages(IEnumerable<GraphEmailMessage> messages, string path) {
             var resolvedPath = Path.GetFullPath(path);
             if (!Directory.Exists(resolvedPath)) Directory.CreateDirectory(resolvedPath);
@@ -279,12 +303,15 @@ namespace Mailozaurr {
                         File.WriteAllText(filePath, content);
                     } catch (Exception ex) {
                         // Log or handle error
-                        Console.WriteLine($"SaveMailMessage - Couldn't save file to {filePath}. Error: {ex.Message}");
+                        LoggingMessages.Logger.WriteWarning($"SaveMailMessage - Couldn't save file to {filePath}. Error: {ex.Message}");
                     }
                 }
             }
         }
 
+        /// <summary>
+        /// Saves attachments to the specified directory.
+        /// </summary>
         public static void SaveAttachments(IEnumerable<Attachment> attachments, string path) {
             var resolvedPath = Path.GetFullPath(path);
             if (!Directory.Exists(resolvedPath)) Directory.CreateDirectory(resolvedPath);
@@ -296,7 +323,7 @@ namespace Mailozaurr {
                         File.WriteAllBytes(filePath, bytes);
                     } catch (Exception ex) {
                         // Log or handle error
-                        Console.WriteLine($"SaveAttachment - Couldn't save file to {filePath}. Error: {ex.Message}");
+                        LoggingMessages.Logger.WriteWarning($"SaveAttachment - Couldn't save file to {filePath}. Error: {ex.Message}");
                     }
                 }
             }

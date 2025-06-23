@@ -11,6 +11,9 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RepositoryUrl>https://github.com/EvotecIT/Mailozaurr</RepositoryUrl>
+    <PackageTags>Windows;MacOS;Linux;Mail;Email;MX;SPF;DMARC;DKIM;GraphApi;SendGrid;Graph;IMAP;POP3</PackageTags>
+    <PackageIconUrl>https://evotec.xyz/wp-content/uploads/2020/07/MailoZaurr.png</PackageIconUrl>
     </PropertyGroup>
 
     <ItemGroup>

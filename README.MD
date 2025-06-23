@@ -88,10 +88,10 @@ This will make sure the project has required libraries.
   - [x] SMTP with oAuth2 Office 365
   - [x] SMTP with oAuth2 Google Mail
   - [x] SMTP with SendGrid
-- [x] SendGrid API
-- [x] Office 365 Graph API
-- [x] PGP/MIME encryption and signature verification
-- Optional retry logic for `Send-EmailMessage` via `-RetryCount`, `-RetryDelayMilliseconds` and `-RetryDelayBackoff`
+  - [x] SendGrid API
+  - [x] Office 365 Graph API
+  - [x] PGP/MIME encryption and signature verification
+  - Optional retry logic for `Send-EmailMessage` via `-RetryCount`, `-RetryDelayMilliseconds`, `-RetryDelayBackoff` and `-RetryAlways`.  Retries are only attempted for transient errors by default, but `-RetryAlways` forces retries on all errors.
 - POP3
   - [x] Connect to POP3
   - [x] Get POP3 Emails
@@ -119,7 +119,6 @@ Send-EmailMessage -From 'mimekit@example.com' -To 'mimekit@example.com' \
     -PrivateKeyPassword 'no.secret'
 ```
 
-
 ## Documentation
 
 While I didn't spent much time creating WIKI, working on Get-Help documentation, I did write blog articles that should help you get started.
@@ -128,6 +127,13 @@ While I didn't spent much time creating WIKI, working on Get-Help documentation,
 - [x] [Easy way to send emails using Microsoft Graph API (Office 365) with PowerShell](https://evotec.xyz/easy-way-to-send-emails-using-microsoft-graph-api-office-365-with-powershell/)
 
 You can also utilize Examples which should help to understand use cases. Of course it would be great having pretty help so if you can help me out feel free to submit PR's.
+- [Example-SendEmail-SignEncrypt.ps1](Examples/Example-SendEmail-SignEncrypt.ps1) - sign and encrypt an email using SMTP.
+
+-Some useful examples:
+- `Examples/Example-AcquireO365TokenInteractive.ps1` – demonstrates `Connect-OAuthO365`, `ConvertFrom-OAuth2Credential`, and using the token with `Send-EmailMessage`, IMAP, and POP3.
+- `Examples/Example-AcquireGoogleTokenInteractive.ps1` – demonstrates `Connect-OAuthGoogle`, `ConvertFrom-OAuth2Credential`, and using the token with `Send-EmailMessage`, IMAP, and POP3.
+- `Sources/Mailozaurr.Examples/AcquireO365TokenInteractive.cs` – C# sample for `OAuthHelpers.AcquireO365TokenInteractiveAsync`.
+- `Sources/Mailozaurr.Examples/AcquireGoogleTokenInteractive.cs` – C# sample for `OAuthHelpers.AcquireGoogleTokenInteractiveAsync`.
 
 Keep in mind PSSharedGoods is only required for development. When you use this module from PowerShellGallery it's not installed as everything is merged.
 

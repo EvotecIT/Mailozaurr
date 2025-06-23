@@ -19,6 +19,7 @@ public sealed class CmdletDisconnectIMAP : AsyncPSCmdlet {
     /// <para type="description">The <see cref="ImapConnectionInfo"/> object containing the MailKit IMAP client instance to disconnect. This is the object returned by <c>Connect-IMAP</c>.</para>
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
+    [ValidateNotNull]
     public ImapConnectionInfo? Client { get; set; }
 
     /// <summary>

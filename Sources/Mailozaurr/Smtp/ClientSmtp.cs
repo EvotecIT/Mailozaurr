@@ -2,20 +2,37 @@ using MimeKit.Utils;
 
 namespace Mailozaurr;
 
+/// <summary>
+/// Extension of <see cref="SmtpClient"/> used to build and send messages.
+/// </summary>
 public partial class ClientSmtp : SmtpClient {
+    /// <summary>Subject of the message.</summary>
     public string Subject { get; set; } = string.Empty;
+    /// <summary>HTML body of the message.</summary>
     public string HtmlBody { get; set; } = string.Empty;
+    /// <summary>Plain text body of the message.</summary>
     public string TextBody { get; set; } = string.Empty;
+    /// <summary>Attachments to include with the message.</summary>
     public List<object>? Attachments { get; set; } = new List<object>();
+    /// <summary>Inline attachments to embed in the message.</summary>
     public List<object>? InlineAttachments { get; set; } = new List<object>();
+    /// <summary>The sender address.</summary>
     public object From { get; set; }
+    /// <summary>Primary recipients.</summary>
     public IEnumerable<object>? To { get; set; } = new List<object>();
+    /// <summary>Carbon copy recipients.</summary>
     public IEnumerable<object>? Cc { get; set; } = new List<object>();
+    /// <summary>Blind carbon copy recipients.</summary>
     public IEnumerable<object>? Bcc { get; set; } = new List<object>();
+    /// <summary>Reply-to address.</summary>
     public object? ReplyTo { get; set; }
+    /// <summary>The underlying MIME message.</summary>
     public MimeMessage Message { get; set; }
+    /// <summary>Priority of the message.</summary>
     public MessagePriority Priority { get; set; }
+    /// <summary>Delivery notification options.</summary>
     public DeliveryNotification[]? DeliveryNotificationOption { get; set; }
+    /// <summary>Comma separated list of all recipients.</summary>
     public string SentTo {
         get {
             var addresses = new List<string>();
@@ -32,6 +49,7 @@ public partial class ClientSmtp : SmtpClient {
         }
     }
 
+    /// <summary>The address(es) the message is sent from.</summary>
     public string SentFrom {
         get {
             var addresses = ConvertToMailboxAddress(From).Select(x => x.Address);
@@ -43,6 +61,12 @@ public partial class ClientSmtp : SmtpClient {
 
     public ClientSmtp(ProtocolLogger protocolLogger) : base(protocolLogger) { }
 
+    /// <summary>
+    /// Determines which delivery status notifications should be requested for the specified recipient.
+    /// </summary>
+    /// <param name="message">The message being sent.</param>
+    /// <param name="mailbox">The recipient mailbox address.</param>
+    /// <returns>The delivery status notification flags to use, or <c>null</c>.</returns>
     protected override DeliveryStatusNotification? GetDeliveryStatusNotifications(MimeMessage message, MailboxAddress mailbox) {
         DeliveryStatusNotification combinedOption = 0;
         if (DeliveryNotificationOption != null) {
@@ -68,6 +92,9 @@ public partial class ClientSmtp : SmtpClient {
         return combinedOption;
     }
 
+    /// <summary>
+    /// Builds the <see cref="MimeMessage"/> based on the configured properties.
+    /// </summary>
     public void CreateMessage() {
         var message = new MimeMessage();
         AddAddressesToMessage(message);
@@ -144,9 +171,10 @@ public partial class ClientSmtp : SmtpClient {
                 MimeEntity? entity = null;
                 switch (inline) {
                     case string path:
+                    {
                         // Read the file into memory so it can be removed immediately
                         var bytes = File.ReadAllBytes(path);
-                        var ms = new MemoryStream(bytes);
+                        using var ms = new MemoryStream(bytes);
                         var part = new MimePart(MimeTypes.GetMimeType(path))
                         {
                             Content = new MimeContent(ms),
@@ -157,6 +185,7 @@ public partial class ClientSmtp : SmtpClient {
                         bodyBuilder.LinkedResources.Add(part);
                         entity = part;
                         break;
+                    }
                     case MimeEntity mime:
                         bodyBuilder.LinkedResources.Add(mime);
                         entity = mime;
@@ -170,16 +199,21 @@ public partial class ClientSmtp : SmtpClient {
         message.Body = bodyBuilder.ToMessageBody();
     }
 
+    /// <summary>
+    /// Saves the constructed message to the specified file path.
+    /// </summary>
+    /// <param name="path">Destination file path.</param>
     public void SaveMessage(string path) {
         Message.WriteTo(path);
     }
 
     private IEnumerable<MailboxAddress> ConvertToMailboxAddress(object input) {
         if (input is string str) {
-            if (!str.Contains("<>")) {
-                yield return new MailboxAddress(str, str);
+            var mailbox = MailboxAddress.Parse(str);
+            if (str.Contains('<') || str.Contains('>')) {
+                yield return mailbox;
             } else {
-                yield return MailboxAddress.Parse(str);
+                yield return new MailboxAddress(string.Empty, mailbox.Address);
             }
         } else if (input is IDictionary dict) {
             if (dict.Contains("Name") && dict.Contains("Email")) {
@@ -194,7 +228,7 @@ public partial class ClientSmtp : SmtpClient {
                 }
             }
         } else {
-            throw new ArgumentException("Invalid input type for ConvertToMailboxAddress");
+            throw new ArgumentException($"Invalid input type for ConvertToMailboxAddress: {input}");
         }
     }
 

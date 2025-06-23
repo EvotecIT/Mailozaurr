@@ -23,18 +23,21 @@ public class CmdletConnectOAuthGoogle : PSCmdlet {
     /// <para type="description">Specifies the Gmail account (email address) to authenticate.</para>
     /// </summary>
     [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string? GmailAccount { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the OAuth2 client ID from the Google Developer Console.</para>
     /// </summary>
     [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string? ClientID { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the OAuth2 client secret from the Google Developer Console.</para>
     /// </summary>
     [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string? ClientSecret { get; set; }
 
     /// <summary>
@@ -55,8 +58,7 @@ public class CmdletConnectOAuthGoogle : PSCmdlet {
             return;
         }
         if (cred != null) {
-            var secure = new System.Security.SecureString();
-            foreach (var c in cred.AccessToken) secure.AppendChar(c);
+            var secure = CredentialHelpers.ToSecureString(cred.AccessToken);
             var psCred = new PSCredential(cred.UserName, secure);
             WriteObject(psCred);
         }

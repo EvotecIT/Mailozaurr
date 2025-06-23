@@ -15,6 +15,7 @@ using System.Security;
 [OutputType(typeof(PSCredential))]
 public class CmdletConvertToMailgunCredential : PSCmdlet {
     [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
     public string? ApiKey { get; set; }
 
     protected override void ProcessRecord() {

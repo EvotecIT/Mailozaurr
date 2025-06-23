@@ -6,9 +6,13 @@ using System.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using Org.BouncyCastle.Bcpg.OpenPgp;
+using System.Threading.Tasks;
 
 namespace Mailozaurr;
 
+/// <summary>
+/// High level wrapper around <see cref="ClientSmtp"/> that exposes convenient methods and retry logic.
+/// </summary>
 public class Smtp {
     public LoggingConfigurator? Logging;
 
@@ -94,6 +98,14 @@ public class Smtp {
 
     public double RetryDelayBackoff { get; set; } = 1.0;
 
+    /// <summary>
+    /// Forces retries even when the encountered error is not considered
+    /// transient. By default retries occur only for transient failures.
+    /// </summary>
+    public bool RetryAlways { get; set; } = false;
+
+    public string? WebhookUrl { get; set; }
+
     public bool CheckCertificateRevocation {
         get => Client.CheckCertificateRevocation;
         set => Client.CheckCertificateRevocation = value;
@@ -177,10 +189,17 @@ public class Smtp {
         Stopwatch = Stopwatch.StartNew();
     }
 
+    /// <summary>
+    /// Creates the MIME message using the current property values.
+    /// </summary>
     public void CreateMessage() {
         Client.CreateMessage();
     }
 
+    /// <summary>
+    /// Saves the constructed message to the specified path.
+    /// </summary>
+    /// <param name="path">Destination file path.</param>
     public void SaveMessage(string path) {
         if (!string.IsNullOrEmpty(path)) {
             Client.SaveMessage(path);
@@ -268,6 +287,12 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// Returns the plain text password, decrypting it when <paramref name="isSecureString"/> is true.
+    /// </summary>
+    /// <param name="password">Password value.</param>
+    /// <param name="isSecureString">Indicates if the password is protected.</param>
+    /// <returns>The plain text password.</returns>
     public string ConvertSecureStringToPlainString(string password, bool isSecureString) {
         if (isSecureString) {
             // Convert the encrypted string back to a SecureString
@@ -285,10 +310,34 @@ public class Smtp {
         return password;
     }
 
-    public SmtpResult Authenticate(string username, string password, bool isSecureString) {
+    /// <summary>
+    /// Authenticate using the specified user name and password. After the
+    /// authentication attempt, the plain text value is either overwritten or
+    /// protected again to avoid leaving sensitive data in memory.
+    /// </summary>
+    /// <param name="username">The user name.</param>
+    /// <param name="password">
+    /// Password value. When <paramref name="isSecureString"/> is <c>true</c>, the
+    /// string is re-secured using <see cref="SecureStringHelper.Protect"/> after
+    /// authentication completes.
+    /// </param>
+    /// <param name="isSecureString">Indicates whether the password was
+    /// previously protected.</param>
+    /// <returns>An <see cref="SmtpResult"/> representing the outcome.</returns>
+    public SmtpResult Authenticate(string username, string password, bool isSecureString, AuthenticationMechanism mechanism = AuthenticationMechanism.Plain) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         try {
-            Client.Authenticate(username, password);
+            switch (mechanism) {
+                case AuthenticationMechanism.CramMd5:
+                    Client.Authenticate(new SaslMechanismCramMd5(username, password));
+                    break;
+                case AuthenticationMechanism.Login:
+                    Client.Authenticate(new SaslMechanismLogin(username, password));
+                    break;
+                default:
+                    Client.Authenticate(new SaslMechanismPlain(username, password));
+                    break;
+            }
             LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Authenticated as {username}");
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (Exception ex) {
@@ -298,6 +347,13 @@ public class Smtp {
                 throw;
             }
             return new SmtpResult(false, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+        } finally {
+            if (isSecureString) {
+                using var securePwd = SecureStringHelper.FromPlainTextString(password);
+                password = SecureStringHelper.Protect(securePwd);
+            } else {
+                password = new string('\0', password.Length);
+            }
         }
     }
 
@@ -312,16 +368,21 @@ public class Smtp {
             try {
                 Client.Send(Message);
                 LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Sent email to {SentTo}");
-                return new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+                var result = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+                Helpers.PostWebhookAsync(WebhookUrl, result).GetAwaiter().GetResult();
+                return result;
             } catch (Exception ex) {
                 lastException = ex;
                 LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending: {ex.Message}");
-                if (attempts >= RetryCount) {
+                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }
-                    return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+                    Helpers.PostWebhookAsync(WebhookUrl, failResult).GetAwaiter().GetResult();
+                    return failResult;
                 }
+
                 var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
                 if (delayMilliseconds > 0) {
                     Thread.Sleep(TimeSpan.FromMilliseconds(delayMilliseconds));
@@ -330,34 +391,92 @@ public class Smtp {
             attempts++;
         } while (attempts <= RetryCount);
 
-        return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", lastException?.Message);
+        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", lastException?.Message);
+        Helpers.PostWebhookAsync(WebhookUrl, finalResult).GetAwaiter().GetResult();
+        return finalResult;
     }
 
+    /// <summary>
+    /// Send the email message asynchronously.
+    /// </summary>
+    /// <returns></returns>
+    public async Task<SmtpResult> SendAsync() {
+        int attempts = 0;
+        Exception? lastException = null;
+        do {
+            try {
+                await Client.SendAsync(Message);
+                LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Sent email to {SentTo}");
+                var result = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+                await Helpers.PostWebhookAsync(WebhookUrl, result);
+                return result;
+            } catch (Exception ex) {
+                lastException = ex;
+                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending: {ex.Message}");
+                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
+                    if (ErrorAction == ActionPreference.Stop) {
+                        throw;
+                    }
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+                    await Helpers.PostWebhookAsync(WebhookUrl, failResult);
+                    return failResult;
+                }
+
+                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+                if (delayMilliseconds > 0) {
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds));
+                }
+            }
+            attempts++;
+        } while (attempts <= RetryCount);
+
+        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", lastException?.Message);
+        await Helpers.PostWebhookAsync(WebhookUrl, finalResult);
+        return finalResult;
+    }
+
+    /// <summary>
+    /// Disconnects from the SMTP server.
+    /// </summary>
     public void Disconnect() {
         Client.Disconnect(true);
         Stopwatch.Stop();
     }
 
+    /// <summary>
+    /// Releases the SMTP connection and associated resources.
+    /// </summary>
     public void Dispose() {
         Disconnect();
         Client.Dispose();
         Stopwatch.Stop();
     }
 
+    /// <summary>
+    /// S/MIME encrypt the message using a PFX certificate file.
+    /// </summary>
+    /// <param name="pfxFilePath">Path to the PFX file.</param>
+    /// <param name="password">Certificate password.</param>
+    /// <param name="isSecureString">Indicates if the password is protected.</param>
+    /// <returns></returns>
     public SmtpResult Encrypt(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
-        X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
-        return Encrypt(certificate);
+        using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
+            return Encrypt(certificate);
+        }
     }
 
+    /// <summary>
+    /// S/MIME encrypt the message using a certificate from the store.
+    /// </summary>
+    /// <param name="certificateThumbprint">Certificate thumbprint.</param>
+    /// <returns></returns>
     public SmtpResult Encrypt(string certificateThumbprint) {
         // Load the certificate from the Windows Certificate Store
-        X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+        using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
         store.Open(OpenFlags.ReadOnly);
 
         X509Certificate2Collection certificates = store.Certificates.Find(X509FindType.FindByThumbprint, certificateThumbprint, false);
-
-        store.Close();
 
         if (certificates.Count > 0) {
             // Use the certificate directly from the store to encrypt the email
@@ -370,6 +489,11 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// S/MIME encrypt the message using the specified certificate instance.
+    /// </summary>
+    /// <param name="certificate">Certificate to encrypt with.</param>
+    /// <returns></returns>
     public SmtpResult Encrypt(X509Certificate2 certificate) {
         MimeMessage message = Message;
         // encrypt our message body using our custom S/MIME cryptography context
@@ -395,6 +519,11 @@ public class Smtp {
         return new SmtpResult(true, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
     }
 
+    /// <summary>
+    /// S/MIME sign the message using the specified certificate.
+    /// </summary>
+    /// <param name="certificate">Certificate used for signing.</param>
+    /// <returns></returns>
     public SmtpResult Sign(X509Certificate2 certificate) {
         MimeMessage message = Message;
         // digitally sign our message body using our custom S/MIME cryptography context
@@ -418,20 +547,31 @@ public class Smtp {
         return new SmtpResult(true, EmailAction.SMimeSignature, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
     }
 
+    /// <summary>
+    /// S/MIME sign the message using a PFX certificate file.
+    /// </summary>
+    /// <param name="pfxFilePath">Path to the PFX file.</param>
+    /// <param name="password">Certificate password.</param>
+    /// <param name="isSecureString">Indicates if the password is protected.</param>
+    /// <returns></returns>
     public SmtpResult Sign(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
-        X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
-        return Sign(certificate);
+        using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
+            return Sign(certificate);
+        }
     }
 
+    /// <summary>
+    /// S/MIME sign the message using a certificate from the store.
+    /// </summary>
+    /// <param name="certificateThumbprint">Certificate thumbprint.</param>
+    /// <returns></returns>
     public SmtpResult Sign(string certificateThumbprint) {
         // Load the certificate from the Windows Certificate Store
-        X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+        using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
         store.Open(OpenFlags.ReadOnly);
 
         X509Certificate2Collection certificates = store.Certificates.Find(X509FindType.FindByThumbprint, certificateThumbprint, false);
-
-        store.Close();
 
         if (certificates.Count > 0) {
             // Use the certificate directly from the store to sign the email
@@ -441,20 +581,31 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// PKCS#7 sign the message using a PFX certificate file.
+    /// </summary>
+    /// <param name="pfxFilePath">Path to the PFX file.</param>
+    /// <param name="password">Certificate password.</param>
+    /// <param name="isSecureString">Indicates if the password is protected.</param>
+    /// <returns></returns>
     public SmtpResult Pkcs7Sign(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
-        X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
-        return Pkcs7Sign(certificate);
+        using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
+            return Pkcs7Sign(certificate);
+        }
     }
 
+    /// <summary>
+    /// PKCS#7 sign the message using a certificate from the store.
+    /// </summary>
+    /// <param name="certificateThumbprint">Certificate thumbprint.</param>
+    /// <returns></returns>
     public SmtpResult Pkcs7Sign(string certificateThumbprint) {
         // Load the certificate from the Windows Certificate Store
-        X509Store store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+        using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
         store.Open(OpenFlags.ReadOnly);
 
         X509Certificate2Collection certificates = store.Certificates.Find(X509FindType.FindByThumbprint, certificateThumbprint, false);
-
-        store.Close();
 
         if (certificates.Count > 0) {
             // Use the certificate directly from the store to sign the email
@@ -467,6 +618,11 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// PKCS#7 sign the message using the specified certificate.
+    /// </summary>
+    /// <param name="certificate">Certificate used for signing.</param>
+    /// <returns></returns>
     public SmtpResult Pkcs7Sign(X509Certificate2 certificate) {
         try {
             MimeMessage message = Message;
@@ -599,6 +755,14 @@ public class Smtp {
         return new SmtpResult(true, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
     }
 
+    /// <summary>
+    /// Performs the specified S/MIME action using a PFX certificate file.
+    /// </summary>
+    /// <param name="emailActionEncryption">The operation to perform.</param>
+    /// <param name="pfxFilePath">Path to the PFX file.</param>
+    /// <param name="password">Certificate password.</param>
+    /// <param name="isSecureString">Indicates if the password is protected.</param>
+    /// <returns></returns>
     public SmtpResult Encrypt(EmailActionEncryption emailActionEncryption, string pfxFilePath, string password, bool isSecureString) {
         switch (emailActionEncryption) {
             case EmailActionEncryption.SMIMESign:
@@ -614,6 +778,12 @@ public class Smtp {
                 return new SmtpResult(true, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", "EmailActionEncryption None");
         }
     }
+    /// <summary>
+    /// Performs the specified S/MIME action using a certificate from the store.
+    /// </summary>
+    /// <param name="emailActionEncryption">The operation to perform.</param>
+    /// <param name="certificateThumbprint">Certificate thumbprint.</param>
+    /// <returns></returns>
     public SmtpResult Encrypt(EmailActionEncryption emailActionEncryption, string certificateThumbprint) {
         switch (emailActionEncryption) {
             case EmailActionEncryption.SMIMESign:
