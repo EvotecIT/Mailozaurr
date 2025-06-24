@@ -197,7 +197,9 @@ public class Graph {
                 }
             }
 
-            if (ConvertedAttachments.Sum(a => a.ContentBytes.Length) > 4000000) {
+            if (ConvertedAttachments.Sum(a => string.IsNullOrEmpty(a.ContentBytes)
+                    ? 0
+                    : Convert.FromBase64String(a.ContentBytes).Length) > 4_000_000) {
                 // Create a draft message if the total size of the attachments is larger than 4MB
                 IsLargerAttachment = true;
             } else {
