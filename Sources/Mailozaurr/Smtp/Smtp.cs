@@ -465,8 +465,16 @@ public class Smtp {
     /// <returns></returns>
     public SmtpResult Encrypt(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
-        using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
+        try {
+            using var certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
             return Encrypt(certificate);
+        } finally {
+            if (isSecureString) {
+                using var securePwd = SecureStringHelper.FromPlainTextString(password);
+                password = SecureStringHelper.Protect(securePwd);
+            } else {
+                password = new string('\0', password.Length);
+            }
         }
     }
 
@@ -560,8 +568,16 @@ public class Smtp {
     /// <returns></returns>
     public SmtpResult Sign(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
-        using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
+        try {
+            using var certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
             return Sign(certificate);
+        } finally {
+            if (isSecureString) {
+                using var securePwd = SecureStringHelper.FromPlainTextString(password);
+                password = SecureStringHelper.Protect(securePwd);
+            } else {
+                password = new string('\0', password.Length);
+            }
         }
     }
 
@@ -594,8 +610,16 @@ public class Smtp {
     /// <returns></returns>
     public SmtpResult Pkcs7Sign(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
-        using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
+        try {
+            using var certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
             return Pkcs7Sign(certificate);
+        } finally {
+            if (isSecureString) {
+                using var securePwd = SecureStringHelper.FromPlainTextString(password);
+                password = SecureStringHelper.Protect(securePwd);
+            } else {
+                password = new string('\0', password.Length);
+            }
         }
     }
 
@@ -722,8 +746,9 @@ public class Smtp {
 
     public SmtpResult PgpSign(string publicKeyPath, string privateKeyPath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
-        MimeMessage message = Message;
-        using var ctx = new EphemeralOpenPgpContext(password);
+        try {
+            MimeMessage message = Message;
+            using var ctx = new EphemeralOpenPgpContext(password);
         if (!File.Exists(publicKeyPath)) {
             string messageText = $"Public key file not found: {publicKeyPath}";
             LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
@@ -751,14 +776,23 @@ public class Smtp {
             if (ErrorAction == ActionPreference.Stop) throw;
             return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
         }
-        Message = message;
-        return new SmtpResult(true, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+            Message = message;
+            return new SmtpResult(true, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+        } finally {
+            if (isSecureString) {
+                using var securePwd = SecureStringHelper.FromPlainTextString(password);
+                password = SecureStringHelper.Protect(securePwd);
+            } else {
+                password = new string('\0', password.Length);
+            }
+        }
     }
 
     public SmtpResult PgpSignAndEncrypt(string publicKeyPath, string privateKeyPath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
-        MimeMessage message = Message;
-        using var ctx = new EphemeralOpenPgpContext(password);
+        try {
+            MimeMessage message = Message;
+            using var ctx = new EphemeralOpenPgpContext(password);
         if (!File.Exists(publicKeyPath)) {
             string messageText = $"Public key file not found: {publicKeyPath}";
             LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
@@ -783,8 +817,16 @@ public class Smtp {
             if (ErrorAction == ActionPreference.Stop) throw;
             return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
         }
-        Message = message;
-        return new SmtpResult(true, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+            Message = message;
+            return new SmtpResult(true, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+        } finally {
+            if (isSecureString) {
+                using var securePwd = SecureStringHelper.FromPlainTextString(password);
+                password = SecureStringHelper.Protect(securePwd);
+            } else {
+                password = new string('\0', password.Length);
+            }
+        }
     }
 
     /// <summary>
