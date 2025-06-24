@@ -4,7 +4,6 @@ using System.Net.Security;
 using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography.X509Certificates;
-using System.Threading;
 using Org.BouncyCastle.Bcpg.OpenPgp;
 using System.Threading.Tasks;
 
@@ -362,45 +361,18 @@ public class Smtp {
     /// </summary>
     /// <returns></returns>
     public SmtpResult Send() {
-        int attempts = 0;
-        Exception? lastException = null;
-        do {
-            try {
-                Client.Send(Message);
-                LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Sent email to {SentTo}");
-                var result = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
-                Helpers.PostWebhookAsync(WebhookUrl, result).GetAwaiter().GetResult();
-                return result;
-            } catch (Exception ex) {
-                lastException = ex;
-                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending: {ex.Message}");
-                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
-                    if (ErrorAction == ActionPreference.Stop) {
-                        throw;
-                    }
-                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
-                    Helpers.PostWebhookAsync(WebhookUrl, failResult).GetAwaiter().GetResult();
-                    return failResult;
-                }
-
-                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
-                if (delayMilliseconds > 0) {
-                    Thread.Sleep(TimeSpan.FromMilliseconds(delayMilliseconds));
-                }
-            }
-            attempts++;
-        } while (attempts <= RetryCount);
-
-        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", lastException?.Message);
-        Helpers.PostWebhookAsync(WebhookUrl, finalResult).GetAwaiter().GetResult();
-        return finalResult;
+        return SendCoreAsync().GetAwaiter().GetResult();
     }
 
     /// <summary>
     /// Send the email message asynchronously.
     /// </summary>
     /// <returns></returns>
-    public async Task<SmtpResult> SendAsync() {
+    public Task<SmtpResult> SendAsync() {
+        return SendCoreAsync();
+    }
+
+    private async Task<SmtpResult> SendCoreAsync() {
         int attempts = 0;
         Exception? lastException = null;
         do {
@@ -434,6 +406,7 @@ public class Smtp {
         await Helpers.PostWebhookAsync(WebhookUrl, finalResult);
         return finalResult;
     }
+
 
     /// <summary>
     /// Disconnects from the SMTP server.
