@@ -209,7 +209,9 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     public MailKit.Security.SecureSocketOptions SecureSocketOptions { get; set; } = MailKit.Security.SecureSocketOptions.Auto;
 
     /// <summary>
-    /// <para>Enables the use of SSL/TLS for the SMTP connection. Recommended to use SecureSocketOptions instead.</para>
+    /// <para>Enables the use of SSL/TLS for the SMTP connection. If
+    /// <see cref="SecureSocketOptions"/> remains <c>Auto</c>, this switch causes
+    /// <c>StartTls</c> to be used automatically.</para>
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
