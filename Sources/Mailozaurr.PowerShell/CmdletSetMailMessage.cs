@@ -23,8 +23,6 @@ public class CmdletSetMailMessage : AsyncPSCmdlet {
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
-    [Parameter(Mandatory = true, ParameterSetName = "Graph")]
-    public SwitchParameter Graph { get; set; }
 
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }

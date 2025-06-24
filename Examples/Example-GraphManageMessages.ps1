@@ -8,10 +8,10 @@ $TenantId = 'your-tenant-id'
 $cred = ConvertTo-GraphCredential -ClientId $ClientId -ClientSecret $ClientSecret -DirectoryId $TenantId
 $graph = Connect-EmailGraph -Credential $cred
 
-$messages = Get-EmailMessage -UserPrincipalName 'user@example.com' -Connection $graph -Graph -Filter "hasAttachments eq true" -Limit 5
+$messages = Get-EmailMessage -UserPrincipalName 'user@example.com' -Connection $graph -Filter "hasAttachments eq true" -Limit 5
 foreach ($m in $messages) {
-    Get-MailMessageAttachment -UserPrincipalName 'user@example.com' -MessageId $m.Id -Connection $graph -Graph |
+    Get-MailMessageAttachment -UserPrincipalName 'user@example.com' -MessageId $m.Id -Connection $graph |
         Save-MailMessageAttachment -Path 'C:\Temp\Attachments'
-    Set-MailMessage -UserPrincipalName 'user@example.com' -MessageId $m.Id -Connection $graph -Graph -Read
-    Move-MailMessage -UserPrincipalName 'user@example.com' -MessageId $m.Id -DestinationFolderId 'Archive' -Connection $graph -Graph
+    Set-MailMessage -UserPrincipalName 'user@example.com' -MessageId $m.Id -Connection $graph -Read
+    Move-MailMessage -UserPrincipalName 'user@example.com' -MessageId $m.Id -DestinationFolderId 'Archive' -Connection $graph
 }
