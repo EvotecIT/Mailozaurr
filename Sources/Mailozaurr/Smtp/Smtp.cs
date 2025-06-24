@@ -485,7 +485,7 @@ public class Smtp {
             if (ErrorAction == ActionPreference.Stop) {
                 throw new Exception("Certificate not found in the store.");
             }
-            return new SmtpResult(true, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "Certificate not found in the store.");
+            return new SmtpResult(false, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", "Certificate not found in the store.");
         }
     }
 
@@ -614,7 +614,7 @@ public class Smtp {
             if (ErrorAction == ActionPreference.Stop) {
                 throw new Exception("Certificate not found in the store.");
             }
-            return new SmtpResult(true, EmailAction.SMimeSignaturePKCS7, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", "Certificate not found in the store.");
+            return new SmtpResult(false, EmailAction.SMimeSignaturePKCS7, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", "Certificate not found in the store.");
         }
     }
 
