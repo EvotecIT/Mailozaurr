@@ -644,7 +644,7 @@ public class Graph {
     /// <param name="uploadUrl">The upload session URL.</param>
     /// <param name="byteArrayContent">The chunk to send.</param>
     public async Task SendFile(string uploadUrl, ByteArrayContent byteArrayContent) {
-        var requestMessage = new HttpRequestMessage(HttpMethod.Put, uploadUrl) {
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Put, uploadUrl) {
             Content = byteArrayContent
         };
         requestMessage.Headers.Add("AnchorMailbox", SentFrom); // This is correctly added to HttpRequestMessage
@@ -654,7 +654,7 @@ public class Graph {
             var uploadChunkResponse = await _client.SendAsync(requestMessage);
             if (!uploadChunkResponse.IsSuccessStatusCode) {
                 // Handle upload error
-                Console.WriteLine(uploadChunkResponse);
+                LogCollector.LogWarning(uploadChunkResponse.ToString());
                 return;
             }
         } finally {
