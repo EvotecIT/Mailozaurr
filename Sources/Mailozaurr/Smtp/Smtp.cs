@@ -461,8 +461,17 @@ public class Smtp {
     /// <returns></returns>
     public SmtpResult Encrypt(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
-        using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
-            return Encrypt(certificate);
+        try {
+            using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
+                return Encrypt(certificate);
+            }
+        } finally {
+            if (isSecureString) {
+                using var securePwd = SecureStringHelper.FromPlainTextString(password);
+                password = SecureStringHelper.Protect(securePwd);
+            } else {
+                password = new string('\0', password.Length);
+            }
         }
     }
 
@@ -556,8 +565,17 @@ public class Smtp {
     /// <returns></returns>
     public SmtpResult Sign(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
-        using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
-            return Sign(certificate);
+        try {
+            using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
+                return Sign(certificate);
+            }
+        } finally {
+            if (isSecureString) {
+                using var securePwd = SecureStringHelper.FromPlainTextString(password);
+                password = SecureStringHelper.Protect(securePwd);
+            } else {
+                password = new string('\0', password.Length);
+            }
         }
     }
 
@@ -590,8 +608,17 @@ public class Smtp {
     /// <returns></returns>
     public SmtpResult Pkcs7Sign(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
-        using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
-            return Pkcs7Sign(certificate);
+        try {
+            using (X509Certificate2 certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet)) {
+                return Pkcs7Sign(certificate);
+            }
+        } finally {
+            if (isSecureString) {
+                using var securePwd = SecureStringHelper.FromPlainTextString(password);
+                password = SecureStringHelper.Protect(securePwd);
+            } else {
+                password = new string('\0', password.Length);
+            }
         }
     }
 
@@ -678,19 +705,25 @@ public class Smtp {
     /// <param name="isSecureString"></param>
     /// <returns></returns>
     public SmtpResult SignAndEncrypt(string pfxFilePath, string password, bool isSecureString) {
-        // Sign the email
-        SmtpResult signResult = Sign(pfxFilePath, password, isSecureString);
-        if (!signResult.Status) {
-            return signResult;
-        }
+        try {
+            // Sign the email
+            SmtpResult signResult = Sign(pfxFilePath, password, isSecureString);
+            if (!signResult.Status) {
+                return signResult;
+            }
 
-        // Encrypt the signed email
-        SmtpResult encryptResult = Encrypt(pfxFilePath, password, isSecureString);
-        if (!encryptResult.Status) {
-            return encryptResult;
-        }
+            // Encrypt the signed email
+            SmtpResult encryptResult = Encrypt(pfxFilePath, password, isSecureString);
+            if (!encryptResult.Status) {
+                return encryptResult;
+            }
 
-        return new SmtpResult(true, EmailAction.SMimeSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+            return new SmtpResult(true, EmailAction.SMimeSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+        } finally {
+            if (!isSecureString) {
+                password = new string('\0', password.Length);
+            }
+        }
     }
 
     public SmtpResult PgpEncrypt(string publicKeyPath) {
@@ -712,47 +745,65 @@ public class Smtp {
 
     public SmtpResult PgpSign(string publicKeyPath, string privateKeyPath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
-        MimeMessage message = Message;
-        using var ctx = new EphemeralOpenPgpContext(password);
-        using (var pub = File.OpenRead(publicKeyPath))
-            ctx.Import(pub);
-        using (var sec = File.OpenRead(privateKeyPath))
-            ctx.Import(new PgpSecretKeyRingBundle(new Org.BouncyCastle.Bcpg.ArmoredInputStream(sec)));
         try {
-            var signer = message.From.Mailboxes.First();
-            var signingKey = ctx.GetSigningKey(signer);
-            message.Body = MultipartSigned.Create(ctx, signingKey, DigestAlgorithm.Sha256, message.Body);
-            var signed = (MultipartSigned)message.Body;
-            var sigs = signed.Verify(ctx);
-            foreach (var sig in sigs)
-                sig.Verify();
-        } catch (Exception ex) {
-            if (ErrorAction == ActionPreference.Stop) throw;
-            return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+            MimeMessage message = Message;
+            using var ctx = new EphemeralOpenPgpContext(password);
+            using (var pub = File.OpenRead(publicKeyPath))
+                ctx.Import(pub);
+            using (var sec = File.OpenRead(privateKeyPath))
+                ctx.Import(new PgpSecretKeyRingBundle(new Org.BouncyCastle.Bcpg.ArmoredInputStream(sec)));
+            try {
+                var signer = message.From.Mailboxes.First();
+                var signingKey = ctx.GetSigningKey(signer);
+                message.Body = MultipartSigned.Create(ctx, signingKey, DigestAlgorithm.Sha256, message.Body);
+                var signed = (MultipartSigned)message.Body;
+                var sigs = signed.Verify(ctx);
+                foreach (var sig in sigs)
+                    sig.Verify();
+            } catch (Exception ex) {
+                if (ErrorAction == ActionPreference.Stop) throw;
+                return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+            }
+            Message = message;
+            return new SmtpResult(true, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+        } finally {
+            if (isSecureString) {
+                using var securePwd = SecureStringHelper.FromPlainTextString(password);
+                password = SecureStringHelper.Protect(securePwd);
+            } else {
+                password = new string('\0', password.Length);
+            }
         }
-        Message = message;
-        return new SmtpResult(true, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
     }
 
     public SmtpResult PgpSignAndEncrypt(string publicKeyPath, string privateKeyPath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
-        MimeMessage message = Message;
-        using var ctx = new EphemeralOpenPgpContext(password);
-        using (var pub = File.OpenRead(publicKeyPath))
-            ctx.Import(pub);
-        using (var sec = File.OpenRead(privateKeyPath))
-            ctx.Import(new PgpSecretKeyRingBundle(new Org.BouncyCastle.Bcpg.ArmoredInputStream(sec)));
-        var recipients = message.To.Mailboxes.Concat(message.Cc.Mailboxes).Concat(message.Bcc.Mailboxes).ToList();
         try {
-            var signingKey = ctx.GetSigningKey(message.From.Mailboxes.First());
-            var encKeys = ctx.GetPublicKeys(recipients);
-            message.Body = MultipartEncrypted.SignAndEncrypt(ctx, signingKey, DigestAlgorithm.Sha256, EncryptionAlgorithm.Cast5, encKeys, message.Body);
-        } catch (Exception ex) {
-            if (ErrorAction == ActionPreference.Stop) throw;
-            return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+            MimeMessage message = Message;
+            using var ctx = new EphemeralOpenPgpContext(password);
+            using (var pub = File.OpenRead(publicKeyPath))
+                ctx.Import(pub);
+            using (var sec = File.OpenRead(privateKeyPath))
+                ctx.Import(new PgpSecretKeyRingBundle(new Org.BouncyCastle.Bcpg.ArmoredInputStream(sec)));
+            var recipients = message.To.Mailboxes.Concat(message.Cc.Mailboxes).Concat(message.Bcc.Mailboxes).ToList();
+            try {
+                var signingKey = ctx.GetSigningKey(message.From.Mailboxes.First());
+                var encKeys = ctx.GetPublicKeys(recipients);
+                message.Body = MultipartEncrypted.SignAndEncrypt(ctx, signingKey, DigestAlgorithm.Sha256, EncryptionAlgorithm.Cast5, encKeys, message.Body);
+            } catch (Exception ex) {
+                if (ErrorAction == ActionPreference.Stop) throw;
+                return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+            }
+            Message = message;
+            return new SmtpResult(true, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+        } finally {
+            if (isSecureString) {
+                using var securePwd = SecureStringHelper.FromPlainTextString(password);
+                password = SecureStringHelper.Protect(securePwd);
+            } else {
+                password = new string('\0', password.Length);
+            }
         }
-        Message = message;
-        return new SmtpResult(true, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
     }
 
     /// <summary>
