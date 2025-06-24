@@ -250,6 +250,12 @@ public class Graph {
         var networkCredential = Credentials as NetworkCredential;
         if (networkCredential != null) {
             var userSplit = networkCredential.UserName.Split('@');
+            if (userSplit.Length != 2) {
+                throw new ArgumentException(
+                    "Credential.UserName must be in the format 'clientid@directoryid'",
+                    nameof(Credentials));
+            }
+
             ApplicationID = userSplit[0];
             ApplicationKey = networkCredential.Password;
             TenantDomain = userSplit[1];
