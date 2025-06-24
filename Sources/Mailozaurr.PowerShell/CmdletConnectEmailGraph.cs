@@ -6,9 +6,9 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// Connects to Microsoft Graph using application credentials.
 /// </summary>
-[Cmdlet(VerbsCommunications.Connect, "Graph")]
+[Cmdlet(VerbsCommunications.Connect, "EmailGraph")]
 [OutputType(typeof(GraphConnectionInfo))]
-public sealed class CmdletConnectGraph : AsyncPSCmdlet {
+public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "Credential")]
     [ValidateNotNull]
     public PSCredential? Credential { get; set; }

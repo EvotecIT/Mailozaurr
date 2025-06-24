@@ -130,7 +130,7 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - [Example-SendEmail-SignEncrypt.ps1](Examples/Example-SendEmail-SignEncrypt.ps1) - sign and encrypt an email using SMTP.
 - [Example-SendEmail-Pgp.ps1](Examples/Example-SendEmail-Pgp.ps1) - send a PGP encrypted email.
 - [Example-GraphManageMessages.ps1](Examples/Example-GraphManageMessages.ps1) - download attachments, set read state and move messages using Microsoft Graph.
-- Use `Connect-Graph` to authenticate with application credentials for Microsoft Graph.
+- Use `Connect-EmailGraph` to authenticate with application credentials for Microsoft Graph.
 - [Example-SendEmail-Attachments.ps1](Examples/Example-SendEmail-Attachments.ps1) - demonstrate file and in-memory attachments.
 - [PGP documentation](Docs/PGP.md) - overview of OpenPGP support.
 

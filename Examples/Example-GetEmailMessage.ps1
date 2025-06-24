@@ -91,4 +91,5 @@ $ClientId = 'your-client-id'
 $ClientSecret = 'your-client-secret'
 $TenantId = 'your-tenant-id'
 $cred = ConvertTo-GraphCredential -ClientId $ClientId -ClientSecret $ClientSecret -DirectoryId $TenantId
-Get-EmailMessage -UserPrincipalName 'user@example.com' -Credential $cred -HasAttachment -Limit 5
+$graph = Connect-EmailGraph -Credential $cred
+Get-EmailMessage -UserPrincipalName 'user@example.com' -Connection $graph -Graph -HasAttachment -Limit 5

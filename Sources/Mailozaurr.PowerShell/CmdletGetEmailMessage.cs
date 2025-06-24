@@ -43,37 +43,28 @@ public sealed class CmdletGetEmailMessage : AsyncPSCmdlet {
     [ValidateNotNull]
     public PopConnectionInfo? PopClient { get; set; }
 
-    [Parameter(Mandatory = true, ParameterSetName = "GraphCredential")]
-    [Parameter(Mandatory = true, ParameterSetName = "GraphConnection")]
+    [Parameter(Mandatory = true, ParameterSetName = "Graph")]
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
-    [Parameter(Mandatory = true, ParameterSetName = "GraphCredential")]
-    [ValidateNotNull]
-    public PSCredential? Credential { get; set; }
-
-    [Parameter(Mandatory = true, ParameterSetName = "GraphConnection")]
+    [Parameter(Mandatory = true, ParameterSetName = "Graph")]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
-    [Parameter(ParameterSetName = "GraphCredential")]
-    [Parameter(ParameterSetName = "GraphConnection")]
+    [Parameter(ParameterSetName = "Graph")]
     [Parameter(ParameterSetName = "MgGraphRequest")]
     public string[]? Property { get; set; }
 
-    [Parameter(ParameterSetName = "GraphCredential")]
-    [Parameter(ParameterSetName = "GraphConnection")]
+    [Parameter(ParameterSetName = "Graph")]
     [Parameter(ParameterSetName = "MgGraphRequest")]
     public string? Filter { get; set; }
 
-    [Parameter(ParameterSetName = "GraphCredential")]
-    [Parameter(ParameterSetName = "GraphConnection")]
+    [Parameter(ParameterSetName = "Graph")]
     [Parameter(ParameterSetName = "MgGraphRequest")]
     public int? Limit { get; set; }
 
-    [Parameter(Mandatory = true, ParameterSetName = "GraphCredential")]
-    [Parameter(Mandatory = true, ParameterSetName = "GraphConnection")]
+    [Parameter(Mandatory = true, ParameterSetName = "Graph")]
     public SwitchParameter Graph { get; set; }
 
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
@@ -145,8 +136,7 @@ public sealed class CmdletGetEmailMessage : AsyncPSCmdlet {
         return ParameterSetName switch {
             "IMAP" => ProcessImapAsync(),
             "POP" => ProcessPopAsync(),
-            "GraphCredential" => ProcessGraphAsync(GetGraphCredential()),
-            "GraphConnection" => ProcessGraphAsync(Connection!.Credential),
+            "Graph" => ProcessGraphAsync(Connection!.Credential),
             "MgGraphRequest" => ProcessMgGraphAsync(),
             _ => Task.CompletedTask
         };
@@ -197,9 +187,6 @@ public sealed class CmdletGetEmailMessage : AsyncPSCmdlet {
         return Task.CompletedTask;
     }
 
-    private GraphCredential GetGraphCredential() => MicrosoftGraphUtils.ConvertFromGraphCredential(
-        Credential!.UserName,
-        Credential.GetNetworkCredential().Password);
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
 

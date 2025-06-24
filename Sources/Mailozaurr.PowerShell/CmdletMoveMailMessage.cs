@@ -20,16 +20,11 @@ public class CmdletMoveMailMessage : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? DestinationFolderId { get; set; }
 
-    [Parameter(Mandatory = true, ParameterSetName = "GraphCredential")]
-    [ValidateNotNull]
-    public PSCredential? Credential { get; set; }
-
-    [Parameter(Mandatory = true, ParameterSetName = "GraphConnection")]
+    [Parameter(Mandatory = true, ParameterSetName = "Graph")]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
-    [Parameter(Mandatory = true, ParameterSetName = "GraphCredential")]
-    [Parameter(Mandatory = true, ParameterSetName = "GraphConnection")]
+    [Parameter(Mandatory = true, ParameterSetName = "Graph")]
     public SwitchParameter Graph { get; set; }
 
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
@@ -37,16 +32,11 @@ public class CmdletMoveMailMessage : AsyncPSCmdlet {
 
     protected override Task ProcessRecordAsync() {
         return ParameterSetName switch {
-            "GraphCredential" => ProcessGraphAsync(GetGraphCredential()),
-            "GraphConnection" => ProcessGraphAsync(Connection!.Credential),
+            "Graph" => ProcessGraphAsync(Connection!.Credential),
             "MgGraphRequest" => ProcessMgGraphAsync(),
             _ => Task.CompletedTask
         };
     }
-
-    private GraphCredential GetGraphCredential() => MicrosoftGraphUtils.ConvertFromGraphCredential(
-        Credential!.UserName,
-        Credential.GetNetworkCredential().Password);
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
         await MicrosoftGraphUtils.MoveMailMessageAsync(cred, UserPrincipalName!, MessageId!, DestinationFolderId!);
