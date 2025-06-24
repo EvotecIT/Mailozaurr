@@ -11,7 +11,15 @@ public class MailgunClient : IDisposable {
     public readonly Stopwatch Stopwatch;
 
     private string ApiKey => Helpers.CredentialToApiKey(Credentials);
-    private string EmailDomain => Helpers.GetEmailAddress(From).Split('@')[1];
+    private string EmailDomain {
+        get {
+            var address = Helpers.GetEmailAddress(From);
+            if (!address.Contains('@')) {
+                throw new ArgumentException($"Invalid email address: {address}", nameof(From));
+            }
+            return address.Split('@')[1];
+        }
+    }
 
     /// <summary>Credentials used to authenticate to the API.</summary>
     public ICredentials Credentials { get; set; }
