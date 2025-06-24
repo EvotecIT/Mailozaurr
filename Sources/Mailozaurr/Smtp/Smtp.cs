@@ -211,16 +211,21 @@ public class Smtp {
     /// </summary>
     /// <param name="server"></param>
     /// <param name="port"></param>
-    /// <param name="secureSocketOptions"></param>
-    /// <param name="useSsl"></param>
+    /// <param name="secureSocketOptions">Options controlling SSL/TLS usage. If left
+    /// as <see cref="SecureSocketOptions.Auto"/> and <paramref name="useSsl"/> is
+    /// <c>true</c>, <see cref="SecureSocketOptions.StartTls"/> will be used.</param>
+    /// <param name="useSsl">Compatibility switch. Overrides
+    /// <paramref name="secureSocketOptions"/> only when set to <c>true</c> and the
+    /// option is left as <see cref="SecureSocketOptions.Auto"/>.</param>
     /// <returns></returns>
     public SmtpResult Connect(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false) {
         Server = server;
         Port = port;
         try {
-            if (useSsl) {
-                // If useSsl is true, use SecureSocketOptions.StartTls, otherwise use whatever is passed in secureSocketOptions
-                // Since we are maintaining backwards compatibility with Send-MailMessage, we need to use StartTls if useSsl is true
+            if (useSsl && secureSocketOptions == SecureSocketOptions.Auto) {
+                // Maintain backwards compatibility with Send-MailMessage by
+                // defaulting to StartTls when the UseSsl flag is supplied and
+                // no explicit option was provided.
                 secureSocketOptions = SecureSocketOptions.StartTls;
             }
             Client.Connect(server, port, secureSocketOptions);

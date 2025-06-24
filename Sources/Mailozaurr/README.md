@@ -55,9 +55,15 @@ if (result.Status)
 }
 else
 {
-    Console.WriteLine($"Failed: {result.ErrorMessage}");
+Console.WriteLine($"Failed: {result.ErrorMessage}");
 }
 ```
+
+> **Note**
+> When `Connect` is called with the `useSsl` flag and
+> `SecureSocketOptions` left as `Auto`, the library automatically uses
+> `SecureSocketOptions.StartTls`. Provide an explicit option if a
+> different behaviour is required.
 
 ### Using Microsoft Graph
 
