@@ -83,6 +83,26 @@ public static class Helpers {
     }
 
     /// <summary>
+    /// Enumerates unique address objects based on email value using the provided hash set to track seen addresses.
+    /// </summary>
+    /// <param name="addresses">Collection of address objects.</param>
+    /// <param name="seen">Hash set tracking emails that were already yielded.</param>
+    /// <returns>Unique address objects.</returns>
+    public static IEnumerable<object> UniqueAddresses(IEnumerable<object>? addresses, HashSet<string> seen) {
+        if (addresses == null) yield break;
+
+        foreach (var address in addresses) {
+            var email = GetEmailAddress(address);
+            if (string.IsNullOrEmpty(email)) continue;
+
+            var lowered = email.ToLowerInvariant();
+            if (seen.Add(lowered)) {
+                yield return address;
+            }
+        }
+    }
+
+    /// <summary>
     /// Determines whether the specified exception represents a transient error
     /// that can be retried safely.
     /// </summary>

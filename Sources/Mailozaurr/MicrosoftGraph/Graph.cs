@@ -147,15 +147,16 @@ public class Graph {
     /// </summary>
     public string SentTo {
         get {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var addresses = new List<string>();
             if (To != null) {
-                addresses.AddRange(To.Select(email => email.ToString()));
+                addresses.AddRange(Helpers.UniqueAddresses(To, seen).Select(obj => Helpers.GetEmailAddress(obj)));
             }
             if (Cc != null) {
-                addresses.AddRange(Cc.Select(email => email.ToString()));
+                addresses.AddRange(Helpers.UniqueAddresses(Cc, seen).Select(obj => Helpers.GetEmailAddress(obj)));
             }
             if (Bcc != null) {
-                addresses.AddRange(Bcc.Select(email => email.ToString()));
+                addresses.AddRange(Helpers.UniqueAddresses(Bcc, seen).Select(obj => Helpers.GetEmailAddress(obj)));
             }
             return string.Join(",", addresses);
         }
@@ -213,12 +214,14 @@ public class Graph {
         // Note: The display name for the sender is controlled by Office 365 and may not reflect the value you provide here.
         // Office 365 will use the mailbox's configured display name for the sender, regardless of what is set in the payload.
         // Always use the email address for API calls and authentication.
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         MessageContainer = new GraphMessageContainer {
             Message = new GraphMessage {
                 From = ConvertToGraphEmailAddress(From),
-                To = ConvertToGraphEmailAddress(To),
-                Cc = ConvertToGraphEmailAddress(Cc),
-                Bcc = ConvertToGraphEmailAddress(Bcc),
+                To = ConvertToGraphEmailAddressUnique(To, seen),
+                Cc = ConvertToGraphEmailAddressUnique(Cc, seen),
+                Bcc = ConvertToGraphEmailAddressUnique(Bcc, seen),
                 ReplyTo = string.IsNullOrEmpty(ReplyTo) ? null : new List<GraphEmailAddress> { ConvertToGraphEmailAddress(ReplyTo)! },
                 Subject = Subject,
                 Body = new GraphContent { Content = HTML, Type = ContentType },
@@ -266,6 +269,19 @@ public class Graph {
             return null;
         }
         return emails.Select(email => new GraphEmailAddress { Email = new GraphEmail { Address = Helpers.GetEmailAddress(email) } }).ToList();
+    }
+
+    private List<GraphEmailAddress>? ConvertToGraphEmailAddressUnique(object[]? emails, HashSet<string> seen) {
+        if (emails == null) {
+            return null;
+        }
+
+        var list = new List<GraphEmailAddress>();
+        foreach (var email in Helpers.UniqueAddresses(emails, seen)) {
+            var address = Helpers.GetEmailAddress(email);
+            list.Add(new GraphEmailAddress { Email = new GraphEmail { Address = address } });
+        }
+        return list.Count == 0 ? null : list;
     }
 
     /// <summary>

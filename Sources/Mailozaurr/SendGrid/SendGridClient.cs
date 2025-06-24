@@ -113,15 +113,16 @@ public class SendGridClient {
     /// </summary>
     public string SentTo {
         get {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var addresses = new List<string>();
             if (To != null) {
-                addresses.AddRange(To.Select(ConvertToEmailObject).Where(x => x != null).Select(x => x.Email));
+                addresses.AddRange(To.Select(ConvertToEmailObject).Where(x => x != null && seen.Add(x.Email)).Select(x => x.Email));
             }
             if (Cc != null) {
-                addresses.AddRange(Cc.Select(ConvertToEmailObject).Where(x => x != null).Select(x => x.Email));
+                addresses.AddRange(Cc.Select(ConvertToEmailObject).Where(x => x != null && seen.Add(x.Email)).Select(x => x.Email));
             }
             if (Bcc != null) {
-                addresses.AddRange(Bcc.Select(ConvertToEmailObject).Where(x => x != null).Select(x => x.Email));
+                addresses.AddRange(Bcc.Select(ConvertToEmailObject).Where(x => x != null && seen.Add(x.Email)).Select(x => x.Email));
             }
             return string.Join(",", addresses);
         }
@@ -188,13 +189,28 @@ public class SendGridClient {
             }
         }
 
-        var personalizations = new List<SendGridPersonalization> {
-                new SendGridPersonalization {
-                    To = To?.Where(t => t != null).Select(ConvertToEmailObject).ToList(),
-                    Cc = Cc?.Where(c => c != null).Select(ConvertToEmailObject).ToList(),
-                    Bcc = Bcc?.Where(b => b != null).Select(ConvertToEmailObject).ToList()
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var personalizations = new List<SendGridPersonalization>
+            {
+                new SendGridPersonalization
+                {
+                    To = To?.Where(t => t != null)
+                        .Select(ConvertToEmailObject)
+                        .Where(x => x != null && seen.Add(x.Email))
+                        .ToList(),
+                    Cc = Cc?.Where(c => c != null)
+                        .Select(ConvertToEmailObject)
+                        .Where(x => x != null && seen.Add(x.Email))
+                        .ToList(),
+                    Bcc = Bcc?.Where(b => b != null)
+                        .Select(ConvertToEmailObject)
+                        .Where(x => x != null && seen.Add(x.Email))
+                        .ToList()
                 }
-            }.Where(p => p.To != null || p.Cc != null || p.Bcc != null).ToList();
+            }
+            .Where(p => p.To != null || p.Cc != null || p.Bcc != null)
+            .ToList();
 
         var content = new List<SendGridContent> {
                 new SendGridContent { Type = "text/plain", Value = Text },

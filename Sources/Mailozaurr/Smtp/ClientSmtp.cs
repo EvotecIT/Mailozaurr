@@ -35,15 +35,16 @@ public partial class ClientSmtp : SmtpClient {
     /// <summary>Comma separated list of all recipients.</summary>
     public string SentTo {
         get {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var addresses = new List<string>();
             if (To != null) {
-                addresses.AddRange(To.Select(ConvertToMailboxAddress).SelectMany(x => x).Select(x => x.Address));
+                addresses.AddRange(ConvertToMailboxAddressesUnique(To, seen).Select(x => x.Address));
             }
             if (Cc != null) {
-                addresses.AddRange(Cc.Select(ConvertToMailboxAddress).SelectMany(x => x).Select(x => x.Address));
+                addresses.AddRange(ConvertToMailboxAddressesUnique(Cc, seen).Select(x => x.Address));
             }
             if (Bcc != null) {
-                addresses.AddRange(Bcc.Select(ConvertToMailboxAddress).SelectMany(x => x).Select(x => x.Address));
+                addresses.AddRange(ConvertToMailboxAddressesUnique(Bcc, seen).Select(x => x.Address));
             }
             return string.Join(",", addresses);
         }
@@ -111,16 +112,18 @@ public partial class ClientSmtp : SmtpClient {
             message.From.Add(fromAddresses.First());
         }
 
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         if (To != null && To.Any()) {
-            message.To.AddRange(To.SelectMany(ConvertToMailboxAddress));
+            message.To.AddRange(ConvertToMailboxAddressesUnique(To, seen));
         }
 
         if (Cc != null && Cc.Any()) {
-            message.Cc.AddRange(Cc.SelectMany(ConvertToMailboxAddress));
+            message.Cc.AddRange(ConvertToMailboxAddressesUnique(Cc, seen));
         }
 
         if (Bcc != null && Bcc.Any()) {
-            message.Bcc.AddRange(Bcc.SelectMany(ConvertToMailboxAddress));
+            message.Bcc.AddRange(ConvertToMailboxAddressesUnique(Bcc, seen));
         }
 
         if (ReplyTo != null) {
@@ -205,6 +208,18 @@ public partial class ClientSmtp : SmtpClient {
     /// <param name="path">Destination file path.</param>
     public void SaveMessage(string path) {
         Message.WriteTo(path);
+    }
+
+    private IEnumerable<MailboxAddress> ConvertToMailboxAddressesUnique(IEnumerable<object>? inputs, HashSet<string> seen) {
+        if (inputs == null) yield break;
+        foreach (var input in inputs) {
+            foreach (var address in ConvertToMailboxAddress(input)) {
+                var lowered = address.Address.ToLowerInvariant();
+                if (seen.Add(lowered)) {
+                    yield return address;
+                }
+            }
+        }
     }
 
     private IEnumerable<MailboxAddress> ConvertToMailboxAddress(object input) {

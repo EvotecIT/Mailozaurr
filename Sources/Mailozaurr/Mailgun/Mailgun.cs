@@ -56,10 +56,11 @@ public class MailgunClient : IDisposable {
     public string SentFrom => Helpers.GetEmailAddress(From);
     public string SentTo {
         get {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var addresses = new List<string>();
-            if (To != null) addresses.AddRange(To.Select(Helpers.GetEmailAddress));
-            if (Cc != null) addresses.AddRange(Cc.Select(Helpers.GetEmailAddress));
-            if (Bcc != null) addresses.AddRange(Bcc.Select(Helpers.GetEmailAddress));
+            if (To != null) addresses.AddRange(Helpers.UniqueAddresses(To, seen).Select(Helpers.GetEmailAddress));
+            if (Cc != null) addresses.AddRange(Helpers.UniqueAddresses(Cc, seen).Select(Helpers.GetEmailAddress));
+            if (Bcc != null) addresses.AddRange(Helpers.UniqueAddresses(Bcc, seen).Select(Helpers.GetEmailAddress));
             return string.Join(",", addresses);
         }
     }
@@ -89,9 +90,10 @@ public class MailgunClient : IDisposable {
     private MultipartFormDataContent CreateContent() {
         var content = new MultipartFormDataContent();
         content.Add(new StringContent(ConvertAddress(From)), "from");
-        foreach (var t in To) content.Add(new StringContent(ConvertAddress(t)), "to");
-        foreach (var c in Cc) content.Add(new StringContent(ConvertAddress(c)), "cc");
-        foreach (var b in Bcc) content.Add(new StringContent(ConvertAddress(b)), "bcc");
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var t in Helpers.UniqueAddresses(To, seen)) content.Add(new StringContent(ConvertAddress(t)), "to");
+        foreach (var c in Helpers.UniqueAddresses(Cc, seen)) content.Add(new StringContent(ConvertAddress(c)), "cc");
+        foreach (var b in Helpers.UniqueAddresses(Bcc, seen)) content.Add(new StringContent(ConvertAddress(b)), "bcc");
         if (ReplyTo != null) content.Add(new StringContent(ConvertAddress(ReplyTo)), "h:Reply-To");
         if (!string.IsNullOrEmpty(Subject)) content.Add(new StringContent(Subject), "subject");
         if (!string.IsNullOrEmpty(Text)) content.Add(new StringContent(Text), "text");
