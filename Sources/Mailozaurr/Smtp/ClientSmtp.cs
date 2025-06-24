@@ -207,6 +207,10 @@ public partial class ClientSmtp : SmtpClient {
     /// </summary>
     /// <param name="path">Destination file path.</param>
     public void SaveMessage(string path) {
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory)) {
+            Directory.CreateDirectory(directory);
+        }
         Message.WriteTo(path);
     }
 
