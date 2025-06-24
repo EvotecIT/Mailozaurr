@@ -321,8 +321,11 @@ namespace Mailozaurr {
                     try {
                         var bytes = Convert.FromBase64String(att.ContentBytes);
                         File.WriteAllBytes(filePath, bytes);
+                    } catch (FormatException fex) {
+                        // Invalid Base64 content
+                        LoggingMessages.Logger.WriteWarning($"SaveAttachment - Invalid base64 content for {att.Name}. Error: {fex.Message}");
                     } catch (Exception ex) {
-                        // Log or handle error
+                        // Log or handle other errors
                         LoggingMessages.Logger.WriteWarning($"SaveAttachment - Couldn't save file to {filePath}. Error: {ex.Message}");
                     }
                 }
