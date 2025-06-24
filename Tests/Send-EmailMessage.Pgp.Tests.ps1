@@ -6,4 +6,16 @@ Describe 'Send-EmailMessage - PGP' {
             -SignOrEncrypt PgpSignAndEncrypt -PublicKeyPath $pub -PrivateKeyPath $sec -PrivateKeyPassword 'no.secret'
         $result.Error | Should -Be 'Email not sent (WhatIf)'
     }
+
+    It 'Returns error when key files are missing' {
+        $smtp = [Mailozaurr.Smtp]::new()
+        $smtp.From = 'a@b.com'
+        $smtp.To = @('c@d.com')
+        $smtp.Subject = 'Test'
+        $smtp.TextBody = 'Body'
+        $smtp.CreateMessage()
+        $result = $smtp.PgpSignAndEncrypt('missing.pub', 'missing.sec', '', $false)
+        $result.Error | Should -Match 'file not found'
+        $result.Status | Should -Be $false
+    }
 }
