@@ -694,6 +694,12 @@ public class Smtp {
     }
 
     public SmtpResult PgpEncrypt(string publicKeyPath) {
+        if (!File.Exists(publicKeyPath)) {
+            string messageText = $"Public key file not found: {publicKeyPath}";
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
+            return new SmtpResult(false, EmailAction.PgpEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
+        }
+
         MimeMessage message = Message;
         using var ctx = new EphemeralOpenPgpContext();
         using (var pub = File.OpenRead(publicKeyPath))
@@ -714,6 +720,17 @@ public class Smtp {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         MimeMessage message = Message;
         using var ctx = new EphemeralOpenPgpContext(password);
+        if (!File.Exists(publicKeyPath)) {
+            string messageText = $"Public key file not found: {publicKeyPath}";
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
+            return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
+        }
+        if (!File.Exists(privateKeyPath)) {
+            string messageText = $"Private key file not found: {privateKeyPath}";
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
+            return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
+        }
+
         using (var pub = File.OpenRead(publicKeyPath))
             ctx.Import(pub);
         using (var sec = File.OpenRead(privateKeyPath))
@@ -738,6 +755,17 @@ public class Smtp {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         MimeMessage message = Message;
         using var ctx = new EphemeralOpenPgpContext(password);
+        if (!File.Exists(publicKeyPath)) {
+            string messageText = $"Public key file not found: {publicKeyPath}";
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
+            return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
+        }
+        if (!File.Exists(privateKeyPath)) {
+            string messageText = $"Private key file not found: {privateKeyPath}";
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
+            return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
+        }
+
         using (var pub = File.OpenRead(publicKeyPath))
             ctx.Import(pub);
         using (var sec = File.OpenRead(privateKeyPath))
