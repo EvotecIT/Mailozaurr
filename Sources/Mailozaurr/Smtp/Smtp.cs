@@ -439,7 +439,9 @@ public class Smtp {
     /// Disconnects from the SMTP server.
     /// </summary>
     public void Disconnect() {
-        Client.Disconnect(true);
+        if (Client.IsConnected) {
+            Client.Disconnect(true);
+        }
         Stopwatch.Stop();
     }
 
@@ -447,7 +449,9 @@ public class Smtp {
     /// Releases the SMTP connection and associated resources.
     /// </summary>
     public void Dispose() {
-        Disconnect();
+        if (Client.IsConnected) {
+            Client.Disconnect(true);
+        }
         Client.Dispose();
         Stopwatch.Stop();
     }
