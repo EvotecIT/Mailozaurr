@@ -240,10 +240,6 @@ public class SendGridClient {
     /// </summary>
     /// <returns>A Task that represents the asynchronous operation. The task result contains the result of the email sending operation.</returns>
     public async Task<SmtpResult> SendEmailAsync() {
-        var request = new HttpRequestMessage(HttpMethod.Post, "https://api.sendgrid.com/v3/mail/send") {
-            Content = new StringContent(MessageJson, Encoding.UTF8, "application/json")
-        };
-
         string apiKey;
         try {
             var networkCredential = Credentials as NetworkCredential;
@@ -258,14 +254,17 @@ public class SendGridClient {
             return credFail;
         }
 
-        request.Headers.Add("Authorization", $"Bearer {apiKey}");
-
         int attempts = 0;
         Exception? lastException = null;
         string? lastContent = null;
         do {
             try {
-                var response = await _client.SendAsync(request);
+                using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.sendgrid.com/v3/mail/send") {
+                    Content = new StringContent(MessageJson, Encoding.UTF8, "application/json")
+                };
+                request.Headers.Add("Authorization", $"Bearer {apiKey}");
+
+                using var response = await _client.SendAsync(request);
                 lastContent = await response.Content.ReadAsStringAsync();
                 LogCollector.LogVerbose($"Send-EmailMessage - Sent email to {SentTo} using SendGrid");
 

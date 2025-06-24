@@ -341,21 +341,18 @@ public class Graph {
         // create message
         CreateMessage();
         LogCollector.LogVerbose("Send-EmailMessage - Sending email via Graph API");
-        // Create the HTTP request.
+        // Create the request URI outside the loop.
         var requestUri = "https://graph.microsoft.com/v1.0/users/" + MessageContainer.Message.From.Email.Address + "/sendMail";
-        var request = new HttpRequestMessage(HttpMethod.Post, requestUri) {
-            Content = new StringContent(MessageJson, Encoding.UTF8, "application/json")
-        };
-        //LoggingMessages.Logger.WriteVerbose($"Url: {requestUri}");
-        //LoggingMessages.Logger.WriteVerbose($"AccessToken Before Sent: {TokenType} {AccessToken}");
-
-        // Add the authorization header.
-        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
 
         int attempts = 0;
         Exception? lastException = null;
         do {
             try {
+                using var request = new HttpRequestMessage(HttpMethod.Post, requestUri) {
+                    Content = new StringContent(MessageJson, Encoding.UTF8, "application/json")
+                };
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
+
                 using var response = await _client.SendAsync(request);
                 var content = await response.Content.ReadAsStringAsync();
                 if (response.IsSuccessStatusCode) {
@@ -440,7 +437,7 @@ public class Graph {
     public async Task<SmtpResult> SendDraftMessage(GraphMessage draftMessage) {
         // Send the draft message
         var sendRequestUri = $"https://graph.microsoft.com/v1.0/users/{MessageContainer.Message.From.Email.Address}/messages/{draftMessage.Id}/send";
-        var sendRequest = new HttpRequestMessage(HttpMethod.Post, sendRequestUri);
+        using var sendRequest = new HttpRequestMessage(HttpMethod.Post, sendRequestUri);
 
         // Add the authorization header
         sendRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
