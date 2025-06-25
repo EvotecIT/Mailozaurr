@@ -21,7 +21,7 @@ public class GraphUploadRangeTests
             "PrepareByteArrayContentForUpload",
             BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.NotNull(method);
-        Task<List<ByteArrayContent>> task = (Task<List<ByteArrayContent>>)method!.Invoke(graph, new object[] { tmp, 10 })!;
+        Task<List<ByteArrayContent>> task = (Task<List<ByteArrayContent>>)method!.Invoke(graph, new object[] { tmp, 10, default(System.Threading.CancellationToken) })!;
         List<ByteArrayContent> chunks = await task;
         File.Delete(tmp);
         Assert.Equal(3, chunks.Count);

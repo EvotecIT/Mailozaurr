@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Security;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 
 namespace Mailozaurr;
 
@@ -129,7 +130,7 @@ public static class Helpers {
         }
     }
 
-    public static async Task PostWebhookAsync(string? url, SmtpResult result) {
+    public static async Task PostWebhookAsync(string? url, SmtpResult result, CancellationToken cancellationToken = default) {
         if (string.IsNullOrEmpty(url)) {
             return;
         }

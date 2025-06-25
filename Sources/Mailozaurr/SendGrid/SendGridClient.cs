@@ -1,4 +1,6 @@
-﻿namespace Mailozaurr;
+﻿using System.Threading;
+
+namespace Mailozaurr;
 
 /// <summary>
 /// A client for sending emails using the SendGrid API.
@@ -239,7 +241,7 @@ public class SendGridClient {
     /// Sends an email asynchronously using the SendGrid API.
     /// </summary>
     /// <returns>A Task that represents the asynchronous operation. The task result contains the result of the email sending operation.</returns>
-    public async Task<SmtpResult> SendEmailAsync() {
+    public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken = default) {
         string apiKey;
         try {
             var networkCredential = Credentials as NetworkCredential;
@@ -250,7 +252,7 @@ public class SendGridClient {
                 throw;
             }
             var credFail = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, "", ex.Message);
-            await Helpers.PostWebhookAsync(WebhookUrl, credFail);
+            await Helpers.PostWebhookAsync(WebhookUrl, credFail, cancellationToken);
             return credFail;
         }
 
@@ -264,13 +266,13 @@ public class SendGridClient {
                 };
                 request.Headers.Add("Authorization", $"Bearer {apiKey}");
 
-                using var response = await _client.SendAsync(request);
+                using var response = await _client.SendAsync(request, cancellationToken);
                 lastContent = await response.Content.ReadAsStringAsync();
                 LogCollector.LogVerbose($"Send-EmailMessage - Sent email to {SentTo} using SendGrid");
 
                 if (response.IsSuccessStatusCode) {
                     var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, response.StatusCode.ToString());
-                    await Helpers.PostWebhookAsync(WebhookUrl, okResult);
+                    await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken);
                     return okResult;
                 }
 
@@ -285,20 +287,20 @@ public class SendGridClient {
                         throw lastException;
                     }
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
-                    await Helpers.PostWebhookAsync(WebhookUrl, failResult);
+                    await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
                     return failResult;
                 }
 
                 var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
                 if (delayMilliseconds > 0) {
-                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds));
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken);
                 }
             }
             attempts++;
         } while (attempts <= RetryCount);
 
         var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
-        await Helpers.PostWebhookAsync(WebhookUrl, finalResult);
+        await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken);
         return finalResult;
     }
 
