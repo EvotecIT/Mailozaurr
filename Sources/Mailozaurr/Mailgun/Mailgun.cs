@@ -147,8 +147,9 @@ public class MailgunClient : IDisposable {
         Exception? lastException = null;
         do {
             try {
+                using var content = CreateContent();
                 using var request = new HttpRequestMessage(HttpMethod.Post, url) {
-                    Content = CreateContent()
+                    Content = content
                 };
                 request.Headers.Authorization = new AuthenticationHeaderValue("Basic", auth);
                 var response = await _client.SendAsync(request);
