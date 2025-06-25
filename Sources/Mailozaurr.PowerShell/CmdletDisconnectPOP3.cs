@@ -5,23 +5,23 @@ using MailKit.Net.Pop3;
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
-/// <para type="synopsis">Disconnects an active POP3 connection previously established with Connect-POP.</para>
-/// <para type="description">The <c>Disconnect-POP</c> cmdlet disconnects an active MailKit POP3 client session. Pass the <see cref="PopConnectionInfo"/> object returned by <c>Connect-POP</c> to this cmdlet to safely close the connection and release resources.</para>
+/// <para type="synopsis">Disconnects an active POP3 connection previously established with Connect-POP3.</para>
+/// <para type="description">The <c>Disconnect-POP3</c> cmdlet disconnects an active MailKit POP3 client session. Pass the <see cref="PopConnectionInfo"/> object returned by <c>Connect-POP3</c> to this cmdlet to safely close the connection and release resources.</para>
 /// <example>
 ///   <summary>Disconnect a POP3 client</summary>
-///   <code>$client = Connect-POP ...; Disconnect-POP -Client $client</code>
+///   <code>$client = Connect-POP3 ...; Disconnect-POP3 -Client $client</code>
 /// </example>
 /// <remarks>
 /// Always disconnect POP3 sessions to avoid resource leaks and server-side session limits.
 /// </remarks>
-/// <seealso cref="CmdletConnectPOP"/>
+/// <seealso cref="CmdletConnectPOP3"/>
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
-[Cmdlet(VerbsCommunications.Disconnect, "POP")]
-[Alias("Disconnect-POP3")]
-public sealed class CmdletDisconnectPOP : AsyncPSCmdlet {
+[Cmdlet(VerbsCommunications.Disconnect, "POP3")]
+[Alias("Disconnect-POP")]
+public sealed class CmdletDisconnectPOP3 : AsyncPSCmdlet {
     /// <summary>
-    /// <para type="description">The <see cref="PopConnectionInfo"/> object containing the MailKit POP3 client instance to disconnect. This is the object returned by <c>Connect-POP</c>.</para>
+    /// <para type="description">The <see cref="PopConnectionInfo"/> object containing the MailKit POP3 client instance to disconnect. This is the object returned by <c>Connect-POP3</c>.</para>
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
     [ValidateNotNull]
@@ -37,10 +37,10 @@ public sealed class CmdletDisconnectPOP : AsyncPSCmdlet {
                 try {
                     data.Disconnect(true);
                 } catch (System.Exception ex) {
-                    WriteWarning($"Disconnect-POP - Unable to disconnect: {ex.Message}");
+                    WriteWarning($"Disconnect-POP3 - Unable to disconnect: {ex.Message}");
                 }
             } else {
-                WriteWarning("Disconnect-POP - The provided object does not contain a valid Data property of type Pop3Client.");
+                WriteWarning("Disconnect-POP3 - The provided object does not contain a valid Data property of type Pop3Client.");
             }
         }
         return Task.CompletedTask;

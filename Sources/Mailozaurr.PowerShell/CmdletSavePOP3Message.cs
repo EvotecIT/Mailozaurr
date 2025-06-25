@@ -6,22 +6,22 @@ namespace Mailozaurr.PowerShell;
 
 /// <summary>
 /// <para type="synopsis">Saves a POP3 message to disk at the specified path.</para>
-/// <para type="description">The <c>Save-POPMessage</c> cmdlet saves a message from a POP3 mailbox (using a <see cref="PopConnectionInfo"/> object from <c>Connect-POP</c>) to disk at the specified path. Use this to archive, export, or process messages retrieved from a POP3 server.</para>
+/// <para type="description">The <c>Save-POP3Message</c> cmdlet saves a message from a POP3 mailbox (using a <see cref="PopConnectionInfo"/> object from <c>Connect-POP3</c>) to disk at the specified path. Use this to archive, export, or process messages retrieved from a POP3 server.</para>
 /// <example>
 ///   <summary>Save a POP3 message to a file</summary>
-///   <code>$client = Connect-POP ...; Save-POPMessage -Client $client -Index 0 -Path "C:\Mail\message.eml"</code>
+///   <code>$client = Connect-POP3 ...; Save-POP3Message -Client $client -Index 0 -Path "C:\Mail\message.eml"</code>
 /// </example>
 /// <remarks>
 /// Use this cmdlet to export or archive messages for backup, migration, or compliance scenarios.
 /// </remarks>
-/// <seealso cref="CmdletConnectPOP"/>
+/// <seealso cref="CmdletConnectPOP3"/>
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
-[Cmdlet(VerbsData.Save, "POPMessage")]
-[Alias("Save-POP3Message")]
-public sealed class CmdletSavePOPMessage : AsyncPSCmdlet {
+[Cmdlet(VerbsData.Save, "POP3Message")]
+[Alias("Save-POPMessage")]
+public sealed class CmdletSavePOP3Message : AsyncPSCmdlet {
     /// <summary>
-    /// <para type="description">The <see cref="PopConnectionInfo"/> object representing the active POP3 connection. This is the object returned by <c>Connect-POP</c>.</para>
+    /// <para type="description">The <see cref="PopConnectionInfo"/> object representing the active POP3 connection. This is the object returned by <c>Connect-POP3</c>.</para>
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
     [ValidateNotNull]

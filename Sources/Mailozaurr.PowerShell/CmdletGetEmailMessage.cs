@@ -18,13 +18,13 @@ namespace Mailozaurr.PowerShell;
 /// </example>
 /// <example>
 ///   <summary>Get POP3 messages received today</summary>
-///   <code>$pop = Connect-POP ...; Get-EmailMessage -PopClient $pop -Since (Get-Date).Date</code>
+///   <code>$pop = Connect-POP3 ...; Get-EmailMessage -PopClient $pop -Since (Get-Date).Date</code>
 /// </example>
 /// <remarks>
 /// Use this cmdlet to retrieve and filter messages from IMAP or POP3 servers for automation or archiving tasks.
 /// </remarks>
 /// <seealso cref="CmdletConnectIMAP"/>
-/// <seealso cref="CmdletConnectPOP"/>
+/// <seealso cref="CmdletConnectPOP3"/>
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "EmailMessage")]
 [OutputType(typeof(MimeMessage))]
@@ -37,7 +37,7 @@ public sealed class CmdletGetEmailMessage : AsyncPSCmdlet {
     public ImapConnectionInfo? ImapClient { get; set; }
 
     /// <summary>
-    /// <para type="description">Active POP3 connection object returned by <c>Connect-POP</c>.</para>
+    /// <para type="description">Active POP3 connection object returned by <c>Connect-POP3</c>.</para>
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "POP", ValueFromPipeline = true)]
     [ValidateNotNull]
