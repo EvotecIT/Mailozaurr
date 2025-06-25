@@ -15,3 +15,5 @@ foreach ($m in $messages) {
     Set-MailMessage -UserPrincipalName 'user@example.com' -MessageId $m.Id -Connection $graph -Read
     Move-MailMessage -UserPrincipalName 'user@example.com' -MessageId $m.Id -DestinationFolderId 'Archive' -Connection $graph
 }
+
+Disconnect-EmailGraph -Connection $graph

@@ -1,7 +1,7 @@
 ﻿@{
     AliasesToExport      = @('Connect-POP3', 'Disconnect-POP3', 'Get-POP3Message', 'Save-POP3Message')
     Author               = 'Przemyslaw Klys'
-    CmdletsToExport      = @('Connect-EmailGraph', 'Connect-IMAP', 'Connect-OAuthGoogle', 'Connect-OAuthO365', 'Connect-POP', 'ConvertFrom-EmlToMsg', 'ConvertTo-GraphCredential', 'ConvertTo-GraphCertificateCredential', 'ConvertTo-OAuth2Credential', 'ConvertTo-SendGridCredential', 'ConvertTo-MailgunCredential', 'Disconnect-IMAP', 'Disconnect-POP', 'Get-IMAPFolder', 'Get-IMAPMessage', 'Get-EmailMessage', 'Get-MailFolder', 'Get-MailMessageAttachment', 'Get-POPMessage', 'Import-MailFile', 'Move-MailMessage', 'Set-MailMessage', 'Save-MailMessageAttachment', 'Save-MailMessage', 'Save-POPMessage', 'Send-EmailMessage', 'Test-EmailAddress')
+    CmdletsToExport      = @('Connect-EmailGraph', 'Connect-IMAP', 'Connect-OAuthGoogle', 'Connect-OAuthO365', 'Connect-POP', 'ConvertFrom-EmlToMsg', 'ConvertTo-GraphCredential', 'ConvertTo-GraphCertificateCredential', 'ConvertTo-OAuth2Credential', 'ConvertTo-SendGridCredential', 'ConvertTo-MailgunCredential', 'Disconnect-EmailGraph', 'Disconnect-IMAP', 'Disconnect-POP', 'Get-IMAPFolder', 'Get-IMAPMessage', 'Get-EmailMessage', 'Get-MailFolder', 'Get-MailMessageAttachment', 'Get-POPMessage', 'Import-MailFile', 'Move-MailMessage', 'Set-MailMessage', 'Save-MailMessageAttachment', 'Save-MailMessage', 'Save-POPMessage', 'Send-EmailMessage', 'Test-EmailAddress')
     CompanyName          = 'Evotec'
     CompatiblePSEditions = @('Desktop', 'Core')
     Copyright            = '(c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.'

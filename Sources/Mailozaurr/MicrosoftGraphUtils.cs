@@ -15,7 +15,9 @@ namespace Mailozaurr {
     public class GraphCredential {
         public string ClientId { get; set; }
         public string DirectoryId { get; set; }
-        public string ClientSecret { get; set; }
+        public string? ClientSecret { get; set; }
+        public string? CertificatePath { get; set; }
+        public string? CertificatePassword { get; set; }
     }
 
     /// <summary>
@@ -66,12 +68,23 @@ namespace Mailozaurr {
         /// Connects to O365 Graph and returns the Authorization header value ("Bearer ...").
         /// </summary>
         public static async Task<string> ConnectO365GraphAsync(GraphCredential credential, string tenantDomain, string resource = "https://manage.office.com") {
+            if (!string.IsNullOrEmpty(credential.CertificatePath)) {
+                var scopes = new[] { $"{resource}/.default" };
+                var auth = await OAuthHelpers.AcquireGraphCertificateTokenAsync(
+                    credential.ClientId,
+                    tenantDomain,
+                    credential.CertificatePath,
+                    credential.CertificatePassword ?? string.Empty,
+                    scopes);
+                return $"{auth.TokenType} {auth.AccessToken}";
+            }
+
             var body = new Dictionary<string, string>
             {
-                {"grant_type", "client_credentials"},
-                {"resource", resource},
-                {"client_id", credential.ClientId},
-                {"client_secret", credential.ClientSecret}
+                { "grant_type", "client_credentials" },
+                { "resource", resource },
+                { "client_id", credential.ClientId },
+                { "client_secret", credential.ClientSecret }
             };
             var content = new FormUrlEncodedContent(body);
             var url = $"https://login.microsoftonline.com/{tenantDomain}/oauth2/token";
@@ -81,10 +94,9 @@ namespace Mailozaurr {
                 throw new Exception($"ConnectO365GraphAsync - Error: {error}");
             }
             var json = await response.Content.ReadAsStringAsync();
-                // Parse JSON for access_token and token_type
-                var token = System.Text.Json.JsonDocument.Parse(json);
-                var accessToken = token.RootElement.GetProperty("access_token").GetString();
-                var tokenType = token.RootElement.GetProperty("token_type").GetString();
+            var token = System.Text.Json.JsonDocument.Parse(json);
+            var accessToken = token.RootElement.GetProperty("access_token").GetString();
+            var tokenType = token.RootElement.GetProperty("token_type").GetString();
             return $"{tokenType} {accessToken}";
         }
 
