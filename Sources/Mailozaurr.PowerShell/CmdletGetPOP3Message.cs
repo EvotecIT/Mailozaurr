@@ -6,26 +6,26 @@ namespace Mailozaurr.PowerShell;
 
 /// <summary>
 /// <para type="synopsis">Retrieves messages from a POP3 mailbox using an active POP3 connection.</para>
-/// <para type="description">The <c>Get-POPMessage</c> cmdlet retrieves one or more messages from a POP3 mailbox using the provided <see cref="PopConnectionInfo"/> object (from <c>Connect-POP</c>). You can specify the message index, count, or use <c>-All</c> to retrieve all messages. Returns message objects for further automation or archiving.</para>
+/// <para type="description">The <c>Get-POP3Message</c> cmdlet retrieves one or more messages from a POP3 mailbox using the provided <see cref="PopConnectionInfo"/> object (from <c>Connect-POP3</c>). You can specify the message index, count, or use <c>-All</c> to retrieve all messages. Returns message objects for further automation or archiving.</para>
 /// <example>
 ///   <summary>Get the first message from a POP3 mailbox</summary>
-///   <code>$client = Connect-POP ...; Get-POPMessage -Client $client -Index 0</code>
+///   <code>$client = Connect-POP3 ...; Get-POP3Message -Client $client -Index 0</code>
 /// </example>
 /// <example>
 ///   <summary>Get all messages from a POP3 mailbox</summary>
-///   <code>$client = Connect-POP ...; Get-POPMessage -Client $client -All</code>
+///   <code>$client = Connect-POP3 ...; Get-POP3Message -Client $client -All</code>
 /// </example>
 /// <remarks>
 /// Use this cmdlet to enumerate or download messages from a POP3 mailbox for backup, migration, or processing.
 /// </remarks>
-/// <seealso cref="CmdletConnectPOP"/>
+/// <seealso cref="CmdletConnectPOP3"/>
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
-[Cmdlet(VerbsCommon.Get, "POPMessage")]
-[Alias("Get-POP3Message")]
-public sealed class CmdletGetPOPMessage : AsyncPSCmdlet {
+[Cmdlet(VerbsCommon.Get, "POP3Message")]
+[Alias("Get-POPMessage")]
+public sealed class CmdletGetPOP3Message : AsyncPSCmdlet {
     /// <summary>
-    /// <para type="description">The <see cref="PopConnectionInfo"/> object representing the active POP3 connection. This is the object returned by <c>Connect-POP</c>.</para>
+    /// <para type="description">The <see cref="PopConnectionInfo"/> object representing the active POP3 connection. This is the object returned by <c>Connect-POP3</c>.</para>
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
     [ValidateNotNull]

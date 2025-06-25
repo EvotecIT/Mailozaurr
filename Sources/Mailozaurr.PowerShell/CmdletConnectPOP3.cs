@@ -6,31 +6,31 @@ namespace Mailozaurr.PowerShell;
 
 /// <summary>
 /// <para type="synopsis">Connects to a POP3 server and authenticates using credentials, OAuth2, or clear text.</para>
-/// <para type="description">The <c>Connect-POP</c> cmdlet establishes a connection to a POP3 server using MailKit. It supports multiple authentication methods, including OAuth2, PSCredential, and clear text username/password. The cmdlet returns a <see cref="PopConnectionInfo"/> object containing connection details and the authenticated client for further use in subsequent cmdlets.</para>
+/// <para type="description">The <c>Connect-POP3</c> cmdlet establishes a connection to a POP3 server using MailKit. It supports multiple authentication methods, including OAuth2, PSCredential, and clear text username/password. The cmdlet returns a <see cref="PopConnectionInfo"/> object containing connection details and the authenticated client for further use in subsequent cmdlets.</para>
 /// <para type="description">Supports advanced options such as certificate validation skipping, custom timeouts, and secure socket options. Designed for secure, flexible, and scriptable POP3 connectivity in PowerShell automation scenarios.</para>
 /// <example>
 ///   <summary>Connect to a POP3 server using credentials</summary>
-///   <code>Connect-POP -Server "pop.example.com" -Credential (Get-Credential)</code>
+///   <code>Connect-POP3 -Server "pop.example.com" -Credential (Get-Credential)</code>
 /// </example>
 /// <example>
 ///   <summary>Connect to Gmail POP3 using OAuth2</summary>
 ///   <code>$cred = Connect-OAuthGoogle -GmailAccount "user@gmail.com" -ClientID "id" -ClientSecret "secret"
-/// Connect-POP -Server "pop.gmail.com" -Credential $cred -oAuth2</code>
+/// Connect-POP3 -Server "pop.gmail.com" -Credential $cred -oAuth2</code>
 /// </example>
 /// <example>
 ///   <summary>Connect to a POP3 server with clear text username and password</summary>
-///   <code>Connect-POP -Server "pop.example.com" -UserName "user" -Password "pass"</code>
+///   <code>Connect-POP3 -Server "pop.example.com" -UserName "user" -Password "pass"</code>
 /// </example>
 /// <remarks>
 /// For OAuth2, use the <c>Connect-OAuthGoogle</c> or <c>Connect-OAuthO365</c> cmdlets to obtain a credential object.
 /// </remarks>
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
-/// <seealso cref="CmdletDisconnectPOP"/>
-/// <seealso cref="CmdletGetPOPMessage"/>
+/// <seealso cref="CmdletDisconnectPOP3"/>
+/// <seealso cref="CmdletGetPOP3Message"/>
 /// </summary>
-[Cmdlet(VerbsCommunications.Connect, "POP")]
-[Alias("Connect-POP3")]
-public sealed class CmdletConnectPOP : AsyncPSCmdlet {
+[Cmdlet(VerbsCommunications.Connect, "POP3")]
+[Alias("Connect-POP")]
+public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Specifies the POP3 server hostname or IP address to connect to.</para>
     /// </summary>
@@ -112,14 +112,14 @@ public sealed class CmdletConnectPOP : AsyncPSCmdlet {
     /// Connects to the POP3 server and returns a <see cref="PopConnectionInfo"/> object with connection and client details.
     /// </summary>
     /// <remarks>
-    /// Use the returned object with <c>Disconnect-POP</c> or <c>Get-POPMessage</c> for further operations.
+    /// Use the returned object with <c>Disconnect-POP3</c> or <c>Get-POP3Message</c> for further operations.
     /// </remarks>
     protected override async Task ProcessRecordAsync() {
         var client = new Pop3Client();
         try {
             await client.ConnectAsync(Server, Port, Options);
         } catch (Exception ex) {
-            WriteWarning($"Connect-POP - Unable to connect: {ex.Message}");
+            WriteWarning($"Connect-POP3 - Unable to connect: {ex.Message}");
             return;
         }
 
@@ -148,17 +148,17 @@ public sealed class CmdletConnectPOP : AsyncPSCmdlet {
                     var password = Credential.Password is SecureString ss ? new System.Net.NetworkCredential("", ss).Password : Credential.GetNetworkCredential().Password;
                     await client.AuthenticateAsync(username, password);
                 } else {
-                    WriteWarning("Connect-POP - No valid authentication method provided.");
+                    WriteWarning("Connect-POP3 - No valid authentication method provided.");
                     await client.DisconnectAsync(true);
                     return;
                 }
             } catch (Exception ex) {
-                WriteWarning($"Connect-POP - Unable to authenticate: {ex.Message}");
+                WriteWarning($"Connect-POP3 - Unable to authenticate: {ex.Message}");
                 await client.DisconnectAsync(true);
                 return;
             }
         } else {
-            WriteWarning("Connect-POP - Client is not connected after ConnectAsync.");
+            WriteWarning("Connect-POP3 - Client is not connected after ConnectAsync.");
             return;
         }
 
@@ -183,7 +183,7 @@ public sealed class CmdletConnectPOP : AsyncPSCmdlet {
             };
             WriteObject(info);
         } else {
-            WriteWarning("Connect-POP - Authentication failed.");
+            WriteWarning("Connect-POP3 - Authentication failed.");
             await client.DisconnectAsync(true);
         }
     }
