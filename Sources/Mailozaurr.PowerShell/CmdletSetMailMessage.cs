@@ -28,18 +28,22 @@ public class CmdletSetMailMessage : AsyncPSCmdlet {
     public SwitchParameter MgGraphRequest { get; set; }
 
     protected override Task ProcessRecordAsync() {
-        return ParameterSetName switch {
-            "Graph" => ProcessGraphAsync(Connection!.Credential),
-            "MgGraphRequest" => ProcessMgGraphAsync(),
-            _ => Task.CompletedTask
-        };
+        switch (ParameterSetName) {
+            case "Graph":
+                return ProcessGraphAsync(Connection!.Credential);
+            case "MgGraphRequest":
+                ProcessMgGraph();
+                return Task.CompletedTask;
+            default:
+                return Task.CompletedTask;
+        }
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
         await MicrosoftGraphUtils.SetMailMessageAsync(cred, UserPrincipalName!, MessageId!, Read.IsPresent);
     }
 
-    private Task ProcessMgGraphAsync() {
+    private void ProcessMgGraph() {
         var uri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/messages/{MessageId}";
         var body = JsonSerializer.Serialize(new { isRead = Read.IsPresent });
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
@@ -49,6 +53,5 @@ public class CmdletSetMailMessage : AsyncPSCmdlet {
             .AddParameter("Body", body)
             .AddParameter("ContentType", "application/json");
         ps.Invoke();
-        return Task.CompletedTask;
     }
 }

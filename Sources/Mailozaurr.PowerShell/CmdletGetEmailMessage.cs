@@ -131,13 +131,19 @@ public sealed class CmdletGetEmailMessage : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override Task ProcessRecordAsync() {
-        return ParameterSetName switch {
-            "IMAP" => ProcessImapAsync(),
-            "POP" => ProcessPopAsync(),
-            "Graph" => ProcessGraphAsync(Connection!.Credential),
-            "MgGraphRequest" => ProcessMgGraphAsync(),
-            _ => Task.CompletedTask
-        };
+        switch (ParameterSetName) {
+            case "IMAP":
+                return ProcessImapAsync();
+            case "POP":
+                return ProcessPopAsync();
+            case "Graph":
+                return ProcessGraphAsync(Connection!.Credential);
+            case "MgGraphRequest":
+                ProcessMgGraph();
+                return Task.CompletedTask;
+            default:
+                return Task.CompletedTask;
+        }
     }
 
     private Task ProcessImapAsync() {
@@ -230,7 +236,7 @@ public sealed class CmdletGetEmailMessage : AsyncPSCmdlet {
     }
 
 
-    private Task ProcessMgGraphAsync() {
+    private void ProcessMgGraph() {
         var filters = new List<string>();
         if (!All.IsPresent) {
             if (!string.IsNullOrEmpty(Subject)) {
@@ -271,6 +277,5 @@ public sealed class CmdletGetEmailMessage : AsyncPSCmdlet {
         foreach (var res in results) {
             WriteObject(res);
         }
-        return Task.CompletedTask;
     }
 }
