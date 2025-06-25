@@ -21,7 +21,7 @@ public class CmdletMoveGraphMessage : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? DestinationFolderId { get; set; }
 
-    [Parameter(Mandatory = true, ParameterSetName = "Graph")]
+    [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
@@ -32,7 +32,12 @@ public class CmdletMoveGraphMessage : AsyncPSCmdlet {
     protected override Task ProcessRecordAsync() {
         switch (ParameterSetName) {
             case "Graph":
-                return ProcessGraphAsync(Connection!.Credential);
+                var conn = Connection ?? DefaultSessions.GraphSession;
+                if (conn == null) {
+                    WriteWarning("Move-GraphMessage - Connection not provided and no default session available.");
+                    return Task.CompletedTask;
+                }
+                return ProcessGraphAsync(conn.Credential);
             case "MgGraphRequest":
                 ProcessMgGraph();
                 return Task.CompletedTask;

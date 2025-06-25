@@ -132,6 +132,7 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - [Example-GraphManageMessages.ps1](Examples/Example-GraphManageMessages.ps1) - download attachments, set read state and move messages using Microsoft Graph.
 - [Example-GetMailFolder.ps1](Examples/Example-GetMailFolder.ps1) - list folders using either `-Connection` or `-MgGraphRequest`.
 - Use `Connect-EmailGraph` and `Disconnect-EmailGraph` to authenticate and release application credentials for Microsoft Graph. The connection cmdlet supports both client secret and certificate authentication modes.
+- `Connect-EmailGraph`, `Connect-IMAP` and `Connect-POP3` store the last successful connection in module variables. Subsequent cmdlets use these defaults when `-Connection` or `-Client` is omitted.
 - [Example-SendEmail-Attachments.ps1](Examples/Example-SendEmail-Attachments.ps1) - demonstrate file and in-memory attachments.
 - [PGP documentation](Docs/PGP.md) - overview of OpenPGP support.
 

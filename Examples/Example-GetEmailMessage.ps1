@@ -1,19 +1,19 @@
 Import-Module $PSScriptRoot\..\Mailozaurr.psd1 -Force
 
 # Example 1: Retrieve messages from an IMAP folder with subject filter
-$imap = Connect-IMAP -Server 'imap.example.com' -UserName 'user@example.com' -Password 'Pa55w0rd' -Port 993 -Options Auto
-Get-EmailMessage -ImapClient $imap -Folder 'Inbox/Reports' -Subject 'Monthly' -Since (Get-Date).AddDays(-7)
-Disconnect-IMAP -Client $imap
+Connect-IMAP -Server 'imap.example.com' -UserName 'user@example.com' -Password 'Pa55w0rd' -Port 993 -Options Auto | Out-Null
+Get-EmailMessage -Folder 'Inbox/Reports' -Subject 'Monthly' -Since (Get-Date).AddDays(-7)
+Disconnect-IMAP
 
 # Example 2: Retrieve today's POP3 messages
-$pop = Connect-POP3 -Server 'pop.example.com' -UserName 'user@example.com' -Password 'Pa55w0rd' -Port 995 -Options Auto
-Get-EmailMessage -PopClient $pop -Since (Get-Date).Date
-Disconnect-POP3 -Client $pop
+Connect-POP3 -Server 'pop.example.com' -UserName 'user@example.com' -Password 'Pa55w0rd' -Port 995 -Options Auto | Out-Null
+Get-POP3Message -Since (Get-Date).Date
+Disconnect-POP3
 
 # Example 3: Retrieve all POP3 messages and delete them
-$pop = Connect-POP3 -Server 'pop.example.com' -UserName 'user@example.com' -Password 'Pa55w0rd' -Port 995 -Options Auto
-Get-EmailMessage -PopClient $pop -All -Delete
-Disconnect-POP3 -Client $pop
+Connect-POP3 -Server 'pop.example.com' -UserName 'user@example.com' -Password 'Pa55w0rd' -Port 995 -Options Auto | Out-Null
+Get-POP3Message -All -Delete
+Disconnect-POP3
 
 # Example 4: Retrieve high priority messages from a specific domain via IMAP
 $imap = Connect-IMAP -Server 'imap.example.com' -UserName 'user@example.com' -Password 'Pa55w0rd' -Port 993 -Options Auto
@@ -91,7 +91,7 @@ $ClientId = 'your-client-id'
 $ClientSecret = 'your-client-secret'
 $TenantId = 'your-tenant-id'
 $cred = ConvertTo-GraphCredential -ClientId $ClientId -ClientSecret $ClientSecret -DirectoryId $TenantId
-$graph = Connect-EmailGraph -Credential $cred
-Get-GraphMessage -UserPrincipalName 'user@example.com' -Connection $graph -HasAttachment -Limit 5
+Connect-EmailGraph -Credential $cred | Out-Null
+Get-GraphMessage -UserPrincipalName 'user@example.com' -HasAttachment -Limit 5
 
-Disconnect-EmailGraph -Connection $graph
+Disconnect-EmailGraph

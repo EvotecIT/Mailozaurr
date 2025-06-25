@@ -65,6 +65,7 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
         }
 
         var info = new GraphConnectionInfo { Credential = cred, IsConnected = connected };
+        DefaultSessions.GraphSession = info;
         WriteObject(info);
     }
 }
