@@ -26,7 +26,7 @@ public static class MessageFetcher {
     /// <param name="all">If set, ignores other filters.</param>
     /// <param name="delete">If set, messages are deleted after fetching.</param>
     /// <returns>Collection of matching messages.</returns>
-    public static IEnumerable<MimeMessage> Fetch(
+    public static IEnumerable<ImapEmailMessage> Fetch(
         ImapClient client,
         string? folder = null,
         string? subject = null,
@@ -83,7 +83,7 @@ public static class MessageFetcher {
             if (priority.HasValue && msg.Priority != ConvertPriority(priority.Value)) {
                 continue;
             }
-            yield return msg;
+            yield return new ImapEmailMessage(uid, msg);
             if (delete) {
                 mailFolder.AddFlags(uid, MessageFlags.Deleted, true);
             }
@@ -106,7 +106,7 @@ public static class MessageFetcher {
     /// <param name="all">If set, ignores other filters.</param>
     /// <param name="delete">If set, messages are deleted after fetching.</param>
     /// <returns>Collection of matching messages.</returns>
-    public static IEnumerable<MimeMessage> Fetch(
+    public static IEnumerable<Pop3EmailMessage> Fetch(
         Pop3Client client,
         string? subject = null,
         string? fromContains = null,
@@ -146,7 +146,7 @@ public static class MessageFetcher {
                 continue;
             }
 
-            yield return message;
+            yield return new Pop3EmailMessage(i, message);
             if (delete) {
                 client.DeleteMessage(i);
             }
