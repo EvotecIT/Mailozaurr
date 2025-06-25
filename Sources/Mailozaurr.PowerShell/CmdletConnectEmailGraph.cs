@@ -14,6 +14,7 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
     public PSCredential? Credential { get; set; }
 
     [Parameter(Mandatory = true, ParameterSetName = "Plain")]
+    [Parameter(Mandatory = true, ParameterSetName = "Certificate")]
     [ValidateNotNullOrEmpty]
     public string? ClientId { get; set; }
 
@@ -22,8 +23,17 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
     public string? ClientSecret { get; set; }
 
     [Parameter(Mandatory = true, ParameterSetName = "Plain")]
+    [Parameter(Mandatory = true, ParameterSetName = "Certificate")]
     [ValidateNotNullOrEmpty]
     public string? DirectoryId { get; set; }
+
+    [Parameter(Mandatory = true, ParameterSetName = "Certificate")]
+    [ValidateNotNullOrEmpty]
+    public string? CertificatePath { get; set; }
+
+    [Parameter(Mandatory = true, ParameterSetName = "Certificate")]
+    [ValidateNotNullOrEmpty]
+    public string? CertificatePassword { get; set; }
 
     protected override async Task ProcessRecordAsync() {
         GraphCredential cred;
@@ -31,8 +41,19 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
             cred = MicrosoftGraphUtils.ConvertFromGraphCredential(
                 Credential!.UserName,
                 Credential.GetNetworkCredential().Password);
+        } else if (ParameterSetName == "Certificate") {
+            cred = new GraphCredential {
+                ClientId = ClientId!,
+                DirectoryId = DirectoryId!,
+                CertificatePath = CertificatePath!,
+                CertificatePassword = CertificatePassword!
+            };
         } else {
-            cred = new GraphCredential { ClientId = ClientId!, ClientSecret = ClientSecret!, DirectoryId = DirectoryId! };
+            cred = new GraphCredential {
+                ClientId = ClientId!,
+                ClientSecret = ClientSecret!,
+                DirectoryId = DirectoryId!
+            };
         }
 
         bool connected = false;
