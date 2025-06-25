@@ -5,15 +5,15 @@ using Mailozaurr.PowerShell;
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
-/// <para type="synopsis">Retrieves messages from a POP3 mailbox using an active POP3 connection.</para>
-/// <para type="description">The <c>Get-POP3Message</c> cmdlet retrieves one or more messages from a POP3 mailbox using the provided <see cref="PopConnectionInfo"/> object (from <c>Connect-POP3</c>). You can specify the message index, count, or use <c>-All</c> to retrieve all messages. Returns message objects for further automation or archiving.</para>
+/// <para type="synopsis">Retrieves messages from a POP3 mailbox with optional filters.</para>
+/// <para type="description">The <c>Get-POP3Message</c> cmdlet fetches messages from a POP3 mailbox using the provided <see cref="PopConnectionInfo"/> object. It supports filtering by subject, sender, recipients, priority, date range and attachment presence. Messages can be removed after retrieval using <c>-Delete</c>.</para>
 /// <example>
-///   <summary>Get the first message from a POP3 mailbox</summary>
-///   <code>$client = Connect-POP3 ...; Get-POP3Message -Client $client -Index 0</code>
+///   <summary>Get messages from a POP3 mailbox with a subject filter</summary>
+///   <code>$client = Connect-POP3 ...; Get-POP3Message -Client $client -Subject 'Report'</code>
 /// </example>
 /// <example>
-///   <summary>Get all messages from a POP3 mailbox</summary>
-///   <code>$client = Connect-POP3 ...; Get-POP3Message -Client $client -All</code>
+///   <summary>Get all messages from a POP3 mailbox and delete them</summary>
+///   <code>$client = Connect-POP3 ...; Get-POP3Message -Client $client -All -Delete</code>
 /// </example>
 /// <remarks>
 /// Use this cmdlet to enumerate or download messages from a POP3 mailbox for backup, migration, or processing.
@@ -50,24 +50,75 @@ public sealed class CmdletGetPOP3Message : AsyncPSCmdlet {
     public SwitchParameter All { get; set; }
 
     /// <summary>
+    /// <para type="description">Only return messages containing this text in the subject.</para>
+    /// </summary>
+    [Parameter]
+    public string? Subject { get; set; }
+
+    /// <summary>
+    /// <para type="description">Only return messages sent from addresses matching this value.</para>
+    /// </summary>
+    [Parameter]
+    public string? FromContains { get; set; }
+
+    /// <summary>
+    /// <para type="description">Only return messages sent to addresses matching this value.</para>
+    /// </summary>
+    [Parameter]
+    public string? ToContains { get; set; }
+
+    /// <summary>
+    /// <para type="description">Only return messages with the specified priority.</para>
+    /// </summary>
+    [Parameter]
+    public MessagePriority? Priority { get; set; }
+
+    /// <summary>
+    /// <para type="description">Return messages delivered on or after this date.</para>
+    /// </summary>
+    [Parameter]
+    public DateTime? Since { get; set; }
+
+    /// <summary>
+    /// <para type="description">Return messages delivered on or before this date.</para>
+    /// </summary>
+    [Parameter]
+    public DateTime? Before { get; set; }
+
+    /// <summary>
+    /// <para type="description">Only return messages that contain attachments.</para>
+    /// </summary>
+    [Parameter]
+    public SwitchParameter HasAttachment { get; set; }
+
+    /// <summary>
+    /// <para type="description">If set, deletes the retrieved messages.</para>
+    /// </summary>
+    [Parameter]
+    public SwitchParameter Delete { get; set; }
+
+    /// <summary>
     /// Retrieves one or more messages from the POP3 mailbox.
     /// </summary>
     protected override Task ProcessRecordAsync() {
         if (Client != null && Client.Data != null) {
-            if (All.IsPresent) {
-                var messages = Client.Data.GetMessages(0, Client.Data.Count);
-                WriteObject(messages, true);
-            } else {
-                if (Index < Client.Data.Count) {
-                    var messages = Client.Data.GetMessages(Index, Count);
-                    WriteObject(messages, true);
-                } else {
-                    WriteWarning($"Get-POP3Message - Index is out of range. Use index less than {Client.Data.Count}.");
-                }
-            }
+            var messages = MessageFetcher.Fetch(
+                Client.Data,
+                Subject,
+                FromContains,
+                ToContains,
+                Priority,
+                Since,
+                Before,
+                All.IsPresent,
+                Delete.IsPresent,
+                HasAttachment.IsPresent);
+
+            WriteObject(messages, true);
         } else {
             WriteWarning("Get-POP3Message - Is POP3 connected?");
         }
+
         return Task.CompletedTask;
     }
 }

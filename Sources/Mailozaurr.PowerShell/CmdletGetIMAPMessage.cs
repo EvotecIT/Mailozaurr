@@ -9,14 +9,18 @@ using Mailozaurr.PowerShell;
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
-/// <para type="synopsis">Retrieves the IMAP inbox folder and prepares the client for message retrieval.</para>
-/// <para type="description">The <c>Get-IMAPMessage</c> cmdlet opens the inbox folder for the provided <see cref="ImapConnectionInfo"/> object (from <c>Connect-IMAP</c>), sets up the folder for message retrieval, and returns the updated connection info. Use this before fetching messages from the IMAP server.</para>
+/// <para type="synopsis">Retrieves messages from an IMAP folder using optional filters.</para>
+/// <para type="description">The <c>Get-IMAPMessage</c> cmdlet fetches messages from the current IMAP folder associated with the provided <see cref="ImapConnectionInfo"/> object. You can filter by subject, sender, recipients, priority, date range and attachment presence. Messages can also be deleted after retrieval.</para>
 /// <example>
-///   <summary>Prepare the IMAP client for message retrieval</summary>
-///   <code>$client = Connect-IMAP ...; Get-IMAPMessage -Client $client</code>
+///   <summary>Get all messages from the current folder</summary>
+///   <code>$client = Connect-IMAP ...; Get-IMAPMessage -Client $client -All</code>
+/// </example>
+/// <example>
+///   <summary>Get messages with a subject filter</summary>
+///   <code>$client = Connect-IMAP ...; Get-IMAPMessage -Client $client -Subject 'Report'</code>
 /// </example>
 /// <remarks>
-/// Use this cmdlet to open the inbox and prepare for message enumeration or retrieval.
+/// Use this cmdlet to retrieve and optionally delete messages from an IMAP server.
 /// </remarks>
 /// <seealso cref="CmdletConnectIMAP"/>
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
@@ -67,46 +71,84 @@ public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
     public SearchQuery? SearchQuery { get; set; }
 
     /// <summary>
+    /// <para type="description">Only return messages containing this text in the subject.</para>
+    /// </summary>
+    [Parameter]
+    public string? Subject { get; set; }
+
+    /// <summary>
+    /// <para type="description">Only return messages sent from addresses matching this value.</para>
+    /// </summary>
+    [Parameter]
+    public string? FromContains { get; set; }
+
+    /// <summary>
+    /// <para type="description">Only return messages sent to addresses matching this value.</para>
+    /// </summary>
+    [Parameter]
+    public string? ToContains { get; set; }
+
+    /// <summary>
+    /// <para type="description">Only return messages with the specified priority.</para>
+    /// </summary>
+    [Parameter]
+    public MessagePriority? Priority { get; set; }
+
+    /// <summary>
+    /// <para type="description">Only return messages that contain attachments.</para>
+    /// </summary>
+    [Parameter]
+    public SwitchParameter HasAttachment { get; set; }
+
+    /// <summary>
+    /// <para type="description">If set, retrieves all messages ignoring other filters.</para>
+    /// </summary>
+    [Parameter]
+    public SwitchParameter All { get; set; }
+
+    /// <summary>
+    /// <para type="description">If set, deletes the retrieved messages.</para>
+    /// </summary>
+    [Parameter]
+    public SwitchParameter Delete { get; set; }
+
+    /// <summary>
+    /// <para type="description">Return messages delivered on or after this date.</para>
+    /// </summary>
+    [Parameter]
+    public DateTime? Since { get; set; }
+
+    /// <summary>
+    /// <para type="description">Return messages delivered on or before this date.</para>
+    /// </summary>
+    [Parameter]
+    public DateTime? Before { get; set; }
+
+    /// <summary>
     /// Opens the inbox folder and retrieves messages if message parameters are specified.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        if (Client != null) {
-            var folder = Client.Folder ?? Client.Data.Inbox;
-            folder.Open(FolderAccess);
-            WriteVerbose($"Get-IMAPMessage - Total messages {folder.Count}, Recent messages {folder.Recent}");
+        if (Client != null && Client.Data != null) {
+            var folder = Client.Folder?.FullName;
 
-            List<MimeMessage> messages = new();
+            var messages = MessageFetcher.Fetch(
+                Client.Data,
+                folder,
+                Subject,
+                FromContains,
+                ToContains,
+                Priority,
+                Since,
+                Before,
+                All.IsPresent,
+                Delete.IsPresent,
+                HasAttachment.IsPresent);
 
-            if (SearchQuery != null) {
-                var uids = folder.Search(SearchQuery);
-                foreach (var uid in uids) {
-                    messages.Add(folder.GetMessage(uid));
-                }
-            } else if (UidStart.HasValue) {
-                var uidList = new List<UniqueId>();
-                uint endVal = UidEnd ?? UidStart.Value;
-                for (uint id = UidStart.Value; id <= endVal; id++)
-                    uidList.Add(new UniqueId(id));
-
-                var uids = folder.Search(MailKit.Search.SearchQuery.Uids(uidList));
-                foreach (var uid in uids)
-                    messages.Add(folder.GetMessage(uid));
-            } else if (SequenceStart.HasValue) {
-                int start = SequenceStart.Value;
-                int end = SequenceEnd ?? SequenceStart.Value;
-                for (int i = start; i <= end && i < folder.Count; i++)
-                    messages.Add(folder.GetMessage(i));
-            }
-
-            if (messages.Count > 0) {
-                WriteObject(messages, true);
-            } else {
-                Client.Folder = folder as MailKit.Net.Imap.ImapFolder;
-                WriteObject(Client);
-            }
+            WriteObject(messages, true);
         } else {
-            WriteVerbose("Get-IMAPMessage - Client not connected?");
+            WriteWarning("Get-IMAPMessage - Is IMAP connected?");
         }
+
         return Task.CompletedTask;
     }
 }

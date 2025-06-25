@@ -7,11 +7,6 @@ $oAuth2 = Connect-oAuthGoogle -ClientID $ClientID -ClientSecret $ClientSecret -G
 $Client = Connect-IMAP -Server 'imap.gmail.com' -Port 993 -Options Auto -Credential $oAuth2 -oAuth2
 
 Get-IMAPFolder -Client $Client -Verbose
-
-## Not yet sure how to best process messages
-#Get-IMAPMessage -Client $Client -Verbose
-#foreach ($folder in $client.Data.Inbox.GetSubfolders($false)) {
-#    "[folder] {0}", $folder.Name
-#}
+Get-IMAPMessage -Client $Client -All -Delete
 
 Disconnect-IMAP -Client $Client -Verbose
