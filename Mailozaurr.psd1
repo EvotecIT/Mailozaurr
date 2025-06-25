@@ -1,5 +1,14 @@
 ﻿@{
-    AliasesToExport      = @('Connect-POP', 'Disconnect-POP', 'Get-POPMessage', 'Save-POPMessage')
+    AliasesToExport      = @(
+        'Connect-POP',
+        'Disconnect-POP',
+        'Get-POPMessage',
+        'Save-POPMessage',
+        'Move-MailMessage',
+        'Set-MailMessage',
+        'Save-MailMessageAttachment',
+        'Save-MailMessage'
+    )
     Author               = 'Przemyslaw Klys'
     CmdletsToExport      = @('Connect-EmailGraph', 'Connect-IMAP', 'Connect-OAuthGoogle', 'Connect-OAuthO365', 'Connect-POP3', 'ConvertFrom-EmlToMsg', 'ConvertFrom-OAuth2Credential', 'ConvertTo-GraphCertificateCredential', 'ConvertTo-GraphCredential', 'ConvertTo-MailgunCredential', 'ConvertTo-OAuth2Credential', 'ConvertTo-SendGridCredential', 'Disconnect-EmailGraph', 'Disconnect-IMAP', 'Disconnect-POP3', 'Get-GraphMessage', 'Get-IMAPFolder', 'Get-IMAPMessage', 'Get-MailFolder', 'Get-MailMessageAttachment', 'Get-POP3Message', 'Import-MailFile', 'Move-MailMessage', 'Save-MailMessage', 'Save-MailMessageAttachment', 'Save-POP3Message', 'Send-EmailMessage', 'Set-MailMessage', 'Test-EmailAddress')
     CompanyName          = 'Evotec'
