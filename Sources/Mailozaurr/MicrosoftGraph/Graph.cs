@@ -323,8 +323,8 @@ public class Graph {
             if (response != null) {
                 try {
                     errorContent = await response.Content.ReadAsStringAsync();
-                } catch {
-                    // ignored
+                } catch (Exception innerEx) {
+                    LoggingMessages.Logger.WriteWarning($"Failed to read error response: {innerEx.Message}");
                 }
             }
 
