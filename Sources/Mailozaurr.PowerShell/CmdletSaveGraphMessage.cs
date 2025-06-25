@@ -5,18 +5,18 @@ namespace Mailozaurr.PowerShell;
 
 /// <summary>
 /// <para type="synopsis">Saves Microsoft Graph email messages to disk in a specified format.</para>
-/// <para type="description">The <c>Save-MailMessage</c> cmdlet saves one or more <see cref="GraphEmailMessage"/> objects to disk at the specified path. Use this to archive, export, or process messages retrieved from Microsoft Graph.</para>
+/// <para type="description">The <c>Save-GraphMessage</c> cmdlet saves one or more <see cref="GraphEmailMessage"/> objects to disk at the specified path. Use this to archive, export, or process messages retrieved from Microsoft Graph.</para>
 /// <example>
 ///   <summary>Save mail messages to a folder</summary>
-///   <code>Get-EmailMessage ... | Save-MailMessage -Path "C:\Archive"</code>
+///   <code>Get-EmailMessage ... | Save-GraphMessage -Path "C:\Archive"</code>
 /// </example>
 /// <remarks>
 /// Use this cmdlet to export or archive messages for backup, migration, or compliance scenarios.
 /// </remarks>
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
-[Cmdlet(VerbsData.Save, "MailMessage")]
-public class CmdletSaveMailMessage : PSCmdlet {
+[Cmdlet(VerbsData.Save, "GraphMessage")]
+public class CmdletSaveGraphMessage : PSCmdlet {
     /// <summary>
     /// <para type="description">Specifies the <see cref="GraphEmailMessage"/> objects to save. Accepts pipeline input.</para>
     /// </summary>

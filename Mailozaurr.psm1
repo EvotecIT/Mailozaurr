@@ -148,4 +148,10 @@ if ($FoundErrors.Count -gt 0) {
     break
 }
 
+# Compatibility aliases for renamed cmdlets
+Set-Alias -Name Move-MailMessage -Value Move-GraphMessage -Scope Local -Force
+Set-Alias -Name Set-MailMessage -Value Set-GraphMessage -Scope Local -Force
+Set-Alias -Name Save-MailMessage -Value Save-GraphMessage -Scope Local -Force
+Set-Alias -Name Save-MailMessageAttachment -Value Save-GraphMessageAttachment -Scope Local -Force
+
 Export-ModuleMember -Function '*' -Alias '*' -Cmdlet '*'

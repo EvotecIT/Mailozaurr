@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
 
-[Cmdlet(VerbsCommon.Set, "MailMessage")]
-public class CmdletSetMailMessage : AsyncPSCmdlet {
+[Cmdlet(VerbsCommon.Set, "GraphMessage")]
+public class CmdletSetGraphMessage : AsyncPSCmdlet {
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
