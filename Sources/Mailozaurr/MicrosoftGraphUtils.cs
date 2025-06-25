@@ -75,7 +75,7 @@ namespace Mailozaurr {
             };
             var content = new FormUrlEncodedContent(body);
             var url = $"https://login.microsoftonline.com/{tenantDomain}/oauth2/token";
-            var response = await HttpClient.PostAsync(url, content);
+            using var response = await HttpClient.PostAsync(url, content);
             if (!response.IsSuccessStatusCode) {
                 var error = await response.Content.ReadAsStringAsync();
                 throw new Exception($"ConnectO365GraphAsync - Error: {error}");

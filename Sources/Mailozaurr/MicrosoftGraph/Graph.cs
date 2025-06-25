@@ -309,36 +309,27 @@ public class Graph {
         //LoggingMessages.Logger.WriteVerbose($"Application ID: {ApplicationID}");
         //LoggingMessages.Logger.WriteVerbose($"Tenant Domain: {TenantDomain}");
         //LoggingMessages.Logger.WriteVerbose($"Application Key {ApplicationKey}");
-        HttpResponseMessage? response = null;
         try {
-            response = await _client.PostAsync($"https://login.microsoftonline.com/{TenantDomain}/oauth2/token", new FormUrlEncodedContent(body), cancellationToken);
-            response.EnsureSuccessStatusCode();
-
+            using var response = await _client.PostAsync($"https://login.microsoftonline.com/{TenantDomain}/oauth2/token", new FormUrlEncodedContent(body), cancellationToken);
             var content = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode) {
+                LogCollector.LogWarning($"Send-EmailMessage - Error during connection using Graph API: {content}");
+                if (ErrorAction == ActionPreference.Stop) {
+                    response.EnsureSuccessStatusCode();
+                }
+                return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, content, content);
+            }
+
             var authorization = JsonSerializer.Deserialize<GraphAuthorization>(content);
             AccessToken = authorization.AccessToken;
             TokenType = authorization.TokenType;
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", "");
         } catch (Exception ex) {
-            var errorContent = string.Empty;
-            if (response != null) {
-                try {
-                    errorContent = await response.Content.ReadAsStringAsync();
-                } catch (Exception innerEx) {
-                    LoggingMessages.Logger.WriteWarning($"Failed to read error response: {innerEx.Message}");
-                }
-            }
-
             LogCollector.LogWarning($"Send-EmailMessage - Error during connection using Graph API: {ex.Message}");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
-
-            var errorMessage = string.IsNullOrEmpty(errorContent)
-                ? ex.Message
-                : $"{ex.Message} - {errorContent}";
-
-            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, errorContent, errorMessage);
+            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, ex.Message);
         }
     }
 
@@ -583,7 +574,7 @@ public class Graph {
     public async Task<string> CreateUploadSession(GraphMessage draftMessage, string attachmentItemJson, CancellationToken cancellationToken = default) {
         var uploadSessionUrl = $"https://graph.microsoft.com/v1.0/users('{SentFrom}')/messages/{draftMessage.Id}/attachments/createUploadSession";
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
-        var uploadSessionResponse = await _client.PostAsync(uploadSessionUrl, new StringContent(attachmentItemJson, Encoding.UTF8, "application/json"), cancellationToken);
+        using var uploadSessionResponse = await _client.PostAsync(uploadSessionUrl, new StringContent(attachmentItemJson, Encoding.UTF8, "application/json"), cancellationToken);
         var uploadSessionContent = await uploadSessionResponse.Content.ReadAsStringAsync();
 
         // {"error":{"code":"InvalidAuthenticationToken","message":"Access token is empty.","innerError":{"date":"2024-06-15T09:51:54","request-id":"4a43e743-e897-4758-8d7d-21858c198e1d","client-request-id":"4a43e743-e897-4758-8d7d-21858c198e1d"}}}
