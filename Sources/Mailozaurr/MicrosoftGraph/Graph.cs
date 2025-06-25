@@ -308,26 +308,19 @@ public class Graph {
         //LoggingMessages.Logger.WriteVerbose($"Application ID: {ApplicationID}");
         //LoggingMessages.Logger.WriteVerbose($"Tenant Domain: {TenantDomain}");
         //LoggingMessages.Logger.WriteVerbose($"Application Key {ApplicationKey}");
-        HttpResponseMessage? response = null;
+        string errorContent = string.Empty;
         try {
-            response = await _client.PostAsync($"https://login.microsoftonline.com/{TenantDomain}/oauth2/token", new FormUrlEncodedContent(body));
-            response.EnsureSuccessStatusCode();
+            using var response = await _client.PostAsync($"https://login.microsoftonline.com/{TenantDomain}/oauth2/token", new FormUrlEncodedContent(body));
+            errorContent = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode) {
+                throw new HttpRequestException(errorContent);
+            }
 
-            var content = await response.Content.ReadAsStringAsync();
-            var authorization = JsonSerializer.Deserialize<GraphAuthorization>(content);
+            var authorization = JsonSerializer.Deserialize<GraphAuthorization>(errorContent);
             AccessToken = authorization.AccessToken;
             TokenType = authorization.TokenType;
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", "");
         } catch (Exception ex) {
-            var errorContent = string.Empty;
-            if (response != null) {
-                try {
-                    errorContent = await response.Content.ReadAsStringAsync();
-                } catch {
-                    // ignored
-                }
-            }
-
             LogCollector.LogWarning($"Send-EmailMessage - Error during connection using Graph API: {ex.Message}");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
@@ -582,7 +575,7 @@ public class Graph {
     public async Task<string> CreateUploadSession(GraphMessage draftMessage, string attachmentItemJson) {
         var uploadSessionUrl = $"https://graph.microsoft.com/v1.0/users('{SentFrom}')/messages/{draftMessage.Id}/attachments/createUploadSession";
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
-        var uploadSessionResponse = await _client.PostAsync(uploadSessionUrl, new StringContent(attachmentItemJson, Encoding.UTF8, "application/json"));
+        using var uploadSessionResponse = await _client.PostAsync(uploadSessionUrl, new StringContent(attachmentItemJson, Encoding.UTF8, "application/json"));
         var uploadSessionContent = await uploadSessionResponse.Content.ReadAsStringAsync();
 
         // {"error":{"code":"InvalidAuthenticationToken","message":"Access token is empty.","innerError":{"date":"2024-06-15T09:51:54","request-id":"4a43e743-e897-4758-8d7d-21858c198e1d","client-request-id":"4a43e743-e897-4758-8d7d-21858c198e1d"}}}
