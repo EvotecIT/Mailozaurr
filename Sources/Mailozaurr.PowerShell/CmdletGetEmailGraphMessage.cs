@@ -9,11 +9,11 @@ namespace Mailozaurr.PowerShell;
 
 /// <summary>
 /// <para type="synopsis">Retrieves mail messages for a user via Microsoft Graph.</para>
-/// <para type="description">The <c>Get-GraphMessage</c> cmdlet fetches messages for the specified user principal name using Microsoft Graph. It supports optional filters like subject, sender, recipient, priority and date range. Results can be limited and optionally deleted.</para>
+/// <para type="description">The <c>Get-EmailGraphMessage</c> cmdlet fetches messages for the specified user principal name using Microsoft Graph. It supports optional filters like subject, sender, recipient, priority and date range. Results can be limited and optionally deleted.</para>
 /// </summary>
-[Cmdlet(VerbsCommon.Get, "GraphMessage")]
+[Cmdlet(VerbsCommon.Get, "EmailGraphMessage")]
 [OutputType(typeof(object))]
-public sealed class CmdletGetGraphMessage : AsyncPSCmdlet {
+public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "Graph")]
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     [ValidateNotNullOrEmpty]
@@ -72,7 +72,7 @@ public sealed class CmdletGetGraphMessage : AsyncPSCmdlet {
 
         var conn = Connection ?? DefaultSessions.GraphSession;
         if (conn == null) {
-            WriteWarning("Get-GraphMessage - Connection not provided and no default session available.");
+            WriteWarning("Get-EmailGraphMessage - Connection not provided and no default session available.");
             return Task.CompletedTask;
         }
 

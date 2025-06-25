@@ -18,7 +18,6 @@ namespace Mailozaurr.PowerShell;
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
 [Cmdlet(VerbsData.Save, "POP3Message")]
-[Alias("Save-POPMessage")]
 public sealed class CmdletSavePOP3Message : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">The <see cref="PopConnectionInfo"/> object representing the active POP3 connection. This is the object returned by <c>Connect-POP3</c>.</para>

@@ -1,16 +1,7 @@
 ﻿@{
-    AliasesToExport      = @(
-        'Connect-POP',
-        'Disconnect-POP',
-        'Get-POPMessage',
-        'Save-POPMessage',
-        'Move-MailMessage',
-        'Set-MailMessage',
-        'Save-MailMessageAttachment',
-        'Save-MailMessage'
-    )
+    AliasesToExport      = @()
     Author               = 'Przemyslaw Klys'
-    CmdletsToExport      = @('Connect-EmailGraph', 'Connect-IMAP', 'Connect-OAuthGoogle', 'Connect-OAuthO365', 'Connect-POP3', 'ConvertFrom-EmlToMsg', 'ConvertFrom-OAuth2Credential', 'ConvertTo-GraphCertificateCredential', 'ConvertTo-GraphCredential', 'ConvertTo-MailgunCredential', 'ConvertTo-OAuth2Credential', 'ConvertTo-SendGridCredential', 'Disconnect-EmailGraph', 'Disconnect-IMAP', 'Disconnect-POP3', 'Get-GraphMessage', 'Get-IMAPFolder', 'Get-IMAPMessage', 'Get-MailFolder', 'Get-MailMessageAttachment', 'Get-POP3Message', 'Import-MailFile', 'Move-MailMessage', 'Save-MailMessage', 'Save-MailMessageAttachment', 'Save-POP3Message', 'Send-EmailMessage', 'Set-MailMessage', 'Test-EmailAddress')
+    CmdletsToExport      = @('Connect-EmailGraph', 'Connect-IMAP', 'Connect-OAuthGoogle', 'Connect-OAuthO365', 'Connect-POP3', 'ConvertFrom-EmlToMsg', 'ConvertFrom-OAuth2Credential', 'ConvertTo-GraphCertificateCredential', 'ConvertTo-GraphCredential', 'ConvertTo-MailgunCredential', 'ConvertTo-OAuth2Credential', 'ConvertTo-SendGridCredential', 'Disconnect-EmailGraph', 'Disconnect-IMAP', 'Disconnect-POP3', 'Get-EmailGraphMessage', 'Get-IMAPFolder', 'Get-IMAPMessage', 'Get-EmailGraphFolder', 'Get-EmailGraphMessageAttachment', 'Get-POP3Message', 'Import-MailFile', 'Move-GraphMessage', 'Save-GraphMessage', 'Save-GraphMessageAttachment', 'Save-POP3Message', 'Send-EmailMessage', 'Set-GraphMessage', 'Test-EmailAddress')
     CompanyName          = 'Evotec'
     CompatiblePSEditions = @('Desktop', 'Core')
     Copyright            = '(c) 2011 - 2025 Przemyslaw Klys @ Evotec. All rights reserved.'
