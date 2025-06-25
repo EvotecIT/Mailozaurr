@@ -1,16 +1,19 @@
 using System.Management.Automation;
 using Mailozaurr;
+using System.Collections.Generic;
 using System.Linq;
+using System.Management.Automation.Runspaces;
 using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
 /// <para type="synopsis">Retrieves attachments for a specific mail message via Microsoft Graph API.</para>
-/// <para type="description">The <c>Get-MailMessageAttachment</c> cmdlet retrieves attachments for the specified mail message ID and user principal name (email address) using Microsoft Graph API. You can specify client credentials directly. Returns attachment objects for further automation or reporting.</para>
+/// <para type="description">The <c>Get-MailMessageAttachment</c> cmdlet retrieves attachments for the specified mail message ID and user principal name using Microsoft Graph API. Provide a <see cref="GraphConnectionInfo"/> object created with <c>Connect-EmailGraph</c> or authenticate via <c>Connect-MgGraph</c>.</para>
 /// <example>
 ///   <summary>Get attachments for a mail message</summary>
-///   <code>Get-MailMessageAttachment -UserPrincipalName "user@domain.com" -MessageId "AAMk..." -ClientId "id" -ClientSecret "secret" -DirectoryId "tenant"</code>
+///   <code>$cred = ConvertTo-GraphCredential -ClientId "id" -ClientSecret "secret" -DirectoryId "tenant"
+///   Get-MailMessageAttachment -UserPrincipalName "user@domain.com" -MessageId "AAMk..." -Credential $cred</code>
 /// </example>
 /// <remarks>
 /// Use this cmdlet to enumerate attachments for mailbox management, reporting, or migration scenarios.
@@ -33,34 +36,37 @@ public class CmdletGetMailMessageAttachment : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? MessageId { get; set; }
     /// <summary>
-    /// <para type="description">Specifies the client ID for Microsoft Graph authentication.</para>
-    /// </summary>
-    [Parameter]
-    public string? ClientId { get; set; }
-    /// <summary>
-    /// <para type="description">Specifies the client secret for Microsoft Graph authentication.</para>
-    /// </summary>
-    [Parameter]
-    public string? ClientSecret { get; set; }
-    /// <summary>
-    /// <para type="description">Specifies the directory (tenant) ID for Microsoft Graph authentication.</para>
-    /// </summary>
-    [Parameter]
-    public string? DirectoryId { get; set; }
+    [Parameter(Mandatory = true, ParameterSetName = "Graph")]
+    [ValidateNotNull]
+    public GraphConnectionInfo? Connection { get; set; }
+
+
+    [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
+    public SwitchParameter MgGraphRequest { get; set; }
     /// <summary>
     /// <para type="description">Specifies the properties to retrieve for each attachment.</para>
     /// </summary>
-    [Parameter]
+    [Parameter(ParameterSetName = "Graph")]
+    [Parameter(ParameterSetName = "MgGraphRequest")]
     public string[]? Property { get; set; }
 
     /// <summary>
     /// Retrieves attachments for the specified mail message via Microsoft Graph API.
     /// </summary>
     protected override async Task ProcessRecordAsync() {
-        var cred = new GraphCredential { ClientId = ClientId, ClientSecret = ClientSecret, DirectoryId = DirectoryId };
-        var attachments = await MicrosoftGraphUtils.GetMailMessageAttachmentsAsync(cred, UserPrincipalName, MessageId, Property);
-        foreach (var att in attachments) {
-            WriteObject(att);
+        if (ParameterSetName == "Graph") {
+            var attachments = await MicrosoftGraphUtils.GetMailMessageAttachmentsAsync(Connection!.Credential, UserPrincipalName!, MessageId!, Property);
+            foreach (var att in attachments) {
+                WriteObject(att);
+            }
+        } else {
+            var query = new Dictionary<string, object>();
+            if (Property != null && Property.Length > 0) query["$select"] = string.Join(",", Property);
+            var uri = MicrosoftGraphUtils.JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{UserPrincipalName}/messages/{MessageId}/attachments", query);
+            var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
+            ps.AddCommand("Invoke-MgGraphRequest").AddParameter("Method", "GET").AddParameter("Uri", uri);
+            var results = ps.Invoke();
+            foreach (var res in results) WriteObject(res);
         }
     }
 }
