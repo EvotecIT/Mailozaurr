@@ -1,14 +1,23 @@
 using System.Management.Automation;
+using System.Management.Automation.Runspaces;
 using Mailozaurr;
+using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
 /// <para type="synopsis">Retrieves mail folders for a user via Microsoft Graph API.</para>
-/// <para type="description">The <c>Get-MailFolder</c> cmdlet retrieves mail folders for the specified user principal name (email address) using Microsoft Graph API. You can specify client credentials directly or use a PSCredential object. Returns folder objects for use in further automation or reporting.</para>
+/// <para type="description">The <c>Get-MailFolder</c> cmdlet retrieves mail folders for the specified user principal name using Microsoft Graph API. Provide a <see cref="GraphConnectionInfo"/> object created with <c>Connect-EmailGraph</c> or authenticate via <c>Connect-MgGraph</c>.</para>
 /// <example>
-///   <summary>Get mail folders for a user</summary>
-///   <code>Get-MailFolder -UserPrincipalName "user@domain.com" -ClientId "id" -ClientSecret "secret" -DirectoryId "tenant"</code>
+///   <summary>Get mail folders using application permissions</summary>
+///   <code>$cred = ConvertTo-GraphCredential -ClientId "id" -ClientSecret "secret" -DirectoryId "tenant"
+///   $graph = Connect-EmailGraph -Credential $cred
+///   Get-MailFolder -UserPrincipalName "user@domain.com" -Connection $graph</code>
+/// </example>
+/// <example>
+///   <summary>Get mail folders using Connect-MgGraph</summary>
+///   <code>Connect-MgGraph -Scopes Mail.Read -NoWelcome
+///   Get-MailFolder -UserPrincipalName "user@domain.com" -MgGraphRequest</code>
 /// </example>
 /// <remarks>
 /// Use this cmdlet to enumerate mail folders for mailbox management, reporting, or migration scenarios.
@@ -17,38 +26,48 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "MailFolder")]
 [OutputType(typeof(object))]
-public class CmdletGetMailFolder : PSCmdlet {
+public class CmdletGetMailFolder : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Specifies the user principal name (email address) whose mail folders will be retrieved.</para>
     /// </summary>
-    [Parameter(Mandatory = true)]
+    [Parameter(Mandatory = true, ParameterSetName = "Graph")]
+    [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
-    /// <summary>
-    /// <para type="description">Specifies the client ID for Microsoft Graph authentication.</para>
-    /// </summary>
-    [Parameter]
-    public string? ClientId { get; set; }
-    /// <summary>
-    /// <para type="description">Specifies the client secret for Microsoft Graph authentication.</para>
-    /// </summary>
-    [Parameter]
-    public string? ClientSecret { get; set; }
-    /// <summary>
-    /// <para type="description">Specifies the directory (tenant) ID for Microsoft Graph authentication.</para>
-    /// </summary>
-    [Parameter]
-    public string? DirectoryId { get; set; }
+
+    [Parameter(Mandatory = true, ParameterSetName = "Graph")]
+    [ValidateNotNull]
+    public GraphConnectionInfo? Connection { get; set; }
+
+    [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
+    public SwitchParameter MgGraphRequest { get; set; }
 
     /// <summary>
     /// Retrieves mail folders for the specified user via Microsoft Graph API.
     /// </summary>
-    protected override void ProcessRecord() {
-        var cred = new GraphCredential { ClientId = ClientId, ClientSecret = ClientSecret, DirectoryId = DirectoryId };
-        var task = MicrosoftGraphUtils.GetMailFoldersAsync(cred, UserPrincipalName);
-        task.Wait();
-        foreach (var folder in task.Result) {
+    protected override Task ProcessRecordAsync() {
+        return ParameterSetName switch {
+            "Graph" => ProcessGraphAsync(Connection!.Credential),
+            "MgGraphRequest" => ProcessMgGraph(),
+            _ => Task.CompletedTask,
+        };
+    }
+
+    private async Task ProcessGraphAsync(GraphCredential cred) {
+        var folders = await MicrosoftGraphUtils.GetMailFoldersAsync(cred, UserPrincipalName!);
+        foreach (var folder in folders) {
             WriteObject(folder);
         }
+    }
+
+    private Task ProcessMgGraph() {
+        var uri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/mailFolders";
+        var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
+        ps.AddCommand("Invoke-MgGraphRequest")
+            .AddParameter("Method", "GET")
+            .AddParameter("Uri", uri);
+        var results = ps.Invoke();
+        foreach (var res in results) WriteObject(res);
+        return Task.CompletedTask;
     }
 }

@@ -101,7 +101,7 @@ This will make sure the project has required libraries.
   - [x] Get IMAP Folder
   - [x] Get IMAP Messages
 - Office 365 Graph API
-  - [x] Get Mail Folders
+  - [x] Get Mail Folders via `Get-MailFolder` with `-Connection` or `-MgGraphRequest`
   - [x] Get Mail Messages
   - [x] Save Mail Messages
 - DNS and email validation functionality is now provided by [DomainDetective](https://github.com/EvotecIT/DomainDetective)
@@ -130,6 +130,7 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - [Example-SendEmail-SignEncrypt.ps1](Examples/Example-SendEmail-SignEncrypt.ps1) - sign and encrypt an email using SMTP.
 - [Example-SendEmail-Pgp.ps1](Examples/Example-SendEmail-Pgp.ps1) - send a PGP encrypted email.
 - [Example-GraphManageMessages.ps1](Examples/Example-GraphManageMessages.ps1) - download attachments, set read state and move messages using Microsoft Graph.
+- [Example-GetMailFolder.ps1](Examples/Example-GetMailFolder.ps1) - list folders using either `-Connection` or `-MgGraphRequest`.
 - Use `Connect-EmailGraph` and `Disconnect-EmailGraph` to authenticate and release application credentials for Microsoft Graph. The connection cmdlet supports both client secret and certificate authentication modes.
 - [Example-SendEmail-Attachments.ps1](Examples/Example-SendEmail-Attachments.ps1) - demonstrate file and in-memory attachments.
 - [PGP documentation](Docs/PGP.md) - overview of OpenPGP support.
