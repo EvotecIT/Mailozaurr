@@ -181,6 +181,7 @@ public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
                 Messages = null, // Not directly available
                 Recent = 0 // Not directly available
             };
+            DefaultSessions.Pop3Session = info;
             WriteObject(info);
         } else {
             WriteWarning("Connect-POP3 - Authentication failed.");

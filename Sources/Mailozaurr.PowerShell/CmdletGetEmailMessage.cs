@@ -29,14 +29,14 @@ public sealed class CmdletGetEmailMessage : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Active IMAP connection object returned by <c>Connect-IMAP</c>.</para>
     /// </summary>
-    [Parameter(Mandatory = true, ParameterSetName = "IMAP", ValueFromPipeline = true)]
+    [Parameter(ParameterSetName = "IMAP", ValueFromPipeline = true)]
     [ValidateNotNull]
     public ImapConnectionInfo? ImapClient { get; set; }
 
     /// <summary>
     /// <para type="description">Active POP3 connection object returned by <c>Connect-POP3</c>.</para>
     /// </summary>
-    [Parameter(Mandatory = true, ParameterSetName = "POP", ValueFromPipeline = true)]
+    [Parameter(ParameterSetName = "POP", ValueFromPipeline = true)]
     [ValidateNotNull]
     public PopConnectionInfo? PopClient { get; set; }
 
@@ -112,13 +112,14 @@ public sealed class CmdletGetEmailMessage : AsyncPSCmdlet {
     }
 
     private Task ProcessImapAsync() {
-        if (ImapClient == null || ImapClient.Data == null) {
+        var imap = ImapClient ?? DefaultSessions.ImapSession;
+        if (imap == null || imap.Data == null) {
             WriteWarning("Get-EmailMessage - Is IMAP connected?");
             return Task.CompletedTask;
         }
 
         var messages = MessageFetcher.Fetch(
-            ImapClient.Data,
+            imap.Data,
             Folder,
             Subject,
             FromContains,
@@ -135,13 +136,14 @@ public sealed class CmdletGetEmailMessage : AsyncPSCmdlet {
     }
 
     private Task ProcessPopAsync() {
-        if (PopClient == null || PopClient.Data == null) {
+        var pop = PopClient ?? DefaultSessions.Pop3Session;
+        if (pop == null || pop.Data == null) {
             WriteWarning("Get-EmailMessage - Is POP3 connected?");
             return Task.CompletedTask;
         }
 
         var messages = MessageFetcher.Fetch(
-            PopClient.Data,
+            pop.Data,
             Subject,
             FromContains,
             ToContains,

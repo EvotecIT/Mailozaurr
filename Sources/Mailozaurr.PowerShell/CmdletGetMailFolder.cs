@@ -35,7 +35,7 @@ public class CmdletGetMailFolder : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
-    [Parameter(Mandatory = true, ParameterSetName = "Graph")]
+    [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
@@ -46,11 +46,17 @@ public class CmdletGetMailFolder : AsyncPSCmdlet {
     /// Retrieves mail folders for the specified user via Microsoft Graph API.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        return ParameterSetName switch {
-            "Graph" => ProcessGraphAsync(Connection!.Credential),
-            "MgGraphRequest" => ProcessMgGraph(),
-            _ => Task.CompletedTask,
-        };
+        if (ParameterSetName == "MgGraphRequest") {
+            return ProcessMgGraph();
+        }
+
+        var conn = Connection ?? DefaultSessions.GraphSession;
+        if (conn == null) {
+            WriteWarning("Get-MailFolder - Connection not provided and no default session available.");
+            return Task.CompletedTask;
+        }
+
+        return ProcessGraphAsync(conn.Credential);
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {

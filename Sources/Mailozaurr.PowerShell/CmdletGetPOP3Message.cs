@@ -27,7 +27,7 @@ public sealed class CmdletGetPOP3Message : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">The <see cref="PopConnectionInfo"/> object representing the active POP3 connection. This is the object returned by <c>Connect-POP3</c>.</para>
     /// </summary>
-    [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
+    [Parameter(Position = 0, ValueFromPipeline = true)]
     [ValidateNotNull]
     public PopConnectionInfo? Client { get; set; }
 
@@ -101,9 +101,10 @@ public sealed class CmdletGetPOP3Message : AsyncPSCmdlet {
     /// Retrieves one or more messages from the POP3 mailbox.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        if (Client != null && Client.Data != null) {
+        var conn = Client ?? DefaultSessions.Pop3Session;
+        if (conn != null && conn.Data != null) {
             var messages = MessageFetcher.Fetch(
-                Client.Data,
+                conn.Data,
                 Subject,
                 FromContains,
                 ToContains,
