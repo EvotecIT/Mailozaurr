@@ -207,7 +207,7 @@ Send-EmailMessage -From 'przemyslaw.klys@something.pl' -To 'przemyslaw.klys@some
   - MS Graph API
     - Added `Get-MailFolder` - work in progress
     - Added `Get-MailMessage` - work in progress
-    - Added `Save-GraphMessage` - work in progress
+    - Added `Save-MailMessage` - work in progress
     - Added check for attachments/message body less than 10 characters. - by andrew0wells [#3](https://github.com/EvotecIT/Mailozaurr/issues/3)
   - SMTP
     - Updated `Send-EmailMessage` error handling

@@ -16,6 +16,7 @@ namespace Mailozaurr.PowerShell;
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
 [Cmdlet(VerbsData.Save, "GraphMessage")]
+[Alias("Save-MailMessage")]
 public class CmdletSaveGraphMessage : PSCmdlet {
     /// <summary>
     /// <para type="description">Specifies the <see cref="GraphEmailMessage"/> objects to save. Accepts pipeline input.</para>
