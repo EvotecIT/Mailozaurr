@@ -41,10 +41,12 @@ public static class MessageFetcher {
         if (!string.IsNullOrEmpty(folder)) {
             try {
                 mailFolder = client.GetFolder(folder);
-            } catch {
+            } catch (Exception ex) {
+                LoggingMessages.Logger.WriteWarning($"Failed to get folder '{folder}': {ex.Message}");
                 try {
                     mailFolder = client.GetFolder(client.PersonalNamespaces[0]).GetSubfolder(folder);
-                } catch {
+                } catch (Exception innerEx) {
+                    LoggingMessages.Logger.WriteWarning($"Failed to get subfolder '{folder}': {innerEx.Message}");
                     mailFolder = client.Inbox;
                 }
             }

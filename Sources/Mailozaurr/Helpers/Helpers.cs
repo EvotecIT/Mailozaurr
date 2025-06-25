@@ -139,7 +139,8 @@ public static class Helpers {
             var json = JsonSerializer.Serialize(result);
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
             await client.PostAsync(url, content);
-        } catch {
+        } catch (Exception ex) {
+            LoggingMessages.Logger.WriteWarning($"Failed to post webhook: {ex.Message}");
         }
     }
 }

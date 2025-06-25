@@ -54,9 +54,8 @@ public class LoggingConfigurator {
             if (!string.IsNullOrEmpty(logPath)) {
                 try {
                     protocolLogger = new ProtocolLogger(logPath, logOverwrite);
-                } catch {
-                    //Console.WriteLine($"Couldn't create protocol logger with {logPath}. Using console output instead.");
-                    // TODO: add logging
+                } catch (Exception ex) {
+                    LoggingMessages.Logger.WriteWarning($"Couldn't create protocol logger with {logPath}: {ex.Message}. Using console output instead.");
                     protocolLogger = new ProtocolLogger(Console.OpenStandardOutput());
                 }
             } else if (logConsole) {

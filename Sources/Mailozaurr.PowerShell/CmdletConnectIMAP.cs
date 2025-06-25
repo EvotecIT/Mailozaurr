@@ -166,7 +166,9 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
             // Open the inbox to get message info
             try {
                 await client.Inbox.OpenAsync(MailKit.FolderAccess.ReadOnly);
-            } catch { /* ignore if fails */ }
+            } catch (Exception ex) {
+                LoggingMessages.Logger.WriteWarning($"Connect-IMAP - Failed to open inbox: {ex.Message}");
+            }
             var info = new ImapConnectionInfo {
                 Uri = $"imaps://{Server}:{Port}/",
                 AuthenticationMechanisms = client.AuthenticationMechanisms,
