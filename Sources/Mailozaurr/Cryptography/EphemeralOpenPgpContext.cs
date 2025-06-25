@@ -28,8 +28,8 @@ public class EphemeralOpenPgpContext : GnuPGContext {
         base.Dispose();
         try {
             Directory.Delete(_tempDirectory, true);
-        } catch {
-            // ignore cleanup errors
+        } catch (Exception ex) {
+            LoggingMessages.Logger.WriteWarning($"Failed to delete temporary directory: {ex.Message}");
         }
     }
 }
