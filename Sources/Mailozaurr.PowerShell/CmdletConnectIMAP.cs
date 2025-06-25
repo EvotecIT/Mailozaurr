@@ -187,6 +187,7 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
                 Messages = client.Inbox,
                 Recent = client.Inbox?.Recent ?? 0
             };
+            DefaultSessions.ImapSession = info;
             WriteObject(info);
         } else {
             WriteWarning("Connect-IMAP - Authentication failed.");

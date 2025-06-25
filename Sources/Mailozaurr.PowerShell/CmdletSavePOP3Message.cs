@@ -23,7 +23,7 @@ public sealed class CmdletSavePOP3Message : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">The <see cref="PopConnectionInfo"/> object representing the active POP3 connection. This is the object returned by <c>Connect-POP3</c>.</para>
     /// </summary>
-    [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
+    [Parameter(Position = 0, ValueFromPipeline = true)]
     [ValidateNotNull]
     public PopConnectionInfo? Client { get; set; }
 
@@ -44,12 +44,13 @@ public sealed class CmdletSavePOP3Message : AsyncPSCmdlet {
     /// Saves the specified POP3 message to disk at the given path.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        if (Client != null && Client.Data != null) {
-            if (Index < Client.Data.Count) {
-                var message = Client.Data.GetMessage(Index);
+        var conn = Client ?? DefaultSessions.Pop3Session;
+        if (conn != null && conn.Data != null) {
+            if (Index < conn.Data.Count) {
+                var message = conn.Data.GetMessage(Index);
                 message.WriteTo(Path);
             } else {
-                WriteWarning($"Save-POP3Message - Index is out of range. Use index less than {Client.Data.Count}.");
+                WriteWarning($"Save-POP3Message - Index is out of range. Use index less than {conn.Data.Count}.");
             }
         } else {
             WriteWarning("Save-POP3Message - Is POP3 connected?");

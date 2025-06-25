@@ -36,7 +36,7 @@ public class CmdletGetMailMessageAttachment : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? MessageId { get; set; }
     /// <summary>
-    [Parameter(Mandatory = true, ParameterSetName = "Graph")]
+    [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
@@ -55,7 +55,12 @@ public class CmdletGetMailMessageAttachment : AsyncPSCmdlet {
     /// </summary>
     protected override async Task ProcessRecordAsync() {
         if (ParameterSetName == "Graph") {
-            var attachments = await MicrosoftGraphUtils.GetMailMessageAttachmentsAsync(Connection!.Credential, UserPrincipalName!, MessageId!, Property);
+            var conn = Connection ?? DefaultSessions.GraphSession;
+            if (conn == null) {
+                WriteWarning("Get-MailMessageAttachment - Connection not provided and no default session available.");
+                return;
+            }
+            var attachments = await MicrosoftGraphUtils.GetMailMessageAttachmentsAsync(conn.Credential, UserPrincipalName!, MessageId!, Property);
             foreach (var att in attachments) {
                 WriteObject(att);
             }

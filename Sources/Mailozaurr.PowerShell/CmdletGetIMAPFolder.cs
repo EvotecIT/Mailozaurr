@@ -23,7 +23,7 @@ public sealed class CmdletGetIMAPFolder : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">The <see cref="ImapConnectionInfo"/> object representing the active IMAP connection. This is the object returned by <c>Connect-IMAP</c>.</para>
     /// </summary>
-    [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
+    [Parameter(Position = 0, ValueFromPipeline = true)]
     [ValidateNotNull]
     public ImapConnectionInfo? Client { get; set; }
 
@@ -37,14 +37,16 @@ public sealed class CmdletGetIMAPFolder : AsyncPSCmdlet {
     /// Opens the inbox folder, updates message counts, and returns the updated connection info.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        if (Client != null) {
-            var folder = Client.Data.Inbox;
+        var conn = Client ?? DefaultSessions.ImapSession;
+        if (conn != null) {
+            var folder = conn.Data.Inbox;
             folder.Open(FolderAccess);
             WriteVerbose($"Get-IMAPFolder - Total messages {folder.Count}, Recent messages {folder.Recent}");
-            Client.Messages = folder;
-            Client.Count = folder.Count;
-            Client.Recent = folder.Recent;
-            WriteObject(Client);
+            conn.Messages = folder;
+            conn.Count = folder.Count;
+            conn.Recent = folder.Recent;
+            DefaultSessions.ImapSession = conn;
+            WriteObject(conn);
         } else {
             WriteVerbose("Get-IMAPFolder - Client not connected?");
         }

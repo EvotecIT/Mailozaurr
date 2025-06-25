@@ -30,7 +30,7 @@ public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">The <see cref="ImapConnectionInfo"/> object representing the active IMAP connection. This is the object returned by <c>Connect-IMAP</c>.</para>
     /// </summary>
-    [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true)]
+    [Parameter(Position = 0, ValueFromPipeline = true)]
     [ValidateNotNull]
     public ImapConnectionInfo? Client { get; set; }
 
@@ -128,11 +128,12 @@ public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
     /// Opens the inbox folder and retrieves messages if message parameters are specified.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        if (Client != null && Client.Data != null) {
-            var folder = Client.Folder?.FullName;
+        var conn = Client ?? DefaultSessions.ImapSession;
+        if (conn != null && conn.Data != null) {
+            var folder = conn.Folder?.FullName;
 
             var messages = MessageFetcher.Fetch(
-                Client.Data,
+                conn.Data,
                 folder,
                 Subject,
                 FromContains,

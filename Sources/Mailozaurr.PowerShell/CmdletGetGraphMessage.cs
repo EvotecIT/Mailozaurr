@@ -19,7 +19,7 @@ public sealed class CmdletGetGraphMessage : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
-    [Parameter(Mandatory = true, ParameterSetName = "Graph")]
+    [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
@@ -66,11 +66,17 @@ public sealed class CmdletGetGraphMessage : AsyncPSCmdlet {
     public SwitchParameter MgGraphRequest { get; set; }
 
     protected override Task ProcessRecordAsync() {
-        return ParameterSetName switch {
-            "Graph" => ProcessGraphAsync(Connection!.Credential),
-            "MgGraphRequest" => ProcessMgGraph(),
-            _ => Task.CompletedTask,
-        };
+        if (ParameterSetName == "MgGraphRequest") {
+            return ProcessMgGraph();
+        }
+
+        var conn = Connection ?? DefaultSessions.GraphSession;
+        if (conn == null) {
+            WriteWarning("Get-GraphMessage - Connection not provided and no default session available.");
+            return Task.CompletedTask;
+        }
+
+        return ProcessGraphAsync(conn.Credential);
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
