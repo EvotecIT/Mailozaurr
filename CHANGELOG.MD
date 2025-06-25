@@ -53,7 +53,7 @@
 - Added `ConvertFrom-EmlToMsg` to convert EML files to MSG files
 - Added `Import-MailFile` to import MSG/EML files to PowerShell Object
 - Added `Get-MailMessage`
-- Added `Get-EmailGraphMessageAttachment`
+- Added `Get-MailMessageAttachment`
 - Added `Find-BIMIRecord`
 - Added `Find-CAARecord`
 - Added `Find-DANERecord`
@@ -205,7 +205,7 @@ Send-EmailMessage -From 'przemyslaw.klys@something.pl' -To 'przemyslaw.klys@some
     - Fixed `DNSServer` parameter usage [#5](https://github.com/EvotecIT/Mailozaurr/issues/5)
 #### 0.0.8 - 2020.08.06
   - MS Graph API
-    - Added `Get-EmailGraphFolder` - work in progress
+    - Added `Get-MailFolder` - work in progress
     - Added `Get-MailMessage` - work in progress
     - Added `Save-MailMessage` - work in progress
     - Added check for attachments/message body less than 10 characters. - by andrew0wells [#3](https://github.com/EvotecIT/Mailozaurr/issues/3)
