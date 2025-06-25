@@ -1,4 +1,5 @@
 ﻿using System.Net.Http.Headers;
+using System.Threading;
 
 namespace Mailozaurr;
 
@@ -296,7 +297,7 @@ public class Graph {
     /// Authenticates to Microsoft Graph using client credentials and obtains an access token.
     /// </summary>
     /// <returns>The result of the connection attempt.</returns>
-    public async Task<SmtpResult> ConnectO365GraphAsync() {
+    public async Task<SmtpResult> ConnectO365GraphAsync(CancellationToken cancellationToken = default) {
         string resource = "https://graph.microsoft.com";
         var body = new Dictionary<string, string> {
             { "grant_type", "client_credentials" },
@@ -310,7 +311,7 @@ public class Graph {
         //LoggingMessages.Logger.WriteVerbose($"Application Key {ApplicationKey}");
         HttpResponseMessage? response = null;
         try {
-            response = await _client.PostAsync($"https://login.microsoftonline.com/{TenantDomain}/oauth2/token", new FormUrlEncodedContent(body));
+            response = await _client.PostAsync($"https://login.microsoftonline.com/{TenantDomain}/oauth2/token", new FormUrlEncodedContent(body), cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync();
@@ -345,7 +346,7 @@ public class Graph {
     /// Sends the prepared message via the Graph API.
     /// </summary>
     /// <returns>The result of the send operation.</returns>
-    public async Task<SmtpResult> SendMessageAsync() {
+    public async Task<SmtpResult> SendMessageAsync(CancellationToken cancellationToken = default) {
         // create message
         CreateMessage();
         LogCollector.LogVerbose("Send-EmailMessage - Sending email via Graph API");
@@ -361,11 +362,11 @@ public class Graph {
                 };
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
 
-                using var response = await _client.SendAsync(request);
+                using var response = await _client.SendAsync(request, cancellationToken);
                 var content = await response.Content.ReadAsStringAsync();
                 if (response.IsSuccessStatusCode) {
                     var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, response.StatusCode.ToString(), "");
-                    await Helpers.PostWebhookAsync(WebhookUrl, okResult);
+                    await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken);
                     return okResult;
                 }
                 var error = JsonSerializer.Deserialize<GraphApiError>(content);
@@ -381,19 +382,19 @@ public class Graph {
                         throw;
                     }
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", ex.Message);
-                    await Helpers.PostWebhookAsync(WebhookUrl, failResult);
+                    await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
                     return failResult;
                 }
                 var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
                 if (delayMilliseconds > 0) {
-                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds));
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken);
                 }
             }
             attempts++;
         } while (attempts <= RetryCount);
 
         var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", lastException?.Message);
-        await Helpers.PostWebhookAsync(WebhookUrl, finalResult);
+        await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken);
         return finalResult;
     }
 
@@ -401,18 +402,18 @@ public class Graph {
     /// Sends a message by first creating a draft and then uploading attachments.
     /// </summary>
     /// <returns>The result of the send operation.</returns>
-    public async Task<SmtpResult> SendMessageDraftAsync() {
+    public async Task<SmtpResult> SendMessageDraftAsync(CancellationToken cancellationToken = default) {
         // Create the draft message using the new method
-        var draftMessage = await CreateDraftMessageAsync();
+        var draftMessage = await CreateDraftMessageAsync(cancellationToken);
 
         // Upload attachments to the draft message
-        await UploadAttachmentsAsync(draftMessage);
+        await UploadAttachmentsAsync(draftMessage, cancellationToken);
 
         int attempts = 0;
         Exception? lastException = null;
         do {
             try {
-                return await SendDraftMessage(draftMessage);
+                return await SendDraftMessage(draftMessage, cancellationToken);
             } catch (Exception ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
@@ -421,19 +422,19 @@ public class Graph {
                         throw;
                     }
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", ex.Message);
-                    await Helpers.PostWebhookAsync(WebhookUrl, failResult);
+                    await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
                     return failResult;
                 }
                 var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
                 if (delayMilliseconds > 0) {
-                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds));
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken);
                 }
             }
             attempts++;
         } while (attempts <= RetryCount);
 
         var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", lastException?.Message);
-        await Helpers.PostWebhookAsync(WebhookUrl, finalResult);
+        await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken);
         return finalResult;
     }
 
@@ -442,7 +443,7 @@ public class Graph {
     /// </summary>
     /// <param name="draftMessage">The draft message to send.</param>
     /// <returns>The result of the send operation.</returns>
-    public async Task<SmtpResult> SendDraftMessage(GraphMessage draftMessage) {
+    public async Task<SmtpResult> SendDraftMessage(GraphMessage draftMessage, CancellationToken cancellationToken = default) {
         // Send the draft message
         var sendRequestUri = $"https://graph.microsoft.com/v1.0/users/{MessageContainer.Message.From.Email.Address}/messages/{draftMessage.Id}/send";
         using var sendRequest = new HttpRequestMessage(HttpMethod.Post, sendRequestUri);
@@ -451,12 +452,12 @@ public class Graph {
         sendRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
 
         // Send the HTTP request for sending the draft message
-        using var sendResponse = await _client.SendAsync(sendRequest);
+        using var sendResponse = await _client.SendAsync(sendRequest, cancellationToken);
 
         // If the status code indicates success, return a successful result
         if (sendResponse.IsSuccessStatusCode) {
             var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, sendResponse.StatusCode.ToString(), "");
-            await Helpers.PostWebhookAsync(WebhookUrl, okResult);
+            await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken);
             return okResult;
         }
 
@@ -468,7 +469,7 @@ public class Graph {
             : $"Error code: {sendError.Error.Code}, message: {sendError.Error.Message}, request ID: {sendError.Error.InnerError.RequestId}, date: {sendError.Error.InnerError.Date}";
         var ex = new HttpRequestException(sendErrorMessage);
         var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, sendContent, ex.Message);
-        await Helpers.PostWebhookAsync(WebhookUrl, failResult);
+        await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
         throw ex;
     }
 
@@ -476,7 +477,7 @@ public class Graph {
     /// Creates a draft message on the server and returns the resulting <see cref="GraphMessage"/>.
     /// </summary>
     /// <returns>The created draft message.</returns>
-    public async Task<GraphMessage> CreateDraftMessageAsync() {
+    public async Task<GraphMessage> CreateDraftMessageAsync(CancellationToken cancellationToken = default) {
         // Create the draft message
         CreateMessage();
 
@@ -498,7 +499,7 @@ public class Graph {
         draftRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
 
         // Send the HTTP request for creating the draft message
-        using var draftResponse = await _client.SendAsync(draftRequest);
+        using var draftResponse = await _client.SendAsync(draftRequest, cancellationToken);
 
         // Read the response content
         var draftContent = await draftResponse.Content.ReadAsStringAsync();
@@ -554,7 +555,7 @@ public class Graph {
     /// </summary>
     /// <param name="attachmentPath">Path to the attachment file.</param>
     /// <returns>The placeholder representing the attachment.</returns>
-    public async Task<GraphAttachmentPlaceHolder> CreateGraphAttachment(string attachmentPath) {
+    public async Task<GraphAttachmentPlaceHolder> CreateGraphAttachment(string attachmentPath, CancellationToken cancellationToken = default) {
         var fileName = Path.GetFileName(attachmentPath);
         var fileSize = new FileInfo(attachmentPath).Length;
 
@@ -563,7 +564,7 @@ public class Graph {
         var attachmentItemWrapper = new GraphAttachmentItemWrapper(attachmentItem);
         var attachmentItemJson = JsonSerializer.Serialize(attachmentItemWrapper);
 
-        var content = await PrepareByteArrayContentForUpload(attachmentPath, ChunkSize);
+        var content = await PrepareByteArrayContentForUpload(attachmentPath, ChunkSize, cancellationToken);
 
         return new GraphAttachmentPlaceHolder() {
             Json = attachmentItemJson,
@@ -579,10 +580,10 @@ public class Graph {
     /// <param name="draftMessage">The draft message the attachment belongs to.</param>
     /// <param name="attachmentItemJson">The serialized attachment item.</param>
     /// <returns>The upload session URL.</returns>
-    public async Task<string> CreateUploadSession(GraphMessage draftMessage, string attachmentItemJson) {
+    public async Task<string> CreateUploadSession(GraphMessage draftMessage, string attachmentItemJson, CancellationToken cancellationToken = default) {
         var uploadSessionUrl = $"https://graph.microsoft.com/v1.0/users('{SentFrom}')/messages/{draftMessage.Id}/attachments/createUploadSession";
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
-        var uploadSessionResponse = await _client.PostAsync(uploadSessionUrl, new StringContent(attachmentItemJson, Encoding.UTF8, "application/json"));
+        var uploadSessionResponse = await _client.PostAsync(uploadSessionUrl, new StringContent(attachmentItemJson, Encoding.UTF8, "application/json"), cancellationToken);
         var uploadSessionContent = await uploadSessionResponse.Content.ReadAsStringAsync();
 
         // {"error":{"code":"InvalidAuthenticationToken","message":"Access token is empty.","innerError":{"date":"2024-06-15T09:51:54","request-id":"4a43e743-e897-4758-8d7d-21858c198e1d","client-request-id":"4a43e743-e897-4758-8d7d-21858c198e1d"}}}
@@ -599,7 +600,7 @@ public class Graph {
     /// <param name="filePath"></param>
     /// <param name="chunkSize"></param>
     /// <returns></returns>
-    private async Task<List<ByteArrayContent>> PrepareByteArrayContentForUpload(string filePath, int chunkSize = 9000000) {
+    private async Task<List<ByteArrayContent>> PrepareByteArrayContentForUpload(string filePath, int chunkSize = 9000000, CancellationToken cancellationToken = default) {
         var fileContents = new List<ByteArrayContent>();
         var fileSize = new FileInfo(filePath).Length;
 
@@ -607,7 +608,7 @@ public class Graph {
         var buffer = new byte[chunkSize];
         int bytesRead;
         long offset = 0;
-        while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0) {
+        while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0) {
             var contentRange = $"bytes {offset}-{offset + bytesRead - 1}/{fileSize}";
             var byteArrayContent = new ByteArrayContent(buffer, 0, bytesRead);
             byteArrayContent.Headers.Add("Content-Range", contentRange);
@@ -622,13 +623,13 @@ public class Graph {
     /// Uploads all attachments for the specified draft message.
     /// </summary>
     /// <param name="draftMessage">The draft message to attach the files to.</param>
-    public async Task UploadAttachmentsAsync(GraphMessage draftMessage) {
+    public async Task UploadAttachmentsAsync(GraphMessage draftMessage, CancellationToken cancellationToken = default) {
         if (Attachments != null && Attachments.Length > 0) {
             foreach (var attachmentPath in Attachments) {
                 if (attachmentPath is string path) {
-                    var attachmentItemJson = await CreateGraphAttachment(path);
-                    var uploadUrl = await CreateUploadSession(draftMessage, attachmentItemJson.Json);
-                    await SendFileChunks(uploadUrl, attachmentItemJson.Content);
+                    var attachmentItemJson = await CreateGraphAttachment(path, cancellationToken);
+                    var uploadUrl = await CreateUploadSession(draftMessage, attachmentItemJson.Json, cancellationToken);
+                    await SendFileChunks(uploadUrl, attachmentItemJson.Content, cancellationToken);
                 }
             }
         }
@@ -637,11 +638,11 @@ public class Graph {
     /// <summary>
     /// Prepares attachments for upload by creating placeholders.
     /// </summary>
-    public async Task PrepareAttachments() {
+    public async Task PrepareAttachments(CancellationToken cancellationToken = default) {
         if (Attachments != null && Attachments.Length > 0) {
             foreach (var attachmentPath in Attachments) {
                 if (attachmentPath is string path) {
-                    var attachmentItemJson = await CreateGraphAttachment(path);
+                    var attachmentItemJson = await CreateGraphAttachment(path, cancellationToken);
                     AttachmentsPlaceHolders.Add(attachmentItemJson);
                 }
             }
@@ -653,9 +654,9 @@ public class Graph {
     /// </summary>
     /// <param name="uploadUrl">The upload session URL.</param>
     /// <param name="fileChunks">The file chunks to upload.</param>
-    public async Task SendFileChunks(string uploadUrl, List<ByteArrayContent> fileChunks) {
+    public async Task SendFileChunks(string uploadUrl, List<ByteArrayContent> fileChunks, CancellationToken cancellationToken = default) {
         foreach (var chunk in fileChunks) {
-            await SendFile(uploadUrl, chunk);
+            await SendFile(uploadUrl, chunk, cancellationToken);
         }
     }
 
@@ -664,7 +665,7 @@ public class Graph {
     /// </summary>
     /// <param name="uploadUrl">The upload session URL.</param>
     /// <param name="byteArrayContent">The chunk to send.</param>
-    public async Task SendFile(string uploadUrl, ByteArrayContent byteArrayContent) {
+    public async Task SendFile(string uploadUrl, ByteArrayContent byteArrayContent, CancellationToken cancellationToken = default) {
         using var requestMessage = new HttpRequestMessage(HttpMethod.Put, uploadUrl) {
             Content = byteArrayContent
         };
@@ -672,7 +673,7 @@ public class Graph {
         var originalAuthorization = _client.DefaultRequestHeaders.Authorization;
         _client.DefaultRequestHeaders.Authorization = null;
         try {
-            var uploadChunkResponse = await _client.SendAsync(requestMessage);
+            var uploadChunkResponse = await _client.SendAsync(requestMessage, cancellationToken);
             if (!uploadChunkResponse.IsSuccessStatusCode) {
                 // Handle upload error
                 LogCollector.LogWarning(uploadChunkResponse.ToString());
