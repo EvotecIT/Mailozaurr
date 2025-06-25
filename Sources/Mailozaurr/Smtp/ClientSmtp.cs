@@ -227,27 +227,50 @@ public partial class ClientSmtp : SmtpClient {
     }
 
     private IEnumerable<MailboxAddress> ConvertToMailboxAddress(object input) {
-        if (input is string str) {
-            var mailbox = MailboxAddress.Parse(str);
-            if (str.Contains('<') || str.Contains('>')) {
-                yield return mailbox;
-            } else {
-                yield return new MailboxAddress(string.Empty, mailbox.Address);
-            }
-        } else if (input is IDictionary dict) {
-            if (dict.Contains("Name") && dict.Contains("Email")) {
-                yield return new MailboxAddress(dict["Name"]?.ToString(), dict["Email"]?.ToString());
-            }
-        } else if (input is MailboxAddress mailbox) {
-            yield return mailbox;
-        } else if (input is IEnumerable<object> list) {
-            foreach (var item in list) {
-                foreach (var address in ConvertToMailboxAddress(item)) {
+        switch (input) {
+            case string str:
+                foreach (var address in ConvertStringToMailboxAddresses(str)) {
                     yield return address;
                 }
-            }
+                break;
+            case IDictionary dict:
+                foreach (var address in ConvertDictionaryToMailboxAddresses(dict)) {
+                    yield return address;
+                }
+                break;
+            case MailboxAddress mailbox:
+                yield return mailbox;
+                break;
+            case IEnumerable<object> list:
+                foreach (var address in ConvertListToMailboxAddresses(list)) {
+                    yield return address;
+                }
+                break;
+            default:
+                throw new ArgumentException($"Invalid input type for ConvertToMailboxAddress: {input}");
+        }
+    }
+
+    private IEnumerable<MailboxAddress> ConvertStringToMailboxAddresses(string value) {
+        var mailbox = MailboxAddress.Parse(value);
+        if (value.Contains('<') || value.Contains('>')) {
+            yield return mailbox;
         } else {
-            throw new ArgumentException($"Invalid input type for ConvertToMailboxAddress: {input}");
+            yield return new MailboxAddress(string.Empty, mailbox.Address);
+        }
+    }
+
+    private IEnumerable<MailboxAddress> ConvertDictionaryToMailboxAddresses(IDictionary dict) {
+        if (dict.Contains("Name") && dict.Contains("Email")) {
+            yield return new MailboxAddress(dict["Name"]?.ToString(), dict["Email"]?.ToString());
+        }
+    }
+
+    private IEnumerable<MailboxAddress> ConvertListToMailboxAddresses(IEnumerable<object> list) {
+        foreach (var item in list) {
+            foreach (var address in ConvertToMailboxAddress(item)) {
+                yield return address;
+            }
         }
     }
 
