@@ -29,7 +29,6 @@ namespace Mailozaurr.PowerShell;
 /// <seealso cref="CmdletGetPOP3Message"/>
 /// </summary>
 [Cmdlet(VerbsCommunications.Connect, "POP3")]
-[Alias("Connect-POP")]
 public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Specifies the POP3 server hostname or IP address to connect to.</para>

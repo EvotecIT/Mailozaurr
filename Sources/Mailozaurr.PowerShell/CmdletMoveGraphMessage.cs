@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 namespace Mailozaurr.PowerShell;
 
 [Cmdlet(VerbsCommon.Move, "GraphMessage")]
-[Alias("Move-MailMessage")]
 public class CmdletMoveGraphMessage : AsyncPSCmdlet {
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]

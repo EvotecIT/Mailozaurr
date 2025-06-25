@@ -5,10 +5,10 @@ namespace Mailozaurr.PowerShell;
 
 /// <summary>
 /// <para type="synopsis">Saves Microsoft Graph email messages to disk in a specified format.</para>
-/// <para type="description">The <c>Save-GraphMessage</c> cmdlet saves one or more <see cref="GraphEmailMessage"/> objects to disk at the specified path. Use this to archive, export, or process messages retrieved from Microsoft Graph.</para>
+/// <para type="description">The <c>Save-GraphMessage</c> cmdlet saves one or more <see cref="EmailGraphMessage"/> objects to disk at the specified path. Use this to archive, export, or process messages retrieved from Microsoft Graph.</para>
 /// <example>
 ///   <summary>Save mail messages to a folder</summary>
-///   <code>Get-EmailMessage ... | Save-GraphMessage -Path "C:\Archive"</code>
+///   <code>Get-EmailGraphMessage ... | Save-GraphMessage -Path "C:\Archive"</code>
 /// </example>
 /// <remarks>
 /// Use this cmdlet to export or archive messages for backup, migration, or compliance scenarios.
@@ -16,10 +16,9 @@ namespace Mailozaurr.PowerShell;
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
 [Cmdlet(VerbsData.Save, "GraphMessage")]
-[Alias("Save-MailMessage")]
 public class CmdletSaveGraphMessage : PSCmdlet {
     /// <summary>
-    /// <para type="description">Specifies the <see cref="GraphEmailMessage"/> objects to save. Accepts pipeline input.</para>
+    /// <para type="description">Specifies the <see cref="EmailGraphMessage"/> objects to save. Accepts pipeline input.</para>
     /// </summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true)]
     [ValidateNotNullOrEmpty]
@@ -36,7 +35,7 @@ public class CmdletSaveGraphMessage : PSCmdlet {
     /// </summary>
     protected override void ProcessRecord() {
         foreach (var m in Message) {
-            if (m.BaseObject is GraphEmailMessage gm) {
+            if (m.BaseObject is EmailGraphMessage gm) {
                 MicrosoftGraphUtils.SaveMailMessages(new[] { gm }, Path);
             } else if (m.BaseObject is MimeKit.MimeMessage mm) {
                 var resolved = System.IO.Path.GetFullPath(Path);

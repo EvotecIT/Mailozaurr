@@ -6,10 +6,10 @@ $ClientSecret = 'your-client-secret'
 $TenantId = 'your-tenant-id'
 $cred = ConvertTo-GraphCredential -ClientId $ClientId -ClientSecret $ClientSecret -DirectoryId $TenantId
 Connect-EmailGraph -Credential $cred | Out-Null
-Get-MailFolder -UserPrincipalName 'user@example.com'
+Get-EmailGraphFolder -UserPrincipalName 'user@example.com'
 Disconnect-EmailGraph
 
 # using Connect-MgGraph
 Import-Module Microsoft.Graph.Authentication -Force
 Connect-MgGraph -Scopes Mail.Read -NoWelcome
-Get-MailFolder -UserPrincipalName 'user@example.com' -MgGraphRequest
+Get-EmailGraphFolder -UserPrincipalName 'user@example.com' -MgGraphRequest

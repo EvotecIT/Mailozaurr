@@ -23,7 +23,7 @@ namespace Mailozaurr {
     /// <summary>
     /// Simplified representation of an email message returned from Graph.
     /// </summary>
-    public class GraphEmailMessage {
+    public class EmailGraphMessage {
         public string Id { get; set; }
         public string Subject { get; set; }
         public string BodyPreview { get; set; }
@@ -303,7 +303,7 @@ namespace Mailozaurr {
         /// <summary>
         /// Saves the bodies of messages to disk as HTML files.
         /// </summary>
-        public static void SaveMailMessages(IEnumerable<GraphEmailMessage> messages, string path) {
+        public static void SaveMailMessages(IEnumerable<EmailGraphMessage> messages, string path) {
             var resolvedPath = Path.GetFullPath(path);
             if (!Directory.Exists(resolvedPath)) Directory.CreateDirectory(resolvedPath);
             foreach (var m in messages) {

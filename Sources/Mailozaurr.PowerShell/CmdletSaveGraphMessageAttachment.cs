@@ -7,7 +7,6 @@ using Mailozaurr;
 namespace Mailozaurr.PowerShell;
 
 [Cmdlet(VerbsData.Save, "GraphMessageAttachment")]
-[Alias("Save-MailMessageAttachment")]
 public class CmdletSaveGraphMessageAttachment : PSCmdlet {
     [Parameter(Mandatory = true, ValueFromPipeline = true)]
     [ValidateNotNullOrEmpty]

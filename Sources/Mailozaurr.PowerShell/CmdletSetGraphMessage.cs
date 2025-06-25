@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 namespace Mailozaurr.PowerShell;
 
 [Cmdlet(VerbsCommon.Set, "GraphMessage")]
-[Alias("Set-MailMessage")]
 public class CmdletSetGraphMessage : AsyncPSCmdlet {
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]

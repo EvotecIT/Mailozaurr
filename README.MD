@@ -101,7 +101,7 @@ This will make sure the project has required libraries.
   - [x] Get IMAP Folder
   - [x] Get IMAP Messages
 - Office 365 Graph API
-  - [x] Get Mail Folders via `Get-MailFolder` with `-Connection` or `-MgGraphRequest`
+  - [x] Get Mail Folders via `Get-EmailGraphFolder` with `-Connection` or `-MgGraphRequest`
   - [x] Get Mail Messages
   - [x] Save Mail Messages
 - DNS and email validation functionality is now provided by [DomainDetective](https://github.com/EvotecIT/DomainDetective)

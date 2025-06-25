@@ -18,7 +18,6 @@ namespace Mailozaurr.PowerShell;
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
 [Cmdlet(VerbsCommunications.Disconnect, "POP3")]
-[Alias("Disconnect-POP")]
 public sealed class CmdletDisconnectPOP3 : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">The <see cref="PopConnectionInfo"/> object containing the MailKit POP3 client instance to disconnect. This is the object returned by <c>Connect-POP3</c>.</para>
