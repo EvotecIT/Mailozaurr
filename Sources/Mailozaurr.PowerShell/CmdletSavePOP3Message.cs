@@ -1,15 +1,18 @@
 using System.Management.Automation;
 using System.Threading.Tasks;
-using Mailozaurr.PowerShell;
+using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
-/// <para type="synopsis">Saves a POP3 message to disk at the specified path.</para>
-/// <para type="description">The <c>Save-POP3Message</c> cmdlet saves a message from a POP3 mailbox (using a <see cref="PopConnectionInfo"/> object from <c>Connect-POP3</c>) to disk at the specified path. Use this to archive, export, or process messages retrieved from a POP3 server.</para>
+/// <para type="synopsis">Saves a POP3 message to disk in either EML or MSG format.</para>
+/// <para type="description">The <c>Save-POP3Message</c> cmdlet saves a message from a POP3 mailbox (using a <see cref="PopConnectionInfo"/> object from <c>Connect-POP3</c>) to disk at the specified path. Use this to archive, export, or process messages retrieved from a POP3 server. The message can be saved as an EML file or converted to MSG format.</para>
 /// <example>
 ///   <summary>Save a POP3 message to a file</summary>
-///   <code>$client = Connect-POP3 ...; Save-POP3Message -Client $client -Index 0 -Path "C:\Mail\message.eml"</code>
+///   <code>
+/// $client = Connect-POP3 ...; Save-POP3Message -Client $client -Index 0 -Path "C:\Mail\message.eml"
+/// $client = Connect-POP3 ...; Save-POP3Message -Client $client -Index 0 -Path "C:\Mail\message.msg"
+///   </code>
 /// </example>
 /// <remarks>
 /// Use this cmdlet to export or archive messages for backup, migration, or compliance scenarios.
@@ -39,6 +42,7 @@ public sealed class CmdletSavePOP3Message : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? Path { get; set; }
 
+
     /// <summary>
     /// Saves the specified POP3 message to disk at the given path.
     /// </summary>
@@ -47,7 +51,14 @@ public sealed class CmdletSavePOP3Message : AsyncPSCmdlet {
         if (conn != null && conn.Data != null) {
             if (Index < conn.Data.Count) {
                 var message = conn.Data.GetMessage(Index);
-                message.WriteTo(Path);
+                if (Path != null && Path.EndsWith(".msg", System.StringComparison.OrdinalIgnoreCase)) {
+                    var tempEml = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{System.Guid.NewGuid()}.eml");
+                    message.WriteTo(tempEml);
+                    EmailMessage.ConvertEmlToMsg(new System.IO.FileInfo(tempEml), new System.IO.FileInfo(Path), true);
+                    System.IO.File.Delete(tempEml);
+                } else {
+                    message.WriteTo(Path);
+                }
             } else {
                 WriteWarning($"Save-POP3Message - Index is out of range. Use index less than {conn.Data.Count}.");
             }
