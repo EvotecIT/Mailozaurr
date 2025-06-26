@@ -198,9 +198,19 @@ public class Graph {
                 }
             }
 
-            if (ConvertedAttachments.Sum(a => string.IsNullOrEmpty(a.ContentBytes)
-                    ? 0
-                    : Convert.FromBase64String(a.ContentBytes).Length) > 4_000_000) {
+            var totalSize = 0;
+            foreach (var a in ConvertedAttachments) {
+                if (string.IsNullOrEmpty(a.ContentBytes)) {
+                    continue;
+                }
+                try {
+                    totalSize += Convert.FromBase64String(a.ContentBytes).Length;
+                } catch (FormatException ex) {
+                    LogCollector.LogError($"Send-EmailMessage - Invalid base64 for attachment '{a.Name}': {ex.Message}");
+                }
+            }
+
+            if (totalSize > 4_000_000) {
                 // Create a draft message if the total size of the attachments is larger than 4MB
                 IsLargerAttachment = true;
             } else {
