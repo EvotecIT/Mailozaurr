@@ -15,6 +15,8 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
 
     [Parameter(Mandatory = true, ParameterSetName = "Plain")]
     [Parameter(Mandatory = true, ParameterSetName = "Certificate")]
+    [Parameter(Mandatory = true, ParameterSetName = "CertificateBytes")]
+    [Parameter(Mandatory = true, ParameterSetName = "CertificatePem")]
     [ValidateNotNullOrEmpty]
     public string? ClientId { get; set; }
 
@@ -24,6 +26,8 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
 
     [Parameter(Mandatory = true, ParameterSetName = "Plain")]
     [Parameter(Mandatory = true, ParameterSetName = "Certificate")]
+    [Parameter(Mandatory = true, ParameterSetName = "CertificateBytes")]
+    [Parameter(Mandatory = true, ParameterSetName = "CertificatePem")]
     [ValidateNotNullOrEmpty]
     public string? DirectoryId { get; set; }
 
@@ -31,7 +35,16 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? CertificatePath { get; set; }
 
+    [Parameter(Mandatory = true, ParameterSetName = "CertificateBytes")]
+    [ValidateNotNull]
+    public byte[]? CertificateBytes { get; set; }
+
+    [Parameter(Mandatory = true, ParameterSetName = "CertificatePem")]
+    [ValidateNotNullOrEmpty]
+    public string? CertificatePemPath { get; set; }
+
     [Parameter(Mandatory = true, ParameterSetName = "Certificate")]
+    [Parameter(Mandatory = true, ParameterSetName = "CertificateBytes")]
     [ValidateNotNullOrEmpty]
     public string? CertificatePassword { get; set; }
 
@@ -47,6 +60,19 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
                 DirectoryId = DirectoryId!,
                 CertificatePath = CertificatePath!,
                 CertificatePassword = CertificatePassword!
+            };
+        } else if (ParameterSetName == "CertificateBytes") {
+            cred = new GraphCredential {
+                ClientId = ClientId!,
+                DirectoryId = DirectoryId!,
+                CertificateBytes = CertificateBytes!,
+                CertificatePassword = CertificatePassword!
+            };
+        } else if (ParameterSetName == "CertificatePem") {
+            cred = new GraphCredential {
+                ClientId = ClientId!,
+                DirectoryId = DirectoryId!,
+                CertificatePemPath = CertificatePemPath!
             };
         } else {
             cred = new GraphCredential {

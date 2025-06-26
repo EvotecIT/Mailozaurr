@@ -18,6 +18,8 @@ namespace Mailozaurr {
         public string? ClientSecret { get; set; }
         public string? CertificatePath { get; set; }
         public string? CertificatePassword { get; set; }
+        public byte[]? CertificateBytes { get; set; }
+        public string? CertificatePemPath { get; set; }
     }
 
     /// <summary>
@@ -75,6 +77,25 @@ namespace Mailozaurr {
                     tenantDomain,
                     credential.CertificatePath,
                     credential.CertificatePassword ?? string.Empty,
+                    scopes);
+                return $"{auth.TokenType} {auth.AccessToken}";
+            }
+            if (credential.CertificateBytes != null) {
+                var scopes = new[] { $"{resource}/.default" };
+                var auth = await OAuthHelpers.AcquireGraphCertificateTokenAsync(
+                    credential.ClientId,
+                    tenantDomain,
+                    credential.CertificateBytes,
+                    credential.CertificatePassword ?? string.Empty,
+                    scopes);
+                return $"{auth.TokenType} {auth.AccessToken}";
+            }
+            if (!string.IsNullOrEmpty(credential.CertificatePemPath)) {
+                var scopes = new[] { $"{resource}/.default" };
+                var auth = await OAuthHelpers.AcquireGraphCertificatePemTokenAsync(
+                    credential.ClientId,
+                    tenantDomain,
+                    credential.CertificatePemPath,
                     scopes);
                 return $"{auth.TokenType} {auth.AccessToken}";
             }
