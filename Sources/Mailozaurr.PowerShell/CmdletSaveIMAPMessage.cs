@@ -11,7 +11,10 @@ namespace Mailozaurr.PowerShell;
 /// <para type="description">The <c>Save-IMAPMessage</c> cmdlet saves a message from an IMAP mailbox (using a <see cref="ImapConnectionInfo"/> object from <c>Connect-IMAP</c>) to disk at the given path. Provide the unique identifier of the message to export or archive it.</para>
 /// <example>
 ///   <summary>Save an IMAP message to a file</summary>
-///   <code>$client = Connect-IMAP ...; Save-IMAPMessage -Client $client -Uid 123 -Path "C:\Mail\message.eml"</code>
+///   <code>
+/// $client = Connect-IMAP ...; Save-IMAPMessage -Client $client -Uid 123 -Path "C:\Mail\message.eml"
+/// $client = Connect-IMAP ...; Save-IMAPMessage -Client $client -Uid 123 -Path "C:\Mail\message.msg"
+///   </code>
 /// </example>
 /// <remarks>
 /// Use this cmdlet to export or archive messages retrieved from an IMAP server.
@@ -47,6 +50,7 @@ public sealed class CmdletSaveIMAPMessage : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? Path { get; set; }
 
+
     /// <summary>
     /// Saves the specified IMAP message to disk at the given path.
     /// </summary>
@@ -57,7 +61,14 @@ public sealed class CmdletSaveIMAPMessage : AsyncPSCmdlet {
             var mailFolder = conn.Data.GetCachedFolder(Folder ?? conn.Folder?.FullName, FolderAccess.ReadOnly);
             conn.Folders[mailFolder.FullName] = (ImapFolder)mailFolder;
             var message = mailFolder.GetMessage(uid);
-            message.WriteTo(Path);
+            if (Path != null && Path.EndsWith(".msg", System.StringComparison.OrdinalIgnoreCase)) {
+                var tempEml = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{System.Guid.NewGuid()}.eml");
+                message.WriteTo(tempEml);
+                EmailMessage.ConvertEmlToMsg(new System.IO.FileInfo(tempEml), new System.IO.FileInfo(Path), true);
+                System.IO.File.Delete(tempEml);
+            } else {
+                message.WriteTo(Path);
+            }
         } else {
             WriteWarning("Save-IMAPMessage - Is IMAP connected?");
         }
