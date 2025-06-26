@@ -6,7 +6,7 @@ namespace Mailozaurr;
 /// <summary>
 /// Helper class for sending messages via Microsoft Graph API.
 /// </summary>
-public class Graph {
+public class Graph : IDisposable {
     private readonly HttpClient _client;
     public string MessageJson = string.Empty;
     public GraphMessageContainer MessageContainer;
@@ -681,5 +681,12 @@ public class Graph {
             LogCollector.LogWarning(uploadChunkResponse.ToString());
             return;
         }
+    }
+
+    /// <summary>
+    /// Releases resources used by the Graph client.
+    /// </summary>
+    public void Dispose() {
+        _client.Dispose();
     }
 }
