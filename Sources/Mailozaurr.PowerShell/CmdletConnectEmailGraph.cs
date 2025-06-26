@@ -74,12 +74,28 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
             };
         }
 
+        var delay = RetryDelayMilliseconds;
         bool connected = false;
-        try {
-            var token = await MicrosoftGraphUtils.ConnectO365GraphAsync(cred, cred.DirectoryId, "https://graph.microsoft.com");
-            connected = !string.IsNullOrEmpty(token);
-        } catch {
-            // ignore errors, return not connected
+        Exception? lastError = null;
+
+        for (var attempt = 0; attempt <= RetryCount; attempt++) {
+            try {
+                var token = await MicrosoftGraphUtils.ConnectO365GraphAsync(cred, cred.DirectoryId, "https://graph.microsoft.com");
+                connected = !string.IsNullOrEmpty(token);
+                break;
+            } catch (Exception ex) {
+                lastError = ex;
+                WriteWarning($"Connect-EmailGraph - Attempt {attempt + 1} failed: {ex.Message}");
+            }
+
+            if (attempt < RetryCount) {
+                if (delay > 0) await Task.Delay(delay);
+                delay = (int)(delay * RetryDelayBackoff);
+            }
+        }
+
+        if (!connected) {
+            WriteWarning($"Connect-EmailGraph - Unable to obtain token after {RetryCount + 1} attempts: {lastError?.Message}");
         }
 
         var info = new GraphConnectionInfo { Credential = cred, IsConnected = connected };

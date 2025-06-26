@@ -132,28 +132,30 @@ public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
     /// Use the returned object with <c>Disconnect-POP3</c> or <c>Get-POP3Message</c> for further operations.
     /// </remarks>
     protected override async Task ProcessRecordAsync() {
-        var client = new Pop3Client();
-        try {
-            await client.ConnectAsync(Server, Port, Options);
-        } catch (Exception ex) {
-            WriteWarning($"Connect-POP3 - Unable to connect: {ex.Message}");
-            return;
-        }
+        var delay = RetryDelayMilliseconds;
+        Pop3Client? client = null;
+        Exception? lastError = null;
 
-        if (SkipCertificateRevocation) {
-            client.CheckCertificateRevocation = false;
-        }
-        if (SkipCertificateValidation) {
-            client.ServerCertificateValidationCallback = (s, c, h, e) => true;
-        }
-        if (client.Timeout != TimeOut) {
-            client.Timeout = TimeOut;
-        }
-
-        if (client.IsConnected) {
+        for (var attempt = 0; attempt <= RetryCount; attempt++) {
+            client = new Pop3Client();
             try {
+                await client.ConnectAsync(Server, Port, Options);
+
+                if (SkipCertificateRevocation) {
+                    client.CheckCertificateRevocation = false;
+                }
+                if (SkipCertificateValidation) {
+                    client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+                }
+                if (client.Timeout != TimeOut) {
+                    client.Timeout = TimeOut;
+                }
+
+                if (!client.IsConnected) {
+                    throw new InvalidOperationException("Client is not connected after ConnectAsync.");
+                }
+
                 if (ParameterSetName == "OAuth2" && OAuth2.IsPresent) {
-                    // OAuth2 authentication using SASL
                     var username = Credential.UserName;
                     var token = new System.Net.NetworkCredential("", Credential.Password).Password;
                     var sasl = new MailKit.Security.SaslMechanismOAuth2(username, token);
@@ -165,44 +167,48 @@ public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
                     var password = Credential.Password is SecureString ss ? new System.Net.NetworkCredential("", ss).Password : Credential.GetNetworkCredential().Password;
                     await client.AuthenticateAsync(username, password);
                 } else {
-                    WriteWarning("Connect-POP3 - No valid authentication method provided.");
-                    await client.DisconnectAsync(true);
-                    return;
+                    throw new InvalidOperationException("No valid authentication method provided.");
                 }
-            } catch (Exception ex) {
-                WriteWarning($"Connect-POP3 - Unable to authenticate: {ex.Message}");
-                await client.DisconnectAsync(true);
+
+                if (!client.IsAuthenticated) {
+                    throw new InvalidOperationException("Authentication failed.");
+                }
+
+                var info = new PopConnectionInfo {
+                    Uri = $"pops://{Server}:{Port}/",
+                    AuthenticationMechanisms = client.AuthenticationMechanisms,
+                    Capabilities = client.Capabilities,
+                    Stream = null, // Not exposed
+                    State = null, // Not exposed
+                    IsConnected = client.IsConnected,
+                    ApopToken = null,
+                    ExpirePolicy = null,
+                    Implementation = null,
+                    LoginDelay = null,
+                    IsAuthenticated = client.IsAuthenticated,
+                    IsSecure = client.IsSecure,
+                    Data = client,
+                    Count = client.Count,
+                    Messages = null,
+                    Recent = 0
+                };
+                DefaultSessions.Pop3Session = info;
+                WriteObject(info);
                 return;
+            } catch (Exception ex) {
+                lastError = ex;
+                WriteWarning($"Connect-POP3 - Attempt {attempt + 1} failed: {ex.Message}");
+                if (client.IsConnected) {
+                    try { await client.DisconnectAsync(true); } catch { /* ignore */ }
+                }
             }
-        } else {
-            WriteWarning("Connect-POP3 - Client is not connected after ConnectAsync.");
-            return;
+
+            if (attempt < RetryCount) {
+                if (delay > 0) await Task.Delay(delay);
+                delay = (int)(delay * RetryDelayBackoff);
+            }
         }
 
-        if (client.IsAuthenticated) {
-            var info = new PopConnectionInfo {
-                Uri = $"pops://{Server}:{Port}/",
-                AuthenticationMechanisms = client.AuthenticationMechanisms,
-                Capabilities = client.Capabilities,
-                Stream = null, // Not exposed
-                State = null, // Not exposed
-                IsConnected = client.IsConnected,
-                ApopToken = null, // Not directly available
-                ExpirePolicy = null, // Not directly available
-                Implementation = null, // Not directly available
-                LoginDelay = null, // Not directly available
-                IsAuthenticated = client.IsAuthenticated,
-                IsSecure = client.IsSecure,
-                Data = client,
-                Count = client.Count,
-                Messages = null, // Not directly available
-                Recent = 0 // Not directly available
-            };
-            DefaultSessions.Pop3Session = info;
-            WriteObject(info);
-        } else {
-            WriteWarning("Connect-POP3 - Authentication failed.");
-            await client.DisconnectAsync(true);
-        }
+        WriteWarning($"Connect-POP3 - Unable to connect after {RetryCount + 1} attempts: {lastError?.Message}");
     }
 }
