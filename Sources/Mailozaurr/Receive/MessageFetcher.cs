@@ -40,22 +40,13 @@ public static class MessageFetcher {
         bool delete = false,
         bool hasAttachment = false,
         IEnumerable<SearchQuery>? additionalQueries = null) {
-        IMailFolder mailFolder = client.Inbox;
-        if (!string.IsNullOrEmpty(folder)) {
-            try {
-                mailFolder = client.GetFolder(folder);
-            } catch (FolderNotFoundException ex) {
-                LoggingMessages.Logger.WriteError($"Failed to get folder '{folder}': {ex.Message}");
-                try {
-                    mailFolder = client.GetFolder(client.PersonalNamespaces[0]).GetSubfolder(folder);
-                } catch (FolderNotFoundException innerEx) {
-                    LoggingMessages.Logger.WriteError($"Failed to get subfolder '{folder}': {innerEx.Message}");
-                    throw;
-                }
-            }
+        IMailFolder mailFolder;
+        try {
+            mailFolder = client.GetCachedFolder(folder, delete ? FolderAccess.ReadWrite : FolderAccess.ReadOnly);
+        } catch (FolderNotFoundException ex) {
+            LoggingMessages.Logger.WriteError($"Failed to get folder '{folder}': {ex.Message}");
+            throw;
         }
-
-        mailFolder.Open(delete ? FolderAccess.ReadWrite : FolderAccess.ReadOnly);
 
         SearchQuery query = SearchQuery.All;
         if (!all) {

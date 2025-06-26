@@ -1,6 +1,8 @@
 using System.Management.Automation;
 using System.Threading.Tasks;
 using MailKit;
+using MailKit.Net.Imap;
+using Mailozaurr;
 using Mailozaurr.PowerShell;
 
 namespace Mailozaurr.PowerShell;
@@ -39,12 +41,13 @@ public sealed class CmdletGetIMAPFolder : AsyncPSCmdlet {
     protected override Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null) {
-            var folder = conn.Data.Inbox;
-            folder.Open(FolderAccess);
+            var folder = (ImapFolder)conn.Data.GetCachedFolder(conn.Folder?.FullName, FolderAccess);
             WriteVerbose($"Get-IMAPFolder - Total messages {folder.Count}, Recent messages {folder.Recent}");
             conn.Messages = folder;
             conn.Count = folder.Count;
             conn.Recent = folder.Recent;
+            conn.Folder = folder;
+            conn.Folders[folder.FullName] = folder;
             DefaultSessions.ImapSession = conn;
             WriteObject(conn);
         } else {
