@@ -43,12 +43,12 @@ public static class MessageFetcher {
             try {
                 mailFolder = client.GetFolder(folder);
             } catch (Exception ex) {
-                LoggingMessages.Logger.WriteWarning($"Failed to get folder '{folder}': {ex.Message}");
+                LoggingMessages.Logger.WriteError($"Failed to get folder '{folder}': {ex.Message}");
                 try {
                     mailFolder = client.GetFolder(client.PersonalNamespaces[0]).GetSubfolder(folder);
                 } catch (Exception innerEx) {
-                    LoggingMessages.Logger.WriteWarning($"Failed to get subfolder '{folder}': {innerEx.Message}");
-                    mailFolder = client.Inbox;
+                    LoggingMessages.Logger.WriteError($"Failed to get subfolder '{folder}': {innerEx.Message}");
+                    throw;
                 }
             }
         }
@@ -76,7 +76,13 @@ public static class MessageFetcher {
 
         var uids = mailFolder.Search(query);
         foreach (var uid in uids) {
-            var msg = mailFolder.GetMessage(uid);
+            MimeMessage msg;
+            try {
+                msg = mailFolder.GetMessage(uid);
+            } catch (Exception ex) {
+                LoggingMessages.Logger.WriteError($"Failed to get message UID {uid}: {ex.Message}");
+                throw;
+            }
             if (hasAttachment && !msg.Attachments.Any()) {
                 continue;
             }
@@ -118,7 +124,13 @@ public static class MessageFetcher {
         bool delete = false,
         bool hasAttachment = false) {
         for (int i = 0; i < client.Count; i++) {
-            var message = client.GetMessage(i);
+            MimeMessage message;
+            try {
+                message = client.GetMessage(i);
+            } catch (Exception ex) {
+                LoggingMessages.Logger.WriteError($"Failed to get message index {i}: {ex.Message}");
+                throw;
+            }
 
             if (!all) {
                 if (!string.IsNullOrEmpty(subject) && (message.Subject == null || message.Subject.IndexOf(subject, StringComparison.OrdinalIgnoreCase) < 0)) {
