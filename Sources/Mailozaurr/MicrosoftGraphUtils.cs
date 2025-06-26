@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Linq;
 using System.IO;
+using System.Collections.Concurrent;
 
 namespace Mailozaurr {
     /// <summary>
@@ -43,6 +44,7 @@ namespace Mailozaurr {
 
     public static class MicrosoftGraphUtils {
         private static readonly HttpClient HttpClient;
+        private static readonly ConcurrentDictionary<string, GraphAuthorization> TokenCache = new();
 
         static MicrosoftGraphUtils() {
             HttpClient = new HttpClient();
@@ -68,6 +70,10 @@ namespace Mailozaurr {
         /// Connects to O365 Graph and returns the Authorization header value ("Bearer ...").
         /// </summary>
         public static async Task<string> ConnectO365GraphAsync(GraphCredential credential, string tenantDomain, string resource = "https://manage.office.com") {
+            var key = $"{credential.ClientId}|{tenantDomain}|{credential.CertificatePath}|{credential.ClientSecret}|{resource}";
+            if (TokenCache.TryGetValue(key, out var cached) && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
+                return $"{cached.TokenType} {cached.AccessToken}";
+            }
             if (!string.IsNullOrEmpty(credential.CertificatePath)) {
                 var scopes = new[] { $"{resource}/.default" };
                 var auth = await OAuthHelpers.AcquireGraphCertificateTokenAsync(
@@ -76,6 +82,7 @@ namespace Mailozaurr {
                     credential.CertificatePath,
                     credential.CertificatePassword ?? string.Empty,
                     scopes);
+                TokenCache[key] = auth;
                 return $"{auth.TokenType} {auth.AccessToken}";
             }
 
@@ -97,6 +104,16 @@ namespace Mailozaurr {
             var token = System.Text.Json.JsonDocument.Parse(json);
             var accessToken = token.RootElement.GetProperty("access_token").GetString();
             var tokenType = token.RootElement.GetProperty("token_type").GetString();
+            var expiresOn = DateTimeOffset.UtcNow.AddHours(1);
+            if (token.RootElement.TryGetProperty("expires_in", out var expIn)) {
+                expiresOn = DateTimeOffset.UtcNow.AddSeconds(expIn.GetInt32());
+            }
+            if (token.RootElement.TryGetProperty("expires_on", out var expOn)) {
+                if (long.TryParse(expOn.GetString(), out var expSeconds)) {
+                    expiresOn = DateTimeOffset.FromUnixTimeSeconds(expSeconds);
+                }
+            }
+            TokenCache[key] = new GraphAuthorization { AccessToken = accessToken, TokenType = tokenType, ExpiresOn = expiresOn };
             return $"{tokenType} {accessToken}";
         }
 

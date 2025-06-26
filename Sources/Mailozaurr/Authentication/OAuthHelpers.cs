@@ -3,6 +3,8 @@ using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Util.Store;
 using System.Security.Cryptography.X509Certificates;
+using System.Linq;
+using System;
 
 namespace Mailozaurr;
 
@@ -31,14 +33,27 @@ public static class OAuthHelpers {
             RedirectUri = redirectUri
         };
         var app = PublicClientApplicationBuilder.CreateWithApplicationOptions(options).Build();
+        TokenCacheHelper.RegisterCache(app.UserTokenCache);
         AuthenticationResult result;
+        var accounts = await app.GetAccountsAsync();
+        IAccount? account = null;
         if (!string.IsNullOrEmpty(login)) {
-            result = await app.AcquireTokenInteractive(scopes)
-                .WithLoginHint(login)
-                .ExecuteAsync();
+            account = accounts.FirstOrDefault(a => string.Equals(a.Username, login, StringComparison.OrdinalIgnoreCase));
         } else {
-            result = await app.AcquireTokenInteractive(scopes)
-                .ExecuteAsync();
+            account = accounts.FirstOrDefault();
+        }
+        try {
+            if (account != null) {
+                result = await app.AcquireTokenSilent(scopes, account).ExecuteAsync();
+            } else {
+                throw new MsalUiRequiredException("", "no_account");
+            }
+        } catch (MsalUiRequiredException) {
+            var builder = app.AcquireTokenInteractive(scopes);
+            if (!string.IsNullOrEmpty(login)) {
+                builder = builder.WithLoginHint(login);
+            }
+            result = await builder.ExecuteAsync();
         }
         return new OAuthCredential {
             UserName = result.Account.Username,
@@ -106,7 +121,8 @@ public static class OAuthHelpers {
         var result = await app.AcquireTokenForClient(scopes).ExecuteAsync();
         return new GraphAuthorization {
             AccessToken = result.AccessToken,
-            TokenType = "Bearer"
+            TokenType = "Bearer",
+            ExpiresOn = result.ExpiresOn
         };
     }
 }
