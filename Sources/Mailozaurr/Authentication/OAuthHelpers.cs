@@ -112,6 +112,37 @@ public static class OAuthHelpers {
         string certificatePassword,
         IEnumerable<string>? scopes = null) {
         var certificate = new X509Certificate2(certificatePath, certificatePassword);
+        return await AcquireGraphCertificateTokenInternal(clientId, tenantId, certificate, scopes);
+    }
+
+    public static async Task<GraphAuthorization> AcquireGraphCertificateTokenAsync(
+        string clientId,
+        string tenantId,
+        byte[] certificateBytes,
+        string certificatePassword,
+        IEnumerable<string>? scopes = null) {
+        var certificate = new X509Certificate2(certificateBytes, certificatePassword);
+        return await AcquireGraphCertificateTokenInternal(clientId, tenantId, certificate, scopes);
+    }
+
+    public static async Task<GraphAuthorization> AcquireGraphCertificatePemTokenAsync(
+        string clientId,
+        string tenantId,
+        string pemPath,
+        IEnumerable<string>? scopes = null) {
+#if NET5_0_OR_GREATER
+        var certificate = X509Certificate2.CreateFromPemFile(pemPath);
+        return await AcquireGraphCertificateTokenInternal(clientId, tenantId, certificate, scopes);
+#else
+        throw new NotSupportedException("PEM certificates are not supported on this framework.");
+#endif
+    }
+
+    private static async Task<GraphAuthorization> AcquireGraphCertificateTokenInternal(
+        string clientId,
+        string tenantId,
+        X509Certificate2 certificate,
+        IEnumerable<string>? scopes) {
         var app = ConfidentialClientApplicationBuilder
             .Create(clientId)
             .WithTenantId(tenantId)
