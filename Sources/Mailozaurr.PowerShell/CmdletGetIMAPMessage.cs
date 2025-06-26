@@ -127,12 +127,12 @@ public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
     /// <summary>
     /// Opens the inbox folder and retrieves messages if message parameters are specified.
     /// </summary>
-    protected override Task ProcessRecordAsync() {
+    protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
             var folder = conn.Folder?.FullName;
 
-            var messages = MessageFetcher.Fetch(
+            await foreach (var message in MessageFetcher.Fetch(
                 conn.Data,
                 folder,
                 Subject,
@@ -143,13 +143,11 @@ public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
                 Before,
                 All.IsPresent,
                 Delete.IsPresent,
-                HasAttachment.IsPresent);
-
-            WriteObject(messages, true);
+                HasAttachment.IsPresent)) {
+                WriteObject(message);
+            }
         } else {
             WriteWarning("Get-IMAPMessage - Is IMAP connected?");
         }
-
-        return Task.CompletedTask;
     }
 }

@@ -99,15 +99,15 @@ public sealed class CmdletGetPOP3Message : AsyncPSCmdlet {
     /// <summary>
     /// Retrieves one or more messages from the POP3 mailbox.
     /// </summary>
-    protected override Task ProcessRecordAsync() {
+    protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.Pop3Session;
         if (conn != null && conn.Data != null) {
             if (!conn.IsConnected) {
                 WriteWarning("Get-POP3Message - Client is not connected.");
-                return Task.CompletedTask;
+                return;
             }
 
-            var messages = MessageFetcher.Fetch(
+            await foreach (var message in MessageFetcher.Fetch(
                 conn.Data,
                 Subject,
                 FromContains,
@@ -117,13 +117,11 @@ public sealed class CmdletGetPOP3Message : AsyncPSCmdlet {
                 Before,
                 All.IsPresent,
                 Delete.IsPresent,
-                HasAttachment.IsPresent);
-
-            WriteObject(messages, true);
+                HasAttachment.IsPresent)) {
+                WriteObject(message);
+            }
         } else {
             WriteWarning("Get-POP3Message - Is POP3 connected?");
         }
-
-        return Task.CompletedTask;
     }
 }

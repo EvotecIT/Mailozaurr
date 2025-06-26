@@ -5,6 +5,7 @@ using MailKit.Search;
 using MimeKit;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Mailozaurr;
 
@@ -26,7 +27,7 @@ public static class MessageFetcher {
     /// <param name="all">If set, ignores other filters.</param>
     /// <param name="delete">If set, messages are deleted after fetching.</param>
     /// <returns>Collection of matching messages.</returns>
-    public static IEnumerable<ImapEmailMessage> Fetch(
+    public static async IAsyncEnumerable<ImapEmailMessage> Fetch(
         ImapClient client,
         string? folder = null,
         string? subject = null,
@@ -53,7 +54,7 @@ public static class MessageFetcher {
             }
         }
 
-        mailFolder.Open(delete ? FolderAccess.ReadWrite : FolderAccess.ReadOnly);
+        await mailFolder.OpenAsync(delete ? FolderAccess.ReadWrite : FolderAccess.ReadOnly);
 
         SearchQuery query = SearchQuery.All;
         if (!all) {
@@ -74,11 +75,11 @@ public static class MessageFetcher {
             }
         }
 
-        var uids = mailFolder.Search(query);
+        var uids = await mailFolder.SearchAsync(query);
         foreach (var uid in uids) {
             MimeMessage msg;
             try {
-                msg = mailFolder.GetMessage(uid);
+                msg = await mailFolder.GetMessageAsync(uid);
             } catch (Exception ex) {
                 LoggingMessages.Logger.WriteError($"Failed to get message UID {uid}: {ex.Message}");
                 throw;
@@ -91,11 +92,11 @@ public static class MessageFetcher {
             }
             yield return new ImapEmailMessage(uid, msg);
             if (delete) {
-                mailFolder.AddFlags(uid, MessageFlags.Deleted, true);
+                await mailFolder.AddFlagsAsync(uid, MessageFlags.Deleted, true);
             }
         }
         if (delete && uids.Count > 0) {
-            mailFolder.Expunge();
+            await mailFolder.ExpungeAsync();
         }
     }
 
@@ -112,7 +113,7 @@ public static class MessageFetcher {
     /// <param name="all">If set, ignores other filters.</param>
     /// <param name="delete">If set, messages are deleted after fetching.</param>
     /// <returns>Collection of matching messages.</returns>
-    public static IEnumerable<Pop3EmailMessage> Fetch(
+    public static async IAsyncEnumerable<Pop3EmailMessage> Fetch(
         Pop3Client client,
         string? subject = null,
         string? fromContains = null,
@@ -126,7 +127,7 @@ public static class MessageFetcher {
         for (int i = 0; i < client.Count; i++) {
             MimeMessage message;
             try {
-                message = client.GetMessage(i);
+                message = await client.GetMessageAsync(i);
             } catch (Exception ex) {
                 LoggingMessages.Logger.WriteError($"Failed to get message index {i}: {ex.Message}");
                 throw;
@@ -160,7 +161,7 @@ public static class MessageFetcher {
 
             yield return new Pop3EmailMessage(i, message);
             if (delete) {
-                client.DeleteMessage(i);
+                await client.DeleteMessageAsync(i);
             }
         }
     }
