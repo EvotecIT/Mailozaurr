@@ -102,6 +102,11 @@ public sealed class CmdletGetPOP3Message : AsyncPSCmdlet {
     protected override Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.Pop3Session;
         if (conn != null && conn.Data != null) {
+            if (!conn.IsConnected) {
+                WriteWarning("Get-POP3Message - Client is not connected.");
+                return Task.CompletedTask;
+            }
+
             var messages = MessageFetcher.Fetch(
                 conn.Data,
                 Subject,
