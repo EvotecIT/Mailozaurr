@@ -29,6 +29,10 @@ public static class ImapClientFolderCache {
                 try {
                     mailFolder = client.GetFolder(name);
                 } catch (FolderNotFoundException) {
+                    if (client.PersonalNamespaces.Count == 0) {
+                        throw;
+                    }
+
                     mailFolder = client.GetFolder(client.PersonalNamespaces[0]).GetSubfolder(name);
                 }
             }
