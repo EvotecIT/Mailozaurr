@@ -45,7 +45,12 @@ public static class MessageFetcher {
             } catch (Exception ex) {
                 LoggingMessages.Logger.WriteError($"Failed to get folder '{folder}': {ex.Message}");
                 try {
-                    mailFolder = client.GetFolder(client.PersonalNamespaces[0]).GetSubfolder(folder);
+                    if (client.PersonalNamespaces.Count > 0) {
+                        mailFolder = client.GetFolder(client.PersonalNamespaces[0]).GetSubfolder(folder);
+                    } else {
+                        LoggingMessages.Logger.WriteError("Personal namespaces list is empty. Unable to access subfolder.");
+                        throw;
+                    }
                 } catch (Exception innerEx) {
                     LoggingMessages.Logger.WriteError($"Failed to get subfolder '{folder}': {innerEx.Message}");
                     throw;
