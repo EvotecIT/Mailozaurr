@@ -5,8 +5,7 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// Represents the result of a successful POP3 connection, including the client and connection details.
 /// </summary>
-public class PopConnectionInfo
-{
+public class PopConnectionInfo : ConnectionInfoBase {
     /// <summary>POP3 server URI.</summary>
     public string Uri { get; set; }
     /// <summary>Authentication mechanisms supported by the server.</summary>
@@ -17,8 +16,6 @@ public class PopConnectionInfo
     public object Stream { get; set; }
     /// <summary>Current state of the connection.</summary>
     public object State { get; set; }
-    /// <summary>Whether the client is connected.</summary>
-    public bool IsConnected { get; set; }
     /// <summary>APOP token, if any.</summary>
     public object ApopToken { get; set; }
     /// <summary>Expire policy.</summary>
