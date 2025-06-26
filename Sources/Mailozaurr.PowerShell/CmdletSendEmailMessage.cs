@@ -621,7 +621,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             }
         } else if (EmailProvider == EmailProvider.Mailgun) {
             var logCollector = new LogCollector();
-            MailgunClient mailgun = new MailgunClient();
+            using MailgunClient mailgun = new MailgunClient();
             mailgun.LogCollector = logCollector;
             mailgun.From = Helpers.GetFromObject(fromEmail, fromName);
             if (Bcc != null) mailgun.Bcc = Bcc.ToList();
@@ -656,7 +656,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 }
             }
         } else if (Graph) {
-            Graph graph = new Graph();
+            using Graph graph = new Graph();
             graph.ChunkSize = ChunkSize;
             graph.From = Helpers.GetFromObject(fromEmail, fromName);
             graph.To = To;
@@ -706,7 +706,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             }
             LogEmitter.EmitLogs(graph.LogCollector, this);
         } else if (MgGraphRequest) {
-            Graph graph = new Graph();
+            using Graph graph = new Graph();
             graph.ChunkSize = ChunkSize;
             graph.From = Helpers.GetFromObject(fromEmail, fromName);
             graph.To = To;

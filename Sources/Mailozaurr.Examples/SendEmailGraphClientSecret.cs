@@ -14,7 +14,7 @@ public static class SendEmailGraphClientSecret {
 
         // === EXAMPLE ===
         try {
-            var graph = new Graph();
+            using var graph = new Graph();
             graph.From = sender;
             graph.To = new[] { recipient };
             graph.Subject = "Test Email via Microsoft Graph (Client Secret)";

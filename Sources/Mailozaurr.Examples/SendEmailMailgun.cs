@@ -12,7 +12,7 @@ public static class SendEmailMailgun {
 
         // === EXAMPLE ===
         try {
-            var mailgun = new MailgunClient();
+            using var mailgun = new MailgunClient();
             mailgun.From = sender;
             mailgun.To = new[] { recipient }.ToList<object>();
             mailgun.Subject = "Test Email via Mailgun";

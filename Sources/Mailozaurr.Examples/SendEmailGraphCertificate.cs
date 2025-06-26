@@ -20,7 +20,7 @@ public static class SendEmailGraphCertificate {
                 certificatePath,
                 certificatePassword);
 
-            var graph = new Graph();
+            using var graph = new Graph();
             graph.From = sender;
             graph.To = new[] { recipient };
             graph.Subject = "Test Email via Microsoft Graph (Certificate)";

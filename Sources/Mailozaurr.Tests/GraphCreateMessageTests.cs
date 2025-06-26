@@ -9,7 +9,7 @@ public class GraphCreateMessageTests
     [Fact]
     public void CreateMessage_WithValidData_BuildsJson()
     {
-        var graph = new Graph
+        using var graph = new Graph
         {
             From = "from@example.com",
             To = new object[] { "to@example.com" },
@@ -25,7 +25,7 @@ public class GraphCreateMessageTests
     [Fact]
     public void CreateAttachments_WithMissingFile_ThrowsFileNotFoundException()
     {
-        var graph = new Graph
+        using var graph = new Graph
         {
             Attachments = new object[] { "missing.file" }
         };
@@ -37,7 +37,7 @@ public class GraphCreateMessageTests
     {
         string tmp = Path.GetTempFileName();
         File.WriteAllBytes(tmp, new byte[4000001]);
-        var graph = new Graph
+        using var graph = new Graph
         {
             From = "from@example.com",
             To = new object[] { "to@example.com" },
