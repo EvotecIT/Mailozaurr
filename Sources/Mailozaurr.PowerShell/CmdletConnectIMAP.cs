@@ -1,6 +1,8 @@
 using MailKit.Net.Imap;
 using MailKit.Security;
+using System.IO;
 using System.Security;
+using System.Security.Authentication;
 
 namespace Mailozaurr.PowerShell;
 
@@ -118,13 +120,19 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
         var client = new ImapClient();
         try {
             await client.ConnectAsync(Server, Port, Options);
-        } catch (Exception ex) {
-            var responseText = (ex as ImapCommandException)?.ResponseText;
+        } catch (ImapCommandException ex) {
+            var responseText = ex.ResponseText;
             if (!string.IsNullOrEmpty(responseText)) {
                 WriteWarning($"Connect-IMAP - Unable to connect: {ex.Message} | Server response: {responseText}");
             } else {
                 WriteWarning($"Connect-IMAP - Unable to connect: {ex.Message}");
             }
+            return;
+        } catch (ImapProtocolException ex) {
+            WriteWarning($"Connect-IMAP - Protocol error: {ex.Message}");
+            return;
+        } catch (IOException ex) {
+            WriteWarning($"Connect-IMAP - Network error: {ex.Message}");
             return;
         }
 
@@ -157,13 +165,25 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
                     await client.DisconnectAsync(true);
                     return;
                 }
-            } catch (Exception ex) {
-                var responseText = (ex as ImapCommandException)?.ResponseText;
+            } catch (System.Security.Authentication.AuthenticationException ex) {
+                WriteWarning($"Connect-IMAP - Authentication error: {ex.Message}");
+                await client.DisconnectAsync(true);
+                return;
+            } catch (ImapCommandException ex) {
+                var responseText = ex.ResponseText;
                 if (!string.IsNullOrEmpty(responseText)) {
                     WriteWarning($"Connect-IMAP - Unable to authenticate: {ex.Message} | Server response: {responseText}");
                 } else {
                     WriteWarning($"Connect-IMAP - Unable to authenticate: {ex.Message}");
                 }
+                await client.DisconnectAsync(true);
+                return;
+            } catch (ImapProtocolException ex) {
+                WriteWarning($"Connect-IMAP - Protocol error: {ex.Message}");
+                await client.DisconnectAsync(true);
+                return;
+            } catch (IOException ex) {
+                WriteWarning($"Connect-IMAP - Network error: {ex.Message}");
                 await client.DisconnectAsync(true);
                 return;
             }
@@ -176,8 +196,8 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
             // Open the inbox to get message info
             try {
                 await client.Inbox.OpenAsync(MailKit.FolderAccess.ReadOnly);
-            } catch (Exception ex) {
-                var responseText = (ex as ImapCommandException)?.ResponseText;
+            } catch (ImapCommandException ex) {
+                var responseText = ex.ResponseText;
                 if (!string.IsNullOrEmpty(responseText)) {
                     LoggingMessages.Logger.WriteWarning($"Connect-IMAP - Failed to open inbox: {ex.Message} | Server response: {responseText}");
                 } else {

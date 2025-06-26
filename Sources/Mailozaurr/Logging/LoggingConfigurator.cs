@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace Mailozaurr;
 
 /// <summary>
@@ -54,7 +56,7 @@ public class LoggingConfigurator {
             if (!string.IsNullOrEmpty(logPath)) {
                 try {
                     protocolLogger = new ProtocolLogger(logPath, logOverwrite);
-                } catch (Exception ex) {
+                } catch (IOException ex) {
                     LoggingMessages.Logger.WriteWarning($"Couldn't create protocol logger with {logPath}: {ex.Message}. Using console output instead.");
                     protocolLogger = new ProtocolLogger(Console.OpenStandardOutput());
                 }

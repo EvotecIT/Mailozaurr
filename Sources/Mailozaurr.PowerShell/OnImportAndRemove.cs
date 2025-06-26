@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Reflection;
 
@@ -47,7 +48,7 @@ public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemb
             if (File.Exists(assemblyPath)) {
                 try {
                     return Assembly.LoadFrom(assemblyPath);
-                } catch (Exception ex) {
+                } catch (BadImageFormatException ex) {
                     Console.WriteLine($"Failed to load assembly from {assemblyPath}: {ex.Message}");
                 }
             }

@@ -1,4 +1,6 @@
-﻿namespace Mailozaurr.PowerShell;
+﻿using System.Management.Automation;
+
+namespace Mailozaurr.PowerShell;
 
 /// <summary>
 /// <para type="synopsis">Sends an email message using SMTP, SendGrid, or Microsoft Graph from within PowerShell. Replaces the deprecated Send-MailMessage.</para>
@@ -883,7 +885,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             if (!Suppress) {
                 WriteObject(new SmtpResult(true, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ""));
             }
-        } catch (Exception ex) {
+        } catch (RuntimeException ex) {
             LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending using Graph Api (MgGraphRequest): {ex.Message}");
             if (errorAction == ActionPreference.Stop) {
                 throw;
@@ -913,7 +915,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             powerShell.AddParameters(parameters);
             try {
                 var results = powerShell.Invoke();
-            } catch (Exception ex) {
+            } catch (RuntimeException ex) {
                 LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending using Graph Api (MgGraphRequest): {ex.Message}");
                 if (errorAction == ActionPreference.Stop) {
                     throw;
@@ -954,7 +956,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 // Handle the case where no results were returned
                 throw new InvalidOperationException("No results were returned from the Invoke-MgGraphRequest command.");
             }
-        } catch (Exception ex) {
+        } catch (RuntimeException ex) {
             LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending using Graph Api (MgGraphRequest): {ex.Message}");
             if (errorAction == ActionPreference.Stop) {
                 throw;
@@ -992,7 +994,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 // Handle the case where no results were returned
                 throw new InvalidOperationException("No results were returned from the Invoke-MgGraphRequest command.");
             }
-        } catch (Exception ex) {
+        } catch (RuntimeException ex) {
             LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending using Graph Api (MgGraphRequest): {ex.Message}");
             if (errorAction == ActionPreference.Stop) {
                 throw;
