@@ -18,7 +18,7 @@ public static class CredentialHelpers {
         // Try to convert from encrypted string, fallback to plain text
         try {
             return new NetworkCredential("", s).SecurePassword;
-        } catch (Exception ex) {
+        } catch (ArgumentException ex) {
             LoggingMessages.Logger.WriteWarning($"Failed to convert to SecureString: {ex.Message}");
             var ss = new SecureString();
             foreach (char c in s) ss.AppendChar(c);

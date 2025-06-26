@@ -25,6 +25,7 @@ public static class MessageFetcher {
     /// <param name="before">Latest delivery date.</param>
     /// <param name="all">If set, ignores other filters.</param>
     /// <param name="delete">If set, messages are deleted after fetching.</param>
+    /// <param name="additionalQueries">Additional <see cref="SearchQuery"/> filters.</param>
     /// <returns>Collection of matching messages.</returns>
     public static IEnumerable<ImapEmailMessage> Fetch(
         ImapClient client,
@@ -37,16 +38,17 @@ public static class MessageFetcher {
         DateTime? before = null,
         bool all = false,
         bool delete = false,
-        bool hasAttachment = false) {
+        bool hasAttachment = false,
+        IEnumerable<SearchQuery>? additionalQueries = null) {
         IMailFolder mailFolder = client.Inbox;
         if (!string.IsNullOrEmpty(folder)) {
             try {
                 mailFolder = client.GetFolder(folder);
-            } catch (Exception ex) {
+            } catch (FolderNotFoundException ex) {
                 LoggingMessages.Logger.WriteError($"Failed to get folder '{folder}': {ex.Message}");
                 try {
                     mailFolder = client.GetFolder(client.PersonalNamespaces[0]).GetSubfolder(folder);
-                } catch (Exception innerEx) {
+                } catch (FolderNotFoundException innerEx) {
                     LoggingMessages.Logger.WriteError($"Failed to get subfolder '{folder}': {innerEx.Message}");
                     throw;
                 }
@@ -74,12 +76,20 @@ public static class MessageFetcher {
             }
         }
 
+        if (additionalQueries != null) {
+            foreach (var q in additionalQueries) {
+                if (q != null) {
+                    query = query.And(q);
+                }
+            }
+        }
+
         var uids = mailFolder.Search(query);
         foreach (var uid in uids) {
             MimeMessage msg;
             try {
                 msg = mailFolder.GetMessage(uid);
-            } catch (Exception ex) {
+            } catch (MessageNotFoundException ex) {
                 LoggingMessages.Logger.WriteError($"Failed to get message UID {uid}: {ex.Message}");
                 throw;
             }
@@ -127,7 +137,7 @@ public static class MessageFetcher {
             MimeMessage message;
             try {
                 message = client.GetMessage(i);
-            } catch (Exception ex) {
+            } catch (Pop3CommandException ex) {
                 LoggingMessages.Logger.WriteError($"Failed to get message index {i}: {ex.Message}");
                 throw;
             }

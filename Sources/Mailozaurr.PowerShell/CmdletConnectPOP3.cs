@@ -1,6 +1,8 @@
 using MailKit.Net.Pop3;
 using MailKit.Security;
+using System.IO;
 using System.Security;
+using System.Security.Authentication;
 
 namespace Mailozaurr.PowerShell;
 
@@ -117,13 +119,19 @@ public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
         var client = new Pop3Client();
         try {
             await client.ConnectAsync(Server, Port, Options);
-        } catch (Exception ex) {
-            var statusText = (ex as Pop3CommandException)?.StatusText;
+        } catch (Pop3CommandException ex) {
+            var statusText = ex.StatusText;
             if (!string.IsNullOrEmpty(statusText)) {
                 WriteWarning($"Connect-POP3 - Unable to connect: {ex.Message} | Server response: {statusText}");
             } else {
                 WriteWarning($"Connect-POP3 - Unable to connect: {ex.Message}");
             }
+            return;
+        } catch (Pop3ProtocolException ex) {
+            WriteWarning($"Connect-POP3 - Protocol error: {ex.Message}");
+            return;
+        } catch (IOException ex) {
+            WriteWarning($"Connect-POP3 - Network error: {ex.Message}");
             return;
         }
 
@@ -156,13 +164,25 @@ public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
                     await client.DisconnectAsync(true);
                     return;
                 }
-            } catch (Exception ex) {
-                var statusText = (ex as Pop3CommandException)?.StatusText;
+            } catch (System.Security.Authentication.AuthenticationException ex) {
+                WriteWarning($"Connect-POP3 - Authentication error: {ex.Message}");
+                await client.DisconnectAsync(true);
+                return;
+            } catch (Pop3CommandException ex) {
+                var statusText = ex.StatusText;
                 if (!string.IsNullOrEmpty(statusText)) {
                     WriteWarning($"Connect-POP3 - Unable to authenticate: {ex.Message} | Server response: {statusText}");
                 } else {
                     WriteWarning($"Connect-POP3 - Unable to authenticate: {ex.Message}");
                 }
+                await client.DisconnectAsync(true);
+                return;
+            } catch (Pop3ProtocolException ex) {
+                WriteWarning($"Connect-POP3 - Protocol error: {ex.Message}");
+                await client.DisconnectAsync(true);
+                return;
+            } catch (IOException ex) {
+                WriteWarning($"Connect-POP3 - Network error: {ex.Message}");
                 await client.DisconnectAsync(true);
                 return;
             }

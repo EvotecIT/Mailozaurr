@@ -38,8 +38,8 @@ public static class Helpers {
         try {
             var networkCredential = credentials as NetworkCredential;
             apiKey = networkCredential.Password;
-        } catch (Exception ex) {
-            apiKey = "";
+        } catch (InvalidCastException) {
+            apiKey = string.Empty;
         }
         return apiKey;
     }
@@ -140,7 +140,7 @@ public static class Helpers {
             var json = JsonSerializer.Serialize(result);
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
             using var response = await client.PostAsync(url, content);
-        } catch (Exception ex) {
+        } catch (HttpRequestException ex) {
             LoggingMessages.Logger.WriteWarning($"Failed to post webhook: {ex.Message}");
         }
     }

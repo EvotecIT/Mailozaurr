@@ -47,7 +47,7 @@ namespace Mailozaurr.Tests {
         [Fact(Skip="Requires network access")]
         public async Task SendEmail_Graph_WithValidInput_Succeeds() {
             // Arrange
-            var graph = new Graph();
+            using var graph = new Graph();
             graph.From = "sender@example.com";
             graph.To = new object[] { "recipient@example.com" };
             graph.Subject = "Test Email (Graph)";
