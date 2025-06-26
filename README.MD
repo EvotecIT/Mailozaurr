@@ -92,6 +92,7 @@ This will make sure the project has required libraries.
   - [x] Office 365 Graph API
   - [x] PGP/MIME encryption and signature verification
   - Optional retry logic for `Send-EmailMessage` via `-RetryCount`, `-RetryDelayMilliseconds`, `-RetryDelayBackoff` and `-RetryAlways`.  Retries are only attempted for transient errors by default, but `-RetryAlways` forces retries on all errors.
+  - Connection cmdlets support the same retry parameters for establishing sessions.
 - POP3
   - [x] Connect to POP3
   - [x] Get POP3 Emails

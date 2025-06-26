@@ -102,6 +102,24 @@ public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
     public int TimeOut { get; set; } = 120000;
 
     /// <summary>
+    /// <para type="description">Specifies how many times the cmdlet should retry when connecting or authenticating. Default is 0 (no retries).</para>
+    /// </summary>
+    [Parameter]
+    public int RetryCount { get; set; } = 0;
+
+    /// <summary>
+    /// <para type="description">Delay in milliseconds between retry attempts.</para>
+    /// </summary>
+    [Parameter]
+    public int RetryDelayMilliseconds { get; set; } = 0;
+
+    /// <summary>
+    /// <para type="description">Multiplicative backoff applied to the retry delay. Value of 1 disables backoff.</para>
+    /// </summary>
+    [Parameter]
+    public double RetryDelayBackoff { get; set; } = 1.0;
+
+    /// <summary>
     /// <para type="description">Enables OAuth2 authentication. Use with a PSCredential object containing the access token as the password.</para>
     /// </summary>
     [Parameter(ParameterSetName = "OAuth2")]

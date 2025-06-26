@@ -35,6 +35,24 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? CertificatePassword { get; set; }
 
+    /// <summary>
+    /// <para type="description">Specifies how many times the cmdlet should retry when obtaining the access token. Default is 0 (no retries).</para>
+    /// </summary>
+    [Parameter]
+    public int RetryCount { get; set; } = 0;
+
+    /// <summary>
+    /// <para type="description">Delay in milliseconds between retry attempts.</para>
+    /// </summary>
+    [Parameter]
+    public int RetryDelayMilliseconds { get; set; } = 0;
+
+    /// <summary>
+    /// <para type="description">Multiplicative backoff applied to the retry delay. Value of 1 disables backoff.</para>
+    /// </summary>
+    [Parameter]
+    public double RetryDelayBackoff { get; set; } = 1.0;
+
     protected override async Task ProcessRecordAsync() {
         GraphCredential cred;
         if (ParameterSetName == "Credential") {
