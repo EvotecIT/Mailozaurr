@@ -1,5 +1,6 @@
 using MailKit.Net.Imap;
 using MailKit.Security;
+using Mailozaurr;
 using System.IO;
 using System.Security;
 using System.Security.Authentication;
@@ -193,9 +194,9 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
         }
 
         if (client.IsAuthenticated) {
-            // Open the inbox to get message info
+            // Open the inbox once and cache folder reference
             try {
-                await client.Inbox.OpenAsync(MailKit.FolderAccess.ReadOnly);
+                _ = client.GetCachedFolder(null, MailKit.FolderAccess.ReadOnly);
             } catch (ImapCommandException ex) {
                 var responseText = ex.ResponseText;
                 if (!string.IsNullOrEmpty(responseText)) {
@@ -204,6 +205,7 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
                     LoggingMessages.Logger.WriteWarning($"Connect-IMAP - Failed to open inbox: {ex.Message}");
                 }
             }
+            var inbox = (ImapFolder)client.GetCachedFolder(null, MailKit.FolderAccess.ReadOnly);
             var info = new ImapConnectionInfo {
                 Uri = $"imaps://{Server}:{Port}/",
                 AuthenticationMechanisms = client.AuthenticationMechanisms,
@@ -218,10 +220,12 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
                 IsAuthenticated = client.IsAuthenticated,
                 IsSecure = client.IsSecure,
                 Data = client,
-                Count = client.Inbox?.Count ?? 0,
-                Messages = client.Inbox,
-                Recent = client.Inbox?.Recent ?? 0
+                Count = inbox.Count,
+                Messages = inbox,
+                Recent = inbox.Recent,
+                Folder = inbox
             };
+            info.Folders[inbox.FullName] = inbox;
             DefaultSessions.ImapSession = info;
             WriteObject(info);
         } else {

@@ -1,3 +1,5 @@
+using Mailozaurr;
+
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
@@ -31,6 +33,7 @@ public sealed class CmdletDisconnectIMAP : AsyncPSCmdlet {
             if (data != null) {
                 try {
                     data.Disconnect(true);
+                    data.ClearFolderCache();
                 } catch (System.Exception ex) {
                     WriteWarning($"Disconnect-IMAP - Unable to disconnect: {ex.Message}");
                 }

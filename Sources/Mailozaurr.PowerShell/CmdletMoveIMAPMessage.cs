@@ -1,6 +1,8 @@
 using System.Management.Automation;
 using System.Threading.Tasks;
 using MailKit;
+using MailKit.Net.Imap;
+using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
 
@@ -52,32 +54,10 @@ public sealed class CmdletMoveIMAPMessage : AsyncPSCmdlet {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
             var uid = new UniqueId(Uid);
-            IMailFolder source = conn.Data.Inbox;
-            if (!string.IsNullOrEmpty(SourceFolder)) {
-                try {
-                    source = conn.Data.GetFolder(SourceFolder);
-                } catch {
-                    try {
-                        source = conn.Data.GetFolder(conn.Data.PersonalNamespaces[0]).GetSubfolder(SourceFolder);
-                    } catch {
-                        WriteWarning($"Move-IMAPMessage - Source folder '{SourceFolder}' not found.");
-                        return Task.CompletedTask;
-                    }
-                }
-            }
-            IMailFolder? dest = null;
-            try {
-                dest = conn.Data.GetFolder(DestinationFolder);
-            } catch {
-                try {
-                    dest = conn.Data.GetFolder(conn.Data.PersonalNamespaces[0]).GetSubfolder(DestinationFolder);
-                } catch {
-                    WriteWarning($"Move-IMAPMessage - Destination folder '{DestinationFolder}' not found.");
-                    return Task.CompletedTask;
-                }
-            }
-            source.Open(FolderAccess.ReadWrite);
-            dest.Open(FolderAccess.ReadWrite);
+            var source = conn.Data.GetCachedFolder(SourceFolder ?? conn.Folder?.FullName, FolderAccess.ReadWrite);
+            var dest = conn.Data.GetCachedFolder(DestinationFolder!, FolderAccess.ReadWrite);
+            conn.Folders[source.FullName] = (ImapFolder)source;
+            conn.Folders[dest.FullName] = (ImapFolder)dest;
             source.MoveTo(uid, dest);
         } else {
             WriteWarning("Move-IMAPMessage - Is IMAP connected?");
