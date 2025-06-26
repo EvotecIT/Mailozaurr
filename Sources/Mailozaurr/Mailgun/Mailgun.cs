@@ -161,7 +161,7 @@ public class MailgunClient : IDisposable {
                 }
                 var error = await response.Content.ReadAsStringAsync();
                 throw new HttpRequestException(error);
-            } catch (Exception ex) {
+            } catch (HttpRequestException ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Mailgun: {ex.Message}");
                 if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {

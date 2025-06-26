@@ -70,7 +70,7 @@ Console.WriteLine($"Failed: {result.ErrorMessage}");
 ```csharp
 using Mailozaurr;
 
-var graph = new Graph();
+using var graph = new Graph();
 graph.From = "sender@example.com";
 graph.To = new[] { "recipient@example.com" };
 graph.Subject = "Graph API Email";

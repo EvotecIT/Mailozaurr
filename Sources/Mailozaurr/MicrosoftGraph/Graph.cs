@@ -6,7 +6,7 @@ namespace Mailozaurr;
 /// <summary>
 /// Helper class for sending messages via Microsoft Graph API.
 /// </summary>
-public class Graph {
+public class Graph : IDisposable {
     private readonly HttpClient _client;
     public string MessageJson = string.Empty;
     public GraphMessageContainer MessageContainer;
@@ -36,7 +36,7 @@ public class Graph {
     /// Office 365 will use the mailbox's configured display name for the sender, regardless of what is set in the payload.
     /// The email address must be used for API calls and authentication.
     /// </summary>
-    public object From { get; set; }
+    public object? From { get; set; }
 
     /// <summary>
     /// Gets or sets the email address to reply to.
@@ -141,7 +141,7 @@ public class Graph {
     /// <summary>
     /// The email address that the message was sent from.
     /// </summary>
-    public string SentFrom => Helpers.GetEmailAddress(From);
+    public string SentFrom => From == null ? string.Empty : Helpers.GetEmailAddress(From);
 
     /// <summary>
     /// A comma-separated list of email addresses that the message was sent to.
@@ -336,6 +336,9 @@ public class Graph {
             AccessToken = authorization.AccessToken;
             TokenType = authorization.TokenType;
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", "");
+        } catch (TaskCanceledException ex) {
+            LogCollector.LogWarning($"Send-EmailMessage - Connection to Graph API cancelled: {ex.Message}");
+            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, ex.Message);
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Error during connection using Graph API: {ex.Message}");
             if (ErrorAction == ActionPreference.Stop) {
@@ -377,6 +380,18 @@ public class Graph {
                     ? $"Unknown error: {content}"
                     : $"Error code: {error.Error.Code}, message: {error.Error.Message}, request ID: {error.Error.InnerError.RequestId}, date: {error.Error.InnerError.Date}";
                 throw new HttpRequestException(errorMessage);
+            } catch (TaskCanceledException ex) {
+                lastException = ex;
+                LogCollector.LogWarning($"Send-EmailMessage - Sending via Graph API cancelled: {ex.Message}");
+                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, ex.Message);
+                    await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
+                    return failResult;
+                }
+                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+                if (delayMilliseconds > 0) {
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken);
+                }
             } catch (Exception ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
@@ -417,6 +432,18 @@ public class Graph {
         do {
             try {
                 return await SendDraftMessage(draftMessage, cancellationToken);
+            } catch (TaskCanceledException ex) {
+                lastException = ex;
+                LogCollector.LogWarning($"Send-EmailMessage - Sending draft via Graph API cancelled: {ex.Message}");
+                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, ex.Message);
+                    await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
+                    return failResult;
+                }
+                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+                if (delayMilliseconds > 0) {
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken);
+                }
             } catch (Exception ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
@@ -659,9 +686,11 @@ public class Graph {
     /// <param name="uploadUrl">The upload session URL.</param>
     /// <param name="fileChunks">The file chunks to upload.</param>
     public async Task SendFileChunks(string uploadUrl, List<ByteArrayContent> fileChunks, CancellationToken cancellationToken = default) {
+        var tasks = new List<Task>();
         foreach (var chunk in fileChunks) {
-            await SendFile(uploadUrl, chunk, cancellationToken);
+            tasks.Add(SendFile(uploadUrl, chunk, cancellationToken));
         }
+        await Task.WhenAll(tasks);
     }
 
     /// <summary>
@@ -681,5 +710,12 @@ public class Graph {
             LogCollector.LogWarning(uploadChunkResponse.ToString());
             return;
         }
+    }
+
+    /// <summary>
+    /// Releases resources used by the Graph client.
+    /// </summary>
+    public void Dispose() {
+        _client.Dispose();
     }
 }

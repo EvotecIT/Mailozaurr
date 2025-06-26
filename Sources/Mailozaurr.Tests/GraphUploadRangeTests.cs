@@ -16,7 +16,7 @@ public class GraphUploadRangeTests
     {
         string tmp = Path.GetTempFileName();
         File.WriteAllBytes(tmp, Enumerable.Range(0, 25).Select(b => (byte)b).ToArray());
-        Graph graph = new Graph();
+        using Graph graph = new Graph();
         MethodInfo? method = typeof(Graph).GetMethod(
             "PrepareByteArrayContentForUpload",
             BindingFlags.NonPublic | BindingFlags.Instance);

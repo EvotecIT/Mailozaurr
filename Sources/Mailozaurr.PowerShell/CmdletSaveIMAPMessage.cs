@@ -1,6 +1,7 @@
 using System.Management.Automation;
 using System.Threading.Tasks;
 using MailKit;
+using MailKit.Net.Imap;
 using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
@@ -57,20 +58,8 @@ public sealed class CmdletSaveIMAPMessage : AsyncPSCmdlet {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
             var uid = new UniqueId(Uid);
-            IMailFolder mailFolder = conn.Data.Inbox;
-            if (!string.IsNullOrEmpty(Folder)) {
-                try {
-                    mailFolder = conn.Data.GetFolder(Folder);
-                } catch {
-                    try {
-                        mailFolder = conn.Data.GetFolder(conn.Data.PersonalNamespaces[0]).GetSubfolder(Folder);
-                    } catch {
-                        WriteWarning($"Save-IMAPMessage - Folder '{Folder}' not found.");
-                        return Task.CompletedTask;
-                    }
-                }
-            }
-            mailFolder.Open(FolderAccess.ReadOnly);
+            var mailFolder = conn.Data.GetCachedFolder(Folder ?? conn.Folder?.FullName, FolderAccess.ReadOnly);
+            conn.Folders[mailFolder.FullName] = (ImapFolder)mailFolder;
             var message = mailFolder.GetMessage(uid);
             if (Path != null && Path.EndsWith(".msg", System.StringComparison.OrdinalIgnoreCase)) {
                 var tempEml = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{System.Guid.NewGuid()}.eml");

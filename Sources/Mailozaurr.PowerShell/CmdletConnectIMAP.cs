@@ -1,6 +1,9 @@
 using MailKit.Net.Imap;
 using MailKit.Security;
+using Mailozaurr;
+using System.IO;
 using System.Security;
+using System.Security.Authentication;
 
 namespace Mailozaurr.PowerShell;
 
@@ -118,13 +121,19 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
         var client = new ImapClient();
         try {
             await client.ConnectAsync(Server, Port, Options);
-        } catch (Exception ex) {
-            var responseText = (ex as ImapCommandException)?.ResponseText;
+        } catch (ImapCommandException ex) {
+            var responseText = ex.ResponseText;
             if (!string.IsNullOrEmpty(responseText)) {
                 WriteWarning($"Connect-IMAP - Unable to connect: {ex.Message} | Server response: {responseText}");
             } else {
                 WriteWarning($"Connect-IMAP - Unable to connect: {ex.Message}");
             }
+            return;
+        } catch (ImapProtocolException ex) {
+            WriteWarning($"Connect-IMAP - Protocol error: {ex.Message}");
+            return;
+        } catch (IOException ex) {
+            WriteWarning($"Connect-IMAP - Network error: {ex.Message}");
             return;
         }
 
@@ -157,13 +166,25 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
                     await client.DisconnectAsync(true);
                     return;
                 }
-            } catch (Exception ex) {
-                var responseText = (ex as ImapCommandException)?.ResponseText;
+            } catch (System.Security.Authentication.AuthenticationException ex) {
+                WriteWarning($"Connect-IMAP - Authentication error: {ex.Message}");
+                await client.DisconnectAsync(true);
+                return;
+            } catch (ImapCommandException ex) {
+                var responseText = ex.ResponseText;
                 if (!string.IsNullOrEmpty(responseText)) {
                     WriteWarning($"Connect-IMAP - Unable to authenticate: {ex.Message} | Server response: {responseText}");
                 } else {
                     WriteWarning($"Connect-IMAP - Unable to authenticate: {ex.Message}");
                 }
+                await client.DisconnectAsync(true);
+                return;
+            } catch (ImapProtocolException ex) {
+                WriteWarning($"Connect-IMAP - Protocol error: {ex.Message}");
+                await client.DisconnectAsync(true);
+                return;
+            } catch (IOException ex) {
+                WriteWarning($"Connect-IMAP - Network error: {ex.Message}");
                 await client.DisconnectAsync(true);
                 return;
             }
@@ -173,17 +194,18 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
         }
 
         if (client.IsAuthenticated) {
-            // Open the inbox to get message info
+            // Open the inbox once and cache folder reference
             try {
-                await client.Inbox.OpenAsync(MailKit.FolderAccess.ReadOnly);
-            } catch (Exception ex) {
-                var responseText = (ex as ImapCommandException)?.ResponseText;
+                _ = client.GetCachedFolder(null, MailKit.FolderAccess.ReadOnly);
+            } catch (ImapCommandException ex) {
+                var responseText = ex.ResponseText;
                 if (!string.IsNullOrEmpty(responseText)) {
                     LoggingMessages.Logger.WriteWarning($"Connect-IMAP - Failed to open inbox: {ex.Message} | Server response: {responseText}");
                 } else {
                     LoggingMessages.Logger.WriteWarning($"Connect-IMAP - Failed to open inbox: {ex.Message}");
                 }
             }
+            var inbox = (ImapFolder)client.GetCachedFolder(null, MailKit.FolderAccess.ReadOnly);
             var info = new ImapConnectionInfo {
                 Uri = $"imaps://{Server}:{Port}/",
                 AuthenticationMechanisms = client.AuthenticationMechanisms,
@@ -198,10 +220,12 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
                 IsAuthenticated = client.IsAuthenticated,
                 IsSecure = client.IsSecure,
                 Data = client,
-                Count = client.Inbox?.Count ?? 0,
-                Messages = client.Inbox,
-                Recent = client.Inbox?.Recent ?? 0
+                Count = inbox.Count,
+                Messages = inbox,
+                Recent = inbox.Recent,
+                Folder = inbox
             };
+            info.Folders[inbox.FullName] = inbox;
             DefaultSessions.ImapSession = info;
             WriteObject(info);
         } else {

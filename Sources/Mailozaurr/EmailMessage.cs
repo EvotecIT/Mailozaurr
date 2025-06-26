@@ -1,4 +1,5 @@
 ﻿using MsgKit;
+using System.IO;
 
 namespace Mailozaurr;
 
@@ -45,7 +46,7 @@ public static class EmailMessage {
                     Converter.ConvertEmlToMsg(emlFile.FullName, msgFile.FullName);
                     return new EmlConversionResult() { EmlFile = emlFile.FullName, MsgFile = msgFile.FullName, Status = true };
                 }
-            } catch (Exception ex) {
+            } catch (IOException ex) {
                 LoggingMessages.Logger.WriteWarning("Error converting EML to MSG: {0}", ex.Message);
                 return new EmlConversionResult() { EmlFile = emlFile.FullName, MsgFile = msgFile.FullName, Status = false, Error = ex.Message };
             }

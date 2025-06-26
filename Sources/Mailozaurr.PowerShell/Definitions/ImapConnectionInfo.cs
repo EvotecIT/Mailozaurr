@@ -1,4 +1,5 @@
 using MailKit.Net.Imap;
+using System.Collections.Generic;
 
 namespace Mailozaurr.PowerShell;
 
@@ -42,4 +43,8 @@ public class ImapConnectionInfo {
     /// IMAP folder.
     /// </summary>
     public ImapFolder Folder { get; set; }
+    /// <summary>
+    /// Cached folders for this connection.
+    /// </summary>
+    public Dictionary<string, ImapFolder> Folders { get; } = new();
 }

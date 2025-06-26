@@ -37,6 +37,8 @@ public sealed class CmdletDisconnectPOP3 : AsyncPSCmdlet {
                     data.Disconnect(true);
                 } catch (System.Exception ex) {
                     WriteWarning($"Disconnect-POP3 - Unable to disconnect: {ex.Message}");
+                } finally {
+                    data.ServerCertificateValidationCallback = null;
                 }
             } else {
                 WriteWarning("Disconnect-POP3 - The provided object does not contain a valid Data property of type Pop3Client.");

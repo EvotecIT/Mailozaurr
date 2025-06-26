@@ -246,7 +246,7 @@ public class SendGridClient {
         try {
             var networkCredential = Credentials as NetworkCredential;
             apiKey = networkCredential.Password;
-        } catch (Exception ex) {
+        } catch (InvalidCastException ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SendGrid: {ex.Message}");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
@@ -279,9 +279,9 @@ public class SendGridClient {
                 var message = $"Status code {response.StatusCode}: {lastContent}";
                 lastException = new HttpRequestException(message);
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SendGrid: {message}");
-            } catch (Exception ex) {
+            } catch (HttpRequestException ex) {
                 lastException = ex;
-                LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SendGrid: {ex.Message}");
+                LogCollector.LogWarning($"Send-EmailMessage - HTTP error during sending using SendGrid: {ex.Message}");
                 if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
                     if (ErrorAction == ActionPreference.Stop && lastException != null) {
                         throw lastException;
@@ -294,6 +294,21 @@ public class SendGridClient {
                 var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
                 if (delayMilliseconds > 0) {
                     await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken);
+                }
+            } catch (TaskCanceledException ex) {
+                lastException = ex;
+                LogCollector.LogWarning($"Send-EmailMessage - Request canceled: {ex.Message}");
+                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
+                    if (ErrorAction == ActionPreference.Stop && lastException != null) {
+                        throw lastException;
+                    }
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
+                    await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
+                    return failResult;
+                }
+                var delayMs = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+                if (delayMs > 0) {
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMs), cancellationToken);
                 }
             }
             attempts++;
