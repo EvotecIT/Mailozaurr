@@ -65,10 +65,10 @@ public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
     public uint? UidEnd { get; set; }
 
     /// <summary>
-    /// <para type="description">Search query used to match messages to retrieve.</para>
+    /// <para type="description">Search queries used to match messages to retrieve.</para>
     /// </summary>
     [Parameter]
-    public SearchQuery? SearchQuery { get; set; }
+    public SearchQuery[]? SearchQuery { get; set; }
 
     /// <summary>
     /// <para type="description">Only return messages containing this text in the subject.</para>
@@ -143,7 +143,8 @@ public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
                 Before,
                 All.IsPresent,
                 Delete.IsPresent,
-                HasAttachment.IsPresent);
+                HasAttachment.IsPresent,
+                SearchQuery);
 
             WriteObject(messages, true);
         } else {
