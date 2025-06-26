@@ -36,7 +36,7 @@ public class Graph {
     /// Office 365 will use the mailbox's configured display name for the sender, regardless of what is set in the payload.
     /// The email address must be used for API calls and authentication.
     /// </summary>
-    public object From { get; set; }
+    public object? From { get; set; }
 
     /// <summary>
     /// Gets or sets the email address to reply to.
@@ -141,7 +141,7 @@ public class Graph {
     /// <summary>
     /// The email address that the message was sent from.
     /// </summary>
-    public string SentFrom => Helpers.GetEmailAddress(From);
+    public string SentFrom => From == null ? string.Empty : Helpers.GetEmailAddress(From);
 
     /// <summary>
     /// A comma-separated list of email addresses that the message was sent to.
