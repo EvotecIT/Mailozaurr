@@ -1,0 +1,25 @@
+namespace Mailozaurr;
+
+/// <summary>
+/// Represents a POP3 email message along with its index.
+/// </summary>
+public class Pop3EmailMessage {
+    /// <summary>
+    /// Creates a new instance of <see cref="Pop3EmailMessage"/>.
+    /// </summary>
+    /// <param name="index">Index of the message within the mailbox.</param>
+    /// <param name="message">The actual MIME message.</param>
+    public Pop3EmailMessage(int index, MimeMessage message) {
+        Index = index;
+        Message = message;
+    }
+
+    /// <summary>Index of the message within the mailbox.</summary>
+    public int Index { get; }
+
+    /// <summary>The underlying <see cref="MimeMessage"/>.</summary>
+    public MimeMessage Message { get; }
+
+    /// <inheritdoc />
+    public override string ToString() => Message.Subject ?? base.ToString();
+}
