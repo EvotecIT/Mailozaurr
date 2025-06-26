@@ -76,6 +76,11 @@ namespace Mailozaurr {
             if (TokenCache.TryGetValue(key, out var cached) && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
                 return $"{cached.TokenType} {cached.AccessToken}";
             }
+            var cachedFile = OAuthTokenCache.Get($"graph:{key}");
+            if (cachedFile != null && cachedFile.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
+                TokenCache[key] = new GraphAuthorization { AccessToken = cachedFile.AccessToken, TokenType = "Bearer", ExpiresOn = cachedFile.ExpiresOn };
+                return $"Bearer {cachedFile.AccessToken}";
+            }
             if (!string.IsNullOrEmpty(credential.CertificatePath)) {
                 var scopes = new[] { $"{resource}/.default" };
                 var auth = await OAuthHelpers.AcquireGraphCertificateTokenAsync(
@@ -135,6 +140,11 @@ namespace Mailozaurr {
                 }
             }
             TokenCache[key] = new GraphAuthorization { AccessToken = accessToken, TokenType = tokenType, ExpiresOn = expiresOn };
+            OAuthTokenCache.Set($"graph:{key}", new OAuthCredential {
+                UserName = credential.ClientId,
+                AccessToken = accessToken,
+                ExpiresOn = expiresOn
+            });
             return $"{tokenType} {accessToken}";
         }
 
