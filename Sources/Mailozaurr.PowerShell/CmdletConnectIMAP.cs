@@ -15,7 +15,7 @@ namespace Mailozaurr.PowerShell;
 /// <example>
 ///   <summary>Connect to Gmail IMAP using OAuth2</summary>
 ///   <code>$cred = Connect-OAuthGoogle -GmailAccount "user@gmail.com" -ClientID "id" -ClientSecret "secret"
-/// Connect-IMAP -Server "imap.gmail.com" -Credential $cred -oAuth2</code>
+/// Connect-IMAP -Server "imap.gmail.com" -Credential $cred -OAuth2</code>
 /// </example>
 /// <example>
 ///   <summary>Connect to an IMAP server with clear text username and password</summary>
@@ -34,7 +34,7 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Specifies the IMAP server hostname or IP address to connect to.</para>
     /// </summary>
-    [Parameter(ParameterSetName = "oAuth2")]
+    [Parameter(ParameterSetName = "OAuth2")]
     [Parameter(ParameterSetName = "Credential")]
     [Parameter(ParameterSetName = "ClearText")]
     [Parameter(Mandatory = true)]
@@ -44,7 +44,7 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Specifies the port to use for the IMAP connection. Default is 993 (IMAPS).</para>
     /// </summary>
-    [Parameter(ParameterSetName = "oAuth2")]
+    [Parameter(ParameterSetName = "OAuth2")]
     [Parameter(ParameterSetName = "Credential")]
     [Parameter(ParameterSetName = "ClearText")]
     public int Port { get; set; } = 993;
@@ -52,7 +52,7 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Skips certificate revocation checks during the connection. Useful for environments with limited certificate infrastructure.</para>
     /// </summary>
-    [Parameter(ParameterSetName = "oAuth2")]
+    [Parameter(ParameterSetName = "OAuth2")]
     [Parameter(ParameterSetName = "Credential")]
     [Parameter(ParameterSetName = "ClearText")]
     public SwitchParameter SkipCertificateRevocation { get; set; }
@@ -60,7 +60,7 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Skips certificate validation. Use with caution; only for trusted/test environments or self-signed certificates.</para>
     /// </summary>
-    [Parameter(ParameterSetName = "oAuth2")]
+    [Parameter(ParameterSetName = "OAuth2")]
     [Parameter(ParameterSetName = "Credential")]
     [Parameter(ParameterSetName = "ClearText")]
     public SwitchParameter SkipCertificateValidation { get; set; }
@@ -82,14 +82,14 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Specifies a PSCredential object for authentication. Used for OAuth2 or standard credential-based authentication.</para>
     /// </summary>
-    [Parameter(ParameterSetName = "oAuth2")]
+    [Parameter(ParameterSetName = "OAuth2")]
     [Parameter(ParameterSetName = "Credential")]
     public PSCredential Credential { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the secure socket options for the IMAP connection. Default is Auto. Options: None, Auto, SslOnConnect, StartTls, StartTlsWhenAvailable.</para>
     /// </summary>
-    [Parameter(ParameterSetName = "oAuth2")]
+    [Parameter(ParameterSetName = "OAuth2")]
     [Parameter(ParameterSetName = "Credential")]
     [Parameter(ParameterSetName = "ClearText")]
     public SecureSocketOptions Options { get; set; } = SecureSocketOptions.Auto;
@@ -97,7 +97,7 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Specifies the connection timeout in milliseconds. Default is 120000 (2 minutes).</para>
     /// </summary>
-    [Parameter(ParameterSetName = "oAuth2")]
+    [Parameter(ParameterSetName = "OAuth2")]
     [Parameter(ParameterSetName = "Credential")]
     [Parameter(ParameterSetName = "ClearText")]
     public int TimeOut { get; set; } = 120000;
@@ -105,8 +105,8 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Enables OAuth2 authentication. Use with a PSCredential object containing the access token as the password.</para>
     /// </summary>
-    [Parameter(ParameterSetName = "oAuth2")]
-    public SwitchParameter oAuth2 { get; set; }
+    [Parameter(ParameterSetName = "OAuth2")]
+    public SwitchParameter OAuth2 { get; set; }
 
     /// <summary>
     /// Connects to the IMAP server and returns an <see cref="ImapConnectionInfo"/> object with connection and client details.
@@ -135,8 +135,8 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
 
         if (client.IsConnected) {
             try {
-                if (ParameterSetName == "oAuth2" && oAuth2.IsPresent) {
-                    // oAuth2 authentication using SASL
+                if (ParameterSetName == "OAuth2" && OAuth2.IsPresent) {
+                    // OAuth2 authentication using SASL
                     var username = Credential.UserName;
                     var token = new System.Net.NetworkCredential("", Credential.Password).Password;
                     var sasl = new MailKit.Security.SaslMechanismOAuth2(username, token);
