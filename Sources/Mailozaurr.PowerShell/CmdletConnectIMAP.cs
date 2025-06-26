@@ -1,5 +1,7 @@
 using MailKit.Net.Imap;
 using MailKit.Security;
+using MailKit;
+using Mailozaurr;
 using System.Security;
 
 namespace Mailozaurr.PowerShell;
@@ -173,9 +175,9 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
         }
 
         if (client.IsAuthenticated) {
-            // Open the inbox to get message info
+            // Open the inbox only once and cache it
             try {
-                await client.Inbox.OpenAsync(MailKit.FolderAccess.ReadOnly);
+                client.GetOrOpenFolder(null, FolderAccess.ReadOnly);
             } catch (Exception ex) {
                 var responseText = (ex as ImapCommandException)?.ResponseText;
                 if (!string.IsNullOrEmpty(responseText)) {
@@ -200,7 +202,8 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
                 Data = client,
                 Count = client.Inbox?.Count ?? 0,
                 Messages = client.Inbox,
-                Recent = client.Inbox?.Recent ?? 0
+                Recent = client.Inbox?.Recent ?? 0,
+                Folder = (ImapFolder)client.Inbox
             };
             DefaultSessions.ImapSession = info;
             WriteObject(info);

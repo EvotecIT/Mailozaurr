@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using MailKit;
 using MailKit.Search;
 using MimeKit;
+using Mailozaurr;
 using Mailozaurr.PowerShell;
 
 namespace Mailozaurr.PowerShell;
@@ -130,11 +131,13 @@ public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
     protected override Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
-            var folder = conn.Folder?.FullName;
+            var folderName = conn.Folder?.FullName;
+            var folder = conn.Data.GetOrOpenFolder(folderName, Delete.IsPresent ? FolderAccess.ReadWrite : FolderAccess.ReadOnly);
+            conn.Folder = folder;
 
             var messages = MessageFetcher.Fetch(
                 conn.Data,
-                folder,
+                folder.FullName,
                 Subject,
                 FromContains,
                 ToContains,

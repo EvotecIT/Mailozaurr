@@ -38,22 +38,7 @@ public static class MessageFetcher {
         bool all = false,
         bool delete = false,
         bool hasAttachment = false) {
-        IMailFolder mailFolder = client.Inbox;
-        if (!string.IsNullOrEmpty(folder)) {
-            try {
-                mailFolder = client.GetFolder(folder);
-            } catch (Exception ex) {
-                LoggingMessages.Logger.WriteError($"Failed to get folder '{folder}': {ex.Message}");
-                try {
-                    mailFolder = client.GetFolder(client.PersonalNamespaces[0]).GetSubfolder(folder);
-                } catch (Exception innerEx) {
-                    LoggingMessages.Logger.WriteError($"Failed to get subfolder '{folder}': {innerEx.Message}");
-                    throw;
-                }
-            }
-        }
-
-        mailFolder.Open(delete ? FolderAccess.ReadWrite : FolderAccess.ReadOnly);
+        var mailFolder = client.GetOrOpenFolder(folder, delete ? FolderAccess.ReadWrite : FolderAccess.ReadOnly);
 
         SearchQuery query = SearchQuery.All;
         if (!all) {

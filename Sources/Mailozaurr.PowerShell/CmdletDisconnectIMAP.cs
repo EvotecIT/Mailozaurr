@@ -1,3 +1,5 @@
+using Mailozaurr;
+
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
@@ -34,6 +36,7 @@ public sealed class CmdletDisconnectIMAP : AsyncPSCmdlet {
                 } catch (System.Exception ex) {
                     WriteWarning($"Disconnect-IMAP - Unable to disconnect: {ex.Message}");
                 }
+                data.ClearFolderCache();
             } else {
                 WriteWarning("Disconnect-IMAP - The provided object does not contain a valid Data property of type ImapClient.");
             }
