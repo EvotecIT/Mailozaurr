@@ -17,7 +17,7 @@
     <PackageIconUrl>https://evotec.xyz/wp-content/uploads/2020/07/MailoZaurr.png</PackageIconUrl>
     </PropertyGroup>
 
-    <ItemGroup>
+  <ItemGroup>
         <PackageReference Include="EmailValidation" Version="1.3.0" />
         <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
         <PackageReference Include="MailKit" Version="4.12.1" />
@@ -52,6 +52,11 @@
         <Using Include="System.IO" />
         <Using Include="System.Linq" />
         <Using Include="System.Diagnostics" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="Resources\disposable_email_blocklist.conf" />
+        <EmbeddedResource Include="Resources\allowlist.conf" />
     </ItemGroup>
 
 </Project>
