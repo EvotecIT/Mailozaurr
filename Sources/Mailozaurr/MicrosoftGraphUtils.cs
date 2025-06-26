@@ -139,6 +139,37 @@ namespace Mailozaurr {
         }
 
         /// <summary>
+        /// Connects to O365 Graph with retry logic and returns the Authorization header value.
+        /// </summary>
+        public static async Task<string> ConnectO365GraphWithRetryAsync(
+            GraphCredential credential,
+            string tenantDomain,
+            int retryCount,
+            int retryDelayMilliseconds,
+            double retryDelayBackoff,
+            string resource = "https://manage.office.com") {
+            int attempts = 0;
+            Exception? lastException = null;
+            do {
+                try {
+                    return await ConnectO365GraphAsync(credential, tenantDomain, resource);
+                } catch (Exception ex) {
+                    lastException = ex;
+                    LoggingMessages.Logger.WriteWarning($"Connect-EmailGraph - {ex.Message}");
+                    if ((!Helpers.IsTransient(ex)) || attempts >= retryCount) {
+                        throw;
+                    }
+                    var delay = (int)Math.Round(retryDelayMilliseconds * Math.Pow(retryDelayBackoff, attempts));
+                    if (delay > 0) {
+                        await Task.Delay(delay);
+                    }
+                }
+                attempts++;
+            } while (attempts <= retryCount);
+            throw lastException!;
+        }
+
+        /// <summary>
         /// Builds a full URI from base, path, and query parameters.
         /// </summary>
         public static string BuildGraphUri(string baseUri, string path, IDictionary<string, string> queryParameters = null) {
