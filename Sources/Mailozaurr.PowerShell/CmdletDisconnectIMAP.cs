@@ -33,6 +33,8 @@ public sealed class CmdletDisconnectIMAP : AsyncPSCmdlet {
                     data.Disconnect(true);
                 } catch (System.Exception ex) {
                     WriteWarning($"Disconnect-IMAP - Unable to disconnect: {ex.Message}");
+                } finally {
+                    data.ServerCertificateValidationCallback = null;
                 }
             } else {
                 WriteWarning("Disconnect-IMAP - The provided object does not contain a valid Data property of type ImapClient.");
