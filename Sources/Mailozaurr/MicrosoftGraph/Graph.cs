@@ -585,8 +585,9 @@ public class Graph {
     /// <returns>The upload session URL.</returns>
     public async Task<string> CreateUploadSession(GraphMessage draftMessage, string attachmentItemJson, CancellationToken cancellationToken = default) {
         var uploadSessionUrl = $"https://graph.microsoft.com/v1.0/users('{SentFrom}')/messages/{draftMessage.Id}/attachments/createUploadSession";
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
-        using var uploadSessionResponse = await _client.PostAsync(uploadSessionUrl, new StringContent(attachmentItemJson, Encoding.UTF8, "application/json"), cancellationToken);
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
+        using var uploadSessionResponse = await client.PostAsync(uploadSessionUrl, new StringContent(attachmentItemJson, Encoding.UTF8, "application/json"), cancellationToken);
         var uploadSessionContent = await uploadSessionResponse.Content.ReadAsStringAsync();
 
         // {"error":{"code":"InvalidAuthenticationToken","message":"Access token is empty.","innerError":{"date":"2024-06-15T09:51:54","request-id":"4a43e743-e897-4758-8d7d-21858c198e1d","client-request-id":"4a43e743-e897-4758-8d7d-21858c198e1d"}}}
@@ -673,17 +674,12 @@ public class Graph {
             Content = byteArrayContent
         };
         requestMessage.Headers.Add("AnchorMailbox", SentFrom); // This is correctly added to HttpRequestMessage
-        var originalAuthorization = _client.DefaultRequestHeaders.Authorization;
-        _client.DefaultRequestHeaders.Authorization = null;
-        try {
-            var uploadChunkResponse = await _client.SendAsync(requestMessage, cancellationToken);
-            if (!uploadChunkResponse.IsSuccessStatusCode) {
-                // Handle upload error
-                LogCollector.LogWarning(uploadChunkResponse.ToString());
-                return;
-            }
-        } finally {
-            _client.DefaultRequestHeaders.Authorization = originalAuthorization;
+        using var client = new HttpClient();
+        var uploadChunkResponse = await client.SendAsync(requestMessage, cancellationToken);
+        if (!uploadChunkResponse.IsSuccessStatusCode) {
+            // Handle upload error
+            LogCollector.LogWarning(uploadChunkResponse.ToString());
+            return;
         }
     }
 }
