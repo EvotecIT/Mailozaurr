@@ -25,6 +25,7 @@ public static class MessageFetcher {
     /// <param name="before">Latest delivery date.</param>
     /// <param name="all">If set, ignores other filters.</param>
     /// <param name="delete">If set, messages are deleted after fetching.</param>
+    /// <param name="additionalQueries">Additional <see cref="SearchQuery"/> filters.</param>
     /// <returns>Collection of matching messages.</returns>
     public static IEnumerable<ImapEmailMessage> Fetch(
         ImapClient client,
@@ -37,7 +38,8 @@ public static class MessageFetcher {
         DateTime? before = null,
         bool all = false,
         bool delete = false,
-        bool hasAttachment = false) {
+        bool hasAttachment = false,
+        IEnumerable<SearchQuery>? additionalQueries = null) {
         IMailFolder mailFolder = client.Inbox;
         if (!string.IsNullOrEmpty(folder)) {
             try {
@@ -71,6 +73,14 @@ public static class MessageFetcher {
             }
             if (before.HasValue) {
                 query = query.And(SearchQuery.DeliveredBefore(before.Value));
+            }
+        }
+
+        if (additionalQueries != null) {
+            foreach (var q in additionalQueries) {
+                if (q != null) {
+                    query = query.And(q);
+                }
             }
         }
 
