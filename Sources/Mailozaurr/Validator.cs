@@ -3810,7 +3810,7 @@ public static class Validator {
                 ReasonErrorIndex = errorReason.ErrorIndex,
                 Error = ""
             };
-        } catch (Exception ex) {
+        } catch (FormatException ex) {
             return new ValidatedEmail {
                 EmailAddress = emailAddress,
                 IsValid = false,

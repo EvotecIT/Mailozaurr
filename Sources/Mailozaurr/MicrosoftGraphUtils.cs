@@ -351,7 +351,7 @@ namespace Mailozaurr {
                     try {
                         var content = m.Body is JsonElement je && je.TryGetProperty("Content", out var c) ? c.GetString() : m.Body.ToString();
                         File.WriteAllText(filePath, content);
-                    } catch (Exception ex) {
+                    } catch (IOException ex) {
                         // Log or handle error
                         LoggingMessages.Logger.WriteWarning($"SaveMailMessage - Couldn't save file to {filePath}. Error: {ex.Message}");
                     }
@@ -374,7 +374,7 @@ namespace Mailozaurr {
                     } catch (FormatException fex) {
                         // Invalid Base64 content
                         LoggingMessages.Logger.WriteWarning($"SaveAttachment - Invalid base64 content for {att.Name}. Error: {fex.Message}");
-                    } catch (Exception ex) {
+                    } catch (IOException ex) {
                         // Log or handle other errors
                         LoggingMessages.Logger.WriteWarning($"SaveAttachment - Couldn't save file to {filePath}. Error: {ex.Message}");
                     }

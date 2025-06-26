@@ -42,11 +42,11 @@ public static class MessageFetcher {
         if (!string.IsNullOrEmpty(folder)) {
             try {
                 mailFolder = client.GetFolder(folder);
-            } catch (Exception ex) {
+            } catch (FolderNotFoundException ex) {
                 LoggingMessages.Logger.WriteError($"Failed to get folder '{folder}': {ex.Message}");
                 try {
                     mailFolder = client.GetFolder(client.PersonalNamespaces[0]).GetSubfolder(folder);
-                } catch (Exception innerEx) {
+                } catch (FolderNotFoundException innerEx) {
                     LoggingMessages.Logger.WriteError($"Failed to get subfolder '{folder}': {innerEx.Message}");
                     throw;
                 }
@@ -79,7 +79,7 @@ public static class MessageFetcher {
             MimeMessage msg;
             try {
                 msg = mailFolder.GetMessage(uid);
-            } catch (Exception ex) {
+            } catch (MessageNotFoundException ex) {
                 LoggingMessages.Logger.WriteError($"Failed to get message UID {uid}: {ex.Message}");
                 throw;
             }
@@ -127,7 +127,7 @@ public static class MessageFetcher {
             MimeMessage message;
             try {
                 message = client.GetMessage(i);
-            } catch (Exception ex) {
+            } catch (Pop3CommandException ex) {
                 LoggingMessages.Logger.WriteError($"Failed to get message index {i}: {ex.Message}");
                 throw;
             }
