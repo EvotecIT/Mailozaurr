@@ -133,89 +133,54 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
     /// Use the returned object with <c>Disconnect-IMAP</c>, <c>Get-IMAPFolder</c>, or <c>Get-IMAPMessage</c> for further operations.
     /// </remarks>
     protected override async Task ProcessRecordAsync() {
-        var delay = RetryDelayMilliseconds;
-        ImapClient? client = null;
-        Exception? lastError = null;
-
-        for (var attempt = 0; attempt <= RetryCount; attempt++) {
-            client = new ImapClient();
-            try {
-                await client.ConnectAsync(Server, Port, Options);
-
-                if (SkipCertificateRevocation) {
-                    client.CheckCertificateRevocation = false;
-                }
-                if (SkipCertificateValidation) {
-                    client.ServerCertificateValidationCallback = (s, c, h, e) => true;
-                }
-                if (client.Timeout != TimeOut) {
-                    client.Timeout = TimeOut;
-                }
-
-                if (!client.IsConnected) {
-                    throw new InvalidOperationException("Client is not connected after ConnectAsync.");
-                }
-
-                if (ParameterSetName == "OAuth2" && OAuth2.IsPresent) {
-                    var username = Credential.UserName;
-                    var token = new System.Net.NetworkCredential("", Credential.Password).Password;
-                    var sasl = new MailKit.Security.SaslMechanismOAuth2(username, token);
-                    await client.AuthenticateAsync(sasl);
-                } else if (ParameterSetName == "ClearText" && !string.IsNullOrEmpty(UserName) && !string.IsNullOrEmpty(Password)) {
-                    await client.AuthenticateAsync(UserName, Password);
-                } else if (Credential != null) {
-                    var username = Credential.UserName;
-                    var password = Credential.Password is SecureString ss ? new System.Net.NetworkCredential("", ss).Password : Credential.GetNetworkCredential().Password;
-                    await client.AuthenticateAsync(username, password);
-                } else {
-                    throw new InvalidOperationException("No valid authentication method provided.");
-                }
-
-                if (!client.IsAuthenticated) {
-                    throw new InvalidOperationException("Authentication failed.");
-                }
-
-                try {
-                    await client.Inbox.OpenAsync(MailKit.FolderAccess.ReadOnly);
-                } catch (Exception ex) {
-                    LoggingMessages.Logger.WriteWarning($"Connect-IMAP - Failed to open inbox: {ex.Message}");
-                }
-
-                var info = new ImapConnectionInfo {
-                    Uri = $"imaps://{Server}:{Port}/",
-                    AuthenticationMechanisms = client.AuthenticationMechanisms,
-                    Capabilities = client.Capabilities,
-                    Stream = null, // Not exposed
-                    State = null, // Not exposed
-                    IsConnected = client.IsConnected,
-                    ApopToken = null,
-                    ExpirePolicy = null,
-                    Implementation = null,
-                    LoginDelay = null,
-                    IsAuthenticated = client.IsAuthenticated,
-                    IsSecure = client.IsSecure,
-                    Data = client,
-                    Count = client.Inbox?.Count ?? 0,
-                    Messages = client.Inbox,
-                    Recent = client.Inbox?.Recent ?? 0
-                };
-                DefaultSessions.ImapSession = info;
-                WriteObject(info);
-                return;
-            } catch (Exception ex) {
-                lastError = ex;
-                WriteWarning($"Connect-IMAP - Attempt {attempt + 1} failed: {ex.Message}");
-                if (client.IsConnected) {
-                    try { await client.DisconnectAsync(true); } catch { /* ignore */ }
-                }
-            }
-
-            if (attempt < RetryCount) {
-                if (delay > 0) await Task.Delay(delay);
-                delay = (int)(delay * RetryDelayBackoff);
-            }
+        NetworkCredential? cred = null;
+        var useOAuth = false;
+        if (ParameterSetName == "OAuth2" && Credential != null) {
+            var token = new System.Net.NetworkCredential("", Credential.Password).Password;
+            cred = new NetworkCredential(Credential.UserName, token);
+            useOAuth = true;
+        } else if (ParameterSetName == "ClearText") {
+            cred = new NetworkCredential(UserName, Password);
+        } else if (Credential != null) {
+            cred = Credential.GetNetworkCredential();
         }
 
-        WriteWarning($"Connect-IMAP - Unable to connect after {RetryCount + 1} attempts: {lastError?.Message}");
+        try {
+            var client = await ConnectionHelpers.ConnectImapAsync(
+                Server,
+                Port,
+                Options,
+                SkipCertificateRevocation.IsPresent,
+                SkipCertificateValidation.IsPresent,
+                TimeOut,
+                cred,
+                useOAuth,
+                RetryCount,
+                RetryDelayMilliseconds,
+                RetryDelayBackoff);
+
+            var info = new ImapConnectionInfo {
+                Uri = $"imaps://{Server}:{Port}/",
+                AuthenticationMechanisms = client.AuthenticationMechanisms,
+                Capabilities = client.Capabilities,
+                Stream = null,
+                State = null,
+                IsConnected = client.IsConnected,
+                ApopToken = null,
+                ExpirePolicy = null,
+                Implementation = null,
+                LoginDelay = null,
+                IsAuthenticated = client.IsAuthenticated,
+                IsSecure = client.IsSecure,
+                Data = client,
+                Count = client.Inbox?.Count ?? 0,
+                Messages = client.Inbox,
+                Recent = client.Inbox?.Recent ?? 0
+            };
+            DefaultSessions.ImapSession = info;
+            WriteObject(info);
+        } catch (Exception ex) {
+            WriteWarning($"Connect-IMAP - {ex.Message}");
+        }
     }
 }

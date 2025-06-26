@@ -67,37 +67,56 @@ namespace Mailozaurr {
         /// <summary>
         /// Connects to O365 Graph and returns the Authorization header value ("Bearer ...").
         /// </summary>
-        public static async Task<string> ConnectO365GraphAsync(GraphCredential credential, string tenantDomain, string resource = "https://manage.office.com") {
-            if (!string.IsNullOrEmpty(credential.CertificatePath)) {
-                var scopes = new[] { $"{resource}/.default" };
-                var auth = await OAuthHelpers.AcquireGraphCertificateTokenAsync(
-                    credential.ClientId,
-                    tenantDomain,
-                    credential.CertificatePath,
-                    credential.CertificatePassword ?? string.Empty,
-                    scopes);
-                return $"{auth.TokenType} {auth.AccessToken}";
-            }
+        public static async Task<string> ConnectO365GraphAsync(
+            GraphCredential credential,
+            string tenantDomain,
+            string resource = "https://manage.office.com",
+            int retryCount = 0,
+            int retryDelayMilliseconds = 0,
+            double retryDelayBackoff = 1.0) {
+            var delay = retryDelayMilliseconds;
+            Exception? lastError = null;
+            for (var attempt = 0; attempt <= retryCount; attempt++) {
+                try {
+                    if (!string.IsNullOrEmpty(credential.CertificatePath)) {
+                        var scopes = new[] { $"{resource}/.default" };
+                        var auth = await OAuthHelpers.AcquireGraphCertificateTokenAsync(
+                            credential.ClientId,
+                            tenantDomain,
+                            credential.CertificatePath,
+                            credential.CertificatePassword ?? string.Empty,
+                            scopes);
+                        return $"{auth.TokenType} {auth.AccessToken}";
+                    }
 
-            var body = new Dictionary<string, string>
-            {
-                { "grant_type", "client_credentials" },
-                { "resource", resource },
-                { "client_id", credential.ClientId },
-                { "client_secret", credential.ClientSecret }
-            };
-            var content = new FormUrlEncodedContent(body);
-            var url = $"https://login.microsoftonline.com/{tenantDomain}/oauth2/token";
-            using var response = await HttpClient.PostAsync(url, content);
-            if (!response.IsSuccessStatusCode) {
-                var error = await response.Content.ReadAsStringAsync();
-                throw new Exception($"ConnectO365GraphAsync - Error: {error}");
+                    var body = new Dictionary<string, string> {
+                        { "grant_type", "client_credentials" },
+                        { "resource", resource },
+                        { "client_id", credential.ClientId },
+                        { "client_secret", credential.ClientSecret }
+                    };
+                    using var content = new FormUrlEncodedContent(body);
+                    var url = $"https://login.microsoftonline.com/{tenantDomain}/oauth2/token";
+                    using var response = await HttpClient.PostAsync(url, content);
+                    if (!response.IsSuccessStatusCode) {
+                        var error = await response.Content.ReadAsStringAsync();
+                        throw new Exception($"ConnectO365GraphAsync - Error: {error}");
+                    }
+                    var json = await response.Content.ReadAsStringAsync();
+                    var token = System.Text.Json.JsonDocument.Parse(json);
+                    var accessToken = token.RootElement.GetProperty("access_token").GetString();
+                    var tokenType = token.RootElement.GetProperty("token_type").GetString();
+                    return $"{tokenType} {accessToken}";
+                } catch (Exception ex) {
+                    lastError = ex;
+                }
+
+                if (attempt < retryCount) {
+                    if (delay > 0) await Task.Delay(delay);
+                    delay = (int)(delay * retryDelayBackoff);
+                }
             }
-            var json = await response.Content.ReadAsStringAsync();
-            var token = System.Text.Json.JsonDocument.Parse(json);
-            var accessToken = token.RootElement.GetProperty("access_token").GetString();
-            var tokenType = token.RootElement.GetProperty("token_type").GetString();
-            return $"{tokenType} {accessToken}";
+            throw lastError ?? new Exception("Unable to obtain Graph token.");
         }
 
         /// <summary>
