@@ -659,9 +659,11 @@ public class Graph : IDisposable {
     /// <param name="uploadUrl">The upload session URL.</param>
     /// <param name="fileChunks">The file chunks to upload.</param>
     public async Task SendFileChunks(string uploadUrl, List<ByteArrayContent> fileChunks, CancellationToken cancellationToken = default) {
+        var tasks = new List<Task>();
         foreach (var chunk in fileChunks) {
-            await SendFile(uploadUrl, chunk, cancellationToken);
+            tasks.Add(SendFile(uploadUrl, chunk, cancellationToken));
         }
+        await Task.WhenAll(tasks);
     }
 
     /// <summary>
