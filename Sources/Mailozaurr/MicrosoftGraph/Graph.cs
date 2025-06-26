@@ -41,7 +41,7 @@ public class Graph {
     /// <summary>
     /// Gets or sets the email address to reply to.
     /// </summary>
-    public string ReplyTo { get; set; }
+    public string? ReplyTo { get; set; }
 
     /// <summary>
     /// Gets or sets the email addresses of the recipients.
@@ -225,7 +225,9 @@ public class Graph {
                 To = ConvertToGraphEmailAddressUnique(To, seen),
                 Cc = ConvertToGraphEmailAddressUnique(Cc, seen),
                 Bcc = ConvertToGraphEmailAddressUnique(Bcc, seen),
-                ReplyTo = string.IsNullOrEmpty(ReplyTo) ? null : new List<GraphEmailAddress> { ConvertToGraphEmailAddress(ReplyTo)! },
+                ReplyTo = string.IsNullOrWhiteSpace(ReplyTo)
+                    ? null
+                    : new List<GraphEmailAddress> { ConvertToGraphEmailAddress(ReplyTo)! },
                 Subject = Subject,
                 Body = new GraphContent { Content = HTML, Type = ContentType },
                 IsDeliveryReceiptRequested = RequestDeliveryReceipt,
