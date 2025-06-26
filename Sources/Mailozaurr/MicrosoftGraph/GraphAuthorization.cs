@@ -1,4 +1,6 @@
-﻿namespace Mailozaurr;
+using System.Text.Json.Serialization;
+
+namespace Mailozaurr;
 
 /// <summary>
 /// Result returned when creating an upload session for large attachments.
@@ -19,4 +21,8 @@ public class GraphAuthorization {
     /// <summary>The access token value.</summary>
     [JsonPropertyName("access_token")]
     public string AccessToken { get; set; }
+
+    /// <summary>Time when the access token expires.</summary>
+    [JsonPropertyName("expires_on")]
+    public DateTimeOffset ExpiresOn { get; set; }
 }
