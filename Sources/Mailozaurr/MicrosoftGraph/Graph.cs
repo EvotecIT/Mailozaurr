@@ -336,6 +336,9 @@ public class Graph : IDisposable {
             AccessToken = authorization.AccessToken;
             TokenType = authorization.TokenType;
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", "");
+        } catch (TaskCanceledException ex) {
+            LogCollector.LogWarning($"Send-EmailMessage - Connection to Graph API cancelled: {ex.Message}");
+            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, ex.Message);
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Error during connection using Graph API: {ex.Message}");
             if (ErrorAction == ActionPreference.Stop) {
@@ -377,6 +380,18 @@ public class Graph : IDisposable {
                     ? $"Unknown error: {content}"
                     : $"Error code: {error.Error.Code}, message: {error.Error.Message}, request ID: {error.Error.InnerError.RequestId}, date: {error.Error.InnerError.Date}";
                 throw new HttpRequestException(errorMessage);
+            } catch (TaskCanceledException ex) {
+                lastException = ex;
+                LogCollector.LogWarning($"Send-EmailMessage - Sending via Graph API cancelled: {ex.Message}");
+                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, ex.Message);
+                    await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
+                    return failResult;
+                }
+                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+                if (delayMilliseconds > 0) {
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken);
+                }
             } catch (Exception ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
@@ -417,6 +432,18 @@ public class Graph : IDisposable {
         do {
             try {
                 return await SendDraftMessage(draftMessage, cancellationToken);
+            } catch (TaskCanceledException ex) {
+                lastException = ex;
+                LogCollector.LogWarning($"Send-EmailMessage - Sending draft via Graph API cancelled: {ex.Message}");
+                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, ex.Message);
+                    await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
+                    return failResult;
+                }
+                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+                if (delayMilliseconds > 0) {
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken);
+                }
             } catch (Exception ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
