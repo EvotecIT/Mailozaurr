@@ -119,7 +119,12 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
         try {
             await client.ConnectAsync(Server, Port, Options);
         } catch (Exception ex) {
-            WriteWarning($"Connect-IMAP - Unable to connect: {ex.Message}");
+            var responseText = (ex as ImapCommandException)?.ResponseText;
+            if (!string.IsNullOrEmpty(responseText)) {
+                WriteWarning($"Connect-IMAP - Unable to connect: {ex.Message} | Server response: {responseText}");
+            } else {
+                WriteWarning($"Connect-IMAP - Unable to connect: {ex.Message}");
+            }
             return;
         }
 
@@ -153,7 +158,12 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
                     return;
                 }
             } catch (Exception ex) {
-                WriteWarning($"Connect-IMAP - Unable to authenticate: {ex.Message}");
+                var responseText = (ex as ImapCommandException)?.ResponseText;
+                if (!string.IsNullOrEmpty(responseText)) {
+                    WriteWarning($"Connect-IMAP - Unable to authenticate: {ex.Message} | Server response: {responseText}");
+                } else {
+                    WriteWarning($"Connect-IMAP - Unable to authenticate: {ex.Message}");
+                }
                 await client.DisconnectAsync(true);
                 return;
             }
@@ -167,7 +177,12 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
             try {
                 await client.Inbox.OpenAsync(MailKit.FolderAccess.ReadOnly);
             } catch (Exception ex) {
-                LoggingMessages.Logger.WriteWarning($"Connect-IMAP - Failed to open inbox: {ex.Message}");
+                var responseText = (ex as ImapCommandException)?.ResponseText;
+                if (!string.IsNullOrEmpty(responseText)) {
+                    LoggingMessages.Logger.WriteWarning($"Connect-IMAP - Failed to open inbox: {ex.Message} | Server response: {responseText}");
+                } else {
+                    LoggingMessages.Logger.WriteWarning($"Connect-IMAP - Failed to open inbox: {ex.Message}");
+                }
             }
             var info = new ImapConnectionInfo {
                 Uri = $"imaps://{Server}:{Port}/",

@@ -118,7 +118,12 @@ public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
         try {
             await client.ConnectAsync(Server, Port, Options);
         } catch (Exception ex) {
-            WriteWarning($"Connect-POP3 - Unable to connect: {ex.Message}");
+            var statusText = (ex as Pop3CommandException)?.StatusText;
+            if (!string.IsNullOrEmpty(statusText)) {
+                WriteWarning($"Connect-POP3 - Unable to connect: {ex.Message} | Server response: {statusText}");
+            } else {
+                WriteWarning($"Connect-POP3 - Unable to connect: {ex.Message}");
+            }
             return;
         }
 
@@ -152,7 +157,12 @@ public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
                     return;
                 }
             } catch (Exception ex) {
-                WriteWarning($"Connect-POP3 - Unable to authenticate: {ex.Message}");
+                var statusText = (ex as Pop3CommandException)?.StatusText;
+                if (!string.IsNullOrEmpty(statusText)) {
+                    WriteWarning($"Connect-POP3 - Unable to authenticate: {ex.Message} | Server response: {statusText}");
+                } else {
+                    WriteWarning($"Connect-POP3 - Unable to authenticate: {ex.Message}");
+                }
                 await client.DisconnectAsync(true);
                 return;
             }
