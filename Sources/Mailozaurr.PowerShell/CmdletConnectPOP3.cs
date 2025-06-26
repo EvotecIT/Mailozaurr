@@ -1,6 +1,5 @@
 using MailKit.Net.Pop3;
 using MailKit.Security;
-using System.IO;
 using System.Security;
 using System.Security.Authentication;
 
@@ -104,6 +103,30 @@ public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
     public int TimeOut { get; set; } = 120000;
 
     /// <summary>
+    /// <para type="description">Number of connection retry attempts.</para>
+    /// </summary>
+    [Parameter(ParameterSetName = "OAuth2")]
+    [Parameter(ParameterSetName = "Credential")]
+    [Parameter(ParameterSetName = "ClearText")]
+    public int RetryCount { get; set; } = 0;
+
+    /// <summary>
+    /// <para type="description">Delay in milliseconds between retries.</para>
+    /// </summary>
+    [Parameter(ParameterSetName = "OAuth2")]
+    [Parameter(ParameterSetName = "Credential")]
+    [Parameter(ParameterSetName = "ClearText")]
+    public int RetryDelayMilliseconds { get; set; } = 0;
+
+    /// <summary>
+    /// <para type="description">Multiplier for increasing retry delay.</para>
+    /// </summary>
+    [Parameter(ParameterSetName = "OAuth2")]
+    [Parameter(ParameterSetName = "Credential")]
+    [Parameter(ParameterSetName = "ClearText")]
+    public double RetryDelayBackoff { get; set; } = 1.0;
+
+    /// <summary>
     /// <para type="description">Enables OAuth2 authentication. Use with a PSCredential object containing the access token as the password.</para>
     /// </summary>
     [Parameter(ParameterSetName = "OAuth2")]
@@ -116,78 +139,38 @@ public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
     /// Use the returned object with <c>Disconnect-POP3</c> or <c>Get-POP3Message</c> for further operations.
     /// </remarks>
     protected override async Task ProcessRecordAsync() {
-        var client = new Pop3Client();
-        try {
-            await client.ConnectAsync(Server, Port, Options);
-        } catch (Pop3CommandException ex) {
-            var statusText = ex.StatusText;
-            if (!string.IsNullOrEmpty(statusText)) {
-                WriteWarning($"Connect-POP3 - Unable to connect: {ex.Message} | Server response: {statusText}");
+        async Task Authenticate(Pop3Client c) {
+            if (ParameterSetName == "OAuth2" && OAuth2.IsPresent) {
+                var username = Credential.UserName;
+                var token = new System.Net.NetworkCredential(string.Empty, Credential.Password).Password;
+                var sasl = new MailKit.Security.SaslMechanismOAuth2(username, token);
+                await c.AuthenticateAsync(sasl);
+            } else if (ParameterSetName == "ClearText" && !string.IsNullOrEmpty(UserName) && !string.IsNullOrEmpty(Password)) {
+                await c.AuthenticateAsync(UserName, Password);
+            } else if (Credential != null) {
+                var username = Credential.UserName;
+                var password = Credential.Password is SecureString ss ? new System.Net.NetworkCredential(string.Empty, ss).Password : Credential.GetNetworkCredential().Password;
+                await c.AuthenticateAsync(username, password);
             } else {
-                WriteWarning($"Connect-POP3 - Unable to connect: {ex.Message}");
+                throw new System.Security.Authentication.AuthenticationException("No valid authentication method provided.");
             }
-            return;
-        } catch (Pop3ProtocolException ex) {
-            WriteWarning($"Connect-POP3 - Protocol error: {ex.Message}");
-            return;
-        } catch (IOException ex) {
-            WriteWarning($"Connect-POP3 - Network error: {ex.Message}");
-            return;
         }
 
-        if (SkipCertificateRevocation) {
-            client.CheckCertificateRevocation = false;
-        }
-        if (SkipCertificateValidation) {
-            client.ServerCertificateValidationCallback = (s, c, h, e) => true;
-        }
-        if (client.Timeout != TimeOut) {
-            client.Timeout = TimeOut;
-        }
-
-        if (client.IsConnected) {
-            try {
-                if (ParameterSetName == "OAuth2" && OAuth2.IsPresent) {
-                    // OAuth2 authentication using SASL
-                    var username = Credential.UserName;
-                    var token = new System.Net.NetworkCredential("", Credential.Password).Password;
-                    var sasl = new MailKit.Security.SaslMechanismOAuth2(username, token);
-                    await client.AuthenticateAsync(sasl);
-                } else if (ParameterSetName == "ClearText" && !string.IsNullOrEmpty(UserName) && !string.IsNullOrEmpty(Password)) {
-                    await client.AuthenticateAsync(UserName, Password);
-                } else if (Credential != null) {
-                    var username = Credential.UserName;
-                    var password = Credential.Password is SecureString ss ? new System.Net.NetworkCredential("", ss).Password : Credential.GetNetworkCredential().Password;
-                    await client.AuthenticateAsync(username, password);
-                } else {
-                    WriteWarning("Connect-POP3 - No valid authentication method provided.");
-                    await client.DisconnectAsync(true);
-                    return;
-                }
-            } catch (System.Security.Authentication.AuthenticationException ex) {
-                WriteWarning($"Connect-POP3 - Authentication error: {ex.Message}");
-                await client.DisconnectAsync(true);
-                return;
-            } catch (Pop3CommandException ex) {
-                var statusText = ex.StatusText;
-                if (!string.IsNullOrEmpty(statusText)) {
-                    WriteWarning($"Connect-POP3 - Unable to authenticate: {ex.Message} | Server response: {statusText}");
-                } else {
-                    WriteWarning($"Connect-POP3 - Unable to authenticate: {ex.Message}");
-                }
-                await client.DisconnectAsync(true);
-                return;
-            } catch (Pop3ProtocolException ex) {
-                WriteWarning($"Connect-POP3 - Protocol error: {ex.Message}");
-                await client.DisconnectAsync(true);
-                return;
-            } catch (IOException ex) {
-                WriteWarning($"Connect-POP3 - Network error: {ex.Message}");
-                await client.DisconnectAsync(true);
-                return;
-            }
-        } else {
-            WriteWarning("Connect-POP3 - Client is not connected after ConnectAsync.");
+        Pop3Client client;
+        try {
+            client = await Pop3Connector.ConnectAsync(
+                Server,
+                Port,
+                Options,
+                TimeOut,
+                SkipCertificateRevocation.IsPresent,
+                SkipCertificateValidation.IsPresent,
+                Authenticate,
+                RetryCount,
+                RetryDelayMilliseconds,
+                RetryDelayBackoff);
+        } catch (Exception ex) {
+            WriteWarning($"Connect-POP3 - {ex.Message}");
             return;
         }
 

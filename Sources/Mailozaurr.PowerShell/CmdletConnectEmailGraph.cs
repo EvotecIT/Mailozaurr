@@ -48,6 +48,24 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? CertificatePassword { get; set; }
 
+    /// <summary>
+    /// <para type="description">Number of connection retry attempts.</para>
+    /// </summary>
+    [Parameter]
+    public int RetryCount { get; set; } = 0;
+
+    /// <summary>
+    /// <para type="description">Delay in milliseconds between retries.</para>
+    /// </summary>
+    [Parameter]
+    public int RetryDelayMilliseconds { get; set; } = 0;
+
+    /// <summary>
+    /// <para type="description">Multiplier for increasing retry delay.</para>
+    /// </summary>
+    [Parameter]
+    public double RetryDelayBackoff { get; set; } = 1.0;
+
     protected override async Task ProcessRecordAsync() {
         GraphCredential cred;
         if (ParameterSetName == "Credential") {
@@ -84,7 +102,13 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
 
         bool connected = false;
         try {
-            var token = await MicrosoftGraphUtils.ConnectO365GraphAsync(cred, cred.DirectoryId, "https://graph.microsoft.com");
+            var token = await MicrosoftGraphUtils.ConnectO365GraphWithRetryAsync(
+                cred,
+                cred.DirectoryId!,
+                RetryCount,
+                RetryDelayMilliseconds,
+                RetryDelayBackoff,
+                "https://graph.microsoft.com");
             connected = !string.IsNullOrEmpty(token);
         } catch {
             // ignore errors, return not connected
