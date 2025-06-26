@@ -111,6 +111,7 @@ public class MailgunClient : IDisposable {
             foreach (var path in Attachment) {
                 if (!File.Exists(path)) {
                     LogCollector.LogWarning($"Send-EmailMessage - Attachment file not found: {path}");
+                    LogCollector.LogWarning($"Send-EmailMessage - Possible issue: Path '{path}' is invalid. Verify the file exists and the path is correct.");
                     continue;
                 }
 
@@ -124,6 +125,7 @@ public class MailgunClient : IDisposable {
             foreach (var path in InlineAttachment) {
                 if (!File.Exists(path)) {
                     LogCollector.LogWarning($"Send-EmailMessage - Inline attachment file not found: {path}");
+                    LogCollector.LogWarning($"Send-EmailMessage - Possible issue: Path '{path}' is invalid. Verify the file exists and the path is correct.");
                     continue;
                 }
 

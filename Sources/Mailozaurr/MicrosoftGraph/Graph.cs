@@ -192,6 +192,11 @@ public class Graph : IDisposable {
             // Convert provided attachments into GraphAttachment objects
             foreach (var item in Attachments) {
                 if (item is string path) {
+                    if (!File.Exists(path)) {
+                        LogCollector.LogWarning($"Send-EmailMessage - Attachment file not found: {path}");
+                        LogCollector.LogWarning($"Send-EmailMessage - Possible issue: Path '{path}' is invalid. Verify the file exists and the path is correct.");
+                        continue;
+                    }
                     ConvertedAttachments.Add(GraphAttachment.FromFile(path));
                 } else if (item is GraphAttachment ga) {
                     ConvertedAttachments.Add(ga);

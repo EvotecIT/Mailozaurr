@@ -704,6 +704,7 @@ public class Smtp {
         if (!File.Exists(publicKeyPath)) {
             string messageText = $"Public key file not found: {publicKeyPath}";
             LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{publicKeyPath}' is invalid. Verify the file exists and the path is correct.");
             return new SmtpResult(false, EmailAction.PgpEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
         }
 
@@ -731,11 +732,13 @@ public class Smtp {
         if (!File.Exists(publicKeyPath)) {
             string messageText = $"Public key file not found: {publicKeyPath}";
             LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{publicKeyPath}' is invalid. Verify the file exists and the path is correct.");
             return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
         }
         if (!File.Exists(privateKeyPath)) {
             string messageText = $"Private key file not found: {privateKeyPath}";
             LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{privateKeyPath}' is invalid. Verify the file exists and the path is correct.");
             return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
         }
 
@@ -775,11 +778,13 @@ public class Smtp {
         if (!File.Exists(publicKeyPath)) {
             string messageText = $"Public key file not found: {publicKeyPath}";
             LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{publicKeyPath}' is invalid. Verify the file exists and the path is correct.");
             return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
         }
         if (!File.Exists(privateKeyPath)) {
             string messageText = $"Private key file not found: {privateKeyPath}";
             LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{privateKeyPath}' is invalid. Verify the file exists and the path is correct.");
             return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
         }
 
