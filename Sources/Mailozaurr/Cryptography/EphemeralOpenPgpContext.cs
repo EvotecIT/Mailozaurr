@@ -30,6 +30,8 @@ public class EphemeralOpenPgpContext : GnuPGContext {
             Directory.Delete(_tempDirectory, true);
         } catch (IOException ex) {
             LoggingMessages.Logger.WriteWarning($"Failed to delete temporary directory: {ex.Message}");
+        } catch (UnauthorizedAccessException ex) {
+            LoggingMessages.Logger.WriteWarning($"Failed to delete temporary directory due to unauthorized access: {ex.Message}");
         }
     }
 }
