@@ -2,6 +2,7 @@ using Microsoft.Identity.Client;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Util.Store;
+using Google.Apis.Auth.OAuth2.Responses;
 using System.Security.Cryptography.X509Certificates;
 using System.Linq;
 using System;
@@ -55,10 +56,13 @@ public static class OAuthHelpers {
             }
             result = await builder.ExecuteAsync();
         }
-        return new OAuthCredential {
+        var cred = new OAuthCredential {
             UserName = result.Account.Username,
-            AccessToken = result.AccessToken
+            AccessToken = result.AccessToken,
+            ExpiresOn = result.ExpiresOn
         };
+        OAuthTokenCache.Set($"o365:{cred.UserName}", cred);
+        return cred;
     }
 
     /// <summary>
@@ -90,10 +94,75 @@ public static class OAuthHelpers {
         if (credential.Token.IsExpired(Google.Apis.Util.SystemClock.Default)) {
             await credential.RefreshTokenAsync(System.Threading.CancellationToken.None);
         }
-        return new OAuthCredential {
+        var cred = new OAuthCredential {
             UserName = credential.UserId,
-            AccessToken = credential.Token.AccessToken
+            AccessToken = credential.Token.AccessToken,
+            RefreshToken = credential.Token.RefreshToken,
+            ExpiresOn = credential.Token.IssuedUtc + TimeSpan.FromSeconds(credential.Token.ExpiresInSeconds ?? 0)
         };
+        OAuthTokenCache.Set($"google:{cred.UserName}", cred);
+        return cred;
+    }
+
+    /// <summary>
+    /// Attempts to retrieve a cached Office 365 token or acquire a new one if necessary.
+    /// </summary>
+    public static async Task<OAuthCredential> AcquireO365TokenCachedAsync(
+        string login,
+        string clientId,
+        string tenantId,
+        string redirectUri,
+        IEnumerable<string> scopes) {
+        var cacheKey = $"o365:{login}";
+        var cached = OAuthTokenCache.Get(cacheKey);
+        if (cached != null && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
+            return cached;
+        }
+
+        var cred = await AcquireO365TokenInteractiveAsync(login, clientId, tenantId, redirectUri, scopes);
+        OAuthTokenCache.Set(cacheKey, cred);
+        return cred;
+    }
+
+    /// <summary>
+    /// Attempts to retrieve a cached Google token or acquire a new one if necessary.
+    /// </summary>
+    public static async Task<OAuthCredential> AcquireGoogleTokenCachedAsync(
+        string gmailAccount,
+        string clientId,
+        string clientSecret,
+        IEnumerable<string> scopes) {
+        var cacheKey = $"google:{gmailAccount}";
+        var cached = OAuthTokenCache.Get(cacheKey);
+        if (cached != null && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
+            return cached;
+        }
+        if (cached != null && !string.IsNullOrEmpty(cached.RefreshToken)) {
+            var clientSecrets = new ClientSecrets { ClientId = clientId, ClientSecret = clientSecret };
+            var initializer = new GoogleAuthorizationCodeFlow.Initializer {
+                ClientSecrets = clientSecrets,
+                Scopes = scopes,
+                DataStore = new FileDataStore("CredentialCacheFolder", false)
+            };
+            var flow = new GoogleAuthorizationCodeFlow(initializer);
+            var token = new Google.Apis.Auth.OAuth2.Responses.TokenResponse { RefreshToken = cached.RefreshToken };
+            var userCred = new UserCredential(flow, gmailAccount, token);
+            var refreshed = await userCred.RefreshTokenAsync(System.Threading.CancellationToken.None);
+            if (refreshed) {
+                var newCred = new OAuthCredential {
+                    UserName = gmailAccount,
+                    AccessToken = userCred.Token.AccessToken,
+                    RefreshToken = userCred.Token.RefreshToken,
+                    ExpiresOn = userCred.Token.IssuedUtc + TimeSpan.FromSeconds(userCred.Token.ExpiresInSeconds ?? 0)
+                };
+                OAuthTokenCache.Set(cacheKey, newCred);
+                return newCred;
+            }
+        }
+
+        var cred = await AcquireGoogleTokenInteractiveAsync(gmailAccount, clientId, clientSecret, scopes);
+        OAuthTokenCache.Set(cacheKey, cred);
+        return cred;
     }
 
     /// <summary>

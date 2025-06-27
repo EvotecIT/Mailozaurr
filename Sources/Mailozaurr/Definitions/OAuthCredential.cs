@@ -12,4 +12,14 @@ public class OAuthCredential {
     /// The access token for the OAuth credential.
     /// </summary>
     public string AccessToken { get; set; }
+
+    /// <summary>
+    /// Time when the access token expires.
+    /// </summary>
+    public DateTimeOffset ExpiresOn { get; set; }
+
+    /// <summary>
+    /// The refresh token, if available.
+    /// </summary>
+    public string? RefreshToken { get; set; }
 }

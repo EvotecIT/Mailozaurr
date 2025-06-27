@@ -17,3 +17,6 @@ Sources/packages/*
 Lib/Default/*
 Lib/Standard/*
 Lib/Core/*
+dotnet-install.sh
+packages-microsoft-prod.deb
+
