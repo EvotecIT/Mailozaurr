@@ -584,279 +584,283 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     /// </summary>
     protected override void ProcessRecord() {
         var (fromEmail, fromName) = Helpers.GetEmailAndName(From);
+
         if (SendGrid || EmailProvider == EmailProvider.SendGrid) {
-            var logCollector = new LogCollector();
-            SendGridClient sendGrid = new SendGridClient();
-            sendGrid.LogCollector = logCollector;
-            sendGrid.From = Helpers.GetFromObject(fromEmail, fromName);
-            if (Bcc != null) sendGrid.Bcc = Bcc.ToList();
-            if (Cc != null) sendGrid.Cc = Cc.ToList();
-            if (To != null) sendGrid.To = To.ToList();
-            sendGrid.ReplyTo = ReplyTo;
-            sendGrid.Subject = Subject;
-            if (Text != null) sendGrid.Text = string.Join("", Text);
-            if (HTML != null) sendGrid.Html = string.Join("", HTML);
-            sendGrid.Priority = Priority;
-            if (Attachment != null) {
-                sendGrid.Attachment = Attachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
-            }
-            sendGrid.SeparateTo = SeparateTo;
-            sendGrid.ErrorAction = errorAction;
-            sendGrid.RetryCount = RetryCount;
-            sendGrid.RetryDelayMilliseconds = RetryDelayMilliseconds;
-            sendGrid.RetryDelayBackoff = RetryDelayBackoff;
-            sendGrid.RetryAlways = RetryAlways.IsPresent;
-            NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
-            sendGrid.Credentials = networkCredential;
-            // create JSON message
-            sendGrid.CreateMessage();
-            if (ShouldProcess(sendGrid.SentTo, "Sending email message via SendGrid")) {
-                var result = sendGrid.SendEmailAsync().GetAwaiter().GetResult();
-                LogEmitter.EmitLogs(logCollector, this);
-                if (!Suppress) {
-                    WriteObject(result);
-                }
-            } else {
-                if (!Suppress) {
-                    WriteObject(new SmtpResult(false, EmailAction.Send, sendGrid.SentTo, sendGrid.SentFrom, "SendGridApi", 0, sendGrid.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
-                }
-            }
+            ProcessSendGrid(fromEmail, fromName);
         } else if (EmailProvider == EmailProvider.Mailgun) {
-            var logCollector = new LogCollector();
-            using MailgunClient mailgun = new MailgunClient();
-            mailgun.LogCollector = logCollector;
-            mailgun.From = Helpers.GetFromObject(fromEmail, fromName);
-            if (Bcc != null) mailgun.Bcc = Bcc.ToList();
-            if (Cc != null) mailgun.Cc = Cc.ToList();
-            if (To != null) mailgun.To = To.ToList();
-            mailgun.ReplyTo = ReplyTo;
-            mailgun.Subject = Subject;
-            if (Text != null) mailgun.Text = string.Join("", Text);
-            if (HTML != null) mailgun.Html = string.Join("", HTML);
-            if (Attachment != null) {
-                mailgun.Attachment = Attachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
-            }
-            if (InlineAttachment != null) {
-                mailgun.InlineAttachment = InlineAttachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
-            }
-            mailgun.ErrorAction = errorAction;
-            mailgun.RetryCount = RetryCount;
-            mailgun.RetryDelayMilliseconds = RetryDelayMilliseconds;
-            mailgun.RetryDelayBackoff = RetryDelayBackoff;
-            mailgun.RetryAlways = RetryAlways.IsPresent;
-            NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
-            mailgun.Credentials = networkCredential;
-            if (ShouldProcess(mailgun.SentTo, "Sending email message via Mailgun")) {
-                var result = mailgun.SendEmailAsync().GetAwaiter().GetResult();
-                LogEmitter.EmitLogs(logCollector, this);
-                if (!Suppress) {
-                    WriteObject(result);
-                }
-            } else {
-                if (!Suppress) {
-                    WriteObject(new SmtpResult(false, EmailAction.Send, mailgun.SentTo, mailgun.SentFrom, "MailgunApi", 0, mailgun.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
-                }
-            }
+            ProcessMailgun(fromEmail, fromName);
         } else if (Graph) {
-            using Graph graph = new Graph();
-            graph.ChunkSize = ChunkSize;
-            graph.From = Helpers.GetFromObject(fromEmail, fromName);
-            graph.To = To;
-            graph.Cc = Cc;
-            graph.Bcc = Bcc;
-            graph.ReplyTo = ReplyTo;
-            graph.Subject = Subject;
-            graph.DoNotSaveToSentItems = DoNotSaveToSentItems;
-            graph.ErrorAction = errorAction;
-            graph.RetryCount = RetryCount;
-            graph.RetryDelayMilliseconds = RetryDelayMilliseconds;
-            graph.RetryDelayBackoff = RetryDelayBackoff;
-            graph.RetryAlways = RetryAlways.IsPresent;
-            graph.RequestReadReceipt = RequestReadReceipt;
-            graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
-            graph.HTML = string.Join("", HTML);
-            graph.ContentType = "HTML";
-            graph.Attachments = Attachment;
-            graph.CreateAttachments();
+            ProcessGraph(fromEmail, fromName);
+        } else if (MgGraphRequest) {
+            ProcessMgGraphRequest(fromEmail, fromName);
+        } else {
+            ProcessSmtp(fromEmail, fromName);
+        }
+    }
 
-            if (!ShouldProcess(graph.SentTo, "Sending email message via Graph")) {
-                LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
-                if (!Suppress) {
-                    WriteObject(new SmtpResult(false, EmailAction.Send, graph.SentTo, graph.SentFrom, "GraphAPI", 0, graph.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
-                }
-                LogEmitter.EmitLogs(graph.LogCollector, this);
-                return;
-            }
-
-            NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
-            graph.Authenticate(networkCredential);
-            var Status = graph.ConnectO365GraphAsync().GetAwaiter().GetResult();
-            if (!Status.Status) {
-                if (!Suppress) {
-                    WriteObject(Status);
-                }
-                LogEmitter.EmitLogs(graph.LogCollector, this);
-                return;
-            }
-            if (graph.IsLargerAttachment) {
-                Status = graph.SendMessageDraftAsync().GetAwaiter().GetResult();
-            } else {
-                Status = graph.SendMessageAsync().GetAwaiter().GetResult();
-            }
+    private void ProcessSendGrid(string? fromEmail, string? fromName) {
+        var logCollector = new LogCollector();
+        SendGridClient sendGrid = new SendGridClient();
+        sendGrid.LogCollector = logCollector;
+        sendGrid.From = Helpers.GetFromObject(fromEmail, fromName);
+        if (Bcc != null) sendGrid.Bcc = Bcc.ToList();
+        if (Cc != null) sendGrid.Cc = Cc.ToList();
+        if (To != null) sendGrid.To = To.ToList();
+        sendGrid.ReplyTo = ReplyTo;
+        sendGrid.Subject = Subject;
+        if (Text != null) sendGrid.Text = string.Join("", Text);
+        if (HTML != null) sendGrid.Html = string.Join("", HTML);
+        sendGrid.Priority = Priority;
+        if (Attachment != null) {
+            sendGrid.Attachment = Attachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
+        }
+        sendGrid.SeparateTo = SeparateTo;
+        sendGrid.ErrorAction = errorAction;
+        sendGrid.RetryCount = RetryCount;
+        sendGrid.RetryDelayMilliseconds = RetryDelayMilliseconds;
+        sendGrid.RetryDelayBackoff = RetryDelayBackoff;
+        sendGrid.RetryAlways = RetryAlways.IsPresent;
+        NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
+        sendGrid.Credentials = networkCredential;
+        sendGrid.CreateMessage();
+        if (ShouldProcess(sendGrid.SentTo, "Sending email message via SendGrid")) {
+            var result = sendGrid.SendEmailAsync().GetAwaiter().GetResult();
+            LogEmitter.EmitLogs(logCollector, this);
             if (!Suppress) {
-                WriteObject(Status);
+                WriteObject(result);
+            }
+        } else if (!Suppress) {
+            WriteObject(new SmtpResult(false, EmailAction.Send, sendGrid.SentTo, sendGrid.SentFrom, "SendGridApi", 0, sendGrid.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
+        }
+    }
+
+    private void ProcessMailgun(string? fromEmail, string? fromName) {
+        var logCollector = new LogCollector();
+        using MailgunClient mailgun = new MailgunClient();
+        mailgun.LogCollector = logCollector;
+        mailgun.From = Helpers.GetFromObject(fromEmail, fromName);
+        if (Bcc != null) mailgun.Bcc = Bcc.ToList();
+        if (Cc != null) mailgun.Cc = Cc.ToList();
+        if (To != null) mailgun.To = To.ToList();
+        mailgun.ReplyTo = ReplyTo;
+        mailgun.Subject = Subject;
+        if (Text != null) mailgun.Text = string.Join("", Text);
+        if (HTML != null) mailgun.Html = string.Join("", HTML);
+        if (Attachment != null) {
+            mailgun.Attachment = Attachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
+        }
+        if (InlineAttachment != null) {
+            mailgun.InlineAttachment = InlineAttachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
+        }
+        mailgun.ErrorAction = errorAction;
+        mailgun.RetryCount = RetryCount;
+        mailgun.RetryDelayMilliseconds = RetryDelayMilliseconds;
+        mailgun.RetryDelayBackoff = RetryDelayBackoff;
+        mailgun.RetryAlways = RetryAlways.IsPresent;
+        NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
+        mailgun.Credentials = networkCredential;
+        if (ShouldProcess(mailgun.SentTo, "Sending email message via Mailgun")) {
+            var result = mailgun.SendEmailAsync().GetAwaiter().GetResult();
+            LogEmitter.EmitLogs(logCollector, this);
+            if (!Suppress) {
+                WriteObject(result);
+            }
+        } else if (!Suppress) {
+            WriteObject(new SmtpResult(false, EmailAction.Send, mailgun.SentTo, mailgun.SentFrom, "MailgunApi", 0, mailgun.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
+        }
+    }
+
+    private void ProcessGraph(string? fromEmail, string? fromName) {
+        using Graph graph = new Graph();
+        graph.ChunkSize = ChunkSize;
+        graph.From = Helpers.GetFromObject(fromEmail, fromName);
+        graph.To = To;
+        graph.Cc = Cc;
+        graph.Bcc = Bcc;
+        graph.ReplyTo = ReplyTo;
+        graph.Subject = Subject;
+        graph.DoNotSaveToSentItems = DoNotSaveToSentItems;
+        graph.ErrorAction = errorAction;
+        graph.RetryCount = RetryCount;
+        graph.RetryDelayMilliseconds = RetryDelayMilliseconds;
+        graph.RetryDelayBackoff = RetryDelayBackoff;
+        graph.RetryAlways = RetryAlways.IsPresent;
+        graph.RequestReadReceipt = RequestReadReceipt;
+        graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
+        graph.HTML = string.Join("", HTML);
+        graph.ContentType = "HTML";
+        graph.Attachments = Attachment;
+        graph.CreateAttachments();
+
+        if (!ShouldProcess(graph.SentTo, "Sending email message via Graph")) {
+            LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
+            if (!Suppress) {
+                WriteObject(new SmtpResult(false, EmailAction.Send, graph.SentTo, graph.SentFrom, "GraphAPI", 0, graph.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
             }
             LogEmitter.EmitLogs(graph.LogCollector, this);
-        } else if (MgGraphRequest) {
-            using Graph graph = new Graph();
-            graph.ChunkSize = ChunkSize;
-            graph.From = Helpers.GetFromObject(fromEmail, fromName);
-            graph.To = To;
-            graph.Cc = Cc;
-            graph.Bcc = Bcc;
-            graph.ReplyTo = ReplyTo;
-            graph.Subject = Subject;
-            graph.DoNotSaveToSentItems = DoNotSaveToSentItems;
-            graph.ErrorAction = errorAction;
-            graph.RetryCount = RetryCount;
-            graph.RetryDelayMilliseconds = RetryDelayMilliseconds;
-            graph.RetryDelayBackoff = RetryDelayBackoff;
-            graph.RequestReadReceipt = RequestReadReceipt;
-            graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
-            graph.HTML = string.Join("", HTML);
-            graph.ContentType = "HTML";
-            graph.Attachments = Attachment;
-            graph.CreateAttachments();
-            if (graph.IsLargerAttachment) {
-                // create draft message
-                var json = graph.CreateDraftForMg();
-                var draftMessageId = InvokeMgGraphRequestPOST1($"v1.0/users/{graph.From}/mailfolders/drafts/messages", EmailAction.SendDraftMessage, json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
-                graph.PrepareAttachments().GetAwaiter().GetResult();
-                // Upload attachments to the draft message
-                foreach (var attachment in graph.AttachmentsPlaceHolders) {
-                    var uploadUrl = InvokeMgGraphRequestPOST(attachment.Json, EmailAction.Send, attachment.Json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
-                    if (uploadUrl != "") {
-                        InvokeMgGraphRequestPUT(uploadUrl, EmailAction.SendAttachment, attachment, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
-                    } else {
-                        graph.LogCollector.LogVerbose("PlaceHolders not working?");
-                    }
-                }
-                InvokeMgGraphRequest($"https://graph.microsoft.com/v1.0/users('{graph.SentFrom}')/messages/{draftMessageId}/send", EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
-                LogEmitter.EmitLogs(graph.LogCollector, this);
-            } else {
-                graph.CreateMessage();
-                InvokeMgGraphRequest($"v1.0/users/{fromEmail}/sendMail", EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
-                LogEmitter.EmitLogs(graph.LogCollector, this);
-            }
-        } else {
-            Smtp SmtpClient = new Smtp(LogPath, LogConsole, LogObject, LogTimestamps, LogSecrets, LogTimeStampsFormat, LogServerPrefix, LogClientPrefix, LogOverwrite);
-            SmtpClient.From = Helpers.GetFromObject(fromEmail, fromName);
-            SmtpClient.ReplyTo = ReplyTo;
-            SmtpClient.Cc = Cc;
-            SmtpClient.Bcc = Bcc;
-            SmtpClient.To = To;
-            SmtpClient.Subject = Subject;
-            SmtpClient.Priority = Priority;
-
-            //SmtpClient.Encoding = Encoding;
-            SmtpClient.DeliveryNotificationOption = DeliveryNotificationOption;
-            SmtpClient.DeliveryStatusNotificationType = DeliveryStatusNotificationType;
-
-            SmtpClient.CheckCertificateRevocation = !SkipCertificateRevocation;
-            SmtpClient.SkipCertificateValidation = SkipCertificateValidation;
-            if (HTML != null) SmtpClient.HtmlBody = string.Join("", HTML);
-            if (Text != null) SmtpClient.TextBody = string.Join("", Text);
-
-            SmtpClient.Attachments = Attachment?.ToList();
-            SmtpClient.InlineAttachments = InlineAttachment?.ToList();
-            SmtpClient.Timeout = Timeout;
-
-            SmtpClient.ErrorAction = errorAction;
-            SmtpClient.RetryCount = RetryCount;
-            SmtpClient.RetryDelayMilliseconds = RetryDelayMilliseconds;
-            SmtpClient.RetryDelayBackoff = RetryDelayBackoff;
-            SmtpClient.RetryAlways = RetryAlways.IsPresent;
-
-            if (!ShouldProcess(SmtpClient.SentTo, "Sending email message")) {
-                LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
-                if (!Suppress) {
-                    WriteObject(new SmtpResult(false, EmailAction.Send, SmtpClient.SentTo, SmtpClient.SentFrom, Server, Port, TimeSpan.Zero, "", "Email not sent (WhatIf)"));
-                }
-                return;
-            }
-
-            // Connect
-            var Status = SmtpClient.Connect(Server, Port, SecureSocketOptions, UseSsl);
-            if (!Status.Status) {
-                if (!Suppress) {
-                    WriteObject(Status);
-                }
-
-                SmtpClient.Dispose();
-                return;
-            }
-
-            SmtpClient.CreateMessage();
-
-            // Sign or Encrypt
-            if (SignOrEncrypt != EmailActionEncryption.None) {
-                if (SignOrEncrypt == EmailActionEncryption.PGPEncrypt && PublicKeyPath != null) {
-                    Status = SmtpClient.PgpEncrypt(PublicKeyPath);
-                } else if (SignOrEncrypt == EmailActionEncryption.PGPSign && PublicKeyPath != null && PrivateKeyPath != null) {
-                    Status = SmtpClient.PgpSign(PublicKeyPath, PrivateKeyPath, PrivateKeyPassword ?? string.Empty, PrivateKeyPasswordAsSecureString);
-                } else if (SignOrEncrypt == EmailActionEncryption.PGPSignAndEncrypt && PublicKeyPath != null && PrivateKeyPath != null) {
-                    Status = SmtpClient.PgpSignAndEncrypt(PublicKeyPath, PrivateKeyPath, PrivateKeyPassword ?? string.Empty, PrivateKeyPasswordAsSecureString);
-                } else if (CertificateThumbprint != null) {
-                    Status = SmtpClient.Encrypt(SignOrEncrypt, CertificateThumbprint);
-                } else if (CertificatePath != null && CertificatePassword != null) {
-                    Status = SmtpClient.Encrypt(SignOrEncrypt, CertificatePath, CertificatePassword,
-                        CertificatePasswordAsSecureString);
-                }
-
-                if (!Status.Status) {
-                    if (!Suppress) {
-                        WriteObject(Status);
-                    }
-
-                    SmtpClient.Dispose();
-                    return;
-                }
-            }
-
-            // Authenticate - skip when no credentials are provided
-            if (UseDefaultCredentials) {
-                Status = SmtpClient.AuthenticateDefaultCredentials();
-            } else if (Credential != null) {
-                NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
-                Status = SmtpClient.Authenticate(networkCredential, OAuth2);
-            } else if (!string.IsNullOrWhiteSpace(Username) || !string.IsNullOrWhiteSpace(Password)) {
-                Status = SmtpClient.Authenticate(Username, Password, AsSecureString, AuthenticationMechanism);
-            } else {
-                LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
-                Status = new SmtpResult(true, EmailAction.Authenticate, SmtpClient.SentTo, SmtpClient.SentFrom, SmtpClient.Server, SmtpClient.Port, SmtpClient.Stopwatch.Elapsed, "Authentication skipped");
-            }
-
-            if (!Status.Status) {
-                if (!Suppress) {
-                    WriteObject(Status);
-                }
-
-                SmtpClient.Dispose();
-                return;
-            }
-
-            // Send the message
-            Status = SmtpClient.Send();
-            if (!Suppress) {
-                WriteObject(Status);
-            }
-
-            // Save the message
-            SmtpClient.SaveMessage(MimeMessagePath);
-
-            // Disconnect & Dispose
-            SmtpClient.Dispose();
+            return;
         }
+
+        NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
+        graph.Authenticate(networkCredential);
+        var status = graph.ConnectO365GraphAsync().GetAwaiter().GetResult();
+        if (!status.Status) {
+            if (!Suppress) {
+                WriteObject(status);
+            }
+            LogEmitter.EmitLogs(graph.LogCollector, this);
+            return;
+        }
+
+        status = graph.IsLargerAttachment ? graph.SendMessageDraftAsync().GetAwaiter().GetResult() : graph.SendMessageAsync().GetAwaiter().GetResult();
+        if (!Suppress) {
+            WriteObject(status);
+        }
+        LogEmitter.EmitLogs(graph.LogCollector, this);
+    }
+
+    private void ProcessMgGraphRequest(string? fromEmail, string? fromName) {
+        using Graph graph = new Graph();
+        graph.ChunkSize = ChunkSize;
+        graph.From = Helpers.GetFromObject(fromEmail, fromName);
+        graph.To = To;
+        graph.Cc = Cc;
+        graph.Bcc = Bcc;
+        graph.ReplyTo = ReplyTo;
+        graph.Subject = Subject;
+        graph.DoNotSaveToSentItems = DoNotSaveToSentItems;
+        graph.ErrorAction = errorAction;
+        graph.RetryCount = RetryCount;
+        graph.RetryDelayMilliseconds = RetryDelayMilliseconds;
+        graph.RetryDelayBackoff = RetryDelayBackoff;
+        graph.RequestReadReceipt = RequestReadReceipt;
+        graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
+        graph.HTML = string.Join("", HTML);
+        graph.ContentType = "HTML";
+        graph.Attachments = Attachment;
+        graph.CreateAttachments();
+        if (graph.IsLargerAttachment) {
+            var json = graph.CreateDraftForMg();
+            var draftMessageId = InvokeMgGraphRequestPOST1($"v1.0/users/{graph.From}/mailfolders/drafts/messages", EmailAction.SendDraftMessage, json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+            graph.PrepareAttachments().GetAwaiter().GetResult();
+            foreach (var attachment in graph.AttachmentsPlaceHolders) {
+                var uploadUrl = InvokeMgGraphRequestPOST(attachment.Json, EmailAction.Send, attachment.Json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+                if (uploadUrl != string.Empty) {
+                    InvokeMgGraphRequestPUT(uploadUrl, EmailAction.SendAttachment, attachment, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+                } else {
+                    graph.LogCollector.LogVerbose("PlaceHolders not working?");
+                }
+            }
+            InvokeMgGraphRequest($"https://graph.microsoft.com/v1.0/users('{graph.SentFrom}')/messages/{draftMessageId}/send", EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+            LogEmitter.EmitLogs(graph.LogCollector, this);
+        } else {
+            graph.CreateMessage();
+            InvokeMgGraphRequest($"v1.0/users/{fromEmail}/sendMail", EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+            LogEmitter.EmitLogs(graph.LogCollector, this);
+        }
+    }
+
+    private void ProcessSmtp(string? fromEmail, string? fromName) {
+        Smtp smtpClient = new Smtp(LogPath, LogConsole, LogObject, LogTimestamps, LogSecrets, LogTimeStampsFormat, LogServerPrefix, LogClientPrefix, LogOverwrite);
+        smtpClient.From = Helpers.GetFromObject(fromEmail, fromName);
+        smtpClient.ReplyTo = ReplyTo;
+        smtpClient.Cc = Cc;
+        smtpClient.Bcc = Bcc;
+        smtpClient.To = To;
+        smtpClient.Subject = Subject;
+        smtpClient.Priority = Priority;
+
+        smtpClient.DeliveryNotificationOption = DeliveryNotificationOption;
+        smtpClient.DeliveryStatusNotificationType = DeliveryStatusNotificationType;
+
+        smtpClient.CheckCertificateRevocation = !SkipCertificateRevocation;
+        smtpClient.SkipCertificateValidation = SkipCertificateValidation;
+        if (HTML != null) smtpClient.HtmlBody = string.Join("", HTML);
+        if (Text != null) smtpClient.TextBody = string.Join("", Text);
+
+        smtpClient.Attachments = Attachment?.ToList();
+        smtpClient.InlineAttachments = InlineAttachment?.ToList();
+        smtpClient.Timeout = Timeout;
+
+        smtpClient.ErrorAction = errorAction;
+        smtpClient.RetryCount = RetryCount;
+        smtpClient.RetryDelayMilliseconds = RetryDelayMilliseconds;
+        smtpClient.RetryDelayBackoff = RetryDelayBackoff;
+        smtpClient.RetryAlways = RetryAlways.IsPresent;
+
+        if (!ShouldProcess(smtpClient.SentTo, "Sending email message")) {
+            LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
+            if (!Suppress) {
+                WriteObject(new SmtpResult(false, EmailAction.Send, smtpClient.SentTo, smtpClient.SentFrom, Server, Port, TimeSpan.Zero, string.Empty, "Email not sent (WhatIf)"));
+            }
+            return;
+        }
+
+        var status = smtpClient.Connect(Server, Port, SecureSocketOptions, UseSsl);
+        if (!status.Status) {
+            if (!Suppress) {
+                WriteObject(status);
+            }
+
+            smtpClient.Dispose();
+            return;
+        }
+
+        smtpClient.CreateMessage();
+
+        if (SignOrEncrypt != EmailActionEncryption.None) {
+            if (SignOrEncrypt == EmailActionEncryption.PGPEncrypt && PublicKeyPath != null) {
+                status = smtpClient.PgpEncrypt(PublicKeyPath);
+            } else if (SignOrEncrypt == EmailActionEncryption.PGPSign && PublicKeyPath != null && PrivateKeyPath != null) {
+                status = smtpClient.PgpSign(PublicKeyPath, PrivateKeyPath, PrivateKeyPassword ?? string.Empty, PrivateKeyPasswordAsSecureString);
+            } else if (SignOrEncrypt == EmailActionEncryption.PGPSignAndEncrypt && PublicKeyPath != null && PrivateKeyPath != null) {
+                status = smtpClient.PgpSignAndEncrypt(PublicKeyPath, PrivateKeyPath, PrivateKeyPassword ?? string.Empty, PrivateKeyPasswordAsSecureString);
+            } else if (CertificateThumbprint != null) {
+                status = smtpClient.Encrypt(SignOrEncrypt, CertificateThumbprint);
+            } else if (CertificatePath != null && CertificatePassword != null) {
+                status = smtpClient.Encrypt(SignOrEncrypt, CertificatePath, CertificatePassword,
+                    CertificatePasswordAsSecureString);
+            }
+
+            if (!status.Status) {
+                if (!Suppress) {
+                    WriteObject(status);
+                }
+
+                smtpClient.Dispose();
+                return;
+            }
+        }
+
+        if (UseDefaultCredentials) {
+            status = smtpClient.AuthenticateDefaultCredentials();
+        } else if (Credential != null) {
+            NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
+            status = smtpClient.Authenticate(networkCredential, OAuth2);
+        } else if (!string.IsNullOrWhiteSpace(Username) || !string.IsNullOrWhiteSpace(Password)) {
+            status = smtpClient.Authenticate(Username, Password, AsSecureString, AuthenticationMechanism);
+        } else {
+            LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
+            status = new SmtpResult(true, EmailAction.Authenticate, smtpClient.SentTo, smtpClient.SentFrom, smtpClient.Server, smtpClient.Port, smtpClient.Stopwatch.Elapsed, "Authentication skipped");
+        }
+
+        if (!status.Status) {
+            if (!Suppress) {
+                WriteObject(status);
+            }
+
+            smtpClient.Dispose();
+            return;
+        }
+
+        status = smtpClient.Send();
+        if (!Suppress) {
+            WriteObject(status);
+        }
+
+        smtpClient.SaveMessage(MimeMessagePath);
+
+        smtpClient.Dispose();
     }
 
 
