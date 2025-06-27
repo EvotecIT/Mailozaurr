@@ -18,7 +18,7 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommunications.Connect, "OAuthGoogle")]
 [OutputType(typeof(PSCredential))]
-public class CmdletConnectOAuthGoogle : PSCmdlet {
+public sealed class CmdletConnectOAuthGoogle : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Specifies the Gmail account (email address) to authenticate.</para>
     /// </summary>
@@ -49,10 +49,11 @@ public class CmdletConnectOAuthGoogle : PSCmdlet {
     /// <summary>
     /// Performs the interactive OAuth2 authentication and returns a PSCredential with the access token.
     /// </summary>
-    protected override void ProcessRecord() {
+    protected override async Task ProcessRecordAsync() {
         OAuthCredential? cred = null;
         try {
-            cred = Task.Run(() => Mailozaurr.OAuthHelpers.AcquireGoogleTokenCachedAsync(GmailAccount, ClientID, ClientSecret, Scope)).GetAwaiter().GetResult();
+            cred = await Mailozaurr.OAuthHelpers
+                .AcquireGoogleTokenCachedAsync(GmailAccount, ClientID, ClientSecret, Scope);
         } catch (System.Exception ex) {
             WriteError(new ErrorRecord(ex, "OAuthGoogleAuthFailed", ErrorCategory.AuthenticationError, null));
             return;
