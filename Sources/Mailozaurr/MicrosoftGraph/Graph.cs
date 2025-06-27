@@ -119,6 +119,10 @@ public class Graph : IDisposable {
     /// </summary>
     public double RetryDelayBackoff { get; set; } = 1.0;
 
+    /// <summary>
+    /// When enabled, scans the HTML body for local image references and embeds
+    /// them as inline attachments.
+    /// </summary>
     public bool AutoEmbedImages { get; set; } = false;
 
     /// <summary>

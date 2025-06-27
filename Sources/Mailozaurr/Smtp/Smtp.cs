@@ -98,6 +98,10 @@ public class Smtp {
 
     public double RetryDelayBackoff { get; set; } = 1.0;
 
+    /// <summary>
+    /// When set to <see langword="true"/>, replaces local image references in
+    /// <see cref="HtmlBody"/> with inline attachments.
+    /// </summary>
     public bool AutoEmbedImages { get; set; } = false;
 
     /// <summary>
