@@ -25,7 +25,7 @@ public static class Validator {
         string? line;
         while ((line = reader.ReadLine()) != null) {
             line = line.Trim();
-            if (line.Length == 0 || line.StartsWith("#")) continue;
+            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#")) continue;
             set.Add(line);
         }
         return set;

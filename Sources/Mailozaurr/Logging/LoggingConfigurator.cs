@@ -52,8 +52,8 @@ public class LoggingConfigurator {
         LogPath = logPath;
 
         ProtocolLogger? protocolLogger = null;
-        if (!string.IsNullOrEmpty(logPath) || logConsole || logObject) {
-            if (!string.IsNullOrEmpty(logPath)) {
+        if (!string.IsNullOrWhiteSpace(logPath) || logConsole || logObject) {
+            if (!string.IsNullOrWhiteSpace(logPath)) {
                 try {
                     protocolLogger = new ProtocolLogger(logPath, logOverwrite);
                 } catch (IOException ex) {
@@ -70,15 +70,15 @@ public class LoggingConfigurator {
             protocolLogger.LogTimestamps = logTimestamps;
             protocolLogger.RedactSecrets = !logSecrets;
 
-            if (!string.IsNullOrEmpty(logTimestampsFormat)) {
+            if (!string.IsNullOrWhiteSpace(logTimestampsFormat)) {
                 protocolLogger.TimestampFormat = logTimestampsFormat;
             }
 
-            if (!string.IsNullOrEmpty(logServerPrefix)) {
+            if (!string.IsNullOrWhiteSpace(logServerPrefix)) {
                 protocolLogger.ServerPrefix = logServerPrefix;
             }
 
-            if (!string.IsNullOrEmpty(logClientPrefix)) {
+            if (!string.IsNullOrWhiteSpace(logClientPrefix)) {
                 protocolLogger.ClientPrefix = logClientPrefix;
             }
         }

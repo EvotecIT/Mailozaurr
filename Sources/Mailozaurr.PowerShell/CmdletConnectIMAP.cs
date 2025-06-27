@@ -147,7 +147,7 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
                 var token = new System.Net.NetworkCredential(string.Empty, Credential.Password).Password;
                 var sasl = new MailKit.Security.SaslMechanismOAuth2(username, token);
                 await c.AuthenticateAsync(sasl);
-            } else if (ParameterSetName == "ClearText" && !string.IsNullOrEmpty(UserName) && !string.IsNullOrEmpty(Password)) {
+            } else if (ParameterSetName == "ClearText" && !string.IsNullOrWhiteSpace(UserName) && !string.IsNullOrWhiteSpace(Password)) {
                 await c.AuthenticateAsync(UserName, Password);
             } else if (Credential != null) {
                 var username = Credential.UserName;
@@ -182,7 +182,7 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
                 _ = client.GetCachedFolder(null, MailKit.FolderAccess.ReadOnly);
             } catch (ImapCommandException ex) {
                 var responseText = ex.ResponseText;
-                if (!string.IsNullOrEmpty(responseText)) {
+                if (!string.IsNullOrWhiteSpace(responseText)) {
                     LoggingMessages.Logger.WriteWarning($"Connect-IMAP - Failed to open inbox: {ex.Message} | Server response: {responseText}");
                 } else {
                     LoggingMessages.Logger.WriteWarning($"Connect-IMAP - Failed to open inbox: {ex.Message}");

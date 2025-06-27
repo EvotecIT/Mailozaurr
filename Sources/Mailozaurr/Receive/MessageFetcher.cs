@@ -53,13 +53,13 @@ public static class MessageFetcher {
 
         SearchQuery query = SearchQuery.All;
         if (!all) {
-            if (!string.IsNullOrEmpty(subject)) {
+            if (!string.IsNullOrWhiteSpace(subject)) {
                 query = query.And(SearchQuery.SubjectContains(subject));
             }
-            if (!string.IsNullOrEmpty(fromContains)) {
+            if (!string.IsNullOrWhiteSpace(fromContains)) {
                 query = query.And(SearchQuery.FromContains(fromContains));
             }
-            if (!string.IsNullOrEmpty(toContains)) {
+            if (!string.IsNullOrWhiteSpace(toContains)) {
                 query = query.And(SearchQuery.ToContains(toContains));
             }
             if (since.HasValue) {
@@ -138,13 +138,13 @@ public static class MessageFetcher {
             }
 
             if (!all) {
-                if (!string.IsNullOrEmpty(subject) && (message.Subject == null || message.Subject.IndexOf(subject, StringComparison.OrdinalIgnoreCase) < 0)) {
+                if (!string.IsNullOrWhiteSpace(subject) && (message.Subject == null || message.Subject.IndexOf(subject, StringComparison.OrdinalIgnoreCase) < 0)) {
                     continue;
                 }
-                if (!string.IsNullOrEmpty(fromContains) && !AddressMatches(message.From, fromContains)) {
+                if (!string.IsNullOrWhiteSpace(fromContains) && !AddressMatches(message.From, fromContains)) {
                     continue;
                 }
-                if (!string.IsNullOrEmpty(toContains) && !AddressMatches(message.To, toContains)) {
+                if (!string.IsNullOrWhiteSpace(toContains) && !AddressMatches(message.To, toContains)) {
                     continue;
                 }
                 var msgDate = message.Date.DateTime;
@@ -183,7 +183,7 @@ public static class MessageFetcher {
             if (addr.Address.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) {
                 return true;
             }
-            if (!string.IsNullOrEmpty(addr.Name) && addr.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) {
+            if (!string.IsNullOrWhiteSpace(addr.Name) && addr.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) {
                 return true;
             }
         }

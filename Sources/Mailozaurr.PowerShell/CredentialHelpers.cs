@@ -13,9 +13,7 @@ public static class CredentialHelpers {
     /// <param name="s"></param>
     /// <returns></returns>
     public static SecureString ToSecureString(string? s) {
-        if (s is null)
-            return new SecureString();
-        if (s.Length == 0)
+        if (string.IsNullOrWhiteSpace(s))
             return new SecureString();
         // Try to convert from encrypted string, fallback to plain text
         try {

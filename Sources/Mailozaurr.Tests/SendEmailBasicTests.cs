@@ -83,8 +83,8 @@ namespace Mailozaurr.Tests {
             smtp.CreateMessage();
 
             // Act
-            var subjectEmpty = string.IsNullOrEmpty(smtp.Message.Subject);
-            var bodyEmpty = smtp.Message.Body is TextPart part && string.IsNullOrEmpty(part.Text);
+            var subjectEmpty = string.IsNullOrWhiteSpace(smtp.Message.Subject);
+            var bodyEmpty = smtp.Message.Body is TextPart part && string.IsNullOrWhiteSpace(part.Text);
 
             // Assert
             Assert.True(subjectEmpty || bodyEmpty);

@@ -151,10 +151,10 @@ public partial class ClientSmtp : SmtpClient {
 
     private void BuildMessageBody(MimeMessage message) {
         var bodyBuilder = new BodyBuilder();
-        if (!string.IsNullOrEmpty(HtmlBody)) {
+        if (!string.IsNullOrWhiteSpace(HtmlBody)) {
             bodyBuilder.HtmlBody = HtmlBody;
         }
-        if (!string.IsNullOrEmpty(TextBody)) {
+        if (!string.IsNullOrWhiteSpace(TextBody)) {
             bodyBuilder.TextBody = TextBody;
         }
         if (Attachments != null) {
@@ -194,7 +194,7 @@ public partial class ClientSmtp : SmtpClient {
                         entity = mime;
                         break;
                 }
-                if (entity is MimePart inlinePart && string.IsNullOrEmpty(inlinePart.ContentId)) {
+                if (entity is MimePart inlinePart && string.IsNullOrWhiteSpace(inlinePart.ContentId)) {
                     inlinePart.ContentId = MimeUtils.GenerateMessageId();
                 }
             }
@@ -208,7 +208,7 @@ public partial class ClientSmtp : SmtpClient {
     /// <param name="path">Destination file path.</param>
     public void SaveMessage(string path) {
         var directory = Path.GetDirectoryName(path);
-        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory)) {
+        if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory)) {
             Directory.CreateDirectory(directory);
         }
         Message.WriteTo(path);

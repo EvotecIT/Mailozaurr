@@ -325,7 +325,7 @@ namespace Mailozaurr {
         internal static unsafe SecureString FromPlainTextString(string plainTextString) {
             Debug.Assert(plainTextString is not null);
 
-            if (plainTextString.Length == 0) {
+            if (string.IsNullOrWhiteSpace(plainTextString)) {
                 return new SecureString();
             }
 

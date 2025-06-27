@@ -38,7 +38,7 @@ public static class OAuthHelpers {
         AuthenticationResult result;
         var accounts = await app.GetAccountsAsync();
         IAccount? account = null;
-        if (!string.IsNullOrEmpty(login)) {
+        if (!string.IsNullOrWhiteSpace(login)) {
             account = accounts.FirstOrDefault(a => string.Equals(a.Username, login, StringComparison.OrdinalIgnoreCase));
         } else {
             account = accounts.FirstOrDefault();
@@ -51,7 +51,7 @@ public static class OAuthHelpers {
             }
         } catch (MsalUiRequiredException) {
             var builder = app.AcquireTokenInteractive(scopes);
-            if (!string.IsNullOrEmpty(login)) {
+            if (!string.IsNullOrWhiteSpace(login)) {
                 builder = builder.WithLoginHint(login);
             }
             result = await builder.ExecuteAsync();
@@ -137,7 +137,7 @@ public static class OAuthHelpers {
         if (cached != null && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
             return cached;
         }
-        if (cached != null && !string.IsNullOrEmpty(cached.RefreshToken)) {
+        if (cached != null && !string.IsNullOrWhiteSpace(cached.RefreshToken)) {
             var clientSecrets = new ClientSecrets { ClientId = clientId, ClientSecret = clientSecret };
             var initializer = new GoogleAuthorizationCodeFlow.Initializer {
                 ClientSecrets = clientSecrets,

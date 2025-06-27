@@ -109,7 +109,7 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
                 RetryDelayMilliseconds,
                 RetryDelayBackoff,
                 "https://graph.microsoft.com");
-            connected = !string.IsNullOrEmpty(token);
+            connected = !string.IsNullOrWhiteSpace(token);
         } catch {
             // ignore errors, return not connected
         }

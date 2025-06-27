@@ -36,7 +36,7 @@ public sealed class CmdletImportMailFile : AsyncPSCmdlet {
     /// Imports the specified mail file and returns its contents as a message object.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        if (!string.IsNullOrEmpty(InputPath) && File.Exists(InputPath)) {
+        if (!string.IsNullOrWhiteSpace(InputPath) && File.Exists(InputPath)) {
             FileInfo item;
             try {
                 item = new FileInfo(InputPath);

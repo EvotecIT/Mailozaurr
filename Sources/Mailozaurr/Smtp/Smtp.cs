@@ -219,7 +219,7 @@ public class Smtp {
     /// </summary>
     /// <param name="path">Destination file path.</param>
     public void SaveMessage(string path) {
-        if (!string.IsNullOrEmpty(path)) {
+        if (!string.IsNullOrWhiteSpace(path)) {
             Client.SaveMessage(path);
         }
     }

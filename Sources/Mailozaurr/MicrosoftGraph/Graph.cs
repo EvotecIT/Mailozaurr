@@ -211,7 +211,7 @@ public class Graph : IDisposable {
 
             var totalSize = 0;
             foreach (var a in ConvertedAttachments) {
-                if (string.IsNullOrEmpty(a.ContentBytes)) {
+                if (string.IsNullOrWhiteSpace(a.ContentBytes)) {
                     continue;
                 }
                 try {
