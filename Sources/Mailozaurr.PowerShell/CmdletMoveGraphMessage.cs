@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
 
+/// <summary>
+/// Moves a Microsoft Graph message to a different folder.
+/// </summary>
 [Cmdlet(VerbsCommon.Move, "GraphMessage")]
 public class CmdletMoveGraphMessage : AsyncPSCmdlet {
     [Parameter(Mandatory = true)]
@@ -28,6 +31,10 @@ public class CmdletMoveGraphMessage : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 
+    /// <summary>
+    /// Processes the cmdlet invocation.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override Task ProcessRecordAsync() {
         switch (ParameterSetName) {
             case "Graph":
@@ -45,10 +52,17 @@ public class CmdletMoveGraphMessage : AsyncPSCmdlet {
         }
     }
 
+    /// <summary>
+    /// Executes the move operation using the Graph SDK.
+    /// </summary>
+    /// <param name="cred">Credential used to access Graph.</param>
     private async Task ProcessGraphAsync(GraphCredential cred) {
         await MicrosoftGraphUtils.MoveMailMessageAsync(cred, UserPrincipalName!, MessageId!, DestinationFolderId!);
     }
 
+    /// <summary>
+    /// Executes the move operation using the <c>Invoke-MgGraphRequest</c> cmdlet.
+    /// </summary>
     private void ProcessMgGraph() {
         var uri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/messages/{MessageId}/move";
         var body = System.Text.Json.JsonSerializer.Serialize(new { destinationId = DestinationFolderId });
