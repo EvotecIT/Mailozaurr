@@ -1,5 +1,4 @@
 using System.Management.Automation;
-using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
 
@@ -52,7 +51,10 @@ public class CmdletConnectOAuthGoogle : PSCmdlet {
     protected override void ProcessRecord() {
         OAuthCredential? cred = null;
         try {
-            cred = Task.Run(() => Mailozaurr.OAuthHelpers.AcquireGoogleTokenCachedAsync(GmailAccount, ClientID, ClientSecret, Scope)).GetAwaiter().GetResult();
+            cred = Mailozaurr.OAuthHelpers
+                .AcquireGoogleTokenCachedAsync(GmailAccount, ClientID, ClientSecret, Scope)
+                .GetAwaiter()
+                .GetResult();
         } catch (System.Exception ex) {
             WriteError(new ErrorRecord(ex, "OAuthGoogleAuthFailed", ErrorCategory.AuthenticationError, null));
             return;
