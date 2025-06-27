@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System;
 using System.Net.Http;
 using System.Security;
 using System.Text;
@@ -15,6 +16,9 @@ public static class Helpers {
     /// <param name="credential">The credential containing the token.</param>
     /// <returns>The username and token.</returns>
     public static (string UserName, string Token) ConvertFromOAuth2Credential(NetworkCredential credential) {
+        if (credential is null) {
+            throw new ArgumentNullException(nameof(credential));
+        }
         return (credential.UserName, credential.Password);
     }
 
