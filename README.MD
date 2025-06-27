@@ -105,6 +105,7 @@ This will make sure the project has required libraries.
   - [x] Get Mail Messages
   - [x] Save Mail Messages
 - DNS and email validation functionality is now provided by [DomainDetective](https://github.com/EvotecIT/DomainDetective)
+- [x] Convert between EML and MSG message formats
 
 ### Using OpenPGP
 
