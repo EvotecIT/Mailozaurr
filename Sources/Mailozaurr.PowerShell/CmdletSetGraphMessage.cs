@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
 
+/// <summary>
+/// Updates properties of an existing Microsoft Graph message.
+/// </summary>
 [Cmdlet(VerbsCommon.Set, "GraphMessage")]
 public class CmdletSetGraphMessage : AsyncPSCmdlet {
     [Parameter(Mandatory = true)]
@@ -27,6 +30,10 @@ public class CmdletSetGraphMessage : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 
+    /// <summary>
+    /// Processes the cmdlet invocation.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override Task ProcessRecordAsync() {
         switch (ParameterSetName) {
             case "Graph":
@@ -44,10 +51,17 @@ public class CmdletSetGraphMessage : AsyncPSCmdlet {
         }
     }
 
+    /// <summary>
+    /// Executes the update operation using the Graph SDK.
+    /// </summary>
+    /// <param name="cred">Credential used to access Graph.</param>
     private async Task ProcessGraphAsync(GraphCredential cred) {
         await MicrosoftGraphUtils.SetMailMessageAsync(cred, UserPrincipalName!, MessageId!, Read.IsPresent);
     }
 
+    /// <summary>
+    /// Executes the update operation using the <c>Invoke-MgGraphRequest</c> cmdlet.
+    /// </summary>
     private void ProcessMgGraph() {
         var uri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/messages/{MessageId}";
         var body = JsonSerializer.Serialize(new { isRead = Read.IsPresent });

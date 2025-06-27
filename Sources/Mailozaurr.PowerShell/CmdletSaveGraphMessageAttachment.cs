@@ -6,6 +6,9 @@ using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
 
+/// <summary>
+/// Saves attachments from Microsoft Graph message objects.
+/// </summary>
 [Cmdlet(VerbsData.Save, "GraphMessageAttachment")]
 public class CmdletSaveGraphMessageAttachment : PSCmdlet {
     [Parameter(Mandatory = true, ValueFromPipeline = true)]
@@ -16,6 +19,9 @@ public class CmdletSaveGraphMessageAttachment : PSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? Path { get; set; }
 
+    /// <summary>
+    /// Processes the cmdlet invocation.
+    /// </summary>
     protected override void ProcessRecord() {
         var graphAttachments = new List<Attachment>();
         var mimeAttachments = new List<MimeEntity>();

@@ -10,6 +10,7 @@
         <LangVersion>latest</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <!-- Required for pointer operations in Helpers/SecureStringHelper.cs -->
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RepositoryUrl>https://github.com/EvotecIT/Mailozaurr</RepositoryUrl>
