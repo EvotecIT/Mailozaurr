@@ -204,8 +204,3 @@ public class InternalLogger {
         }
     }
 }
-
-/// <summary>
-/// Represents the arguments for a log event.
-/// </summary>
-/// <seealso cref="System.EventArgs" />
