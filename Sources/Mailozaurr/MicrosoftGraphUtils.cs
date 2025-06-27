@@ -395,6 +395,7 @@ namespace Mailozaurr {
                     } catch (IOException ex) {
                         // Log or handle error
                         LoggingMessages.Logger.WriteWarning($"SaveMailMessage - Couldn't save file to {filePath}. Error: {ex.Message}");
+                        LoggingMessages.Logger.WriteWarning($"SaveMailMessage - Possible issue: Ensure the directory '{resolvedPath}' exists and you have write permissions.");
                     }
                 }
             }
@@ -415,9 +416,11 @@ namespace Mailozaurr {
                     } catch (FormatException fex) {
                         // Invalid Base64 content
                         LoggingMessages.Logger.WriteWarning($"SaveAttachment - Invalid base64 content for {att.Name}. Error: {fex.Message}");
+                        LoggingMessages.Logger.WriteWarning($"SaveAttachment - Possible issue: The attachment '{att.Name}' may be corrupted.");
                     } catch (IOException ex) {
                         // Log or handle other errors
                         LoggingMessages.Logger.WriteWarning($"SaveAttachment - Couldn't save file to {filePath}. Error: {ex.Message}");
+                        LoggingMessages.Logger.WriteWarning($"SaveAttachment - Possible issue: Verify the path '{filePath}' exists and you have write permissions.");
                     }
                 }
             }
