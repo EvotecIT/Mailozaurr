@@ -1,4 +1,5 @@
 ﻿using System.Management.Automation;
+using System.IO;
 
 namespace Mailozaurr.PowerShell;
 
@@ -583,6 +584,8 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     /// Process the record.
     /// </summary>
     protected override void ProcessRecord() {
+        Attachment = FilterExistingPaths(Attachment, nameof(Attachment));
+        InlineAttachment = FilterExistingPaths(InlineAttachment, nameof(InlineAttachment));
         var (fromEmail, fromName) = Helpers.GetEmailAndName(From);
         if (SendGrid || EmailProvider == EmailProvider.SendGrid) {
             var logCollector = new LogCollector();
@@ -1005,5 +1008,34 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
         }
 
         return "";
+    }
+
+    private object[]? FilterExistingPaths(object[]? paths, string parameterName) {
+        if (paths == null) {
+            return null;
+        }
+
+        List<object> valid = new();
+
+        foreach (var item in paths) {
+            string? path = item switch {
+                string s => s,
+                FileInfo fi => fi.FullName,
+                _ => null
+            };
+
+            if (path != null) {
+                if (!File.Exists(path)) {
+                    WriteWarning($"Send-EmailMessage - File not found: {path}. Removing from '{parameterName}'.");
+                    continue;
+                }
+            }
+
+            if (item != null) {
+                valid.Add(item);
+            }
+        }
+
+        return valid.Count > 0 ? valid.ToArray() : null;
     }
 }
