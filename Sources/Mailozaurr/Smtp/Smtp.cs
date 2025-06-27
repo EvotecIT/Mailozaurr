@@ -98,6 +98,8 @@ public class Smtp {
 
     public double RetryDelayBackoff { get; set; } = 1.0;
 
+    public bool AutoEmbedImages { get; set; } = false;
+
     /// <summary>
     /// Forces retries even when the encountered error is not considered
     /// transient. By default retries occur only for transient failures.
@@ -193,6 +195,18 @@ public class Smtp {
     /// Creates the MIME message using the current property values.
     /// </summary>
     public void CreateMessage() {
+        if (AutoEmbedImages) {
+            var (html, paths) = HtmlUtils.ExtractLocalImagePaths(HtmlBody);
+            HtmlBody = html;
+            if (paths.Count > 0) {
+                InlineAttachments ??= new List<object>();
+                foreach (var p in paths) {
+                    if (!InlineAttachments.Contains(p)) {
+                        InlineAttachments.Add(p);
+                    }
+                }
+            }
+        }
         Client.CreateMessage();
     }
 

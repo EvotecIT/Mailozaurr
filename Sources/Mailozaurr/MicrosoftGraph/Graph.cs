@@ -119,6 +119,8 @@ public class Graph : IDisposable {
     /// </summary>
     public double RetryDelayBackoff { get; set; } = 1.0;
 
+    public bool AutoEmbedImages { get; set; } = false;
+
     /// <summary>
     /// Forces retries even when the encountered error is not classified as
     /// transient.
@@ -188,6 +190,7 @@ public class Graph : IDisposable {
     /// Converts the <see cref="Attachments"/> collection into <see cref="GraphAttachment"/> instances.
     /// </summary>
     public void CreateAttachments() {
+        ConvertedAttachments.Clear();
         if (Attachments != null && Attachments.Any()) {
             // Convert provided attachments into GraphAttachment objects
             foreach (var item in Attachments) {
@@ -224,6 +227,17 @@ public class Graph : IDisposable {
     /// Builds the <see cref="GraphMessageContainer"/> object that represents the email.
     /// </summary>
     public void CreateMessage() {
+        CreateAttachments();
+        if (AutoEmbedImages) {
+            var (html, paths) = HtmlUtils.ExtractLocalImagePaths(HTML);
+            HTML = html;
+            foreach (var p in paths) {
+                var att = GraphAttachment.FromFile(p);
+                att.IsInline = true;
+                att.ContentId = Path.GetFileName(p);
+                ConvertedAttachments.Add(att);
+            }
+        }
         // Note: The display name for the sender is controlled by Office 365 and may not reflect the value you provide here.
         // Office 365 will use the mailbox's configured display name for the sender, regardless of what is set in the payload.
         // Always use the email address for API calls and authentication.

@@ -65,6 +65,12 @@ public class GraphAttachment {
     [JsonPropertyName("contentBytes")]
     public string ContentBytes { get; set; }
 
+    [JsonPropertyName("isInline")]
+    public bool IsInline { get; set; }
+
+    [JsonPropertyName("contentId")]
+    public string? ContentId { get; set; }
+
     /// <summary>
     /// Creates a <see cref="GraphAttachment"/> from a local file path.
     /// </summary>
