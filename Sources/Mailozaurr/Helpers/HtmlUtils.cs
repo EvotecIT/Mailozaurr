@@ -2,7 +2,16 @@ using System.Text.RegularExpressions;
 
 namespace Mailozaurr;
 
+/// <summary>
+/// Helper utilities for working with HTML content.
+/// </summary>
 public static class HtmlUtils {
+    /// <summary>
+    /// Replaces local image <c>src</c> references with <c>cid:</c> links and returns the
+    /// updated HTML and a collection of the embedded file paths.
+    /// </summary>
+    /// <param name="html">HTML content that may contain local image paths.</param>
+    /// <returns>The updated HTML and list of file paths that were replaced.</returns>
     public static (string Html, List<string> Paths) ExtractLocalImagePaths(string html) {
         var paths = new List<string>();
         if (string.IsNullOrEmpty(html)) return (html, paths);

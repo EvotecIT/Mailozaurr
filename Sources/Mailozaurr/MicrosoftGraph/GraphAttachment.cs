@@ -66,9 +66,17 @@ public class GraphAttachment {
     public string ContentBytes { get; set; }
 
     [JsonPropertyName("isInline")]
+    /// <summary>
+    /// Indicates whether this attachment should be rendered inline in the
+    /// message body.
+    /// </summary>
     public bool IsInline { get; set; }
 
     [JsonPropertyName("contentId")]
+    /// <summary>
+    /// Optional identifier used to reference the attachment via a <c>cid:</c>
+    /// URL within the HTML body.
+    /// </summary>
     public string? ContentId { get; set; }
 
     /// <summary>
