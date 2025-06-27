@@ -53,4 +53,51 @@ public static class EmailMessage {
         }
         return new EmlConversionResult() { EmlFile = emlFile.FullName, MsgFile = msgFile.FullName, Status = false, Error = "EML file does not exist" };
     }
+
+    /// <summary>
+    /// Converts one or more MSG files to EML format.
+    /// </summary>
+    /// <param name="msgFile">Paths to the MSG files to convert.</param>
+    /// <param name="outputFolder">The folder where EML files should be saved.</param>
+    /// <param name="force">If set to <c>true</c>, existing EML files will be overwritten.</param>
+    /// <returns>A collection of conversion results for each processed file.</returns>
+    public static IEnumerable<MsgConversionResult> ConvertMsgToEml(string[] msgFile, string outputFolder, bool force) {
+        LoggingMessages.Logger.WriteVerbose($"Converting {msgFile.Length} MSG file(s) to EML file(s)...");
+        foreach (var msg in msgFile) {
+            var fileName = Path.GetFileNameWithoutExtension(msg);
+            var targetFile = Path.Combine(outputFolder, $"{fileName}.eml");
+            var eml = ConvertMsgToEml(new FileInfo(msg), new FileInfo(targetFile), force);
+            yield return eml;
+        }
+    }
+
+    /// <summary>
+    /// Converts a single MSG file to EML format.
+    /// </summary>
+    /// <param name="msgFile">The input MSG file.</param>
+    /// <param name="emlFile">The target EML file.</param>
+    /// <param name="force">If set to <c>true</c>, an existing EML file will be overwritten.</param>
+    /// <returns>The result of the conversion.</returns>
+    public static MsgConversionResult ConvertMsgToEml(FileInfo msgFile, FileInfo emlFile, bool force) {
+        if (File.Exists(msgFile.FullName)) {
+            LoggingMessages.Logger.WriteVerbose("Processing MSG file: {0}", msgFile);
+            try {
+                if (File.Exists(emlFile.FullName) && !force) {
+                    LoggingMessages.Logger.WriteWarning("EML file already exists: {0}", emlFile);
+                    return new MsgConversionResult() { MsgFile = msgFile.FullName, EmlFile = emlFile.FullName, Status = false, Error = "EML file already exists" };
+                } else {
+                    if (File.Exists(emlFile.FullName)) {
+                        LoggingMessages.Logger.WriteVerbose("Removing existing EML file: {0}", emlFile);
+                        File.Delete(emlFile.FullName);
+                    }
+                    Converter.ConvertMsgToEml(msgFile.FullName, emlFile.FullName);
+                    return new MsgConversionResult() { MsgFile = msgFile.FullName, EmlFile = emlFile.FullName, Status = true };
+                }
+            } catch (IOException ex) {
+                LoggingMessages.Logger.WriteWarning("Error converting MSG to EML: {0}", ex.Message);
+                return new MsgConversionResult() { MsgFile = msgFile.FullName, EmlFile = emlFile.FullName, Status = false, Error = ex.Message };
+            }
+        }
+        return new MsgConversionResult() { MsgFile = msgFile.FullName, EmlFile = emlFile.FullName, Status = false, Error = "MSG file does not exist" };
+    }
 }
