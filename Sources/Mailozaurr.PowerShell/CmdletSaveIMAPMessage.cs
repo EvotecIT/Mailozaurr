@@ -61,13 +61,22 @@ public sealed class CmdletSaveIMAPMessage : AsyncPSCmdlet {
             var mailFolder = conn.Data.GetCachedFolder(Folder ?? conn.Folder?.FullName, FolderAccess.ReadOnly);
             conn.Folders[mailFolder.FullName] = (ImapFolder)mailFolder;
             var message = mailFolder.GetMessage(uid);
-            if (Path != null && Path.EndsWith(".msg", System.StringComparison.OrdinalIgnoreCase)) {
-                var tempEml = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{System.Guid.NewGuid()}.eml");
-                message.WriteTo(tempEml);
-                EmailMessage.ConvertEmlToMsg(new System.IO.FileInfo(tempEml), new System.IO.FileInfo(Path), true);
-                System.IO.File.Delete(tempEml);
-            } else {
-                message.WriteTo(Path);
+
+            if (!string.IsNullOrEmpty(Path)) {
+                var fullPath = System.IO.Path.GetFullPath(Path);
+                var directory = System.IO.Path.GetDirectoryName(fullPath);
+                if (!string.IsNullOrEmpty(directory) && !System.IO.Directory.Exists(directory)) {
+                    System.IO.Directory.CreateDirectory(directory);
+                }
+
+                if (fullPath.EndsWith(".msg", System.StringComparison.OrdinalIgnoreCase)) {
+                    var tempEml = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{System.Guid.NewGuid()}.eml");
+                    message.WriteTo(tempEml);
+                    EmailMessage.ConvertEmlToMsg(new System.IO.FileInfo(tempEml), new System.IO.FileInfo(fullPath), true);
+                    System.IO.File.Delete(tempEml);
+                } else {
+                    message.WriteTo(fullPath);
+                }
             }
         } else {
             WriteWarning("Save-IMAPMessage - Is IMAP connected?");
