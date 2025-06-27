@@ -10,39 +10,7 @@ using System.IO;
 using System.Collections.Concurrent;
 
 namespace Mailozaurr {
-    /// <summary>
-    /// Represents credentials required for Microsoft Graph authentication.
-    /// </summary>
-    public class GraphCredential {
-        public string ClientId { get; set; }
-        public string DirectoryId { get; set; }
-        public string? ClientSecret { get; set; }
-        public string? CertificatePath { get; set; }
-        public string? CertificatePassword { get; set; }
-        public byte[]? CertificateBytes { get; set; }
-        public string? CertificatePemPath { get; set; }
-    }
 
-    /// <summary>
-    /// Simplified representation of an email message returned from Graph.
-    /// </summary>
-    public class EmailGraphMessage {
-        public string Id { get; set; }
-        public string Subject { get; set; }
-        public string BodyPreview { get; set; }
-        public object Body { get; set; }
-        public string ChangeKey { get; set; }
-        // Add more properties as needed
-    }
-
-    /// <summary>
-    /// Represents a file attachment from Microsoft Graph.
-    /// </summary>
-    public class Attachment {
-        public string Name { get; set; }
-        public string ContentBytes { get; set; }
-        // Add more properties as needed
-    }
 
     public static class MicrosoftGraphUtils {
         private static readonly HttpClient HttpClient;

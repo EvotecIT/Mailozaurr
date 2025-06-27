@@ -1,16 +1,6 @@
 ﻿namespace Mailozaurr;
 
 /// <summary>
-/// Wrapper used when serializing a message for Graph API calls.
-/// </summary>
-public class GraphMessageContainer {
-    [JsonPropertyName("message")]
-    public GraphMessage Message { get; set; }
-    [JsonPropertyName("saveToSentItems")]
-    public bool SaveToSentItems { get; set; }
-}
-
-/// <summary>
 /// Represents an email message for use with the Graph API.
 /// </summary>
 public class GraphMessage {
@@ -55,31 +45,4 @@ public class GraphMessage {
     [JsonPropertyName("attachments")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<GraphAttachment>? Attachments { get; set; }
-}
-
-/// <summary>
-/// Represents an email address object for Graph API payloads.
-/// </summary>
-public class GraphEmailAddress {
-    [JsonPropertyName("emailAddress")]
-    public GraphEmail Email { get; set; }
-}
-
-/// <summary>
-/// Simple email address container.
-/// </summary>
-public class GraphEmail {
-    [JsonPropertyName("address")]
-    public string Address { get; set; }
-}
-
-/// <summary>
-/// Body content for a message.
-/// </summary>
-public class GraphContent {
-    [JsonPropertyName("contentType")]
-    public string Type { get; set; } = "Text";
-
-    [JsonPropertyName("content")]
-    public string Content { get; set; } = "";
 }
