@@ -49,7 +49,7 @@ namespace Mailozaurr {
                 TokenCache[key] = new GraphAuthorization { AccessToken = cachedFile.AccessToken, TokenType = "Bearer", ExpiresOn = cachedFile.ExpiresOn };
                 return $"Bearer {cachedFile.AccessToken}";
             }
-            if (!string.IsNullOrEmpty(credential.CertificatePath)) {
+            if (!string.IsNullOrWhiteSpace(credential.CertificatePath)) {
                 var scopes = new[] { $"{resource}/.default" };
                 var auth = await OAuthHelpers.AcquireGraphCertificateTokenAsync(
                     credential.ClientId,
@@ -70,7 +70,7 @@ namespace Mailozaurr {
                     scopes);
                 return $"{auth.TokenType} {auth.AccessToken}";
             }
-            if (!string.IsNullOrEmpty(credential.CertificatePemPath)) {
+            if (!string.IsNullOrWhiteSpace(credential.CertificatePemPath)) {
                 var scopes = new[] { $"{resource}/.default" };
                 var auth = await OAuthHelpers.AcquireGraphCertificatePemTokenAsync(
                     credential.ClientId,
@@ -153,7 +153,7 @@ namespace Mailozaurr {
         public static string BuildGraphUri(string baseUri, string path, IDictionary<string, string> queryParameters = null) {
             var uriBuilder = new StringBuilder();
             uriBuilder.Append(baseUri.TrimEnd('/'));
-            if (!string.IsNullOrEmpty(path)) {
+            if (!string.IsNullOrWhiteSpace(path)) {
                 if (!path.StartsWith("/")) uriBuilder.Append('/');
                 uriBuilder.Append(path);
             }
@@ -185,7 +185,7 @@ namespace Mailozaurr {
                     request.Headers.TryAddWithoutValidation(kvp.Key, kvp.Value);
                 }
             }
-            if (!string.IsNullOrEmpty(body) && (method == "POST" || method == "PUT" || method == "PATCH")) {
+            if (!string.IsNullOrWhiteSpace(body) && (method == "POST" || method == "PUT" || method == "PATCH")) {
                 request.Content = new StringContent(body, Encoding.UTF8, "application/json");
             }
             using var response = await HttpClient.SendAsync(request);
@@ -214,7 +214,7 @@ namespace Mailozaurr {
                     }
                 } else if (value == null) {
                     dict.Remove(key);
-                } else if (value is string s && s == string.Empty) {
+                } else if (value is string s && string.IsNullOrWhiteSpace(s)) {
                     dict.Remove(key);
                 } else if (value is System.Collections.IList list && list.Count == 0) {
                     dict.Remove(key);
@@ -234,7 +234,7 @@ namespace Mailozaurr {
         /// </summary>
         public static string JoinUriQuery(string baseUri, string relativeOrAbsoluteUri = null, IDictionary<string, object> queryParameters = null, bool escapeUriString = false) {
             string url = baseUri.TrimEnd('/');
-            if (!string.IsNullOrEmpty(relativeOrAbsoluteUri)) {
+            if (!string.IsNullOrWhiteSpace(relativeOrAbsoluteUri)) {
                 url += "/" + relativeOrAbsoluteUri.TrimStart('/');
             }
             var uriBuilder = new UriBuilder(url);
@@ -293,7 +293,7 @@ namespace Mailozaurr {
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
             headers["Authorization"] = token;
             var queryParams = new Dictionary<string, object>();
-            if (!string.IsNullOrEmpty(filter)) queryParams["$filter"] = filter;
+            if (!string.IsNullOrWhiteSpace(filter)) queryParams["$filter"] = filter;
             if (properties != null && properties.Any()) queryParams["$select"] = string.Join(",", properties);
             var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/messages", queryParams);
             var doc = await InvokeGraphApiAsync("GET", uri, headers);
@@ -376,7 +376,7 @@ namespace Mailozaurr {
             var resolvedPath = Path.GetFullPath(path);
             if (!Directory.Exists(resolvedPath)) Directory.CreateDirectory(resolvedPath);
             foreach (var att in attachments) {
-                if (!string.IsNullOrEmpty(att.ContentBytes) && !string.IsNullOrEmpty(att.Name)) {
+                if (!string.IsNullOrWhiteSpace(att.ContentBytes) && !string.IsNullOrWhiteSpace(att.Name)) {
                     var filePath = Path.Combine(resolvedPath, att.Name);
                     try {
                         var bytes = Convert.FromBase64String(att.ContentBytes);

@@ -154,7 +154,7 @@ public class SendGridClient {
     /// <param name="emailAddress">The object to convert.</param>
     /// <returns>A SendGridEmailAddress object, or null if the provided object is null or an empty string.</returns>
     private SendGridEmailAddress? ConvertToEmailObject(object? emailAddress) {
-        if (emailAddress == null || string.IsNullOrEmpty(emailAddress.ToString())) {
+        if (emailAddress == null || string.IsNullOrWhiteSpace(emailAddress.ToString())) {
             return null;
         } else if (emailAddress is string emailString) {
             return new SendGridEmailAddress { Email = emailString };
@@ -164,7 +164,7 @@ public class SendGridClient {
             }
 
             var emailValue = emailDict["Email"] as string;
-            if (string.IsNullOrEmpty(emailValue)) {
+            if (string.IsNullOrWhiteSpace(emailValue)) {
                 return null;
             }
 

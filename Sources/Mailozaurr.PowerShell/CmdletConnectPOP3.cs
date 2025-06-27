@@ -145,7 +145,7 @@ public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
                 var token = new System.Net.NetworkCredential(string.Empty, Credential.Password).Password;
                 var sasl = new MailKit.Security.SaslMechanismOAuth2(username, token);
                 await c.AuthenticateAsync(sasl);
-            } else if (ParameterSetName == "ClearText" && !string.IsNullOrEmpty(UserName) && !string.IsNullOrEmpty(Password)) {
+            } else if (ParameterSetName == "ClearText" && !string.IsNullOrWhiteSpace(UserName) && !string.IsNullOrWhiteSpace(Password)) {
                 await c.AuthenticateAsync(UserName, Password);
             } else if (Credential != null) {
                 var username = Credential.UserName;

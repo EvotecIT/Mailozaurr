@@ -14,12 +14,12 @@ public static class HtmlUtils {
     /// <returns>The updated HTML and list of file paths that were replaced.</returns>
     public static (string Html, List<string> Paths) ExtractLocalImagePaths(string html) {
         var paths = new List<string>();
-        if (string.IsNullOrEmpty(html)) return (html, paths);
+        if (string.IsNullOrWhiteSpace(html)) return (html, paths);
 
         string pattern = "<img[^>]+src=[\"']([^\"']+)[\"']";
         foreach (Match match in Regex.Matches(html, pattern, RegexOptions.IgnoreCase)) {
             var path = match.Groups[1].Value;
-            if (string.IsNullOrEmpty(path)) continue;
+            if (string.IsNullOrWhiteSpace(path)) continue;
             if (path.StartsWith("http", StringComparison.OrdinalIgnoreCase) ||
                 path.StartsWith("cid:", StringComparison.OrdinalIgnoreCase) ||
                 path.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) {

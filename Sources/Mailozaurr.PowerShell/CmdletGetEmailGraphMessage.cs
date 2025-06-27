@@ -99,7 +99,7 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
     private Task ProcessMgGraph() {
         var filter = BuildFilter();
         var query = new Dictionary<string, object>();
-        if (!string.IsNullOrEmpty(filter)) query["$filter"] = filter;
+        if (!string.IsNullOrWhiteSpace(filter)) query["$filter"] = filter;
         if (Property != null && Property.Length > 0) query["$select"] = string.Join(",", Property);
         if (Limit.HasValue) query["$top"] = Limit.Value.ToString();
         var uri = MicrosoftGraphUtils.JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{UserPrincipalName}/messages", query);
@@ -118,13 +118,13 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
     private string BuildFilter() {
         var filters = new List<string>();
         if (!All.IsPresent) {
-            if (!string.IsNullOrEmpty(Subject)) {
+            if (!string.IsNullOrWhiteSpace(Subject)) {
                 filters.Add($"contains(subject,'{Subject.Replace("'", "''")}')");
             }
-            if (!string.IsNullOrEmpty(FromContains)) {
+            if (!string.IsNullOrWhiteSpace(FromContains)) {
                 filters.Add($"contains(from/emailAddress/address,'{FromContains.Replace("'", "''")}')");
             }
-            if (!string.IsNullOrEmpty(ToContains)) {
+            if (!string.IsNullOrWhiteSpace(ToContains)) {
                 filters.Add($"toRecipients/any(r:contains(r/emailAddress/address,'{ToContains.Replace("'", "''")}'))");
             }
             if (Since.HasValue) {
@@ -138,8 +138,8 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
             filters.Add("hasAttachments eq true");
         }
         var filter = string.Join(" and ", filters);
-        if (!string.IsNullOrEmpty(Filter)) {
-            filter = string.IsNullOrEmpty(filter) ? Filter : $"{filter} and {Filter}";
+        if (!string.IsNullOrWhiteSpace(Filter)) {
+            filter = string.IsNullOrWhiteSpace(filter) ? Filter : $"{filter} and {Filter}";
         }
         return filter;
     }

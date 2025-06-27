@@ -89,7 +89,7 @@ public class MailgunClient : IDisposable {
     /// <returns>The formatted address string.</returns>
     private static string ConvertAddress(object address) {
         var (email, name) = Helpers.GetEmailAndName(address);
-        return string.IsNullOrEmpty(name) ? email : $"{name} <{email}>";
+        return string.IsNullOrWhiteSpace(name) ? email : $"{name} <{email}>";
     }
 
     /// <summary>
@@ -104,9 +104,9 @@ public class MailgunClient : IDisposable {
         foreach (var c in Helpers.UniqueAddresses(Cc, seen)) content.Add(new StringContent(ConvertAddress(c)), "cc");
         foreach (var b in Helpers.UniqueAddresses(Bcc, seen)) content.Add(new StringContent(ConvertAddress(b)), "bcc");
         if (ReplyTo != null) content.Add(new StringContent(ConvertAddress(ReplyTo)), "h:Reply-To");
-        if (!string.IsNullOrEmpty(Subject)) content.Add(new StringContent(Subject), "subject");
-        if (!string.IsNullOrEmpty(Text)) content.Add(new StringContent(Text), "text");
-        if (!string.IsNullOrEmpty(Html)) content.Add(new StringContent(Html), "html");
+        if (!string.IsNullOrWhiteSpace(Subject)) content.Add(new StringContent(Subject), "subject");
+        if (!string.IsNullOrWhiteSpace(Text)) content.Add(new StringContent(Text), "text");
+        if (!string.IsNullOrWhiteSpace(Html)) content.Add(new StringContent(Html), "html");
         if (Attachment != null) {
             foreach (var path in Attachment) {
                 if (!File.Exists(path)) {

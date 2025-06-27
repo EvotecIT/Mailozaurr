@@ -20,7 +20,7 @@ public static class ImapClientFolderCache {
     /// <returns>The opened folder.</returns>
     public static IMailFolder GetCachedFolder(this ImapClient client, string? folder, FolderAccess access) {
         var map = Cache.GetOrCreateValue(client);
-        var name = string.IsNullOrEmpty(folder) ? client.Inbox.FullName : folder;
+        var name = string.IsNullOrWhiteSpace(folder) ? client.Inbox.FullName : folder;
 
         if (!map.TryGetValue(name, out var mailFolder)) {
             if (name.Equals(client.Inbox.FullName, System.StringComparison.OrdinalIgnoreCase)) {

@@ -69,7 +69,7 @@ public static class Helpers {
     /// <param name="name">Display name.</param>
     /// <returns>The object to be used as sender.</returns>
     public static object GetFromObject(string email, string name) {
-        if (!string.IsNullOrEmpty(name)) {
+        if (!string.IsNullOrWhiteSpace(name)) {
             return new Dictionary<string, object> { { "Name", name }, { "Email", email } };
         }
         return email;
@@ -101,7 +101,7 @@ public static class Helpers {
 
         foreach (var address in addresses) {
             var email = GetEmailAddress(address);
-            if (string.IsNullOrEmpty(email)) continue;
+            if (string.IsNullOrWhiteSpace(email)) continue;
 
             var lowered = email.ToLowerInvariant();
             if (seen.Add(lowered)) {
@@ -138,7 +138,7 @@ public static class Helpers {
     }
 
     public static async Task PostWebhookAsync(string? url, SmtpResult result, CancellationToken cancellationToken = default) {
-        if (string.IsNullOrEmpty(url)) {
+        if (string.IsNullOrWhiteSpace(url)) {
             return;
         }
 
