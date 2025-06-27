@@ -663,7 +663,9 @@ public class Graph : IDisposable {
         long offset = 0;
         while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0) {
             var contentRange = $"bytes {offset}-{offset + bytesRead - 1}/{fileSize}";
-            var byteArrayContent = new ByteArrayContent(buffer, 0, bytesRead);
+            var chunk = new byte[bytesRead];
+            Array.Copy(buffer, chunk, bytesRead);
+            var byteArrayContent = new ByteArrayContent(chunk);
             byteArrayContent.Headers.Add("Content-Range", contentRange);
             fileContents.Add(byteArrayContent);
             offset += bytesRead;
