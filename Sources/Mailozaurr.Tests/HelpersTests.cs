@@ -20,6 +20,14 @@ public class HelpersTests
         Assert.Equal("dict@example.com", result);
     }
 
+    [Fact]
+    public void GetEmailAddress_ReturnsEmpty_WhenEmailKeyMissing()
+    {
+        var dict = new Dictionary<string, object> { { "Name", "John" } };
+        var result = Mailozaurr.Helpers.GetEmailAddress(dict);
+        Assert.Equal(string.Empty, result);
+    }
+
     private class CustomObject
     {
         public override string ToString() => "Custom";

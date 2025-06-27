@@ -51,8 +51,11 @@ public static class Helpers {
         if (from is string s) {
             return s;
         }
-        if (from is IDictionary<string, object> dict && dict.ContainsKey("Email")) {
-            return dict["Email"]?.ToString();
+        if (from is IDictionary<string, object> dict) {
+            if (dict.TryGetValue("Email", out var emailObj)) {
+                return emailObj?.ToString() ?? string.Empty;
+            }
+            return string.Empty;
         }
         return from?.ToString() ?? string.Empty;
     }
