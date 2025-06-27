@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Net;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -39,5 +40,11 @@ public class HelpersTests
         var obj = new CustomObject();
         var result = Mailozaurr.Helpers.GetEmailAddress(obj);
         Assert.Equal("Custom", result);
+    }
+
+    [Fact]
+    public void ConvertFromOAuth2Credential_ThrowsArgumentNullException_WhenCredentialIsNull()
+    {
+        Assert.Throws<ArgumentNullException>(() => Mailozaurr.Helpers.ConvertFromOAuth2Credential(null!));
     }
 }
