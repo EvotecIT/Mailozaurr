@@ -246,6 +246,9 @@ public class Graph : IDisposable {
                 ConvertedAttachments.Add(att);
             }
         }
+        if (From is null) {
+            throw new InvalidOperationException("From address must be specified.");
+        }
         // Note: The display name for the sender is controlled by Office 365 and may not reflect the value you provide here.
         // Office 365 will use the mailbox's configured display name for the sender, regardless of what is set in the payload.
         // Always use the email address for API calls and authentication.

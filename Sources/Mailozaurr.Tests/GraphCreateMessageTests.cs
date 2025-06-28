@@ -52,4 +52,18 @@ public class GraphCreateMessageTests
         Assert.True(graph.IsLargerAttachment);
         Assert.Null(graph.MessageContainer.Message.Attachments);
     }
+
+    [Fact]
+    public void CreateMessage_WithoutFrom_ThrowsInvalidOperationException()
+    {
+        using var graph = new Graph
+        {
+            To = new object[] { "to@example.com" },
+            Subject = "subject",
+            HTML = "body",
+            ContentType = "HTML"
+        };
+
+        Assert.Throws<InvalidOperationException>(() => graph.CreateMessage());
+    }
 }
