@@ -11,23 +11,38 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Move, "GraphMessage")]
 public class CmdletMoveGraphMessage : AsyncPSCmdlet {
+    /// <summary>
+    /// UPN of the mailbox owner containing the message.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
+    /// <summary>
+    /// Identifier of the message to move.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? MessageId { get; set; }
 
+    /// <summary>
+    /// Target folder identifier where the message will be moved.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? DestinationFolderId { get; set; }
 
+    /// <summary>
+    /// Optional Graph connection used when moving the message.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
 
+    /// <summary>
+    /// Indicates that the message should be moved using Invoke-MgGraphRequest.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 

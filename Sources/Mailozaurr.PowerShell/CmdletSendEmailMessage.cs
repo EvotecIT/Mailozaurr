@@ -528,24 +528,36 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     public string? CertificateThumbprint { get; set; }
 
+    /// <summary>
+    /// Path to the recipient's public key used for PGP operations.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
     [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     public string? PublicKeyPath { get; set; }
 
+    /// <summary>
+    /// Path to the sender's private key used for PGP signing.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
     [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     public string? PrivateKeyPath { get; set; }
 
+    /// <summary>
+    /// Password for the private key when required.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
     [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     public string? PrivateKeyPassword { get; set; }
 
+    /// <summary>
+    /// Indicates that <see cref="PrivateKeyPassword"/> is provided as a secure string.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
     [Parameter(Mandatory = false, ParameterSetName = "oAuth")]

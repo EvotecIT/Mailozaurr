@@ -230,6 +230,15 @@ public static class OAuthHelpers {
         return await AcquireGraphCertificateTokenInternal(clientId, tenantId, certificate, scopes);
     }
 
+    /// <summary>
+    /// Acquires an app-only token using a certificate provided as a byte array.
+    /// </summary>
+    /// <param name="clientId">The application (client) identifier.</param>
+    /// <param name="tenantId">The tenant identifier.</param>
+    /// <param name="certificateBytes">Certificate bytes in PFX format.</param>
+    /// <param name="certificatePassword">Password for the certificate.</param>
+    /// <param name="scopes">Optional scopes to request.</param>
+    /// <returns>The authorization information including access token.</returns>
     public static async Task<GraphAuthorization> AcquireGraphCertificateTokenAsync(
         string clientId,
         string tenantId,
@@ -240,6 +249,14 @@ public static class OAuthHelpers {
         return await AcquireGraphCertificateTokenInternal(clientId, tenantId, certificate, scopes);
     }
 
+    /// <summary>
+    /// Acquires an app-only token using a PEM encoded certificate file.
+    /// </summary>
+    /// <param name="clientId">The application (client) identifier.</param>
+    /// <param name="tenantId">The tenant identifier.</param>
+    /// <param name="pemPath">Path to the PEM certificate file.</param>
+    /// <param name="scopes">Optional scopes to request.</param>
+    /// <returns>The authorization information including access token.</returns>
     public static async Task<GraphAuthorization> AcquireGraphCertificatePemTokenAsync(
         string clientId,
         string tenantId,

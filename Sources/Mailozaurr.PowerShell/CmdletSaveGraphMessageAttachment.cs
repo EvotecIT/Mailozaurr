@@ -11,10 +11,16 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsData.Save, "GraphMessageAttachment")]
 public class CmdletSaveGraphMessageAttachment : PSCmdlet {
+    /// <summary>
+    /// Attachments to save from the message.
+    /// </summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true)]
     [ValidateNotNullOrEmpty]
     public PSObject[]? Attachment { get; set; }
 
+    /// <summary>
+    /// Destination path for saved attachments.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? Path { get; set; }
