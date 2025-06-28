@@ -179,6 +179,16 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - `Sources/Mailozaurr.Examples/AcquireGoogleTokenInteractive.cs` – C# sample for `OAuthHelpers.AcquireGoogleTokenInteractiveAsync`.
 - `Sources/Mailozaurr.Examples/SendEmailAttachments.cs` – C# sample demonstrating attachments and inline resources.
 
+### Filtering Graph messages
+
+`Get-EmailGraphMessage` supports the `-Filter` parameter for raw OData queries. This value is passed directly to Microsoft Graph's `$filter` option.
+
+```powershell
+Get-EmailGraphMessage -UserPrincipalName 'user@example.com' -Filter "receivedDateTime ge 2024-01-01T00:00:00Z and contains(subject,'Invoice')"
+```
+
+See the [Microsoft Graph query parameters documentation](https://learn.microsoft.com/en-us/graph/query-parameters#filter-parameter) for details.
+
 Keep in mind PSSharedGoods is only required for development. When you use this module from PowerShellGallery it's not installed as everything is merged.
 
 ### Limiting access to mailboxes (Microsoft Graph API)
