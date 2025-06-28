@@ -36,7 +36,7 @@ public class CmdletGetEmailGraphMessageAttachment : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? MessageId { get; set; }
     /// <summary>
-    [Parameter(ParameterSetName = "Graph")]
+    [Parameter(ParameterSetName = "Graph", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 

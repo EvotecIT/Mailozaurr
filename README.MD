@@ -106,6 +106,15 @@ This will make sure the project has required libraries.
   - [x] Get Mail Folders via `Get-EmailGraphFolder` with `-Connection` or `-MgGraphRequest`
   - [x] Get Mail Messages
   - [x] Save Mail Messages
+- Pipeline input is supported for Graph connection objects when retrieving
+  folders or messages:
+
+```powershell
+$graph = Connect-EmailGraph -Credential $cred
+$graph | Get-EmailGraphFolder -UserPrincipalName 'user@example.com'
+$graph | Get-EmailGraphMessage -UserPrincipalName 'user@example.com' -Limit 10 |
+    Save-GraphMessage -Path 'C:\Archive'
+```
 - DNS and email validation functionality is now provided by [DomainDetective](https://github.com/EvotecIT/DomainDetective)
 - [x] Convert between EML and MSG message formats
 

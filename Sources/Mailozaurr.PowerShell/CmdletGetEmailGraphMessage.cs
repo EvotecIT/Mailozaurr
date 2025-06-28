@@ -19,7 +19,7 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
-    [Parameter(ParameterSetName = "Graph")]
+    [Parameter(ParameterSetName = "Graph", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
