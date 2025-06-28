@@ -51,13 +51,20 @@ public sealed class CmdletSavePOP3Message : AsyncPSCmdlet {
         if (conn != null && conn.Data != null) {
             if (Index < conn.Data.Count) {
                 var message = conn.Data.GetMessage(Index);
-                if (Path != null && Path.EndsWith(".msg", System.StringComparison.OrdinalIgnoreCase)) {
-                    var tempEml = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{System.Guid.NewGuid()}.eml");
-                    message.WriteTo(tempEml);
-                    EmailMessage.ConvertEmlToMsg(new System.IO.FileInfo(tempEml), new System.IO.FileInfo(Path), true);
-                    System.IO.File.Delete(tempEml);
-                } else {
-                    message.WriteTo(Path);
+                if (Path != null) {
+                    var resolved = System.IO.Path.GetFullPath(Path);
+                    var directory = System.IO.Path.GetDirectoryName(resolved);
+                    if (!string.IsNullOrEmpty(directory) && !System.IO.Directory.Exists(directory)) {
+                        System.IO.Directory.CreateDirectory(directory);
+                    }
+                    if (resolved.EndsWith(".msg", System.StringComparison.OrdinalIgnoreCase)) {
+                        var tempEml = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{System.Guid.NewGuid()}.eml");
+                        message.WriteTo(tempEml);
+                        EmailMessage.ConvertEmlToMsg(new System.IO.FileInfo(tempEml), new System.IO.FileInfo(resolved), true);
+                        System.IO.File.Delete(tempEml);
+                    } else {
+                        message.WriteTo(resolved);
+                    }
                 }
             } else {
                 WriteWarning($"Save-POP3Message - Index is out of range. Use index less than {conn.Data.Count}.");
