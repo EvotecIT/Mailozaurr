@@ -395,15 +395,53 @@ namespace Mailozaurr {
         }
 
         /// <summary>
-        /// Moves a mail message to another folder.
+        /// Performs an action on a mail message.
         /// </summary>
-        public static async Task MoveMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId, string destinationFolderId) {
+        public static async Task ExecuteMailMessageActionAsync(GraphCredential credential, string userPrincipalName, string messageId, GraphMessageAction action, string? destinationFolderId = null) {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
             headers["Authorization"] = token;
-            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/messages/{messageId}/move");
-            var body = JsonSerializer.Serialize(new { destinationId = destinationFolderId });
-            await InvokeGraphApiAsync("POST", uri, headers, body);
+
+            string method;
+            string uri;
+            string? body = null;
+
+            switch (action) {
+                case GraphMessageAction.Move:
+                    if (string.IsNullOrWhiteSpace(destinationFolderId)) throw new ArgumentNullException(nameof(destinationFolderId));
+                    method = "POST";
+                    uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/messages/{messageId}/move");
+                    body = JsonSerializer.Serialize(new { destinationId = destinationFolderId });
+                    break;
+                case GraphMessageAction.Copy:
+                    if (string.IsNullOrWhiteSpace(destinationFolderId)) throw new ArgumentNullException(nameof(destinationFolderId));
+                    method = "POST";
+                    uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/messages/{messageId}/copy");
+                    body = JsonSerializer.Serialize(new { destinationId = destinationFolderId });
+                    break;
+                case GraphMessageAction.Delete:
+                    method = "DELETE";
+                    uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/messages/{messageId}");
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(action), action, null);
+            }
+
+            await InvokeGraphApiAsync(method, uri, headers, body);
+        }
+
+        /// <summary>
+        /// Moves a mail message to another folder.
+        /// </summary>
+        public static async Task MoveMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId, string destinationFolderId) {
+            await ExecuteMailMessageActionAsync(credential, userPrincipalName, messageId, GraphMessageAction.Move, destinationFolderId);
+        }
+
+        /// <summary>
+        /// Copies a mail message to another folder.
+        /// </summary>
+        public static async Task CopyMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId, string destinationFolderId) {
+            await ExecuteMailMessageActionAsync(credential, userPrincipalName, messageId, GraphMessageAction.Copy, destinationFolderId);
         }
 
         /// <summary>
@@ -422,11 +460,7 @@ namespace Mailozaurr {
         /// Deletes a mail message.
         /// </summary>
         public static async Task DeleteMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId) {
-            var headers = new Dictionary<string, string>();
-            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
-            headers["Authorization"] = token;
-            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/messages/{messageId}");
-            await InvokeGraphApiAsync("DELETE", uri, headers);
+            await ExecuteMailMessageActionAsync(credential, userPrincipalName, messageId, GraphMessageAction.Delete);
         }
     }
 }
