@@ -6,6 +6,7 @@ using Google.Apis.Auth.OAuth2.Responses;
 using System.Security.Cryptography.X509Certificates;
 using System.Linq;
 using System;
+using System.Collections.Generic;
 
 namespace Mailozaurr;
 
@@ -66,6 +67,44 @@ public static class OAuthHelpers {
     }
 
     /// <summary>
+    /// Attempts to silently acquire a new Office 365 access token using the cached refresh token.
+    /// </summary>
+    private static async Task<OAuthCredential?> AcquireO365TokenSilentAsync(
+        string login,
+        string clientId,
+        string tenantId,
+        string redirectUri,
+        IEnumerable<string> scopes) {
+        var options = new PublicClientApplicationOptions {
+            ClientId = clientId,
+            TenantId = tenantId,
+            RedirectUri = redirectUri
+        };
+        var app = PublicClientApplicationBuilder.CreateWithApplicationOptions(options).Build();
+        TokenCacheHelper.RegisterCache(app.UserTokenCache);
+        var accounts = await app.GetAccountsAsync();
+        IAccount? account = null;
+        if (!string.IsNullOrWhiteSpace(login)) {
+            account = accounts.FirstOrDefault(a => string.Equals(a.Username, login, StringComparison.OrdinalIgnoreCase));
+        } else {
+            account = accounts.FirstOrDefault();
+        }
+        if (account == null) {
+            return null;
+        }
+        try {
+            var result = await app.AcquireTokenSilent(scopes, account).ExecuteAsync();
+            return new OAuthCredential {
+                UserName = result.Account.Username,
+                AccessToken = result.AccessToken,
+                ExpiresOn = result.ExpiresOn
+            };
+        } catch (MsalUiRequiredException) {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Acquires an OAuth token for a Gmail account using an interactive browser flow.
     /// </summary>
     /// <param name="gmailAccount">The Gmail account to authenticate.</param>
@@ -117,6 +156,13 @@ public static class OAuthHelpers {
         var cached = OAuthTokenCache.Get(cacheKey);
         if (cached != null && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
             return cached;
+        }
+        if (cached != null) {
+            var refreshed = await AcquireO365TokenSilentAsync(login, clientId, tenantId, redirectUri, scopes);
+            if (refreshed != null) {
+                OAuthTokenCache.Set(cacheKey, refreshed);
+                return refreshed;
+            }
         }
 
         var cred = await AcquireO365TokenInteractiveAsync(login, clientId, tenantId, redirectUri, scopes);
