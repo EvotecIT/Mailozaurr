@@ -100,12 +100,45 @@ This will make sure the project has required libraries.
   - [x] Connect to IMAP
   - [x] Get IMAP Folder
   - [x] Get IMAP Messages
+  - [x] Listen for new IMAP messages via `ImapIdleListener`
+  - [x] Wait for new IMAP messages with the `Wait-IMAPMessage` cmdlet
 - Office 365 Graph API
   - [x] Get Mail Folders via `Get-EmailGraphFolder` with `-Connection` or `-MgGraphRequest`
   - [x] Get Mail Messages
   - [x] Save Mail Messages
 - DNS and email validation functionality is now provided by [DomainDetective](https://github.com/EvotecIT/DomainDetective)
 - [x] Convert between EML and MSG message formats
+
+### Listening for new IMAP mail
+
+The `ImapIdleListener` class uses the IMAP IDLE command to raise events whenever
+new mail arrives. Create an instance with your connected `ImapClient`, subscribe
+to `MessageArrived`, and call `StartAsync`:
+
+```csharp
+using var client = new ImapClient();
+await client.ConnectAsync("imap.example.com", 993, SecureSocketOptions.SslOnConnect);
+await client.AuthenticateAsync("user@example.com", "password");
+
+var listener = new Mailozaurr.ImapIdleListener(client);
+listener.MessageArrived += (s, msg) =>
+    Console.WriteLine($"New message: {msg.Message.Subject}");
+await listener.StartAsync();
+```
+
+Call `Stop()` to end listening. See
+`Sources/Mailozaurr.Examples/ImapIdleListenerExample.cs` for a full example.
+
+Alternatively, use the PowerShell cmdlet `Wait-IMAPMessage` to output new
+messages directly to the pipeline:
+
+```powershell
+$cred = Get-Credential
+$client = Connect-IMAP -Server 'imap.example.com' -Credential $cred
+Wait-IMAPMessage -Client $client -Action { param($m) "New: $($m.Message.Subject)" }
+```
+
+Press <kbd>Ctrl+C</kbd> to stop waiting for messages.
 
 ### Using OpenPGP
 
@@ -135,6 +168,8 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - Use `Connect-EmailGraph` and `Disconnect-EmailGraph` to authenticate and release application credentials for Microsoft Graph. The connection cmdlet supports both client secret and certificate authentication modes.
 - `Connect-EmailGraph`, `Connect-IMAP` and `Connect-POP3` store the last successful connection in module variables. Subsequent cmdlets use these defaults when `-Connection` or `-Client` is omitted.
 - [Example-SendEmail-Attachments.ps1](Examples/Example-SendEmail-Attachments.ps1) - demonstrate file and in-memory attachments.
+- [Example-WaitImapMessage.ps1](Examples/Example-WaitImapMessage.ps1) - wait for new mail from PowerShell.
+- [ImapIdleListenerExample.cs](Sources/Mailozaurr.Examples/ImapIdleListenerExample.cs) - C# sample listening for new mail.
 - [PGP documentation](Docs/PGP.md) - overview of OpenPGP support.
 
 -Some useful examples:
