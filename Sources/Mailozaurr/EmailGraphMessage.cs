@@ -10,22 +10,22 @@ public class EmailGraphMessage {
     public string Id { get; set; }
 
     /// <summary>
-    /// Gets or sets the message subject.
+    /// Gets or sets the subject line of the message.
     /// </summary>
     public string Subject { get; set; }
 
     /// <summary>
-    /// Gets or sets a short preview of the message body.
+    /// Gets or sets the preview text of the message body.
     /// </summary>
     public string BodyPreview { get; set; }
 
     /// <summary>
-    /// Gets or sets the message body content.
+    /// Gets or sets the full body content of the message.
     /// </summary>
     public object Body { get; set; }
 
     /// <summary>
-    /// Gets or sets the change key for the message.
+    /// Gets or sets the change key used for concurrency checks.
     /// </summary>
     public string ChangeKey { get; set; }
     // Add more properties as needed

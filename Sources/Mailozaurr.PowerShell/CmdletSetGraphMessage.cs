@@ -11,22 +11,37 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Set, "GraphMessage")]
 public class CmdletSetGraphMessage : AsyncPSCmdlet {
+    /// <summary>
+    /// UPN of the mailbox owner containing the message.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
+    /// <summary>
+    /// Identifier of the message to modify.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? MessageId { get; set; }
 
+    /// <summary>
+    /// Marks the message as read when set.
+    /// </summary>
     [Parameter]
     public SwitchParameter Read { get; set; }
 
+    /// <summary>
+    /// Optional Graph connection used when updating the message.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
 
+    /// <summary>
+    /// Indicates that the message should be updated using Invoke-MgGraphRequest.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 
