@@ -27,8 +27,12 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
     [Parameter(ParameterSetName = "MgGraphRequest")]
     public string[]? Property { get; set; }
 
+    /// <summary>
+    /// <para type="description">Raw OData filter passed directly to Microsoft Graph.</para>
+    /// </summary>
     [Parameter(ParameterSetName = "Graph")]
     [Parameter(ParameterSetName = "MgGraphRequest")]
+    [Alias("ODataFilter")]
     public string? Filter { get; set; }
 
     [Parameter(ParameterSetName = "Graph")]
@@ -80,7 +84,7 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        var filter = BuildFilter();
+        var filter = BuildFilter(Filter);
         var messages = await MicrosoftGraphUtils.GetMailMessagesAsync(
             cred,
             UserPrincipalName!,
@@ -97,7 +101,7 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
     }
 
     private Task ProcessMgGraph() {
-        var filter = BuildFilter();
+        var filter = BuildFilter(Filter);
         var query = new Dictionary<string, object>();
         if (!string.IsNullOrWhiteSpace(filter)) query["$filter"] = filter;
         if (Property != null && Property.Length > 0) query["$select"] = string.Join(",", Property);
@@ -115,7 +119,10 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
         return Task.CompletedTask;
     }
 
-    private string BuildFilter() {
+    /// <summary>
+    /// Combines built-in conditions with a raw OData filter.
+    /// </summary>
+    private string BuildFilter(string? rawFilter) {
         var filters = new List<string>();
         if (!All.IsPresent) {
             if (!string.IsNullOrWhiteSpace(Subject)) {
@@ -138,8 +145,8 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
             filters.Add("hasAttachments eq true");
         }
         var filter = string.Join(" and ", filters);
-        if (!string.IsNullOrWhiteSpace(Filter)) {
-            filter = string.IsNullOrWhiteSpace(filter) ? Filter : $"{filter} and {Filter}";
+        if (!string.IsNullOrWhiteSpace(rawFilter)) {
+            filter = string.IsNullOrWhiteSpace(filter) ? rawFilter : $"{filter} and {rawFilter}";
         }
         return filter;
     }
