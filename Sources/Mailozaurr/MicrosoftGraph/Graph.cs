@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Headers;
+﻿using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading;
 
 namespace Mailozaurr;
@@ -656,25 +657,21 @@ public class Graph : IDisposable {
     /// <param name="filePath"></param>
     /// <param name="chunkSize"></param>
     /// <returns></returns>
-    private async Task<List<ByteArrayContent>> PrepareByteArrayContentForUpload(string filePath, int chunkSize = 9000000, CancellationToken cancellationToken = default) {
-        var fileContents = new List<ByteArrayContent>();
+    private Task<List<StreamContent>> PrepareByteArrayContentForUpload(string filePath, int chunkSize = 9000000, CancellationToken cancellationToken = default) {
+        var fileContents = new List<StreamContent>();
         var fileSize = new FileInfo(filePath).Length;
 
-        using var fileStream = new FileStream(filePath, FileMode.Open);
-        var buffer = new byte[chunkSize];
-        int bytesRead;
         long offset = 0;
-        while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0) {
-            var contentRange = $"bytes {offset}-{offset + bytesRead - 1}/{fileSize}";
-            var chunk = new byte[bytesRead];
-            Array.Copy(buffer, chunk, bytesRead);
-            var byteArrayContent = new ByteArrayContent(chunk);
-            byteArrayContent.Headers.Add("Content-Range", contentRange);
-            fileContents.Add(byteArrayContent);
-            offset += bytesRead;
+        while (offset < fileSize) {
+            var length = Math.Min(chunkSize, fileSize - offset);
+            var stream = new PartialFileStream(filePath, offset, length);
+            var streamContent = new StreamContent(stream);
+            streamContent.Headers.Add("Content-Range", $"bytes {offset}-{offset + length - 1}/{fileSize}");
+            fileContents.Add(streamContent);
+            offset += length;
         }
 
-        return fileContents;
+        return Task.FromResult(fileContents);
     }
 
     /// <summary>
@@ -712,12 +709,11 @@ public class Graph : IDisposable {
     /// </summary>
     /// <param name="uploadUrl">The upload session URL.</param>
     /// <param name="fileChunks">The file chunks to upload.</param>
-    public async Task SendFileChunks(string uploadUrl, List<ByteArrayContent> fileChunks, CancellationToken cancellationToken = default) {
-        var tasks = new List<Task>();
+    public async Task SendFileChunks(string uploadUrl, List<StreamContent> fileChunks, CancellationToken cancellationToken = default) {
         foreach (var chunk in fileChunks) {
-            tasks.Add(SendFile(uploadUrl, chunk, cancellationToken));
+            await SendFile(uploadUrl, chunk, cancellationToken).ConfigureAwait(false);
+            chunk.Dispose();
         }
-        await Task.WhenAll(tasks);
     }
 
     /// <summary>
@@ -725,7 +721,7 @@ public class Graph : IDisposable {
     /// </summary>
     /// <param name="uploadUrl">The upload session URL.</param>
     /// <param name="byteArrayContent">The chunk to send.</param>
-    public async Task SendFile(string uploadUrl, ByteArrayContent byteArrayContent, CancellationToken cancellationToken = default) {
+    public async Task SendFile(string uploadUrl, StreamContent byteArrayContent, CancellationToken cancellationToken = default) {
         using var requestMessage = new HttpRequestMessage(HttpMethod.Put, uploadUrl) {
             Content = byteArrayContent
         };
