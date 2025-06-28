@@ -176,20 +176,31 @@ public class SendGridClient {
     }
 
     /// <summary>
+    /// Converts an attachment object to a <see cref="SendGridAttachment"/>.
+    /// </summary>
+    /// <param name="attachment">The attachment object to convert.</param>
+    /// <returns>The <see cref="SendGridAttachment"/> instance or <c>null</c> if the input is <c>null</c>.</returns>
+    private static SendGridAttachment? ConvertToAttachment(object? attachment) {
+        if (attachment == null) {
+            return null;
+        }
+
+        return attachment switch {
+            string path => new SendGridAttachment(path),
+            SendGridAttachment sg => sg,
+            _ => throw new ArgumentException($"attachment object type {attachment.GetType().Name} requires addition")
+        };
+    }
+
+    /// <summary>
     /// Creates a SendGridMessage object from the properties of this SendGridClient.
     /// </summary>
     public void CreateMessage() {
 
-        var attachments = new List<SendGridAttachment>();
-        if (Attachment != null) {
-            foreach (var item in Attachment) {
-                if (item is string p) {
-                    attachments.Add(new SendGridAttachment(p));
-                } else if (item is SendGridAttachment sg) {
-                    attachments.Add(sg);
-                }
-            }
-        }
+        var attachments = Attachment?
+            .Select(ConvertToAttachment)
+            .Where(a => a != null)
+            .ToList() ?? new List<SendGridAttachment>();
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
