@@ -4,27 +4,36 @@
 /// Represents a simple file attachment used when sending messages.
 /// </summary>
 public class GraphAttachment {
+    /// <summary>
+    /// Gets or sets the Graph type of the attachment.
+    /// </summary>
     [JsonPropertyName("@odata.type")]
     public string ODataType { get; set; } = "#microsoft.graph.fileAttachment";
 
+    /// <summary>
+    /// Gets or sets the attachment file name.
+    /// </summary>
     [JsonPropertyName("name")]
     public string Name { get; set; }
 
+    /// <summary>
+    /// Gets or sets the file content encoded as a Base64 string.
+    /// </summary>
     [JsonPropertyName("contentBytes")]
     public string ContentBytes { get; set; }
 
-    [JsonPropertyName("isInline")]
     /// <summary>
     /// Indicates whether this attachment should be rendered inline in the
     /// message body.
     /// </summary>
+    [JsonPropertyName("isInline")]
     public bool IsInline { get; set; }
 
-    [JsonPropertyName("contentId")]
     /// <summary>
     /// Optional identifier used to reference the attachment via a <c>cid:</c>
     /// URL within the HTML body.
     /// </summary>
+    [JsonPropertyName("contentId")]
     public string? ContentId { get; set; }
 
     /// <summary>

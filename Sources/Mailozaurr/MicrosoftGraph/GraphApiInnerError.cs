@@ -4,12 +4,21 @@ namespace Mailozaurr;
 /// Additional error details returned by the Graph API.
 /// </summary>
 public class GraphApiInnerError {
+    /// <summary>
+    /// Gets or sets the request identifier associated with the error.
+    /// </summary>
     [JsonPropertyName("request-id")]
     public string RequestId { get; set; }
 
+    /// <summary>
+    /// Gets or sets the client request identifier associated with the error.
+    /// </summary>
     [JsonPropertyName("client-request-id")]
     public string ClientRequestId { get; set; }
 
+    /// <summary>
+    /// Gets or sets the timestamp of when the error occurred.
+    /// </summary>
     [JsonPropertyName("date")]
     public DateTime Date { get; set; }
 }
