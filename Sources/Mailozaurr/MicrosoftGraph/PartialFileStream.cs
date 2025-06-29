@@ -13,7 +13,7 @@ internal sealed class PartialFileStream : Stream
 
     public PartialFileStream(string path, long offset, long length)
     {
-        _stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        _stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         _stream.Seek(offset, SeekOrigin.Begin);
         _length = length;
         _remaining = length;
