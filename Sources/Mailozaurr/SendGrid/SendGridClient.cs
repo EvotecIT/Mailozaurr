@@ -193,14 +193,32 @@ public class SendGridClient {
     }
 
     /// <summary>
+    /// Converts a collection of attachment objects to a list of <see cref="SendGridAttachment"/>.
+    /// </summary>
+    /// <param name="attachments">Attachments to convert.</param>
+    /// <returns>List of converted attachments.</returns>
+    private static List<SendGridAttachment> ConvertAttachments(IEnumerable<object>? attachments) {
+        var result = new List<SendGridAttachment>();
+        if (attachments == null) {
+            return result;
+        }
+
+        foreach (var item in attachments) {
+            var converted = ConvertToAttachment(item);
+            if (converted != null) {
+                result.Add(converted);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Creates a SendGridMessage object from the properties of this SendGridClient.
     /// </summary>
     public void CreateMessage() {
 
-        var attachments = Attachment?
-            .Select(ConvertToAttachment)
-            .Where(a => a != null)
-            .ToList() ?? new List<SendGridAttachment>();
+        var attachments = ConvertAttachments(Attachment);
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
