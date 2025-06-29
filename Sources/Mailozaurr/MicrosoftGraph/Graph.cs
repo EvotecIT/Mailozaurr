@@ -610,7 +610,7 @@ public class Graph : IDisposable {
     /// </summary>
     /// <param name="attachmentPath">Path to the attachment file.</param>
     /// <returns>The placeholder representing the attachment.</returns>
-    public async Task<GraphAttachmentPlaceHolder> CreateGraphAttachment(string attachmentPath, CancellationToken cancellationToken = default) {
+    public Task<GraphAttachmentPlaceHolder> CreateGraphAttachment(string attachmentPath, CancellationToken cancellationToken = default) {
         var fileName = Path.GetFileName(attachmentPath);
         var fileSize = new FileInfo(attachmentPath).Length;
 
@@ -619,14 +619,17 @@ public class Graph : IDisposable {
         var attachmentItemWrapper = new GraphAttachmentItemWrapper(attachmentItem);
         var attachmentItemJson = JsonSerializer.Serialize(attachmentItemWrapper);
 
-        var content = await PrepareByteArrayContentForUpload(attachmentPath, ChunkSize, cancellationToken);
+        List<StreamContent> content = PrepareByteArrayContentForUpload(attachmentPath, ChunkSize, cancellationToken);
 
-        return new GraphAttachmentPlaceHolder() {
+        var placeholder = new GraphAttachmentPlaceHolder {
             Json = attachmentItemJson,
             Content = content,
+            FilePath = attachmentPath,
             FileSize = fileSize,
             FileName = fileName
         };
+
+        return Task.FromResult(placeholder);
     }
 
     /// <summary>
@@ -656,21 +659,26 @@ public class Graph : IDisposable {
     /// <param name="filePath"></param>
     /// <param name="chunkSize"></param>
     /// <returns></returns>
-    private async Task<List<ByteArrayContent>> PrepareByteArrayContentForUpload(string filePath, int chunkSize = 9000000, CancellationToken cancellationToken = default) {
-        var fileContents = new List<ByteArrayContent>();
+    private List<StreamContent> PrepareByteArrayContentForUpload(string filePath, int chunkSize = 9000000, CancellationToken cancellationToken = default) {
+        var fileContents = new List<StreamContent>();
         var fileSize = new FileInfo(filePath).Length;
 
-        using var fileStream = new FileStream(filePath, FileMode.Open);
+        using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         var buffer = new byte[chunkSize];
         int bytesRead;
         long offset = 0;
-        while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0) {
-            var contentRange = $"bytes {offset}-{offset + bytesRead - 1}/{fileSize}";
+        while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0) {
+            if (cancellationToken.IsCancellationRequested) {
+                return fileContents;
+            }
+
             var chunk = new byte[bytesRead];
             Array.Copy(buffer, chunk, bytesRead);
-            var byteArrayContent = new ByteArrayContent(chunk);
-            byteArrayContent.Headers.Add("Content-Range", contentRange);
-            fileContents.Add(byteArrayContent);
+            var memoryStream = new MemoryStream(chunk, writable: false);
+            var contentRange = $"bytes {offset}-{offset + bytesRead - 1}/{fileSize}";
+            var streamContent = new StreamContent(memoryStream);
+            streamContent.Headers.Add("Content-Range", contentRange);
+            fileContents.Add(streamContent);
             offset += bytesRead;
         }
 
@@ -712,12 +720,10 @@ public class Graph : IDisposable {
     /// </summary>
     /// <param name="uploadUrl">The upload session URL.</param>
     /// <param name="fileChunks">The file chunks to upload.</param>
-    public async Task SendFileChunks(string uploadUrl, List<ByteArrayContent> fileChunks, CancellationToken cancellationToken = default) {
-        var tasks = new List<Task>();
+    public async Task SendFileChunks(string uploadUrl, IEnumerable<StreamContent> fileChunks, CancellationToken cancellationToken = default) {
         foreach (var chunk in fileChunks) {
-            tasks.Add(SendAttachmentChunk(uploadUrl, chunk, cancellationToken));
+            await SendAttachmentChunk(uploadUrl, chunk, cancellationToken);
         }
-        await Task.WhenAll(tasks);
     }
 
     /// <summary>
@@ -725,7 +731,7 @@ public class Graph : IDisposable {
     /// </summary>
     /// <param name="uploadUrl">The upload session URL.</param>
     /// <param name="byteArrayContent">The chunk to send.</param>
-    public async Task SendAttachmentChunk(string uploadUrl, ByteArrayContent byteArrayContent, CancellationToken cancellationToken = default) {
+    public async Task SendAttachmentChunk(string uploadUrl, StreamContent byteArrayContent, CancellationToken cancellationToken = default) {
         using var requestMessage = new HttpRequestMessage(HttpMethod.Put, uploadUrl) {
             Content = byteArrayContent
         };
