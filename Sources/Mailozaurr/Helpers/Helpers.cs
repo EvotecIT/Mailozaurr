@@ -5,6 +5,7 @@ using System.Security;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
+using System.Linq;
 
 namespace Mailozaurr;
 
@@ -101,10 +102,14 @@ public static class Helpers {
 
         foreach (var address in addresses) {
             var email = GetEmailAddress(address);
-            if (string.IsNullOrWhiteSpace(email)) continue;
+            if (string.IsNullOrWhiteSpace(email)) {
+                continue;
+            }
 
-            var lowered = email.ToLowerInvariant();
-            if (seen.Add(lowered)) {
+            var normalized = string
+                .Concat(email.Where(c => !char.IsWhiteSpace(c)))
+                .ToLowerInvariant();
+            if (seen.Add(normalized)) {
                 yield return address;
             }
         }
