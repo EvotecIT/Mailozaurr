@@ -1,5 +1,6 @@
 using System.Management.Automation;
 using System.Threading.Tasks;
+using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
 
@@ -110,8 +111,8 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
                 RetryDelayBackoff,
                 "https://graph.microsoft.com");
             connected = !string.IsNullOrWhiteSpace(token);
-        } catch {
-            // ignore errors, return not connected
+        } catch (GraphApiException ex) {
+            WriteError(new ErrorRecord(ex, "GraphApiError", ErrorCategory.InvalidOperation, null));
         }
 
         var info = new GraphConnectionInfo { Credential = cred, IsConnected = connected };

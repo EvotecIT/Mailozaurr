@@ -60,9 +60,13 @@ public class CmdletGetEmailGraphFolder : AsyncPSCmdlet {
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        var folders = await MicrosoftGraphUtils.GetMailFoldersAsync(cred, UserPrincipalName!);
-        foreach (var folder in folders) {
-            WriteObject(folder);
+        try {
+            var folders = await MicrosoftGraphUtils.GetMailFoldersAsync(cred, UserPrincipalName!);
+            foreach (var folder in folders) {
+                WriteObject(folder);
+            }
+        } catch (GraphApiException ex) {
+            WriteError(new ErrorRecord(ex, "GraphApiError", ErrorCategory.InvalidOperation, null));
         }
     }
 

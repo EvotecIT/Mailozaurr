@@ -1,5 +1,6 @@
 ﻿using System.Management.Automation;
 using System.IO;
+using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
 
@@ -718,19 +719,26 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
 
         NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
         graph.Authenticate(networkCredential);
-        var status = graph.ConnectO365GraphAsync().GetAwaiter().GetResult();
-        if (!status.Status) {
+        try {
+            var status = graph.ConnectO365GraphAsync().GetAwaiter().GetResult();
+            if (!status.Status) {
+                if (!Suppress) {
+                    WriteObject(status);
+                }
+                LogEmitter.EmitLogs(graph.LogCollector, this);
+                return;
+            }
+
+            status = graph.IsLargerAttachment
+                ? graph.SendMessageDraftAsync().GetAwaiter().GetResult()
+                : graph.SendMessageAsync().GetAwaiter().GetResult();
             if (!Suppress) {
                 WriteObject(status);
             }
-            LogEmitter.EmitLogs(graph.LogCollector, this);
-            return;
+        } catch (GraphApiException ex) {
+            WriteError(new ErrorRecord(ex, "GraphApiError", ErrorCategory.InvalidOperation, null));
         }
 
-        status = graph.IsLargerAttachment ? graph.SendMessageDraftAsync().GetAwaiter().GetResult() : graph.SendMessageAsync().GetAwaiter().GetResult();
-        if (!Suppress) {
-            WriteObject(status);
-        }
         LogEmitter.EmitLogs(graph.LogCollector, this);
     }
 

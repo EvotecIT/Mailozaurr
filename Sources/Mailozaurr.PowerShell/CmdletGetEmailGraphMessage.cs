@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
+using Mailozaurr;
 using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
@@ -84,19 +85,23 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        var filter = BuildFilter(Filter);
-        var messages = await MicrosoftGraphUtils.GetMailMessagesAsync(
-            cred,
-            UserPrincipalName!,
-            Property,
-            filter,
-            Limit);
+        try {
+            var filter = BuildFilter(Filter);
+            var messages = await MicrosoftGraphUtils.GetMailMessagesAsync(
+                cred,
+                UserPrincipalName!,
+                Property,
+                filter,
+                Limit);
 
-        foreach (var msg in messages) {
-            WriteObject(PSObject.AsPSObject(msg));
-            if (Delete.IsPresent && msg.TryGetValue("id", out var idObj) && idObj is string id) {
-                await MicrosoftGraphUtils.DeleteMailMessageAsync(cred, UserPrincipalName!, id);
+            foreach (var msg in messages) {
+                WriteObject(PSObject.AsPSObject(msg));
+                if (Delete.IsPresent && msg.TryGetValue("id", out var idObj) && idObj is string id) {
+                    await MicrosoftGraphUtils.DeleteMailMessageAsync(cred, UserPrincipalName!, id);
+                }
             }
+        } catch (GraphApiException ex) {
+            WriteError(new ErrorRecord(ex, "GraphApiError", ErrorCategory.InvalidOperation, null));
         }
     }
 
