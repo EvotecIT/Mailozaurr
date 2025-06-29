@@ -715,17 +715,17 @@ public class Graph : IDisposable {
     public async Task SendFileChunks(string uploadUrl, List<ByteArrayContent> fileChunks, CancellationToken cancellationToken = default) {
         var tasks = new List<Task>();
         foreach (var chunk in fileChunks) {
-            tasks.Add(SendFile(uploadUrl, chunk, cancellationToken));
+            tasks.Add(SendAttachmentChunk(uploadUrl, chunk, cancellationToken));
         }
         await Task.WhenAll(tasks);
     }
 
     /// <summary>
-    /// Uploads a single file chunk to the Graph API.
+    /// Uploads a single attachment chunk to the Graph API.
     /// </summary>
     /// <param name="uploadUrl">The upload session URL.</param>
     /// <param name="byteArrayContent">The chunk to send.</param>
-    public async Task SendFile(string uploadUrl, ByteArrayContent byteArrayContent, CancellationToken cancellationToken = default) {
+    public async Task SendAttachmentChunk(string uploadUrl, ByteArrayContent byteArrayContent, CancellationToken cancellationToken = default) {
         using var requestMessage = new HttpRequestMessage(HttpMethod.Put, uploadUrl) {
             Content = byteArrayContent
         };
