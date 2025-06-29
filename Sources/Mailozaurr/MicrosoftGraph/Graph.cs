@@ -404,7 +404,7 @@ public class Graph : IDisposable {
                 var errorMessage = (error == null || error.Error == null || error.Error.InnerError == null)
                     ? $"Unknown error: {content}"
                     : $"Error code: {error.Error.Code}, message: {error.Error.Message}, request ID: {error.Error.InnerError.RequestId}, date: {error.Error.InnerError.Date}";
-                throw new HttpRequestException(errorMessage);
+                throw new GraphApiException(response.StatusCode, errorMessage, content);
             } catch (TaskCanceledException ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Sending via Graph API cancelled: {ex.Message}");
@@ -522,7 +522,7 @@ public class Graph : IDisposable {
         var sendErrorMessage = (sendError == null || sendError.Error == null || sendError.Error.InnerError == null)
             ? $"Unknown error: {sendContent}"
             : $"Error code: {sendError.Error.Code}, message: {sendError.Error.Message}, request ID: {sendError.Error.InnerError.RequestId}, date: {sendError.Error.InnerError.Date}";
-        var ex = new HttpRequestException(sendErrorMessage);
+        var ex = new GraphApiException(sendResponse.StatusCode, sendErrorMessage, sendContent);
         var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, sendContent, ex.Message);
         await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
         throw ex;
@@ -564,7 +564,7 @@ public class Graph : IDisposable {
             var errorMessage = (error == null || error.Error == null)
                 ? $"Unknown error: {draftContent}"
                 : $"Error code: {error.Error.Code}, message: {error.Error.Message}";
-            throw new HttpRequestException(errorMessage);
+            throw new GraphApiException(draftResponse.StatusCode, errorMessage, draftContent);
         }
 
         // Deserialize the draft message

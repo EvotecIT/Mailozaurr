@@ -60,9 +60,13 @@ public class CmdletGetEmailGraphMessageAttachment : AsyncPSCmdlet {
                 WriteWarning("Get-EmailGraphMessageAttachment - Connection not provided and no default session available.");
                 return;
             }
-            var attachments = await MicrosoftGraphUtils.GetMailMessageAttachmentsAsync(conn.Credential, UserPrincipalName!, MessageId!, Property);
-            foreach (var att in attachments) {
-                WriteObject(att);
+            try {
+                var attachments = await MicrosoftGraphUtils.GetMailMessageAttachmentsAsync(conn.Credential, UserPrincipalName!, MessageId!, Property);
+                foreach (var att in attachments) {
+                    WriteObject(att);
+                }
+            } catch (GraphApiException ex) {
+                WriteError(new ErrorRecord(ex, "GraphApiError", ErrorCategory.InvalidOperation, null));
             }
         } else {
             var query = new Dictionary<string, object>();

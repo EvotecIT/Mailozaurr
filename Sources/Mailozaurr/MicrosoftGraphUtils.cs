@@ -90,11 +90,13 @@ namespace Mailozaurr {
             var content = new FormUrlEncodedContent(body);
             var url = $"https://login.microsoftonline.com/{tenantDomain}/oauth2/token";
             using var response = await HttpClient.PostAsync(url, content);
-            if (!response.IsSuccessStatusCode) {
-                var error = await response.Content.ReadAsStringAsync();
-                throw new Exception($"ConnectO365GraphAsync - Error: {error}");
-            }
             var json = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode) {
+                throw new GraphApiException(
+                    response.StatusCode,
+                    $"ConnectO365GraphAsync - Error: {json}",
+                    json);
+            }
             var token = System.Text.Json.JsonDocument.Parse(json);
             var accessToken = token.RootElement.GetProperty("access_token").GetString();
             var tokenType = token.RootElement.GetProperty("token_type").GetString();
@@ -191,7 +193,10 @@ namespace Mailozaurr {
             using var response = await HttpClient.SendAsync(request);
             var responseContent = await response.Content.ReadAsStringAsync();
             if (!response.IsSuccessStatusCode) {
-                throw new Exception($"InvokeGraphApiAsync - Error: {response.StatusCode} - {responseContent}");
+                throw new GraphApiException(
+                    response.StatusCode,
+                    $"InvokeGraphApiAsync - Error: {response.StatusCode} - {responseContent}",
+                    responseContent);
             }
             return JsonDocument.Parse(responseContent);
         }

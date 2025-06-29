@@ -72,7 +72,11 @@ public class CmdletMoveGraphMessage : AsyncPSCmdlet {
     /// </summary>
     /// <param name="cred">Credential used to access Graph.</param>
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        await MicrosoftGraphUtils.MoveMailMessageAsync(cred, UserPrincipalName!, MessageId!, DestinationFolderId!);
+        try {
+            await MicrosoftGraphUtils.MoveMailMessageAsync(cred, UserPrincipalName!, MessageId!, DestinationFolderId!);
+        } catch (GraphApiException ex) {
+            WriteError(new ErrorRecord(ex, "GraphApiError", ErrorCategory.InvalidOperation, null));
+        }
     }
 
     /// <summary>
