@@ -9,7 +9,7 @@ namespace Mailozaurr;
 /// Provides a <see cref="GnuPGContext"/> that stores keys in a temporary
 /// directory which gets removed when the instance is disposed.
 /// </summary>
-public class EphemeralOpenPgpContext : GnuPGContext {
+public class EphemeralOpenPgpContext : GnuPGContext, IDisposable {
     private readonly string? _password;
     private readonly string _tempDirectory;
 
@@ -28,9 +28,19 @@ public class EphemeralOpenPgpContext : GnuPGContext {
     /// <param name="path">The generated directory path.</param>
     /// <returns>The created path.</returns>
     private static string CreateTempDirectory(out string path) {
-        path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
-        Directory.CreateDirectory(path);
-        return path;
+        var temp = Path.GetTempPath();
+        while (true) {
+            path = Path.Combine(temp, Path.GetRandomFileName());
+            try {
+                using var fs = new FileStream(path, FileMode.CreateNew);
+                fs.Close();
+                File.Delete(path);
+                Directory.CreateDirectory(path);
+                return path;
+            } catch (IOException) {
+                // Collision occurred, retry with a new path
+            }
+        }
     }
 
     /// <summary>
@@ -55,4 +65,5 @@ public class EphemeralOpenPgpContext : GnuPGContext {
             LoggingMessages.Logger.WriteWarning($"Failed to delete temporary directory due to unauthorized access: {ex.Message}");
         }
     }
+    void IDisposable.Dispose() => Dispose();
 }
