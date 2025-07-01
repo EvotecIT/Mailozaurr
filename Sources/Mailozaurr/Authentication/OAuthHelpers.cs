@@ -212,6 +212,68 @@ public static class OAuthHelpers {
     }
 
     /// <summary>
+    /// Acquires an Office 365 access token using the device code flow.
+    /// </summary>
+    /// <param name="clientId">The application (client) identifier.</param>
+    /// <param name="tenantId">The tenant (directory) identifier.</param>
+    /// <param name="scopes">Scopes to request for the token.</param>
+    /// <param name="deviceCodeCallback">Optional callback to display the device code.</param>
+    /// <returns>The acquired credential.</returns>
+    public static async Task<OAuthCredential> AcquireO365TokenDeviceCodeAsync(
+        string clientId,
+        string tenantId,
+        IEnumerable<string> scopes,
+        Func<DeviceCodeResult, Task>? deviceCodeCallback = null) {
+        var options = new PublicClientApplicationOptions {
+            ClientId = clientId,
+            TenantId = tenantId
+        };
+        var app = PublicClientApplicationBuilder.CreateWithApplicationOptions(options).Build();
+        TokenCacheHelper.RegisterCache(app.UserTokenCache);
+        deviceCodeCallback ??= result => {
+            Console.WriteLine(result.Message);
+            return Task.CompletedTask;
+        };
+        var result = await app.AcquireTokenWithDeviceCode(scopes, deviceCodeCallback).ExecuteAsync();
+        var cred = new OAuthCredential {
+            UserName = result.Account.Username,
+            AccessToken = result.AccessToken,
+            ExpiresOn = result.ExpiresOn
+        };
+        OAuthTokenCache.Set($"o365:{cred.UserName}", cred);
+        return cred;
+    }
+
+    /// <summary>
+    /// Acquires an Office 365 access token on behalf of a user using an existing token.
+    /// </summary>
+    /// <param name="clientId">The application (client) identifier.</param>
+    /// <param name="tenantId">The tenant (directory) identifier.</param>
+    /// <param name="clientSecret">The client secret for the application.</param>
+    /// <param name="userAccessToken">The user access token to exchange.</param>
+    /// <param name="scopes">Scopes to request for the new token.</param>
+    /// <returns>The acquired credential.</returns>
+    public static async Task<OAuthCredential> AcquireO365TokenOnBehalfOfAsync(
+        string clientId,
+        string tenantId,
+        string clientSecret,
+        string userAccessToken,
+        IEnumerable<string> scopes) {
+        var app = ConfidentialClientApplicationBuilder
+            .Create(clientId)
+            .WithTenantId(tenantId)
+            .WithClientSecret(clientSecret)
+            .Build();
+        var assertion = new UserAssertion(userAccessToken);
+        var result = await app.AcquireTokenOnBehalfOf(scopes, assertion).ExecuteAsync();
+        return new OAuthCredential {
+            UserName = result.Account.Username,
+            AccessToken = result.AccessToken,
+            ExpiresOn = result.ExpiresOn
+        };
+    }
+
+    /// <summary>
     /// Acquires an app-only Microsoft Graph token using a certificate.
     /// </summary>
     /// <param name="clientId">The application (client) identifier.</param>
