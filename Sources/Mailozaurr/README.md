@@ -1,9 +1,9 @@
 # Mailozaurr
 
-Mailozaurr is a powerful .NET library for sending emails using various providers (SMTP, SendGrid, Mailgun, Microsoft Graph, etc.), supporting advanced features like attachments, HTML bodies, and authentication.
+Mailozaurr is a powerful .NET library for sending emails using various providers (SMTP, SendGrid, Mailgun, Amazon SES, Microsoft Graph, etc.), supporting advanced features like attachments, HTML bodies, and authentication.
 
 ## Features
-- Send emails via SMTP, SendGrid, Mailgun, Microsoft Graph, and more
+- Send emails via SMTP, SendGrid, Mailgun, Amazon SES, Microsoft Graph, and more
 - Support for attachments, HTML, and plain text
 - OAuth2 and basic authentication
 - Delivery notifications and advanced options
@@ -85,6 +85,7 @@ graph.HTML = "<p>Sent via Microsoft Graph!</p>";
 - `Graph` - for Microsoft Graph API
 - `SendGridClient` - for SendGrid
 - `MailgunClient` - for Mailgun
+- `SesClient` - for Amazon SES
 - `SmtpResult` - result object for send operations
 
 ## Building from Source

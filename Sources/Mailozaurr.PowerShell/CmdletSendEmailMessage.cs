@@ -331,6 +331,12 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     public SwitchParameter RetryAlways { get; set; }
 
     /// <summary>
+    /// <para>Specifies the AWS region when using the SES provider.</para>
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
+    public string? Region { get; set; }
+
+    /// <summary>
     /// <para>Specifies chunk size in bytes used for Graph attachment uploads. Default is 9MB.</para>
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "Graph")]
@@ -607,6 +613,8 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             ProcessSendGrid(fromEmail, fromName);
         } else if (EmailProvider == EmailProvider.Mailgun) {
             ProcessMailgun(fromEmail, fromName);
+        } else if (EmailProvider == EmailProvider.SES) {
+            ProcessSes(fromEmail, fromName);
         } else if (Graph) {
             ProcessGraph(fromEmail, fromName);
         } else if (MgGraphRequest) {
@@ -685,6 +693,43 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             }
         } else if (!Suppress) {
             WriteObject(new SmtpResult(false, EmailAction.Send, mailgun.SentTo, mailgun.SentFrom, "MailgunApi", 0, mailgun.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
+        }
+    }
+
+    private void ProcessSes(string? fromEmail, string? fromName) {
+        var logCollector = new LogCollector();
+        using SesClient ses = new SesClient();
+        ses.LogCollector = logCollector;
+        ses.From = Helpers.GetFromObject(fromEmail, fromName);
+        if (Bcc != null) ses.Bcc = Bcc.ToList();
+        if (Cc != null) ses.Cc = Cc.ToList();
+        if (To != null) ses.To = To.ToList();
+        ses.ReplyTo = ReplyTo;
+        ses.Subject = Subject;
+        if (Text != null) ses.Text = string.Join("", Text);
+        if (HTML != null) ses.Html = string.Join("", HTML);
+        if (Attachment != null) {
+            ses.Attachment = Attachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
+        }
+        if (InlineAttachment != null) {
+            ses.InlineAttachment = InlineAttachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
+        }
+        ses.ErrorAction = errorAction;
+        ses.RetryCount = RetryCount;
+        ses.RetryDelayMilliseconds = RetryDelayMilliseconds;
+        ses.RetryDelayBackoff = RetryDelayBackoff;
+        ses.RetryAlways = RetryAlways.IsPresent;
+        if (!string.IsNullOrEmpty(Region)) ses.Region = Region;
+        NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
+        ses.Credentials = networkCredential;
+        if (ShouldProcess(ses.SentTo, "Sending email message via SES")) {
+            var result = ses.SendEmailAsync().GetAwaiter().GetResult();
+            LogEmitter.EmitLogs(logCollector, this);
+            if (!Suppress) {
+                WriteObject(result);
+            }
+        } else if (!Suppress) {
+            WriteObject(new SmtpResult(false, EmailAction.Send, ses.SentTo, ses.SentFrom, "SESApi", 0, ses.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
         }
     }
 
