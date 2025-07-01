@@ -176,6 +176,7 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - [Example-SendEmail-OAuthGmail.ps1](Examples/Example-SendEmail-OAuthGmail.ps1) - send mail through Gmail using OAuth2.
 - [Example-SendEmail-OAuthO365.ps1](Examples/Example-SendEmail-OAuthO365.ps1) - send mail through Office 365 using OAuth2.
 - [Example-GraphManageMessages.ps1](Examples/Example-GraphManageMessages.ps1) - download attachments, set read state and move messages using Microsoft Graph.
+- [Example-SavePop3MessageAttachment.ps1](Examples/Example-SavePop3MessageAttachment.ps1) - download attachments from a POP3 mailbox.
 - [Example-GetMailFolder.ps1](Examples/Example-GetMailFolder.ps1) - list folders using either `-Connection` or `-MgGraphRequest`.
 - [Example-ConnectEmailGraph-DeviceCode.ps1](Examples/Example-ConnectEmailGraph-DeviceCode.ps1) - authenticate with device code.
 - [Example-ConnectEmailGraph-OnBehalfOf.ps1](Examples/Example-ConnectEmailGraph-OnBehalfOf.ps1) - exchange a user token for Graph access.
