@@ -1049,6 +1049,21 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             };
 
             if (path != null) {
+                if (path.IndexOfAny(new[] { '*', '?' }) >= 0) {
+                    string directory = Path.GetDirectoryName(path) ?? Directory.GetCurrentDirectory();
+                    string pattern = Path.GetFileName(path);
+                    int startCount = valid.Count;
+                    foreach (var file in Directory.GetFiles(directory, pattern)) {
+                        if (File.Exists(file)) {
+                            valid.Add(new FileInfo(file));
+                        }
+                    }
+                    if (valid.Count == startCount) {
+                        WriteWarning($"Send-EmailMessage - No files found for wildcard pattern: {path}. Removing from '{parameterName}'.");
+                    }
+                    continue;
+                }
+
                 if (!File.Exists(path)) {
                     WriteWarning($"Send-EmailMessage - File not found: {path}. Removing from '{parameterName}'.");
                     continue;
