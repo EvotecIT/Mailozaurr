@@ -400,6 +400,67 @@ namespace Mailozaurr {
         }
 
         /// <summary>
+        /// Executes a search query across one or more mailboxes.
+        /// </summary>
+        public static async Task<List<GraphMessageInfo>> SearchMailboxesAsync(
+            GraphCredential credential,
+            IEnumerable<string> userPrincipalNames,
+            string queryString,
+            int from = 0,
+            int size = 25) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+
+            var requests = new List<object>();
+            foreach (var upn in userPrincipalNames) {
+                requests.Add(new {
+                    entityTypes = new[] { "message" },
+                    from,
+                    size,
+                    query = new { queryString },
+                    userScopes = new[] { upn }
+                });
+            }
+
+            var body = JsonSerializer.Serialize(new { requests });
+            var doc = await InvokeGraphApiAsync("POST", "https://graph.microsoft.com/v1.0/search/query", headers, body);
+
+            var results = new List<GraphMessageInfo>();
+            int index = 0;
+            if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
+                foreach (var item in valueElement.EnumerateArray()) {
+                    var upn = userPrincipalNames.ElementAt(index++);
+                    if (item.TryGetProperty("hitsContainers", out var containers) && containers.ValueKind == JsonValueKind.Array) {
+                        foreach (var container in containers.EnumerateArray()) {
+                            if (container.TryGetProperty("hits", out var hits) && hits.ValueKind == JsonValueKind.Array) {
+                                foreach (var hit in hits.EnumerateArray()) {
+                                    string? summary = null;
+                                    if (hit.TryGetProperty("summary", out var sumEl)) summary = sumEl.GetString();
+                                    if (hit.TryGetProperty("resource", out var res) && res.ValueKind == JsonValueKind.Object) {
+                                        var dict = ConvertJsonElementToNativeObject(res) as Dictionary<string, object>;
+                                        object? idObj = null;
+                                        object? subjectObj = null;
+                                        dict?.TryGetValue("id", out idObj);
+                                        dict?.TryGetValue("subject", out subjectObj);
+                                        results.Add(new GraphMessageInfo {
+                                            UserPrincipalName = upn,
+                                            Id = idObj as string,
+                                            Subject = subjectObj as string,
+                                            Summary = summary
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return results;
+        }
+
+        /// <summary>
         /// Performs an action on a mail message.
         /// </summary>
         public static async Task ExecuteMailMessageActionAsync(GraphCredential credential, string userPrincipalName, string messageId, GraphMessageAction action, string? destinationFolderId = null) {
