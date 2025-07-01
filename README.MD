@@ -174,6 +174,7 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - [Example-SendEmail-Pgp.ps1](Examples/Example-SendEmail-Pgp.ps1) - send a PGP encrypted email.
 - [Example-GraphManageMessages.ps1](Examples/Example-GraphManageMessages.ps1) - download attachments, set read state and move messages using Microsoft Graph.
 - [Example-GetMailFolder.ps1](Examples/Example-GetMailFolder.ps1) - list folders using either `-Connection` or `-MgGraphRequest`.
+- [Example-SendEmail-GraphWithMgRequest.ps1](Examples/Example-SendEmail-GraphWithMgRequest.ps1) - send mail using Connect-MgGraph and the `-MgGraphRequest` switch.
 - Use `Connect-EmailGraph` and `Disconnect-EmailGraph` to authenticate and release application credentials for Microsoft Graph. The connection cmdlet supports both client secret and certificate authentication modes.
 - `Connect-EmailGraph`, `Connect-IMAP` and `Connect-POP3` store the last successful connection in module variables. Subsequent cmdlets use these defaults when `-Connection` or `-Client` is omitted.
 - [Example-SendEmail-Attachments.ps1](Examples/Example-SendEmail-Attachments.ps1) - demonstrate file and in-memory attachments.
@@ -187,6 +188,32 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - `Sources/Mailozaurr.Examples/AcquireO365TokenInteractive.cs` – C# sample for `OAuthHelpers.AcquireO365TokenInteractiveAsync`.
 - `Sources/Mailozaurr.Examples/AcquireGoogleTokenInteractive.cs` – C# sample for `OAuthHelpers.AcquireGoogleTokenInteractiveAsync`.
 - `Sources/Mailozaurr.Examples/SendEmailAttachments.cs` – C# sample demonstrating attachments and inline resources.
+
+### Choosing between `-Graph` and `-MgGraphRequest`
+
+The module supports two ways of calling Microsoft Graph. Use `-Graph` when you connect with `Connect-EmailGraph` and provide credentials created with `ConvertTo-GraphCredential` or `ConvertTo-GraphCertificateCredential`. The `-MgGraphRequest` switch is meant for scenarios where you authenticate through the Microsoft Graph PowerShell SDK using `Connect-MgGraph`.
+
+| Parameter | Connect command | When to use |
+|-----------|-----------------|-------------|
+| `-Graph` | `Connect-EmailGraph` | Application or certificate authentication handled by Mailozaurr. |
+| `-MgGraphRequest` | `Connect-MgGraph` | Already authenticated via the Microsoft Graph PowerShell SDK. |
+
+**Example using `-Graph`**
+
+```powershell
+$cred = ConvertTo-GraphCredential -ClientId $ClientId -ClientSecret $ClientSecret -DirectoryId $TenantId
+Connect-EmailGraph -Credential $cred
+Send-EmailMessage -From 'user@example.com' -To 'user@example.com' -Subject 'Graph Test' -Graph
+Disconnect-EmailGraph
+```
+
+**Example using `-MgGraphRequest`**
+
+```powershell
+Import-Module Microsoft.Graph.Authentication
+Connect-MgGraph -Scopes Mail.Send -NoWelcome
+Send-EmailMessage -From 'user@example.com' -To 'user@example.com' -Subject 'Graph Test' -MgGraphRequest
+```
 
 ### Filtering Graph messages
 
