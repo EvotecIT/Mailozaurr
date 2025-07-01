@@ -1,4 +1,5 @@
-﻿using System.Management.Automation;
+using System;
+using System.Management.Automation;
 using System.IO;
 using Mailozaurr;
 
@@ -35,6 +36,7 @@ namespace Mailozaurr.PowerShell;
 [Cmdlet(VerbsCommunications.Send, "EmailMessage", DefaultParameterSetName = "Compatibility", SupportsShouldProcess = true)]
 [CmdletBinding()]
 public sealed class CmdletSendEmailMessage : PSCmdlet {
+    private const long GraphAttachmentLimitBytes = 150000000;
     /// <summary>
     /// <para>Specifies the SMTP server to use for sending the email message. Required for SMTP scenarios.</para>
     /// </summary>
@@ -707,6 +709,16 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
         graph.ContentType = "HTML";
         graph.Attachments = Attachment;
         graph.CreateAttachments();
+        long graphSize = GetTotalAttachmentSize(graph.ConvertedAttachments);
+        if (graphSize > GraphAttachmentLimitBytes) {
+            WriteError(new ErrorRecord(
+                new ArgumentException("Attachments exceed Graph limit of 150MB."),
+                "GraphAttachmentLimitExceeded",
+                ErrorCategory.InvalidData,
+                null));
+            LogEmitter.EmitLogs(graph.LogCollector, this);
+            return;
+        }
 
         if (!ShouldProcess(graph.SentTo, "Sending email message via Graph")) {
             LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
@@ -762,6 +774,16 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
         graph.ContentType = "HTML";
         graph.Attachments = Attachment;
         graph.CreateAttachments();
+        long size = GetTotalAttachmentSize(graph.ConvertedAttachments);
+        if (size > GraphAttachmentLimitBytes) {
+            WriteError(new ErrorRecord(
+                new ArgumentException("Attachments exceed Graph limit of 150MB."),
+                "GraphAttachmentLimitExceeded",
+                ErrorCategory.InvalidData,
+                null));
+            LogEmitter.EmitLogs(graph.LogCollector, this);
+            return;
+        }
         if (graph.IsLargerAttachment) {
             var json = graph.CreateDraftForMg();
             var draftMessageId = InvokeMgGraphRequestPOST1($"v1.0/users/{graph.From}/mailfolders/drafts/messages", EmailAction.SendDraftMessage, json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
@@ -1032,6 +1054,20 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
         }
 
         return "";
+    }
+
+    private static long GetTotalAttachmentSize(IEnumerable<GraphAttachment> attachments) {
+        long size = 0;
+        foreach (var a in attachments) {
+            if (string.IsNullOrWhiteSpace(a.ContentBytes)) {
+                continue;
+            }
+            try {
+                size += Convert.FromBase64String(a.ContentBytes).LongLength;
+            } catch (FormatException) {
+            }
+        }
+        return size;
     }
 
     private object[]? FilterExistingPaths(object[]? paths, string parameterName) {
