@@ -97,10 +97,12 @@ This will make sure the project has required libraries.
   - [x] Connect to POP3
   - [x] Get POP3 Emails
   - [x] Save POP3 Emails
+  - [x] Delete POP3 Messages with `Get-POP3Message -Delete`
 - IMAP
   - [x] Connect to IMAP
   - [x] Get IMAP Folder
   - [x] Get IMAP Messages
+  - [x] Delete IMAP Messages with `Get-IMAPMessage -Delete`
   - [x] Listen for new IMAP messages via `ImapIdleListener`
   - [x] Wait for new IMAP messages with the `Wait-IMAPMessage` cmdlet
 - Office 365 Graph API
@@ -118,6 +120,23 @@ $graph | Get-EmailGraphMessage -UserPrincipalName 'user@example.com' -Limit 10 |
 ```
 - DNS and email validation functionality is now provided by [DomainDetective](https://github.com/EvotecIT/DomainDetective)
 - [x] Convert between EML and MSG message formats
+
+### Authenticating to IMAP and POP3
+
+Both `Connect-IMAP` and `Connect-POP3` support a variety of sign-in methods. You can use plain credentials, pass a `PSCredential` object, or supply an OAuth token.
+
+```powershell
+# Username and password
+$imap = Connect-IMAP -Server 'imap.example.com' -UserName 'user@example.com' -Password 'p@ssword'
+
+# Credential object
+$cred = Get-Credential
+$pop3 = Connect-POP3 -Server 'pop.example.com' -Credential $cred
+
+# OAuth2 token
+$oauth = Connect-OAuthGoogle -ClientId 'id' -ClientSecret 'secret' -GmailAccount 'user@example.com' -Scope https://mail.google.com/
+$imapOAuth = Connect-IMAP -Server 'imap.gmail.com' -Credential $oauth -OAuth2
+```
 
 ### Listening for new IMAP mail
 
@@ -185,6 +204,10 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - `Connect-EmailGraph`, `Connect-IMAP` and `Connect-POP3` store the last successful connection in module variables. Subsequent cmdlets use these defaults when `-Connection` or `-Client` is omitted.
 - [Example-SendEmail-Attachments.ps1](Examples/Example-SendEmail-Attachments.ps1) - demonstrate file and in-memory attachments.
 - [Example-WaitImapMessage.ps1](Examples/Example-WaitImapMessage.ps1) - wait for new mail from PowerShell.
+- [Example-DeleteImapMessages.ps1](Examples/Example-DeleteImapMessages.ps1) - delete messages from an IMAP mailbox.
+- [Example-DeletePop3Messages.ps1](Examples/Example-DeletePop3Messages.ps1) - delete messages from a POP3 mailbox.
+- [Example-ImapFilterScenarios.ps1](Examples/Example-ImapFilterScenarios.ps1) - ten filtering techniques for IMAP.
+- [Example-Pop3FilterScenarios.ps1](Examples/Example-Pop3FilterScenarios.ps1) - ten filtering techniques for POP3.
 - [ImapIdleListenerExample.cs](Sources/Mailozaurr.Examples/ImapIdleListenerExample.cs) - C# sample listening for new mail.
 - [PGP documentation](Docs/PGP.md) - overview of OpenPGP support.
 - [OAuth flow documentation](Docs/OAuthFlows.md) - device code and on-behalf-of usage.
