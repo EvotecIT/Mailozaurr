@@ -71,9 +71,14 @@ public sealed class CmdletSaveIMAPMessage : AsyncPSCmdlet {
 
                 if (fullPath.EndsWith(".msg", System.StringComparison.OrdinalIgnoreCase)) {
                     var tempEml = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{System.Guid.NewGuid()}.eml");
-                    message.WriteTo(tempEml);
-                    EmailMessage.ConvertEmlToMsg(new System.IO.FileInfo(tempEml), new System.IO.FileInfo(fullPath), true);
-                    System.IO.File.Delete(tempEml);
+                    try {
+                        message.WriteTo(tempEml);
+                        EmailMessage.ConvertEmlToMsg(new System.IO.FileInfo(tempEml), new System.IO.FileInfo(fullPath), true);
+                    } finally {
+                        if (System.IO.File.Exists(tempEml)) {
+                            System.IO.File.Delete(tempEml);
+                        }
+                    }
                 } else {
                     message.WriteTo(fullPath);
                 }

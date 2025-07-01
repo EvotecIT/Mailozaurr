@@ -83,6 +83,9 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
     [Parameter]
     public double RetryDelayBackoff { get; set; } = 1.0;
 
+    [Parameter]
+    public int TimeoutSeconds { get; set; } = 100;
+
     protected override async Task ProcessRecordAsync() {
         GraphCredential cred;
         OAuthCredential? oauth = null;
@@ -155,6 +158,20 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
             } catch (GraphApiException ex) {
                 WriteError(new ErrorRecord(ex, "GraphApiError", ErrorCategory.InvalidOperation, null));
             }
+        }
+        
+        MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
+        try {
+            var token = await MicrosoftGraphUtils.ConnectO365GraphWithRetryAsync(
+                cred,
+                cred.DirectoryId!,
+                RetryCount,
+                RetryDelayMilliseconds,
+                RetryDelayBackoff,
+                "https://graph.microsoft.com");
+            connected = !string.IsNullOrWhiteSpace(token);
+        } catch (GraphApiException ex) {
+            WriteError(new ErrorRecord(ex, "GraphApiError", ErrorCategory.InvalidOperation, null));
         }
 
         var info = new GraphConnectionInfo { Credential = cred, IsConnected = connected, OAuthCredential = oauth };

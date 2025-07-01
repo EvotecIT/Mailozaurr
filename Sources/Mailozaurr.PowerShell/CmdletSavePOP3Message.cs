@@ -59,9 +59,14 @@ public sealed class CmdletSavePOP3Message : AsyncPSCmdlet {
                     }
                     if (resolved.EndsWith(".msg", System.StringComparison.OrdinalIgnoreCase)) {
                         var tempEml = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{System.Guid.NewGuid()}.eml");
-                        message.WriteTo(tempEml);
-                        EmailMessage.ConvertEmlToMsg(new System.IO.FileInfo(tempEml), new System.IO.FileInfo(resolved), true);
-                        System.IO.File.Delete(tempEml);
+                        try {
+                            message.WriteTo(tempEml);
+                            EmailMessage.ConvertEmlToMsg(new System.IO.FileInfo(tempEml), new System.IO.FileInfo(resolved), true);
+                        } finally {
+                            if (System.IO.File.Exists(tempEml)) {
+                                System.IO.File.Delete(tempEml);
+                            }
+                        }
                     } else {
                         message.WriteTo(resolved);
                     }

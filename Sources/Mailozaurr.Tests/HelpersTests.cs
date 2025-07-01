@@ -1,6 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -66,5 +69,16 @@ public class HelpersTests
             .ToArray();
 
         Assert.Equal(new[] { " Test@example.com ", "other@example.com" }, result);
+    }
+
+    [Fact]
+    public async Task PostWebhookAsync_CancellationRequested_ThrowsAsync()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var result = new SmtpResult(true, EmailAction.Send, string.Empty, string.Empty, string.Empty, 0, TimeSpan.Zero);
+
+        await Assert.ThrowsAsync<TaskCanceledException>(() =>
+            Mailozaurr.Helpers.PostWebhookAsync("http://localhost", result, cts.Token));
     }
 }

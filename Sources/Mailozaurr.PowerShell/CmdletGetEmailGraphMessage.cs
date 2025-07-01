@@ -70,6 +70,15 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 
+    [Parameter]
+    public int TimeoutSeconds { get; set; } = 100;
+
+    [Parameter]
+    public int RetryCount { get; set; } = 0;
+
+    [Parameter]
+    public int RetryDelayMilliseconds { get; set; } = 0;
+
     protected override Task ProcessRecordAsync() {
         if (ParameterSetName == "MgGraphRequest") {
             return ProcessMgGraph();
@@ -85,23 +94,45 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        try {
-            var filter = BuildFilter(Filter);
-            var messages = await MicrosoftGraphUtils.GetMailMessagesAsync(
-                cred,
-                UserPrincipalName!,
-                Property,
-                filter,
-                Limit);
+        MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
+        int attempts = 0;
+        Exception? lastException = null;
+        do {
+            try {
+                var filter = BuildFilter(Filter);
+                var messages = await MicrosoftGraphUtils.GetMailMessagesAsync(
+                    cred,
+                    UserPrincipalName!,
+                    Property,
+                    filter,
+                    Limit);
 
-            foreach (var msg in messages) {
-                WriteObject(PSObject.AsPSObject(msg));
-                if (Delete.IsPresent && msg.TryGetValue("id", out var idObj) && idObj is string id) {
-                    await MicrosoftGraphUtils.DeleteMailMessageAsync(cred, UserPrincipalName!, id);
+                foreach (var msg in messages) {
+                    WriteObject(PSObject.AsPSObject(msg));
+                    if (Delete.IsPresent && msg.TryGetValue("id", out var idObj) && idObj is string id) {
+                        await MicrosoftGraphUtils.DeleteMailMessageAsync(cred, UserPrincipalName!, id);
+                    }
+                }
+                return;
+            } catch (Exception ex) {
+                lastException = ex;
+                WriteWarning($"Get-EmailGraphMessage - {ex.Message}");
+                if (!Helpers.IsTransient(ex) || attempts >= RetryCount) {
+                    if (ex is GraphApiException gex) {
+                        WriteError(new ErrorRecord(gex, "GraphApiError", ErrorCategory.InvalidOperation, null));
+                    } else {
+                        WriteError(new ErrorRecord(ex, "GraphError", ErrorCategory.InvalidOperation, null));
+                    }
+                    return;
+                }
+                if (RetryDelayMilliseconds > 0) {
+                    await Task.Delay(RetryDelayMilliseconds);
                 }
             }
-        } catch (GraphApiException ex) {
-            WriteError(new ErrorRecord(ex, "GraphApiError", ErrorCategory.InvalidOperation, null));
+            attempts++;
+        } while (attempts <= RetryCount);
+        if (lastException is not null) {
+            WriteError(new ErrorRecord(lastException, "GraphError", ErrorCategory.InvalidOperation, null));
         }
     }
 

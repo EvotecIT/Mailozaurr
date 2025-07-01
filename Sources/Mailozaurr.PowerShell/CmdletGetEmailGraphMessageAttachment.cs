@@ -43,6 +43,15 @@ public class CmdletGetEmailGraphMessageAttachment : AsyncPSCmdlet {
 
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
+
+    [Parameter]
+    public int TimeoutSeconds { get; set; } = 100;
+
+    [Parameter]
+    public int RetryCount { get; set; } = 0;
+
+    [Parameter]
+    public int RetryDelayMilliseconds { get; set; } = 0;
     /// <summary>
     /// <para type="description">Specifies the properties to retrieve for each attachment.</para>
     /// </summary>
@@ -60,13 +69,35 @@ public class CmdletGetEmailGraphMessageAttachment : AsyncPSCmdlet {
                 WriteWarning("Get-EmailGraphMessageAttachment - Connection not provided and no default session available.");
                 return;
             }
-            try {
-                var attachments = await MicrosoftGraphUtils.GetMailMessageAttachmentsAsync(conn.Credential, UserPrincipalName!, MessageId!, Property);
-                foreach (var att in attachments) {
-                    WriteObject(att);
+            MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
+            int attempts = 0;
+            Exception? lastException = null;
+            do {
+                try {
+                    var attachments = await MicrosoftGraphUtils.GetMailMessageAttachmentsAsync(conn.Credential, UserPrincipalName!, MessageId!, Property);
+                    foreach (var att in attachments) {
+                        WriteObject(att);
+                    }
+                    return;
+                } catch (Exception ex) {
+                    lastException = ex;
+                    WriteWarning($"Get-EmailGraphMessageAttachment - {ex.Message}");
+                    if (!Helpers.IsTransient(ex) || attempts >= RetryCount) {
+                        if (ex is GraphApiException gex) {
+                            WriteError(new ErrorRecord(gex, "GraphApiError", ErrorCategory.InvalidOperation, null));
+                        } else {
+                            WriteError(new ErrorRecord(ex, "GraphError", ErrorCategory.InvalidOperation, null));
+                        }
+                        return;
+                    }
+                    if (RetryDelayMilliseconds > 0) {
+                        await Task.Delay(RetryDelayMilliseconds);
+                    }
                 }
-            } catch (GraphApiException ex) {
-                WriteError(new ErrorRecord(ex, "GraphApiError", ErrorCategory.InvalidOperation, null));
+                attempts++;
+            } while (attempts <= RetryCount);
+            if (lastException is not null) {
+                WriteError(new ErrorRecord(lastException, "GraphError", ErrorCategory.InvalidOperation, null));
             }
         } else {
             var query = new Dictionary<string, object>();
