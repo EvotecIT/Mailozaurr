@@ -17,8 +17,12 @@ public enum EmailProvider {
     /// Use the Mailgun REST API to deliver mail.
     /// </summary>
     Mailgun,
+
+    /// <summary>
+    /// Use the Amazon SES REST API to deliver mail.
+    /// </summary>
+    SES,
     //MailChimp,
-    //AmazonSES,
     //Moosend,
     //Postmark,
     //Brevo (Sendinblue),
