@@ -172,6 +172,8 @@ While I didn't spent much time creating WIKI, working on Get-Help documentation,
 You can also utilize Examples which should help to understand use cases. Of course it would be great having pretty help so if you can help me out feel free to submit PR's.
 - [Example-SendEmail-SignEncrypt.ps1](Examples/Example-SendEmail-SignEncrypt.ps1) - sign and encrypt an email using SMTP.
 - [Example-SendEmail-Pgp.ps1](Examples/Example-SendEmail-Pgp.ps1) - send a PGP encrypted email.
+- [Example-SendEmail-OAuthGmail.ps1](Examples/Example-SendEmail-OAuthGmail.ps1) - send mail through Gmail using OAuth2.
+- [Example-SendEmail-OAuthO365.ps1](Examples/Example-SendEmail-OAuthO365.ps1) - send mail through Office 365 using OAuth2.
 - [Example-GraphManageMessages.ps1](Examples/Example-GraphManageMessages.ps1) - download attachments, set read state and move messages using Microsoft Graph.
 - [Example-GetMailFolder.ps1](Examples/Example-GetMailFolder.ps1) - list folders using either `-Connection` or `-MgGraphRequest`.
 - [Example-ConnectEmailGraph-DeviceCode.ps1](Examples/Example-ConnectEmailGraph-DeviceCode.ps1) - authenticate with device code.
