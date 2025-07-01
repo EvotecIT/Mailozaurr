@@ -1,6 +1,8 @@
 using System.Net.Http.Headers;
 using System.Diagnostics;
 using System.Threading;
+using System.Threading.Tasks;
+using System.IO;
 
 namespace Mailozaurr;
 
@@ -92,11 +94,24 @@ public class MailgunClient : IDisposable {
         return string.IsNullOrWhiteSpace(name) ? email : $"{name} <{email}>";
     }
 
+    private static async Task<byte[]> ReadFileBytesAsync(string path, CancellationToken cancellationToken) {
+        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
+        var bytes = new byte[fs.Length];
+        var read = 0;
+        while (read < bytes.Length) {
+            var r = await fs.ReadAsync(bytes, read, bytes.Length - read, cancellationToken);
+            if (r == 0) break;
+            read += r;
+        }
+        return bytes;
+    }
+
     /// <summary>
     /// Builds the multipart HTTP content used for the Mailgun API request.
     /// </summary>
+    /// <param name="cancellationToken">Token to cancel asynchronous operations.</param>
     /// <returns>The constructed multipart content.</returns>
-    private MultipartFormDataContent CreateContent() {
+    private async Task<MultipartFormDataContent> CreateContentAsync(CancellationToken cancellationToken) {
         var content = new MultipartFormDataContent();
         content.Add(new StringContent(ConvertAddress(From)), "from");
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -115,7 +130,7 @@ public class MailgunClient : IDisposable {
                     continue;
                 }
 
-                var bytes = File.ReadAllBytes(path);
+                var bytes = await ReadFileBytesAsync(path, cancellationToken);
                 var fileContent = new ByteArrayContent(bytes);
                 fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                 content.Add(fileContent, "attachment", Path.GetFileName(path));
@@ -129,7 +144,7 @@ public class MailgunClient : IDisposable {
                     continue;
                 }
 
-                var bytes = File.ReadAllBytes(path);
+                var bytes = await ReadFileBytesAsync(path, cancellationToken);
                 var fileContent = new ByteArrayContent(bytes);
                 fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                 content.Add(fileContent, "inline", Path.GetFileName(path));
@@ -150,7 +165,7 @@ public class MailgunClient : IDisposable {
         Exception? lastException = null;
         do {
             try {
-                using var content = CreateContent();
+                using var content = await CreateContentAsync(cancellationToken);
                 using var request = new HttpRequestMessage(HttpMethod.Post, url) {
                     Content = content
                 };
