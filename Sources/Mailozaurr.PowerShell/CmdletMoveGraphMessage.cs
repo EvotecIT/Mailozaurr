@@ -46,6 +46,15 @@ public class CmdletMoveGraphMessage : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 
+    [Parameter]
+    public int TimeoutSeconds { get; set; } = 100;
+
+    [Parameter]
+    public int RetryCount { get; set; } = 0;
+
+    [Parameter]
+    public int RetryDelayMilliseconds { get; set; } = 0;
+
     /// <summary>
     /// Processes the cmdlet invocation.
     /// </summary>
@@ -72,10 +81,32 @@ public class CmdletMoveGraphMessage : AsyncPSCmdlet {
     /// </summary>
     /// <param name="cred">Credential used to access Graph.</param>
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        try {
-            await MicrosoftGraphUtils.MoveMailMessageAsync(cred, UserPrincipalName!, MessageId!, DestinationFolderId!);
-        } catch (GraphApiException ex) {
-            WriteError(new ErrorRecord(ex, "GraphApiError", ErrorCategory.InvalidOperation, null));
+        MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
+        int attempts = 0;
+        Exception? lastException = null;
+        do {
+            try {
+                await MicrosoftGraphUtils.MoveMailMessageAsync(cred, UserPrincipalName!, MessageId!, DestinationFolderId!);
+                return;
+            } catch (Exception ex) {
+                lastException = ex;
+                WriteWarning($"Move-GraphMessage - {ex.Message}");
+                if (!Helpers.IsTransient(ex) || attempts >= RetryCount) {
+                    if (ex is GraphApiException gex) {
+                        WriteError(new ErrorRecord(gex, "GraphApiError", ErrorCategory.InvalidOperation, null));
+                    } else {
+                        WriteError(new ErrorRecord(ex, "GraphError", ErrorCategory.InvalidOperation, null));
+                    }
+                    return;
+                }
+                if (RetryDelayMilliseconds > 0) {
+                    await Task.Delay(RetryDelayMilliseconds);
+                }
+            }
+            attempts++;
+        } while (attempts <= RetryCount);
+        if (lastException is not null) {
+            WriteError(new ErrorRecord(lastException, "GraphError", ErrorCategory.InvalidOperation, null));
         }
     }
 

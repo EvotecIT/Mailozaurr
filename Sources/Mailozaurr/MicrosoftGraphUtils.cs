@@ -16,8 +16,17 @@ namespace Mailozaurr {
         private static readonly HttpClient HttpClient;
         private static readonly ConcurrentDictionary<string, GraphAuthorization> TokenCache = new();
 
+        /// <summary>
+        /// Timeout for HTTP operations in seconds.
+        /// </summary>
+        public static int TimeoutSeconds {
+            get => (int)HttpClient.Timeout.TotalSeconds;
+            set => HttpClient.Timeout = TimeSpan.FromSeconds(value);
+        }
+
         static MicrosoftGraphUtils() {
             HttpClient = new HttpClient();
+            HttpClient.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
             AppDomain.CurrentDomain.ProcessExit += (_, _) => HttpClient.Dispose();
         }
         /// <summary>
