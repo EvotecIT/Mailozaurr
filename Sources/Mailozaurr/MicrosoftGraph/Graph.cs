@@ -653,15 +653,27 @@ public class Graph : IDisposable {
         using var client = new HttpClient();
         client.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
-        using var uploadSessionResponse = await client.PostAsync(uploadSessionUrl, new StringContent(attachmentItemJson, Encoding.UTF8, "application/json"), cancellationToken);
+        using var uploadSessionResponse = await client.PostAsync(
+            uploadSessionUrl,
+            new StringContent(attachmentItemJson, Encoding.UTF8, "application/json"),
+            cancellationToken);
+
         var uploadSessionContent = await uploadSessionResponse.Content.ReadAsStringAsync();
 
         // {"error":{"code":"InvalidAuthenticationToken","message":"Access token is empty.","innerError":{"date":"2024-06-15T09:51:54","request-id":"4a43e743-e897-4758-8d7d-21858c198e1d","client-request-id":"4a43e743-e897-4758-8d7d-21858c198e1d"}}}
         //Console.WriteLine(uploadSessionContent);
-        var uploadSessionResult = JsonSerializer.Deserialize<GraphUploadSessionResult>(uploadSessionContent);
+        return ParseUploadSessionResult(uploadSessionContent);
+    }
 
-        var uploadUrl = uploadSessionResult?.UploadUrl ?? throw new InvalidOperationException("Upload URL not found.");
-        return uploadUrl;
+    private static string ParseUploadSessionResult(string uploadSessionContent) {
+        var uploadSessionResult = JsonSerializer.Deserialize<GraphUploadSessionResult>(uploadSessionContent)
+            ?? throw new InvalidOperationException("Failed to deserialize the upload session response.");
+
+        if (string.IsNullOrEmpty(uploadSessionResult.UploadUrl)) {
+            throw new InvalidOperationException("Upload URL not found in the session response.");
+        }
+
+        return uploadSessionResult.UploadUrl;
     }
 
     /// <summary>
