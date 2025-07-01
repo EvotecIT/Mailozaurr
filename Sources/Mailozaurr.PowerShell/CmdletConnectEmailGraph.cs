@@ -67,6 +67,9 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
     [Parameter]
     public double RetryDelayBackoff { get; set; } = 1.0;
 
+    [Parameter]
+    public int TimeoutSeconds { get; set; } = 100;
+
     protected override async Task ProcessRecordAsync() {
         GraphCredential cred;
         if (ParameterSetName == "Credential") {
@@ -102,6 +105,7 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
         }
 
         bool connected = false;
+        MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         try {
             var token = await MicrosoftGraphUtils.ConnectO365GraphWithRetryAsync(
                 cred,

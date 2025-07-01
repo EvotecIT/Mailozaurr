@@ -1,3 +1,4 @@
+using System;
 ﻿using System.Net.Http.Headers;
 using System.Threading;
 
@@ -120,6 +121,14 @@ public class Graph : IDisposable {
     public double RetryDelayBackoff { get; set; } = 1.0;
 
     /// <summary>
+    /// Timeout for HTTP operations in seconds.
+    /// </summary>
+    public int TimeoutSeconds {
+        get => (int)_client.Timeout.TotalSeconds;
+        set => _client.Timeout = TimeSpan.FromSeconds(value);
+    }
+
+    /// <summary>
     /// When enabled, scans the HTML body for local image references and embeds
     /// them as inline attachments.
     /// </summary>
@@ -187,6 +196,7 @@ public class Graph : IDisposable {
     public Graph() {
         Stopwatch = Stopwatch.StartNew();
         _client = new HttpClient();
+        _client.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
         if (LogCollector == null) LogCollector = new();
     }
 
@@ -641,6 +651,7 @@ public class Graph : IDisposable {
     public async Task<string> CreateUploadSession(GraphMessage draftMessage, string attachmentItemJson, CancellationToken cancellationToken = default) {
         var uploadSessionUrl = $"https://graph.microsoft.com/v1.0/users('{SentFrom}')/messages/{draftMessage.Id}/attachments/createUploadSession";
         using var client = new HttpClient();
+        client.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
         using var uploadSessionResponse = await client.PostAsync(uploadSessionUrl, new StringContent(attachmentItemJson, Encoding.UTF8, "application/json"), cancellationToken);
         var uploadSessionContent = await uploadSessionResponse.Content.ReadAsStringAsync();
@@ -737,6 +748,7 @@ public class Graph : IDisposable {
         };
         requestMessage.Headers.Add("AnchorMailbox", SentFrom); // This is correctly added to HttpRequestMessage
         using var client = new HttpClient();
+        client.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
         var uploadChunkResponse = await client.SendAsync(requestMessage, cancellationToken);
         if (!uploadChunkResponse.IsSuccessStatusCode) {
             // Handle upload error
