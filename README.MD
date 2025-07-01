@@ -176,6 +176,7 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - [Example-GetMailFolder.ps1](Examples/Example-GetMailFolder.ps1) - list folders using either `-Connection` or `-MgGraphRequest`.
 - [Example-ConnectEmailGraph-DeviceCode.ps1](Examples/Example-ConnectEmailGraph-DeviceCode.ps1) - authenticate with device code.
 - [Example-ConnectEmailGraph-OnBehalfOf.ps1](Examples/Example-ConnectEmailGraph-OnBehalfOf.ps1) - exchange a user token for Graph access.
+- [Example-SendEmail-GraphDeviceCode.ps1](Examples/Example-SendEmail-GraphDeviceCode.ps1) - interactive device code sign-in and send an email.
 - [Example-SendEmail-GraphWithMgRequest.ps1](Examples/Example-SendEmail-GraphWithMgRequest.ps1) - send mail using Connect-MgGraph and the `-MgGraphRequest` switch.
 - Use `Connect-EmailGraph` and `Disconnect-EmailGraph` to authenticate and release application credentials for Microsoft Graph. The connection cmdlet supports both client secret and certificate authentication modes.
 - `Connect-EmailGraph`, `Connect-IMAP` and `Connect-POP3` store the last successful connection in module variables. Subsequent cmdlets use these defaults when `-Connection` or `-Client` is omitted.
