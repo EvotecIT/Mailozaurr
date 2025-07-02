@@ -99,6 +99,7 @@ This will make sure the project has required libraries.
   - [x] Save POP3 Emails
   - [x] Delete POP3 Messages with `Get-POP3Message -Delete`
   - [x] Wait for new POP3 messages with the `Wait-POP3Message` cmdlet supporting `-Until`, `-StopOnMatch` and `-TimeoutSeconds`
+  - [x] Search POP3 mailboxes with `Search-POP3Mailbox` returning messages (use `-Count` to limit results)
 - IMAP
   - [x] Connect to IMAP
   - [x] Get IMAP Folder
@@ -107,11 +108,13 @@ This will make sure the project has required libraries.
   - [x] Delete IMAP Messages with `Get-IMAPMessage -Delete`
   - [x] Listen for new IMAP messages via `ImapIdleListener`
   - [x] Wait for new IMAP messages with the `Wait-IMAPMessage` cmdlet supporting `-Until`, `-StopOnMatch` and `-TimeoutSeconds`
+  - [x] Search IMAP mailboxes with `Search-IMAPMailbox` returning messages (use `-Count` to limit results)
 - Office 365 Graph API
   - [x] Get Mail Folders via `Get-EmailGraphFolder` with `-Connection` or `-MgGraphRequest`
   - [x] Get Mail Messages
   - [x] Save Mail Messages
   - [x] Wait for new Graph messages with the `Wait-GraphMessage` cmdlet
+  - [x] Search Graph mailboxes with `Search-GraphMailbox` returning message info (use `-Count` to limit results)
 - Pipeline input is supported for Graph connection objects when retrieving
   folders or messages:
 
