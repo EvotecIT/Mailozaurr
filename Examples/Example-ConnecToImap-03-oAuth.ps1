@@ -7,7 +7,8 @@ $oAuth2 = Connect-OAuthGoogle -ClientID $ClientID -ClientSecret $ClientSecret -G
 $Client = Connect-IMAP -Server 'imap.gmail.com' -Port 993 -Options Auto -Credential $oAuth2 -OAuth2
 
 Get-IMAPFolder -Client $Client -Verbose
-Get-IMAPMessage -Client $Client -All -Delete
+# Delete messages from a specific sender using OAuth authentication
+Get-IMAPMessage -Client $Client -FromContains 'alerts@example.com' -Since (Get-Date).AddDays(-7) -Delete
 
 Disconnect-IMAP -Client $Client -Verbose
 
