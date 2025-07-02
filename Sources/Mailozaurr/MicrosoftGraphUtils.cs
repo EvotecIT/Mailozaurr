@@ -537,5 +537,162 @@ namespace Mailozaurr {
         public static async Task DeleteMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId) {
             await ExecuteMailMessageActionAsync(credential, userPrincipalName, messageId, GraphMessageAction.Delete);
         }
+
+        /// <summary>
+        /// Deletes all messages from the Junk Email folder.
+        /// </summary>
+        public static async Task ClearJunkMailAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            IEnumerable<string>? skipIds = null,
+            IEnumerable<string>? skipFrom = null,
+            IEnumerable<string>? skipTo = null,
+            IEnumerable<string>? skipSubjectContains = null,
+            bool skipHasAttachment = false,
+            IEnumerable<string>? skipAttachmentExtension = null) {
+            var properties = new List<string> { "id" };
+            if (skipFrom != null) properties.Add("from");
+            if (skipTo != null) properties.Add("toRecipients");
+            if (skipSubjectContains != null) properties.Add("subject");
+            if (skipHasAttachment || skipAttachmentExtension != null) properties.Add("hasAttachments");
+
+            var messages = await GetJunkMailMessagesAsync(
+                credential,
+                userPrincipalName,
+                properties,
+                skipIds,
+                skipFrom,
+                skipTo,
+                skipSubjectContains,
+                skipHasAttachment,
+                skipAttachmentExtension);
+
+            foreach (var msg in messages) {
+                var id = msg["id"] as string;
+                if (string.IsNullOrWhiteSpace(id)) continue;
+                await DeleteMailMessageAsync(credential, userPrincipalName, id);
+            }
+        }
+
+        public static List<Dictionary<string, object>> FilterJunkMessages(
+            IEnumerable<Dictionary<string, object>> messages,
+            IEnumerable<string>? skipIds = null,
+            IEnumerable<string>? skipFrom = null,
+            IEnumerable<string>? skipTo = null,
+            IEnumerable<string>? skipSubjectContains = null,
+            bool skipHasAttachment = false) {
+            var result = new List<Dictionary<string, object>>();
+            var skipIdsSet = skipIds != null ? new HashSet<string>(skipIds, StringComparer.OrdinalIgnoreCase) : null;
+            foreach (var msg in messages) {
+                var id = msg.TryGetValue("id", out var idObj) ? idObj as string : null;
+                if (!string.IsNullOrWhiteSpace(id) && skipIdsSet != null && skipIdsSet.Contains(id)) {
+                    continue;
+                }
+
+                if (skipFrom != null &&
+                    msg.TryGetValue("from", out var fromObj) &&
+                    fromObj is Dictionary<string, object> fDict &&
+                    fDict.TryGetValue("emailAddress", out var addrObj) &&
+                    addrObj is Dictionary<string, object> addr &&
+                    addr.TryGetValue("address", out var fromAddrObj) &&
+                    fromAddrObj is string fromAddr &&
+                    skipFrom.Contains(fromAddr, StringComparer.OrdinalIgnoreCase)) {
+                    continue;
+                }
+
+                if (skipTo != null &&
+                    msg.TryGetValue("toRecipients", out var toObj) &&
+                    toObj is object[] arr &&
+                    arr.OfType<Dictionary<string, object>>().Any(rec =>
+                        rec.TryGetValue("emailAddress", out var tAddrObj) &&
+                        tAddrObj is Dictionary<string, object> tAddr &&
+                        tAddr.TryGetValue("address", out var addrVal) &&
+                        addrVal is string addrStr &&
+                        skipTo.Contains(addrStr, StringComparer.OrdinalIgnoreCase))) {
+                    continue;
+                }
+
+                if (skipSubjectContains != null &&
+                    msg.TryGetValue("subject", out var subjObj) &&
+                    subjObj is string subj &&
+                    skipSubjectContains.Any(s => subj.IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0)) {
+                    continue;
+                }
+
+                if (skipHasAttachment &&
+                    msg.TryGetValue("hasAttachments", out var hasObj) &&
+                    hasObj is bool hasAtt && hasAtt) {
+                    continue;
+                }
+
+                result.Add(msg);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Retrieves messages from the Junk Email folder.
+        /// </summary>
+        public static async Task<List<Dictionary<string, object>>> GetJunkMailMessagesAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            IEnumerable<string>? properties = null,
+            IEnumerable<string>? skipIds = null,
+            IEnumerable<string>? skipFrom = null,
+            IEnumerable<string>? skipTo = null,
+            IEnumerable<string>? skipSubjectContains = null,
+            bool skipHasAttachment = false,
+            IEnumerable<string>? skipAttachmentExtension = null) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var props = properties != null ? new List<string>(properties) : new List<string>();
+            if (skipHasAttachment || skipAttachmentExtension != null) {
+                if (!props.Contains("hasAttachments")) props.Add("hasAttachments");
+            }
+            var query = new Dictionary<string, object>();
+            if (props.Count > 0) query["$select"] = string.Join(",", props);
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/junkemail/messages", query);
+            var messages = new List<Dictionary<string, object>>();
+            while (!string.IsNullOrWhiteSpace(uri)) {
+                var doc = await InvokeGraphApiAsync("GET", uri, headers);
+                if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
+                    foreach (var item in valueElement.EnumerateArray()) {
+                        var native = ConvertJsonElementToNativeObject(item) as Dictionary<string, object>;
+                        if (native != null) messages.Add(native);
+                    }
+                }
+                uri = null;
+                if (doc.RootElement.TryGetProperty("@odata.nextLink", out var next)) {
+                    uri = next.GetString();
+                }
+            }
+            if (skipIds != null || skipFrom != null || skipTo != null || skipSubjectContains != null || skipHasAttachment) {
+                messages = FilterJunkMessages(messages, skipIds, skipFrom, skipTo, skipSubjectContains, skipHasAttachment);
+            }
+
+            if (skipAttachmentExtension != null && skipAttachmentExtension.Any()) {
+                var result = new List<Dictionary<string, object>>();
+                foreach (var msg in messages) {
+                    if (!msg.TryGetValue("id", out var idObj) || idObj is not string id) continue;
+                    if (msg.TryGetValue("hasAttachments", out var hasObj) && hasObj is bool hasAtt && hasAtt) {
+                        var atts = await GetMailMessageAttachmentsAsync(
+                            credential,
+                            userPrincipalName,
+                            id,
+                            new[] { "name" });
+                        if (atts.Any(att =>
+                                skipAttachmentExtension.Contains(
+                                    System.IO.Path.GetExtension(att.Name ?? string.Empty).TrimStart('.'),
+                                    StringComparer.OrdinalIgnoreCase))) {
+                            continue;
+                        }
+                    }
+                    result.Add(msg);
+                }
+                messages = result;
+            }
+            return messages;
+        }
     }
 }
