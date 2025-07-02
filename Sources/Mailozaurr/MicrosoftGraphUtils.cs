@@ -566,5 +566,35 @@ namespace Mailozaurr {
                 await DeleteMailMessageAsync(credential, userPrincipalName, id);
             }
         }
+
+        /// <summary>
+        /// Retrieves messages from the Junk Email folder.
+        /// </summary>
+        public static async Task<List<Dictionary<string, object>>> GetJunkMailMessagesAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            IEnumerable<string>? properties = null) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var query = new Dictionary<string, object>();
+            if (properties != null && properties.Any()) query["$select"] = string.Join(",", properties);
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/junkemail/messages", query);
+            var messages = new List<Dictionary<string, object>>();
+            while (!string.IsNullOrWhiteSpace(uri)) {
+                var doc = await InvokeGraphApiAsync("GET", uri, headers);
+                if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
+                    foreach (var item in valueElement.EnumerateArray()) {
+                        var native = ConvertJsonElementToNativeObject(item) as Dictionary<string, object>;
+                        if (native != null) messages.Add(native);
+                    }
+                }
+                uri = null;
+                if (doc.RootElement.TryGetProperty("@odata.nextLink", out var next)) {
+                    uri = next.GetString();
+                }
+            }
+            return messages;
+        }
     }
 }

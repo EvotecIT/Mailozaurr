@@ -19,11 +19,20 @@ public sealed class CmdletClearIMAPJunk : AsyncPSCmdlet {
     [Parameter(Position = 1)]
     public string? Folder { get; set; }
 
+    [Parameter]
+    public SwitchParameter Preview { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
             var folder = Folder ?? "Junk";
+            if (Preview.IsPresent) {
+                await foreach (var msg in JunkCleaner.GetImapJunkAsync(conn.Data, folder, CancelToken)) {
+                    WriteObject(msg);
+                }
+                return;
+            }
             if (!ShouldProcess(folder, "Clearing IMAP junk")) return;
             await JunkCleaner.ClearImapJunkAsync(conn.Data, folder, CancelToken);
         } else {

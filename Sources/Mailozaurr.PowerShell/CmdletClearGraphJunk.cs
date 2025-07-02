@@ -23,6 +23,12 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
     public SwitchParameter MgGraphRequest { get; set; }
 
     [Parameter]
+    public string[]? Property { get; set; }
+
+    [Parameter]
+    public SwitchParameter Preview { get; set; }
+
+    [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
     [Parameter]
@@ -39,9 +45,16 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
                     WriteWarning("Clear-GraphJunk - Connection not provided and no default session available.");
                     return Task.CompletedTask;
                 }
+                if (Preview.IsPresent) {
+                    return ProcessPreviewGraphAsync(conn.Credential);
+                }
                 return ProcessGraphAsync(conn.Credential);
             case "MgGraphRequest":
-                ProcessMgGraph();
+                if (Preview.IsPresent) {
+                    ProcessPreviewMgGraph();
+                } else {
+                    ProcessMgGraph();
+                }
                 return Task.CompletedTask;
             default:
                 return Task.CompletedTask;
@@ -79,6 +92,14 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
         }
     }
 
+    private async Task ProcessPreviewGraphAsync(GraphCredential cred) {
+        var props = Property != null && Property.Length > 0 ? Property : new[] { "id", "subject", "bodyPreview" };
+        var messages = await MicrosoftGraphUtils.GetJunkMailMessagesAsync(cred, UserPrincipalName!, props);
+        foreach (var msg in messages) {
+            WriteObject(PSObject.AsPSObject(msg));
+        }
+    }
+
     private void ProcessMgGraph() {
         if (!ShouldProcess(UserPrincipalName!, "Clearing Graph junk")) return;
         var listUri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/mailFolders/junkemail/messages?$select=id";
@@ -102,6 +123,21 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
                 .AddParameter("Uri", $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/messages/{id}")
                 .AddParameter("ContentType", "application/json");
             delPs.Invoke();
+        }
+    }
+
+    private void ProcessPreviewMgGraph() {
+        var listUri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/mailFolders/junkemail/messages";
+        if (Property != null && Property.Length > 0) {
+            listUri += "?$select=" + string.Join(",", Property);
+        }
+        var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
+        ps.AddCommand("Invoke-MgGraphRequest")
+            .AddParameter("Method", "GET")
+            .AddParameter("Uri", listUri);
+        var results = ps.Invoke();
+        foreach (var res in results) {
+            WriteObject(res);
         }
     }
 }

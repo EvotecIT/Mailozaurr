@@ -1,6 +1,8 @@
 using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Search;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -27,5 +29,23 @@ public static class JunkCleaner {
         }
         await junk.AddFlagsAsync(uids, MessageFlags.Deleted, true, cancellationToken).ConfigureAwait(false);
         await junk.ExpungeAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Retrieves messages from the specified junk folder without deleting them.
+    /// </summary>
+    /// <param name="client">Connected IMAP client.</param>
+    /// <param name="folder">Folder name or <c>null</c> for "Junk".</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public static async IAsyncEnumerable<ImapEmailMessage> GetImapJunkAsync(
+        ImapClient client,
+        string? folder = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default) {
+        var junk = client.GetCachedFolder(folder ?? "Junk", FolderAccess.ReadOnly);
+        var uids = await junk.SearchAsync(SearchQuery.All, cancellationToken).ConfigureAwait(false);
+        foreach (var uid in uids) {
+            var message = await junk.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
+            yield return new ImapEmailMessage(uid, message);
+        }
     }
 }

@@ -4,6 +4,6 @@ $cred = ConvertTo-GraphCredential -ClientId 'id' -ClientSecret 'secret' -Directo
 Connect-EmailGraph -Credential $cred | Out-Null
 
 # Preview junk cleanup
-Clear-GraphJunk -UserPrincipalName 'user@example.com' -WhatIf
+Clear-GraphJunk -UserPrincipalName 'user@example.com' -Preview
 
 Disconnect-EmailGraph
