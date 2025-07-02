@@ -1,7 +1,4 @@
 using System.Management.Automation;
-using System.Collections.Generic;
-using MimeKit;
-using System.IO;
 using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
@@ -16,7 +13,7 @@ public class CmdletSaveGraphMessageAttachment : PSCmdlet {
     /// </summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true)]
     [ValidateNotNullOrEmpty]
-    public PSObject[]? Attachment { get; set; }
+    public Attachment[]? Attachment { get; set; }
 
     /// <summary>
     /// Destination path for saved attachments.
@@ -29,20 +26,8 @@ public class CmdletSaveGraphMessageAttachment : PSCmdlet {
     /// Processes the cmdlet invocation.
     /// </summary>
     protected override void ProcessRecord() {
-        var graphAttachments = new List<Attachment>();
-        var mimeAttachments = new List<MimeEntity>();
-        foreach (var att in Attachment) {
-            if (att.BaseObject is Attachment ga) {
-                graphAttachments.Add(ga);
-            } else if (att.BaseObject is MimeEntity me) {
-                mimeAttachments.Add(me);
-            }
-        }
-        if (mimeAttachments.Count > 0) {
-            MimeKitUtils.SaveAttachments(mimeAttachments, Path);
-        }
-        if (graphAttachments.Count > 0) {
-            MicrosoftGraphUtils.SaveAttachments(graphAttachments, Path);
+        if (Attachment?.Length > 0) {
+            MicrosoftGraphUtils.SaveAttachments(Attachment, Path);
         }
     }
 }
