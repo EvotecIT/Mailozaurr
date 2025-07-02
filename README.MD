@@ -154,12 +154,34 @@ Using OAuth tokens works the same:
 $token = Connect-OAuthGoogle -ClientId 'id' -ClientSecret 'secret' -GmailAccount 'user@example.com' -Scope https://mail.google.com/
 $client = Connect-IMAP -Server 'imap.gmail.com' -Credential $token -OAuth2
 Get-IMAPFolder -Client $client -Root
+```
 
 You can also open a specific folder by path:
 
 ```powershell
 $client = Connect-IMAP -Server 'imap.example.com' -Credential $cred
 Get-IMAPFolder -Client $client -Path 'Inbox/Reports'
+```
+
+### Listing folder contents
+
+Once a folder is opened you can retrieve its messages using `Get-IMAPMessage`.
+
+```powershell
+# Inbox messages
+$client = Connect-IMAP -Server 'imap.example.com' -Credential $cred
+Get-IMAPFolder -Client $client
+Get-IMAPMessage -Client $client
+
+# Nested folder
+Get-IMAPFolder -Client $client -Path 'Inbox/Reports/2024'
+Get-IMAPMessage -Client $client
+
+# Sent and deleted items
+Get-IMAPFolder -Client $client -Path 'Sent'
+Get-IMAPMessage -Client $client
+Get-IMAPFolder -Client $client -Path 'Deleted Items'
+Get-IMAPMessage -Client $client
 ```
 
 ### Listening for new IMAP mail
@@ -225,6 +247,7 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - [Example-SaveImapMessageAttachmentFiltered.ps1](Examples/Example-SaveImapMessageAttachmentFiltered.ps1) - search IMAP messages and save matching attachments.
 - [Example-ListImapRootFolders.ps1](Examples/Example-ListImapRootFolders.ps1) - list root folders using credentials.
 - [Example-ListImapRootFoldersOAuth.ps1](Examples/Example-ListImapRootFoldersOAuth.ps1) - list root folders using OAuth.
+- [Example-ListImapFolderContents.ps1](Examples/Example-ListImapFolderContents.ps1) - open folders by path and list messages.
 - [Example-GetMailFolder.ps1](Examples/Example-GetMailFolder.ps1) - list folders using either `-Connection` or `-MgGraphRequest`.
 - [Example-ConnectEmailGraph-DeviceCode.ps1](Examples/Example-ConnectEmailGraph-DeviceCode.ps1) - authenticate with device code.
 - [Example-ConnectEmailGraph-OnBehalfOf.ps1](Examples/Example-ConnectEmailGraph-OnBehalfOf.ps1) - exchange a user token for Graph access.
