@@ -1,43 +1,30 @@
 using System;
 using System.Management.Automation;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
-/// <para type="synopsis">Waits for new IMAP messages using the IMAP IDLE command.</para>
-/// <para type="description">The <c>Wait-IMAPMessage</c> cmdlet listens for new messages arriving in the specified folder and writes them to the pipeline as they are received.</para>
+/// <para type="synopsis">Waits for new Graph messages by polling Microsoft Graph.</para>
+/// <para type="description">The <c>Wait-GraphMessage</c> cmdlet listens for new messages for the specified user principal name. Messages are written to the pipeline as they arrive.</para>
 /// <example>
-///   <summary>Listen for new messages in the inbox</summary>
+///   <summary>Listen for new messages</summary>
 ///   <code>
-/// $listener = Wait-IMAPMessage -Client $client
+/// $listener = Wait-GraphMessage -Connection $graph -UserPrincipalName 'user@example.com'
 ///   </code>
 /// </example>
-/// <remarks>
-/// Use Ctrl+C to stop waiting for messages. The cmdlet relies on a connected <see cref="ImapConnectionInfo"/> object from <c>Connect-IMAP</c>.
-/// </remarks>
-/// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
-[Cmdlet(VerbsLifecycle.Wait, "IMAPMessage")]
-[OutputType(typeof(ImapEmailMessage))]
-public sealed class CmdletWaitIMAPMessage : AsyncPSCmdlet, System.IDisposable {
-    /// <summary>
-    /// <para type="description">The <see cref="ImapConnectionInfo"/> representing the active IMAP session. Defaults to the last session created by <c>Connect-IMAP</c>.</para>
-    /// </summary>
+[Cmdlet(VerbsLifecycle.Wait, "GraphMessage")]
+[OutputType(typeof(object))]
+public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
     [Parameter(ValueFromPipeline = true)]
     [ValidateNotNull]
-    public ImapConnectionInfo? Client { get; set; }
+    public GraphConnectionInfo? Connection { get; set; }
 
-    /// <summary>
-    /// <para type="description">Optional folder name to monitor. Defaults to Inbox.</para>
-    /// </summary>
-    [Parameter]
-    public string? Folder { get; set; }
+    [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
+    public string? UserPrincipalName { get; set; }
 
-    /// <summary>
-    /// <para type="description">Optional script block invoked for each arriving message.</para>
-    /// </summary>
     [Parameter]
     public ScriptBlock? Action { get; set; }
 
@@ -50,19 +37,19 @@ public sealed class CmdletWaitIMAPMessage : AsyncPSCmdlet, System.IDisposable {
     [Parameter]
     public int TimeoutSeconds { get; set; }
 
-    private ImapIdleListener? _listener;
+    private GraphMessageListener? _listener;
     private CancellationTokenSource? _timeoutSource;
     private CancellationTokenSource? _linkedSource;
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        var conn = Client ?? DefaultSessions.ImapSession;
-        if (conn == null || conn.Data == null) {
-            WriteWarning("Wait-IMAPMessage - Is IMAP connected?");
+        var conn = Connection ?? DefaultSessions.GraphSession;
+        if (conn == null || conn.Credential == null) {
+            WriteWarning("Wait-GraphMessage - Connection not provided and no default session available.");
             return;
         }
 
-        _listener = new ImapIdleListener(conn.Data, Folder);
+        _listener = new GraphMessageListener(conn.Credential, UserPrincipalName!);
         _listener.MessageArrived += OnMessageArrived;
         await _listener.StartAsync(CancelToken);
 
@@ -78,7 +65,7 @@ public sealed class CmdletWaitIMAPMessage : AsyncPSCmdlet, System.IDisposable {
         } catch (TaskCanceledException) { }
     }
 
-    private void OnMessageArrived(object? sender, ImapEmailMessage message) {
+    private void OnMessageArrived(object? sender, System.Collections.Generic.Dictionary<string, object> message) {
         var match = Until == null || LanguagePrimitives.IsTrue(Until.InvokeReturnAsIs(message));
         if (match) {
             WriteObject(message);

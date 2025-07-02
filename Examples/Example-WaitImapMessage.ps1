@@ -3,10 +3,13 @@ Import-Module $PSScriptRoot\..\Mailozaurr.psd1 -Force
 $credential = Get-Credential
 $client = Connect-IMAP -Server 'imap.example.com' -Credential $credential
 
-Write-Host 'Waiting for new messages. Press Ctrl+C to stop.'
-Wait-IMAPMessage -Client $client -Action {
+Write-Host 'Waiting for new IMAP messages from alice@example.com.'
+Wait-IMAPMessage -Client $client -Until {
+    param($m)
+    $m.Message.From.Mailboxes.Address -contains 'alice@example.com'
+} -StopOnMatch -TimeoutSeconds 600 -Action {
     param($msg)
-    Write-Host "New message: $($msg.Message.Subject)"
+    Write-Host "New IMAP message from Alice: $($msg.Message.Subject)"
 }
 
 Disconnect-IMAP -Client $client
