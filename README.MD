@@ -98,14 +98,14 @@ This will make sure the project has required libraries.
   - [x] Get POP3 Emails
   - [x] Save POP3 Emails
   - [x] Delete POP3 Messages with `Get-POP3Message -Delete`
-  - [x] Wait for new POP3 messages with the `Wait-POP3Message` cmdlet
+  - [x] Wait for new POP3 messages with the `Wait-POP3Message` cmdlet supporting `-Until`, `-StopOnMatch` and `-TimeoutSeconds`
 - IMAP
   - [x] Connect to IMAP
   - [x] Get IMAP Folder
   - [x] Get IMAP Messages
   - [x] Delete IMAP Messages with `Get-IMAPMessage -Delete`
   - [x] Listen for new IMAP messages via `ImapIdleListener`
-  - [x] Wait for new IMAP messages with the `Wait-IMAPMessage` cmdlet
+  - [x] Wait for new IMAP messages with the `Wait-IMAPMessage` cmdlet supporting `-Until`, `-StopOnMatch` and `-TimeoutSeconds`
 - Office 365 Graph API
   - [x] Get Mail Folders via `Get-EmailGraphFolder` with `-Connection` or `-MgGraphRequest`
   - [x] Get Mail Messages
@@ -166,12 +166,12 @@ messages directly to the pipeline:
 ```powershell
 $cred = Get-Credential
 $client = Connect-IMAP -Server 'imap.example.com' -Credential $cred
-Wait-IMAPMessage -Client $client -Action { param($m) "New: $($m.Message.Subject)" }
+Wait-IMAPMessage -Client $client -Until { $_.Message.From.Mailboxes.Address -contains 'alice@example.com' } -StopOnMatch -TimeoutSeconds 600 -Action { param($m) "New IMAP from Alice: $($m.Message.Subject)" }
 ```
 
 Press <kbd>Ctrl+C</kbd> to stop waiting for messages.
 
-The same concept applies to POP3 and Microsoft Graph mailboxes. Both `Wait-POP3Message` and `Wait-GraphMessage` support `-Until`, `-StopOnMatch` and `-TimeoutSeconds` parameters so you can wait for specific senders or stop after a period of time:
+The same concept applies to POP3, IMAP and Microsoft Graph mailboxes. `Wait-POP3Message`, `Wait-IMAPMessage` and `Wait-GraphMessage` all support `-Until`, `-StopOnMatch` and `-TimeoutSeconds` parameters so you can wait for specific senders or stop after a period of time:
 
 ```powershell
 $cred = Get-Credential

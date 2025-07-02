@@ -1,4 +1,6 @@
+using System;
 using System.Management.Automation;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
@@ -39,7 +41,18 @@ public sealed class CmdletWaitIMAPMessage : AsyncPSCmdlet, System.IDisposable {
     [Parameter]
     public ScriptBlock? Action { get; set; }
 
+    [Parameter]
+    public ScriptBlock? Until { get; set; }
+
+    [Parameter]
+    public SwitchParameter StopOnMatch { get; set; }
+
+    [Parameter]
+    public int TimeoutSeconds { get; set; }
+
     private ImapIdleListener? _listener;
+    private CancellationTokenSource? _timeoutSource;
+    private CancellationTokenSource? _linkedSource;
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
@@ -52,18 +65,32 @@ public sealed class CmdletWaitIMAPMessage : AsyncPSCmdlet, System.IDisposable {
         _listener = new ImapIdleListener(conn.Data, Folder);
         _listener.MessageArrived += OnMessageArrived;
         await _listener.StartAsync(CancelToken);
+
+        CancellationToken token = CancelToken;
+        if (TimeoutSeconds > 0) {
+            _timeoutSource = new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds));
+            _linkedSource = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, _timeoutSource.Token);
+            token = _linkedSource.Token;
+        }
+
         try {
-            await Task.Delay(-1, CancelToken);
+            await Task.Delay(-1, token);
         } catch (TaskCanceledException) { }
     }
 
     private void OnMessageArrived(object? sender, ImapEmailMessage message) {
-        WriteObject(message);
-        if (Action != null) {
-            try {
-                Action.Invoke(message);
-            } catch (RuntimeException ex) {
-                WriteError(ex.ErrorRecord);
+        var match = Until == null || LanguagePrimitives.IsTrue(Until.InvokeReturnAsIs(message));
+        if (match) {
+            WriteObject(message);
+            if (Action != null) {
+                try {
+                    Action.Invoke(message);
+                } catch (RuntimeException ex) {
+                    WriteError(ex.ErrorRecord);
+                }
+            }
+            if (StopOnMatch) {
+                StopProcessing();
             }
         }
     }
@@ -71,15 +98,23 @@ public sealed class CmdletWaitIMAPMessage : AsyncPSCmdlet, System.IDisposable {
     /// <inheritdoc />
     protected override Task EndProcessingAsync() {
         _listener?.Dispose();
+        _timeoutSource?.Dispose();
+        _linkedSource?.Dispose();
         return Task.CompletedTask;
     }
 
     /// <inheritdoc />
-    public void Dispose() => _listener?.Dispose();
+    public void Dispose() {
+        _listener?.Dispose();
+        _timeoutSource?.Dispose();
+        _linkedSource?.Dispose();
+    }
 
     /// <inheritdoc />
     protected override void StopProcessing() {
         _listener?.Stop();
+        _timeoutSource?.Cancel();
+        _linkedSource?.Cancel();
         base.StopProcessing();
     }
 }
