@@ -5,6 +5,6 @@ $client = Connect-IMAP -Server 'imap.example.com' -Credential $credential -Port 
 
 # Fetch recent messages with attachments matching a subject filter
 Get-IMAPMessage -Client $client -Subject 'Report' -Since (Get-Date).AddDays(-7) -HasAttachment |
-    ForEach-Object { $_.Message.Attachments | Save-GraphMessageAttachment -Path "$Env:UserProfile\Downloads\MailAttachments" }
+    ForEach-Object { Save-IMAPMessageAttachment -Client $client -Uid $_.Uid.Id -Path "$Env:UserProfile\Downloads\MailAttachments" }
 
 Disconnect-IMAP -Client $client
