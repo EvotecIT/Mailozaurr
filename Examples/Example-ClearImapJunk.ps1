@@ -27,10 +27,16 @@ Clear-IMAPJunk -Client $imap -SkipMessageId '<id1@example.com>','<id2@example.co
 # Example 8: skip messages with given UIDs
 Clear-IMAPJunk -Client $imap -SkipUid 1000,1001
 
-# Example 9: combine multiple skip options
-Clear-IMAPJunk -Client $imap -SkipFrom 'boss@example.com' -SkipSubjectContains 'Internal'
 
-# Example 10: clear a custom junk folder
+# Example 9: skip messages that have attachments
+Clear-IMAPJunk -Client $imap -SkipHasAttachment
+
+# Example 10: skip messages containing ZIP attachments
+Clear-IMAPJunk -Client $imap -SkipAttachmentExtension 'zip'
+
+# Example 11: combine multiple skip options
+Clear-IMAPJunk -Client $imap -SkipFrom 'boss@example.com' -SkipSubjectContains 'Internal'
+# Example 12: clear a custom junk folder
 Clear-IMAPJunk -Client $imap -Folder 'Spam/Junk'
 
 Disconnect-IMAP -Client $imap

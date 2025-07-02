@@ -39,6 +39,12 @@ public sealed class CmdletClearIMAPJunk : AsyncPSCmdlet {
     [Parameter]
     public uint[]? SkipUid { get; set; }
 
+    [Parameter]
+    public SwitchParameter SkipHasAttachment { get; set; }
+
+    [Parameter]
+    public string[]? SkipAttachmentExtension { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
@@ -53,6 +59,8 @@ public sealed class CmdletClearIMAPJunk : AsyncPSCmdlet {
                     SkipSubjectContains,
                     SkipMessageId,
                     SkipUid?.Select(id => new UniqueId(id)),
+                    SkipHasAttachment.IsPresent,
+                    SkipAttachmentExtension,
                     CancelToken)) {
                     WriteObject(msg);
                 }
@@ -67,6 +75,8 @@ public sealed class CmdletClearIMAPJunk : AsyncPSCmdlet {
                 SkipSubjectContains,
                 SkipMessageId,
                 SkipUid?.Select(id => new UniqueId(id)),
+                SkipHasAttachment.IsPresent,
+                SkipAttachmentExtension,
                 CancelToken);
         } else {
             WriteWarning("Clear-IMAPJunk - Is IMAP connected?");

@@ -12,4 +12,18 @@ Describe 'Clear-IMAPJunk' {
         $warn | Should -Not -BeNullOrEmpty
         $warn[0] | Should -Be 'Clear-IMAPJunk - Is IMAP connected?'
     }
+
+    It 'Warns when IMAP connection missing with -WhatIf and SkipHasAttachment' {
+        $info = [Mailozaurr.PowerShell.ImapConnectionInfo]::new()
+        Clear-IMAPJunk -Client $info -WhatIf -SkipHasAttachment -WarningVariable warn
+        $warn | Should -Not -BeNullOrEmpty
+        $warn[0] | Should -Be 'Clear-IMAPJunk - Is IMAP connected?'
+    }
+
+    It 'Warns when IMAP connection missing with -Preview and SkipAttachmentExtension' {
+        $info = [Mailozaurr.PowerShell.ImapConnectionInfo]::new()
+        Clear-IMAPJunk -Client $info -Preview -SkipAttachmentExtension 'zip' -WarningVariable warn
+        $warn | Should -Not -BeNullOrEmpty
+        $warn[0] | Should -Be 'Clear-IMAPJunk - Is IMAP connected?'
+    }
 }

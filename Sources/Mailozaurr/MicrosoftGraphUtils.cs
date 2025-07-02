@@ -547,11 +547,14 @@ namespace Mailozaurr {
             IEnumerable<string>? skipIds = null,
             IEnumerable<string>? skipFrom = null,
             IEnumerable<string>? skipTo = null,
-            IEnumerable<string>? skipSubjectContains = null) {
+            IEnumerable<string>? skipSubjectContains = null,
+            bool skipHasAttachment = false,
+            IEnumerable<string>? skipAttachmentExtension = null) {
             var properties = new List<string> { "id" };
             if (skipFrom != null) properties.Add("from");
             if (skipTo != null) properties.Add("toRecipients");
             if (skipSubjectContains != null) properties.Add("subject");
+            if (skipHasAttachment || skipAttachmentExtension != null) properties.Add("hasAttachments");
 
             var messages = await GetJunkMailMessagesAsync(
                 credential,
@@ -560,7 +563,9 @@ namespace Mailozaurr {
                 skipIds,
                 skipFrom,
                 skipTo,
-                skipSubjectContains);
+                skipSubjectContains,
+                skipHasAttachment,
+                skipAttachmentExtension);
 
             foreach (var msg in messages) {
                 var id = msg["id"] as string;
@@ -574,7 +579,8 @@ namespace Mailozaurr {
             IEnumerable<string>? skipIds = null,
             IEnumerable<string>? skipFrom = null,
             IEnumerable<string>? skipTo = null,
-            IEnumerable<string>? skipSubjectContains = null) {
+            IEnumerable<string>? skipSubjectContains = null,
+            bool skipHasAttachment = false) {
             var result = new List<Dictionary<string, object>>();
             var skipIdsSet = skipIds != null ? new HashSet<string>(skipIds, StringComparer.OrdinalIgnoreCase) : null;
             foreach (var msg in messages) {
@@ -613,6 +619,12 @@ namespace Mailozaurr {
                     continue;
                 }
 
+                if (skipHasAttachment &&
+                    msg.TryGetValue("hasAttachments", out var hasObj) &&
+                    hasObj is bool hasAtt && hasAtt) {
+                    continue;
+                }
+
                 result.Add(msg);
             }
             return result;
@@ -628,12 +640,18 @@ namespace Mailozaurr {
             IEnumerable<string>? skipIds = null,
             IEnumerable<string>? skipFrom = null,
             IEnumerable<string>? skipTo = null,
-            IEnumerable<string>? skipSubjectContains = null) {
+            IEnumerable<string>? skipSubjectContains = null,
+            bool skipHasAttachment = false,
+            IEnumerable<string>? skipAttachmentExtension = null) {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
             headers["Authorization"] = token;
+            var props = properties != null ? new List<string>(properties) : new List<string>();
+            if (skipHasAttachment || skipAttachmentExtension != null) {
+                if (!props.Contains("hasAttachments")) props.Add("hasAttachments");
+            }
             var query = new Dictionary<string, object>();
-            if (properties != null && properties.Any()) query["$select"] = string.Join(",", properties);
+            if (props.Count > 0) query["$select"] = string.Join(",", props);
             var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/junkemail/messages", query);
             var messages = new List<Dictionary<string, object>>();
             while (!string.IsNullOrWhiteSpace(uri)) {
@@ -649,8 +667,30 @@ namespace Mailozaurr {
                     uri = next.GetString();
                 }
             }
-            if (skipIds != null || skipFrom != null || skipTo != null || skipSubjectContains != null) {
-                messages = FilterJunkMessages(messages, skipIds, skipFrom, skipTo, skipSubjectContains);
+            if (skipIds != null || skipFrom != null || skipTo != null || skipSubjectContains != null || skipHasAttachment) {
+                messages = FilterJunkMessages(messages, skipIds, skipFrom, skipTo, skipSubjectContains, skipHasAttachment);
+            }
+
+            if (skipAttachmentExtension != null && skipAttachmentExtension.Any()) {
+                var result = new List<Dictionary<string, object>>();
+                foreach (var msg in messages) {
+                    if (!msg.TryGetValue("id", out var idObj) || idObj is not string id) continue;
+                    if (msg.TryGetValue("hasAttachments", out var hasObj) && hasObj is bool hasAtt && hasAtt) {
+                        var atts = await GetMailMessageAttachmentsAsync(
+                            credential,
+                            userPrincipalName,
+                            id,
+                            new[] { "name" });
+                        if (atts.Any(att =>
+                                skipAttachmentExtension.Contains(
+                                    System.IO.Path.GetExtension(att.Name ?? string.Empty).TrimStart('.'),
+                                    StringComparer.OrdinalIgnoreCase))) {
+                            continue;
+                        }
+                    }
+                    result.Add(msg);
+                }
+                messages = result;
             }
             return messages;
         }

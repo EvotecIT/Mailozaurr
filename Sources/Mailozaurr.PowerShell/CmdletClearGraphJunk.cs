@@ -42,6 +42,12 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
     public string[]? SkipSubjectContains { get; set; }
 
     [Parameter]
+    public SwitchParameter SkipHasAttachment { get; set; }
+
+    [Parameter]
+    public string[]? SkipAttachmentExtension { get; set; }
+
+    [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
     [Parameter]
@@ -87,7 +93,9 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
                     SkipId,
                     SkipFrom,
                     SkipTo,
-                    SkipSubjectContains);
+                    SkipSubjectContains,
+                    SkipHasAttachment.IsPresent,
+                    SkipAttachmentExtension);
                 return;
             } catch (Exception ex) {
                 lastException = ex;
@@ -119,6 +127,7 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
         if (SkipFrom != null && !props.Contains("from")) props.Add("from");
         if (SkipTo != null && !props.Contains("toRecipients")) props.Add("toRecipients");
         if (SkipSubjectContains != null && !props.Contains("subject")) props.Add("subject");
+        if ((SkipHasAttachment.IsPresent || SkipAttachmentExtension != null) && !props.Contains("hasAttachments")) props.Add("hasAttachments");
 
         var messages = await MicrosoftGraphUtils.GetJunkMailMessagesAsync(
             cred,
@@ -127,7 +136,9 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
             SkipId,
             SkipFrom,
             SkipTo,
-            SkipSubjectContains);
+            SkipSubjectContains,
+            SkipHasAttachment.IsPresent,
+            SkipAttachmentExtension);
 
         foreach (var msg in messages) {
             WriteObject(PSObject.AsPSObject(msg));
@@ -140,6 +151,7 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
         if (SkipSubjectContains != null) select.Add("subject");
         if (SkipFrom != null) select.Add("from");
         if (SkipTo != null) select.Add("toRecipients");
+        if (SkipHasAttachment.IsPresent || SkipAttachmentExtension != null) select.Add("hasAttachments");
         var listUri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/mailFolders/junkemail/messages?$select=" + string.Join(",", select);
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
@@ -150,7 +162,32 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
             .OfType<PSObject>()
             .Select(o => o.Properties.ToDictionary(p => p.Name, p => p.Value))
             .ToList();
-        var filtered = MicrosoftGraphUtils.FilterJunkMessages(dict, SkipId, SkipFrom, SkipTo, SkipSubjectContains);
+        var filtered = MicrosoftGraphUtils.FilterJunkMessages(dict, SkipId, SkipFrom, SkipTo, SkipSubjectContains, SkipHasAttachment.IsPresent);
+        if (SkipAttachmentExtension != null && SkipAttachmentExtension.Length > 0) {
+            var final = new List<Dictionary<string, object>>();
+            foreach (var msg in filtered) {
+                if (!msg.TryGetValue("id", out var idObj) || idObj is not string id) continue;
+                if (msg.TryGetValue("hasAttachments", out var hasObj) && hasObj is bool ha && ha) {
+                    var attPs = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
+                    attPs.AddCommand("Invoke-MgGraphRequest")
+                        .AddParameter("Method", "GET")
+                        .AddParameter("Uri", $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/messages/{id}/attachments?$select=name");
+                    var attRes = attPs.Invoke();
+                    var names = attRes
+                        .OfType<PSObject>()
+                        .SelectMany<PSObject, PSObject>(o =>
+                            ((System.Collections.IEnumerable?)o.Properties["value"].Value)?.OfType<PSObject>() ?? System.Array.Empty<PSObject>())
+                        .Select(a => a.Properties["name"].Value as string)
+                        .Where(n => n != null)
+                        .ToList();
+                    if (names.Any(n => SkipAttachmentExtension.Contains(System.IO.Path.GetExtension(n!).TrimStart('.'), StringComparer.OrdinalIgnoreCase))) {
+                        continue;
+                    }
+                }
+                final.Add(msg);
+            }
+            filtered = final;
+        }
         foreach (var msg in filtered) {
             var id = msg["id"] as string;
             if (string.IsNullOrWhiteSpace(id)) continue;
@@ -170,6 +207,7 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
         if (SkipFrom != null && !props.Contains("from")) props.Add("from");
         if (SkipTo != null && !props.Contains("toRecipients")) props.Add("toRecipients");
         if (SkipSubjectContains != null && !props.Contains("subject")) props.Add("subject");
+        if ((SkipHasAttachment.IsPresent || SkipAttachmentExtension != null) && !props.Contains("hasAttachments")) props.Add("hasAttachments");
         var listUri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/mailFolders/junkemail/messages?$select=" + string.Join(",", props);
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
@@ -180,7 +218,32 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
             .OfType<PSObject>()
             .Select(o => o.Properties.ToDictionary(p => p.Name, p => p.Value))
             .ToList();
-        var filtered = MicrosoftGraphUtils.FilterJunkMessages(dict, SkipId, SkipFrom, SkipTo, SkipSubjectContains);
+        var filtered = MicrosoftGraphUtils.FilterJunkMessages(dict, SkipId, SkipFrom, SkipTo, SkipSubjectContains, SkipHasAttachment.IsPresent);
+        if (SkipAttachmentExtension != null && SkipAttachmentExtension.Length > 0) {
+            var final = new List<Dictionary<string, object>>();
+            foreach (var msg in filtered) {
+                if (!msg.TryGetValue("id", out var idObj) || idObj is not string id) continue;
+                if (msg.TryGetValue("hasAttachments", out var hasObj) && hasObj is bool ha && ha) {
+                    var attPs = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
+                    attPs.AddCommand("Invoke-MgGraphRequest")
+                        .AddParameter("Method", "GET")
+                        .AddParameter("Uri", $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/messages/{id}/attachments?$select=name");
+                    var attRes = attPs.Invoke();
+                    var names = attRes
+                        .OfType<PSObject>()
+                        .SelectMany<PSObject, PSObject>(o =>
+                            ((System.Collections.IEnumerable?)o.Properties["value"].Value)?.OfType<PSObject>() ?? System.Array.Empty<PSObject>())
+                        .Select(a => a.Properties["name"].Value as string)
+                        .Where(n => n != null)
+                        .ToList();
+                    if (names.Any(n => SkipAttachmentExtension.Contains(System.IO.Path.GetExtension(n!).TrimStart('.'), StringComparer.OrdinalIgnoreCase))) {
+                        continue;
+                    }
+                }
+                final.Add(msg);
+            }
+            filtered = final;
+        }
         foreach (var msg in filtered) {
             WriteObject(PSObject.AsPSObject(msg));
         }

@@ -26,6 +26,8 @@ public static class JunkCleaner {
         IEnumerable<string>? skipSubjectContains = null,
         IEnumerable<string>? skipMessageId = null,
         IEnumerable<UniqueId>? skipUid = null,
+        bool skipHasAttachment = false,
+        IEnumerable<string>? skipAttachmentExtension = null,
         CancellationToken cancellationToken = default) {
         var junk = client.GetCachedFolder(folder ?? "Junk", FolderAccess.ReadWrite);
         var uids = await junk.SearchAsync(SearchQuery.All, cancellationToken).ConfigureAwait(false);
@@ -42,6 +44,13 @@ public static class JunkCleaner {
             if (skipFrom != null && message.From.Mailboxes.Any(m => skipFrom.Contains(m.Address, StringComparer.OrdinalIgnoreCase))) continue;
             if (skipTo != null && message.To.Mailboxes.Any(m => skipTo.Contains(m.Address, StringComparer.OrdinalIgnoreCase))) continue;
             if (skipSubjectContains != null && message.Subject != null && skipSubjectContains.Any(s => message.Subject.IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0)) continue;
+            if (skipHasAttachment && message.Attachments.Any()) continue;
+            if (skipAttachmentExtension != null && message.Attachments.OfType<MimeKit.MimePart>().Any(att =>
+                    skipAttachmentExtension.Contains(
+                        System.IO.Path.GetExtension(att.FileName ?? string.Empty).TrimStart('.'),
+                        StringComparer.OrdinalIgnoreCase))) {
+                continue;
+            }
             toDelete.Add(uid);
         }
 
@@ -65,6 +74,8 @@ public static class JunkCleaner {
         IEnumerable<string>? skipSubjectContains = null,
         IEnumerable<string>? skipMessageId = null,
         IEnumerable<UniqueId>? skipUid = null,
+        bool skipHasAttachment = false,
+        IEnumerable<string>? skipAttachmentExtension = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default) {
         var junk = client.GetCachedFolder(folder ?? "Junk", FolderAccess.ReadOnly);
         var uids = await junk.SearchAsync(SearchQuery.All, cancellationToken).ConfigureAwait(false);
@@ -76,6 +87,13 @@ public static class JunkCleaner {
             if (skipFrom != null && message.From.Mailboxes.Any(m => skipFrom.Contains(m.Address, StringComparer.OrdinalIgnoreCase))) continue;
             if (skipTo != null && message.To.Mailboxes.Any(m => skipTo.Contains(m.Address, StringComparer.OrdinalIgnoreCase))) continue;
             if (skipSubjectContains != null && message.Subject != null && skipSubjectContains.Any(s => message.Subject.IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0)) continue;
+            if (skipHasAttachment && message.Attachments.Any()) continue;
+            if (skipAttachmentExtension != null && message.Attachments.OfType<MimeKit.MimePart>().Any(att =>
+                    skipAttachmentExtension.Contains(
+                        System.IO.Path.GetExtension(att.FileName ?? string.Empty).TrimStart('.'),
+                        StringComparer.OrdinalIgnoreCase))) {
+                continue;
+            }
             yield return new ImapEmailMessage(uid, message);
         }
     }
