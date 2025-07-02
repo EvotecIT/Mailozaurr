@@ -553,15 +553,38 @@ namespace Mailozaurr {
             if (skipTo != null) properties.Add("toRecipients");
             if (skipSubjectContains != null) properties.Add("subject");
 
-            var messages = await GetJunkMailMessagesAsync(credential, userPrincipalName, properties);
-            var skipIdsSet = skipIds != null ? new HashSet<string>(skipIds, StringComparer.OrdinalIgnoreCase) : null;
+            var messages = await GetJunkMailMessagesAsync(
+                credential,
+                userPrincipalName,
+                properties,
+                skipIds,
+                skipFrom,
+                skipTo,
+                skipSubjectContains);
 
             foreach (var msg in messages) {
                 var id = msg["id"] as string;
                 if (string.IsNullOrWhiteSpace(id)) continue;
-                if (skipIdsSet != null && skipIdsSet.Contains(id)) continue;
+                await DeleteMailMessageAsync(credential, userPrincipalName, id);
+            }
+        }
 
-                if (skipFrom != null && msg.TryGetValue("from", out var fromObj) &&
+        public static List<Dictionary<string, object>> FilterJunkMessages(
+            IEnumerable<Dictionary<string, object>> messages,
+            IEnumerable<string>? skipIds = null,
+            IEnumerable<string>? skipFrom = null,
+            IEnumerable<string>? skipTo = null,
+            IEnumerable<string>? skipSubjectContains = null) {
+            var result = new List<Dictionary<string, object>>();
+            var skipIdsSet = skipIds != null ? new HashSet<string>(skipIds, StringComparer.OrdinalIgnoreCase) : null;
+            foreach (var msg in messages) {
+                var id = msg.TryGetValue("id", out var idObj) ? idObj as string : null;
+                if (!string.IsNullOrWhiteSpace(id) && skipIdsSet != null && skipIdsSet.Contains(id)) {
+                    continue;
+                }
+
+                if (skipFrom != null &&
+                    msg.TryGetValue("from", out var fromObj) &&
                     fromObj is Dictionary<string, object> fDict &&
                     fDict.TryGetValue("emailAddress", out var addrObj) &&
                     addrObj is Dictionary<string, object> addr &&
@@ -571,7 +594,8 @@ namespace Mailozaurr {
                     continue;
                 }
 
-                if (skipTo != null && msg.TryGetValue("toRecipients", out var toObj) &&
+                if (skipTo != null &&
+                    msg.TryGetValue("toRecipients", out var toObj) &&
                     toObj is object[] arr &&
                     arr.OfType<Dictionary<string, object>>().Any(rec =>
                         rec.TryGetValue("emailAddress", out var tAddrObj) &&
@@ -582,14 +606,16 @@ namespace Mailozaurr {
                     continue;
                 }
 
-                if (skipSubjectContains != null && msg.TryGetValue("subject", out var subjObj) &&
+                if (skipSubjectContains != null &&
+                    msg.TryGetValue("subject", out var subjObj) &&
                     subjObj is string subj &&
                     skipSubjectContains.Any(s => subj.IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0)) {
                     continue;
                 }
 
-                await DeleteMailMessageAsync(credential, userPrincipalName, id);
+                result.Add(msg);
             }
+            return result;
         }
 
         /// <summary>
@@ -598,7 +624,11 @@ namespace Mailozaurr {
         public static async Task<List<Dictionary<string, object>>> GetJunkMailMessagesAsync(
             GraphCredential credential,
             string userPrincipalName,
-            IEnumerable<string>? properties = null) {
+            IEnumerable<string>? properties = null,
+            IEnumerable<string>? skipIds = null,
+            IEnumerable<string>? skipFrom = null,
+            IEnumerable<string>? skipTo = null,
+            IEnumerable<string>? skipSubjectContains = null) {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
             headers["Authorization"] = token;
@@ -618,6 +648,9 @@ namespace Mailozaurr {
                 if (doc.RootElement.TryGetProperty("@odata.nextLink", out var next)) {
                     uri = next.GetString();
                 }
+            }
+            if (skipIds != null || skipFrom != null || skipTo != null || skipSubjectContains != null) {
+                messages = FilterJunkMessages(messages, skipIds, skipFrom, skipTo, skipSubjectContains);
             }
             return messages;
         }
