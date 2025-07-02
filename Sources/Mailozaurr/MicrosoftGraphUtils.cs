@@ -537,5 +537,34 @@ namespace Mailozaurr {
         public static async Task DeleteMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId) {
             await ExecuteMailMessageActionAsync(credential, userPrincipalName, messageId, GraphMessageAction.Delete);
         }
+
+        /// <summary>
+        /// Deletes all messages from the Junk Email folder.
+        /// </summary>
+        public static async Task ClearJunkMailAsync(GraphCredential credential, string userPrincipalName) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/junkemail/messages", new Dictionary<string, object> { { "$select", "id" } });
+            var ids = new List<string>();
+            while (!string.IsNullOrWhiteSpace(uri)) {
+                var doc = await InvokeGraphApiAsync("GET", uri, headers);
+                if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
+                    foreach (var item in valueElement.EnumerateArray()) {
+                        if (item.TryGetProperty("id", out var idEl)) {
+                            var id = idEl.GetString();
+                            if (!string.IsNullOrWhiteSpace(id)) ids.Add(id);
+                        }
+                    }
+                }
+                uri = null;
+                if (doc.RootElement.TryGetProperty("@odata.nextLink", out var next)) {
+                    uri = next.GetString();
+                }
+            }
+            foreach (var id in ids) {
+                await DeleteMailMessageAsync(credential, userPrincipalName, id);
+            }
+        }
     }
 }
