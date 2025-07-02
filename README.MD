@@ -98,6 +98,7 @@ This will make sure the project has required libraries.
   - [x] Get POP3 Emails
   - [x] Save POP3 Emails
   - [x] Delete POP3 Messages with `Get-POP3Message -Delete`
+  - [x] Wait for new POP3 messages with the `Wait-POP3Message` cmdlet
 - IMAP
   - [x] Connect to IMAP
   - [x] Get IMAP Folder
@@ -109,6 +110,7 @@ This will make sure the project has required libraries.
   - [x] Get Mail Folders via `Get-EmailGraphFolder` with `-Connection` or `-MgGraphRequest`
   - [x] Get Mail Messages
   - [x] Save Mail Messages
+  - [x] Wait for new Graph messages with the `Wait-GraphMessage` cmdlet
 - Pipeline input is supported for Graph connection objects when retrieving
   folders or messages:
 
