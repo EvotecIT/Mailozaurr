@@ -101,6 +101,7 @@ This will make sure the project has required libraries.
 - IMAP
   - [x] Connect to IMAP
   - [x] Get IMAP Folder
+  - [x] List IMAP root folders with `Get-IMAPFolder -Root`
   - [x] Get IMAP Messages
   - [x] Delete IMAP Messages with `Get-IMAPMessage -Delete`
   - [x] Listen for new IMAP messages via `ImapIdleListener`
@@ -136,6 +137,29 @@ $pop3 = Connect-POP3 -Server 'pop.example.com' -Credential $cred
 # OAuth2 token
 $oauth = Connect-OAuthGoogle -ClientId 'id' -ClientSecret 'secret' -GmailAccount 'user@example.com' -Scope https://mail.google.com/
 $imapOAuth = Connect-IMAP -Server 'imap.gmail.com' -Credential $oauth -OAuth2
+```
+
+### Enumerating IMAP folders
+
+After connecting you can list the top-level folders:
+
+```powershell
+$client = Connect-IMAP -Server 'imap.example.com' -Credential $cred
+Get-IMAPFolder -Client $client -Root
+```
+
+Using OAuth tokens works the same:
+
+```powershell
+$token = Connect-OAuthGoogle -ClientId 'id' -ClientSecret 'secret' -GmailAccount 'user@example.com' -Scope https://mail.google.com/
+$client = Connect-IMAP -Server 'imap.gmail.com' -Credential $token -OAuth2
+Get-IMAPFolder -Client $client -Root
+
+You can also open a specific folder by path:
+
+```powershell
+$client = Connect-IMAP -Server 'imap.example.com' -Credential $cred
+Get-IMAPFolder -Client $client -Path 'Inbox/Reports'
 ```
 
 ### Listening for new IMAP mail
@@ -199,6 +223,8 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - [Example-SaveImapMessageAttachment.ps1](Examples/Example-SaveImapMessageAttachment.ps1) - download attachments from an IMAP mailbox.
 - [Example-SavePop3MessageAttachmentFiltered.ps1](Examples/Example-SavePop3MessageAttachmentFiltered.ps1) - search POP3 messages and save matching attachments.
 - [Example-SaveImapMessageAttachmentFiltered.ps1](Examples/Example-SaveImapMessageAttachmentFiltered.ps1) - search IMAP messages and save matching attachments.
+- [Example-ListImapRootFolders.ps1](Examples/Example-ListImapRootFolders.ps1) - list root folders using credentials.
+- [Example-ListImapRootFoldersOAuth.ps1](Examples/Example-ListImapRootFoldersOAuth.ps1) - list root folders using OAuth.
 - [Example-GetMailFolder.ps1](Examples/Example-GetMailFolder.ps1) - list folders using either `-Connection` or `-MgGraphRequest`.
 - [Example-ConnectEmailGraph-DeviceCode.ps1](Examples/Example-ConnectEmailGraph-DeviceCode.ps1) - authenticate with device code.
 - [Example-ConnectEmailGraph-OnBehalfOf.ps1](Examples/Example-ConnectEmailGraph-OnBehalfOf.ps1) - exchange a user token for Graph access.
