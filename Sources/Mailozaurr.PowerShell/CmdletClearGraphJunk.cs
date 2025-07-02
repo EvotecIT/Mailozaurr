@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using System.Threading.Tasks;
+using System.Linq;
 using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
@@ -27,6 +28,18 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
 
     [Parameter]
     public SwitchParameter Preview { get; set; }
+
+    [Parameter]
+    public string[]? SkipId { get; set; }
+
+    [Parameter]
+    public string[]? SkipFrom { get; set; }
+
+    [Parameter]
+    public string[]? SkipTo { get; set; }
+
+    [Parameter]
+    public string[]? SkipSubjectContains { get; set; }
 
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
@@ -68,7 +81,13 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
         Exception? lastException = null;
         do {
             try {
-                await MicrosoftGraphUtils.ClearJunkMailAsync(cred, UserPrincipalName!);
+                await MicrosoftGraphUtils.ClearJunkMailAsync(
+                    cred,
+                    UserPrincipalName!,
+                    SkipId,
+                    SkipFrom,
+                    SkipTo,
+                    SkipSubjectContains);
                 return;
             } catch (Exception ex) {
                 lastException = ex;
@@ -93,30 +112,75 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
     }
 
     private async Task ProcessPreviewGraphAsync(GraphCredential cred) {
-        var props = Property != null && Property.Length > 0 ? Property : new[] { "id", "subject", "bodyPreview" };
+        var props = new List<string>();
+        if (Property != null && Property.Length > 0) props.AddRange(Property);
+        if (!props.Contains("id")) props.Add("id");
+        if (SkipSubjectContains != null && !props.Contains("subject")) props.Add("subject");
+        if (SkipFrom != null && !props.Contains("from")) props.Add("from");
+        if (SkipTo != null && !props.Contains("toRecipients")) props.Add("toRecipients");
+        if (!props.Contains("bodyPreview")) props.Add("bodyPreview");
+
         var messages = await MicrosoftGraphUtils.GetJunkMailMessagesAsync(cred, UserPrincipalName!, props);
         foreach (var msg in messages) {
+            var id = msg["id"] as string;
+            if (SkipId != null && id != null && SkipId.Contains(id, StringComparer.OrdinalIgnoreCase)) continue;
+            if (SkipFrom != null && msg.TryGetValue("from", out var fromObj) &&
+                fromObj is Dictionary<string, object> fDict &&
+                fDict.TryGetValue("emailAddress", out var addrObj) &&
+                addrObj is Dictionary<string, object> addr &&
+                addr.TryGetValue("address", out var fromAddrObj) &&
+                fromAddrObj is string fromAddr &&
+                SkipFrom.Contains(fromAddr, StringComparer.OrdinalIgnoreCase)) {
+                continue;
+            }
+            if (SkipTo != null && msg.TryGetValue("toRecipients", out var toObj) &&
+                toObj is object[] arr &&
+                arr.OfType<Dictionary<string, object>>().Any(rec =>
+                    rec.TryGetValue("emailAddress", out var tAddrObj) &&
+                    tAddrObj is Dictionary<string, object> tAddr &&
+                    tAddr.TryGetValue("address", out var addrVal) &&
+                    addrVal is string addrStr &&
+                    SkipTo.Contains(addrStr, StringComparer.OrdinalIgnoreCase))) {
+                continue;
+            }
+            if (SkipSubjectContains != null && msg.TryGetValue("subject", out var subjObj) &&
+                subjObj is string subj &&
+                SkipSubjectContains.Any(s => subj.IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0)) {
+                continue;
+            }
+
             WriteObject(PSObject.AsPSObject(msg));
         }
     }
 
     private void ProcessMgGraph() {
         if (!ShouldProcess(UserPrincipalName!, "Clearing Graph junk")) return;
-        var listUri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/mailFolders/junkemail/messages?$select=id";
+        var select = new List<string> { "id" };
+        if (SkipSubjectContains != null) select.Add("subject");
+        if (SkipFrom != null) select.Add("from");
+        if (SkipTo != null) select.Add("toRecipients");
+        var listUri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/mailFolders/junkemail/messages?$select=" + string.Join(",", select);
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "GET")
             .AddParameter("Uri", listUri);
         var results = ps.Invoke();
-        var ids = new List<string>();
         foreach (var res in results) {
             var obj = PSObject.AsPSObject(res);
             var id = obj.Properties["id"]?.Value as string;
-            if (!string.IsNullOrWhiteSpace(id)) {
-                ids.Add(id);
-            }
-        }
-        foreach (var id in ids) {
+            if (string.IsNullOrWhiteSpace(id)) continue;
+            if (SkipId != null && SkipId.Contains(id, StringComparer.OrdinalIgnoreCase)) continue;
+            if (SkipFrom != null && obj.Properties["from"]?.Value is PSObject fp &&
+                fp.Properties["emailAddress"]?.Value is PSObject ea &&
+                ea.Properties["address"]?.Value is string addr &&
+                SkipFrom.Contains(addr, StringComparer.OrdinalIgnoreCase)) continue;
+            if (SkipTo != null && obj.Properties["toRecipients"]?.Value is object[] recArr &&
+                recArr.OfType<PSObject>().Any(rec => rec.Properties["emailAddress"]?.Value is PSObject ea2 &&
+                    ea2.Properties["address"]?.Value is string tAddr &&
+                    SkipTo.Contains(tAddr, StringComparer.OrdinalIgnoreCase))) continue;
+            if (SkipSubjectContains != null && obj.Properties["subject"]?.Value is string subj &&
+                SkipSubjectContains.Any(s => subj.IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0)) continue;
+
             var delPs = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
             delPs.AddCommand("Invoke-MgGraphRequest")
                 .AddParameter("Method", "DELETE")
@@ -127,17 +191,35 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
     }
 
     private void ProcessPreviewMgGraph() {
-        var listUri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/mailFolders/junkemail/messages";
-        if (Property != null && Property.Length > 0) {
-            listUri += "?$select=" + string.Join(",", Property);
-        }
+        var props = new List<string>();
+        if (Property != null && Property.Length > 0) props.AddRange(Property);
+        if (!props.Contains("id")) props.Add("id");
+        if (SkipFrom != null && !props.Contains("from")) props.Add("from");
+        if (SkipTo != null && !props.Contains("toRecipients")) props.Add("toRecipients");
+        if (SkipSubjectContains != null && !props.Contains("subject")) props.Add("subject");
+        var listUri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/mailFolders/junkemail/messages?$select=" + string.Join(",", props);
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "GET")
             .AddParameter("Uri", listUri);
         var results = ps.Invoke();
         foreach (var res in results) {
-            WriteObject(res);
+            var obj = PSObject.AsPSObject(res);
+            var id = obj.Properties["id"]?.Value as string;
+            if (string.IsNullOrWhiteSpace(id)) continue;
+            if (SkipId != null && SkipId.Contains(id, StringComparer.OrdinalIgnoreCase)) continue;
+            if (SkipFrom != null && obj.Properties["from"]?.Value is PSObject fp &&
+                fp.Properties["emailAddress"]?.Value is PSObject ea &&
+                ea.Properties["address"]?.Value is string addr &&
+                SkipFrom.Contains(addr, StringComparer.OrdinalIgnoreCase)) continue;
+            if (SkipTo != null && obj.Properties["toRecipients"]?.Value is object[] recArr &&
+                recArr.OfType<PSObject>().Any(rec => rec.Properties["emailAddress"]?.Value is PSObject ea2 &&
+                    ea2.Properties["address"]?.Value is string tAddr &&
+                    SkipTo.Contains(tAddr, StringComparer.OrdinalIgnoreCase))) continue;
+            if (SkipSubjectContains != null && obj.Properties["subject"]?.Value is string subj &&
+                SkipSubjectContains.Any(s => subj.IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0)) continue;
+
+            WriteObject(obj);
         }
     }
 }

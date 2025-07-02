@@ -1,14 +1,14 @@
 Describe 'Clear-IMAPJunk' {
-    It 'Warns when IMAP connection missing with -WhatIf' {
+    It 'Warns when IMAP connection missing with -WhatIf and SkipFrom' {
         $info = [Mailozaurr.PowerShell.ImapConnectionInfo]::new()
-        Clear-IMAPJunk -Client $info -WhatIf -WarningVariable warn
+        Clear-IMAPJunk -Client $info -WhatIf -SkipFrom 'a' -WarningVariable warn
         $warn | Should -Not -BeNullOrEmpty
         $warn[0] | Should -Be 'Clear-IMAPJunk - Is IMAP connected?'
     }
 
-    It 'Warns when IMAP connection missing with -Preview' {
+    It 'Warns when IMAP connection missing with -Preview and SkipUid' {
         $info = [Mailozaurr.PowerShell.ImapConnectionInfo]::new()
-        Clear-IMAPJunk -Client $info -Preview -WarningVariable warn
+        Clear-IMAPJunk -Client $info -Preview -SkipUid 1 -WarningVariable warn
         $warn | Should -Not -BeNullOrEmpty
         $warn[0] | Should -Be 'Clear-IMAPJunk - Is IMAP connected?'
     }

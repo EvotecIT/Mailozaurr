@@ -541,28 +541,53 @@ namespace Mailozaurr {
         /// <summary>
         /// Deletes all messages from the Junk Email folder.
         /// </summary>
-        public static async Task ClearJunkMailAsync(GraphCredential credential, string userPrincipalName) {
-            var headers = new Dictionary<string, string>();
-            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
-            headers["Authorization"] = token;
-            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/junkemail/messages", new Dictionary<string, object> { { "$select", "id" } });
-            var ids = new List<string>();
-            while (!string.IsNullOrWhiteSpace(uri)) {
-                var doc = await InvokeGraphApiAsync("GET", uri, headers);
-                if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
-                    foreach (var item in valueElement.EnumerateArray()) {
-                        if (item.TryGetProperty("id", out var idEl)) {
-                            var id = idEl.GetString();
-                            if (!string.IsNullOrWhiteSpace(id)) ids.Add(id);
-                        }
-                    }
+        public static async Task ClearJunkMailAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            IEnumerable<string>? skipIds = null,
+            IEnumerable<string>? skipFrom = null,
+            IEnumerable<string>? skipTo = null,
+            IEnumerable<string>? skipSubjectContains = null) {
+            var properties = new List<string> { "id" };
+            if (skipFrom != null) properties.Add("from");
+            if (skipTo != null) properties.Add("toRecipients");
+            if (skipSubjectContains != null) properties.Add("subject");
+
+            var messages = await GetJunkMailMessagesAsync(credential, userPrincipalName, properties);
+            var skipIdsSet = skipIds != null ? new HashSet<string>(skipIds, StringComparer.OrdinalIgnoreCase) : null;
+
+            foreach (var msg in messages) {
+                var id = msg["id"] as string;
+                if (string.IsNullOrWhiteSpace(id)) continue;
+                if (skipIdsSet != null && skipIdsSet.Contains(id)) continue;
+
+                if (skipFrom != null && msg.TryGetValue("from", out var fromObj) &&
+                    fromObj is Dictionary<string, object> fDict &&
+                    fDict.TryGetValue("emailAddress", out var addrObj) &&
+                    addrObj is Dictionary<string, object> addr &&
+                    addr.TryGetValue("address", out var fromAddrObj) &&
+                    fromAddrObj is string fromAddr &&
+                    skipFrom.Contains(fromAddr, StringComparer.OrdinalIgnoreCase)) {
+                    continue;
                 }
-                uri = null;
-                if (doc.RootElement.TryGetProperty("@odata.nextLink", out var next)) {
-                    uri = next.GetString();
+
+                if (skipTo != null && msg.TryGetValue("toRecipients", out var toObj) &&
+                    toObj is object[] arr &&
+                    arr.OfType<Dictionary<string, object>>().Any(rec =>
+                        rec.TryGetValue("emailAddress", out var tAddrObj) &&
+                        tAddrObj is Dictionary<string, object> tAddr &&
+                        tAddr.TryGetValue("address", out var addrVal) &&
+                        addrVal is string addrStr &&
+                        skipTo.Contains(addrStr, StringComparer.OrdinalIgnoreCase))) {
+                    continue;
                 }
-            }
-            foreach (var id in ids) {
+
+                if (skipSubjectContains != null && msg.TryGetValue("subject", out var subjObj) &&
+                    subjObj is string subj &&
+                    skipSubjectContains.Any(s => subj.IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0)) {
+                    continue;
+                }
+
                 await DeleteMailMessageAsync(credential, userPrincipalName, id);
             }
         }

@@ -1,6 +1,8 @@
 using System.Management.Automation;
 using MailKit.Net.Imap;
 using System.Threading.Tasks;
+using System.Linq;
+using MailKit;
 using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
@@ -22,19 +24,50 @@ public sealed class CmdletClearIMAPJunk : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter Preview { get; set; }
 
+    [Parameter]
+    public string[]? SkipFrom { get; set; }
+
+    [Parameter]
+    public string[]? SkipTo { get; set; }
+
+    [Parameter]
+    public string[]? SkipSubjectContains { get; set; }
+
+    [Parameter]
+    public string[]? SkipMessageId { get; set; }
+
+    [Parameter]
+    public uint[]? SkipUid { get; set; }
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
             var folder = Folder ?? "Junk";
             if (Preview.IsPresent) {
-                await foreach (var msg in JunkCleaner.GetImapJunkAsync(conn.Data, folder, CancelToken)) {
+                await foreach (var msg in JunkCleaner.GetImapJunkAsync(
+                    conn.Data,
+                    folder,
+                    SkipFrom,
+                    SkipTo,
+                    SkipSubjectContains,
+                    SkipMessageId,
+                    SkipUid?.Select(id => new UniqueId(id)),
+                    CancelToken)) {
                     WriteObject(msg);
                 }
                 return;
             }
             if (!ShouldProcess(folder, "Clearing IMAP junk")) return;
-            await JunkCleaner.ClearImapJunkAsync(conn.Data, folder, CancelToken);
+            await JunkCleaner.ClearImapJunkAsync(
+                conn.Data,
+                folder,
+                SkipFrom,
+                SkipTo,
+                SkipSubjectContains,
+                SkipMessageId,
+                SkipUid?.Select(id => new UniqueId(id)),
+                CancelToken);
         } else {
             WriteWarning("Clear-IMAPJunk - Is IMAP connected?");
         }
