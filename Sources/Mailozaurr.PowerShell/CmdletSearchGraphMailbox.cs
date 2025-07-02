@@ -27,6 +27,8 @@ public class CmdletSearchGraphMailbox : AsyncPSCmdlet {
     public int From { get; set; }
 
     [Parameter]
+    [Alias("Count")]
+    [ValidateRange(1, int.MaxValue)]
     public int Size { get; set; } = 25;
 
     protected override async Task ProcessRecordAsync() {
