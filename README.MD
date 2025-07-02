@@ -171,6 +171,26 @@ Wait-IMAPMessage -Client $client -Action { param($m) "New: $($m.Message.Subject)
 
 Press <kbd>Ctrl+C</kbd> to stop waiting for messages.
 
+The same concept applies to POP3 and Microsoft Graph mailboxes. Both `Wait-POP3Message` and `Wait-GraphMessage` support `-Until`, `-StopOnMatch` and `-TimeoutSeconds` parameters so you can wait for specific senders or stop after a period of time:
+
+```powershell
+$cred = Get-Credential
+$graph = Connect-EmailGraph -Credential $cred
+Wait-GraphMessage -Connection $graph -UserPrincipalName 'user@example.com' -Until { $_.from.emailAddress.address -eq 'alice@example.com' } -StopOnMatch -TimeoutSeconds 600 -Action {
+    param($m)
+    "Graph from Alice: $($m.subject)"
+}
+```
+
+```powershell
+$cred = Get-Credential
+$client = Connect-POP3 -Server 'pop.example.com' -Credential $cred
+Wait-POP3Message -Client $client -Until { $_.Message.From.Mailboxes.Address -contains 'alice@example.com' } -StopOnMatch -TimeoutSeconds 600 -Action {
+    param($m)
+    "POP3 from Alice: $($m.Message.Subject)"
+}
+```
+
 ### Using OpenPGP
 
 PGP/MIME encryption allows securing messages using public and private keys. To sign and encrypt a message provide paths to the public and secret key files:
