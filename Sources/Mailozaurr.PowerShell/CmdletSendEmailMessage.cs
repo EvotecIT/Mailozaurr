@@ -1,6 +1,10 @@
 using System;
 using System.Management.Automation;
 using System.IO;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Text.Json;
 using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
@@ -376,6 +380,13 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
+
+    /// <summary>
+    /// <para>Submits the message using Microsoft Graph batch requests.</para>
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "Graph")]
+    [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
+    public SwitchParameter Batch { get; set; }
 
     /// <summary>
     /// <para>Indicates that the provided password is a SecureString.</para>
@@ -782,6 +793,12 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 if (!Suppress) {
                     WriteObject(status);
                 }
+                LogEmitter.EmitLogs(graph.LogCollector, this);
+                return;
+            }
+            if (Batch.IsPresent) {
+                var batchResult = graph.SendMessageBatchAsync().GetAwaiter().GetResult();
+                if (!Suppress) { WriteObject(batchResult); }
                 LogEmitter.EmitLogs(graph.LogCollector, this);
                 return;
             }
