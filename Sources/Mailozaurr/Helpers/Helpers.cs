@@ -142,18 +142,25 @@ public static class Helpers {
         }
     }
 
-    public static async Task PostWebhookAsync(string? url, SmtpResult result, CancellationToken cancellationToken = default) {
+    public static async Task PostWebhookAsync(string? url, SmtpResult result, CancellationToken cancellationToken = default, HttpClient? client = null) {
         if (string.IsNullOrWhiteSpace(url)) {
             return;
         }
 
+        HttpClient? ownedClient = null;
+
         try {
-            using var client = new HttpClient();
+            if (client == null) {
+                ownedClient = new HttpClient();
+                client = ownedClient;
+            }
             var json = JsonSerializer.Serialize(result);
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
             using var response = await client.PostAsync(url, content, cancellationToken);
         } catch (HttpRequestException ex) {
             LoggingMessages.Logger.WriteWarning($"Failed to post webhook: {ex.Message}");
+        } finally {
+            ownedClient?.Dispose();
         }
     }
 }

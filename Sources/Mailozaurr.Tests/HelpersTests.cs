@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
+using Mailozaurr;
 
 namespace Mailozaurr.Tests;
 
@@ -53,6 +55,36 @@ public class HelpersTests
     }
 
     [Fact]
+    public void ConvertFromPlainText_ReturnsNetworkCredentialWithSecurePassword()
+    {
+        var cred = Mailozaurr.Helpers.ConvertFromPlainText("user", "secret");
+
+        Assert.Equal("user", cred.UserName);
+        Assert.Equal(6, cred.SecurePassword.Length);
+        Assert.Equal("secret", cred.Password);
+    }
+
+    [Fact]
+    public void GetEmailAndName_ReturnsTuple_WhenDictionaryProvided()
+    {
+        var input = new Dictionary<string, object> { { "Email", "a@b.com" }, { "Name", "Alice" } };
+
+        var (email, name) = Mailozaurr.Helpers.GetEmailAndName(input);
+
+        Assert.Equal("a@b.com", email);
+        Assert.Equal("Alice", name);
+    }
+
+    [Fact]
+    public void GetEmailAndName_ReturnsEmailAndNullName_WhenStringProvided()
+    {
+        var (email, name) = Mailozaurr.Helpers.GetEmailAndName("c@d.com");
+
+        Assert.Equal("c@d.com", email);
+        Assert.Null(name);
+    }
+
+    [Fact]
     public void UniqueAddresses_RemovesDuplicates_IgnoringCaseAndWhitespace()
     {
         var addresses = new object[]
@@ -72,13 +104,78 @@ public class HelpersTests
     }
 
     [Fact]
+    public void UniqueAddresses_SkipsNullOrInvalidEmails()
+    {
+        var addresses = new object?[]
+        {
+            null,
+            new Dictionary<string, object> { { "Name", "Missing" } },
+            " ",
+            "valid@example.com"
+        };
+        var seen = new HashSet<string>();
+
+        var result = Mailozaurr.Helpers
+            .UniqueAddresses(addresses, seen)
+            .Select(Mailozaurr.Helpers.GetEmailAddress)
+            .ToArray();
+
+        Assert.Equal(new[] { "valid@example.com" }, result);
+    }
+
+    [Fact]
+    public void UniqueAddresses_ReturnsFirstOccurrence_WhenDictionaryEmailsDuplicate()
+    {
+        var first = new Dictionary<string, object> { { "Email", "d@e.com" }, { "Name", "One" } };
+        var second = new Dictionary<string, object> { { "Email", "D@e.com" }, { "Name", "Two" } };
+        var addresses = new object[] { first, second };
+        var seen = new HashSet<string>();
+
+        var result = Mailozaurr.Helpers
+            .UniqueAddresses(addresses, seen)
+            .ToArray();
+
+        Assert.Single(result);
+        Assert.Same(first, result[0]);
+    }
+
+    private class CancelHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromCanceled<HttpResponseMessage>(cancellationToken);
+    }
+
+    private class ThrowHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => throw new HttpRequestException("boom");
+    }
+
+    [Fact]
     public async Task PostWebhookAsync_CancellationRequested_ThrowsAsync()
     {
         using var cts = new CancellationTokenSource();
         cts.Cancel();
+        var client = new HttpClient(new CancelHandler());
         var result = new SmtpResult(true, EmailAction.Send, string.Empty, string.Empty, string.Empty, 0, TimeSpan.Zero);
 
         await Assert.ThrowsAsync<TaskCanceledException>(() =>
-            Mailozaurr.Helpers.PostWebhookAsync("http://localhost", result, cts.Token));
+            Mailozaurr.Helpers.PostWebhookAsync("http://localhost", result, cts.Token, client));
+    }
+
+    [Fact]
+    public async Task PostWebhookAsync_HttpRequestException_LogsWarning()
+    {
+        var client = new HttpClient(new ThrowHandler());
+        var result = new SmtpResult(true, EmailAction.Send, string.Empty, string.Empty, string.Empty, 0, TimeSpan.Zero);
+        string? message = null;
+        void Handler(object? _, LogEventArgs e) => message = e.Message;
+        Mailozaurr.LoggingMessages.Logger.OnWarningMessage += Handler;
+
+        await Mailozaurr.Helpers.PostWebhookAsync("http://localhost", result, default, client);
+
+        Mailozaurr.LoggingMessages.Logger.OnWarningMessage -= Handler;
+        Assert.NotNull(message);
+        Assert.Contains("Failed to post webhook", message);
     }
 }
