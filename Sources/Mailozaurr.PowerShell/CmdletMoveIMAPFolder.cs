@@ -10,6 +10,8 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Move, "IMAPFolder", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 public sealed class CmdletMoveIMAPFolder : AsyncPSCmdlet {
+    private const string ParentParameterSet = "Parent";
+    private const string RootParameterSet = "Root";
     /// <summary>Active IMAP connection info.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]
     [ValidateNotNull]
@@ -21,9 +23,13 @@ public sealed class CmdletMoveIMAPFolder : AsyncPSCmdlet {
     public string? Folder { get; set; }
 
     /// <summary>Destination folder name.</summary>
-    [Parameter(Mandatory = true, Position = 2)]
+    [Parameter(Mandatory = true, Position = 2, ParameterSetName = ParentParameterSet)]
     [ValidateNotNullOrEmpty]
     public string? DestinationFolder { get; set; }
+
+    /// <summary>Move folder to the root.</summary>
+    [Parameter(ParameterSetName = RootParameterSet)]
+    public SwitchParameter Root { get; set; }
 
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
@@ -31,7 +37,8 @@ public sealed class CmdletMoveIMAPFolder : AsyncPSCmdlet {
             if (!ShouldProcess(Folder!, "Moving IMAP folder")) {
                 return;
             }
-            await FolderOperations.MoveFolderAsync(conn.Data, Folder!, DestinationFolder!, CancelToken);
+            var dest = ParameterSetName == RootParameterSet ? null : DestinationFolder;
+            await FolderOperations.MoveFolderAsync(conn.Data, Folder!, dest, CancelToken);
         } else {
             WriteWarning("Move-IMAPFolder - Is IMAP connected?");
         }

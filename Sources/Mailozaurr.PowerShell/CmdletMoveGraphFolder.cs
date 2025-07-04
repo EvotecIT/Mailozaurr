@@ -11,6 +11,8 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Move, "GraphFolder", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 public class CmdletMoveGraphFolder : AsyncPSCmdlet {
+    private const string ParentParameterSet = "Parent";
+    private const string RootParameterSet = "Root";
     /// <summary>User principal name owning the folder.</summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
@@ -22,9 +24,13 @@ public class CmdletMoveGraphFolder : AsyncPSCmdlet {
     public string? FolderId { get; set; }
 
     /// <summary>Identifier of the destination folder.</summary>
-    [Parameter(Mandatory = true)]
+    [Parameter(Mandatory = true, ParameterSetName = ParentParameterSet)]
     [ValidateNotNullOrEmpty]
     public string? DestinationFolderId { get; set; }
+
+    /// <summary>Move folder to the root.</summary>
+    [Parameter(ParameterSetName = RootParameterSet)]
+    public SwitchParameter Root { get; set; }
 
     /// <summary>Connection information for Microsoft Graph.</summary>
     [Parameter(ParameterSetName = "Graph")]
@@ -49,7 +55,8 @@ public class CmdletMoveGraphFolder : AsyncPSCmdlet {
 
     protected override Task ProcessRecordAsync() {
         switch (ParameterSetName) {
-            case "Graph":
+            case ParentParameterSet:
+            case RootParameterSet:
                 var conn = Connection ?? DefaultSessions.GraphSession;
                 if (conn == null) {
                     WriteWarning("Move-GraphFolder - Connection not provided and no default session available.");
@@ -73,7 +80,8 @@ public class CmdletMoveGraphFolder : AsyncPSCmdlet {
         Exception? lastException = null;
         do {
             try {
-                await MicrosoftGraphUtils.MoveFolderAsync(cred, UserPrincipalName!, FolderId!, DestinationFolderId!);
+                var dest = ParameterSetName == RootParameterSet ? "msgfolderroot" : DestinationFolderId!;
+                await MicrosoftGraphUtils.MoveFolderAsync(cred, UserPrincipalName!, FolderId!, dest);
                 return;
             } catch (Exception ex) {
                 lastException = ex;
@@ -101,8 +109,9 @@ public class CmdletMoveGraphFolder : AsyncPSCmdlet {
         if (!ShouldProcess(FolderId!, "Moving Graph folder")) {
             return;
         }
+        var dest = ParameterSetName == RootParameterSet ? "msgfolderroot" : DestinationFolderId;
         var uri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/mailFolders/{FolderId}/move";
-        var body = JsonSerializer.Serialize(new { destinationId = DestinationFolderId });
+        var body = JsonSerializer.Serialize(new { destinationId = dest });
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "POST")

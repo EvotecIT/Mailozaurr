@@ -20,6 +20,10 @@ public class CmdletRemoveGraphFolder : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? FolderId { get; set; }
 
+    /// <summary>Remove subfolders as well. Microsoft Graph always deletes recursively.</summary>
+    [Parameter]
+    public SwitchParameter Recursive { get; set; }
+
     /// <summary>Connection information for Microsoft Graph.</summary>
     [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNull]

@@ -20,13 +20,17 @@ public sealed class CmdletRemoveIMAPFolder : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? Folder { get; set; }
 
+    /// <summary>Remove subfolders as well.</summary>
+    [Parameter]
+    public SwitchParameter Recursive { get; set; }
+
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
             if (!ShouldProcess(Folder!, "Removing IMAP folder")) {
                 return;
             }
-            await FolderOperations.RemoveFolderAsync(conn.Data, Folder!, CancelToken);
+            await FolderOperations.RemoveFolderAsync(conn.Data, Folder!, Recursive, CancelToken);
         } else {
             WriteWarning("Remove-IMAPFolder - Is IMAP connected?");
         }
