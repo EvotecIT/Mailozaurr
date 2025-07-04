@@ -9,6 +9,9 @@ namespace Mailozaurr;
 /// Provides helper methods for connecting to IMAP servers with retry logic.
 /// </summary>
 public static class ImapConnector {
+    public static Func<ImapClient> ClientFactory { get; set; } = () => new ImapClient();
+    public static Func<int, Task>? DelayAsync { get; set; }
+
     /// <summary>
     /// Connects and authenticates to an IMAP server with retry support.
     /// </summary>
@@ -37,7 +40,7 @@ public static class ImapConnector {
         int attempts = 0;
         Exception? lastException = null;
         do {
-            var client = new ImapClient();
+            var client = ClientFactory();
             try {
                 await client.ConnectAsync(server, port, options);
                 if (skipCertificateRevocation) {
@@ -67,7 +70,11 @@ public static class ImapConnector {
                 }
                 var delay = (int)Math.Round(retryDelayMilliseconds * Math.Pow(retryDelayBackoff, attempts));
                 if (delay > 0) {
-                    await Task.Delay(delay);
+                    if (DelayAsync != null) {
+                        await DelayAsync(delay);
+                    } else {
+                        await Task.Delay(delay);
+                    }
                 }
             }
             attempts++;
