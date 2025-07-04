@@ -15,7 +15,6 @@ public static class FolderOperations {
     /// <param name="client">Active IMAP client instance.</param>
     /// <param name="sourceFolder">Name of the folder to move.</param>
     /// <param name="destinationFolder">Name of the destination folder. Pass <c>null</c> or an empty string to move to the root.</param>
-    /// <param name="recursive">When set to <c>true</c>, removes all subfolders recursively.</param>
     /// <param name="cancellationToken">Token used to cancel the asynchronous operation.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     public static async Task MoveFolderAsync(
