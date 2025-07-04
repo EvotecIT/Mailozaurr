@@ -10,8 +10,13 @@ namespace Mailozaurr;
 /// </summary>
 public static class FolderOperations {
     /// <summary>
-    /// Moves a folder to a new parent folder.
+    /// Moves an IMAP folder to a different parent folder.
     /// </summary>
+    /// <param name="client">Active IMAP client instance.</param>
+    /// <param name="sourceFolder">Name of the folder to move.</param>
+    /// <param name="destinationFolder">Name of the destination folder.</param>
+    /// <param name="cancellationToken">Token used to cancel the asynchronous operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public static async Task MoveFolderAsync(
         ImapClient client,
         string sourceFolder,
@@ -24,8 +29,13 @@ public static class FolderOperations {
     }
 
     /// <summary>
-    /// Renames an existing folder.
+    /// Renames an existing IMAP folder.
     /// </summary>
+    /// <param name="client">Active IMAP client instance.</param>
+    /// <param name="folder">Name of the folder to rename.</param>
+    /// <param name="newName">New name for the folder.</param>
+    /// <param name="cancellationToken">Token used to cancel the asynchronous operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public static async Task RenameFolderAsync(
         ImapClient client,
         string folder,
@@ -37,8 +47,12 @@ public static class FolderOperations {
     }
 
     /// <summary>
-    /// Removes a folder.
+    /// Permanently deletes a folder.
     /// </summary>
+    /// <param name="client">Active IMAP client instance.</param>
+    /// <param name="folder">Name of the folder to remove.</param>
+    /// <param name="cancellationToken">Token used to cancel the asynchronous operation.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public static async Task RemoveFolderAsync(
         ImapClient client,
         string folder,

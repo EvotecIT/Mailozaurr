@@ -10,14 +10,17 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Move, "IMAPFolder", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 public sealed class CmdletMoveIMAPFolder : AsyncPSCmdlet {
+    /// <summary>Active IMAP connection info.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]
     [ValidateNotNull]
     public ImapConnectionInfo? Client { get; set; }
 
+    /// <summary>Name of the folder to move.</summary>
     [Parameter(Mandatory = true, Position = 1)]
     [ValidateNotNullOrEmpty]
     public string? Folder { get; set; }
 
+    /// <summary>Destination folder name.</summary>
     [Parameter(Mandatory = true, Position = 2)]
     [ValidateNotNullOrEmpty]
     public string? DestinationFolder { get; set; }

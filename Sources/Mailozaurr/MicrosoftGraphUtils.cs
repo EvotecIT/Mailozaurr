@@ -698,6 +698,11 @@ namespace Mailozaurr {
         /// <summary>
         /// Moves a mail folder to another location.
         /// </summary>
+        /// <param name="credential">Credential used to authenticate to Microsoft Graph.</param>
+        /// <param name="userPrincipalName">User principal name owning the mail folder.</param>
+        /// <param name="folderId">Identifier of the folder to move.</param>
+        /// <param name="destinationFolderId">Identifier of the new parent folder.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         public static async Task MoveFolderAsync(
             GraphCredential credential,
             string userPrincipalName,
@@ -714,6 +719,11 @@ namespace Mailozaurr {
         /// <summary>
         /// Renames a mail folder.
         /// </summary>
+        /// <param name="credential">Credential used to authenticate to Microsoft Graph.</param>
+        /// <param name="userPrincipalName">User principal name owning the mail folder.</param>
+        /// <param name="folderId">Identifier of the folder to rename.</param>
+        /// <param name="newDisplayName">New display name for the folder.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         public static async Task RenameFolderAsync(
             GraphCredential credential,
             string userPrincipalName,
@@ -730,6 +740,10 @@ namespace Mailozaurr {
         /// <summary>
         /// Removes a mail folder.
         /// </summary>
+        /// <param name="credential">Credential used to authenticate to Microsoft Graph.</param>
+        /// <param name="userPrincipalName">User principal name owning the mail folder.</param>
+        /// <param name="folderId">Identifier of the folder to remove.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         public static async Task RemoveFolderAsync(
             GraphCredential credential,
             string userPrincipalName,

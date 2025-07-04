@@ -10,27 +10,34 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Remove, "GraphFolder", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 public class CmdletRemoveGraphFolder : AsyncPSCmdlet {
+    /// <summary>User principal name owning the folder.</summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
+    /// <summary>Identifier of the folder to remove.</summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? FolderId { get; set; }
 
+    /// <summary>Connection information for Microsoft Graph.</summary>
     [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
+    /// <summary>Use <c>Invoke-MgGraphRequest</c> instead of built-in logic.</summary>
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 
+    /// <summary>Request timeout in seconds.</summary>
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
+    /// <summary>Number of retries on transient errors.</summary>
     [Parameter]
     public int RetryCount { get; set; } = 0;
 
+    /// <summary>Delay between retries in milliseconds.</summary>
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 

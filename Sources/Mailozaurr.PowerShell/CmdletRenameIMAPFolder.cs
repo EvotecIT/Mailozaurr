@@ -10,14 +10,17 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet("Rename", "IMAPFolder", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 public sealed class CmdletRenameIMAPFolder : AsyncPSCmdlet {
+    /// <summary>Active IMAP connection info.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]
     [ValidateNotNull]
     public ImapConnectionInfo? Client { get; set; }
 
+    /// <summary>Folder name to rename.</summary>
     [Parameter(Mandatory = true, Position = 1)]
     [ValidateNotNullOrEmpty]
     public string? Folder { get; set; }
 
+    /// <summary>New name for the folder.</summary>
     [Parameter(Mandatory = true, Position = 2)]
     [ValidateNotNullOrEmpty]
     public string? NewName { get; set; }

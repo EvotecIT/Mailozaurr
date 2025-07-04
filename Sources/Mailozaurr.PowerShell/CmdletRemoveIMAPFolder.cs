@@ -10,10 +10,12 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Remove, "IMAPFolder", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 public sealed class CmdletRemoveIMAPFolder : AsyncPSCmdlet {
+    /// <summary>Active IMAP connection info.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]
     [ValidateNotNull]
     public ImapConnectionInfo? Client { get; set; }
 
+    /// <summary>Name of the folder to remove.</summary>
     [Parameter(Mandatory = true, Position = 1)]
     [ValidateNotNullOrEmpty]
     public string? Folder { get; set; }
