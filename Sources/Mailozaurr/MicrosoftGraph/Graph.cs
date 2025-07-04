@@ -539,6 +539,39 @@ public class Graph : IDisposable {
     }
 
     /// <summary>
+    /// Sends the current message using Microsoft Graph batch requests.
+    /// </summary>
+    public async Task<SmtpResult> SendMessageBatchAsync(CancellationToken cancellationToken = default) {
+        CreateMessage();
+        var credential = new GraphCredential {
+            ClientId = ApplicationID,
+            ClientSecret = ApplicationKey,
+            DirectoryId = TenantDomain
+        };
+        var bodyObj = JsonSerializer.Deserialize<object>(MessageJson);
+        var request = new GraphBatchRequest {
+            Id = "1",
+            Method = "POST",
+            Url = $"/users/{MessageContainer.Message.From.Email.Address}/sendMail",
+            Headers = new Dictionary<string, string> { ["Content-Type"] = "application/json" },
+            Body = bodyObj
+        };
+        var results = await MicrosoftGraphUtils.SendBatchAsync(credential, new[] { request });
+        var response = results.FirstOrDefault();
+        var success = response != null && response.Status >= 200 && response.Status < 300;
+        return new SmtpResult(
+            success,
+            EmailAction.Send,
+            SentTo,
+            SentFrom,
+            "GraphAPI",
+            0,
+            Stopwatch.Elapsed,
+            response?.Status.ToString() ?? string.Empty,
+            success ? string.Empty : response?.Body.ToString());
+    }
+
+    /// <summary>
     /// Creates a draft message on the server and returns the resulting <see cref="GraphMessage"/>.
     /// </summary>
     /// <returns>The created draft message.</returns>

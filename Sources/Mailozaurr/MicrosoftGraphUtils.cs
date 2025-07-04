@@ -211,6 +211,37 @@ namespace Mailozaurr {
         }
 
         /// <summary>
+        /// Sends multiple requests to Microsoft Graph in a single batch.
+        /// </summary>
+        public static async Task<IReadOnlyList<GraphBatchResult>> SendBatchAsync(GraphCredential credential, IEnumerable<GraphBatchRequest> requests) {
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            var headers = new Dictionary<string, string> { { "Authorization", token } };
+            var batchPayload = new { requests = requests.Select(r => new { id = r.Id, method = r.Method, url = r.Url.TrimStart('/') , headers = r.Headers, body = r.Body }) };
+            var jsonBody = JsonSerializer.Serialize(batchPayload);
+            var doc = await InvokeGraphApiAsync("POST", "https://graph.microsoft.com/v1.0/$batch", headers, jsonBody);
+            var results = new List<GraphBatchResult>();
+            if (doc.RootElement.TryGetProperty("responses", out var responses) && responses.ValueKind == JsonValueKind.Array) {
+                foreach (var item in responses.EnumerateArray()) {
+                    var result = new GraphBatchResult();
+                    if (item.TryGetProperty("id", out var idEl) && idEl.ValueKind == JsonValueKind.String) result.Id = idEl.GetString();
+                    if (item.TryGetProperty("status", out var statusEl) && statusEl.TryGetInt32(out var status)) result.Status = status;
+                    if (item.TryGetProperty("headers", out var headersEl) && headersEl.ValueKind == JsonValueKind.Object) {
+                        var h = new Dictionary<string, string>();
+                        foreach (var prop in headersEl.EnumerateObject()) {
+                            if (prop.Value.ValueKind == JsonValueKind.String) h[prop.Name] = prop.Value.GetString();
+                        }
+                        result.Headers = h;
+                    }
+                    if (item.TryGetProperty("body", out var bodyEl)) {
+                        result.Body = bodyEl;
+                    }
+                    results.Add(result);
+                }
+            }
+            return results;
+        }
+
+        /// <summary>
         /// Removes empty values from a dictionary recursively (null, empty string, empty array, empty dictionary).
         /// </summary>
         public static void RemoveEmptyValues(IDictionary<string, object> dict, HashSet<string> exclude = null, bool recursive = true, int rerun = 0) {

@@ -785,7 +785,6 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 LogEmitter.EmitLogs(graph.LogCollector, this);
                 return;
             }
-
             status = graph.IsLargerAttachment
                 ? graph.SendMessageDraftAsync().GetAwaiter().GetResult()
                 : graph.SendMessageAsync().GetAwaiter().GetResult();
