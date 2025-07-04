@@ -725,5 +725,65 @@ namespace Mailozaurr {
             }
             return messages;
         }
+
+        /// <summary>
+        /// Moves a mail folder to another location.
+        /// </summary>
+        /// <param name="credential">Credential used to authenticate to Microsoft Graph.</param>
+        /// <param name="userPrincipalName">User principal name owning the mail folder.</param>
+        /// <param name="folderId">Identifier of the folder to move.</param>
+        /// <param name="destinationFolderId">Identifier of the new parent folder.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        public static async Task MoveFolderAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            string folderId,
+            string destinationFolderId) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/{folderId}/move");
+            var body = JsonSerializer.Serialize(new { destinationId = destinationFolderId });
+            await InvokeGraphApiAsync("POST", uri, headers, body);
+        }
+
+        /// <summary>
+        /// Renames a mail folder.
+        /// </summary>
+        /// <param name="credential">Credential used to authenticate to Microsoft Graph.</param>
+        /// <param name="userPrincipalName">User principal name owning the mail folder.</param>
+        /// <param name="folderId">Identifier of the folder to rename.</param>
+        /// <param name="newDisplayName">New display name for the folder.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        public static async Task RenameFolderAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            string folderId,
+            string newDisplayName) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/{folderId}");
+            var body = JsonSerializer.Serialize(new { displayName = newDisplayName });
+            await InvokeGraphApiAsync("PATCH", uri, headers, body);
+        }
+
+        /// <summary>
+        /// Removes a mail folder.
+        /// </summary>
+        /// <param name="credential">Credential used to authenticate to Microsoft Graph.</param>
+        /// <param name="userPrincipalName">User principal name owning the mail folder.</param>
+        /// <param name="folderId">Identifier of the folder to remove.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        public static async Task RemoveFolderAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            string folderId) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/{folderId}");
+            await InvokeGraphApiAsync("DELETE", uri, headers);
+        }
     }
 }
