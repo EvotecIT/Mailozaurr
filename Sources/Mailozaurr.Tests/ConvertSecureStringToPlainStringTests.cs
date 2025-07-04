@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
-using System.Linq;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using Xunit;
 
@@ -19,10 +20,20 @@ public class ConvertSecureStringToPlainStringTests
     [Fact]
     public void ReturnsDecryptedPassword_WhenSecure()
     {
-        if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)) return;
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return;
         var smtp = new Smtp();
-        byte[] bytes = Encoding.Unicode.GetBytes("secret");
-        string protectedStr = string.Concat(bytes.Select(b => b.ToString("x2", CultureInfo.InvariantCulture)));
+
+        static string ProtectString(string value)
+        {
+            byte[] bytes = Encoding.Unicode.GetBytes(value);
+            byte[] protectedBytes = ProtectedData.Protect(bytes, null, DataProtectionScope.CurrentUser);
+            var sb = new StringBuilder(protectedBytes.Length * 2);
+            foreach (byte b in protectedBytes)
+                sb.Append(b.ToString("x2", CultureInfo.InvariantCulture));
+            return sb.ToString();
+        }
+
+        string protectedStr = ProtectString("secret");
 
         var result = smtp.ConvertSecureStringToPlainString(protectedStr, true);
 
