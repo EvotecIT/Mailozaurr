@@ -38,13 +38,18 @@ public class GraphBatchAndRetryTests
         }
     }
 
+    private static FieldInfo GetHandlerField()
+        => typeof(HttpMessageInvoker).GetField("_handler", BindingFlags.NonPublic | BindingFlags.Instance)
+        ?? typeof(HttpMessageInvoker).GetField("handler", BindingFlags.NonPublic | BindingFlags.Instance)
+        ?? throw new InvalidOperationException("HttpClient handler field not found");
+
     [Fact]
     public async Task SendMessageBatchAsync_BuildsBatchPayload()
     {
         var handler = new BatchHandler();
         var field = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
         var client = (HttpClient)field.GetValue(null)!;
-        var handlerField = typeof(HttpMessageInvoker).GetField("_handler", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var handlerField = GetHandlerField();
         var original = (HttpMessageHandler)handlerField.GetValue(client)!;
         handlerField.SetValue(client, handler);
         try
@@ -101,7 +106,7 @@ public class GraphBatchAndRetryTests
         var handler = new RetryHandler();
         var field = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
         var client = (HttpClient)field.GetValue(null)!;
-        var handlerField = typeof(HttpMessageInvoker).GetField("_handler", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var handlerField = GetHandlerField();
         var original = (HttpMessageHandler)handlerField.GetValue(client)!;
         handlerField.SetValue(client, handler);
         var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
