@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using MimeKit;
 
 namespace Mailozaurr;
 
@@ -32,6 +33,22 @@ public class Pop3MessageInfo {
 
     /// <summary>Date the message was sent.</summary>
     public DateTime Date => Raw.Message.Date.DateTime;
+
+    /// <summary>Plain text body.</summary>
+    public string? TextBody => Raw.Message.TextBody;
+
+    /// <summary>HTML body.</summary>
+    public string? HtmlBody => Raw.Message.HtmlBody;
+
+    /// <summary>Message priority.</summary>
+    public MessagePriority Priority => Raw.Message.Priority switch {
+        MimeKit.MessagePriority.Urgent => MessagePriority.High,
+        MimeKit.MessagePriority.NonUrgent => MessagePriority.Low,
+        _ => MessagePriority.Normal,
+    };
+
+    /// <summary>Whether the message has any attachments.</summary>
+    public bool HasAttachments => Raw.Message.Attachments.Any();
 
     /// <inheritdoc />
     public override string ToString() => Subject ?? base.ToString();

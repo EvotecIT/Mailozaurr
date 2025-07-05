@@ -117,6 +117,7 @@ This will make sure the project has required libraries.
   - [x] Mark messages read or unread with `Set-GraphMessage`
   - [x] Wait for new Graph messages with the `Wait-GraphMessage` cmdlet
   - [x] Search Graph mailboxes with `Search-GraphMailbox` returning message info (use `-Count` to limit results)
+  - [x] Message cmdlets output friendly wrappers exposing From, To, Subject, Date and body text
 - Pipeline input is supported for Graph connection objects when retrieving
   folders or messages:
 
