@@ -56,6 +56,12 @@ public class SesClient : IDisposable
         _client = new HttpClient();
     }
 
+    public SesClient(HttpMessageHandler handler)
+    {
+        Stopwatch = Stopwatch.StartNew();
+        _client = new HttpClient(handler);
+    }
+
     private MimeMessage BuildMessage()
     {
         Smtp smtp = new();
@@ -138,7 +144,7 @@ public class SesClient : IDisposable
                 if (response.IsSuccessStatusCode)
                 {
                     SmtpResult ok = new(true, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, response.StatusCode.ToString());
-                    await Helpers.PostWebhookAsync(WebhookUrl, ok, cancellationToken);
+                    await Helpers.PostWebhookAsync(WebhookUrl, ok, cancellationToken, _client);
                     return ok;
                 }
 
@@ -158,7 +164,7 @@ public class SesClient : IDisposable
                     throw lastException;
                 }
                 SmtpResult fail = new(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, lastException?.Message);
-                await Helpers.PostWebhookAsync(WebhookUrl, fail, cancellationToken);
+                await Helpers.PostWebhookAsync(WebhookUrl, fail, cancellationToken, _client);
                 return fail;
             }
 
@@ -172,7 +178,7 @@ public class SesClient : IDisposable
         while (attempts <= RetryCount);
 
         SmtpResult final = new(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, lastException?.Message);
-        await Helpers.PostWebhookAsync(WebhookUrl, final, cancellationToken);
+        await Helpers.PostWebhookAsync(WebhookUrl, final, cancellationToken, _client);
         return final;
     }
 
