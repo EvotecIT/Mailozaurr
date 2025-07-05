@@ -114,8 +114,10 @@ This will make sure the project has required libraries.
   - [x] Get Mail Folders via `Get-EmailGraphFolder` with `-Connection` or `-MgGraphRequest`
   - [x] Get Mail Messages
   - [x] Save Mail Messages
+  - [x] Mark messages read or unread with `Set-GraphMessage`
   - [x] Wait for new Graph messages with the `Wait-GraphMessage` cmdlet
   - [x] Search Graph mailboxes with `Search-GraphMailbox` returning message info (use `-Count` to limit results)
+  - [x] Message cmdlets output friendly wrappers exposing From, To, Subject, Date and body text
 - Pipeline input is supported for Graph connection objects when retrieving
   folders or messages:
 
@@ -267,6 +269,7 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - [Example-SendEmail-OAuthGmail.ps1](Examples/Example-SendEmail-OAuthGmail.ps1) - send mail through Gmail using OAuth2.
 - [Example-SendEmail-OAuthO365.ps1](Examples/Example-SendEmail-OAuthO365.ps1) - send mail through Office 365 using OAuth2.
 - [Example-GraphManageMessages.ps1](Examples/Example-GraphManageMessages.ps1) - download attachments, set read state and move messages using Microsoft Graph.
+- [Example-SetGraphMessage.ps1](Examples/Example-SetGraphMessage.ps1) - mark Graph messages read or unread and move them.
 - [Example-SavePop3MessageAttachment.ps1](Examples/Example-SavePop3MessageAttachment.ps1) - download attachments from a POP3 mailbox.
 - [Example-SaveImapMessageAttachment.ps1](Examples/Example-SaveImapMessageAttachment.ps1) - download attachments from an IMAP mailbox.
 - [Example-SavePop3MessageAttachmentFiltered.ps1](Examples/Example-SavePop3MessageAttachmentFiltered.ps1) - search POP3 messages and save matching attachments.

@@ -479,16 +479,9 @@ namespace Mailozaurr {
                                     if (hit.TryGetProperty("summary", out var sumEl)) summary = sumEl.GetString();
                                     if (hit.TryGetProperty("resource", out var res) && res.ValueKind == JsonValueKind.Object) {
                                         var dict = ConvertJsonElementToNativeObject(res) as Dictionary<string, object>;
-                                        object? idObj = null;
-                                        object? subjectObj = null;
-                                        dict?.TryGetValue("id", out idObj);
-                                        dict?.TryGetValue("subject", out subjectObj);
-                                        results.Add(new GraphMessageInfo {
-                                            UserPrincipalName = upn,
-                                            Id = idObj as string,
-                                            Subject = subjectObj as string,
-                                            Summary = summary
-                                        });
+                                        if (dict != null) {
+                                            results.Add(new GraphMessageInfo(dict, upn, summary));
+                                        }
                                     }
                                 }
                             }
