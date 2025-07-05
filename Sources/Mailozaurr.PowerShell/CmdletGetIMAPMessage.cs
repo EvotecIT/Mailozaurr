@@ -26,6 +26,7 @@ namespace Mailozaurr.PowerShell;
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "IMAPMessage")]
+[OutputType(typeof(ImapMessageInfo))]
 public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">The <see cref="ImapConnectionInfo"/> object representing the active IMAP connection. This is the object returned by <c>Connect-IMAP</c>.</para>
@@ -146,7 +147,7 @@ public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
                 HasAttachment.IsPresent,
                 SearchQuery,
                 CancelToken)) {
-                WriteObject(message);
+                WriteObject(new ImapMessageInfo(message));
             }
         } else {
             WriteWarning("Get-IMAPMessage - Is IMAP connected?");

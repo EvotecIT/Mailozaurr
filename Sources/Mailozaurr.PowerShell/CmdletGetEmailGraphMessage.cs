@@ -13,7 +13,7 @@ namespace Mailozaurr.PowerShell;
 /// <para type="description">The <c>Get-EmailGraphMessage</c> cmdlet fetches messages for the specified user principal name using Microsoft Graph. It supports optional filters like subject, sender, recipient, priority and date range. Results can be limited and optionally deleted.</para>
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "EmailGraphMessage")]
-[OutputType(typeof(object))]
+[OutputType(typeof(GraphMessageInfo))]
 public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "Graph")]
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
@@ -108,7 +108,8 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
                     Limit);
 
                 foreach (var msg in messages) {
-                    WriteObject(PSObject.AsPSObject(msg));
+                    var info = new GraphMessageInfo(msg, UserPrincipalName!);
+                    WriteObject(info);
                     if (Delete.IsPresent && msg.TryGetValue("id", out var idObj) && idObj is string id) {
                         await MicrosoftGraphUtils.DeleteMailMessageAsync(cred, UserPrincipalName!, id);
                     }

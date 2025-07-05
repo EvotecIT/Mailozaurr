@@ -22,6 +22,7 @@ namespace Mailozaurr.PowerShell;
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "POP3Message")]
+[OutputType(typeof(Pop3MessageInfo))]
 public sealed class CmdletGetPOP3Message : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">The <see cref="PopConnectionInfo"/> object representing the active POP3 connection. This is the object returned by <c>Connect-POP3</c>.</para>
@@ -119,7 +120,7 @@ public sealed class CmdletGetPOP3Message : AsyncPSCmdlet {
                 Delete.IsPresent,
                 HasAttachment.IsPresent,
                 CancelToken)) {
-                WriteObject(message);
+                WriteObject(new Pop3MessageInfo(message));
             }
         } else {
             WriteWarning("Get-POP3Message - Is POP3 connected?");
