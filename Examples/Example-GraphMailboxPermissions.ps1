@@ -14,16 +14,14 @@ $perms | Format-Table Id, GrantedTo, Roles
 
 # Grant permissions using typed objects and enum roles
 $permissions = @(
-    [Mailozaurr.GraphMailboxPermission]::FromHashtable(@{
-        roles     = 'Owner'
-        grantedTo = @{ user = 'julia@example.com' }
-    }, 'user@example.com'),
-    [Mailozaurr.GraphMailboxPermission]::FromHashtable(@{
-        roles     = 'Read'
-        grantedTo = @{ user = 'ken@example.com' }
-    }, 'user@example.com')
+    New-GraphMailboxPermissionObject -Roles Owner -GrantedToUser 'julia@example.com' -UserPrincipalName 'user@example.com',
+    New-GraphMailboxPermissionObject -Roles Read -GrantedToUser 'ken@example.com' -UserPrincipalName 'user@example.com'
 )
 Add-GraphMailboxPermission -Connection $graph -UserPrincipalName 'user@example.com' -MailboxPermission $permissions
+
+# Alternatively build permissions using a builder object
+$builder = New-GraphMailboxPermissionBuilder -GrantedToUser 'melanie@example.com' -Roles Write
+$permObj = New-GraphMailboxPermissionObject -Builder $builder -UserPrincipalName 'user@example.com'
 
 # Bulk add permissions from CSV (columns should map to Graph permission properties)
 Add-GraphMailboxPermission -Connection $graph -UserPrincipalName 'user@example.com' -CsvPath '.\permissions.csv'
