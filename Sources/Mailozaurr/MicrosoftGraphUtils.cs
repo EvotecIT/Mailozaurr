@@ -778,5 +778,71 @@ namespace Mailozaurr {
             var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/{folderId}");
             await InvokeGraphApiAsync("DELETE", uri, headers);
         }
+
+        /// <summary>
+        /// Retrieves aggregated mailbox statistics including message count and total attachment size.
+        /// </summary>
+        public static async Task<GraphMailboxStatistics> GetMailboxStatisticsAsync(
+            GraphCredential credential,
+            string userPrincipalName) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+
+            var folderQuery = new Dictionary<string, object> { { "$select", "totalItemCount" } };
+            var folderUri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders", folderQuery);
+            int messageCount = 0;
+            while (!string.IsNullOrWhiteSpace(folderUri)) {
+                var doc = await InvokeGraphApiAsync("GET", folderUri, headers);
+                if (doc.RootElement.TryGetProperty("value", out var folders) && folders.ValueKind == JsonValueKind.Array) {
+                    foreach (var item in folders.EnumerateArray()) {
+                        if (item.TryGetProperty("totalItemCount", out var countEl) && countEl.TryGetInt32(out var count)) {
+                            messageCount += count;
+                        }
+                    }
+                }
+                folderUri = null;
+                if (doc.RootElement.TryGetProperty("@odata.nextLink", out var next)) {
+                    folderUri = next.GetString();
+                }
+            }
+
+            long attachmentSize = 0;
+            var msgQuery = new Dictionary<string, object> {
+                { "$select", "id,hasAttachments" },
+                { "$top", "50" }
+            };
+            var msgUri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/messages", msgQuery);
+            while (!string.IsNullOrWhiteSpace(msgUri)) {
+                var doc = await InvokeGraphApiAsync("GET", msgUri, headers);
+                if (doc.RootElement.TryGetProperty("value", out var msgs) && msgs.ValueKind == JsonValueKind.Array) {
+                    foreach (var msg in msgs.EnumerateArray()) {
+                        if (!msg.TryGetProperty("id", out var idEl) || idEl.ValueKind != JsonValueKind.String) continue;
+                        var hasAtt = msg.TryGetProperty("hasAttachments", out var ha) && ha.GetBoolean();
+                        if (!hasAtt) continue;
+                        var id = idEl.GetString();
+                        if (string.IsNullOrWhiteSpace(id)) continue;
+                        var atts = await GetMailMessageAttachmentsAsync(
+                            credential,
+                            userPrincipalName,
+                            id!,
+                            new[] { "size" });
+                        foreach (var att in atts) {
+                            attachmentSize += att.Size;
+                        }
+                    }
+                }
+                msgUri = null;
+                if (doc.RootElement.TryGetProperty("@odata.nextLink", out var nextMsg)) {
+                    msgUri = nextMsg.GetString();
+                }
+            }
+
+            return new GraphMailboxStatistics {
+                UserPrincipalName = userPrincipalName,
+                MessageCount = messageCount,
+                TotalAttachmentSize = attachmentSize
+            };
+        }
     }
 }
