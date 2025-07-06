@@ -120,9 +120,8 @@ public class MicrosoftGraphUtilsTests
     {
         const string json = "{\"value\":[{\"id\":\"1\",\"subject\":\"Hi\"}]}";
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
-        var clientField = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var originalClient = (HttpClient)clientField.GetValue(null)!;
-        clientField.SetValue(null, new HttpClient(handler));
+        var originalClient = MicrosoftGraphUtils.HttpClient;
+        MicrosoftGraphUtils.HttpClient = new HttpClient(handler);
 
         var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
         var cache = (ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
@@ -139,7 +138,7 @@ public class MicrosoftGraphUtilsTests
         }
         finally
         {
-            clientField.SetValue(null, originalClient);
+            MicrosoftGraphUtils.HttpClient = originalClient;
             cache.TryRemove(key, out _);
         }
     }
@@ -149,9 +148,8 @@ public class MicrosoftGraphUtilsTests
     {
         const string json = "{\"value\":[{\"id\":\"fid\",\"displayName\":\"Inbox\",\"parentFolderId\":\"root\",\"childFolderCount\":0,\"unreadItemCount\":2,\"totalItemCount\":5,\"isHidden\":false,\"wellKnownName\":\"inbox\"}]}";
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
-        var clientField = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var originalClient = (HttpClient)clientField.GetValue(null)!;
-        clientField.SetValue(null, new HttpClient(handler));
+        var originalClient = MicrosoftGraphUtils.HttpClient;
+        MicrosoftGraphUtils.HttpClient = new HttpClient(handler);
 
         var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
         var cache = (ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
@@ -174,7 +172,7 @@ public class MicrosoftGraphUtilsTests
         }
         finally
         {
-            clientField.SetValue(null, originalClient);
+            MicrosoftGraphUtils.HttpClient = originalClient;
             cache.TryRemove(key, out _);
         }
     }

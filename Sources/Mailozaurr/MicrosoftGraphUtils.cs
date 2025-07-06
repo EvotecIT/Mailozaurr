@@ -13,7 +13,13 @@ namespace Mailozaurr {
 
 
     public static class MicrosoftGraphUtils {
-        private static readonly HttpClient HttpClient;
+        private static HttpClient _httpClient;
+
+        internal static HttpClient HttpClient
+        {
+            get => _httpClient;
+            set => _httpClient = value;
+        }
         private static readonly ConcurrentDictionary<string, GraphAuthorization> TokenCache = new();
 
         /// <summary>
@@ -25,9 +31,9 @@ namespace Mailozaurr {
         }
 
         static MicrosoftGraphUtils() {
-            HttpClient = new HttpClient();
-            HttpClient.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
-            AppDomain.CurrentDomain.ProcessExit += (_, _) => HttpClient.Dispose();
+            _httpClient = new HttpClient();
+            _httpClient.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => _httpClient.Dispose();
         }
         /// <summary>
         /// Converts a credential string (username@directory) and secret to a GraphCredential object.
