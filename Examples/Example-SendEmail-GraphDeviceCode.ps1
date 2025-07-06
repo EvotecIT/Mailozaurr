@@ -5,7 +5,7 @@ $TenantId = 'Your-Tenant-ID'
 $Scopes = @('Mail.ReadWrite','Mail.Send')
 
 # Sign in interactively using device code
-$graph = Connect-EmailGraph -ClientId $ClientId -DirectoryId $TenantId -DeviceCode -Scopes $Scopes
+$graph = Connect-EmailGraph -ClientId $ClientId -DirectoryId $TenantId -DeviceCode -Scopes $Scopes -MaxConcurrentRequests 10
 
 $Body = EmailBody {
     EmailText -Text 'Hello from device code authentication!'

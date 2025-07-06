@@ -1,52 +1,37 @@
+using System.Collections.Generic;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using Mailozaurr;
-using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
-/// Renames a Microsoft Graph mail folder.
+/// Removes an inbox rule via Microsoft Graph.
 /// </summary>
-[Cmdlet("Rename", "GraphFolder", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
-public class CmdletRenameGraphFolder : AsyncPSCmdlet {
-    /// <summary>User principal name owning the folder.</summary>
+[Cmdlet(VerbsCommon.Remove, "GraphInboxRule", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
+public sealed class CmdletRemoveGraphInboxRule : AsyncPSCmdlet {
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
-    /// <summary>Identifier of the folder to rename.</summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
-    public string? FolderId { get; set; }
+    public string? RuleId { get; set; }
 
-    /// <summary>The new folder name.</summary>
-    [Parameter(Mandatory = true)]
-    [ValidateNotNullOrEmpty]
-    public string? NewName { get; set; }
-
-    /// <summary>Connection information for Microsoft Graph.</summary>
-    [Parameter(ParameterSetName = "Graph")]
+    [Parameter(ParameterSetName = "Graph", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
-    /// <summary>Use <c>Invoke-MgGraphRequest</c> instead of built-in logic.</summary>
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 
-    /// <summary>Request timeout in seconds.</summary>
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
     [Parameter]
-    public int MaxConcurrentRequests { get; set; } = 5;
-
-    /// <summary>Number of retries on transient errors.</summary>
-    [Parameter]
     public int RetryCount { get; set; } = 0;
 
-    /// <summary>Delay between retries in milliseconds.</summary>
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
@@ -55,7 +40,7 @@ public class CmdletRenameGraphFolder : AsyncPSCmdlet {
             case "Graph":
                 var conn = Connection ?? DefaultSessions.GraphSession;
                 if (conn == null) {
-                    WriteWarning("Rename-GraphFolder - Connection not provided and no default session available.");
+                    WriteWarning("Remove-GraphInboxRule - Connection not provided and no default session available.");
                     return Task.CompletedTask;
                 }
                 return ProcessGraphAsync(conn.Credential);
@@ -68,20 +53,19 @@ public class CmdletRenameGraphFolder : AsyncPSCmdlet {
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        if (!ShouldProcess(FolderId!, "Renaming Graph folder")) {
+        if (!ShouldProcess(RuleId!, "Removing inbox rule")) {
             return;
         }
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
-        MicrosoftGraphUtils.MaxConcurrentRequests = MaxConcurrentRequests;
         int attempts = 0;
         Exception? lastException = null;
         do {
             try {
-                await MicrosoftGraphUtils.RenameFolderAsync(cred, UserPrincipalName!, FolderId!, NewName!);
+                await MicrosoftGraphUtils.RemoveRuleAsync(cred, UserPrincipalName!, RuleId!);
                 return;
             } catch (Exception ex) {
                 lastException = ex;
-                WriteWarning($"Rename-GraphFolder - {ex.Message}");
+                WriteWarning($"Remove-GraphInboxRule - {ex.Message}");
                 if (!Helpers.IsTransient(ex) || attempts >= RetryCount) {
                     if (ex is GraphApiException gex) {
                         WriteError(new ErrorRecord(gex, "GraphApiError", ErrorCategory.InvalidOperation, null));
@@ -90,9 +74,7 @@ public class CmdletRenameGraphFolder : AsyncPSCmdlet {
                     }
                     return;
                 }
-                if (RetryDelayMilliseconds > 0) {
-                    await Task.Delay(RetryDelayMilliseconds);
-                }
+                if (RetryDelayMilliseconds > 0) await Task.Delay(RetryDelayMilliseconds);
             }
             attempts++;
         } while (attempts <= RetryCount);
@@ -102,16 +84,16 @@ public class CmdletRenameGraphFolder : AsyncPSCmdlet {
     }
 
     private void ProcessMgGraph() {
-        if (!ShouldProcess(FolderId!, "Renaming Graph folder")) {
+        if (!ShouldProcess(RuleId!, "Removing inbox rule")) {
             return;
         }
-        var uri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/mailFolders/{FolderId}";
-        var body = JsonSerializer.Serialize(new { displayName = NewName });
+        var uri = MicrosoftGraphUtils.JoinUriQuery(
+            "https://graph.microsoft.com/v1.0",
+            $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules/{RuleId}");
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
-            .AddParameter("Method", "PATCH")
+            .AddParameter("Method", "DELETE")
             .AddParameter("Uri", uri)
-            .AddParameter("Body", body)
             .AddParameter("ContentType", "application/json");
         ps.Invoke();
     }

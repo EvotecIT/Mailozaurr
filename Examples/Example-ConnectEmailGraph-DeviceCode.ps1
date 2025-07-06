@@ -5,5 +5,5 @@ $TenantId = 'Your-Tenant-ID'
 $Scopes = @('Mail.ReadWrite','Mail.Send')
 
 # Authenticate using device code flow
-$graph = Connect-EmailGraph -ClientId $ClientId -DirectoryId $TenantId -DeviceCode -Scopes $Scopes
+$graph = Connect-EmailGraph -ClientId $ClientId -DirectoryId $TenantId -DeviceCode -Scopes $Scopes -MaxConcurrentRequests 10
 $graph

@@ -49,6 +49,9 @@ public class CmdletSetGraphMessage : AsyncPSCmdlet {
     public int TimeoutSeconds { get; set; } = 100;
 
     [Parameter]
+    public int MaxConcurrentRequests { get; set; } = 5;
+
+    [Parameter]
     public int RetryCount { get; set; } = 0;
 
     [Parameter]
@@ -81,6 +84,7 @@ public class CmdletSetGraphMessage : AsyncPSCmdlet {
     /// <param name="cred">Credential used to access Graph.</param>
     private async Task ProcessGraphAsync(GraphCredential cred) {
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
+        MicrosoftGraphUtils.MaxConcurrentRequests = MaxConcurrentRequests;
         int attempts = 0;
         Exception? lastException = null;
         do {
