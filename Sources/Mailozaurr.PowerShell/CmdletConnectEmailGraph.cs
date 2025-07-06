@@ -86,6 +86,9 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
+    [Parameter]
+    public int MaxConcurrentRequests { get; set; } = 5;
+
     protected override async Task ProcessRecordAsync() {
         GraphCredential cred;
         OAuthCredential? oauth = null;
@@ -161,6 +164,7 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
         }
         
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
+        MicrosoftGraphUtils.MaxConcurrentRequests = MaxConcurrentRequests;
         try {
             var token = await MicrosoftGraphUtils.ConnectO365GraphWithRetryAsync(
                 cred,

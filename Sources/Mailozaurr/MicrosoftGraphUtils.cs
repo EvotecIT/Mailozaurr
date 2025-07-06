@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Linq;
 using System.IO;
 using System.Collections.Concurrent;
+using System.Threading;
 
 namespace Mailozaurr {
 
@@ -15,6 +16,23 @@ namespace Mailozaurr {
     public static class MicrosoftGraphUtils {
         private static readonly HttpClient HttpClient;
         private static readonly ConcurrentDictionary<string, GraphAuthorization> TokenCache = new();
+        private static SemaphoreSlim _concurrencySemaphore = new(5, 5);
+        private static int _maxConcurrentRequests = 5;
+
+        public static int MaxConcurrentRequests {
+            get => _maxConcurrentRequests;
+            set {
+                if (value <= 0) {
+                    throw new ArgumentOutOfRangeException(nameof(MaxConcurrentRequests));
+                }
+                var newSem = new SemaphoreSlim(value, value);
+                var old = Interlocked.Exchange(ref _concurrencySemaphore, newSem);
+                old.Dispose();
+                _maxConcurrentRequests = value;
+            }
+        }
+
+        internal static SemaphoreSlim ConcurrencySemaphore => _concurrencySemaphore;
 
         /// <summary>
         /// Timeout for HTTP operations in seconds.
@@ -98,33 +116,38 @@ namespace Mailozaurr {
             };
             var content = new FormUrlEncodedContent(body);
             var url = $"https://login.microsoftonline.com/{tenantDomain}/oauth2/token";
-            using var response = await HttpClient.PostAsync(url, content);
-            var json = await response.Content.ReadAsStringAsync();
-            if (!response.IsSuccessStatusCode) {
-                throw new GraphApiException(
-                    response.StatusCode,
-                    $"ConnectO365GraphAsync - Error: {json}",
-                    json);
-            }
-            var token = System.Text.Json.JsonDocument.Parse(json);
-            var accessToken = token.RootElement.GetProperty("access_token").GetString();
-            var tokenType = token.RootElement.GetProperty("token_type").GetString();
-            var expiresOn = DateTimeOffset.UtcNow.AddHours(1);
-            if (token.RootElement.TryGetProperty("expires_in", out var expIn)) {
-                expiresOn = DateTimeOffset.UtcNow.AddSeconds(expIn.GetInt32());
-            }
-            if (token.RootElement.TryGetProperty("expires_on", out var expOn)) {
-                if (long.TryParse(expOn.GetString(), out var expSeconds)) {
-                    expiresOn = DateTimeOffset.FromUnixTimeSeconds(expSeconds);
+            await ConcurrencySemaphore.WaitAsync();
+            try {
+                using var response = await HttpClient.PostAsync(url, content);
+                var json = await response.Content.ReadAsStringAsync();
+                if (!response.IsSuccessStatusCode) {
+                    throw new GraphApiException(
+                        response.StatusCode,
+                        $"ConnectO365GraphAsync - Error: {json}",
+                        json);
                 }
+                var token = System.Text.Json.JsonDocument.Parse(json);
+                var accessToken = token.RootElement.GetProperty("access_token").GetString();
+                var tokenType = token.RootElement.GetProperty("token_type").GetString();
+                var expiresOn = DateTimeOffset.UtcNow.AddHours(1);
+                if (token.RootElement.TryGetProperty("expires_in", out var expIn)) {
+                    expiresOn = DateTimeOffset.UtcNow.AddSeconds(expIn.GetInt32());
+                }
+                if (token.RootElement.TryGetProperty("expires_on", out var expOn)) {
+                    if (long.TryParse(expOn.GetString(), out var expSeconds)) {
+                        expiresOn = DateTimeOffset.FromUnixTimeSeconds(expSeconds);
+                    }
+                }
+                TokenCache[key] = new GraphAuthorization { AccessToken = accessToken, TokenType = tokenType, ExpiresOn = expiresOn };
+                OAuthTokenCache.Set($"graph:{key}", new OAuthCredential {
+                    UserName = credential.ClientId,
+                    AccessToken = accessToken,
+                    ExpiresOn = expiresOn
+                });
+                return $"{tokenType} {accessToken}";
+            } finally {
+                ConcurrencySemaphore.Release();
             }
-            TokenCache[key] = new GraphAuthorization { AccessToken = accessToken, TokenType = tokenType, ExpiresOn = expiresOn };
-            OAuthTokenCache.Set($"graph:{key}", new OAuthCredential {
-                UserName = credential.ClientId,
-                AccessToken = accessToken,
-                ExpiresOn = expiresOn
-            });
-            return $"{tokenType} {accessToken}";
         }
 
         /// <summary>
@@ -199,15 +222,20 @@ namespace Mailozaurr {
             if (!string.IsNullOrWhiteSpace(body) && (method == "POST" || method == "PUT" || method == "PATCH")) {
                 request.Content = new StringContent(body, Encoding.UTF8, "application/json");
             }
-            using var response = await HttpClient.SendAsync(request);
-            var responseContent = await response.Content.ReadAsStringAsync();
-            if (!response.IsSuccessStatusCode) {
-                throw new GraphApiException(
-                    response.StatusCode,
-                    $"InvokeGraphApiAsync - Error: {response.StatusCode} - {responseContent}",
-                    responseContent);
+            await ConcurrencySemaphore.WaitAsync();
+            try {
+                using var response = await HttpClient.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                if (!response.IsSuccessStatusCode) {
+                    throw new GraphApiException(
+                        response.StatusCode,
+                        $"InvokeGraphApiAsync - Error: {response.StatusCode} - {responseContent}",
+                        responseContent);
+                }
+                return JsonDocument.Parse(responseContent);
+            } finally {
+                ConcurrencySemaphore.Release();
             }
-            return JsonDocument.Parse(responseContent);
         }
 
         /// <summary>

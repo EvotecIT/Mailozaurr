@@ -37,6 +37,9 @@ public class CmdletRemoveGraphFolder : AsyncPSCmdlet {
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
+    [Parameter]
+    public int MaxConcurrentRequests { get; set; } = 5;
+
     /// <summary>Number of retries on transient errors.</summary>
     [Parameter]
     public int RetryCount { get; set; } = 0;
@@ -67,6 +70,7 @@ public class CmdletRemoveGraphFolder : AsyncPSCmdlet {
             return;
         }
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
+        MicrosoftGraphUtils.MaxConcurrentRequests = MaxConcurrentRequests;
         int attempts = 0;
         Exception? lastException = null;
         do {
