@@ -789,16 +789,29 @@ namespace Mailozaurr {
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
             headers["Authorization"] = token;
 
-            var folderQuery = new Dictionary<string, object> { { "$select", "totalItemCount" } };
+            var folderQuery = new Dictionary<string, object> {
+                { "$select", "id,displayName,wellKnownName,totalItemCount,unreadItemCount,childFolderCount" },
+                { "$top", "100" }
+            };
             var folderUri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders", folderQuery);
             int messageCount = 0;
+            int folderCount = 0;
+            var foldersStats = new List<GraphMailboxFolderStatistics>();
             while (!string.IsNullOrWhiteSpace(folderUri)) {
                 var doc = await InvokeGraphApiAsync("GET", folderUri, headers);
                 if (doc.RootElement.TryGetProperty("value", out var folders) && folders.ValueKind == JsonValueKind.Array) {
                     foreach (var item in folders.EnumerateArray()) {
-                        if (item.TryGetProperty("totalItemCount", out var countEl) && countEl.TryGetInt32(out var count)) {
-                            messageCount += count;
-                        }
+                        var stat = new GraphMailboxFolderStatistics {
+                            Id = item.GetProperty("id").GetString(),
+                            DisplayName = item.GetProperty("displayName").GetString(),
+                            WellKnownName = item.TryGetProperty("wellKnownName", out var wn) ? wn.GetString() : null,
+                            TotalItemCount = item.TryGetProperty("totalItemCount", out var tic) && tic.TryGetInt32(out var c) ? c : 0,
+                            UnreadItemCount = item.TryGetProperty("unreadItemCount", out var uic) && uic.TryGetInt32(out var u) ? u : 0,
+                            ChildFolderCount = item.TryGetProperty("childFolderCount", out var cfc) && cfc.TryGetInt32(out var cf) ? cf : 0
+                        };
+                        messageCount += stat.TotalItemCount;
+                        folderCount++;
+                        foldersStats.Add(stat);
                     }
                 }
                 folderUri = null;
@@ -808,6 +821,7 @@ namespace Mailozaurr {
             }
 
             long attachmentSize = 0;
+            int messagesWithAttachments = 0;
             var msgQuery = new Dictionary<string, object> {
                 { "$select", "id,hasAttachments" },
                 { "$top", "50" }
@@ -817,11 +831,18 @@ namespace Mailozaurr {
                 var doc = await InvokeGraphApiAsync("GET", msgUri, headers);
                 if (doc.RootElement.TryGetProperty("value", out var msgs) && msgs.ValueKind == JsonValueKind.Array) {
                     foreach (var msg in msgs.EnumerateArray()) {
-                        if (!msg.TryGetProperty("id", out var idEl) || idEl.ValueKind != JsonValueKind.String) continue;
+                        if (!msg.TryGetProperty("id", out var idEl) || idEl.ValueKind != JsonValueKind.String) {
+                            continue;
+                        }
                         var hasAtt = msg.TryGetProperty("hasAttachments", out var ha) && ha.GetBoolean();
-                        if (!hasAtt) continue;
+                        if (!hasAtt) {
+                            continue;
+                        }
+                        messagesWithAttachments++;
                         var id = idEl.GetString();
-                        if (string.IsNullOrWhiteSpace(id)) continue;
+                        if (string.IsNullOrWhiteSpace(id)) {
+                            continue;
+                        }
                         var atts = await GetMailMessageAttachmentsAsync(
                             credential,
                             userPrincipalName,
@@ -838,11 +859,15 @@ namespace Mailozaurr {
                 }
             }
 
-            return new GraphMailboxStatistics {
+            var result = new GraphMailboxStatistics {
                 UserPrincipalName = userPrincipalName,
                 MessageCount = messageCount,
-                TotalAttachmentSize = attachmentSize
+                MessagesWithAttachments = messagesWithAttachments,
+                TotalAttachmentSize = attachmentSize,
+                TotalFolders = folderCount
             };
+            result.FolderStatistics.AddRange(foldersStats);
+            return result;
         }
     }
 }

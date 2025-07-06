@@ -4,4 +4,5 @@ $cred = ConvertTo-GraphCredential -ClientId 'id' -ClientSecret 'secret' -Directo
 $graph = Connect-EmailGraph -Credential $cred
 
 Get-GraphMailboxStatistics -UserPrincipalName 'user@example.com' -Connection $graph |
+    Select-Object UserPrincipalName, MessageCount, MessagesWithAttachments, TotalAttachmentSize, TotalFolders, FolderStatistics |
     Export-Csv -NoTypeInformation 'mailbox-stats.csv'

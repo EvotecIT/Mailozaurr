@@ -6,7 +6,8 @@ using Mailozaurr;
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
-/// Retrieves aggregated mailbox statistics via Microsoft Graph.
+/// Retrieves detailed mailbox statistics via Microsoft Graph, including
+/// message and folder counts as well as attachment sizes.
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "GraphMailboxStatistics")]
 [OutputType(typeof(GraphMailboxStatistics))]
