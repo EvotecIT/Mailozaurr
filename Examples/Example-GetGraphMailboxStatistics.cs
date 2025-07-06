@@ -1,21 +1,26 @@
+using System.Management.Automation;
+using System.Threading.Tasks;
 using Mailozaurr;
-using System;
 
-// Example retrieving mailbox statistics via Microsoft Graph
-var credential = new GraphCredential {
-    ClientId = "id",
-    ClientSecret = "secret",
-    DirectoryId = "tenant"
-};
+/// <summary>
+/// Example cmdlet demonstrating how to expose mailbox statistics from
+/// <see cref="MicrosoftGraphUtils"/> in PowerShell.
+/// </summary>
+[Cmdlet(VerbsCommon.Get, "ExampleGraphMailboxStatistics")]
+[OutputType(typeof(GraphMailboxStatistics))]
+public sealed class GetExampleGraphMailboxStatisticsCommand : AsyncPSCmdlet {
+    [Parameter(Mandatory = true)]
+    [ValidateNotNull]
+    public GraphCredential? Credential { get; set; }
 
-var stats = MicrosoftGraphUtils.GetMailboxStatisticsAsync(
-    credential,
-    "user@example.com").GetAwaiter().GetResult();
+    [Parameter(Mandatory = true)]
+    [ValidateNotNullOrEmpty]
+    public string? UserPrincipalName { get; set; }
 
-Console.WriteLine($"Messages: {stats.MessageCount}");
-Console.WriteLine($"With attachments: {stats.MessagesWithAttachments}");
-Console.WriteLine($"Attachment size: {stats.TotalAttachmentSize}");
-
-foreach (var folder in stats.FolderStatistics) {
-    Console.WriteLine($"{folder.DisplayName}: {folder.TotalItemCount}");
+    protected override async Task ProcessRecordAsync() {
+        var stats = await MicrosoftGraphUtils.GetMailboxStatisticsAsync(
+            Credential!,
+            UserPrincipalName!);
+        WriteObject(stats);
+    }
 }
