@@ -28,6 +28,10 @@ public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
     [ValidateNotNull]
     public GraphInboxRule? RuleObject { get; set; }
 
+    [Parameter(ParameterSetName = "Graph")]
+    [ValidateNotNull]
+    public GraphInboxRuleBuilder? RuleBuilder { get; set; }
+
     [Parameter(Mandatory = true, ParameterSetName = "Params")]
     public string DisplayName { get; set; } = string.Empty;
 
@@ -106,6 +110,8 @@ public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
         GraphInboxRule obj;
         if (ParameterSetName == "Params") {
             obj = BuildFromParams();
+        } else if (RuleBuilder != null) {
+            obj = RuleBuilder.Build();
         } else if (RuleObject != null) {
             obj = RuleObject;
         } else {
@@ -142,7 +148,9 @@ public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
         var uri = MicrosoftGraphUtils.JoinUriQuery(
             "https://graph.microsoft.com/v1.0",
             $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules");
-        var bodyObj = RuleObject ?? JsonSerializer.Deserialize<GraphInboxRule>(JsonSerializer.Serialize(Rule));
+        var bodyObj = RuleBuilder != null
+            ? RuleBuilder.Build()
+            : RuleObject ?? JsonSerializer.Deserialize<GraphInboxRule>(JsonSerializer.Serialize(Rule));
         var body = JsonSerializer.Serialize(bodyObj, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
