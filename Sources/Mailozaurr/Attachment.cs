@@ -13,5 +13,10 @@ public class Attachment {
     /// Gets or sets the attachment content encoded as a Base64 string.
     /// </summary>
     public string ContentBytes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the size of the attachment in bytes.
+    /// </summary>
+    public long Size { get; set; }
     // Add more properties as needed
 }
