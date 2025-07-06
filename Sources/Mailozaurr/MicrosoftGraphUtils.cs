@@ -808,6 +808,46 @@ namespace Mailozaurr {
         }
 
         /// <summary>
+        /// Retrieves mailbox permissions for a user.
+        /// </summary>
+        public static async Task<List<GraphMailboxPermission>> GetMailboxPermissionsAsync(GraphCredential credential, string userPrincipalName) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/permissions");
+            var doc = await InvokeGraphApiAsync("GET", uri, headers);
+            var result = new List<GraphMailboxPermission>();
+            if (doc.RootElement.TryGetProperty("value", out var val) && val.ValueKind == JsonValueKind.Array) {
+                foreach (var item in val.EnumerateArray()) {
+                    var dict = ConvertJsonElementToNativeObject(item) as Dictionary<string, object>;
+                    if (dict != null) result.Add(new GraphMailboxPermission(dict, userPrincipalName));
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Adds a mailbox permission.
+        /// </summary>
+        public static async Task AddMailboxPermissionAsync(GraphCredential credential, string userPrincipalName, string body) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/permissions");
+            await InvokeGraphApiAsync("POST", uri, headers, body);
+        }
+
+        /// <summary>
+        /// Removes a mailbox permission.
+        /// </summary>
+        public static async Task RemoveMailboxPermissionAsync(GraphCredential credential, string userPrincipalName, string permissionId) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/permissions/{permissionId}");
+        }
+      
+        /// <summary>     
         /// Retrieves aggregated mailbox statistics including message count and total attachment size.
         /// </summary>
         public static async Task<GraphMailboxStatistics> GetMailboxStatisticsAsync(
