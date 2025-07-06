@@ -19,7 +19,7 @@ namespace Mailozaurr.PowerShell;
 /// <seealso cref="CmdletConnectIMAP"/>
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
-[Cmdlet(VerbsCommon.Move, "IMAPMessage")]
+[Cmdlet(VerbsCommon.Move, "IMAPMessage", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 public sealed class CmdletMoveIMAPMessage : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">The <see cref="ImapConnectionInfo"/> object representing the active IMAP connection. This is the object returned by <c>Connect-IMAP</c>.</para>
@@ -53,6 +53,9 @@ public sealed class CmdletMoveIMAPMessage : AsyncPSCmdlet {
     protected override Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
+            if (!ShouldProcess(Uid.ToString(), $"Moving IMAP message to {DestinationFolder}")) {
+                return Task.CompletedTask;
+            }
             var uid = new UniqueId(Uid);
             var source = conn.Data.GetCachedFolder(SourceFolder ?? conn.Folder?.FullName, FolderAccess.ReadWrite);
             var dest = conn.Data.GetCachedFolder(DestinationFolder!, FolderAccess.ReadWrite);

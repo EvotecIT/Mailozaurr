@@ -25,7 +25,7 @@ namespace Mailozaurr.PowerShell;
 /// <seealso cref="CmdletConnectIMAP"/>
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
-[Cmdlet(VerbsCommon.Get, "IMAPMessage")]
+[Cmdlet(VerbsCommon.Get, "IMAPMessage", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 [OutputType(typeof(ImapMessageInfo))]
 public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
     /// <summary>
@@ -133,6 +133,11 @@ public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
         if (conn != null && conn.Data != null) {
             var folder = conn.Folder?.FullName;
 
+            var del = Delete.IsPresent;
+            if (del && !ShouldProcess(folder ?? "INBOX", "Deleting IMAP messages")) {
+                del = false;
+            }
+
             await foreach (var message in MessageFetcher.Fetch(
                 conn.Data,
                 folder,
@@ -143,7 +148,7 @@ public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
                 Since,
                 Before,
                 All.IsPresent,
-                Delete.IsPresent,
+                del,
                 HasAttachment.IsPresent,
                 SearchQuery,
                 CancelToken)) {
