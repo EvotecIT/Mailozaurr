@@ -9,7 +9,7 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// Moves a Microsoft Graph message to a different folder.
 /// </summary>
-[Cmdlet(VerbsCommon.Move, "GraphMessage")]
+[Cmdlet(VerbsCommon.Move, "GraphMessage", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 public class CmdletMoveGraphMessage : AsyncPSCmdlet {
     /// <summary>
     /// UPN of the mailbox owner containing the message.
@@ -81,6 +81,9 @@ public class CmdletMoveGraphMessage : AsyncPSCmdlet {
     /// </summary>
     /// <param name="cred">Credential used to access Graph.</param>
     private async Task ProcessGraphAsync(GraphCredential cred) {
+        if (!ShouldProcess(MessageId!, "Moving Graph message")) {
+            return;
+        }
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         int attempts = 0;
         Exception? lastException = null;
@@ -114,6 +117,9 @@ public class CmdletMoveGraphMessage : AsyncPSCmdlet {
     /// Executes the move operation using the <c>Invoke-MgGraphRequest</c> cmdlet.
     /// </summary>
     private void ProcessMgGraph() {
+        if (!ShouldProcess(MessageId!, "Moving Graph message")) {
+            return;
+        }
         var uri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/messages/{MessageId}/move";
         var body = System.Text.Json.JsonSerializer.Serialize(new { destinationId = DestinationFolderId });
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
