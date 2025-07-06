@@ -5,4 +5,5 @@ $ClientSecret = 'your-client-secret'
 $TenantId = 'your-tenant-id'
 $cred = ConvertTo-GraphCredential -ClientId $ClientId -ClientSecret $ClientSecret -DirectoryId $TenantId
 $graph = Connect-EmailGraph -Credential $cred
-Get-EmailGraphFolder -UserPrincipalName 'user@example.com' -Connection $graph | Format-Table
+Get-EmailGraphFolder -UserPrincipalName 'user@example.com' -Connection $graph |
+    Format-Table DisplayName, FullPath, TotalItemCount, UnreadItemCount

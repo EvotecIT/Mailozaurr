@@ -101,13 +101,22 @@ public class MessageInfoTests {
             ["id"] = "fid",
             ["displayName"] = "Inbox",
             ["parentFolderId"] = "root",
-            ["childFolderCount"] = 3
+            ["childFolderCount"] = 3,
+            ["unreadItemCount"] = 2,
+            ["totalItemCount"] = 5,
+            ["isHidden"] = true,
+            ["wellKnownName"] = "inbox"
         };
         var info = new GraphFolderInfo(raw, "user@example.com");
         Assert.Equal("fid", info.Id);
         Assert.Equal("Inbox", info.DisplayName);
         Assert.Equal("root", info.ParentFolderId);
         Assert.Equal(3, info.ChildFolderCount);
+        Assert.Equal(2, info.UnreadItemCount);
+        Assert.Equal(5, info.TotalItemCount);
+        Assert.True(info.IsHidden);
+        Assert.Equal("inbox", info.WellKnownName);
+        Assert.Null(info.FullPath);
         Assert.Same(raw, info.Raw);
         Assert.Equal("user@example.com", info.UserPrincipalName);
     }

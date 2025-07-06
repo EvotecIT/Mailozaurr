@@ -147,7 +147,7 @@ public class MicrosoftGraphUtilsTests
     [Fact]
     public async Task GetMailFolderInfosAsync_ReturnsTypedObjects()
     {
-        const string json = "{\"value\":[{\"id\":\"fid\",\"displayName\":\"Inbox\",\"parentFolderId\":\"root\",\"childFolderCount\":0}]}";
+        const string json = "{\"value\":[{\"id\":\"fid\",\"displayName\":\"Inbox\",\"parentFolderId\":\"root\",\"childFolderCount\":0,\"unreadItemCount\":2,\"totalItemCount\":5,\"isHidden\":false,\"wellKnownName\":\"inbox\"}]}";
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
         var clientField = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
         var originalClient = (HttpClient)clientField.GetValue(null)!;
@@ -163,8 +163,14 @@ public class MicrosoftGraphUtilsTests
             var cred = new GraphCredential { ClientId = "id", ClientSecret = "sec", DirectoryId = "tenant" };
             var result = await MicrosoftGraphUtils.GetMailFolderInfosAsync(cred, "user@tenant");
             Assert.Single(result);
-            Assert.Equal("fid", result[0].Id);
-            Assert.Equal("Inbox", result[0].DisplayName);
+            var folder = result[0];
+            Assert.Equal("fid", folder.Id);
+            Assert.Equal("Inbox", folder.DisplayName);
+            Assert.Equal(2, folder.UnreadItemCount);
+            Assert.Equal(5, folder.TotalItemCount);
+            Assert.False(folder.IsHidden);
+            Assert.Equal("inbox", folder.WellKnownName);
+            Assert.Equal("Inbox", folder.FullPath);
         }
         finally
         {

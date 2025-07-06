@@ -13,6 +13,7 @@ class Program {
         // await FetchImapMessages.RunAsync();
         // await FetchPopMessages.RunAsync();
         // await FetchGraphMessages.RunAsync();
+        // await FetchGraphFolders.RunAsync();
     }
 }
 

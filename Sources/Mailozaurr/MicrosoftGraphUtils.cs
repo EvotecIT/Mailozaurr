@@ -421,7 +421,30 @@ namespace Mailozaurr {
                     result.Add(new GraphFolderInfo(dict, userPrincipalName));
                 }
             }
+            BuildFolderPaths(result);
             return result;
+        }
+
+        private static void BuildFolderPaths(List<GraphFolderInfo> folders) {
+            var map = new Dictionary<string, GraphFolderInfo>();
+            foreach (var f in folders) {
+                if (!string.IsNullOrEmpty(f.Id)) map[f.Id!] = f;
+            }
+
+            foreach (var f in folders) {
+                f.FullPath = GetPath(f, map);
+            }
+
+            static string? GetPath(GraphFolderInfo folder, Dictionary<string, GraphFolderInfo> map) {
+                var parts = new List<string>();
+                var current = folder;
+                var visited = new HashSet<string?>();
+                while (current != null && !string.IsNullOrEmpty(current.Id) && visited.Add(current.Id)) {
+                    if (!string.IsNullOrEmpty(current.DisplayName)) parts.Insert(0, current.DisplayName!);
+                    if (string.IsNullOrEmpty(current.ParentFolderId) || !map.TryGetValue(current.ParentFolderId, out current)) break;
+                }
+                return parts.Count > 0 ? string.Join("/", parts) : null;
+            }
         }
 
         /// <summary>
