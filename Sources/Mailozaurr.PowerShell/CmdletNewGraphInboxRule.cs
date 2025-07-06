@@ -28,7 +28,47 @@ public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
     [ValidateNotNull]
     public GraphInboxRule? RuleObject { get; set; }
 
+    [Parameter(Mandatory = true, ParameterSetName = "Params")]
+    public string DisplayName { get; set; } = string.Empty;
+
+    [Parameter(ParameterSetName = "Params")]
+    public int Sequence { get; set; }
+
+    [Parameter(ParameterSetName = "Params")]
+    public SwitchParameter Enabled { get; set; }
+
+    [Parameter(ParameterSetName = "Params")]
+    public string? MoveToFolder { get; set; }
+
+    [Parameter(ParameterSetName = "Params")]
+    public string? CopyToFolder { get; set; }
+
+    [Parameter(ParameterSetName = "Params")]
+    public SwitchParameter Delete { get; set; }
+
+    [Parameter(ParameterSetName = "Params")]
+    public string[]? ForwardTo { get; set; }
+
+    [Parameter(ParameterSetName = "Params")]
+    public SwitchParameter StopProcessing { get; set; }
+
+    [Parameter(ParameterSetName = "Params")]
+    public string[]? SenderContains { get; set; }
+
+    [Parameter(ParameterSetName = "Params")]
+    public string[]? RecipientContains { get; set; }
+
+    [Parameter(ParameterSetName = "Params")]
+    public string[]? SubjectContains { get; set; }
+
+    [Parameter(ParameterSetName = "Params")]
+    public string[]? BodyContains { get; set; }
+
+    [Parameter(ParameterSetName = "Params")]
+    public string? Importance { get; set; }
+
     [Parameter(ParameterSetName = "Graph", ValueFromPipeline = true)]
+    [Parameter(ParameterSetName = "Params", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
@@ -64,7 +104,9 @@ public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
         int attempts = 0;
         Exception? lastException = null;
         GraphInboxRule obj;
-        if (RuleObject != null) {
+        if (ParameterSetName == "Params") {
+            obj = BuildFromParams();
+        } else if (RuleObject != null) {
             obj = RuleObject;
         } else {
             var dict = Rule!.Cast<DictionaryEntry>().ToDictionary(d => (string)d.Key, d => d.Value!);
@@ -110,5 +152,35 @@ public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
             .AddParameter("ContentType", "application/json");
         var results = ps.Invoke();
         foreach (var res in results) WriteObject(res);
+    }
+
+    private GraphInboxRule BuildFromParams() {
+        var rule = new GraphInboxRule {
+            DisplayName = DisplayName,
+            Sequence = Sequence,
+            IsEnabled = Enabled.IsPresent
+        };
+
+        if (SenderContains != null || RecipientContains != null || SubjectContains != null || BodyContains != null || Importance != null) {
+            rule.Conditions = new GraphInboxRulePredicates {
+                SenderContains = SenderContains != null ? new List<string>(SenderContains) : null,
+                RecipientContains = RecipientContains != null ? new List<string>(RecipientContains) : null,
+                SubjectContains = SubjectContains != null ? new List<string>(SubjectContains) : null,
+                BodyContains = BodyContains != null ? new List<string>(BodyContains) : null,
+                Importance = Importance
+            };
+        }
+
+        if (!string.IsNullOrEmpty(MoveToFolder) || !string.IsNullOrEmpty(CopyToFolder) || Delete.IsPresent || ForwardTo != null || StopProcessing.IsPresent) {
+            rule.Actions = new GraphInboxRuleActions {
+                MoveToFolder = MoveToFolder,
+                CopyToFolder = CopyToFolder,
+                Delete = Delete.IsPresent ? true : null,
+                ForwardTo = ForwardTo != null ? new List<GraphEmailAddress>(ForwardTo.Select(a => new GraphEmailAddress { Email = new GraphEmail { Address = a } })) : null,
+                StopProcessingRules = StopProcessing.IsPresent ? true : null
+            };
+        }
+
+        return rule;
     }
 }

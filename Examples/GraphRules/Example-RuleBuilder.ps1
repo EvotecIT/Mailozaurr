@@ -9,13 +9,12 @@ $graph = Connect-EmailGraph -Credential $cred
 
 # Build a rule that moves messages from the boss to Archive and stops processing
 $builder = New-GraphInboxRuleBuilder -DisplayName 'Boss Archive' -Sequence 1 -SenderContains 'boss@example.com' -MoveToFolder 'Archive' -StopProcessing
-$rule = New-GraphInboxRuleObject -Builder $builder
-New-GraphInboxRule -UserPrincipalName 'user@example.com' -Connection $graph -RuleObject $rule
+New-GraphInboxRule -UserPrincipalName 'user@example.com' -Connection $graph -RuleObject ($builder.Build())
 
 # Build and create a rule that forwards urgent messages
 $forward = New-GraphInboxRuleBuilder -DisplayName 'Forward Urgent' -Sequence 2 -SubjectContains 'urgent' -ForwardTo 'assistant@example.com' -Enabled
-New-GraphInboxRule -UserPrincipalName 'user@example.com' -Connection $graph -RuleObject (New-GraphInboxRuleObject -Builder $forward)
+New-GraphInboxRule -UserPrincipalName 'user@example.com' -Connection $graph -RuleObject ($forward.Build())
 
 # Build and create a rule that deletes spam
 $spam = New-GraphInboxRuleBuilder -DisplayName 'Delete Spam' -Sequence 3 -SenderContains 'spam@example.com' -Delete
-New-GraphInboxRule -UserPrincipalName 'user@example.com' -Connection $graph -RuleObject (New-GraphInboxRuleObject -Builder $spam)
+New-GraphInboxRule -UserPrincipalName 'user@example.com' -Connection $graph -RuleObject ($spam.Build())
