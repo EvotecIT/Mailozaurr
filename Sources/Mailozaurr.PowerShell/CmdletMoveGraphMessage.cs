@@ -50,6 +50,9 @@ public class CmdletMoveGraphMessage : AsyncPSCmdlet {
     public int TimeoutSeconds { get; set; } = 100;
 
     [Parameter]
+    public int MaxConcurrentRequests { get; set; } = 5;
+
+    [Parameter]
     public int RetryCount { get; set; } = 0;
 
     [Parameter]
@@ -85,6 +88,7 @@ public class CmdletMoveGraphMessage : AsyncPSCmdlet {
             return;
         }
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
+        MicrosoftGraphUtils.MaxConcurrentRequests = MaxConcurrentRequests;
         int attempts = 0;
         Exception? lastException = null;
         do {

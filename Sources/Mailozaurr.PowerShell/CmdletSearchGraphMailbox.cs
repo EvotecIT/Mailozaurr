@@ -31,6 +31,9 @@ public class CmdletSearchGraphMailbox : AsyncPSCmdlet {
     [ValidateRange(1, int.MaxValue)]
     public int Size { get; set; } = 25;
 
+    [Parameter]
+    public int MaxConcurrentRequests { get; set; } = 5;
+
     protected override async Task ProcessRecordAsync() {
         var conn = Connection ?? DefaultSessions.GraphSession;
         if (conn == null) {
@@ -38,6 +41,7 @@ public class CmdletSearchGraphMailbox : AsyncPSCmdlet {
             return;
         }
 
+        MicrosoftGraphUtils.MaxConcurrentRequests = MaxConcurrentRequests;
         try {
             var results = await MicrosoftGraphUtils.SearchMailboxesAsync(
                 conn.Credential,
