@@ -25,7 +25,7 @@ namespace Mailozaurr.PowerShell;
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "EmailGraphFolder")]
-[OutputType(typeof(object))]
+[OutputType(typeof(GraphFolderInfo))]
 public class CmdletGetEmailGraphFolder : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Specifies the user principal name (email address) whose mail folders will be retrieved.</para>
@@ -74,9 +74,9 @@ public class CmdletGetEmailGraphFolder : AsyncPSCmdlet {
         Exception? lastException = null;
         do {
             try {
-                var folders = await MicrosoftGraphUtils.GetMailFoldersAsync(cred, UserPrincipalName!);
-                foreach (var folder in folders) {
-                    WriteObject(folder);
+                var infos = await MicrosoftGraphUtils.GetMailFolderInfosAsync(cred, UserPrincipalName!);
+                foreach (var info in infos) {
+                    WriteObject(info);
                 }
                 return;
             } catch (Exception ex) {
@@ -108,7 +108,15 @@ public class CmdletGetEmailGraphFolder : AsyncPSCmdlet {
             .AddParameter("Method", "GET")
             .AddParameter("Uri", uri);
         var results = ps.Invoke();
-        foreach (var res in results) WriteObject(res);
+        foreach (var res in results) {
+            if (res is PSObject obj) {
+                var dict = obj.Properties.ToDictionary(p => p.Name, p => p.Value);
+                var info = new GraphFolderInfo(dict, UserPrincipalName!);
+                WriteObject(info);
+            } else {
+                WriteObject(res);
+            }
+        }
         return Task.CompletedTask;
     }
 }

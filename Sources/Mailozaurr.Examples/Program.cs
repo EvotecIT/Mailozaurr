@@ -12,6 +12,7 @@ class Program {
         await SendEmailMailgun.RunAsync();
         // await FetchImapMessages.RunAsync();
         // await FetchPopMessages.RunAsync();
+        // await FetchGraphMessages.RunAsync();
     }
 }
 
@@ -27,3 +28,4 @@ class Program {
 //   - AcquireGoogleTokenInteractive.cs
 //   - AcquireO365TokenInteractive.cs
 //   - SendEmailMailgun.cs
+//   - FetchGraphMessages.cs

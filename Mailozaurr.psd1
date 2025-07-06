@@ -19,4 +19,5 @@
         }
     }
     RootModule           = 'Mailozaurr.psm1'
+    FormatsToProcess     = @('Mailozaurr.Format.ps1xml')
 }

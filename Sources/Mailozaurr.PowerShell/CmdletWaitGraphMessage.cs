@@ -15,7 +15,7 @@ namespace Mailozaurr.PowerShell;
 /// </example>
 /// </summary>
 [Cmdlet(VerbsLifecycle.Wait, "GraphMessage")]
-[OutputType(typeof(object))]
+[OutputType(typeof(GraphMessageInfo))]
 public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
     [Parameter(ValueFromPipeline = true)]
     [ValidateNotNull]
@@ -66,12 +66,13 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
     }
 
     private void OnMessageArrived(object? sender, System.Collections.Generic.Dictionary<string, object> message) {
-        var match = Until == null || LanguagePrimitives.IsTrue(Until.InvokeReturnAsIs(message));
+        var info = new GraphMessageInfo(message, UserPrincipalName!);
+        var match = Until == null || LanguagePrimitives.IsTrue(Until.InvokeReturnAsIs(info));
         if (match) {
-            WriteObject(message);
+            WriteObject(info);
             if (Action != null) {
                 try {
-                    Action.Invoke(message);
+                    Action.Invoke(info);
                 } catch (RuntimeException ex) {
                     WriteError(ex.ErrorRecord);
                 }

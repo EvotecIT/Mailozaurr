@@ -26,9 +26,14 @@ public class GraphMessageInfo {
         if (raw.TryGetValue("id", out var idObj)) Id = idObj as string;
         if (raw.TryGetValue("subject", out var subjectObj)) Subject = subjectObj as string;
         if (raw.TryGetValue("from", out var fromObj)) From = ExtractAddress(fromObj);
+        if (raw.TryGetValue("sender", out var senderObj)) Sender = ExtractAddress(senderObj);
         if (raw.TryGetValue("toRecipients", out var toObj)) To = ExtractAddresses(toObj);
+        if (raw.TryGetValue("ccRecipients", out var ccObj)) Cc = ExtractAddresses(ccObj);
         if (raw.TryGetValue("sentDateTime", out var dateObj) && DateTimeOffset.TryParse(dateObj?.ToString(), out var dt)) {
             Date = dt.DateTime;
+        }
+        if (raw.TryGetValue("receivedDateTime", out var rcvObj) && DateTimeOffset.TryParse(rcvObj?.ToString(), out var rcv)) {
+            ReceivedDate = rcv.DateTime;
         }
         if (raw.TryGetValue("bodyPreview", out var previewObj)) BodyPreview = previewObj as string;
         if (raw.TryGetValue("body", out var bodyObj)) {
@@ -41,6 +46,11 @@ public class GraphMessageInfo {
         if (raw.TryGetValue("isRead", out var readObj) && bool.TryParse(readObj?.ToString(), out var read)) {
             IsRead = read;
         }
+        if (raw.TryGetValue("hasAttachments", out var attObj) && bool.TryParse(attObj?.ToString(), out var hasAtt)) {
+            HasAttachments = hasAtt;
+        }
+        if (raw.TryGetValue("conversationId", out var convObj)) ConversationId = convObj as string;
+        if (raw.TryGetValue("internetMessageId", out var msgIdObj)) InternetMessageId = msgIdObj as string;
         if (raw.TryGetValue("importance", out var importanceObj)) Importance = importanceObj as string;
     }
 
@@ -59,11 +69,20 @@ public class GraphMessageInfo {
     /// <summary>Recipient addresses.</summary>
     public string? To { get; set; }
 
+    /// <summary>Carbon copy recipients.</summary>
+    public string? Cc { get; set; }
+
+    /// <summary>Actual sender address.</summary>
+    public string? Sender { get; set; }
+
     /// <summary>Subject of the message.</summary>
     public string? Subject { get; set; }
 
     /// <summary>Date the message was sent.</summary>
     public DateTime? Date { get; set; }
+
+    /// <summary>Date the message was received.</summary>
+    public DateTime? ReceivedDate { get; set; }
 
     /// <summary>Preview text of the body.</summary>
     public string? BodyPreview { get; set; }
@@ -76,6 +95,15 @@ public class GraphMessageInfo {
 
     /// <summary>Whether the message is marked as read.</summary>
     public bool? IsRead { get; set; }
+
+    /// <summary>Indicates whether the message has attachments.</summary>
+    public bool? HasAttachments { get; set; }
+
+    /// <summary>Identifier used to organize conversation threads.</summary>
+    public string? ConversationId { get; set; }
+
+    /// <summary>Internet Message ID header.</summary>
+    public string? InternetMessageId { get; set; }
 
     /// <summary>Message importance.</summary>
     public string? Importance { get; set; }

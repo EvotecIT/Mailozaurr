@@ -100,18 +100,17 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
         do {
             try {
                 var filter = BuildFilter(Filter);
-                var messages = await MicrosoftGraphUtils.GetMailMessagesAsync(
+                var messages = await MicrosoftGraphUtils.GetMailMessageInfosAsync(
                     cred,
                     UserPrincipalName!,
                     Property,
                     filter,
                     Limit);
 
-                foreach (var msg in messages) {
-                    var info = new GraphMessageInfo(msg, UserPrincipalName!);
+                foreach (var info in messages) {
                     WriteObject(info);
-                    if (Delete.IsPresent && msg.TryGetValue("id", out var idObj) && idObj is string id) {
-                        await MicrosoftGraphUtils.DeleteMailMessageAsync(cred, UserPrincipalName!, id);
+                    if (Delete.IsPresent && info.Id is not null) {
+                        await MicrosoftGraphUtils.DeleteMailMessageAsync(cred, UserPrincipalName!, info.Id);
                     }
                 }
                 return;

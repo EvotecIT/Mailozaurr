@@ -354,6 +354,23 @@ namespace Mailozaurr {
         }
 
         /// <summary>
+        /// Retrieves mail messages and converts them to <see cref="GraphMessageInfo"/> objects.
+        /// </summary>
+        public static async Task<List<GraphMessageInfo>> GetMailMessageInfosAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            IEnumerable<string>? properties = null,
+            string? filter = null,
+            int? limit = null) {
+            var raw = await GetMailMessagesAsync(credential, userPrincipalName, properties, filter, limit).ConfigureAwait(false);
+            var result = new List<GraphMessageInfo>(raw.Count);
+            foreach (var msg in raw) {
+                result.Add(new GraphMessageInfo(msg, userPrincipalName));
+            }
+            return result;
+        }
+
+        /// <summary>
         /// Retrieves attachments for a specific message.
         /// </summary>
         public static async Task<List<Attachment>> GetMailMessageAttachmentsAsync(GraphCredential credential, string userPrincipalName, string messageId, IEnumerable<string> properties = null) {
@@ -390,6 +407,21 @@ namespace Mailozaurr {
                 }
             }
             return folders;
+        }
+
+        /// <summary>
+        /// Lists mail folders and converts them to <see cref="GraphFolderInfo"/> objects.
+        /// </summary>
+        public static async Task<List<GraphFolderInfo>> GetMailFolderInfosAsync(GraphCredential credential, string userPrincipalName) {
+            var raw = await GetMailFoldersAsync(credential, userPrincipalName).ConfigureAwait(false);
+            var result = new List<GraphFolderInfo>(raw.Count);
+            foreach (var folder in raw) {
+                var dict = ConvertJsonElementToNativeObject(folder) as Dictionary<string, object>;
+                if (dict != null) {
+                    result.Add(new GraphFolderInfo(dict, userPrincipalName));
+                }
+            }
+            return result;
         }
 
         /// <summary>
@@ -717,6 +749,36 @@ namespace Mailozaurr {
                 messages = result;
             }
             return messages;
+        }
+
+        /// <summary>
+        /// Retrieves messages from the Junk Email folder as <see cref="GraphMessageInfo"/> objects.
+        /// </summary>
+        public static async Task<List<GraphMessageInfo>> GetJunkMailMessageInfosAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            IEnumerable<string>? properties = null,
+            IEnumerable<string>? skipIds = null,
+            IEnumerable<string>? skipFrom = null,
+            IEnumerable<string>? skipTo = null,
+            IEnumerable<string>? skipSubjectContains = null,
+            bool skipHasAttachment = false,
+            IEnumerable<string>? skipAttachmentExtension = null) {
+            var raw = await GetJunkMailMessagesAsync(
+                credential,
+                userPrincipalName,
+                properties,
+                skipIds,
+                skipFrom,
+                skipTo,
+                skipSubjectContains,
+                skipHasAttachment,
+                skipAttachmentExtension).ConfigureAwait(false);
+            var result = new List<GraphMessageInfo>(raw.Count);
+            foreach (var msg in raw) {
+                result.Add(new GraphMessageInfo(msg, userPrincipalName));
+            }
+            return result;
         }
 
         /// <summary>

@@ -1,6 +1,11 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Reflection;
+using System.Threading.Tasks;
 using Xunit;
 using Mailozaurr;
 
@@ -108,5 +113,63 @@ public class MicrosoftGraphUtilsTests
             skipHasAttachment: true);
 
         Assert.Empty(filtered);
+    }
+
+    [Fact]
+    public async Task GetMailMessageInfosAsync_ReturnsTypedObjects()
+    {
+        const string json = "{\"value\":[{\"id\":\"1\",\"subject\":\"Hi\"}]}";
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
+        var clientField = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var originalClient = (HttpClient)clientField.GetValue(null)!;
+        clientField.SetValue(null, new HttpClient(handler));
+
+        var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var cache = (ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
+        var key = "id|tenant||sec|https://graph.microsoft.com";
+        cache[key] = new GraphAuthorization { AccessToken = "tok", TokenType = "Bearer", ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(5) };
+
+        try
+        {
+            var cred = new GraphCredential { ClientId = "id", ClientSecret = "sec", DirectoryId = "tenant" };
+            var result = await MicrosoftGraphUtils.GetMailMessageInfosAsync(cred, "user@tenant");
+            Assert.Single(result);
+            Assert.Equal("1", result[0].Id);
+            Assert.Equal("user@tenant", result[0].UserPrincipalName);
+        }
+        finally
+        {
+            clientField.SetValue(null, originalClient);
+            cache.TryRemove(key, out _);
+        }
+    }
+
+    [Fact]
+    public async Task GetMailFolderInfosAsync_ReturnsTypedObjects()
+    {
+        const string json = "{\"value\":[{\"id\":\"fid\",\"displayName\":\"Inbox\",\"parentFolderId\":\"root\",\"childFolderCount\":0}]}";
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
+        var clientField = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var originalClient = (HttpClient)clientField.GetValue(null)!;
+        clientField.SetValue(null, new HttpClient(handler));
+
+        var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var cache = (ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
+        var key = "id|tenant||sec|https://graph.microsoft.com";
+        cache[key] = new GraphAuthorization { AccessToken = "tok", TokenType = "Bearer", ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(5) };
+
+        try
+        {
+            var cred = new GraphCredential { ClientId = "id", ClientSecret = "sec", DirectoryId = "tenant" };
+            var result = await MicrosoftGraphUtils.GetMailFolderInfosAsync(cred, "user@tenant");
+            Assert.Single(result);
+            Assert.Equal("fid", result[0].Id);
+            Assert.Equal("Inbox", result[0].DisplayName);
+        }
+        finally
+        {
+            clientField.SetValue(null, originalClient);
+            cache.TryRemove(key, out _);
+        }
     }
 }

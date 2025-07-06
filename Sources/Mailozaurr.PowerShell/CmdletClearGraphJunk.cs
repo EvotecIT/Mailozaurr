@@ -11,6 +11,7 @@ namespace Mailozaurr.PowerShell;
 /// Clears the Junk Email folder via Microsoft Graph.
 /// </summary>
 [Cmdlet(VerbsCommon.Clear, "GraphJunk", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
+[OutputType(typeof(GraphMessageInfo))]
 public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
@@ -129,7 +130,7 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
         if (SkipSubjectContains != null && !props.Contains("subject")) props.Add("subject");
         if ((SkipHasAttachment.IsPresent || SkipAttachmentExtension != null) && !props.Contains("hasAttachments")) props.Add("hasAttachments");
 
-        var messages = await MicrosoftGraphUtils.GetJunkMailMessagesAsync(
+        var messages = await MicrosoftGraphUtils.GetJunkMailMessageInfosAsync(
             cred,
             UserPrincipalName!,
             props,
@@ -140,8 +141,8 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
             SkipHasAttachment.IsPresent,
             SkipAttachmentExtension);
 
-        foreach (var msg in messages) {
-            WriteObject(PSObject.AsPSObject(msg));
+        foreach (var info in messages) {
+            WriteObject(info);
         }
     }
 
@@ -245,7 +246,8 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
             filtered = final;
         }
         foreach (var msg in filtered) {
-            WriteObject(PSObject.AsPSObject(msg));
+            var info = new GraphMessageInfo(msg, UserPrincipalName!);
+            WriteObject(info);
         }
     }
 }
