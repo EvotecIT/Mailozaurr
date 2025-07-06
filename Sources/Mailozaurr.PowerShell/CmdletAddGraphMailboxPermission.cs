@@ -18,11 +18,11 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
 
     [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNullOrEmpty]
-    public Hashtable? Permission { get; set; }
+    public Hashtable[]? Permission { get; set; }
 
-    [Parameter(ParameterSetName = "Object")]
+    [Parameter(ParameterSetName = "Object", ValueFromPipeline = true)]
     [ValidateNotNull]
-    public GraphMailboxPermission? MailboxPermission { get; set; }
+    public GraphMailboxPermission[]? MailboxPermission { get; set; }
 
     [Parameter(Mandatory = true, ParameterSetName = "Csv")]
     [ValidateNotNullOrEmpty]
@@ -46,29 +46,35 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
-    protected override Task ProcessRecordAsync() {
+    protected override async Task ProcessRecordAsync() {
         if (ParameterSetName == "MgGraphRequest") {
             ProcessMgGraph();
-            return Task.CompletedTask;
+            return;
         }
 
         var conn = Connection ?? DefaultSessions.GraphSession;
         if (conn == null) {
             WriteWarning("Add-GraphMailboxPermission - Connection not provided and no default session available.");
-            return Task.CompletedTask;
+            return;
         }
 
         if (ParameterSetName == "Csv") {
-            return ProcessCsvAsync(conn.Credential);
+            await ProcessCsvAsync(conn.Credential).ConfigureAwait(false);
+            return;
         }
 
         if (ParameterSetName == "Object") {
-            if (MailboxPermission!.UserPrincipalName == null)
-                MailboxPermission.UserPrincipalName = UserPrincipalName;
-            return ProcessGraphAsync(conn.Credential, MailboxPermission);
+            foreach (var perm in MailboxPermission!) {
+                if (perm.UserPrincipalName == null)
+                    perm.UserPrincipalName = UserPrincipalName;
+                await ProcessGraphAsync(conn.Credential, perm).ConfigureAwait(false);
+            }
+            return;
         }
 
-        return ProcessGraphAsync(conn.Credential, Permission!);
+        foreach (var ht in Permission!)
+            await ProcessGraphAsync(conn.Credential, ht).ConfigureAwait(false);
+        return;
     }
 
     private async Task ProcessCsvAsync(GraphCredential cred) {
@@ -126,12 +132,16 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
                 InvokeMgGraph(body);
             }
         } else if (MailboxPermission != null) {
-            body = JsonSerializer.Serialize(MailboxPermission.ToDictionary());
-            InvokeMgGraph(body);
+            foreach (var perm in MailboxPermission) {
+                body = JsonSerializer.Serialize(perm.ToDictionary());
+                InvokeMgGraph(body);
+            }
         } else if (Permission != null) {
-            var conv = Permission.Cast<DictionaryEntry>().ToDictionary(e => (string)e.Key, e => e.Value);
-            body = JsonSerializer.Serialize(conv);
-            InvokeMgGraph(body);
+            foreach (var ht in Permission) {
+                var conv = ht.Cast<DictionaryEntry>().ToDictionary(e => (string)e.Key, e => e.Value);
+                body = JsonSerializer.Serialize(conv);
+                InvokeMgGraph(body);
+            }
         }
     }
 

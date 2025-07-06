@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Management.Automation;
@@ -17,11 +18,17 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
 
     [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNullOrEmpty]
-    public string? PermissionId { get; set; }
+    public string[]? PermissionId { get; set; }
 
-    [Parameter(ParameterSetName = "Object")]
+    [Parameter(ParameterSetName = "Object", ValueFromPipeline = true)]
     [ValidateNotNull]
-    public GraphMailboxPermission? MailboxPermission { get; set; }
+    public GraphMailboxPermission[]? MailboxPermission { get; set; }
+
+    [Parameter(ParameterSetName = "Filter")]
+    public GraphMailboxRole[]? Role { get; set; }
+
+    [Parameter(ParameterSetName = "Filter")]
+    public string[]? GrantedToUser { get; set; }
 
     [Parameter(Mandatory = true, ParameterSetName = "Csv")]
     [ValidateNotNullOrEmpty]
@@ -45,29 +52,40 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
-    protected override Task ProcessRecordAsync() {
+    protected override async Task ProcessRecordAsync() {
         if (ParameterSetName == "MgGraphRequest") {
             ProcessMgGraph();
-            return Task.CompletedTask;
+            return;
         }
 
         var conn = Connection ?? DefaultSessions.GraphSession;
         if (conn == null) {
             WriteWarning("Remove-GraphMailboxPermission - Connection not provided and no default session available.");
-            return Task.CompletedTask;
+            return;
         }
 
         if (ParameterSetName == "Csv") {
-            return ProcessCsvAsync(conn.Credential);
+            await ProcessCsvAsync(conn.Credential).ConfigureAwait(false);
+            return;
         }
 
         if (ParameterSetName == "Object") {
-            if (MailboxPermission!.UserPrincipalName == null)
-                MailboxPermission.UserPrincipalName = UserPrincipalName;
-            return ProcessGraphAsync(conn.Credential, MailboxPermission);
+            foreach (var perm in MailboxPermission!) {
+                if (perm.UserPrincipalName == null)
+                    perm.UserPrincipalName = UserPrincipalName;
+                await ProcessGraphAsync(conn.Credential, perm).ConfigureAwait(false);
+            }
+            return;
         }
 
-        return ProcessGraphAsync(conn.Credential, PermissionId!);
+        if (ParameterSetName == "Filter") {
+            await ProcessFilterAsync(conn.Credential).ConfigureAwait(false);
+            return;
+        }
+
+        foreach (var id in PermissionId!)
+            await ProcessGraphAsync(conn.Credential, id).ConfigureAwait(false);
+        return;
     }
 
     private async Task ProcessCsvAsync(GraphCredential cred) {
@@ -79,6 +97,17 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
             if (!string.IsNullOrWhiteSpace(id))
                 await ProcessGraphAsync(cred, id).ConfigureAwait(false);
         }
+    }
+
+    private async Task ProcessFilterAsync(GraphCredential cred) {
+        var perms = await MicrosoftGraphUtils.GetMailboxPermissionsAsync(cred, UserPrincipalName!).ConfigureAwait(false);
+        var filtered = perms.AsEnumerable();
+        if (Role != null && Role.Length > 0)
+            filtered = filtered.Where(p => p.Roles != null && p.Roles.Intersect(Role).Any());
+        if (GrantedToUser != null && GrantedToUser.Length > 0)
+            filtered = filtered.Where(p => p.GrantedTo?.User != null && GrantedToUser.Contains(p.GrantedTo.User, StringComparer.OrdinalIgnoreCase));
+        foreach (var p in filtered)
+            await ProcessGraphAsync(cred, p).ConfigureAwait(false);
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred, object permission) {
@@ -124,12 +153,18 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
                 if (!string.IsNullOrWhiteSpace(id))
                     InvokeMgGraph(id);
             }
-        } else if (MailboxPermission != null && MailboxPermission.Id != null) {
-            if (!ShouldProcess(MailboxPermission.Id, "Removing mailbox permission")) return;
-            InvokeMgGraph(MailboxPermission.Id);
+        } else if (MailboxPermission != null) {
+            foreach (var perm in MailboxPermission) {
+                if (perm.Id != null) {
+                    if (!ShouldProcess(perm.Id, "Removing mailbox permission")) continue;
+                    InvokeMgGraph(perm.Id);
+                }
+            }
         } else if (PermissionId != null) {
-            if (!ShouldProcess(PermissionId, "Removing mailbox permission")) return;
-            InvokeMgGraph(PermissionId);
+            foreach (var id in PermissionId) {
+                if (!ShouldProcess(id, "Removing mailbox permission")) continue;
+                InvokeMgGraph(id);
+            }
         }
     }
 

@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace Mailozaurr;
@@ -27,8 +28,9 @@ public class GraphMailboxPermission {
         UserPrincipalName = userPrincipalName;
         if (raw.TryGetValue("id", out var idObj)) Id = idObj as string;
         if (raw.TryGetValue("roles", out var rolesObj) && rolesObj is object[] arr)
-            Roles = arr.Select(r => r?.ToString()).Where(r => r is not null).ToArray()!;
-        if (raw.TryGetValue("grantedTo", out var granted)) GrantedTo = granted;
+            Roles = arr.Select(r => Enum.TryParse<GraphMailboxRole>(r?.ToString(), true, out var role) ? role : GraphMailboxRole.Custom).ToArray();
+        if (raw.TryGetValue("grantedTo", out var granted) && granted is Dictionary<string, object> gdict)
+            GrantedTo = GraphMailboxGrantee.FromDictionary(gdict);
     }
 
     /// <summary>Unique permission identifier.</summary>
@@ -38,10 +40,10 @@ public class GraphMailboxPermission {
     public string? UserPrincipalName { get; set; }
 
     /// <summary>Roles assigned by the permission.</summary>
-    public string[]? Roles { get; set; }
+    public GraphMailboxRole[]? Roles { get; set; }
 
     /// <summary>Information about the grantee.</summary>
-    public object? GrantedTo { get; set; }
+    public GraphMailboxGrantee? GrantedTo { get; set; }
 
     /// <summary>Raw dictionary returned by Graph.</summary>
     public Dictionary<string, object> Raw { get; }
@@ -63,8 +65,10 @@ public class GraphMailboxPermission {
     public Dictionary<string, object> ToDictionary() {
         var dict = new Dictionary<string, object>(Raw);
         if (Id != null) dict["id"] = Id;
-        if (Roles != null) dict["roles"] = Roles;
-        if (GrantedTo != null) dict["grantedTo"] = GrantedTo;
+        if (Roles != null)
+            dict["roles"] = Roles.Select(r => r.ToString().ToLowerInvariant()).ToArray();
+        if (GrantedTo != null)
+            dict["grantedTo"] = GrantedTo.ToDictionary();
         return dict;
     }
 
