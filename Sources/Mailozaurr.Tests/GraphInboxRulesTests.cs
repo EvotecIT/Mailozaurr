@@ -18,4 +18,13 @@ public class GraphInboxRulesTests {
             "/users/user@example.com/mailFolders/inbox/messageRules/1");
         Assert.Equal("https://graph.microsoft.com/v1.0/users/user@example.com/mailFolders/inbox/messageRules/1", uri);
     }
+
+    [Fact]
+    public void JoinUriQuery_BuildsFilteredUri() {
+        string uri = MicrosoftGraphUtils.JoinUriQuery(
+            "https://graph.microsoft.com/v1.0",
+            "/users/user@example.com/mailFolders/inbox/messageRules",
+            new Dictionary<string, object> { ["$filter"] = "displayName eq 'A'" });
+        Assert.Equal("https://graph.microsoft.com/v1.0/users/user@example.com/mailFolders/inbox/messageRules?%24filter=displayName%20eq%20%27A%27", uri);
+    }
 }

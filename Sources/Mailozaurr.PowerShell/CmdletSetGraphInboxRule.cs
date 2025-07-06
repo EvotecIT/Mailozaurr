@@ -3,22 +3,25 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
-using Mailozaurr;
-using System.Threading.Tasks;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Mailozaurr;
+using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
-/// Creates a new inbox rule via Microsoft Graph.
+/// Updates an existing inbox rule via Microsoft Graph.
 /// </summary>
-[Cmdlet(VerbsCommon.New, "GraphInboxRule")]
+[Cmdlet(VerbsCommon.Set, "GraphInboxRule", SupportsShouldProcess = true)]
 [OutputType(typeof(GraphInboxRule))]
-public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
+public sealed class CmdletSetGraphInboxRule : AsyncPSCmdlet
+{
     [Parameter(Mandatory = true)]
-    [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
+
+    [Parameter(Mandatory = true)]
+    public string? RuleId { get; set; }
 
     [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNull]
@@ -44,45 +47,54 @@ public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
-    protected override Task ProcessRecordAsync() {
-        if (ParameterSetName == "MgGraphRequest") {
+    protected override Task ProcessRecordAsync()
+    {
+        if (ParameterSetName == "MgGraphRequest")
+        {
             ProcessMgGraph();
             return Task.CompletedTask;
         }
 
         var conn = Connection ?? DefaultSessions.GraphSession;
-        if (conn == null) {
-            WriteWarning("New-GraphInboxRule - Connection not provided and no default session available.");
+        if (conn == null)
+        {
+            WriteWarning("Set-GraphInboxRule - Connection not provided and no default session available.");
             return Task.CompletedTask;
         }
 
         return ProcessGraphAsync(conn.Credential);
     }
 
-    private async Task ProcessGraphAsync(GraphCredential cred) {
+    private async Task ProcessGraphAsync(GraphCredential cred)
+    {
+        if (!ShouldProcess(RuleId!, "Updating inbox rule"))
+        {
+            return;
+        }
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         int attempts = 0;
         Exception? lastException = null;
-        GraphInboxRule obj;
-        if (RuleObject != null) {
-            obj = RuleObject;
-        } else {
-            var dict = Rule!.Cast<DictionaryEntry>().ToDictionary(d => (string)d.Key, d => d.Value!);
-            var json = JsonSerializer.Serialize(dict);
-            obj = JsonSerializer.Deserialize<GraphInboxRule>(json)!;
-        }
-        do {
-            try {
-                var res = await MicrosoftGraphUtils.NewRuleAsync(cred, UserPrincipalName!, obj);
+        GraphInboxRule obj = RuleObject ?? JsonSerializer.Deserialize<GraphInboxRule>(JsonSerializer.Serialize(Rule))!;
+        do
+        {
+            try
+            {
+                var res = await MicrosoftGraphUtils.UpdateRuleAsync(cred, UserPrincipalName!, RuleId!, obj);
                 WriteObject(res);
                 return;
-            } catch (Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 lastException = ex;
-                WriteWarning($"New-GraphInboxRule - {ex.Message}");
-                if (!Helpers.IsTransient(ex) || attempts >= RetryCount) {
-                    if (ex is GraphApiException gex) {
+                WriteWarning($"Set-GraphInboxRule - {ex.Message}");
+                if (!Helpers.IsTransient(ex) || attempts >= RetryCount)
+                {
+                    if (ex is GraphApiException gex)
+                    {
                         WriteError(new ErrorRecord(gex, "GraphApiError", ErrorCategory.InvalidOperation, null));
-                    } else {
+                    }
+                    else
+                    {
                         WriteError(new ErrorRecord(ex, "GraphError", ErrorCategory.InvalidOperation, null));
                     }
                     return;
@@ -91,20 +103,26 @@ public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
             }
             attempts++;
         } while (attempts <= RetryCount);
-        if (lastException is not null) {
+        if (lastException is not null)
+        {
             WriteError(new ErrorRecord(lastException, "GraphError", ErrorCategory.InvalidOperation, null));
         }
     }
 
-    private void ProcessMgGraph() {
+    private void ProcessMgGraph()
+    {
+        if (!ShouldProcess(RuleId!, "Updating inbox rule"))
+        {
+            return;
+        }
         var uri = MicrosoftGraphUtils.JoinUriQuery(
             "https://graph.microsoft.com/v1.0",
-            $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules");
+            $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules/{RuleId}");
         var bodyObj = RuleObject ?? JsonSerializer.Deserialize<GraphInboxRule>(JsonSerializer.Serialize(Rule));
         var body = JsonSerializer.Serialize(bodyObj, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
-            .AddParameter("Method", "POST")
+            .AddParameter("Method", "PATCH")
             .AddParameter("Uri", uri)
             .AddParameter("Body", body)
             .AddParameter("ContentType", "application/json");

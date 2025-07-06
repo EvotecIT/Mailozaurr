@@ -785,18 +785,21 @@ namespace Mailozaurr {
         /// <param name="credential">Credential used to authenticate to Microsoft Graph.</param>
         /// <param name="userPrincipalName">User principal name owning the mailbox.</param>
         /// <returns>List of inbox rules represented as dictionaries.</returns>
-        public static async Task<List<Dictionary<string, object>>> GetRulesAsync(
+        public static async Task<List<GraphInboxRule>> GetRulesAsync(
             GraphCredential credential,
-            string userPrincipalName) {
+            string userPrincipalName,
+            string? filter = null) {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
             headers["Authorization"] = token;
-            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/inbox/messageRules");
+            Dictionary<string, object>? qp = null;
+            if (!string.IsNullOrWhiteSpace(filter)) qp = new Dictionary<string, object> { ["$filter"] = filter };
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/inbox/messageRules", qp);
             var doc = await InvokeGraphApiAsync("GET", uri, headers);
-            var rules = new List<Dictionary<string, object>>();
+            var rules = new List<GraphInboxRule>();
             if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
                 foreach (var item in valueElement.EnumerateArray()) {
-                    var rule = ConvertJsonElementToNativeObject(item) as Dictionary<string, object>;
+                    var rule = JsonSerializer.Deserialize<GraphInboxRule>(item.GetRawText());
                     if (rule != null) rules.Add(rule);
                 }
             }
@@ -810,18 +813,34 @@ namespace Mailozaurr {
         /// <param name="userPrincipalName">User principal name owning the mailbox.</param>
         /// <param name="rule">Dictionary describing the rule to create.</param>
         /// <returns>The created rule as a dictionary.</returns>
-        public static async Task<Dictionary<string, object>> NewRuleAsync(
+        public static async Task<GraphInboxRule> NewRuleAsync(
             GraphCredential credential,
             string userPrincipalName,
-            Dictionary<string, object> rule) {
+            GraphInboxRule rule) {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
             headers["Authorization"] = token;
-            RemoveEmptyValues(rule);
-            var body = JsonSerializer.Serialize(rule);
+            var body = JsonSerializer.Serialize(rule, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
             var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/inbox/messageRules");
             var doc = await InvokeGraphApiAsync("POST", uri, headers, body);
-            return ConvertJsonElementToNativeObject(doc.RootElement) as Dictionary<string, object> ?? new();
+            return JsonSerializer.Deserialize<GraphInboxRule>(doc.RootElement.GetRawText())!;
+        }
+
+        /// <summary>
+        /// Updates an existing inbox rule.
+        /// </summary>
+        public static async Task<GraphInboxRule> UpdateRuleAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            string ruleId,
+            GraphInboxRule rule) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var body = JsonSerializer.Serialize(rule, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/inbox/messageRules/{ruleId}");
+            var doc = await InvokeGraphApiAsync("PATCH", uri, headers, body);
+            return JsonSerializer.Deserialize<GraphInboxRule>(doc.RootElement.GetRawText())!;
         }
 
         /// <summary>

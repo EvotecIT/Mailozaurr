@@ -11,7 +11,7 @@ namespace Mailozaurr.PowerShell;
 /// Retrieves inbox rules for a mailbox via Microsoft Graph.
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "GraphInboxRule")]
-[OutputType(typeof(Dictionary<string, object>))]
+[OutputType(typeof(GraphInboxRule))]
 public sealed class CmdletGetGraphInboxRule : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "Graph")]
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
@@ -21,6 +21,9 @@ public sealed class CmdletGetGraphInboxRule : AsyncPSCmdlet {
     [Parameter(ParameterSetName = "Graph", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
+
+    [Parameter]
+    public string? Filter { get; set; }
 
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
@@ -54,7 +57,7 @@ public sealed class CmdletGetGraphInboxRule : AsyncPSCmdlet {
         Exception? lastException = null;
         do {
             try {
-                var rules = await MicrosoftGraphUtils.GetRulesAsync(cred, UserPrincipalName!);
+                var rules = await MicrosoftGraphUtils.GetRulesAsync(cred, UserPrincipalName!, Filter);
                 foreach (var r in rules) WriteObject(r);
                 return;
             } catch (Exception ex) {
@@ -78,9 +81,11 @@ public sealed class CmdletGetGraphInboxRule : AsyncPSCmdlet {
     }
 
     private Task ProcessMgGraph() {
+        var qp = string.IsNullOrWhiteSpace(Filter) ? null : new Dictionary<string, object> { ["$filter"] = Filter };
         var uri = MicrosoftGraphUtils.JoinUriQuery(
             "https://graph.microsoft.com/v1.0",
-            $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules");
+            $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules",
+            qp);
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "GET")
