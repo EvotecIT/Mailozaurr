@@ -56,11 +56,11 @@ namespace Mailozaurr {
         /// </summary>
         public static async Task<string> ConnectO365GraphAsync(GraphCredential credential, string tenantDomain, string resource = "https://manage.office.com") {
             var key = $"{credential.ClientId}|{tenantDomain}|{credential.CertificatePath}|{credential.ClientSecret}|{resource}";
-            if (TokenCache.TryGetValue(key, out var cached) && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
+            if (TokenCache.TryGetValue(key, out var cached) && cached.ExpiresOn >= DateTimeOffset.UtcNow.AddMinutes(4)) {
                 return $"{cached.TokenType} {cached.AccessToken}";
             }
             var cachedFile = OAuthTokenCache.Get($"graph:{key}");
-            if (cachedFile != null && cachedFile.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
+            if (cachedFile != null && cachedFile.ExpiresOn >= DateTimeOffset.UtcNow.AddMinutes(4)) {
                 TokenCache[key] = new GraphAuthorization { AccessToken = cachedFile.AccessToken, TokenType = "Bearer", ExpiresOn = cachedFile.ExpiresOn };
                 return $"Bearer {cachedFile.AccessToken}";
             }
