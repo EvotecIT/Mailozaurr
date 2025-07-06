@@ -19,11 +19,17 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? PermissionId { get; set; }
 
+    [Parameter(ParameterSetName = "Object")]
+    [ValidateNotNull]
+    public GraphMailboxPermission? MailboxPermission { get; set; }
+
     [Parameter(Mandatory = true, ParameterSetName = "Csv")]
     [ValidateNotNullOrEmpty]
     public string? CsvPath { get; set; }
 
     [Parameter(ParameterSetName = "Graph", ValueFromPipeline = true)]
+    [Parameter(ParameterSetName = "Object", ValueFromPipeline = true)]
+    [Parameter(ParameterSetName = "Csv", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
@@ -55,6 +61,12 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
             return ProcessCsvAsync(conn.Credential);
         }
 
+        if (ParameterSetName == "Object") {
+            if (MailboxPermission!.UserPrincipalName == null)
+                MailboxPermission.UserPrincipalName = UserPrincipalName;
+            return ProcessGraphAsync(conn.Credential, MailboxPermission);
+        }
+
         return ProcessGraphAsync(conn.Credential, PermissionId!);
     }
 
@@ -69,14 +81,20 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
         }
     }
 
-    private async Task ProcessGraphAsync(GraphCredential cred, string permissionId) {
-        if (!ShouldProcess(permissionId, "Removing mailbox permission")) return;
+    private async Task ProcessGraphAsync(GraphCredential cred, object permission) {
+        var id = permission switch {
+            GraphMailboxPermission p => p.Id,
+            string s => s,
+            _ => null
+        };
+        if (id is null) return;
+        if (!ShouldProcess(id, "Removing mailbox permission")) return;
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         int attempts = 0;
         Exception? lastException = null;
         do {
             try {
-                await MicrosoftGraphUtils.RemoveMailboxPermissionAsync(cred, UserPrincipalName!, permissionId);
+                await MicrosoftGraphUtils.RemoveMailboxPermissionAsync(cred, UserPrincipalName!, id);
                 return;
             } catch (Exception ex) {
                 lastException = ex;
@@ -97,7 +115,7 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
     }
 
     private void ProcessMgGraph() {
-        if (ParameterSetName == "Csv") {
+        if (CsvPath != null) {
             var psCsv = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
             psCsv.AddCommand("Import-Csv").AddParameter("Path", CsvPath);
             var rows = psCsv.Invoke();
@@ -106,9 +124,12 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
                 if (!string.IsNullOrWhiteSpace(id))
                     InvokeMgGraph(id);
             }
-        } else {
-            if (!ShouldProcess(PermissionId!, "Removing mailbox permission")) return;
-            InvokeMgGraph(PermissionId!);
+        } else if (MailboxPermission != null && MailboxPermission.Id != null) {
+            if (!ShouldProcess(MailboxPermission.Id, "Removing mailbox permission")) return;
+            InvokeMgGraph(MailboxPermission.Id);
+        } else if (PermissionId != null) {
+            if (!ShouldProcess(PermissionId, "Removing mailbox permission")) return;
+            InvokeMgGraph(PermissionId);
         }
     }
 

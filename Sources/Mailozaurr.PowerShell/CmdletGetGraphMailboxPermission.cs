@@ -9,7 +9,7 @@ namespace Mailozaurr.PowerShell;
 /// Retrieves mailbox permissions for a user via Microsoft Graph.
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "GraphMailboxPermission")]
-[OutputType(typeof(Dictionary<string, object>))]
+[OutputType(typeof(GraphMailboxPermission))]
 public class CmdletGetGraphMailboxPermission : AsyncPSCmdlet {
     /// <summary>User principal name owning the mailbox.</summary>
     [Parameter(Mandatory = true)]

@@ -20,11 +20,17 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public Hashtable? Permission { get; set; }
 
+    [Parameter(ParameterSetName = "Object")]
+    [ValidateNotNull]
+    public GraphMailboxPermission? MailboxPermission { get; set; }
+
     [Parameter(Mandatory = true, ParameterSetName = "Csv")]
     [ValidateNotNullOrEmpty]
     public string? CsvPath { get; set; }
 
     [Parameter(ParameterSetName = "Graph", ValueFromPipeline = true)]
+    [Parameter(ParameterSetName = "Object", ValueFromPipeline = true)]
+    [Parameter(ParameterSetName = "Csv", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
@@ -56,6 +62,12 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
             return ProcessCsvAsync(conn.Credential);
         }
 
+        if (ParameterSetName == "Object") {
+            if (MailboxPermission!.UserPrincipalName == null)
+                MailboxPermission.UserPrincipalName = UserPrincipalName;
+            return ProcessGraphAsync(conn.Credential, MailboxPermission);
+        }
+
         return ProcessGraphAsync(conn.Credential, Permission!);
     }
 
@@ -69,12 +81,16 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
         }
     }
 
-    private async Task ProcessGraphAsync(GraphCredential cred, Hashtable permission) {
+    private async Task ProcessGraphAsync(GraphCredential cred, object permission) {
         if (!ShouldProcess(UserPrincipalName!, "Adding mailbox permission")) return;
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         int attempts = 0;
         Exception? lastException = null;
-        var body = JsonSerializer.Serialize(permission.Cast<DictionaryEntry>().ToDictionary(e => (string)e.Key, e => e.Value));
+        string body = permission switch {
+            Hashtable ht => JsonSerializer.Serialize(ht.Cast<DictionaryEntry>().ToDictionary(e => (string)e.Key, e => e.Value)),
+            GraphMailboxPermission p => JsonSerializer.Serialize(p.ToDictionary()),
+            _ => JsonSerializer.Serialize(permission)
+        };
         do {
             try {
                 await MicrosoftGraphUtils.AddMailboxPermissionAsync(cred, UserPrincipalName!, body);
@@ -100,7 +116,7 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
     private void ProcessMgGraph() {
         if (!ShouldProcess(UserPrincipalName!, "Adding mailbox permission")) return;
         string body;
-        if (ParameterSetName == "Csv") {
+        if (CsvPath != null) {
             var psCsv = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
             psCsv.AddCommand("Import-Csv").AddParameter("Path", CsvPath);
             var rows = psCsv.Invoke();
@@ -109,8 +125,11 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
                 body = JsonSerializer.Serialize(dict);
                 InvokeMgGraph(body);
             }
-        } else {
-            var conv = Permission!.Cast<DictionaryEntry>().ToDictionary(e => (string)e.Key, e => e.Value);
+        } else if (MailboxPermission != null) {
+            body = JsonSerializer.Serialize(MailboxPermission.ToDictionary());
+            InvokeMgGraph(body);
+        } else if (Permission != null) {
+            var conv = Permission.Cast<DictionaryEntry>().ToDictionary(e => (string)e.Key, e => e.Value);
             body = JsonSerializer.Serialize(conv);
             InvokeMgGraph(body);
         }

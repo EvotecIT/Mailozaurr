@@ -9,15 +9,15 @@ $cred  = ConvertTo-GraphCredential -ClientId $ClientId -ClientSecret $ClientSecr
 $graph = Connect-EmailGraph -Credential $cred
 
 # Display existing permissions for the mailbox
-Get-GraphMailboxPermission -Connection $graph -UserPrincipalName 'user@example.com' |
-    Format-Table id,grantedTo,roles
+$perms = Get-GraphMailboxPermission -Connection $graph -UserPrincipalName 'user@example.com'
+$perms | Format-Table Id, GrantedTo, Roles
 
-# Grant full access to another user using hashtable input
-$permission = @{
-    role    = 'owner'
+# Grant full access to another user using a typed object
+$permission = [Mailozaurr.GraphMailboxPermission]::FromHashtable(@{
+    role      = 'owner'
     grantedTo = @{ user = 'julia@example.com' }
-}
-Add-GraphMailboxPermission -Connection $graph -UserPrincipalName 'user@example.com' -Permission $permission
+})
+Add-GraphMailboxPermission -Connection $graph -UserPrincipalName 'user@example.com' -MailboxPermission $permission
 
 # Bulk add permissions from CSV (columns should map to Graph permission properties)
 Add-GraphMailboxPermission -Connection $graph -UserPrincipalName 'user@example.com' -CsvPath '.\permissions.csv'
@@ -28,6 +28,9 @@ Get-GraphMailboxPermission -Connection $graph -UserPrincipalName 'user@example.c
 # Remove a single permission by id
 Remove-GraphMailboxPermission -Connection $graph -UserPrincipalName 'user@example.com' -PermissionId 'permission-id'
 
+# Advanced: remove using a permission object
+($perms)[0].RemoveAsync($graph.Credential) | Out-Null
+
 # Remove multiple permissions from CSV (file requires PermissionId column)
 Remove-GraphMailboxPermission -Connection $graph -UserPrincipalName 'user@example.com' -CsvPath '.\permissionsToRemove.csv'
 
@@ -37,3 +40,4 @@ Connect-MgGraph -Scopes 'Mail.ReadWrite' -NoWelcome
 Get-GraphMailboxPermission -UserPrincipalName 'user@example.com' -MgGraphRequest
 
 Disconnect-EmailGraph -Connection $graph
+
