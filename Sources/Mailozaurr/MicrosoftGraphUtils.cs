@@ -778,5 +778,68 @@ namespace Mailozaurr {
             var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/{folderId}");
             await InvokeGraphApiAsync("DELETE", uri, headers);
         }
+
+        /// <summary>
+        /// Retrieves inbox rules for the specified user.
+        /// </summary>
+        /// <param name="credential">Credential used to authenticate to Microsoft Graph.</param>
+        /// <param name="userPrincipalName">User principal name owning the mailbox.</param>
+        /// <returns>List of inbox rules represented as dictionaries.</returns>
+        public static async Task<List<Dictionary<string, object>>> GetRulesAsync(
+            GraphCredential credential,
+            string userPrincipalName) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/inbox/messageRules");
+            var doc = await InvokeGraphApiAsync("GET", uri, headers);
+            var rules = new List<Dictionary<string, object>>();
+            if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
+                foreach (var item in valueElement.EnumerateArray()) {
+                    var rule = ConvertJsonElementToNativeObject(item) as Dictionary<string, object>;
+                    if (rule != null) rules.Add(rule);
+                }
+            }
+            return rules;
+        }
+
+        /// <summary>
+        /// Creates a new inbox rule.
+        /// </summary>
+        /// <param name="credential">Credential used to authenticate to Microsoft Graph.</param>
+        /// <param name="userPrincipalName">User principal name owning the mailbox.</param>
+        /// <param name="rule">Dictionary describing the rule to create.</param>
+        /// <returns>The created rule as a dictionary.</returns>
+        public static async Task<Dictionary<string, object>> NewRuleAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            Dictionary<string, object> rule) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            RemoveEmptyValues(rule);
+            var body = JsonSerializer.Serialize(rule);
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/inbox/messageRules");
+            var doc = await InvokeGraphApiAsync("POST", uri, headers, body);
+            return ConvertJsonElementToNativeObject(doc.RootElement) as Dictionary<string, object> ?? new();
+        }
+
+        /// <summary>
+        /// Removes the specified inbox rule.
+        /// </summary>
+        /// <param name="credential">Credential used to authenticate to Microsoft Graph.</param>
+        /// <param name="userPrincipalName">User principal name owning the mailbox.</param>
+        /// <param name="ruleId">Identifier of the rule to remove.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        public static async Task RemoveRuleAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            string ruleId) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/inbox/messageRules/{ruleId}");
+            await InvokeGraphApiAsync("DELETE", uri, headers);
+        }
     }
 }
