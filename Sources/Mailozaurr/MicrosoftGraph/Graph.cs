@@ -357,20 +357,25 @@ public class Graph : IDisposable {
         //LoggingMessages.Logger.WriteVerbose($"Tenant Domain: {TenantDomain}");
         //LoggingMessages.Logger.WriteVerbose($"Application Key {ApplicationKey}");
         try {
-            using var response = await _client.PostAsync($"https://login.microsoftonline.com/{TenantDomain}/oauth2/token", new FormUrlEncodedContent(body), cancellationToken);
-            var content = await response.Content.ReadAsStringAsync();
-            if (!response.IsSuccessStatusCode) {
-                LogCollector.LogWarning($"Send-EmailMessage - Error during connection using Graph API: {content}");
-                if (ErrorAction == ActionPreference.Stop) {
-                    response.EnsureSuccessStatusCode();
+            await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
+            try {
+                using var response = await _client.PostAsync($"https://login.microsoftonline.com/{TenantDomain}/oauth2/token", new FormUrlEncodedContent(body), cancellationToken);
+                var content = await response.Content.ReadAsStringAsync();
+                if (!response.IsSuccessStatusCode) {
+                    LogCollector.LogWarning($"Send-EmailMessage - Error during connection using Graph API: {content}");
+                    if (ErrorAction == ActionPreference.Stop) {
+                        response.EnsureSuccessStatusCode();
+                    }
+                    return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, content, content);
                 }
-                return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, content, content);
-            }
 
-            var authorization = JsonSerializer.Deserialize<GraphAuthorization>(content);
-            AccessToken = authorization.AccessToken;
-            TokenType = authorization.TokenType;
-            return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", "");
+                var authorization = JsonSerializer.Deserialize<GraphAuthorization>(content);
+                AccessToken = authorization.AccessToken;
+                TokenType = authorization.TokenType;
+                return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", "");
+            } finally {
+                MicrosoftGraphUtils.ConcurrencySemaphore.Release();
+            }
         } catch (TaskCanceledException ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Connection to Graph API cancelled: {ex.Message}");
             return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, ex.Message);
@@ -403,18 +408,23 @@ public class Graph : IDisposable {
                 };
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
 
-                using var response = await _client.SendAsync(request, cancellationToken);
-                var content = await response.Content.ReadAsStringAsync();
-                if (response.IsSuccessStatusCode) {
-                    var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, response.StatusCode.ToString(), "");
-                    await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken);
-                    return okResult;
+                await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
+                try {
+                    using var response = await _client.SendAsync(request, cancellationToken);
+                    var content = await response.Content.ReadAsStringAsync();
+                    if (response.IsSuccessStatusCode) {
+                        var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, response.StatusCode.ToString(), "");
+                        await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken);
+                        return okResult;
+                    }
+                    var error = JsonSerializer.Deserialize<GraphApiError>(content);
+                    var errorMessage = (error == null || error.Error == null || error.Error.InnerError == null)
+                        ? $"Unknown error: {content}"
+                        : $"Error code: {error.Error.Code}, message: {error.Error.Message}, request ID: {error.Error.InnerError.RequestId}, date: {error.Error.InnerError.Date}";
+                    throw new GraphApiException(response.StatusCode, errorMessage, content);
+                } finally {
+                    MicrosoftGraphUtils.ConcurrencySemaphore.Release();
                 }
-                var error = JsonSerializer.Deserialize<GraphApiError>(content);
-                var errorMessage = (error == null || error.Error == null || error.Error.InnerError == null)
-                    ? $"Unknown error: {content}"
-                    : $"Error code: {error.Error.Code}, message: {error.Error.Message}, request ID: {error.Error.InnerError.RequestId}, date: {error.Error.InnerError.Date}";
-                throw new GraphApiException(response.StatusCode, errorMessage, content);
             } catch (TaskCanceledException ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Sending via Graph API cancelled: {ex.Message}");
@@ -517,25 +527,30 @@ public class Graph : IDisposable {
         sendRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
 
         // Send the HTTP request for sending the draft message
-        using var sendResponse = await _client.SendAsync(sendRequest, cancellationToken);
+        await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
+        try {
+            using var sendResponse = await _client.SendAsync(sendRequest, cancellationToken);
 
-        // If the status code indicates success, return a successful result
-        if (sendResponse.IsSuccessStatusCode) {
-            var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, sendResponse.StatusCode.ToString(), "");
-            await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken);
-            return okResult;
+            // If the status code indicates success, return a successful result
+            if (sendResponse.IsSuccessStatusCode) {
+                var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, sendResponse.StatusCode.ToString(), "");
+                await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken);
+                return okResult;
+            }
+
+            // If the status code indicates an error, throw an exception with the content
+            var sendContent = await sendResponse.Content.ReadAsStringAsync();
+            var sendError = JsonSerializer.Deserialize<GraphApiError>(sendContent);
+            var sendErrorMessage = (sendError == null || sendError.Error == null || sendError.Error.InnerError == null)
+                ? $"Unknown error: {sendContent}"
+                : $"Error code: {sendError.Error.Code}, message: {sendError.Error.Message}, request ID: {sendError.Error.InnerError.RequestId}, date: {sendError.Error.InnerError.Date}";
+            var ex = new GraphApiException(sendResponse.StatusCode, sendErrorMessage, sendContent);
+            var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, sendContent, ex.Message);
+            await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
+            throw ex;
+        } finally {
+            MicrosoftGraphUtils.ConcurrencySemaphore.Release();
         }
-
-        // If the status code indicates an error, throw an exception with the content
-        var sendContent = await sendResponse.Content.ReadAsStringAsync();
-        var sendError = JsonSerializer.Deserialize<GraphApiError>(sendContent);
-        var sendErrorMessage = (sendError == null || sendError.Error == null || sendError.Error.InnerError == null)
-            ? $"Unknown error: {sendContent}"
-            : $"Error code: {sendError.Error.Code}, message: {sendError.Error.Message}, request ID: {sendError.Error.InnerError.RequestId}, date: {sendError.Error.InnerError.Date}";
-        var ex = new GraphApiException(sendResponse.StatusCode, sendErrorMessage, sendContent);
-        var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, sendContent, ex.Message);
-        await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
-        throw ex;
     }
 
     /// <summary>
@@ -597,27 +612,35 @@ public class Graph : IDisposable {
         draftRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
 
         // Send the HTTP request for creating the draft message
-        using var draftResponse = await _client.SendAsync(draftRequest, cancellationToken);
-
-        // Read the response content
-        var draftContent = await draftResponse.Content.ReadAsStringAsync();
-
-        if (!draftResponse.IsSuccessStatusCode) {
-            var error = JsonSerializer.Deserialize<GraphApiError>(draftContent);
-            var errorMessage = (error == null || error.Error == null)
-                ? $"Unknown error: {draftContent}"
-                : $"Error code: {error.Error.Code}, message: {error.Error.Message}";
-            throw new GraphApiException(draftResponse.StatusCode, errorMessage, draftContent);
+        await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
+        HttpResponseMessage draftResponse;
+        try {
+            draftResponse = await _client.SendAsync(draftRequest, cancellationToken);
+        } finally {
+            MicrosoftGraphUtils.ConcurrencySemaphore.Release();
         }
 
-        // Deserialize the draft message
-        var draftMessage = JsonSerializer.Deserialize<GraphMessage>(draftContent);
+        using (draftResponse) {
+            // Read the response content
+            var draftContent = await draftResponse.Content.ReadAsStringAsync();
 
-        if (draftMessage == null) {
-            throw new InvalidOperationException("Failed to create draft message.");
+            if (!draftResponse.IsSuccessStatusCode) {
+                var error = JsonSerializer.Deserialize<GraphApiError>(draftContent);
+                var errorMessage = (error == null || error.Error == null)
+                    ? $"Unknown error: {draftContent}"
+                    : $"Error code: {error.Error.Code}, message: {error.Error.Message}";
+                throw new GraphApiException(draftResponse.StatusCode, errorMessage, draftContent);
+            }
+
+            // Deserialize the draft message
+            var draftMessage = JsonSerializer.Deserialize<GraphMessage>(draftContent);
+
+            if (draftMessage == null) {
+                throw new InvalidOperationException("Failed to create draft message.");
+            }
+
+            return draftMessage;
         }
-
-        return draftMessage;
     }
 
     /// <summary>
@@ -686,16 +709,24 @@ public class Graph : IDisposable {
         using var client = new HttpClient();
         client.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
-        using var uploadSessionResponse = await client.PostAsync(
-            uploadSessionUrl,
-            new StringContent(attachmentItemJson, Encoding.UTF8, "application/json"),
-            cancellationToken);
+        await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
+        HttpResponseMessage uploadSessionResponse;
+        try {
+            uploadSessionResponse = await client.PostAsync(
+                uploadSessionUrl,
+                new StringContent(attachmentItemJson, Encoding.UTF8, "application/json"),
+                cancellationToken);
+        } finally {
+            MicrosoftGraphUtils.ConcurrencySemaphore.Release();
+        }
 
-        var uploadSessionContent = await uploadSessionResponse.Content.ReadAsStringAsync();
+        using (uploadSessionResponse) {
+            var uploadSessionContent = await uploadSessionResponse.Content.ReadAsStringAsync();
 
-        // {"error":{"code":"InvalidAuthenticationToken","message":"Access token is empty.","innerError":{"date":"2024-06-15T09:51:54","request-id":"4a43e743-e897-4758-8d7d-21858c198e1d","client-request-id":"4a43e743-e897-4758-8d7d-21858c198e1d"}}}
-        //Console.WriteLine(uploadSessionContent);
-        return ParseUploadSessionResult(uploadSessionContent);
+            // {"error":{"code":"InvalidAuthenticationToken","message":"Access token is empty.","innerError":{"date":"2024-06-15T09:51:54","request-id":"4a43e743-e897-4758-8d7d-21858c198e1d","client-request-id":"4a43e743-e897-4758-8d7d-21858c198e1d"}}}
+            //Console.WriteLine(uploadSessionContent);
+            return ParseUploadSessionResult(uploadSessionContent);
+        }
     }
 
     private static string ParseUploadSessionResult(string uploadSessionContent) {
@@ -794,11 +825,16 @@ public class Graph : IDisposable {
         requestMessage.Headers.Add("AnchorMailbox", SentFrom); // This is correctly added to HttpRequestMessage
         using var client = new HttpClient();
         client.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
-        var uploadChunkResponse = await client.SendAsync(requestMessage, cancellationToken);
-        if (!uploadChunkResponse.IsSuccessStatusCode) {
-            // Handle upload error
-            LogCollector.LogWarning(uploadChunkResponse.ToString());
-            return;
+        await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
+        try {
+            var uploadChunkResponse = await client.SendAsync(requestMessage, cancellationToken);
+            if (!uploadChunkResponse.IsSuccessStatusCode) {
+                // Handle upload error
+                LogCollector.LogWarning(uploadChunkResponse.ToString());
+                return;
+            }
+        } finally {
+            MicrosoftGraphUtils.ConcurrencySemaphore.Release();
         }
     }
 

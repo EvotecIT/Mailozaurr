@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Collections.Generic;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
 using Mailozaurr;
@@ -6,30 +8,11 @@ using System.Threading.Tasks;
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
-/// <para type="synopsis">Retrieves mail folders for a user via Microsoft Graph API.</para>
-/// <para type="description">The <c>Get-EmailGraphFolder</c> cmdlet retrieves mail folders for the specified user principal name using Microsoft Graph API. Provide a <see cref="GraphConnectionInfo"/> object created with <c>Connect-EmailGraph</c> or authenticate via <c>Connect-MgGraph</c>.</para>
-/// <example>
-///   <summary>Get mail folders using application permissions</summary>
-///   <code>$cred = ConvertTo-GraphCredential -ClientId "id" -ClientSecret "secret" -DirectoryId "tenant"
-///   $graph = Connect-EmailGraph -Credential $cred
-///   Get-EmailGraphFolder -UserPrincipalName "user@domain.com" -Connection $graph</code>
-/// </example>
-/// <example>
-///   <summary>Get mail folders using Connect-MgGraph</summary>
-///   <code>Connect-MgGraph -Scopes Mail.Read -NoWelcome
-///   Get-EmailGraphFolder -UserPrincipalName "user@domain.com" -MgGraphRequest</code>
-/// </example>
-/// <remarks>
-/// Use this cmdlet to enumerate mail folders for mailbox management, reporting, or migration scenarios.
-/// </remarks>
-/// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
+/// Retrieves inbox rules for a mailbox via Microsoft Graph.
 /// </summary>
-[Cmdlet(VerbsCommon.Get, "EmailGraphFolder")]
-[OutputType(typeof(object))]
-public class CmdletGetEmailGraphFolder : AsyncPSCmdlet {
-    /// <summary>
-    /// <para type="description">Specifies the user principal name (email address) whose mail folders will be retrieved.</para>
-    /// </summary>
+[Cmdlet(VerbsCommon.Get, "GraphInboxRule")]
+[OutputType(typeof(GraphInboxRule))]
+public sealed class CmdletGetGraphInboxRule : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "Graph")]
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     [ValidateNotNullOrEmpty]
@@ -39,6 +22,9 @@ public class CmdletGetEmailGraphFolder : AsyncPSCmdlet {
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
+    [Parameter]
+    public string? Filter { get; set; }
+
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 
@@ -46,17 +32,11 @@ public class CmdletGetEmailGraphFolder : AsyncPSCmdlet {
     public int TimeoutSeconds { get; set; } = 100;
 
     [Parameter]
-    public int MaxConcurrentRequests { get; set; } = 5;
-
-    [Parameter]
     public int RetryCount { get; set; } = 0;
 
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
-    /// <summary>
-    /// Retrieves mail folders for the specified user via Microsoft Graph API.
-    /// </summary>
     protected override Task ProcessRecordAsync() {
         if (ParameterSetName == "MgGraphRequest") {
             return ProcessMgGraph();
@@ -64,7 +44,7 @@ public class CmdletGetEmailGraphFolder : AsyncPSCmdlet {
 
         var conn = Connection ?? DefaultSessions.GraphSession;
         if (conn == null) {
-            WriteWarning("Get-EmailGraphFolder - Connection not provided and no default session available.");
+            WriteWarning("Get-GraphInboxRule - Connection not provided and no default session available.");
             return Task.CompletedTask;
         }
 
@@ -73,19 +53,16 @@ public class CmdletGetEmailGraphFolder : AsyncPSCmdlet {
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
-        MicrosoftGraphUtils.MaxConcurrentRequests = MaxConcurrentRequests;
         int attempts = 0;
         Exception? lastException = null;
         do {
             try {
-                var folders = await MicrosoftGraphUtils.GetMailFoldersAsync(cred, UserPrincipalName!);
-                foreach (var folder in folders) {
-                    WriteObject(folder);
-                }
+                var rules = await MicrosoftGraphUtils.GetRulesAsync(cred, UserPrincipalName!, Filter);
+                foreach (var r in rules) WriteObject(r);
                 return;
             } catch (Exception ex) {
                 lastException = ex;
-                WriteWarning($"Get-EmailGraphFolder - {ex.Message}");
+                WriteWarning($"Get-GraphInboxRule - {ex.Message}");
                 if (!Helpers.IsTransient(ex) || attempts >= RetryCount) {
                     if (ex is GraphApiException gex) {
                         WriteError(new ErrorRecord(gex, "GraphApiError", ErrorCategory.InvalidOperation, null));
@@ -94,9 +71,7 @@ public class CmdletGetEmailGraphFolder : AsyncPSCmdlet {
                     }
                     return;
                 }
-                if (RetryDelayMilliseconds > 0) {
-                    await Task.Delay(RetryDelayMilliseconds);
-                }
+                if (RetryDelayMilliseconds > 0) await Task.Delay(RetryDelayMilliseconds);
             }
             attempts++;
         } while (attempts <= RetryCount);
@@ -106,7 +81,11 @@ public class CmdletGetEmailGraphFolder : AsyncPSCmdlet {
     }
 
     private Task ProcessMgGraph() {
-        var uri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/mailFolders";
+        var qp = string.IsNullOrWhiteSpace(Filter) ? null : new Dictionary<string, object> { ["$filter"] = Filter };
+        var uri = MicrosoftGraphUtils.JoinUriQuery(
+            "https://graph.microsoft.com/v1.0",
+            $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules",
+            qp);
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "GET")
