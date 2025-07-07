@@ -37,6 +37,9 @@ public class CmdletRemoveGraphFolder : AsyncPSCmdlet {
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
+    /// <summary>
+    /// Maximum number of concurrent Microsoft Graph requests allowed.
+    /// </summary>
     [Parameter]
     public int MaxConcurrentRequests { get; set; } = 5;
 

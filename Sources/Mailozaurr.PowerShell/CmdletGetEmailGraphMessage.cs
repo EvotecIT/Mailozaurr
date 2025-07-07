@@ -17,13 +17,22 @@ namespace Mailozaurr.PowerShell;
 public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "Graph")]
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
+    /// <summary>
+    /// User principal name whose mailbox is queried.
+    /// </summary>
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
+    /// <summary>
+    /// Graph connection information.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
+    /// <summary>
+    /// Message properties to select.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph")]
     [Parameter(ParameterSetName = "MgGraphRequest")]
     public string[]? Property { get; set; }
@@ -36,49 +45,94 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
     [Alias("ODataFilter")]
     public string? Filter { get; set; }
 
+    /// <summary>
+    /// Limits the number of returned messages.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph")]
     [Parameter(ParameterSetName = "MgGraphRequest")]
     public int? Limit { get; set; }
 
+    /// <summary>
+    /// Filters messages by subject text.
+    /// </summary>
     [Parameter]
     public string? Subject { get; set; }
 
+    /// <summary>
+    /// Filters messages where the sender contains this value.
+    /// </summary>
     [Parameter]
     public string? FromContains { get; set; }
 
+    /// <summary>
+    /// Filters messages where the recipient contains this value.
+    /// </summary>
     [Parameter]
     public string? ToContains { get; set; }
 
+    /// <summary>
+    /// Filters messages by importance.
+    /// </summary>
     [Parameter]
     public MessagePriority? Priority { get; set; }
 
+    /// <summary>
+    /// Retrieves messages received since this date.
+    /// </summary>
     [Parameter]
     public DateTime? Since { get; set; }
 
+    /// <summary>
+    /// Retrieves messages received before this date.
+    /// </summary>
     [Parameter]
     public DateTime? Before { get; set; }
 
+    /// <summary>
+    /// Filters messages that have attachments.
+    /// </summary>
     [Parameter]
     public SwitchParameter HasAttachment { get; set; }
 
+    /// <summary>
+    /// When present, retrieves all messages ignoring limit.
+    /// </summary>
     [Parameter]
     public SwitchParameter All { get; set; }
 
+    /// <summary>
+    /// Deletes messages after retrieval when set.
+    /// </summary>
     [Parameter]
     public SwitchParameter Delete { get; set; }
 
+    /// <summary>
+    /// When specified, uses Invoke-MgGraphRequest for the operation.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 
+    /// <summary>
+    /// Request timeout in seconds.
+    /// </summary>
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
+    /// <summary>
+    /// Maximum number of concurrent Graph requests.
+    /// </summary>
     [Parameter]
     public int MaxConcurrentRequests { get; set; } = 5;
 
+    /// <summary>
+    /// Number of retry attempts on failure.
+    /// </summary>
     [Parameter]
     public int RetryCount { get; set; } = 0;
 
+    /// <summary>
+    /// Delay between retries in milliseconds.
+    /// </summary>
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 

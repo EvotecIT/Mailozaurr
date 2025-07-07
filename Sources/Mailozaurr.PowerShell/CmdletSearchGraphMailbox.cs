@@ -11,26 +11,44 @@ namespace Mailozaurr.PowerShell;
 [Cmdlet(VerbsCommon.Search, "GraphMailbox")]
 [OutputType(typeof(GraphMessageInfo))]
 public class CmdletSearchGraphMailbox : AsyncPSCmdlet {
+    /// <summary>
+    /// User principal names to search across.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string[]? UserPrincipalName { get; set; }
 
+    /// <summary>
+    /// Query string used to filter messages.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? Query { get; set; }
 
+    /// <summary>
+    /// Graph connection information.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
+    /// <summary>
+    /// Message index to start from.
+    /// </summary>
     [Parameter]
     public int From { get; set; }
 
+    /// <summary>
+    /// Number of messages to retrieve.
+    /// </summary>
     [Parameter]
     [Alias("Count")]
     [ValidateRange(1, int.MaxValue)]
     public int Size { get; set; } = 25;
 
+    /// <summary>
+    /// Maximum number of parallel Graph requests.
+    /// </summary>
     [Parameter]
     public int MaxConcurrentRequests { get; set; } = 5;
 

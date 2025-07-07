@@ -18,22 +18,37 @@ using System.Threading.Tasks;
 [Cmdlet(VerbsData.ConvertTo, "GraphCertificateCredential")]
 [OutputType(typeof(PSCredential))]
 public class CmdletConvertToGraphCertificateCredential : PSCmdlet {
+    /// <summary>
+    /// Azure AD application (client) identifier.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? ClientId { get; set; }
 
+    /// <summary>
+    /// Azure AD tenant identifier.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? TenantId { get; set; }
 
+    /// <summary>
+    /// Path to the client certificate (PFX).
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? CertificatePath { get; set; }
 
+    /// <summary>
+    /// Password for the client certificate.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? CertificatePassword { get; set; }
 
+    /// <summary>
+    /// Optional scopes to request.
+    /// </summary>
     [Parameter]
     public string[]? Scopes { get; set; }
 

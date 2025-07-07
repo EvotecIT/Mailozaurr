@@ -14,6 +14,9 @@ using System.Security;
 [Cmdlet(VerbsData.ConvertTo, "MailgunCredential")]
 [OutputType(typeof(PSCredential))]
 public class CmdletConvertToMailgunCredential : PSCmdlet {
+    /// <summary>
+    /// Mailgun API key used for authentication.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? ApiKey { get; set; }
