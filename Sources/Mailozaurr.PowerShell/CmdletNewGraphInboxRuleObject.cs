@@ -12,45 +12,87 @@ namespace Mailozaurr.PowerShell;
 [OutputType(typeof(GraphInboxRule))]
 public sealed class CmdletNewGraphInboxRuleObject : PSCmdlet
 {
+    /// <summary>
+    /// Display name for the inbox rule.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "Params")]
     public string DisplayName { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Builder object used to create the rule.
+    /// </summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true, ParameterSetName = "Builder")]
     public GraphInboxRuleBuilder? Builder { get; set; }
 
+    /// <summary>
+    /// Rule processing sequence number.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public int Sequence { get; set; }
 
+    /// <summary>
+    /// Enables the rule when set.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public SwitchParameter Enabled { get; set; }
 
+    /// <summary>
+    /// Folder to move matching messages to.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public string? MoveToFolder { get; set; }
 
+    /// <summary>
+    /// Folder to copy matching messages to.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public string? CopyToFolder { get; set; }
 
+    /// <summary>
+    /// Deletes matching messages.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public SwitchParameter Delete { get; set; }
 
+    /// <summary>
+    /// Addresses to forward matching messages to.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public string[]? ForwardTo { get; set; }
 
+    /// <summary>
+    /// Stops processing additional rules when this rule matches.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public SwitchParameter StopProcessing { get; set; }
 
+    /// <summary>
+    /// Sender address patterns to match.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public string[]? SenderContains { get; set; }
 
+    /// <summary>
+    /// Recipient address patterns to match.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public string[]? RecipientContains { get; set; }
 
+    /// <summary>
+    /// Subject text patterns to match.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public string[]? SubjectContains { get; set; }
 
+    /// <summary>
+    /// Body text patterns to match.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public string[]? BodyContains { get; set; }
 
+    /// <summary>
+    /// Importance level to match.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public string? Importance { get; set; }
 

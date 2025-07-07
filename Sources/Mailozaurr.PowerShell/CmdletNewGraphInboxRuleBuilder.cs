@@ -11,42 +11,81 @@ namespace Mailozaurr.PowerShell;
 [OutputType(typeof(GraphInboxRuleBuilder))]
 public sealed class CmdletNewGraphInboxRuleBuilder : PSCmdlet
 {
+    /// <summary>
+    /// Display name for the inbox rule.
+    /// </summary>
     [Parameter(Mandatory = true)]
     public string DisplayName { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Rule processing order.
+    /// </summary>
     [Parameter]
     public int Sequence { get; set; }
 
+    /// <summary>
+    /// Enables the rule when set.
+    /// </summary>
     [Parameter]
     public SwitchParameter Enabled { get; set; }
 
+    /// <summary>
+    /// Destination folder to move messages to.
+    /// </summary>
     [Parameter]
     public string? MoveToFolder { get; set; }
 
+    /// <summary>
+    /// Destination folder to copy messages to.
+    /// </summary>
     [Parameter]
     public string? CopyToFolder { get; set; }
 
+    /// <summary>
+    /// Deletes messages that match the rule.
+    /// </summary>
     [Parameter]
     public SwitchParameter Delete { get; set; }
 
+    /// <summary>
+    /// Addresses to forward matching messages to.
+    /// </summary>
     [Parameter]
     public string[]? ForwardTo { get; set; }
 
+    /// <summary>
+    /// Stops processing further rules when this rule matches.
+    /// </summary>
     [Parameter]
     public SwitchParameter StopProcessing { get; set; }
 
+    /// <summary>
+    /// Sender address patterns to match.
+    /// </summary>
     [Parameter]
     public string[]? SenderContains { get; set; }
 
+    /// <summary>
+    /// Recipient address patterns to match.
+    /// </summary>
     [Parameter]
     public string[]? RecipientContains { get; set; }
 
+    /// <summary>
+    /// Subject text patterns to match.
+    /// </summary>
     [Parameter]
     public string[]? SubjectContains { get; set; }
 
+    /// <summary>
+    /// Body text patterns to match.
+    /// </summary>
     [Parameter]
     public string[]? BodyContains { get; set; }
 
+    /// <summary>
+    /// Message importance to match.
+    /// </summary>
     [Parameter]
     public string? Importance { get; set; }
 

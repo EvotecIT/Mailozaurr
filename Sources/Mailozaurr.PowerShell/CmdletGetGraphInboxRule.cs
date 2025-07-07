@@ -13,27 +13,48 @@ namespace Mailozaurr.PowerShell;
 [Cmdlet(VerbsCommon.Get, "GraphInboxRule")]
 [OutputType(typeof(GraphInboxRule))]
 public sealed class CmdletGetGraphInboxRule : AsyncPSCmdlet {
+    /// <summary>
+    /// User principal name whose inbox rules are retrieved.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "Graph")]
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
+    /// <summary>
+    /// Connection information for Microsoft Graph.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
+    /// <summary>
+    /// Optional OData filter string.
+    /// </summary>
     [Parameter]
     public string? Filter { get; set; }
 
+    /// <summary>
+    /// Indicates the use of Invoke-MgGraphRequest for this operation.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 
+    /// <summary>
+    /// Request timeout in seconds.
+    /// </summary>
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
+    /// <summary>
+    /// Number of retry attempts on failure.
+    /// </summary>
     [Parameter]
     public int RetryCount { get; set; } = 0;
 
+    /// <summary>
+    /// Delay between retries in milliseconds.
+    /// </summary>
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 

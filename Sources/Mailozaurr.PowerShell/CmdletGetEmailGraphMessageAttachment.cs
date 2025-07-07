@@ -36,23 +36,41 @@ public class CmdletGetEmailGraphMessageAttachment : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? MessageId { get; set; }
     /// <summary>
+    /// <summary>
+    /// Graph connection information.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
 
+    /// <summary>
+    /// Executes the request via Invoke-MgGraphRequest when set.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 
+    /// <summary>
+    /// Request timeout in seconds.
+    /// </summary>
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
+    /// <summary>
+    /// Maximum number of concurrent Graph requests.
+    /// </summary>
     [Parameter]
     public int MaxConcurrentRequests { get; set; } = 5;
 
+    /// <summary>
+    /// Number of retry attempts on failure.
+    /// </summary>
     [Parameter]
     public int RetryCount { get; set; } = 0;
 
+    /// <summary>
+    /// Delay between retries in milliseconds.
+    /// </summary>
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
     /// <summary>
