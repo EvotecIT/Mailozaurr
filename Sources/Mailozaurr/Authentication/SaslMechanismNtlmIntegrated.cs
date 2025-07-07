@@ -83,6 +83,9 @@ namespace Mailozaurr {
         }
 
 
+        /// <summary>
+        /// Resets the authentication state allowing the mechanism to be reused.
+        /// </summary>
         public override void Reset() {
             state = LoginState.Initial;
             base.Reset();

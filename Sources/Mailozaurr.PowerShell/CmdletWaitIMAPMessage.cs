@@ -36,17 +36,26 @@ public sealed class CmdletWaitIMAPMessage : AsyncPSCmdlet, System.IDisposable {
     public string? Folder { get; set; }
 
     /// <summary>
-    /// <para type="description">Optional script block invoked for each arriving message.</para>
+    /// Optional action executed for each received message.
     /// </summary>
     [Parameter]
     public ScriptBlock? Action { get; set; }
 
+    /// <summary>
+    /// Script block that determines when to stop waiting for messages.
+    /// </summary>
     [Parameter]
     public ScriptBlock? Until { get; set; }
 
+    /// <summary>
+    /// Stops listening when the <c>Until</c> condition is satisfied.
+    /// </summary>
     [Parameter]
     public SwitchParameter StopOnMatch { get; set; }
 
+    /// <summary>
+    /// Optional timeout after which the cmdlet stops waiting.
+    /// </summary>
     [Parameter]
     public int TimeoutSeconds { get; set; }
 
@@ -55,6 +64,9 @@ public sealed class CmdletWaitIMAPMessage : AsyncPSCmdlet, System.IDisposable {
     private CancellationTokenSource? _linkedSource;
 
     /// <inheritdoc />
+    /// <summary>
+    /// Begins listening for new IMAP messages using the IDLE command.
+    /// </summary>
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn == null || conn.Data == null) {

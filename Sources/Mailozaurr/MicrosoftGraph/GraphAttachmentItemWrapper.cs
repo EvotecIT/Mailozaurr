@@ -5,6 +5,9 @@ namespace Mailozaurr;
 /// </summary>
 public class GraphAttachmentItemWrapper {
     [JsonPropertyName("AttachmentItem")]
+    /// <summary>
+    /// Gets the attachment item used when creating the upload session.
+    /// </summary>
     public GraphAttachmentItem AttachmentItem { get; set; }
 
     /// <summary>Initializes a new instance of the wrapper.</summary>

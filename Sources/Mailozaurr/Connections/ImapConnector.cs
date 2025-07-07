@@ -9,7 +9,14 @@ namespace Mailozaurr;
 /// Provides helper methods for connecting to IMAP servers with retry logic.
 /// </summary>
 public static class ImapConnector {
+    /// <summary>
+    /// Factory used to create <see cref="ImapClient"/> instances.
+    /// </summary>
     public static Func<ImapClient> ClientFactory { get; set; } = () => new ImapClient();
+
+    /// <summary>
+    /// Delegate used to introduce a delay between connection retries.
+    /// </summary>
     public static Func<int, Task>? DelayAsync { get; set; }
 
     /// <summary>

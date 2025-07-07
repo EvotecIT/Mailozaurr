@@ -11,19 +11,34 @@ namespace Mailozaurr.PowerShell;
 [Cmdlet(VerbsLifecycle.Wait, "POP3Message")]
 [OutputType(typeof(Pop3EmailMessage))]
 public sealed class CmdletWaitPOP3Message : AsyncPSCmdlet, IDisposable {
+    /// <summary>
+    /// Connection information for the POP3 session used for polling.
+    /// </summary>
     [Parameter(ValueFromPipeline = true)]
     [ValidateNotNull]
     public PopConnectionInfo? Client { get; set; }
 
+    /// <summary>
+    /// Optional action invoked for each message that arrives.
+    /// </summary>
     [Parameter]
     public ScriptBlock? Action { get; set; }
 
+    /// <summary>
+    /// Script block determining when to stop waiting for messages.
+    /// </summary>
     [Parameter]
     public ScriptBlock? Until { get; set; }
 
+    /// <summary>
+    /// Stops polling when the <c>Until</c> condition is satisfied.
+    /// </summary>
     [Parameter]
     public SwitchParameter StopOnMatch { get; set; }
 
+    /// <summary>
+    /// Optional timeout after which the cmdlet stops polling.
+    /// </summary>
     [Parameter]
     public int TimeoutSeconds { get; set; }
 
@@ -32,6 +47,9 @@ public sealed class CmdletWaitPOP3Message : AsyncPSCmdlet, IDisposable {
     private CancellationTokenSource? _linkedSource;
 
     /// <inheritdoc />
+    /// <summary>
+    /// Begins polling the POP3 mailbox for new messages until stopped.
+    /// </summary>
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.Pop3Session;
         if (conn == null || conn.Data == null) {

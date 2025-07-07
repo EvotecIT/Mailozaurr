@@ -17,23 +17,41 @@ namespace Mailozaurr.PowerShell;
 [Cmdlet(VerbsLifecycle.Wait, "GraphMessage")]
 [OutputType(typeof(object))]
 public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
+    /// <summary>
+    /// Graph connection information used when polling for messages.
+    /// </summary>
     [Parameter(ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
+    /// <summary>
+    /// User principal name whose mailbox should be monitored.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
+    /// <summary>
+    /// Optional action executed for each received message.
+    /// </summary>
     [Parameter]
     public ScriptBlock? Action { get; set; }
 
+    /// <summary>
+    /// Script block that determines when to stop waiting for messages.
+    /// </summary>
     [Parameter]
     public ScriptBlock? Until { get; set; }
 
+    /// <summary>
+    /// Stops waiting when a message matches the <c>Until</c> condition.
+    /// </summary>
     [Parameter]
     public SwitchParameter StopOnMatch { get; set; }
 
+    /// <summary>
+    /// Optional timeout after which listening will stop automatically.
+    /// </summary>
     [Parameter]
     public int TimeoutSeconds { get; set; }
 
@@ -42,6 +60,9 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
     private CancellationTokenSource? _linkedSource;
 
     /// <inheritdoc />
+    /// <summary>
+    /// Starts listening for new Graph messages until stopped or timed out.
+    /// </summary>
     protected override async Task ProcessRecordAsync() {
         var conn = Connection ?? DefaultSessions.GraphSession;
         if (conn == null || conn.Credential == null) {
