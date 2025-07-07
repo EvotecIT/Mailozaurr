@@ -7,33 +7,53 @@ namespace Mailozaurr;
 /// <summary>
 /// Simple client for sending emails using the Amazon SES REST API.
 /// </summary>
-public class SesClient : IDisposable
-{
+public class SesClient : IDisposable {
     private readonly HttpClient _client;
+
+    /// <summary>Measures send latency.</summary>
     public readonly Stopwatch Stopwatch;
 
+    /// <summary>Credentials used to authenticate with Amazon SES.</summary>
     public ICredentials Credentials { get; set; } = CredentialCache.DefaultNetworkCredentials;
+    /// <summary>Controls how errors are handled.</summary>
     public ActionPreference? ErrorAction { get; set; }
 
+    /// <summary>Primary recipients.</summary>
     public List<object> To { get; set; } = new();
+    /// <summary>Carbon copy recipients.</summary>
     public List<object> Cc { get; set; } = new();
+    /// <summary>Blind carbon copy recipients.</summary>
     public List<object> Bcc { get; set; } = new();
+    /// <summary>The sender address.</summary>
     public object From { get; set; } = string.Empty;
+    /// <summary>Reply-to address.</summary>
     public object? ReplyTo { get; set; }
+    /// <summary>The message subject.</summary>
     public string? Subject { get; set; }
+    /// <summary>Plain text body.</summary>
     public string Text { get; set; } = string.Empty;
+    /// <summary>HTML body.</summary>
     public string Html { get; set; } = string.Empty;
+    /// <summary>Paths to attachments to include.</summary>
     public string[]? Attachment { get; set; }
+    /// <summary>Paths to inline attachments to include.</summary>
     public string[]? InlineAttachment { get; set; }
 
+    /// <summary>Number of retry attempts on failure.</summary>
     public int RetryCount { get; set; } = 0;
+    /// <summary>Base delay in milliseconds between retries.</summary>
     public int RetryDelayMilliseconds { get; set; } = 0;
+    /// <summary>Exponential backoff multiplier for retries.</summary>
     public double RetryDelayBackoff { get; set; } = 1.0;
+    /// <summary>Retry even on non-transient errors.</summary>
     public bool RetryAlways { get; set; } = false;
 
+    /// <summary>AWS region to use.</summary>
     public string Region { get; set; } = "us-east-1";
+    /// <summary>Webhook invoked after sending.</summary>
     public string? WebhookUrl { get; set; }
 
+    /// <summary>Collector used to store log entries.</summary>
     public LogCollector LogCollector { get; set; } = new();
 
     public string SentFrom => Helpers.GetEmailAddress(From);

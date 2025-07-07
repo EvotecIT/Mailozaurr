@@ -3,7 +3,12 @@ using MailKit.Security;
 using System;
 using System.Threading.Tasks;
 
+/// <summary>
+/// Demonstrates how to use <see cref="Mailozaurr.ImapIdleListener"/> to
+/// receive IMAP messages as they arrive.
+/// </summary>
 public static class ImapIdleListenerExample {
+    /// <summary>Runs the example.</summary>
     public static async Task RunAsync() {
         // === CONFIGURATION ===
         const string server = "imap.example.com";

@@ -4,7 +4,11 @@ using MimeKit;
 using System;
 using System.Threading.Tasks;
 
+/// <summary>
+/// Example demonstrating how to fetch messages from a POP3 server.
+/// </summary>
 public static class FetchPopMessages {
+    /// <summary>Runs the example.</summary>
     public static async Task RunAsync() {
         // === CONFIGURATION ===
         string server = "pop.example.com";

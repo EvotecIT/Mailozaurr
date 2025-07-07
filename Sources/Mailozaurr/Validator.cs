@@ -7,6 +7,10 @@ using EmailValidation;
 
 namespace Mailozaurr;
 
+/// <summary>
+/// Provides helper methods for validating email addresses and detecting
+/// disposable domains.
+/// </summary>
 public static class Validator {
     private static readonly HashSet<string> DisposableDomains;
     private static readonly HashSet<string> AllowedDomains;

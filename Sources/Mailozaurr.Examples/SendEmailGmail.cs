@@ -2,7 +2,11 @@ using Mailozaurr;
 using MailKit.Security;
 using System;
 
+/// <summary>
+/// Sends an email using Gmail SMTP and an app password.
+/// </summary>
 public static class SendEmailGmail {
+    /// <summary>Runs the example.</summary>
     public static void Run() {
         // === CONFIGURATION ===
         string gmailAddress = "youraddress@gmail.com";

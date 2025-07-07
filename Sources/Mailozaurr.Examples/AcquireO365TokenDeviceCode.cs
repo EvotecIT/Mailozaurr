@@ -2,7 +2,11 @@ using Mailozaurr;
 using System;
 using System.Threading.Tasks;
 
+/// <summary>
+/// Obtains an OAuth token for Office 365 using the device code flow.
+/// </summary>
 public static class AcquireO365TokenDeviceCode {
+    /// <summary>Runs the example.</summary>
     public static async Task RunAsync() {
         string clientId = "your-client-id";
         string tenantId = "your-tenant-id";
