@@ -12,13 +12,18 @@ using System.Threading;
 
 namespace Mailozaurr {
 
-
+    /// <summary>
+    /// Utility helpers for working with the Microsoft Graph API.
+    /// </summary>
     public static class MicrosoftGraphUtils {
         private static readonly HttpClient HttpClient;
         private static readonly ConcurrentDictionary<string, GraphAuthorization> TokenCache = new();
         private static SemaphoreSlim _concurrencySemaphore = new(5, 5);
         private static int _maxConcurrentRequests = 5;
 
+        /// <summary>
+        /// Gets or sets the maximum number of concurrent HTTP requests allowed.
+        /// </summary>
         public static int MaxConcurrentRequests {
             get => _maxConcurrentRequests;
             set {
@@ -35,7 +40,7 @@ namespace Mailozaurr {
         internal static SemaphoreSlim ConcurrencySemaphore => _concurrencySemaphore;
 
         /// <summary>
-        /// Timeout for HTTP operations in seconds.
+        /// Gets or sets the timeout for HTTP operations in seconds.
         /// </summary>
         public static int TimeoutSeconds {
             get => (int)HttpClient.Timeout.TotalSeconds;

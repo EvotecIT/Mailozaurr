@@ -31,6 +31,9 @@ public sealed class CmdletSetIMAPMessage : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter Unread { get; set; }
 
+    /// <summary>
+    /// Processes the cmdlet, updating message flags as requested.
+    /// </summary>
     protected override async Task ProcessRecordAsync() {
         if (Read.IsPresent && Unread.IsPresent) {
             ThrowTerminatingError(new ErrorRecord(new PSArgumentException("Specify only -Read or -Unread."), "InvalidFlags", ErrorCategory.InvalidArgument, null));

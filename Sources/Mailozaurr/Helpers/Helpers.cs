@@ -142,6 +142,13 @@ public static class Helpers {
         }
     }
 
+    /// <summary>
+    /// Posts the provided <see cref="SmtpResult"/> to a webhook endpoint.
+    /// </summary>
+    /// <param name="url">Destination webhook URL.</param>
+    /// <param name="result">Result object describing the send operation.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    /// <param name="client">Optional HTTP client to reuse.</param>
     public static async Task PostWebhookAsync(string? url, SmtpResult result, CancellationToken cancellationToken = default, HttpClient? client = null) {
         if (string.IsNullOrWhiteSpace(url)) {
             return;

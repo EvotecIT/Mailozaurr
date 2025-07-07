@@ -56,7 +56,14 @@ public class SesClient : IDisposable {
     /// <summary>Collector used to store log entries.</summary>
     public LogCollector LogCollector { get; set; } = new();
 
+    /// <summary>
+    /// Gets the normalized sender email address.
+    /// </summary>
     public string SentFrom => Helpers.GetEmailAddress(From);
+
+    /// <summary>
+    /// Gets a comma separated list of recipient email addresses.
+    /// </summary>
     public string SentTo
     {
         get
@@ -70,14 +77,19 @@ public class SesClient : IDisposable {
         }
     }
 
-    public SesClient()
-    {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SesClient"/> class using a default <see cref="HttpClient"/>.
+    /// </summary>
+    public SesClient() {
         Stopwatch = Stopwatch.StartNew();
         _client = new HttpClient();
     }
 
-    public SesClient(HttpMessageHandler handler)
-    {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SesClient"/> class using the specified HTTP handler.
+    /// </summary>
+    /// <param name="handler">The HTTP handler to use for requests.</param>
+    public SesClient(HttpMessageHandler handler) {
         Stopwatch = Stopwatch.StartNew();
         _client = new HttpClient(handler);
     }
@@ -202,8 +214,10 @@ public class SesClient : IDisposable {
         return final;
     }
 
-    public void Dispose()
-    {
+    /// <summary>
+    /// Releases resources used by the <see cref="SesClient"/> instance.
+    /// </summary>
+    public void Dispose() {
         _client.Dispose();
     }
 }

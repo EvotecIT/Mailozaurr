@@ -9,8 +9,17 @@ namespace Mailozaurr;
 /// </summary>
 public class Graph : IDisposable {
     private readonly HttpClient _client;
+    /// <summary>
+    /// Serialized JSON representation of the current Graph message.
+    /// </summary>
     public string MessageJson = string.Empty;
+
+    /// <summary>
+    /// Container object used when building a Graph message.
+    /// </summary>
     public GraphMessageContainer MessageContainer;
+
+    /// <summary>Measures elapsed time spent during send operations.</summary>
     public readonly Stopwatch Stopwatch;
 
     /// <summary>
@@ -23,6 +32,9 @@ public class Graph : IDisposable {
     /// </summary>
     public List<GraphAttachment> ConvertedAttachments { get; set; } = new List<GraphAttachment>();
 
+    /// <summary>
+    /// Collection of attachment placeholders used for large file uploads.
+    /// </summary>
     public List<GraphAttachmentPlaceHolder> AttachmentsPlaceHolders { get; set; } = new List<GraphAttachmentPlaceHolder>();
 
     /// <summary>

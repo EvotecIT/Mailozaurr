@@ -49,30 +49,51 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? DirectoryId { get; set; }
 
+    /// <summary>
+    /// Path to a PFX certificate used for authentication.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "Certificate")]
     [ValidateNotNullOrEmpty]
     public string? CertificatePath { get; set; }
 
+    /// <summary>
+    /// Raw bytes of a PFX certificate used for authentication.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "CertificateBytes")]
     [ValidateNotNull]
     public byte[]? CertificateBytes { get; set; }
 
+    /// <summary>
+    /// Path to a PEM encoded certificate used for authentication.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "CertificatePem")]
     [ValidateNotNullOrEmpty]
     public string? CertificatePemPath { get; set; }
 
+    /// <summary>
+    /// Password used to decrypt the certificate file.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "Certificate")]
     [Parameter(Mandatory = true, ParameterSetName = "CertificateBytes")]
     [ValidateNotNullOrEmpty]
     public string? CertificatePassword { get; set; }
 
+    /// <summary>
+    /// Use the device code flow for authentication.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "DeviceCode")]
     public SwitchParameter DeviceCode { get; set; }
 
+    /// <summary>
+    /// Access token to use for on-behalf-of authentication.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "OnBehalfOf")]
     [ValidateNotNullOrEmpty]
     public string? OnBehalfOfToken { get; set; }
 
+    /// <summary>
+    /// Microsoft Graph permission scopes to request.
+    /// </summary>
     [Parameter(ParameterSetName = "DeviceCode")]
     [Parameter(ParameterSetName = "OnBehalfOf")]
     public string[] Scopes { get; set; } = new[] { "https://graph.microsoft.com/.default" };

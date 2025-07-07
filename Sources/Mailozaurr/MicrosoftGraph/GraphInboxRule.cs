@@ -60,6 +60,9 @@ public class GraphInboxRulePredicates
 {
     [JsonPropertyName("senderContains")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    /// <summary>
+    /// Gets or sets a list of strings that must appear in the sender address.
+    /// </summary>
     public List<string>? SenderContains { get; set; }
 
     [JsonPropertyName("recipientContains")]

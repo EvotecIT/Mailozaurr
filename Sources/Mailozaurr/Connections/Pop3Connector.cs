@@ -9,7 +9,14 @@ namespace Mailozaurr;
 /// Provides helper methods for connecting to POP3 servers with retry logic.
 /// </summary>
 public static class Pop3Connector {
+    /// <summary>
+    /// Factory used to create <see cref="Pop3Client"/> instances.
+    /// </summary>
     public static Func<Pop3Client> ClientFactory { get; set; } = () => new Pop3Client();
+
+    /// <summary>
+    /// Delegate used to delay between connection retries.
+    /// </summary>
     public static Func<int, Task>? DelayAsync { get; set; }
     /// <summary>
     /// Connects and authenticates to a POP3 server with retry support.

@@ -26,6 +26,9 @@ public sealed class CmdletSetPOP3Message : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter Unread { get; set; }
 
+    /// <summary>
+    /// Processes the cmdlet, updating POP3 message flags.
+    /// </summary>
     protected override Task ProcessRecordAsync() {
         if (Read.IsPresent && Unread.IsPresent) {
             ThrowTerminatingError(new ErrorRecord(new PSArgumentException("Specify only -Read or -Unread."), "InvalidFlags", ErrorCategory.InvalidArgument, null));
