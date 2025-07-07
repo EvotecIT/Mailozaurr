@@ -3,7 +3,11 @@ using System;
 using System.Net;
 using System.Threading.Tasks;
 
+/// <summary>
+/// Example sending an email using the <see cref="MailgunClient"/>.
+/// </summary>
 public static class SendEmailMailgun {
+    /// <summary>Runs the example.</summary>
     public static async Task RunAsync() {
         // === CONFIGURATION ===
         string apiKey = "your-mailgun-api-key";
@@ -26,3 +30,4 @@ public static class SendEmailMailgun {
         }
     }
 }
+

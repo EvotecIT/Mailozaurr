@@ -2,7 +2,11 @@ using Mailozaurr;
 using System;
 using System.Threading.Tasks;
 
+/// <summary>
+/// Obtains an OAuth token for Office 365 using the interactive flow.
+/// </summary>
 public static class AcquireO365TokenInteractive {
+    /// <summary>Runs the example.</summary>
     public static async Task RunAsync() {
         // === CONFIGURATION ===
         string login = "user@example.com";

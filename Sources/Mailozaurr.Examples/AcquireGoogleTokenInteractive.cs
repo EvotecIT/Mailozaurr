@@ -2,7 +2,11 @@ using Mailozaurr;
 using System;
 using System.Threading.Tasks;
 
+/// <summary>
+/// Obtains an OAuth token for Gmail using the interactive flow.
+/// </summary>
 public static class AcquireGoogleTokenInteractive {
+    /// <summary>Runs the example.</summary>
     public static async Task RunAsync() {
         // === CONFIGURATION ===
         string gmailAccount = "user@gmail.com";

@@ -1,7 +1,11 @@
 using MailKit.Security;
 using Mailozaurr;
 
+/// <summary>
+/// Example showing how to authenticate using SASL mechanisms.
+/// </summary>
 public static class SendEmailSasl {
+    /// <summary>Runs the example.</summary>
     public static void Run() {
         var smtp = new Smtp();
         smtp.From = "sender@example.com";

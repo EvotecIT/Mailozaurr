@@ -11,6 +11,7 @@ namespace Mailozaurr;
 /// </summary>
 public class MailgunClient : IDisposable {
     private readonly HttpClient _client;
+    /// <summary>Measures total time spent sending.</summary>
     public readonly Stopwatch Stopwatch;
 
     private string ApiKey => Helpers.CredentialToApiKey(Credentials);
@@ -52,8 +53,11 @@ public class MailgunClient : IDisposable {
 
     /// <summary>Collector used to store log entries.</summary>
     public LogCollector LogCollector { get; set; } = new();
+    /// <summary>Number of retry attempts on failure.</summary>
     public int RetryCount { get; set; } = 0;
+    /// <summary>Base delay in milliseconds between retries.</summary>
     public int RetryDelayMilliseconds { get; set; } = 0;
+    /// <summary>Exponential backoff multiplier for retries.</summary>
     public double RetryDelayBackoff { get; set; } = 1.0;
 
     /// <summary>
@@ -62,9 +66,12 @@ public class MailgunClient : IDisposable {
     /// </summary>
     public bool RetryAlways { get; set; } = false;
 
+    /// <summary>URL of the webhook called after sending.</summary>
     public string? WebhookUrl { get; set; }
 
+    /// <summary>The normalized sender email address.</summary>
     public string SentFrom => Helpers.GetEmailAddress(From);
+    /// <summary>Comma separated list of recipients.</summary>
     public string SentTo {
         get {
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

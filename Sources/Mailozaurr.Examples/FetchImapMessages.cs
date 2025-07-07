@@ -6,7 +6,11 @@ using MimeKit;
 using System;
 using System.Threading.Tasks;
 
+/// <summary>
+/// Example demonstrating how to search and fetch messages using IMAP.
+/// </summary>
 public static class FetchImapMessages {
+    /// <summary>Runs the example.</summary>
     public static async Task RunAsync() {
         // === CONFIGURATION ===
         string server = "imap.example.com";

@@ -1,7 +1,11 @@
 using System;
 using Mailozaurr;
 
+/// <summary>
+/// Example demonstrating how to sign and encrypt email using PGP.
+/// </summary>
 public static class SendEmailPgp {
+    /// <summary>Runs the example.</summary>
     public static void Run() {
         var smtp = new Smtp();
         smtp.From = "mimekit@example.com";
