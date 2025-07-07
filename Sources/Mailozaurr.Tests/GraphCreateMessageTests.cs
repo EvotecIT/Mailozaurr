@@ -4,6 +4,9 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
+/// <summary>
+/// Tests creation of Graph API messages.
+/// </summary>
 public class GraphCreateMessageTests
 {
     [Fact]

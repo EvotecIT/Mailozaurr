@@ -2,6 +2,9 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
+/// <summary>
+/// Unit tests for <see cref="GraphInboxRuleBuilder"/> and related helpers.
+/// </summary>
 public class GraphInboxRulesTests {
     [Fact]
     public void JoinUriQuery_BuildsRulesUri() {

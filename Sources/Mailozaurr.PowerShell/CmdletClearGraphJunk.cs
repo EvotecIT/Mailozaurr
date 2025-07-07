@@ -12,50 +12,95 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Clear, "GraphJunk", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
+    /// <summary>
+    /// User principal name of the mailbox to clean.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
+    /// <summary>
+    /// Connection information for Microsoft Graph.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
+    /// <summary>
+    /// Returns the Microsoft Graph request payload instead of sending it.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 
+    /// <summary>
+    /// Additional message properties to retrieve.
+    /// </summary>
     [Parameter]
     public string[]? Property { get; set; }
 
+    /// <summary>
+    /// When present, only outputs the messages that would be removed.
+    /// </summary>
     [Parameter]
     public SwitchParameter Preview { get; set; }
 
+    /// <summary>
+    /// Message identifiers that should not be removed.
+    /// </summary>
     [Parameter]
     public string[]? SkipId { get; set; }
 
+    /// <summary>
+    /// Sender addresses to exclude from deletion.
+    /// </summary>
     [Parameter]
     public string[]? SkipFrom { get; set; }
 
+    /// <summary>
+    /// Recipient addresses to exclude from deletion.
+    /// </summary>
     [Parameter]
     public string[]? SkipTo { get; set; }
 
+    /// <summary>
+    /// Skips messages when the subject contains any of these strings.
+    /// </summary>
     [Parameter]
     public string[]? SkipSubjectContains { get; set; }
 
+    /// <summary>
+    /// Skip messages that have attachments.
+    /// </summary>
     [Parameter]
     public SwitchParameter SkipHasAttachment { get; set; }
 
+    /// <summary>
+    /// Attachment file extensions to exclude.
+    /// </summary>
     [Parameter]
     public string[]? SkipAttachmentExtension { get; set; }
 
+    /// <summary>
+    /// Timeout for Graph requests in seconds.
+    /// </summary>
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
+    /// <summary>
+    /// Maximum number of concurrent Graph requests.
+    /// </summary>
     [Parameter]
     public int MaxConcurrentRequests { get; set; } = 5;
 
+    /// <summary>
+    /// Number of retry attempts on failure.
+    /// </summary>
     [Parameter]
     public int RetryCount { get; set; } = 0;
 
+    /// <summary>
+    /// Delay between retries in milliseconds.
+    /// </summary>
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 

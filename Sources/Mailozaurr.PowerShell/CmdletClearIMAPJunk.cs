@@ -21,27 +21,51 @@ public sealed class CmdletClearIMAPJunk : AsyncPSCmdlet {
     [Parameter(Position = 1)]
     public string? Folder { get; set; }
 
+    /// <summary>
+    /// When set, lists messages that would be removed without deleting them.
+    /// </summary>
     [Parameter]
     public SwitchParameter Preview { get; set; }
 
+    /// <summary>
+    /// Sender addresses to exclude from deletion.
+    /// </summary>
     [Parameter]
     public string[]? SkipFrom { get; set; }
 
+    /// <summary>
+    /// Recipient addresses to exclude from deletion.
+    /// </summary>
     [Parameter]
     public string[]? SkipTo { get; set; }
 
+    /// <summary>
+    /// Skips messages when the subject contains these strings.
+    /// </summary>
     [Parameter]
     public string[]? SkipSubjectContains { get; set; }
 
+    /// <summary>
+    /// Message-Id headers to exclude.
+    /// </summary>
     [Parameter]
     public string[]? SkipMessageId { get; set; }
 
+    /// <summary>
+    /// IMAP UIDs to exclude from deletion.
+    /// </summary>
     [Parameter]
     public uint[]? SkipUid { get; set; }
 
+    /// <summary>
+    /// Skips messages that contain attachments.
+    /// </summary>
     [Parameter]
     public SwitchParameter SkipHasAttachment { get; set; }
 
+    /// <summary>
+    /// Attachment file extensions to exclude.
+    /// </summary>
     [Parameter]
     public string[]? SkipAttachmentExtension { get; set; }
 

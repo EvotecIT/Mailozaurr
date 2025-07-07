@@ -12,37 +12,64 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Add, "GraphMailboxPermission", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
+    /// <summary>
+    /// User principal name of the mailbox owner.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
+    /// <summary>
+    /// Permission definitions when using the Graph parameter set.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNullOrEmpty]
     public Hashtable[]? Permission { get; set; }
 
+    /// <summary>
+    /// Mailbox permission objects provided via the pipeline.
+    /// </summary>
     [Parameter(ParameterSetName = "Object", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphMailboxPermission[]? MailboxPermission { get; set; }
 
+    /// <summary>
+    /// Path to a CSV file containing permission definitions.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "Csv")]
     [ValidateNotNullOrEmpty]
     public string? CsvPath { get; set; }
 
+    /// <summary>
+    /// Graph connection information.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph", ValueFromPipeline = true)]
     [Parameter(ParameterSetName = "Object", ValueFromPipeline = true)]
     [Parameter(ParameterSetName = "Csv", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
+    /// <summary>
+    /// Indicates that the raw Microsoft Graph request should be returned.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 
+    /// <summary>
+    /// Timeout for Graph requests in seconds.
+    /// </summary>
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
+    /// <summary>
+    /// Number of retry attempts on failure.
+    /// </summary>
     [Parameter]
     public int RetryCount { get; set; } = 0;
 
+    /// <summary>
+    /// Delay between retries in milliseconds.
+    /// </summary>
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 

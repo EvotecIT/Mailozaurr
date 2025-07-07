@@ -10,6 +10,9 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
+/// <summary>
+/// Tests for the SES client asynchronous email sending logic.
+/// </summary>
 public class SesClientSendEmailAsyncTests
 {
     private static byte[] HmacSha256(byte[] key, string data)

@@ -4,6 +4,9 @@ using Microsoft.Identity.Client;
 
 namespace Mailozaurr;
 
+/// <summary>
+/// Provides helper methods for persisting and retrieving MSAL token caches.
+/// </summary>
 internal static class TokenCacheHelper {
     private static readonly object FileLock = new();
     private static readonly string CacheFilePath = Path.Combine(
@@ -11,6 +14,10 @@ internal static class TokenCacheHelper {
         "Mailozaurr",
         "msal_cache.bin");
 
+    /// <summary>
+    /// Registers callbacks to persist the token cache before and after access.
+    /// </summary>
+    /// <param name="tokenCache">Token cache instance from MSAL.</param>
     public static void RegisterCache(ITokenCache tokenCache) {
         tokenCache.SetBeforeAccess(BeforeAccessNotification);
         tokenCache.SetAfterAccess(AfterAccessNotification);

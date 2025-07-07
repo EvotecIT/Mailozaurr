@@ -6,6 +6,9 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
+/// <summary>
+/// Verifies handling of inline attachments for SMTP messages.
+/// </summary>
 public class SmtpInlineAttachmentTests
 {
     [Fact]

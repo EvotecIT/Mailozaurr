@@ -5,6 +5,9 @@ using System.Text.Json;
 
 namespace Mailozaurr;
 
+/// <summary>
+/// Provides simple persistent caching for OAuth credentials.
+/// </summary>
 internal static class OAuthTokenCache {
     private static readonly object LockObj = new();
     private static readonly string CacheFilePath = Path.Combine(
@@ -29,12 +32,22 @@ internal static class OAuthTokenCache {
         }
     }
 
+    /// <summary>
+    /// Retrieves a credential from the cache.
+    /// </summary>
+    /// <param name="key">Unique cache key.</param>
+    /// <returns>The cached credential or <c>null</c> if not found.</returns>
     public static OAuthCredential? Get(string key) {
         var cache = LoadCache();
         cache.TryGetValue(key, out var cred);
         return cred;
     }
 
+    /// <summary>
+    /// Saves a credential to the cache on disk.
+    /// </summary>
+    /// <param name="key">Unique cache key.</param>
+    /// <param name="credential">Credential to cache.</param>
     public static void Set(string key, OAuthCredential credential) {
         var cache = LoadCache();
         cache[key] = credential;
