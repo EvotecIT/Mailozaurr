@@ -171,14 +171,13 @@ public class HelpersTests
     {
         var client = new HttpClient(new ThrowHandler());
         var result = new SmtpResult(true, EmailAction.Send, string.Empty, string.Empty, string.Empty, 0, TimeSpan.Zero);
-        string? message = null;
-        void Handler(object? _, LogEventArgs e) => message = e.Message;
+        var messages = new List<string>();
+        void Handler(object? _, LogEventArgs e) => messages.Add(e.Message);
         Mailozaurr.LoggingMessages.Logger.OnWarningMessage += Handler;
 
         await Mailozaurr.Helpers.PostWebhookAsync("http://localhost", result, default, client);
 
         Mailozaurr.LoggingMessages.Logger.OnWarningMessage -= Handler;
-        Assert.NotNull(message);
-        Assert.Contains("Failed to post webhook", message);
+        Assert.Contains(messages, static m => m.Contains("Failed to post webhook"));
     }
 }
