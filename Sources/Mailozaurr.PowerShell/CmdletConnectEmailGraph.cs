@@ -10,10 +10,16 @@ namespace Mailozaurr.PowerShell;
 [Cmdlet(VerbsCommunications.Connect, "EmailGraph")]
 [OutputType(typeof(GraphConnectionInfo))]
 public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
+    /// <summary>
+    /// Credential object containing client ID and secret.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "Credential")]
     [ValidateNotNull]
     public PSCredential? Credential { get; set; }
 
+    /// <summary>
+    /// Client (application) identifier.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "Plain")]
     [Parameter(Mandatory = true, ParameterSetName = "Certificate")]
     [Parameter(Mandatory = true, ParameterSetName = "CertificateBytes")]
@@ -23,11 +29,17 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? ClientId { get; set; }
 
+    /// <summary>
+    /// Secret associated with the application (for app-only auth).
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "Plain")]
     [Parameter(Mandatory = true, ParameterSetName = "OnBehalfOf")]
     [ValidateNotNullOrEmpty]
     public string? ClientSecret { get; set; }
 
+    /// <summary>
+    /// Directory (tenant) identifier.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "Plain")]
     [Parameter(Mandatory = true, ParameterSetName = "Certificate")]
     [Parameter(Mandatory = true, ParameterSetName = "CertificateBytes")]

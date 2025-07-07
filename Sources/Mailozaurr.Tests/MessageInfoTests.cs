@@ -6,6 +6,9 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
+/// <summary>
+/// Tests for message information helper classes.
+/// </summary>
 public class MessageInfoTests {
     [Fact]
     public void ImapInfo_ExposesProperties() {

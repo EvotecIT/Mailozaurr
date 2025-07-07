@@ -10,6 +10,9 @@ using Mailozaurr;
 
 namespace Mailozaurr.Tests;
 
+/// <summary>
+/// Tests for miscellaneous helper methods.
+/// </summary>
 public class HelpersTests
 {
     [Fact]
