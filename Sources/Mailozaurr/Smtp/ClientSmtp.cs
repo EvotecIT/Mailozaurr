@@ -32,6 +32,8 @@ public partial class ClientSmtp : SmtpClient {
     public MessagePriority Priority { get; set; }
     /// <summary>Delivery notification options.</summary>
     public DeliveryNotification[]? DeliveryNotificationOption { get; set; }
+    /// <summary>Custom headers to add to the message.</summary>
+    public IDictionary<string, string>? Headers { get; set; }
     /// <summary>Comma separated list of all recipients.</summary>
     public string SentTo {
         get {
@@ -102,6 +104,7 @@ public partial class ClientSmtp : SmtpClient {
         SetMessagePriority(message);
         BuildMessageBody(message);
         message.Subject = Subject;
+        AddHeaders(message);
         Message = message;
     }
 
@@ -200,6 +203,13 @@ public partial class ClientSmtp : SmtpClient {
             }
         }
         message.Body = bodyBuilder.ToMessageBody();
+    }
+
+    private void AddHeaders(MimeMessage message) {
+        if (Headers == null) return;
+        foreach (var kvp in Headers) {
+            message.Headers.Add(kvp.Key, kvp.Value);
+        }
     }
 
     /// <summary>

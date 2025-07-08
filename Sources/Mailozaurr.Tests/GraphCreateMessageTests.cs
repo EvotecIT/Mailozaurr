@@ -26,6 +26,22 @@ public class GraphCreateMessageTests
     }
 
     [Fact]
+    public void CreateMessage_WithHeaders_IncludesHeaders()
+    {
+        using var graph = new Graph
+        {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "subject",
+            HTML = "body",
+            ContentType = "HTML",
+            Headers = new System.Collections.Generic.Dictionary<string, string> { ["X-Test"] = "123" }
+        };
+        graph.CreateMessage();
+        Assert.Contains("X-Test", graph.MessageJson, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void CreateAttachments_WithMissingFile_ThrowsFileNotFoundException()
     {
         using var graph = new Graph

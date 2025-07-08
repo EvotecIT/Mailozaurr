@@ -39,6 +39,8 @@ public class SesClient : IDisposable {
     /// <summary>Paths to inline attachments to include.</summary>
     public string[]? InlineAttachment { get; set; }
 
+    public Dictionary<string, string>? Headers { get; set; }
+
     /// <summary>Number of retry attempts on failure.</summary>
     public int RetryCount { get; set; } = 0;
     /// <summary>Base delay in milliseconds between retries.</summary>
@@ -107,6 +109,7 @@ public class SesClient : IDisposable {
         smtp.HtmlBody = Html;
         if (Attachment != null) smtp.Attachments = Attachment.ToList<object>();
         if (InlineAttachment != null) smtp.InlineAttachments = InlineAttachment.ToList<object>();
+        if (Headers != null) smtp.Headers = Headers;
         smtp.CreateMessage();
         return smtp.Message;
     }

@@ -43,6 +43,11 @@ public class Smtp {
         set => Client.InlineAttachments = value;
     }
 
+    public IDictionary<string, string>? Headers {
+        get => Client.Headers;
+        set => Client.Headers = value;
+    }
+
     public object From {
         get => Client.From;
         set => Client.From = value;

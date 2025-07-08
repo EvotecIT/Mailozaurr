@@ -296,6 +296,16 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Alias("InlineAttachments")]
     public object[]? InlineAttachment { get; set; }
 
+    [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
+    [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
+    [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
+    [Parameter(Mandatory = false, ParameterSetName = "Graph")]
+    [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
+    [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
+    [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
+    [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
+    public Hashtable? Headers { get; set; }
+
     /// <summary>
     /// <para>Specifies the maximum time (in milliseconds) to wait for the SMTP operation to complete. Default is 12000.</para>
     /// </summary>
@@ -640,6 +650,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
         if (Attachment != null) {
             sendGrid.Attachment = Attachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
         }
+        if (Headers != null) sendGrid.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => (string)d.Key, d => (string)d.Value);
         sendGrid.SeparateTo = SeparateTo;
         sendGrid.ErrorAction = errorAction;
         sendGrid.RetryCount = RetryCount;
@@ -678,6 +689,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
         if (InlineAttachment != null) {
             mailgun.InlineAttachment = InlineAttachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
         }
+        if (Headers != null) mailgun.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => (string)d.Key, d => (string)d.Value);
         mailgun.ErrorAction = errorAction;
         mailgun.RetryCount = RetryCount;
         mailgun.RetryDelayMilliseconds = RetryDelayMilliseconds;
@@ -714,6 +726,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
         if (InlineAttachment != null) {
             ses.InlineAttachment = InlineAttachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
         }
+        if (Headers != null) ses.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => (string)d.Key, d => (string)d.Value);
         ses.ErrorAction = errorAction;
         ses.RetryCount = RetryCount;
         ses.RetryDelayMilliseconds = RetryDelayMilliseconds;
@@ -753,6 +766,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
         graph.HTML = string.Join("", HTML);
         graph.ContentType = "HTML";
         graph.Attachments = Attachment;
+        if (Headers != null) graph.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => (string)d.Key, d => (string)d.Value);
         graph.CreateAttachments();
         long graphSize = GetTotalAttachmentSize(graph.ConvertedAttachments);
         if (graphSize > GraphAttachmentLimitBytes) {
@@ -817,6 +831,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
         graph.HTML = string.Join("", HTML);
         graph.ContentType = "HTML";
         graph.Attachments = Attachment;
+        if (Headers != null) graph.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => (string)d.Key, d => (string)d.Value);
         graph.CreateAttachments();
         long size = GetTotalAttachmentSize(graph.ConvertedAttachments);
         if (size > GraphAttachmentLimitBytes) {
@@ -869,6 +884,7 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
 
         smtpClient.Attachments = Attachment?.ToList();
         smtpClient.InlineAttachments = InlineAttachment?.ToList();
+        if (Headers != null) smtpClient.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => (string)d.Key, d => (string)d.Value);
         smtpClient.Timeout = Timeout;
 
         smtpClient.ErrorAction = errorAction;

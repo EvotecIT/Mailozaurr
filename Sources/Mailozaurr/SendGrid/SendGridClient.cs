@@ -51,6 +51,8 @@ public class SendGridClient {
     /// </summary>
     public object[]? Attachment { get; set; }
 
+    public Dictionary<string, string>? Headers { get; set; }
+
     /// <summary>
     /// Gets or sets the subject of the email.
     /// </summary>
@@ -255,7 +257,8 @@ public class SendGridClient {
             Subject = Subject,
             Content = content,
             ReplyTo = ConvertToEmailObject(ReplyTo),
-            Attachments = attachments
+            Attachments = attachments,
+            Headers = Headers
         };
 
         var options = new JsonSerializerOptions() {
