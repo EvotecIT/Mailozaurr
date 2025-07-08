@@ -42,4 +42,23 @@ public class SendGridCreateMessageTests
         };
         Assert.Throws<ArgumentException>(() => client.CreateMessage());
     }
+
+    [Fact]
+    public void CreateMessage_WithHeaders_IncludesHeaders()
+    {
+        var client = new SendGridClient
+        {
+            From = "from@example.com",
+            To = new List<object> { "to@example.com" },
+            Subject = "subject",
+            Text = "text",
+            Credentials = new NetworkCredential("apikey", "test"),
+            Headers = new Dictionary<string, string> { ["X-Test"] = "123" }
+        };
+        client.CreateMessage();
+        PropertyInfo? prop = typeof(SendGridClient).GetProperty("MessageJson", BindingFlags.NonPublic | BindingFlags.Instance);
+        var json = prop?.GetValue(client) as string;
+        Assert.NotNull(json);
+        Assert.Contains("X-Test", json!, StringComparison.OrdinalIgnoreCase);
+    }
 }

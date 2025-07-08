@@ -51,6 +51,8 @@ public class MailgunClient : IDisposable {
     /// <summary>File paths to include as inline attachments.</summary>
     public string[]? InlineAttachment { get; set; }
 
+    public Dictionary<string, string>? Headers { get; set; }
+
     /// <summary>Collector used to store log entries.</summary>
     public LogCollector LogCollector { get; set; } = new();
     /// <summary>Number of retry attempts on failure.</summary>
@@ -155,6 +157,11 @@ public class MailgunClient : IDisposable {
                 var fileContent = new ByteArrayContent(bytes);
                 fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                 content.Add(fileContent, "inline", Path.GetFileName(path));
+            }
+        }
+        if (Headers != null) {
+            foreach (var kvp in Headers) {
+                content.Add(new StringContent(kvp.Value), $"h:{kvp.Key}");
             }
         }
         return content;

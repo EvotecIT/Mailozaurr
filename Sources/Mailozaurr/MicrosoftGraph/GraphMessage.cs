@@ -81,4 +81,7 @@ public class GraphMessage {
     [JsonPropertyName("attachments")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<GraphAttachment>? Attachments { get; set; }
-}
+
+    [JsonPropertyName("internetMessageHeaders")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<GraphInternetMessageHeader>? InternetMessageHeaders { get; set; }}

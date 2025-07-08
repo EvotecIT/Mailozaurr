@@ -154,6 +154,8 @@ public class Graph : IDisposable {
 
     public string? WebhookUrl { get; set; }
 
+    public Dictionary<string, string>? Headers { get; set; }
+
     /// <summary>
     /// Size in bytes of the chunks used when uploading attachments. Defaults to
     /// 9MB.
@@ -294,6 +296,9 @@ public class Graph : IDisposable {
         };
         if (ConvertedAttachments.Count > 0 && IsLargerAttachment == false) {
             MessageContainer.Message.Attachments = ConvertedAttachments;
+        }
+        if (Headers != null && Headers.Count > 0) {
+            MessageContainer.Message.InternetMessageHeaders = Headers.Select(kvp => new GraphInternetMessageHeader { Name = kvp.Key, Value = kvp.Value }).ToList();
         }
 
         var options = new JsonSerializerOptions() {

@@ -33,4 +33,7 @@ public class SendGridMessage {
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<SendGridAttachment>? Attachments { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, string>? Headers { get; set; }
 }
