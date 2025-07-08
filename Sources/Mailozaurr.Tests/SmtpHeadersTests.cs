@@ -18,4 +18,26 @@ public class SmtpHeadersTests
         smtp.CreateMessage();
         Assert.Equal("123", smtp.Message.Headers["X-Test"]);
     }
+
+    [Fact]
+    public void CreateMessage_WithMultipleHeaders_AddsAllHeaders()
+    {
+        var smtp = new Smtp
+        {
+            From = "a@b.com",
+            To = new object[] { "c@d.com" },
+            Subject = "test",
+            TextBody = "body",
+            Headers = new Dictionary<string, string>
+            {
+                ["X-One"] = "1",
+                ["X-Two"] = "2"
+            }
+        };
+
+        smtp.CreateMessage();
+
+        Assert.Equal("1", smtp.Message.Headers["X-One"]);
+        Assert.Equal("2", smtp.Message.Headers["X-Two"]);
+    }
 }
