@@ -269,7 +269,14 @@ public partial class ClientSmtp : SmtpClient {
     }
 
     private IEnumerable<MailboxAddress> ConvertStringToMailboxAddresses(string value) {
-        var mailbox = MailboxAddress.Parse(value);
+        MailboxAddress mailbox;
+        try {
+            mailbox = MailboxAddress.Parse(value);
+        } catch (Exception ex) {
+            LoggingMessages.Logger.WriteWarning($"Failed to parse address '{value}': {ex.Message}");
+            yield break;
+        }
+
         if (value.Contains('<') || value.Contains('>')) {
             yield return mailbox;
         } else {
@@ -290,5 +297,4 @@ public partial class ClientSmtp : SmtpClient {
             }
         }
     }
-
 }
