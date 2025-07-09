@@ -131,10 +131,12 @@ public sealed class GmailApiClient {
     }
 
     private sealed class AttachmentResponse {
+        /// <summary>Base64 encoded attachment data.</summary>
         public string? Data { get; set; }
     }
 
     private sealed class GmailListResponse {
+        /// <summary>Messages returned by the API.</summary>
         public List<GmailMessage>? Messages { get; set; }
     }
 }

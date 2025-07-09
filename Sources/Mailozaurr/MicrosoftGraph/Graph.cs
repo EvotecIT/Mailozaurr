@@ -152,8 +152,10 @@ public class Graph : IDisposable {
     /// </summary>
     public bool RetryAlways { get; set; } = false;
 
+    /// <summary>Webhook invoked after sending.</summary>
     public string? WebhookUrl { get; set; }
 
+    /// <summary>Custom headers to include with the message.</summary>
     public Dictionary<string, string>? Headers { get; set; }
 
     /// <summary>
@@ -202,6 +204,7 @@ public class Graph : IDisposable {
     /// </summary>
     public bool RequestDeliveryReceipt { get; set; }
 
+    /// <summary>Collector used to store log entries.</summary>
     public LogCollector LogCollector { get; set; } = new();
 
     /// <summary>

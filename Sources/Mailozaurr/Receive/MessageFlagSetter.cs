@@ -17,13 +17,25 @@ public static class MessageFlagSetter {
     /// Abstraction for flag operations on a folder.
     /// </summary>
     public interface IImapFolder {
+        /// <summary>Adds flags to the specified message.</summary>
+        /// <param name="uid">Message unique identifier.</param>
+        /// <param name="flags">Flags to add.</param>
+        /// <param name="silent">Whether to perform the operation silently.</param>
+        /// <param name="cancellationToken">Token used to cancel the operation.</param>
         Task AddFlagsAsync(UniqueId uid, MessageFlags flags, bool silent, CancellationToken cancellationToken = default);
+        /// <summary>Removes flags from the specified message.</summary>
+        /// <param name="uid">Message unique identifier.</param>
+        /// <param name="flags">Flags to remove.</param>
+        /// <param name="silent">Whether to perform the operation silently.</param>
+        /// <param name="cancellationToken">Token used to cancel the operation.</param>
         Task RemoveFlagsAsync(UniqueId uid, MessageFlags flags, bool silent, CancellationToken cancellationToken = default);
     }
 
     private class FolderWrapper(IMailFolder folder) : IImapFolder {
+        /// <inheritdoc />
         public Task AddFlagsAsync(UniqueId uid, MessageFlags flags, bool silent, CancellationToken cancellationToken = default) =>
             folder.AddFlagsAsync(uid, flags, silent, cancellationToken);
+        /// <inheritdoc />
         public Task RemoveFlagsAsync(UniqueId uid, MessageFlags flags, bool silent, CancellationToken cancellationToken = default) =>
             folder.RemoveFlagsAsync(uid, flags, silent, cancellationToken);
     }
@@ -54,6 +66,13 @@ public static class MessageFlagSetter {
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Tries to get the local read flag for a POP3 message.
+    /// </summary>
+    /// <param name="client">POP3 client.</param>
+    /// <param name="index">Message index.</param>
+    /// <param name="read">Returns the current read state.</param>
+    /// <returns><c>true</c> when a state was found.</returns>
     public static bool TryGetPop3Read(Pop3Client client, int index, out bool read) {
         var state = Pop3Flags.GetOrCreateValue(client);
         return state.TryGetValue(index, out read);

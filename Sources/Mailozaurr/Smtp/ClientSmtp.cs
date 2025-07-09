@@ -60,8 +60,11 @@ public partial class ClientSmtp : SmtpClient {
         }
     }
 
+    /// <summary>Initializes a new instance of the <see cref="ClientSmtp"/> class.</summary>
     public ClientSmtp() { }
 
+    /// <summary>Initializes a new instance of the <see cref="ClientSmtp"/> class using the specified logger.</summary>
+    /// <param name="protocolLogger">The protocol logger.</param>
     public ClientSmtp(ProtocolLogger protocolLogger) : base(protocolLogger) { }
 
     /// <summary>

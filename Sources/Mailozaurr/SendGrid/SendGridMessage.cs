@@ -32,8 +32,10 @@ public class SendGridMessage {
     public SendGridEmailAddress? ReplyTo { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    /// <summary>Attachments to include with the message.</summary>
     public List<SendGridAttachment>? Attachments { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    /// <summary>Custom headers to include with the message.</summary>
     public Dictionary<string, string>? Headers { get; set; }
 }

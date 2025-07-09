@@ -51,6 +51,7 @@ public class MailgunClient : IDisposable {
     /// <summary>File paths to include as inline attachments.</summary>
     public string[]? InlineAttachment { get; set; }
 
+    /// <summary>Custom headers to include with the message.</summary>
     public Dictionary<string, string>? Headers { get; set; }
 
     /// <summary>Collector used to store log entries.</summary>
