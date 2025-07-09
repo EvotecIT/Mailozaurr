@@ -1,5 +1,6 @@
 using System;
 using System.Net.Http;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
@@ -38,6 +39,20 @@ namespace Mailozaurr {
         }
 
         internal static SemaphoreSlim ConcurrencySemaphore => _concurrencySemaphore;
+
+        private static TimeSpan GetRetryAfterDelay(HttpResponseMessage response) {
+            if (response.Headers.TryGetValues("Retry-After", out var values)) {
+                var value = System.Linq.Enumerable.FirstOrDefault(values);
+                if (int.TryParse(value, out var seconds)) {
+                    return TimeSpan.FromSeconds(seconds);
+                }
+                if (DateTimeOffset.TryParse(value, out var date)) {
+                    var diff = date - DateTimeOffset.UtcNow;
+                    return diff > TimeSpan.Zero ? diff : TimeSpan.Zero;
+                }
+            }
+            return TimeSpan.Zero;
+        }
 
         /// <summary>
         /// Gets or sets the timeout for HTTP operations in seconds.
@@ -122,8 +137,17 @@ namespace Mailozaurr {
             var content = new FormUrlEncodedContent(body);
             var url = $"https://login.microsoftonline.com/{tenantDomain}/oauth2/token";
             await ConcurrencySemaphore.WaitAsync();
+            HttpResponseMessage? response = null;
             try {
-                using var response = await HttpClient.PostAsync(url, content);
+                response = await HttpClient.PostAsync(url, content);
+                if ((int)response.StatusCode == 429) {
+                    var delay = GetRetryAfterDelay(response);
+                    response.Dispose();
+                    if (delay > TimeSpan.Zero) {
+                        await Task.Delay(delay);
+                    }
+                    response = await HttpClient.PostAsync(url, content);
+                }
                 var json = await response.Content.ReadAsStringAsync();
                 if (!response.IsSuccessStatusCode) {
                     throw new GraphApiException(
@@ -151,6 +175,7 @@ namespace Mailozaurr {
                 });
                 return $"{tokenType} {accessToken}";
             } finally {
+                response?.Dispose();
                 ConcurrencySemaphore.Release();
             }
         }
@@ -228,8 +253,17 @@ namespace Mailozaurr {
                 request.Content = new StringContent(body, Encoding.UTF8, "application/json");
             }
             await ConcurrencySemaphore.WaitAsync();
+            HttpResponseMessage? response = null;
             try {
-                using var response = await HttpClient.SendAsync(request);
+                response = await HttpClient.SendAsync(request);
+                if ((int)response.StatusCode == 429) {
+                    var delay = GetRetryAfterDelay(response);
+                    response.Dispose();
+                    if (delay > TimeSpan.Zero) {
+                        await Task.Delay(delay);
+                    }
+                    response = await HttpClient.SendAsync(request);
+                }
                 var responseContent = await response.Content.ReadAsStringAsync();
                 if (!response.IsSuccessStatusCode) {
                     throw new GraphApiException(
@@ -239,6 +273,7 @@ namespace Mailozaurr {
                 }
                 return JsonDocument.Parse(responseContent);
             } finally {
+                response?.Dispose();
                 ConcurrencySemaphore.Release();
             }
         }
