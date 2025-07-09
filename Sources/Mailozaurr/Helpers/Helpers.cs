@@ -39,14 +39,10 @@ public static class Helpers {
     /// <param name="credentials">Credential containing the key.</param>
     /// <returns>The API key.</returns>
     public static string CredentialToApiKey(ICredentials credentials) {
-        string apiKey;
-        try {
-            var networkCredential = credentials as NetworkCredential;
-            apiKey = networkCredential.Password;
-        } catch (InvalidCastException) {
-            apiKey = string.Empty;
+        if (credentials is NetworkCredential networkCredential) {
+            return networkCredential.Password;
         }
-        return apiKey;
+        return string.Empty;
     }
 
     /// <summary>Retrieves the email address string from various types of objects.</summary>
