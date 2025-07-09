@@ -13,6 +13,7 @@ public class GraphMessageListener : IDisposable {
     private readonly string _userPrincipalName;
     private readonly HashSet<string> _seenIds = new();
     private CancellationTokenSource? _cancel;
+    private Task? _pollTask;
     private readonly TimeSpan _interval;
 
     /// <summary>
@@ -54,13 +55,28 @@ public class GraphMessageListener : IDisposable {
             }
         }
 
-        _ = PollLoopAsync();
+        _pollTask = PollLoopAsync();
     }
 
     /// <summary>
     /// Stops listening for new messages.
     /// </summary>
-    public void Stop() => _cancel?.Cancel();
+    public void Stop() {
+        if (_cancel == null) {
+            return;
+        }
+
+        _cancel.Cancel();
+        try {
+            _pollTask?.GetAwaiter().GetResult();
+        } catch (OperationCanceledException) {
+            // ignored
+        }
+
+        _cancel.Dispose();
+        _cancel = null;
+        _pollTask = null;
+    }
 
     private async Task PollLoopAsync() {
         while (!_cancel!.IsCancellationRequested) {
@@ -85,5 +101,7 @@ public class GraphMessageListener : IDisposable {
     /// <inheritdoc />
     public void Dispose() {
         Stop();
+        _cancel?.Dispose();
+        _cancel = null;
     }
 }

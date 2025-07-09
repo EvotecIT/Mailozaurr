@@ -9,6 +9,7 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
+[Collection("GraphCollection")]
 public class GraphBatchAndRetryTests {
     private class BatchHandler : HttpMessageHandler {
         public HttpRequestMessage? BatchRequest;
@@ -99,6 +100,9 @@ public class GraphBatchAndRetryTests {
         var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
         var cache = (System.Collections.Concurrent.ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
         cache.Clear();
+        var oauthType = typeof(MicrosoftGraphUtils).Assembly.GetType("Mailozaurr.OAuthTokenCache");
+        var oauthField = oauthType?.GetField("_cache", BindingFlags.NonPublic | BindingFlags.Static);
+        oauthField?.SetValue(null, null);
         string cachePath = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "Mailozaurr", "oauth_cache.json");
         if (System.IO.File.Exists(cachePath)) System.IO.File.Delete(cachePath);
         try {
