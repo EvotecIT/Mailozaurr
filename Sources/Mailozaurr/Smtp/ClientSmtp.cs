@@ -162,10 +162,13 @@ public partial class ClientSmtp : SmtpClient {
             bodyBuilder.TextBody = TextBody;
         }
         if (Attachments != null) {
+            var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var attachment in Attachments) {
                 switch (attachment) {
-                    case string path:
+                    case string path when seenPaths.Add(path):
                         bodyBuilder.Attachments.Add(path);
+                        break;
+                    case string:
                         break;
                     case MimeEntity entity:
                         bodyBuilder.Attachments.Add(entity);
@@ -174,10 +177,11 @@ public partial class ClientSmtp : SmtpClient {
             }
         }
         if (InlineAttachments != null) {
+            var seenInline = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var inline in InlineAttachments) {
                 MimeEntity? entity = null;
                 switch (inline) {
-                    case string path:
+                    case string path when seenInline.Add(path):
                     {
                         // Read the file into memory so it can be removed immediately
                         var bytes = File.ReadAllBytes(path);
@@ -193,6 +197,8 @@ public partial class ClientSmtp : SmtpClient {
                         entity = part;
                         break;
                     }
+                    case string:
+                        break;
                     case MimeEntity mime:
                         bodyBuilder.LinkedResources.Add(mime);
                         entity = mime;

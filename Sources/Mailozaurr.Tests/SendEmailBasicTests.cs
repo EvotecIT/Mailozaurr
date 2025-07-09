@@ -150,5 +150,23 @@ namespace Mailozaurr.Tests {
             // Assert
             Assert.Equal(1, attachCount);
         }
-    }
-}
+
+        [Fact]
+        public void SendEmail_WithDuplicateAttachments_AddsOnce() {
+            var tmp = Path.GetTempFileName();
+            File.WriteAllText(tmp, "data");
+            var smtp = new Smtp();
+            smtp.From = "a@b.com";
+            smtp.To = new object[] { "c@d.com" };
+            smtp.Subject = "test";
+            smtp.Attachments = new System.Collections.Generic.List<object> { tmp, tmp };
+            smtp.CreateMessage();
+
+            var attachCount = smtp.Message.BodyParts
+                .OfType<MimePart>()
+                .Count(p => p.IsAttachment);
+            File.Delete(tmp);
+
+            Assert.Equal(1, attachCount);
+        }
+    }}

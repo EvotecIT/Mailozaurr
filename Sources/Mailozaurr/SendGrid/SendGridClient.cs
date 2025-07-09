@@ -205,9 +205,14 @@ public class SendGridClient {
             return result;
         }
 
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var item in attachments) {
             var converted = ConvertToAttachment(item);
             if (converted != null) {
+                if (item is string path && !seen.Add(path)) {
+                    continue;
+                }
                 result.Add(converted);
             }
         }
