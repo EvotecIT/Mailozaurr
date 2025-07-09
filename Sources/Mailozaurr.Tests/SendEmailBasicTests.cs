@@ -61,6 +61,28 @@ namespace Mailozaurr.Tests {
         }
 
         [Fact]
+        public async Task SendEmail_SendGrid_WithToken_Succeeds() {
+            var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") });
+            var client = new SendGridClient();
+            var field = typeof(SendGridClient).GetField("_client", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+            field.SetValue(client, new HttpClient(handler));
+
+            client.From = "sender@example.com";
+            client.To = new System.Collections.Generic.List<object> { "recipient@example.com" };
+            client.Subject = "Test Email (SendGrid)";
+            client.Html = "<b>Hello from Mailozaurr SendGrid!</b>";
+            client.Text = "Hello from Mailozaurr SendGrid!";
+            client.Credentials = new NetworkCredential("apikey", "SENDGRID_API_KEY");
+            client.CreateMessage();
+
+            using var cts = new CancellationTokenSource();
+            var result = await client.SendEmailAsync(cts.Token);
+
+            Assert.True(result.Status, $"SendGrid send failed: {result.Error}");
+            Assert.Single(handler.Requests);
+        }
+
+        [Fact]
         public async Task SendEmail_SendGrid_InvalidCredentialType_Fails() {
             var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") });
             var client = new SendGridClient();

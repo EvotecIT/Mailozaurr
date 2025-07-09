@@ -278,7 +278,13 @@ public class SendGridClient {
     /// Sends an email asynchronously using the SendGrid API.
     /// </summary>
     /// <returns>A Task that represents the asynchronous operation. The task result contains the result of the email sending operation.</returns>
-    public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken = default) {
+    public Task<SmtpResult> SendEmailAsync() => SendEmailAsync(CancellationToken.None);
+
+    /// <summary>
+    /// Sends an email asynchronously using the SendGrid API.
+    /// </summary>
+    /// <returns>A Task that represents the asynchronous operation. The task result contains the result of the email sending operation.</returns>
+    public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken) {
         string apiKey;
         if (Credentials is NetworkCredential networkCredential) {
             apiKey = networkCredential.Password;
@@ -304,7 +310,11 @@ public class SendGridClient {
                 request.Headers.Add("Authorization", $"Bearer {apiKey}");
 
                 using var response = await _client.SendAsync(request, cancellationToken);
+#if NET5_0_OR_GREATER
+                lastContent = await response.Content.ReadAsStringAsync(cancellationToken);
+#else
                 lastContent = await response.Content.ReadAsStringAsync();
+#endif
                 LogCollector.LogVerbose($"Send-EmailMessage - Sent email to {SentTo} using SendGrid");
 
                 if (response.IsSuccessStatusCode) {
