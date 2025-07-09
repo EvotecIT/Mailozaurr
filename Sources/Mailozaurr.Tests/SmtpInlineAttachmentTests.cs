@@ -45,4 +45,23 @@ public class SmtpInlineAttachmentTests
 
         Assert.Null(ex);
     }
+
+    [Fact]
+    public void CreateMessage_MissingInlineAttachment_SkipsResource()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        if (File.Exists(path)) File.Delete(path);
+        var smtp = new Smtp
+        {
+            From = "a@b.com",
+            To = new object[] { "c@d.com" },
+            Subject = "test",
+            HtmlBody = "<img src=\"cid:test\">",
+            InlineAttachments = new List<object> { path }
+        };
+
+        smtp.CreateMessage();
+
+        Assert.IsType<TextPart>(smtp.Message.Body);
+    }
 }

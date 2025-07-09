@@ -166,7 +166,12 @@ public partial class ClientSmtp : SmtpClient {
             foreach (var attachment in Attachments) {
                 switch (attachment) {
                     case string path when seenPaths.Add(path):
-                        bodyBuilder.Attachments.Add(path);
+                        if (File.Exists(path)) {
+                            bodyBuilder.Attachments.Add(path);
+                        } else {
+                            LoggingMessages.Logger.WriteWarning(
+                                $"Send-EmailMessage - File not found: {path}. Skipping attachment.");
+                        }
                         break;
                     case string:
                         break;
@@ -183,18 +188,23 @@ public partial class ClientSmtp : SmtpClient {
                 switch (inline) {
                     case string path when seenInline.Add(path):
                     {
-                        // Read the file into memory so it can be removed immediately
-                        var bytes = File.ReadAllBytes(path);
-                        using var ms = new MemoryStream(bytes);
-                        var part = new MimePart(MimeTypes.GetMimeType(path))
-                        {
-                            Content = new MimeContent(ms),
-                            FileName = Path.GetFileName(path),
-                            ContentId = Path.GetFileName(path),
-                            ContentDisposition = new ContentDisposition(ContentDisposition.Inline)
-                        };
-                        bodyBuilder.LinkedResources.Add(part);
-                        entity = part;
+                        if (File.Exists(path)) {
+                            // Read the file into memory so it can be removed immediately
+                            var bytes = File.ReadAllBytes(path);
+                            using var ms = new MemoryStream(bytes);
+                            var part = new MimePart(MimeTypes.GetMimeType(path))
+                            {
+                                Content = new MimeContent(ms),
+                                FileName = Path.GetFileName(path),
+                                ContentId = Path.GetFileName(path),
+                                ContentDisposition = new ContentDisposition(ContentDisposition.Inline)
+                            };
+                            bodyBuilder.LinkedResources.Add(part);
+                            entity = part;
+                        } else {
+                            LoggingMessages.Logger.WriteWarning(
+                                $"Send-EmailMessage - File not found: {path}. Skipping inline attachment.");
+                        }
                         break;
                     }
                     case string:
