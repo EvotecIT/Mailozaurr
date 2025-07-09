@@ -99,6 +99,7 @@ public partial class ClientSmtp : SmtpClient {
     /// Builds the <see cref="MimeMessage"/> based on the configured properties.
     /// </summary>
     public void CreateMessage() {
+        InlineAttachments ??= new List<object>();
         var message = new MimeMessage();
         AddAddressesToMessage(message);
         SetMessagePriority(message);

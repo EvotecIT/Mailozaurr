@@ -28,4 +28,21 @@ public class SmtpInlineAttachmentTests
         File.Delete(tmp);
         Assert.Equal(1, inlineCount);
     }
+
+    [Fact]
+    public void CreateMessage_NullInlineAttachments_DoesNotThrow()
+    {
+        var smtp = new Smtp
+        {
+            From = "a@b.com",
+            To = new object[] { "c@d.com" },
+            Subject = "test",
+            HtmlBody = "<b>body</b>",
+            InlineAttachments = null
+        };
+
+        var ex = Record.Exception(() => smtp.CreateMessage());
+
+        Assert.Null(ex);
+    }
 }
