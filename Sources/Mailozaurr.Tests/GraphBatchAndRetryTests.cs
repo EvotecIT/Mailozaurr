@@ -89,6 +89,24 @@ public class GraphBatchAndRetryTests {
         }
     }
 
+    private class RetryAfterHandler : HttpMessageHandler {
+        public int CallCount;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            CallCount++;
+            if (request.RequestUri!.AbsoluteUri.Contains("oauth2")) {
+                if (CallCount == 1) {
+                    var resp = new HttpResponseMessage((HttpStatusCode)429);
+                    resp.Headers.Add("Retry-After", "0");
+                    return Task.FromResult(resp);
+                }
+                var json = "{\"access_token\":\"token\",\"token_type\":\"Bearer\"}";
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
+            }
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
+    }
+
     [Fact]
     public async Task ConnectO365GraphWithRetryAsync_RetriesUntilSuccess() {
         var handler = new RetryHandler();
@@ -110,6 +128,32 @@ public class GraphBatchAndRetryTests {
             string token = await MicrosoftGraphUtils.ConnectO365GraphWithRetryAsync(credential, "tenant", 2, 0, 1);
             Assert.Equal("Bearer token", token);
             Assert.Equal(3, handler.CallCount);
+        } finally {
+            handlerField.SetValue(client, original);
+        }
+    }
+
+    [Fact]
+    public async Task ConnectO365GraphAsync_RetriesAfter429() {
+        var handler = new RetryAfterHandler();
+        var field = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var client = (HttpClient)field.GetValue(null)!;
+        var handlerField = GetHandlerField();
+        var original = (HttpMessageHandler)handlerField.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var cache = (System.Collections.Concurrent.ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
+        cache.Clear();
+        var oauthType = typeof(MicrosoftGraphUtils).Assembly.GetType("Mailozaurr.OAuthTokenCache");
+        var oauthField = oauthType?.GetField("_cache", BindingFlags.NonPublic | BindingFlags.Static);
+        oauthField?.SetValue(null, null);
+        string cachePath = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "Mailozaurr", "oauth_cache.json");
+        if (System.IO.File.Exists(cachePath)) System.IO.File.Delete(cachePath);
+        try {
+            var credential = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
+            string token = await MicrosoftGraphUtils.ConnectO365GraphAsync(credential, "tenant", "https://graph.microsoft.com");
+            Assert.Equal("Bearer token", token);
+            Assert.Equal(2, handler.CallCount);
         } finally {
             handlerField.SetValue(client, original);
         }
