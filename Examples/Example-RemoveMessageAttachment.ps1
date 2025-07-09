@@ -12,7 +12,7 @@ $msg.To.Add([MimeKit.MailboxAddress]::new('Recipient','recipient@example.com'))
 $msg.Subject = 'Sample'
 $msg.Body = $builder.ToMessageBody()
 
-$msg = Remove-MessageAttachment -MimeMessage $msg
+$msg = Remove-IMAPMessageAttachment -Message $msg
 Send-EmailMessage -From 'sender@example.com' -To 'recipient@example.com' -Subject $msg.Subject -Body $builder.TextBody -Server 'smtp.example.com' -Port 25 -Message $msg -WhatIf
 
 # For Graph messages
@@ -22,5 +22,10 @@ $graphMsg = [Mailozaurr.GraphMessage]::new()
 $graphMsg.Subject = 'Graph sample'
 $graphMsg.Body = [Mailozaurr.GraphContent]::new()
 $graphMsg.Attachments = @([Mailozaurr.GraphAttachment]::FromFile($file))
-$graphMsg = Remove-MessageAttachment -GraphMessage $graphMsg
+$graphMsg = Remove-GraphMessageAttachment -Message $graphMsg
 # Forward $graphMsg using your preferred method
+
+# For POP3 messages (after retrieval)
+$popMsg = [MimeKit.MimeMessage]::new()
+$popMsg.Body = $builder.ToMessageBody()
+$popMsg = Remove-POP3MessageAttachment -Message $popMsg
