@@ -80,6 +80,20 @@ public class SesClientSendEmailAsyncTests
     }
 
     [Fact]
+    public async Task SendEmailAsync_WithToken_Succeeds()
+    {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") });
+        using var client = CreateClient(handler);
+        client.WebhookUrl = null;
+
+        using var cts = new CancellationTokenSource();
+        var result = await client.SendEmailAsync(cts.Token);
+
+        Assert.True(result.Status);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
     public async Task SendEmailAsync_RetriesFailedRequest()
     {
         var handler = new RecordingHandler(

@@ -160,7 +160,12 @@ public class SesClient : IDisposable {
     /// <summary>
     /// Sends the email using Amazon SES.
     /// </summary>
-    public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken = default)
+    public Task<SmtpResult> SendEmailAsync() => SendEmailAsync(CancellationToken.None);
+
+    /// <summary>
+    /// Sends the email using Amazon SES.
+    /// </summary>
+    public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken)
     {
         int attempts = 0;
         Exception? lastException = null;
@@ -175,7 +180,11 @@ public class SesClient : IDisposable {
             {
                 using HttpRequestMessage request = CreateRequest(body, DateTime.UtcNow);
                 HttpResponseMessage response = await _client.SendAsync(request, cancellationToken);
+#if NET5_0_OR_GREATER
+                string respContent = await response.Content.ReadAsStringAsync(cancellationToken);
+#else
                 string respContent = await response.Content.ReadAsStringAsync();
+#endif
                 if (response.IsSuccessStatusCode)
                 {
                     SmtpResult ok = new(true, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, response.StatusCode.ToString());

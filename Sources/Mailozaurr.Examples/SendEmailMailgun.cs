@@ -1,6 +1,7 @@
 using Mailozaurr;
 using System;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 
 /// <summary>
@@ -23,7 +24,8 @@ public static class SendEmailMailgun {
             mailgun.Text = "Hello from Mailozaurr via Mailgun!";
             mailgun.Html = "<p>Hello from Mailozaurr via Mailgun!</p>";
             mailgun.Credentials = new NetworkCredential("api", apiKey);
-            var result = await mailgun.SendEmailAsync();
+            using var cts = new CancellationTokenSource();
+            var result = await mailgun.SendEmailAsync(cts.Token);
             Console.WriteLine(result.Status ? "Mailgun: Email sent!" : $"Mailgun: Failed: {result.Error}");
         } catch (Exception ex) {
             Console.WriteLine($"Mailgun Example Error: {ex.Message}");

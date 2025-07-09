@@ -171,7 +171,13 @@ public class MailgunClient : IDisposable {
     /// Sends the email using the Mailgun REST API.
     /// </summary>
     /// <returns>The result of the send operation.</returns>
-    public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken = default) {
+    public Task<SmtpResult> SendEmailAsync() => SendEmailAsync(CancellationToken.None);
+
+    /// <summary>
+    /// Sends the email using the Mailgun REST API.
+    /// </summary>
+    /// <returns>The result of the send operation.</returns>
+    public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken) {
         var url = $"https://api.mailgun.net/v3/{EmailDomain}/messages";
         var auth = Convert.ToBase64String(Encoding.ASCII.GetBytes($"api:{ApiKey}"));
 
@@ -190,7 +196,11 @@ public class MailgunClient : IDisposable {
                     await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken);
                     return okResult;
                 }
+#if NET5_0_OR_GREATER
+                var error = await response.Content.ReadAsStringAsync(cancellationToken);
+#else
                 var error = await response.Content.ReadAsStringAsync();
+#endif
                 throw new HttpRequestException(error);
             } catch (HttpRequestException ex) {
                 lastException = ex;
