@@ -32,4 +32,19 @@ public class EphemeralOpenPgpContextTests
             Assert.False(Directory.Exists(dir));
         }
     }
+
+    [Fact]
+    public void Dispose_DoesNotThrow_WhenDirectoryAlreadyDeleted()
+    {
+        var field = typeof(EphemeralOpenPgpContext).GetField("_tempDirectory", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var ctx = new EphemeralOpenPgpContext();
+        var dir = (string)field.GetValue(ctx)!;
+
+        Assert.True(Directory.Exists(dir));
+        Directory.Delete(dir, true);
+        Assert.False(Directory.Exists(dir));
+
+        var ex = Record.Exception(() => ctx.Dispose());
+        Assert.Null(ex);
+    }
 }
