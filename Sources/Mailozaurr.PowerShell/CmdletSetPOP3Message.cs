@@ -43,7 +43,11 @@ public sealed class CmdletSetPOP3Message : AsyncPSCmdlet {
                 return MessageFlagSetter.SetReadAsync(conn.Data, Index, false, CancelToken);
             }
         } else {
-            WriteWarning("Set-POP3Message - Is POP3 connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Set-POP3Message - POP3 client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
         }
         return Task.CompletedTask;
     }

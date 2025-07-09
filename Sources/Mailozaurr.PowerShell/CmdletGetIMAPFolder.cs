@@ -71,7 +71,10 @@ public sealed class CmdletGetIMAPFolder : AsyncPSCmdlet {
                 WriteObject(conn);
             }
         } else {
-            WriteWarning("Get-IMAPFolder - Is IMAP connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Get-IMAPFolder - IMAP client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
         }
-    }
-}
+    }}

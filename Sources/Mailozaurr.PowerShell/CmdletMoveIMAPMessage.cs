@@ -63,7 +63,11 @@ public sealed class CmdletMoveIMAPMessage : AsyncPSCmdlet {
             conn.Folders[dest.FullName] = (ImapFolder)dest;
             source.MoveTo(uid, dest);
         } else {
-            WriteWarning("Move-IMAPMessage - Is IMAP connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Move-IMAPMessage - IMAP client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
         }
         return Task.CompletedTask;
     }

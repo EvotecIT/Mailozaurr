@@ -89,7 +89,11 @@ public sealed class CmdletSearchPOP3Mailbox : AsyncPSCmdlet {
                 WriteObject(msg);
             }
         } else {
-            WriteWarning("Search-POP3Mailbox - Is POP3 connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Search-POP3Mailbox - POP3 client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
         }
     }
 }

@@ -33,7 +33,11 @@ public sealed class CmdletRemovePOP3Message : AsyncPSCmdlet {
                 }
             }
         } else {
-            WriteWarning("Remove-POP3Message - Is POP3 connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Remove-POP3Message - POP3 client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
         }
     }
 }

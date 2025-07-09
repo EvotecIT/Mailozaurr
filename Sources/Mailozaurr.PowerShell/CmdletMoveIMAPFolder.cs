@@ -40,7 +40,11 @@ public sealed class CmdletMoveIMAPFolder : AsyncPSCmdlet {
             var dest = ParameterSetName == RootParameterSet ? null : DestinationFolder;
             await FolderOperations.MoveFolderAsync(conn.Data, Folder!, dest, CancelToken);
         } else {
-            WriteWarning("Move-IMAPFolder - Is IMAP connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Move-IMAPFolder - IMAP client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
         }
     }
 }
