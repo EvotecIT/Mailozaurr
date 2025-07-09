@@ -99,5 +99,9 @@ public class GraphMessageListener : IDisposable {
     }
 
     /// <inheritdoc />
-    public void Dispose() => Stop();
+    public void Dispose() {
+        Stop();
+        _cancel?.Dispose();
+        _cancel = null;
+    }
 }
