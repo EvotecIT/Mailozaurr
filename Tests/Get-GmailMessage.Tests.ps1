@@ -1,0 +1,6 @@
+Describe 'Get-GmailMessage cmdlet' {
+    It 'Cmdlet derives from AsyncPSCmdlet' {
+        $base = [Mailozaurr.PowerShell.CmdletGetGmailMessage].BaseType
+        $base.FullName | Should -Be 'Mailozaurr.PowerShell.AsyncPSCmdlet'
+    }
+}

@@ -22,6 +22,11 @@ public enum EmailProvider {
     /// Use the Amazon SES REST API to deliver mail.
     /// </summary>
     SES,
+
+    /// <summary>
+    /// Use the Gmail REST API to deliver mail.
+    /// </summary>
+    Gmail,
     //MailChimp,
     //Moosend,
     //Postmark,
