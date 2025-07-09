@@ -49,7 +49,7 @@ public static class ImapConnector {
         do {
             var client = ClientFactory();
             try {
-                await client.ConnectAsync(server, port, options);
+                await client.ConnectAsync(server, port, options).ConfigureAwait(false);
                 if (skipCertificateRevocation) {
                     client.CheckCertificateRevocation = false;
                 }
@@ -59,7 +59,7 @@ public static class ImapConnector {
                 if (client.Timeout != timeout) {
                     client.Timeout = timeout;
                 }
-                await authenticateAsync(client);
+                await authenticateAsync(client).ConfigureAwait(false);
                 if (!client.IsAuthenticated) {
                     throw new InvalidOperationException("Authentication failed.");
                 }
@@ -69,7 +69,7 @@ public static class ImapConnector {
                 LoggingMessages.Logger.WriteWarning($"Connect-IMAP - {ex.Message}");
                 try {
                     if (client.IsConnected) {
-                        await client.DisconnectAsync(true);
+                        await client.DisconnectAsync(true).ConfigureAwait(false);
                     }
                 } catch { }
                 if ((!Helpers.IsTransient(ex)) || attempts >= retryCount) {
@@ -78,9 +78,9 @@ public static class ImapConnector {
                 var delay = (int)Math.Round(retryDelayMilliseconds * Math.Pow(retryDelayBackoff, attempts));
                 if (delay > 0) {
                     if (DelayAsync != null) {
-                        await DelayAsync(delay);
+                        await DelayAsync(delay).ConfigureAwait(false);
                     } else {
-                        await Task.Delay(delay);
+                        await Task.Delay(delay).ConfigureAwait(false);
                     }
                 }
             }
