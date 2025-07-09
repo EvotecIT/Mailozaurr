@@ -61,6 +61,12 @@ public sealed class CmdletSearchPOP3Mailbox : AsyncPSCmdlet {
     public SwitchParameter HasAttachment { get; set; }
 
     /// <summary>
+    /// Query language string to filter messages.
+    /// </summary>
+    [Parameter]
+    public string? Query { get; set; }
+
+    /// <summary>
     /// Maximum number of messages to return.
     /// </summary>
     [Parameter]
@@ -84,7 +90,8 @@ public sealed class CmdletSearchPOP3Mailbox : AsyncPSCmdlet {
                 Before,
                 HasAttachment.IsPresent,
                 Count,
-                CancelToken);
+                CancelToken,
+                Query);
             foreach (var msg in messages) {
                 WriteObject(msg);
             }
