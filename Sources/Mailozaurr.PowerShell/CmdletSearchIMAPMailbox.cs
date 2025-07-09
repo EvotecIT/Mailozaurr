@@ -32,6 +32,12 @@ public sealed class CmdletSearchIMAPMailbox : AsyncPSCmdlet {
     public SearchQuery[]? SearchQuery { get; set; }
 
     /// <summary>
+    /// Query language string to filter messages.
+    /// </summary>
+    [Parameter]
+    public string? Query { get; set; }
+
+    /// <summary>
     /// Filters messages by subject.
     /// </summary>
     [Parameter]
@@ -95,7 +101,8 @@ public sealed class CmdletSearchIMAPMailbox : AsyncPSCmdlet {
                 HasAttachment.IsPresent,
                 SearchQuery,
                 Count,
-                CancelToken);
+                CancelToken,
+                Query);
             foreach (var msg in messages) {
                 WriteObject(msg);
             }
