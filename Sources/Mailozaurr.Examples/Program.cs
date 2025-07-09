@@ -10,6 +10,7 @@ class Program {
         await SendEmailGraphClientSecret.RunAsync();
         // await SendEmailGraphCertificate.RunAsync();
         await SendEmailMailgun.RunAsync();
+        // await SendEmailSmtpAsync.RunAsync();
         // await FetchImapMessages.RunAsync();
         // await FetchPopMessages.RunAsync();
     }
@@ -27,3 +28,4 @@ class Program {
 //   - AcquireGoogleTokenInteractive.cs
 //   - AcquireO365TokenInteractive.cs
 //   - SendEmailMailgun.cs
+//   - SendEmailSmtpAsync.cs

@@ -297,6 +297,41 @@ public class Smtp {
     }
 
     /// <summary>
+    /// Asynchronously connect to the SMTP server using the provided server and port.
+    /// </summary>
+    /// <param name="server"></param>
+    /// <param name="port"></param>
+    /// <param name="secureSocketOptions">Options controlling SSL/TLS usage. If left
+    /// as <see cref="SecureSocketOptions.Auto"/> and <paramref name="useSsl"/> is
+    /// <c>true</c>, <see cref="SecureSocketOptions.StartTls"/> will be used.</param>
+    /// <param name="useSsl">Compatibility switch. Overrides
+    /// <paramref name="secureSocketOptions"/> only when set to <c>true</c> and the
+    /// option is left as <see cref="SecureSocketOptions.Auto"/>.</param>
+    /// <returns></returns>
+    public async Task<SmtpResult> ConnectAsync(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false) {
+        Server = server;
+        Port = port;
+        try {
+            if (useSsl && secureSocketOptions == SecureSocketOptions.Auto) {
+                // Maintain backwards compatibility with Send-MailMessage by
+                // defaulting to StartTls when the UseSsl flag is supplied and
+                // no explicit option was provided.
+                secureSocketOptions = SecureSocketOptions.StartTls;
+            }
+            await Client.ConnectAsync(server, port, secureSocketOptions);
+            LoggingMessages.Logger.WriteVerbose($"Connected to {server} on {port} port using SSL: {secureSocketOptions}");
+            return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "");
+        } catch (Exception ex) {
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during connect: {ex.Message}");
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Port? ({port} was used), Using SSL? ({secureSocketOptions}, was used). You can also try 'SkipCertificateValidation' or 'SkipCertificateRevocation'.");
+            if (ErrorAction == ActionPreference.Stop) {
+                throw;
+            }
+            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "", ex.Message);
+        }
+    }
+
+    /// <summary>
     /// Authenticate using the provided credentials.
     /// </summary>
     /// <param name="Credentials"></param>
@@ -316,6 +351,36 @@ public class Smtp {
             } else {
                 Client.Authenticate(Credentials);
                 //  Settings.Logger.WriteVerbose($"Send-EmailMessage - Authenticated using ICredentials");
+            }
+            return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+        } catch (Exception ex) {
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during authentication (oAuth): {ex.Message}");
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: OAuth? ({isOAuth} was used), ICredentials? ({Credentials}, was used).");
+            if (ErrorAction == ActionPreference.Stop) {
+                throw;
+            }
+            return new SmtpResult(false, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Asynchronously authenticate using the provided credentials.
+    /// </summary>
+    /// <param name="Credentials"></param>
+    /// <param name="isOAuth"></param>
+    /// <returns></returns>
+    public async Task<SmtpResult> AuthenticateAsync(ICredentials Credentials, bool isOAuth = false) {
+        try {
+            if (isOAuth) {
+                var networkCredential = Credentials as NetworkCredential;
+                if (networkCredential != null) {
+                    var (userName, token) = Helpers.ConvertFromOAuth2Credential(networkCredential);
+                    var oauth2 = new SaslMechanismOAuth2(userName, token);
+                    await Client.AuthenticateAsync(oauth2);
+                }
+                LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Authenticated using oAuth");
+            } else {
+                await Client.AuthenticateAsync(Credentials);
             }
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (Exception ex) {
