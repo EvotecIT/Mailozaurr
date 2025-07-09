@@ -61,6 +61,27 @@ namespace Mailozaurr.Tests {
         }
 
         [Fact]
+        public async Task SendEmail_SendGrid_InvalidCredentialType_Fails() {
+            var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") });
+            var client = new SendGridClient();
+            var field = typeof(SendGridClient).GetField("_client", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+            field.SetValue(client, new HttpClient(handler));
+
+            client.From = "sender@example.com";
+            client.To = new System.Collections.Generic.List<object> { "recipient@example.com" };
+            client.Subject = "Test Email (SendGrid)";
+            client.Html = "<b>Hello from Mailozaurr SendGrid!</b>";
+            client.Text = "Hello from Mailozaurr SendGrid!";
+            client.Credentials = new CredentialCache();
+            client.CreateMessage();
+
+            var result = await client.SendEmailAsync();
+
+            Assert.False(result.Status);
+            Assert.Empty(handler.Requests);
+        }
+
+        [Fact]
         public async Task SendEmail_Graph_WithValidInput_Succeeds() {
             var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") });
             using var graph = new Graph();

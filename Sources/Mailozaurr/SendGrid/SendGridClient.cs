@@ -275,15 +275,15 @@ public class SendGridClient {
     /// <returns>A Task that represents the asynchronous operation. The task result contains the result of the email sending operation.</returns>
     public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken = default) {
         string apiKey;
-        try {
-            var networkCredential = Credentials as NetworkCredential;
+        if (Credentials is NetworkCredential networkCredential) {
             apiKey = networkCredential.Password;
-        } catch (InvalidCastException ex) {
-            LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SendGrid: {ex.Message}");
+        } else {
+            const string message = "Credentials must be NetworkCredential";
+            LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SendGrid: {message}");
             if (ErrorAction == ActionPreference.Stop) {
-                throw;
+                throw new InvalidCastException(message);
             }
-            var credFail = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, "", ex.Message);
+            var credFail = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, string.Empty, message);
             await Helpers.PostWebhookAsync(WebhookUrl, credFail, cancellationToken);
             return credFail;
         }
