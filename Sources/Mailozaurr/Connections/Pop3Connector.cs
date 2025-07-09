@@ -70,7 +70,9 @@ public static class Pop3Connector {
                     if (client.IsConnected) {
                         await client.DisconnectAsync(true);
                     }
-                } catch { }
+                } catch (Exception ex2) {
+                    LoggingMessages.Logger.WriteWarning($"Connect-POP3 - {ex2.Message}");
+                }
                 if ((!Helpers.IsTransient(ex)) || attempts >= retryCount) {
                     throw;
                 }
