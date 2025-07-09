@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Reflection;
 using Xunit;
@@ -41,5 +42,48 @@ public class SendGridCreateMessageTests
             Credentials = new NetworkCredential("apikey", "test")
         };
         Assert.Throws<ArgumentException>(() => client.CreateMessage());
+    }
+
+    [Fact]
+    public void CreateMessage_WithHeaders_IncludesHeaders()
+    {
+        var client = new SendGridClient
+        {
+            From = "from@example.com",
+            To = new List<object> { "to@example.com" },
+            Subject = "subject",
+            Text = "text",
+            Credentials = new NetworkCredential("apikey", "test"),
+            Headers = new Dictionary<string, string> { ["X-Test"] = "123" }
+        };
+        client.CreateMessage();
+        PropertyInfo? prop = typeof(SendGridClient).GetProperty("MessageJson", BindingFlags.NonPublic | BindingFlags.Instance);
+        var json = prop?.GetValue(client) as string;
+        Assert.NotNull(json);
+        Assert.Contains("X-Test", json!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CreateMessage_DuplicateAttachments_IncludedOnce()
+    {
+        var tmp = Path.GetTempFileName();
+        File.WriteAllText(tmp, "data");
+        var client = new SendGridClient
+        {
+            From = "from@example.com",
+            To = new List<object> { "to@example.com" },
+            Subject = "subject",
+            Text = "text",
+            Credentials = new NetworkCredential("apikey", "test"),
+            Attachment = new object[] { tmp, tmp }
+        };
+        client.CreateMessage();
+        PropertyInfo? prop = typeof(SendGridClient).GetProperty("MessageJson", BindingFlags.NonPublic | BindingFlags.Instance);
+        var json = prop?.GetValue(client) as string;
+        File.Delete(tmp);
+        Assert.NotNull(json);
+        using var doc = System.Text.Json.JsonDocument.Parse(json!);
+        var count = doc.RootElement.GetProperty("Attachments").GetArrayLength();
+        Assert.Equal(1, count);
     }
 }

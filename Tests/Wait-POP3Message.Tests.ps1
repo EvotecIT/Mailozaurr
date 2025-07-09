@@ -1,9 +1,7 @@
 Describe 'Wait-POP3Message' {
-    It 'Warns when POP3 connection missing' {
+    It 'Throws when POP3 connection missing' {
         $info = [Mailozaurr.PowerShell.PopConnectionInfo]::new()
-        Wait-POP3Message -Client $info -WarningVariable warn -Action {} -ErrorAction SilentlyContinue
-        $warn | Should -Not -BeNullOrEmpty
-        $warn[0] | Should -Be 'Wait-POP3Message - Is POP3 connected?'
+        { Wait-POP3Message -Client $info -Action {} } | Should -Throw
     }
 
     It 'Invokes action and cancels on match' {

@@ -80,5 +80,7 @@ public class Pop3PollListener : IDisposable {
     /// <inheritdoc />
     public void Dispose() {
         Stop();
+        _cancel?.Dispose();
+        _cancel = null;
     }
 }

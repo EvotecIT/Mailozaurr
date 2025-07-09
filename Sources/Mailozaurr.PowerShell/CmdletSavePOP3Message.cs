@@ -75,8 +75,11 @@ public sealed class CmdletSavePOP3Message : AsyncPSCmdlet {
                 WriteWarning($"Save-POP3Message - Index is out of range. Use index less than {conn.Data.Count}.");
             }
         } else {
-            WriteWarning("Save-POP3Message - Is POP3 connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Save-POP3Message - POP3 client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
         }
         return Task.CompletedTask;
-    }
-}
+    }}

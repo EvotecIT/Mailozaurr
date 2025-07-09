@@ -33,7 +33,11 @@ public sealed class CmdletRenameIMAPFolder : AsyncPSCmdlet {
             }
             await FolderOperations.RenameFolderAsync(conn.Data, Folder!, NewName!, CancelToken);
         } else {
-            WriteWarning("Rename-IMAPFolder - Is IMAP connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Rename-IMAPFolder - IMAP client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
         }
     }
 }

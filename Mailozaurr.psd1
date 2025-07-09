@@ -17,5 +17,4 @@
             ProjectUri = 'https://github.com/EvotecIT/MailoZaurr'
             Tags       = @('Windows', 'MacOS', 'Linux', 'Mail', 'Email', 'MX', 'SPF', 'DMARC', 'DKIM', 'GraphApi', 'SendGrid', 'Graph', 'IMAP', 'POP3')
         }
-    }
-    RootModule           = 'Mailozaurr.psm1'}
+    }    RootModule           = 'Mailozaurr.psm1'}

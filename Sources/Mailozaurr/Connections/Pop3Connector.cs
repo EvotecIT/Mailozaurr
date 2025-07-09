@@ -48,7 +48,7 @@ public static class Pop3Connector {
         do {
             var client = ClientFactory();
             try {
-                await client.ConnectAsync(server, port, options);
+                await client.ConnectAsync(server, port, options).ConfigureAwait(false);
                 if (skipCertificateRevocation) {
                     client.CheckCertificateRevocation = false;
                 }
@@ -58,7 +58,7 @@ public static class Pop3Connector {
                 if (client.Timeout != timeout) {
                     client.Timeout = timeout;
                 }
-                await authenticateAsync(client);
+                await authenticateAsync(client).ConfigureAwait(false);
                 if (!client.IsAuthenticated) {
                     throw new InvalidOperationException("Authentication failed.");
                 }
@@ -68,18 +68,20 @@ public static class Pop3Connector {
                 LoggingMessages.Logger.WriteWarning($"Connect-POP3 - {ex.Message}");
                 try {
                     if (client.IsConnected) {
-                        await client.DisconnectAsync(true);
+                        await client.DisconnectAsync(true).ConfigureAwait(false);
                     }
-                } catch { }
+                } catch (Exception ex2) {
+                    LoggingMessages.Logger.WriteWarning($"Connect-POP3 - {ex2.Message}");
+                }
                 if ((!Helpers.IsTransient(ex)) || attempts >= retryCount) {
                     throw;
                 }
                 var delay = (int)Math.Round(retryDelayMilliseconds * Math.Pow(retryDelayBackoff, attempts));
                 if (delay > 0) {
                     if (DelayAsync != null) {
-                        await DelayAsync(delay);
+                        await DelayAsync(delay).ConfigureAwait(false);
                     } else {
-                        await Task.Delay(delay);
+                        await Task.Delay(delay).ConfigureAwait(false);
                     }
                 }
             }

@@ -57,6 +57,9 @@ public class EphemeralOpenPgpContext : GnuPGContext, IDisposable {
     /// </summary>
     public new void Dispose() {
         base.Dispose();
+        if (!Directory.Exists(_tempDirectory))
+            return;
+
         try {
             Directory.Delete(_tempDirectory, true);
         } catch (IOException ex) {

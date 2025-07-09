@@ -43,6 +43,11 @@ public class Smtp {
         set => Client.InlineAttachments = value;
     }
 
+    public IDictionary<string, string>? Headers {
+        get => Client.Headers;
+        set => Client.Headers = value;
+    }
+
     public object From {
         get => Client.From;
         set => Client.From = value;
@@ -593,9 +598,17 @@ public class Smtp {
         if (certificates.Count > 0) {
             // Use the certificate directly from the store to sign the email
             return Sign(certificates[0]);
-        } else {
-            throw new Exception("Certificate not found in the store.");
         }
+
+        var messageText = "Certificate not found in the store.";
+        LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
+        LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Thumbprint '{certificateThumbprint}' is invalid or the certificate is missing.");
+
+        if (ErrorAction == ActionPreference.Stop) {
+            throw new Exception(messageText);
+        }
+
+        return new SmtpResult(false, EmailAction.SMimeSignature, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
     }
 
     /// <summary>
@@ -727,57 +740,59 @@ public class Smtp {
         }
 
         MimeMessage message = Message;
-        using var ctx = new EphemeralOpenPgpContext();
-        using (var pub = File.OpenRead(publicKeyPath))
-            ctx.Import(pub);
-        var recipients = message.To.Mailboxes.Concat(message.Cc.Mailboxes).Concat(message.Bcc.Mailboxes).ToList();
-        try {
-            var keys = ctx.GetPublicKeys(recipients);
-            message.Body = MultipartEncrypted.Encrypt(ctx, keys, message.Body);
-        } catch (Exception ex) {
-            if (ErrorAction == ActionPreference.Stop) throw;
-            return new SmtpResult(false, EmailAction.PgpEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+        using (var ctx = new EphemeralOpenPgpContext()) {
+            using (var pub = File.OpenRead(publicKeyPath))
+                ctx.Import(pub);
+            var recipients = message.To.Mailboxes.Concat(message.Cc.Mailboxes).Concat(message.Bcc.Mailboxes).ToList();
+            try {
+                var keys = ctx.GetPublicKeys(recipients);
+                message.Body = MultipartEncrypted.Encrypt(ctx, keys, message.Body);
+            } catch (Exception ex) {
+                if (ErrorAction == ActionPreference.Stop) throw;
+                return new SmtpResult(false, EmailAction.PgpEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+            }
+            Message = message;
+            return new SmtpResult(true, EmailAction.PgpEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         }
-        Message = message;
-        return new SmtpResult(true, EmailAction.PgpEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
     }
 
     public SmtpResult PgpSign(string publicKeyPath, string privateKeyPath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         try {
             MimeMessage message = Message;
-            using var ctx = new EphemeralOpenPgpContext(password);
-        if (!File.Exists(publicKeyPath)) {
-            string messageText = $"Public key file not found: {publicKeyPath}";
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{publicKeyPath}' is invalid. Verify the file exists and the path is correct.");
-            return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
-        }
-        if (!File.Exists(privateKeyPath)) {
-            string messageText = $"Private key file not found: {privateKeyPath}";
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{privateKeyPath}' is invalid. Verify the file exists and the path is correct.");
-            return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
-        }
+            using (var ctx = new EphemeralOpenPgpContext(password)) {
+                if (!File.Exists(publicKeyPath)) {
+                    string messageText = $"Public key file not found: {publicKeyPath}";
+                    LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
+                    LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{publicKeyPath}' is invalid. Verify the file exists and the path is correct.");
+                    return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
+                }
+                if (!File.Exists(privateKeyPath)) {
+                    string messageText = $"Private key file not found: {privateKeyPath}";
+                    LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
+                    LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{privateKeyPath}' is invalid. Verify the file exists and the path is correct.");
+                    return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
+                }
 
-        using (var pub = File.OpenRead(publicKeyPath))
-            ctx.Import(pub);
-        using (var sec = File.OpenRead(privateKeyPath))
-            ctx.Import(new PgpSecretKeyRingBundle(new Org.BouncyCastle.Bcpg.ArmoredInputStream(sec)));
-        try {
-            var signer = message.From.Mailboxes.First();
-            var signingKey = ctx.GetSigningKey(signer);
-            message.Body = MultipartSigned.Create(ctx, signingKey, DigestAlgorithm.Sha256, message.Body);
-            var signed = (MultipartSigned)message.Body;
-            var sigs = signed.Verify(ctx);
-            foreach (var sig in sigs)
-                sig.Verify();
-        } catch (Exception ex) {
-            if (ErrorAction == ActionPreference.Stop) throw;
-            return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
-        }
-            Message = message;
-            return new SmtpResult(true, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+                using (var pub = File.OpenRead(publicKeyPath))
+                    ctx.Import(pub);
+                using (var sec = File.OpenRead(privateKeyPath))
+                    ctx.Import(new PgpSecretKeyRingBundle(new Org.BouncyCastle.Bcpg.ArmoredInputStream(sec)));
+                try {
+                    var signer = message.From.Mailboxes.First();
+                    var signingKey = ctx.GetSigningKey(signer);
+                    message.Body = MultipartSigned.Create(ctx, signingKey, DigestAlgorithm.Sha256, message.Body);
+                    var signed = (MultipartSigned)message.Body;
+                    var sigs = signed.Verify(ctx);
+                    foreach (var sig in sigs)
+                        sig.Verify();
+                } catch (Exception ex) {
+                    if (ErrorAction == ActionPreference.Stop) throw;
+                    return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+                }
+                Message = message;
+                return new SmtpResult(true, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+            }
         } finally {
             if (isSecureString) {
                 using var securePwd = SecureStringHelper.FromPlainTextString(password);
@@ -792,35 +807,36 @@ public class Smtp {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         try {
             MimeMessage message = Message;
-            using var ctx = new EphemeralOpenPgpContext(password);
-        if (!File.Exists(publicKeyPath)) {
-            string messageText = $"Public key file not found: {publicKeyPath}";
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{publicKeyPath}' is invalid. Verify the file exists and the path is correct.");
-            return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
-        }
-        if (!File.Exists(privateKeyPath)) {
-            string messageText = $"Private key file not found: {privateKeyPath}";
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{privateKeyPath}' is invalid. Verify the file exists and the path is correct.");
-            return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
-        }
+            using (var ctx = new EphemeralOpenPgpContext(password)) {
+                if (!File.Exists(publicKeyPath)) {
+                    string messageText = $"Public key file not found: {publicKeyPath}";
+                    LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
+                    LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{publicKeyPath}' is invalid. Verify the file exists and the path is correct.");
+                    return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
+                }
+                if (!File.Exists(privateKeyPath)) {
+                    string messageText = $"Private key file not found: {privateKeyPath}";
+                    LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
+                    LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{privateKeyPath}' is invalid. Verify the file exists and the path is correct.");
+                    return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
+                }
 
-        using (var pub = File.OpenRead(publicKeyPath))
-            ctx.Import(pub);
-        using (var sec = File.OpenRead(privateKeyPath))
-            ctx.Import(new PgpSecretKeyRingBundle(new Org.BouncyCastle.Bcpg.ArmoredInputStream(sec)));
-        var recipients = message.To.Mailboxes.Concat(message.Cc.Mailboxes).Concat(message.Bcc.Mailboxes).ToList();
-        try {
-            var signingKey = ctx.GetSigningKey(message.From.Mailboxes.First());
-            var encKeys = ctx.GetPublicKeys(recipients);
-            message.Body = MultipartEncrypted.SignAndEncrypt(ctx, signingKey, DigestAlgorithm.Sha256, EncryptionAlgorithm.Cast5, encKeys, message.Body);
-        } catch (Exception ex) {
-            if (ErrorAction == ActionPreference.Stop) throw;
-            return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
-        }
-            Message = message;
-            return new SmtpResult(true, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+                using (var pub = File.OpenRead(publicKeyPath))
+                    ctx.Import(pub);
+                using (var sec = File.OpenRead(privateKeyPath))
+                    ctx.Import(new PgpSecretKeyRingBundle(new Org.BouncyCastle.Bcpg.ArmoredInputStream(sec)));
+                var recipients = message.To.Mailboxes.Concat(message.Cc.Mailboxes).Concat(message.Bcc.Mailboxes).ToList();
+                try {
+                    var signingKey = ctx.GetSigningKey(message.From.Mailboxes.First());
+                    var encKeys = ctx.GetPublicKeys(recipients);
+                    message.Body = MultipartEncrypted.SignAndEncrypt(ctx, signingKey, DigestAlgorithm.Sha256, EncryptionAlgorithm.Cast5, encKeys, message.Body);
+                } catch (Exception ex) {
+                    if (ErrorAction == ActionPreference.Stop) throw;
+                    return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+                }
+                Message = message;
+                return new SmtpResult(true, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+            }
         } finally {
             if (isSecureString) {
                 using var securePwd = SecureStringHelper.FromPlainTextString(password);

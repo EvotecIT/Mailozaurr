@@ -70,7 +70,11 @@ public sealed class CmdletWaitIMAPMessage : AsyncPSCmdlet, System.IDisposable {
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn == null || conn.Data == null) {
-            WriteWarning("Wait-IMAPMessage - Is IMAP connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Wait-IMAPMessage - IMAP client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
             return;
         }
 

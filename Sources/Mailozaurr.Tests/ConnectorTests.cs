@@ -18,6 +18,10 @@ public class ConnectorTests
         public int ConnectCalls { get; private set; }
         public new bool Authenticated { get; set; }
         public override bool IsAuthenticated => Authenticated;
+        private bool _connected;
+        private int _timeout;
+        public override bool IsConnected => _connected;
+        public override int Timeout { get => _timeout; set => _timeout = value; }
         public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default)
         {
             ConnectCalls++;
@@ -25,9 +29,14 @@ public class ConnectorTests
             {
                 throw new HttpRequestException("fail");
             }
+            _connected = true;
             return Task.CompletedTask;
         }
-        public override Task DisconnectAsync(bool quit, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public override Task DisconnectAsync(bool quit, CancellationToken cancellationToken = default)
+        {
+            _connected = false;
+            return Task.CompletedTask;
+        }
     }
 
     private class FakePop3Client : Pop3Client
@@ -36,6 +45,10 @@ public class ConnectorTests
         public int ConnectCalls { get; private set; }
         public new bool Authenticated { get; set; }
         public override bool IsAuthenticated => Authenticated;
+        private bool _connected;
+        private int _timeout;
+        public override bool IsConnected => _connected;
+        public override int Timeout { get => _timeout; set => _timeout = value; }
         public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default)
         {
             ConnectCalls++;
@@ -43,9 +56,26 @@ public class ConnectorTests
             {
                 throw new HttpRequestException("fail");
             }
+            _connected = true;
             return Task.CompletedTask;
         }
-        public override Task DisconnectAsync(bool quit, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public override Task DisconnectAsync(bool quit, CancellationToken cancellationToken = default)
+        {
+            _connected = false;
+            return Task.CompletedTask;
+        }
+    }
+
+    private class FakeImapDisconnectFailClient : FakeImapClient
+    {
+        public override Task DisconnectAsync(bool quit, CancellationToken cancellationToken = default)
+            => Task.FromException(new InvalidOperationException("disconnect"));
+    }
+
+    private class FakePop3DisconnectFailClient : FakePop3Client
+    {
+        public override Task DisconnectAsync(bool quit, CancellationToken cancellationToken = default)
+            => Task.FromException(new InvalidOperationException("disconnect"));
     }
 
     [Fact]
@@ -116,5 +146,43 @@ public class ConnectorTests
         Pop3Connector.DelayAsync = null;
         Assert.Equal(3, fake.ConnectCalls);
         Assert.Equal(new[] { 10, 20 }, delays);
+    }
+
+    [Fact]
+    public async Task ImapConnector_LogsDisconnectException()
+    {
+        var fake = new FakeImapDisconnectFailClient();
+        ImapConnector.ClientFactory = () => fake;
+        var messages = new List<string>();
+        void Handler(object? _, LogEventArgs e) => messages.Add(e.Message);
+        LoggingMessages.Logger.OnWarningMessage += Handler;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => ImapConnector.ConnectAsync(
+            "s", 1, SecureSocketOptions.Auto, 0, false, false,
+            _ => throw new InvalidOperationException("auth"),
+            0, 0, 1));
+
+        LoggingMessages.Logger.OnWarningMessage -= Handler;
+        ImapConnector.ClientFactory = () => new ImapClient();
+        Assert.Contains(messages, static m => m.Contains("disconnect"));
+    }
+
+    [Fact]
+    public async Task Pop3Connector_LogsDisconnectException()
+    {
+        var fake = new FakePop3DisconnectFailClient();
+        Pop3Connector.ClientFactory = () => fake;
+        var messages = new List<string>();
+        void Handler(object? _, LogEventArgs e) => messages.Add(e.Message);
+        LoggingMessages.Logger.OnWarningMessage += Handler;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Pop3Connector.ConnectAsync(
+            "s", 1, SecureSocketOptions.Auto, 0, false, false,
+            _ => throw new InvalidOperationException("auth"),
+            0, 0, 1));
+
+        LoggingMessages.Logger.OnWarningMessage -= Handler;
+        Pop3Connector.ClientFactory = () => new Pop3Client();
+        Assert.Contains(messages, static m => m.Contains("disconnect"));
     }
 }

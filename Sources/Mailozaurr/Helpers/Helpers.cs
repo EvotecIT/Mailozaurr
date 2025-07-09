@@ -32,6 +32,7 @@ public static class Helpers {
         foreach (char c in password) {
             secStringPassword.AppendChar(c);
         }
+        secStringPassword.MakeReadOnly();
         return new NetworkCredential(userName, secStringPassword);
     }
 
@@ -39,14 +40,10 @@ public static class Helpers {
     /// <param name="credentials">Credential containing the key.</param>
     /// <returns>The API key.</returns>
     public static string CredentialToApiKey(ICredentials credentials) {
-        string apiKey;
-        try {
-            var networkCredential = credentials as NetworkCredential;
-            apiKey = networkCredential.Password;
-        } catch (InvalidCastException) {
-            apiKey = string.Empty;
+        if (credentials is NetworkCredential networkCredential) {
+            return networkCredential.Password;
         }
-        return apiKey;
+        return string.Empty;
     }
 
     /// <summary>Retrieves the email address string from various types of objects.</summary>
@@ -163,7 +160,7 @@ public static class Helpers {
             }
             var json = JsonSerializer.Serialize(result);
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
-            using var response = await client.PostAsync(url, content, cancellationToken);
+            using var response = await client.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
         } catch (HttpRequestException ex) {
             LoggingMessages.Logger.WriteWarning($"Failed to post webhook: {ex.Message}");
         } finally {

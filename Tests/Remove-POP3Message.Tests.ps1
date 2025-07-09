@@ -1,8 +1,6 @@
 Describe 'Remove-POP3Message' {
-    It 'Warns when POP3 connection missing' {
+    It 'Throws when POP3 connection missing' {
         $info = [Mailozaurr.PowerShell.PopConnectionInfo]::new()
-        Remove-POP3Message -Client $info -Index 0 -WhatIf -WarningVariable warn
-        $warn | Should -Not -BeNullOrEmpty
-        $warn[0] | Should -Be 'Remove-POP3Message - Is POP3 connected?'
+        { Remove-POP3Message -Client $info -Index 0 -WhatIf } | Should -Throw
     }
 }

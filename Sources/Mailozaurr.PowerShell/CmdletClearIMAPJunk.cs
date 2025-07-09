@@ -103,7 +103,11 @@ public sealed class CmdletClearIMAPJunk : AsyncPSCmdlet {
                 SkipAttachmentExtension,
                 CancelToken);
         } else {
-            WriteWarning("Clear-IMAPJunk - Is IMAP connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Clear-IMAPJunk - IMAP client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
         }
     }
 }

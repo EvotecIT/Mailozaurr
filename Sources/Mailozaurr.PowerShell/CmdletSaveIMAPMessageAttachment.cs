@@ -50,7 +50,11 @@ public sealed class CmdletSaveIMAPMessageAttachment : AsyncPSCmdlet {
             var message = mailFolder.GetMessage(uid);
             MimeKitUtils.SaveAttachments(message.Attachments, Path);
         } else {
-            WriteWarning("Save-IMAPMessageAttachment - Is IMAP connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Save-IMAPMessageAttachment - IMAP client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
         }
         return Task.CompletedTask;
     }

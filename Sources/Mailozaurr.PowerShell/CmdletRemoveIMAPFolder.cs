@@ -32,7 +32,11 @@ public sealed class CmdletRemoveIMAPFolder : AsyncPSCmdlet {
             }
             await FolderOperations.RemoveFolderAsync(conn.Data, Folder!, Recursive, CancelToken);
         } else {
-            WriteWarning("Remove-IMAPFolder - Is IMAP connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Remove-IMAPFolder - IMAP client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
         }
     }
 }
