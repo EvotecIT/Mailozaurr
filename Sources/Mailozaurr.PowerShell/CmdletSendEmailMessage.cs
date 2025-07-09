@@ -347,6 +347,12 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     public string? Region { get; set; }
 
     /// <summary>
+    /// <para>Specifies the Gmail account when using the Gmail provider.</para>
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
+    public string? GmailAccount { get; set; }
+
+    /// <summary>
     /// <para>Specifies chunk size in bytes used for Graph attachment uploads. Default is 9MB.</para>
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "Graph")]
@@ -625,6 +631,8 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             ProcessMailgun(fromEmail, fromName);
         } else if (EmailProvider == EmailProvider.SES) {
             ProcessSes(fromEmail, fromName);
+        } else if (EmailProvider == EmailProvider.Gmail) {
+            ProcessGmail(fromEmail, fromName);
         } else if (Graph) {
             ProcessGraph(fromEmail, fromName);
         } else if (MgGraphRequest) {
@@ -743,6 +751,43 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
             }
         } else if (!Suppress) {
             WriteObject(new SmtpResult(false, EmailAction.Send, ses.SentTo, ses.SentFrom, "SESApi", 0, ses.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
+        }
+    }
+
+    private void ProcessGmail(string? fromEmail, string? fromName) {
+        var smtp = new Smtp();
+        smtp.From = Helpers.GetFromObject(fromEmail, fromName);
+        if (Bcc != null) smtp.Bcc = Bcc.ToList();
+        if (Cc != null) smtp.Cc = Cc.ToList();
+        if (To != null) smtp.To = To.ToList();
+        smtp.ReplyTo = ReplyTo;
+        smtp.Subject = Subject;
+        if (Text != null) smtp.TextBody = string.Join("", Text);
+        if (HTML != null) smtp.HtmlBody = string.Join("", HTML);
+        smtp.Attachments = Attachment?.ToList();
+        smtp.InlineAttachments = InlineAttachment?.ToList();
+        smtp.Priority = Priority;
+        smtp.CreateMessage();
+
+        var net = Credential!.GetNetworkCredential();
+        var oauth = new OAuthCredential {
+            UserName = net.UserName,
+            AccessToken = net.Password,
+            ExpiresOn = System.DateTimeOffset.MaxValue
+        };
+
+        var client = new GmailApiClient(oauth);
+        try {
+            if (ShouldProcess(smtp.SentTo, "Sending email message via Gmail API")) {
+                var msg = client.SendAsync(GmailAccount!, smtp.Message).GetAwaiter().GetResult();
+                if (!Suppress) {
+                    WriteObject(new SmtpResult(true, EmailAction.Send, smtp.SentTo, smtp.SentFrom, "GmailApi", 0, smtp.Stopwatch.Elapsed, msg.Id));
+                }
+            } else if (!Suppress) {
+                WriteObject(new SmtpResult(false, EmailAction.Send, smtp.SentTo, smtp.SentFrom, "GmailApi", 0, smtp.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
+            }
+        } finally {
+            smtp.Dispose();
         }
     }
 
