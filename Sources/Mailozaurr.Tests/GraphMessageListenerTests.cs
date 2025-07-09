@@ -38,7 +38,7 @@ public class GraphMessageListenerTests {
         var responses = new[] {
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"access_token\":\"token\",\"token_type\":\"Bearer\"}") },
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"value\":[]}") },
-            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"value\":[]}") },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"access_token\":\"token\",\"token_type\":\"Bearer\"}") },
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"value\":[]}") }
         };
         var handler = new QueueHandler(responses);
@@ -56,24 +56,31 @@ public class GraphMessageListenerTests {
             var cred = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
             var listener = new GraphMessageListener(cred, "user", TimeSpan.FromMilliseconds(10));
             var cancelField = typeof(GraphMessageListener).GetField("_cancel", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            var pollField = typeof(GraphMessageListener).GetField("_pollTask", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
             await listener.StartAsync();
             var first = cancelField.GetValue(listener);
+            var firstPoll = pollField.GetValue(listener);
             await Task.Delay(20);
             listener.Dispose();
             Assert.Null(cancelField.GetValue(listener));
+            Assert.Null(pollField.GetValue(listener));
 
             await listener.StartAsync();
             var second = cancelField.GetValue(listener);
+            var secondPoll = pollField.GetValue(listener);
             await Task.Delay(20);
             listener.Dispose();
             Assert.Null(cancelField.GetValue(listener));
+            Assert.Null(pollField.GetValue(listener));
 
             Assert.NotNull(first);
             Assert.NotNull(second);
             Assert.NotSame(first, second);
+            Assert.NotNull(firstPoll);
+            Assert.NotNull(secondPoll);
+            Assert.NotSame(firstPoll, secondPoll);
         } finally {
             handlerField.SetValue(client, original);
         }
-    }
-}
+    }}
