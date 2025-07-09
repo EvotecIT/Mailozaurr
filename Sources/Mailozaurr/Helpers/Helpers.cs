@@ -32,6 +32,7 @@ public static class Helpers {
         foreach (char c in password) {
             secStringPassword.AppendChar(c);
         }
+        secStringPassword.MakeReadOnly();
         return new NetworkCredential(userName, secStringPassword);
     }
 
