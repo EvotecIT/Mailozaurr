@@ -51,6 +51,7 @@ public class SendGridClient {
     /// </summary>
     public object[]? Attachment { get; set; }
 
+    /// <summary>Custom headers to include with the message.</summary>
     public Dictionary<string, string>? Headers { get; set; }
 
     /// <summary>
@@ -110,6 +111,7 @@ public class SendGridClient {
     /// </summary>
     public bool RetryAlways { get; set; } = false;
 
+    /// <summary>Webhook invoked after sending.</summary>
     public string? WebhookUrl { get; set; }
 
     /// <summary>

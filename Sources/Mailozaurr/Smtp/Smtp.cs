@@ -14,75 +14,91 @@ namespace Mailozaurr;
 /// High level wrapper around <see cref="ClientSmtp"/> that exposes convenient methods and retry logic.
 /// </summary>
 public class Smtp {
+    /// <summary>Configuration used for protocol logging.</summary>
     public LoggingConfigurator? Logging;
 
+    /// <summary>Underlying SMTP client used to send messages.</summary>
     public ClientSmtp Client { get; }
 
+    /// <summary>Subject of the message.</summary>
     public string Subject {
         get => Client.Subject;
         set => Client.Subject = value;
     }
 
+    /// <summary>HTML body of the message.</summary>
     public string HtmlBody {
         get => Client.HtmlBody;
         set => Client.HtmlBody = value;
     }
 
+    /// <summary>Plain text body of the message.</summary>
     public string TextBody {
         get => Client.TextBody;
         set => Client.TextBody = value;
     }
 
+    /// <summary>Attachments to include with the message.</summary>
     public List<object>? Attachments {
         get => Client.Attachments;
         set => Client.Attachments = value;
     }
 
+    /// <summary>Inline attachments to embed in the message.</summary>
     public List<object>? InlineAttachments {
         get => Client.InlineAttachments;
         set => Client.InlineAttachments = value;
     }
 
+    /// <summary>Custom headers to add to the message.</summary>
     public IDictionary<string, string>? Headers {
         get => Client.Headers;
         set => Client.Headers = value;
     }
 
+    /// <summary>The sender address.</summary>
     public object From {
         get => Client.From;
         set => Client.From = value;
     }
 
+    /// <summary>Primary recipients.</summary>
     public IEnumerable<object>? To {
         get => Client.To;
         set => Client.To = value;
     }
 
+    /// <summary>Carbon copy recipients.</summary>
     public IEnumerable<object>? Cc {
         get => Client.Cc;
         set => Client.Cc = value;
     }
 
+    /// <summary>Blind carbon copy recipients.</summary>
     public IEnumerable<object>? Bcc {
         get => Client.Bcc;
         set => Client.Bcc = value;
     }
 
+    /// <summary>Reply-to address.</summary>
     public object? ReplyTo {
         get => Client.ReplyTo;
         set => Client.ReplyTo = value;
     }
 
+    /// <summary>The underlying MIME message.</summary>
     public MimeMessage Message {
         get => Client.Message;
         set => Client.Message = value;
     }
 
+    /// <summary>Priority of the message.</summary>
     public MessagePriority Priority {
         get => Client.Priority;
         set => Client.Priority = value;
     }
 
+    /// <summary>Delivery notification options.</summary>
     public DeliveryNotification[]? DeliveryNotificationOption {
         get => Client.DeliveryNotificationOption;
         set {
@@ -92,15 +108,19 @@ public class Smtp {
         }
     }
 
+    /// <summary>Timeout for SMTP operations in milliseconds.</summary>
     public int Timeout {
         get => Client.Timeout;
         set => Client.Timeout = value;
     }
 
+    /// <summary>Number of retry attempts on failure.</summary>
     public int RetryCount { get; set; } = 0;
 
+    /// <summary>Base delay in milliseconds between retries.</summary>
     public int RetryDelayMilliseconds { get; set; } = 0;
 
+    /// <summary>Exponential backoff multiplier for retries.</summary>
     public double RetryDelayBackoff { get; set; } = 1.0;
 
     /// <summary>
@@ -115,14 +135,17 @@ public class Smtp {
     /// </summary>
     public bool RetryAlways { get; set; } = false;
 
+    /// <summary>Webhook invoked after sending.</summary>
     public string? WebhookUrl { get; set; }
 
+    /// <summary>Validate the server certificate against revocation lists.</summary>
     public bool CheckCertificateRevocation {
         get => Client.CheckCertificateRevocation;
         set => Client.CheckCertificateRevocation = value;
     }
 
     private bool _skipCertificateValidation;
+    /// <summary>Skip server certificate validation.</summary>
     public bool SkipCertificateValidation {
         get => _skipCertificateValidation;
         set {
@@ -135,6 +158,7 @@ public class Smtp {
         }
     }
 
+    /// <summary>Domain name to use in the SMTP HELO.</summary>
     public string LocalDomain {
         get => Client.LocalDomain;
         set {
@@ -142,6 +166,7 @@ public class Smtp {
         }
     }
 
+    /// <summary>Delivery status notification type to request.</summary>
     public DeliveryStatusNotificationType? DeliveryStatusNotificationType {
         get => Client.DeliveryStatusNotificationType;
         set {
@@ -151,20 +176,27 @@ public class Smtp {
         }
     }
 
+    /// <summary>Custom certificate validation callback.</summary>
     public RemoteCertificateValidationCallback ServerCertificateValidationCallback {
         get => Client.ServerCertificateValidationCallback;
         set => Client.ServerCertificateValidationCallback = value;
     }
 
+    /// <summary>Port used to connect to the SMTP server.</summary>
     public int Port { get; private set; } = 25;
 
+    /// <summary>SMTP server host name.</summary>
     public string Server { get; private set; } = String.Empty;
 
+    /// <summary>Action to take when an error occurs.</summary>
     public ActionPreference? ErrorAction { get; set; }
 
+    /// <summary>Comma separated list of all recipients.</summary>
     public string SentTo => Client.SentTo;
+    /// <summary>Normalized address the message is sent from.</summary>
     public string SentFrom => Helpers.GetEmailAddress(From);
 
+    /// <summary>Stopwatch measuring the time of operations.</summary>
     public readonly Stopwatch Stopwatch;
 
     /// <summary>
@@ -731,6 +763,11 @@ public class Smtp {
         return new SmtpResult(true, EmailAction.SMimeSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
     }
 
+    /// <summary>
+    /// Encrypts the current message using the specified OpenPGP public key.
+    /// </summary>
+    /// <param name="publicKeyPath">Path to the recipient public key.</param>
+    /// <returns>The result of the encryption operation.</returns>
     public SmtpResult PgpEncrypt(string publicKeyPath) {
         if (!File.Exists(publicKeyPath)) {
             string messageText = $"Public key file not found: {publicKeyPath}";
@@ -756,6 +793,14 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// Signs the current message using OpenPGP keys.
+    /// </summary>
+    /// <param name="publicKeyPath">Path to the public key.</param>
+    /// <param name="privateKeyPath">Path to the private key.</param>
+    /// <param name="password">Password protecting the private key.</param>
+    /// <param name="isSecureString">Whether the password is protected.</param>
+    /// <returns>The result of the signing operation.</returns>
     public SmtpResult PgpSign(string publicKeyPath, string privateKeyPath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         try {
@@ -803,6 +848,14 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// Signs and encrypts the current message using OpenPGP keys.
+    /// </summary>
+    /// <param name="publicKeyPath">Path to the public key.</param>
+    /// <param name="privateKeyPath">Path to the private key.</param>
+    /// <param name="password">Password protecting the private key.</param>
+    /// <param name="isSecureString">Whether the password is protected.</param>
+    /// <returns>The result of the sign and encrypt operation.</returns>
     public SmtpResult PgpSignAndEncrypt(string publicKeyPath, string privateKeyPath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         try {

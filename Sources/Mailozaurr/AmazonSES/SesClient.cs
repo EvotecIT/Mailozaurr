@@ -39,6 +39,7 @@ public class SesClient : IDisposable {
     /// <summary>Paths to inline attachments to include.</summary>
     public string[]? InlineAttachment { get; set; }
 
+    /// <summary>Custom headers to include with the message.</summary>
     public Dictionary<string, string>? Headers { get; set; }
 
     /// <summary>Number of retry attempts on failure.</summary>

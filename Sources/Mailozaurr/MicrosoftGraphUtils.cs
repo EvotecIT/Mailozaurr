@@ -666,6 +666,16 @@ namespace Mailozaurr {
             }
         }
 
+        /// <summary>
+        /// Filters a collection of messages using provided skip criteria.
+        /// </summary>
+        /// <param name="messages">Messages to filter.</param>
+        /// <param name="skipIds">IDs of messages to exclude.</param>
+        /// <param name="skipFrom">Sender addresses to exclude.</param>
+        /// <param name="skipTo">Recipient addresses to exclude.</param>
+        /// <param name="skipSubjectContains">Subject substrings to exclude.</param>
+        /// <param name="skipHasAttachment">Exclude messages that have attachments.</param>
+        /// <returns>List of messages that are not considered junk.</returns>
         public static List<Dictionary<string, object>> FilterJunkMessages(
             IEnumerable<Dictionary<string, object>> messages,
             IEnumerable<string>? skipIds = null,
