@@ -598,9 +598,17 @@ public class Smtp {
         if (certificates.Count > 0) {
             // Use the certificate directly from the store to sign the email
             return Sign(certificates[0]);
-        } else {
-            throw new Exception("Certificate not found in the store.");
         }
+
+        var messageText = "Certificate not found in the store.";
+        LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
+        LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Thumbprint '{certificateThumbprint}' is invalid or the certificate is missing.");
+
+        if (ErrorAction == ActionPreference.Stop) {
+            throw new Exception(messageText);
+        }
+
+        return new SmtpResult(false, EmailAction.SMimeSignature, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
     }
 
     /// <summary>
