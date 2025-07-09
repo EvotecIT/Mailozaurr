@@ -53,7 +53,11 @@ public sealed class CmdletWaitPOP3Message : AsyncPSCmdlet, IDisposable {
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.Pop3Session;
         if (conn == null || conn.Data == null) {
-            WriteWarning("Wait-POP3Message - Is POP3 connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Wait-POP3Message - POP3 client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
             return;
         }
 

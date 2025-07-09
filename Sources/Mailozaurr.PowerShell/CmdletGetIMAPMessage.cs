@@ -155,7 +155,10 @@ public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
                 WriteObject(new ImapMessageInfo(message));
             }
         } else {
-            WriteWarning("Get-IMAPMessage - Is IMAP connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Get-IMAPMessage - IMAP client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
         }
-    }
-}
+    }}

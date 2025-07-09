@@ -48,7 +48,11 @@ public sealed class CmdletSetIMAPMessage : AsyncPSCmdlet {
                 await MessageFlagSetter.SetFlagsAsync(conn.Data, uid, MessageFlags.Seen, false, Folder ?? conn.Folder?.FullName, CancelToken);
             }
         } else {
-            WriteWarning("Set-IMAPMessage - Is IMAP connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Set-IMAPMessage - IMAP client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
         }
     }
 }

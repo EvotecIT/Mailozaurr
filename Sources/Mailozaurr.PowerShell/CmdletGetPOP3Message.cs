@@ -123,7 +123,10 @@ public sealed class CmdletGetPOP3Message : AsyncPSCmdlet {
                 WriteObject(new Pop3MessageInfo(message));
             }
         } else {
-            WriteWarning("Get-POP3Message - Is POP3 connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Get-POP3Message - POP3 client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
         }
-    }
-}
+    }}

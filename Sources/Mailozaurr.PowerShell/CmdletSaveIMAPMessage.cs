@@ -84,7 +84,11 @@ public sealed class CmdletSaveIMAPMessage : AsyncPSCmdlet {
                 }
             }
         } else {
-            WriteWarning("Save-IMAPMessage - Is IMAP connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Save-IMAPMessage - IMAP client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
         }
         return Task.CompletedTask;
     }

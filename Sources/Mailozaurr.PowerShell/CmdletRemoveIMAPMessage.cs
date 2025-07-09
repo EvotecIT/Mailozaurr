@@ -36,7 +36,11 @@ public sealed class CmdletRemoveIMAPMessage : AsyncPSCmdlet {
                 await MessageRemover.DeleteAsync(conn.Data, new UniqueId(u), folder, CancelToken);
             }
         } else {
-            WriteWarning("Remove-IMAPMessage - Is IMAP connected?");
+            ThrowTerminatingError(new ErrorRecord(
+                new InvalidOperationException("Remove-IMAPMessage - IMAP client not provided or not connected."),
+                "ClientNotConnected",
+                ErrorCategory.InvalidOperation,
+                null));
         }
     }
 }
