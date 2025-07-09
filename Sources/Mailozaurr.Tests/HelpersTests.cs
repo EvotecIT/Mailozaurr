@@ -68,6 +68,31 @@ public class HelpersTests
     }
 
     [Fact]
+    public void CredentialToApiKey_ReturnsPassword_WhenNetworkCredential()
+    {
+        var cred = new NetworkCredential("apikey", "theKey");
+
+        string result = Mailozaurr.Helpers.CredentialToApiKey(cred);
+
+        Assert.Equal("theKey", result);
+    }
+
+    private class DummyCredentials : ICredentials
+    {
+        public NetworkCredential GetCredential(Uri uri, string authType) => new NetworkCredential();
+    }
+
+    [Fact]
+    public void CredentialToApiKey_ReturnsEmptyString_WhenNotNetworkCredential()
+    {
+        ICredentials creds = new DummyCredentials();
+
+        string result = Mailozaurr.Helpers.CredentialToApiKey(creds);
+
+        Assert.Equal(string.Empty, result);
+    }
+
+    [Fact]
     public void GetEmailAndName_ReturnsTuple_WhenDictionaryProvided()
     {
         var input = new Dictionary<string, object> { { "Email", "a@b.com" }, { "Name", "Alice" } };
