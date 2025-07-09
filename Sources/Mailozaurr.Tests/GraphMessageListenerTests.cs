@@ -10,6 +10,7 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
+[Collection("GraphCollection")]
 public class GraphMessageListenerTests {
     private class QueueHandler : HttpMessageHandler {
         private readonly Queue<HttpResponseMessage> _responses;

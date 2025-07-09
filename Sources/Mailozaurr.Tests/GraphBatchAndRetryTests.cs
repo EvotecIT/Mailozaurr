@@ -9,6 +9,7 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
+[Collection("GraphCollection")]
 public class GraphBatchAndRetryTests {
     private class BatchHandler : HttpMessageHandler {
         public HttpRequestMessage? BatchRequest;
