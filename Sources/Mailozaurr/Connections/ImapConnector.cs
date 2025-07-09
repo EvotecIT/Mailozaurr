@@ -71,7 +71,9 @@ public static class ImapConnector {
                     if (client.IsConnected) {
                         await client.DisconnectAsync(true).ConfigureAwait(false);
                     }
-                } catch { }
+                } catch (Exception ex2) {
+                    LoggingMessages.Logger.WriteWarning($"Connect-IMAP - {ex2.Message}");
+                }
                 if ((!Helpers.IsTransient(ex)) || attempts >= retryCount) {
                     throw;
                 }
