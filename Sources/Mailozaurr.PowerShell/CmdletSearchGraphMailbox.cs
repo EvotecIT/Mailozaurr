@@ -52,6 +52,9 @@ public class CmdletSearchGraphMailbox : AsyncPSCmdlet {
     [Parameter]
     public int MaxConcurrentRequests { get; set; } = 5;
 
+    /// <summary>
+    /// Executes the cmdlet logic asynchronously.
+    /// </summary>
     protected override async Task ProcessRecordAsync() {
         var conn = Connection ?? DefaultSessions.GraphSession;
         if (conn == null) {

@@ -73,6 +73,9 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
+    /// <summary>
+    /// Executes the cmdlet logic asynchronously.
+    /// </summary>
     protected override async Task ProcessRecordAsync() {
         if (ParameterSetName == "MgGraphRequest") {
             ProcessMgGraph();
