@@ -130,6 +130,15 @@ public class Smtp {
     public bool AutoEmbedImages { get; set; } = false;
 
     /// <summary>
+    /// When set to <see langword="true"/>, downloads remote images referenced in
+    /// <see cref="HtmlBody"/> and embeds them as inline attachments.
+    /// </summary>
+    public bool AutoEmbedRemoteImages {
+        get => Client.AutoEmbedRemoteImages;
+        set => Client.AutoEmbedRemoteImages = value;
+    }
+
+    /// <summary>
     /// Forces retries even when the encountered error is not considered
     /// transient. By default retries occur only for transient failures.
     /// </summary>

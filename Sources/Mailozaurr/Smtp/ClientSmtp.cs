@@ -34,6 +34,8 @@ public partial class ClientSmtp : SmtpClient {
     public DeliveryNotification[]? DeliveryNotificationOption { get; set; }
     /// <summary>Custom headers to add to the message.</summary>
     public IDictionary<string, string>? Headers { get; set; }
+    /// <summary>Download remote images referenced in HtmlBody and embed them.</summary>
+    public bool AutoEmbedRemoteImages { get; set; } = false;
     /// <summary>Comma separated list of all recipients.</summary>
     public string SentTo {
         get {
@@ -220,6 +222,21 @@ public partial class ClientSmtp : SmtpClient {
                 if (entity is MimePart inlinePart && string.IsNullOrWhiteSpace(inlinePart.ContentId)) {
                     inlinePart.ContentId = MimeUtils.GenerateMessageId();
                 }
+            }
+        }
+        if (AutoEmbedRemoteImages && !string.IsNullOrWhiteSpace(bodyBuilder.HtmlBody)) {
+            var (html, images) = HtmlUtils.DownloadRemoteImagesAsync(bodyBuilder.HtmlBody).GetAwaiter().GetResult();
+            bodyBuilder.HtmlBody = html;
+            HtmlBody = html;
+            foreach (var img in images) {
+                using var ms = new MemoryStream(img.Data);
+                var part = new MimePart(img.MediaType) {
+                    Content = new MimeContent(ms),
+                    FileName = img.ContentId,
+                    ContentId = img.ContentId,
+                    ContentDisposition = new ContentDisposition(ContentDisposition.Inline)
+                };
+                bodyBuilder.LinkedResources.Add(part);
             }
         }
         message.Body = bodyBuilder.ToMessageBody();
