@@ -1,5 +1,10 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
+#if !UNIX
+using System.Security.AccessControl;
+using System.Security.Principal;
+#endif
 using Org.BouncyCastle.Bcpg.OpenPgp;
 using MimeKit.Cryptography;
 
@@ -36,11 +41,43 @@ public class EphemeralOpenPgpContext : GnuPGContext, IDisposable {
                 fs.Close();
                 File.Delete(path);
                 Directory.CreateDirectory(path);
+                SetRestrictivePermissions(path);
                 return path;
             } catch (IOException) {
                 // Collision occurred, retry with a new path
             }
         }
+    }
+
+#if UNIX
+    [DllImport("libc", SetLastError = true)]
+    private static extern int chmod(string path, int mode);
+#endif
+
+    private static void SetRestrictivePermissions(string directory) {
+#if UNIX
+        try {
+            _ = chmod(directory, Convert.ToInt32("700", 8));
+        } catch (Exception ex) {
+            LoggingMessages.Logger.WriteWarning($"Failed to set permissions on temporary directory: {ex.Message}");
+        }
+#else
+        try {
+            var info = new DirectoryInfo(directory);
+            var current = WindowsIdentity.GetCurrent().User!;
+            var security = new DirectorySecurity();
+            security.SetOwner(current);
+            security.SetAccessRule(new FileSystemAccessRule(
+                current,
+                FileSystemRights.FullControl,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None,
+                AccessControlType.Allow));
+            info.SetAccessControl(security);
+        } catch (Exception ex) {
+            LoggingMessages.Logger.WriteWarning($"Failed to set permissions on temporary directory: {ex.Message}");
+        }
+#endif
     }
 
     /// <summary>

@@ -3,6 +3,11 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
+#if !UNIX
+using System.Security.AccessControl;
+using System.Security.Principal;
+#endif
 using System.Threading.Tasks;
 using Xunit;
 
@@ -47,4 +52,41 @@ public class EphemeralOpenPgpContextTests
         var ex = Record.Exception(() => ctx.Dispose());
         Assert.Null(ex);
     }
+
+#if NET8_0_OR_GREATER
+    [Fact]
+    public void CreateTempDirectory_HasRestrictivePermissions()
+    {
+        var field = typeof(EphemeralOpenPgpContext).GetField("_tempDirectory", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        using var ctx = new EphemeralOpenPgpContext();
+        var dir = (string)field.GetValue(ctx)!;
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+#if !UNIX
+            var security = new DirectoryInfo(dir).GetAccessControl();
+            var rules = security.GetAccessRules(true, true, typeof(SecurityIdentifier));
+            var current = WindowsIdentity.GetCurrent().User;
+            bool hasUserRule = false;
+            foreach (FileSystemAccessRule rule in rules)
+            {
+                if (rule.IdentityReference.Equals(current) && rule.AccessControlType == AccessControlType.Allow && rule.FileSystemRights.HasFlag(FileSystemRights.FullControl))
+                {
+                    hasUserRule = true;
+                }
+                else if (rule.AccessControlType == AccessControlType.Allow)
+                {
+                    Assert.False(true, "Unexpected access rule found");
+                }
+            }
+            Assert.True(hasUserRule);
+#endif
+        }
+        else
+        {
+            var mode = new DirectoryInfo(dir).UnixFileMode;
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, mode);
+        }
+    }
+#endif
 }
