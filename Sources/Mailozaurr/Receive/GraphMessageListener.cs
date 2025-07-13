@@ -79,9 +79,14 @@ public class GraphMessageListener : IDisposable {
     }
 
     private async Task PollLoopAsync() {
-        while (!_cancel!.IsCancellationRequested) {
+        while (true) {
+            var cancel = _cancel;
+            if (cancel == null || cancel.IsCancellationRequested) {
+                break;
+            }
+
             try {
-                await Task.Delay(_interval, _cancel.Token).ConfigureAwait(false);
+                await Task.Delay(_interval, cancel.Token).ConfigureAwait(false);
                 var messages = await MicrosoftGraphUtils.GetMailMessagesAsync(_credential, _userPrincipalName).ConfigureAwait(false);
                 foreach (var msg in messages) {
                     if (msg.TryGetValue("id", out var idObj) && idObj is string id && !_seenIds.Contains(id)) {
@@ -89,11 +94,15 @@ public class GraphMessageListener : IDisposable {
                         MessageArrived?.Invoke(this, msg);
                     }
                 }
-            } catch (OperationCanceledException) when (_cancel.IsCancellationRequested) {
+            } catch (OperationCanceledException) when (cancel.IsCancellationRequested) {
+                break;
+            } catch (ObjectDisposedException) {
                 break;
             } catch (Exception ex) {
                 PollError?.Invoke(this, ex);
-                await Task.Delay(TimeSpan.FromSeconds(5), _cancel.Token).ConfigureAwait(false);
+                if (cancel != null) {
+                    await Task.Delay(TimeSpan.FromSeconds(5), cancel.Token).ConfigureAwait(false);
+                }
             }
         }
     }
