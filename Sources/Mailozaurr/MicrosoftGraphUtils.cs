@@ -71,6 +71,7 @@ namespace Mailozaurr {
         /// Converts a credential string (username@directory) and secret to a GraphCredential object.
         /// </summary>
         public static GraphCredential ConvertFromGraphCredential(string username, string password) {
+            username = username.Trim();
             var parts = username.Split('@');
             if (parts.Length != 2) {
                 throw new ArgumentException("Invalid credential format. Expected 'clientid@directoryid'.");
