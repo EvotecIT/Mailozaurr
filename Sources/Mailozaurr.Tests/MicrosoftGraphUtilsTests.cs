@@ -11,7 +11,7 @@ public class MicrosoftGraphUtilsTests
     [Fact]
     public void BuildGraphUri_JoinsBaseAndPath()
     {
-        string uri = MicrosoftGraphUtils.BuildGraphUri("https://graph.microsoft.com/v1.0/", "/users/me");
+        string uri = MicrosoftGraphUtils.BuildGraphUri(GraphEndpoint.V1, "/users/me");
         Assert.Equal("https://graph.microsoft.com/v1.0/users/me", uri);
     }
 
@@ -25,7 +25,7 @@ public class MicrosoftGraphUtilsTests
     [Fact]
     public void JoinUriQuery_JoinsUriCorrectly()
     {
-        string uri = MicrosoftGraphUtils.JoinUriQuery("https://graph.microsoft.com/v1.0/", "users/me");
+        string uri = MicrosoftGraphUtils.JoinUriQuery(GraphEndpoint.V1, "users/me");
         Assert.Equal("https://graph.microsoft.com/v1.0/users/me", uri);
     }
 

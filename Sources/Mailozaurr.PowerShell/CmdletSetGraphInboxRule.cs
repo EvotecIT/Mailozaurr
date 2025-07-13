@@ -131,7 +131,7 @@ public sealed class CmdletSetGraphInboxRule : AsyncPSCmdlet
             return;
         }
         var uri = MicrosoftGraphUtils.JoinUriQuery(
-            "https://graph.microsoft.com/v1.0",
+            GraphEndpoint.V1,
             $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules/{RuleId}");
         var bodyObj = RuleObject ?? JsonSerializer.Deserialize<GraphInboxRule>(JsonSerializer.Serialize(Rule));
         var body = JsonSerializer.Serialize(bodyObj, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });

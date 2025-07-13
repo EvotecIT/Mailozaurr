@@ -417,7 +417,9 @@ public class Graph : IDisposable {
         CreateMessage();
         LogCollector.LogVerbose("Send-EmailMessage - Sending email via Graph API");
         // Create the request URI outside the loop.
-        var requestUri = "https://graph.microsoft.com/v1.0/users/" + MessageContainer.Message.From.Email.Address + "/sendMail";
+        var requestUri = MicrosoftGraphUtils.BuildGraphUri(
+            GraphEndpoint.V1,
+            $"/users/{MessageContainer.Message.From.Email.Address}/sendMail");
 
         int attempts = 0;
         Exception? lastException = null;
@@ -540,7 +542,9 @@ public class Graph : IDisposable {
     /// <returns>The result of the send operation.</returns>
     public async Task<SmtpResult> SendDraftMessage(GraphMessage draftMessage, CancellationToken cancellationToken = default) {
         // Send the draft message
-        var sendRequestUri = $"https://graph.microsoft.com/v1.0/users/{MessageContainer.Message.From.Email.Address}/messages/{draftMessage.Id}/send";
+        var sendRequestUri = MicrosoftGraphUtils.BuildGraphUri(
+            GraphEndpoint.V1,
+            $"/users/{MessageContainer.Message.From.Email.Address}/messages/{draftMessage.Id}/send");
         using var sendRequest = new HttpRequestMessage(HttpMethod.Post, sendRequestUri);
 
         // Add the authorization header
@@ -623,7 +627,9 @@ public class Graph : IDisposable {
 
         var messageJson = CreateDraft();
 
-        var draftRequestUri = $"https://graph.microsoft.com/v1.0/users/{MessageContainer.Message.From.Email.Address}/mailfolders/drafts/messages";
+        var draftRequestUri = MicrosoftGraphUtils.BuildGraphUri(
+            GraphEndpoint.V1,
+            $"/users/{MessageContainer.Message.From.Email.Address}/mailfolders/drafts/messages");
         var draftRequest = new HttpRequestMessage(HttpMethod.Post, draftRequestUri) {
             Content = new StringContent(messageJson, Encoding.UTF8, "application/json")
         };
@@ -725,7 +731,9 @@ public class Graph : IDisposable {
     /// <param name="attachmentItemJson">The serialized attachment item.</param>
     /// <returns>The upload session URL.</returns>
     public async Task<string> CreateUploadSession(GraphMessage draftMessage, string attachmentItemJson, CancellationToken cancellationToken = default) {
-        var uploadSessionUrl = $"https://graph.microsoft.com/v1.0/users('{SentFrom}')/messages/{draftMessage.Id}/attachments/createUploadSession";
+        var uploadSessionUrl = MicrosoftGraphUtils.BuildGraphUri(
+            GraphEndpoint.V1,
+            $"/users('{SentFrom}')/messages/{draftMessage.Id}/attachments/createUploadSession");
         using var client = new HttpClient();
         client.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);

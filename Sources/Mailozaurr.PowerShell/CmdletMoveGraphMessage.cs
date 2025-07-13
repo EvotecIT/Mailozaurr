@@ -124,7 +124,9 @@ public class CmdletMoveGraphMessage : AsyncPSCmdlet {
         if (!ShouldProcess(MessageId!, "Moving Graph message")) {
             return;
         }
-        var uri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/messages/{MessageId}/move";
+        var uri = MicrosoftGraphUtils.BuildGraphUri(
+            GraphEndpoint.V1,
+            $"/users/{UserPrincipalName}/messages/{MessageId}/move");
         var body = System.Text.Json.JsonSerializer.Serialize(new { destinationId = DestinationFolderId });
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")

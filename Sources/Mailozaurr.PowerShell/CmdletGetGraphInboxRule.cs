@@ -104,7 +104,7 @@ public sealed class CmdletGetGraphInboxRule : AsyncPSCmdlet {
     private Task ProcessMgGraph() {
         var qp = string.IsNullOrWhiteSpace(Filter) ? null : new Dictionary<string, object> { ["$filter"] = Filter };
         var uri = MicrosoftGraphUtils.JoinUriQuery(
-            "https://graph.microsoft.com/v1.0",
+            GraphEndpoint.V1,
             $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules",
             qp);
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);

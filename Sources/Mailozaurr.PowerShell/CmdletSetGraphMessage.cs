@@ -129,7 +129,9 @@ public class CmdletSetGraphMessage : AsyncPSCmdlet {
     /// Executes the update operation using the <c>Invoke-MgGraphRequest</c> cmdlet.
     /// </summary>
     private void ProcessMgGraph() {
-        var uri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/messages/{MessageId}";
+        var uri = MicrosoftGraphUtils.BuildGraphUri(
+            GraphEndpoint.V1,
+            $"/users/{UserPrincipalName}/messages/{MessageId}");
         var body = JsonSerializer.Serialize(new { isRead = Read.IsPresent });
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
