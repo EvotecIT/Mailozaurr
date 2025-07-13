@@ -15,11 +15,11 @@ namespace Mailozaurr.PowerShell;
 [Cmdlet(VerbsCommon.Get, "EmailGraphMessage")]
 [OutputType(typeof(GraphMessageInfo))]
 public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
-    [Parameter(Mandatory = true, ParameterSetName = "Graph")]
-    [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     /// <summary>
     /// User principal name whose mailbox is queried.
     /// </summary>
+    [Parameter(Mandatory = true, ParameterSetName = "Graph")]
+    [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 

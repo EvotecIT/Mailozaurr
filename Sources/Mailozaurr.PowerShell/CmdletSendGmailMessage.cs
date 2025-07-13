@@ -36,6 +36,9 @@ public sealed class CmdletSendGmailMessage : AsyncPSCmdlet {
     [Parameter]
     public object[]? Attachment { get; set; }
 
+    /// <summary>
+    /// Executes the cmdlet logic asynchronously.
+    /// </summary>
     protected override async Task ProcessRecordAsync() {
         var net = Credential!.GetNetworkCredential();
         var oauth = new OAuthCredential {
