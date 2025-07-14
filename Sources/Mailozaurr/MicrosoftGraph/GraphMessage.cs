@@ -82,6 +82,10 @@ public class GraphMessage {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<GraphAttachment>? Attachments { get; set; }
 
+    /// <summary>
+    /// Collection of MIME headers associated with the message.
+    /// </summary>
     [JsonPropertyName("internetMessageHeaders")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public List<GraphInternetMessageHeader>? InternetMessageHeaders { get; set; }}
+    public List<GraphInternetMessageHeader>? InternetMessageHeaders { get; set; }
+}

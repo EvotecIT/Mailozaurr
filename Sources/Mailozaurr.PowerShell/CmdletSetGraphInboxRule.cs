@@ -35,18 +35,33 @@ public sealed class CmdletSetGraphInboxRule : AsyncPSCmdlet
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
+    /// <summary>
+    /// When set, uses <c>Invoke-MgGraphRequest</c> for the update instead of the SDK.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 
+    /// <summary>
+    /// Timeout in seconds for Graph operations.
+    /// </summary>
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
+    /// <summary>
+    /// Number of retry attempts when a request fails.
+    /// </summary>
     [Parameter]
     public int RetryCount { get; set; } = 0;
 
+    /// <summary>
+    /// Delay between retry attempts in milliseconds.
+    /// </summary>
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
+    /// <summary>
+    /// Executes the cmdlet logic asynchronously.
+    /// </summary>
     protected override Task ProcessRecordAsync()
     {
         if (ParameterSetName == "MgGraphRequest")
@@ -116,7 +131,7 @@ public sealed class CmdletSetGraphInboxRule : AsyncPSCmdlet
             return;
         }
         var uri = MicrosoftGraphUtils.JoinUriQuery(
-            "https://graph.microsoft.com/v1.0",
+            GraphEndpoint.V1,
             $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules/{RuleId}");
         var bodyObj = RuleObject ?? JsonSerializer.Deserialize<GraphInboxRule>(JsonSerializer.Serialize(Rule));
         var body = JsonSerializer.Serialize(bodyObj, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });

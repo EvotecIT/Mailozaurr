@@ -14,6 +14,7 @@ public class ImapEmailMessage {
     public ImapEmailMessage(UniqueId uid, MimeMessage message) {
         Uid = uid;
         Message = message;
+        Encryption = MimeKitUtils.GetEncryption(message);
     }
 
     /// <summary>Unique identifier of the message.</summary>
@@ -21,6 +22,9 @@ public class ImapEmailMessage {
 
     /// <summary>The underlying <see cref="MimeMessage"/>.</summary>
     public MimeMessage Message { get; }
+
+    /// <summary>Detected encryption or signature type.</summary>
+    public EmailEncryption Encryption { get; }
 
     /// <inheritdoc />
     public override string ToString() => Message.Subject ?? base.ToString();

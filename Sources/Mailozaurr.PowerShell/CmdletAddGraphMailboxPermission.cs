@@ -73,6 +73,9 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
+    /// <summary>
+    /// Executes the cmdlet logic asynchronously.
+    /// </summary>
     protected override async Task ProcessRecordAsync() {
         if (ParameterSetName == "MgGraphRequest") {
             ProcessMgGraph();
@@ -173,7 +176,9 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
     }
 
     private void InvokeMgGraph(string body) {
-        var uri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/permissions";
+        var uri = MicrosoftGraphUtils.BuildGraphUri(
+            GraphEndpoint.V1,
+            $"/users/{UserPrincipalName}/permissions");
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "POST")

@@ -35,6 +35,9 @@ public sealed class CmdletRemoveGraphInboxRule : AsyncPSCmdlet {
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
+    /// <summary>
+    /// Executes the cmdlet logic asynchronously.
+    /// </summary>
     protected override Task ProcessRecordAsync() {
         switch (ParameterSetName) {
             case "Graph":
@@ -88,7 +91,7 @@ public sealed class CmdletRemoveGraphInboxRule : AsyncPSCmdlet {
             return;
         }
         var uri = MicrosoftGraphUtils.JoinUriQuery(
-            "https://graph.microsoft.com/v1.0",
+            GraphEndpoint.V1,
             $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules/{RuleId}");
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")

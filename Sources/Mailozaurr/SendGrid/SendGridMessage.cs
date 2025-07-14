@@ -31,11 +31,11 @@ public class SendGridMessage {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SendGridEmailAddress? ReplyTo { get; set; }
 
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     /// <summary>Attachments to include with the message.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<SendGridAttachment>? Attachments { get; set; }
 
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     /// <summary>Custom headers to include with the message.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, string>? Headers { get; set; }
 }

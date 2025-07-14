@@ -23,6 +23,9 @@ public sealed class CmdletSetIMAPFolder : AsyncPSCmdlet {
     [Parameter]
     public FolderAccess FolderAccess { get; set; } = FolderAccess.ReadOnly;
 
+    /// <summary>
+    /// Executes the cmdlet logic asynchronously.
+    /// </summary>
     protected override Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
