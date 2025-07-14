@@ -30,6 +30,11 @@ public static class TemporarySmimeCertificate
 #if NETSTANDARD2_0
         throw new NotSupportedException("Temporary S/MIME certificates require .NET Framework 4.7.2 or later.");
 #elif NETFRAMEWORK
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && Type.GetType("System.Security.Cryptography.X509Certificates.CertificateRequest") != null)
+        {
+            return CreateWithCertificateRequest(subjectName, validDays, outputPath);
+        }
+
         return CreateWithBouncyCastle(subjectName, validDays, outputPath);
 #else
         // CertificateRequest is unavailable on some platforms such as Mono.
@@ -38,6 +43,12 @@ public static class TemporarySmimeCertificate
             return CreateWithBouncyCastle(subjectName, validDays, outputPath);
         }
 
+        return CreateWithCertificateRequest(subjectName, validDays, outputPath);
+#endif
+    }
+
+    private static X509Certificate2 CreateWithCertificateRequest(string subjectName, int validDays, string? outputPath)
+    {
         using RSA rsa = RSA.Create();
         rsa.KeySize = 2048;
         var req = new CertificateRequest(subjectName, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -68,7 +79,6 @@ public static class TemporarySmimeCertificate
         }
 
         return result;
-#endif
     }
 
     private static X509Certificate2 CreateWithBouncyCastle(string subjectName, int validDays, string? outputPath)
