@@ -18,7 +18,11 @@ public static class TemporarySmimeCertificate
     /// <returns>A new <see cref="X509Certificate2"/> instance.</returns>
     public static X509Certificate2 CreateSelfSigned(string subjectName = "CN=Mailozaurr Test", int validDays = 1, string? outputPath = null)
     {
-        using RSA rsa = RSA.Create(2048);
+#if NETSTANDARD2_0
+        throw new NotSupportedException("Temporary S/MIME certificates require .NET Framework 4.7.2 or later.");
+#else
+        using RSA rsa = RSA.Create();
+        rsa.KeySize = 2048;
         var req = new CertificateRequest(subjectName, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         req.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, false));
         req.CertificateExtensions.Add(
@@ -40,5 +44,6 @@ public static class TemporarySmimeCertificate
             File.WriteAllBytes(outputPath, cert.Export(X509ContentType.Pfx));
         }
         return result;
+#endif
     }
 }
