@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Linq;
 using System.IO;
+using System.Text.Json.Serialization;
 using System.Collections.Concurrent;
 using System.Threading;
 
@@ -1067,6 +1068,81 @@ namespace Mailozaurr {
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
             headers["Authorization"] = token;
             var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/mailFolders/inbox/messageRules/{ruleId}");
+            await InvokeGraphApiAsync("DELETE", uri, headers);
+        }
+
+        /// <summary>
+        /// Retrieves calendar events for the specified user.
+        /// </summary>
+        public static async Task<List<Dictionary<string, object>>> GetEventsAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            IEnumerable<string>? properties = null,
+            string? filter = null,
+            int? limit = null) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var qp = new Dictionary<string, object>();
+            if (!string.IsNullOrWhiteSpace(filter)) qp["$filter"] = filter;
+            if (properties != null && properties.Any()) qp["$select"] = string.Join(",", properties);
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/events", qp);
+            var doc = await InvokeGraphApiAsync("GET", uri, headers);
+            var events = new List<Dictionary<string, object>>();
+            if (doc.RootElement.TryGetProperty("value", out var val) && val.ValueKind == JsonValueKind.Array) {
+                foreach (var item in val.EnumerateArray()) {
+                    if (limit.HasValue && events.Count >= limit.Value) break;
+                    var dict = ConvertJsonElementToNativeObject(item) as Dictionary<string, object>;
+                    if (dict != null) events.Add(dict);
+                }
+            }
+            return events;
+        }
+
+        /// <summary>
+        /// Creates a new calendar event.
+        /// </summary>
+        public static async Task<GraphEvent> NewEventAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            GraphEvent ev) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var body = JsonSerializer.Serialize(ev, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/events");
+            var doc = await InvokeGraphApiAsync("POST", uri, headers, body);
+            return JsonSerializer.Deserialize<GraphEvent>(doc.RootElement.GetRawText())!;
+        }
+
+        /// <summary>
+        /// Updates an existing calendar event.
+        /// </summary>
+        public static async Task<GraphEvent> UpdateEventAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            string eventId,
+            GraphEvent ev) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var body = JsonSerializer.Serialize(ev, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/events/{eventId}");
+            var doc = await InvokeGraphApiAsync("PATCH", uri, headers, body);
+            return JsonSerializer.Deserialize<GraphEvent>(doc.RootElement.GetRawText())!;
+        }
+
+        /// <summary>
+        /// Removes the specified calendar event.
+        /// </summary>
+        public static async Task RemoveEventAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            string eventId) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/events/{eventId}");
             await InvokeGraphApiAsync("DELETE", uri, headers);
         }
     }

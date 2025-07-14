@@ -1,0 +1,71 @@
+using System.Collections.Generic;
+using System.Management.Automation;
+using System.Threading.Tasks;
+using Mailozaurr;
+
+namespace Mailozaurr.PowerShell;
+
+/// <summary>
+/// Retrieves calendar events using Microsoft Graph.
+/// </summary>
+[Cmdlet(VerbsCommon.Get, "GraphEvent")]
+[OutputType(typeof(Dictionary<string, object>))]
+public sealed class CmdletGetGraphEvent : AsyncPSCmdlet {
+    [Parameter(Mandatory = true)]
+    public string? UserPrincipalName { get; set; }
+
+    [Parameter(ValueFromPipeline = true)]
+    [ValidateNotNull]
+    public GraphConnectionInfo? Connection { get; set; }
+
+    [Parameter]
+    public string[]? Property { get; set; }
+
+    [Parameter]
+    public string? Filter { get; set; }
+
+    [Parameter]
+    public int? Limit { get; set; }
+
+    [Parameter]
+    public int TimeoutSeconds { get; set; } = 100;
+
+    [Parameter]
+    public int RetryCount { get; set; } = 0;
+
+    [Parameter]
+    public int RetryDelayMilliseconds { get; set; } = 0;
+
+    protected override Task ProcessRecordAsync() {
+        var conn = Connection ?? DefaultSessions.GraphSession;
+        if (conn == null) {
+            WriteWarning("Get-GraphEvent - Connection not provided and no default session available.");
+            return Task.CompletedTask;
+        }
+        return ProcessGraphAsync(conn.Credential);
+    }
+
+    private async Task ProcessGraphAsync(GraphCredential cred) {
+        MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
+        int attempts = 0;
+        Exception? last = null;
+        do {
+            try {
+                var events = await MicrosoftGraphUtils.GetEventsAsync(cred, UserPrincipalName!, Property, Filter, Limit);
+                foreach (var ev in events) WriteObject(ev);
+                return;
+            } catch (Exception ex) {
+                last = ex;
+                WriteWarning($"Get-GraphEvent - {ex.Message}");
+                if (!Helpers.IsTransient(ex) || attempts >= RetryCount) {
+                    if (ex is GraphApiException gex) WriteError(new ErrorRecord(gex, "GraphApiError", ErrorCategory.InvalidOperation, null));
+                    else WriteError(new ErrorRecord(ex, "GraphError", ErrorCategory.InvalidOperation, null));
+                    return;
+                }
+                if (RetryDelayMilliseconds > 0) await Task.Delay(RetryDelayMilliseconds);
+            }
+            attempts++;
+        } while (attempts <= RetryCount);
+        if (last != null) WriteError(new ErrorRecord(last, "GraphError", ErrorCategory.InvalidOperation, null));
+    }
+}
