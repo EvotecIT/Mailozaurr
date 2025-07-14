@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.IO;
@@ -118,32 +119,74 @@ public static class TemporarySmimeCertificate {
             File.WriteAllBytes(outputPath, raw);
         }
 
-        // Try different key storage flags for better cross-platform compatibility
-        var flags = X509KeyStorageFlags.Exportable;
+        // Try different approaches for better cross-platform compatibility
+        return CreateCertificateWithFallbacks(raw, pfxPassword);
+    }
 
-        // On macOS/Mono, add PersistKeySet flag for better compatibility
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
-            flags |= X509KeyStorageFlags.PersistKeySet;
+    /// <summary>
+    /// Creates an X509Certificate2 with comprehensive fallback strategies for cross-platform compatibility.
+    /// </summary>
+    private static X509Certificate2 CreateCertificateWithFallbacks(byte[] pfxData, string password) {
+        var exceptions = new List<Exception>();
+
+        // Strategy 1: Try different key storage flags with password
+        var flagCombinations = new[] {
+            X509KeyStorageFlags.Exportable,
+            X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet,
+            X509KeyStorageFlags.Exportable | X509KeyStorageFlags.MachineKeySet,
+            X509KeyStorageFlags.Exportable | X509KeyStorageFlags.DefaultKeySet,
+            X509KeyStorageFlags.Exportable | X509KeyStorageFlags.UserKeySet,
+            X509KeyStorageFlags.MachineKeySet,
+            X509KeyStorageFlags.UserKeySet,
+            X509KeyStorageFlags.DefaultKeySet
+        };
+
+        foreach (var flags in flagCombinations) {
+            try {
+                return new X509Certificate2(pfxData, password, flags);
+            } catch (CryptographicException ex) {
+                exceptions.Add(ex);
+            }
         }
 
-        try {
-            return new X509Certificate2(raw, pfxPassword, flags);
-        } catch (CryptographicException ex) when (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
-            // Fallback: Try without PersistKeySet flag on non-Windows platforms
-            flags = X509KeyStorageFlags.Exportable;
-            try {
-                return new X509Certificate2(raw, pfxPassword, flags);
-            } catch (CryptographicException) {
-                // Fallback: Try with MachineKeySet flag
-                flags = X509KeyStorageFlags.Exportable | X509KeyStorageFlags.MachineKeySet;
+        // Strategy 2: Try without password (some implementations work better this way)
+        if (!string.IsNullOrEmpty(password)) {
+            foreach (var flags in flagCombinations) {
                 try {
-                    return new X509Certificate2(raw, pfxPassword, flags);
-                } catch (CryptographicException) {
-                    // Last resort: Try with DefaultKeySet
-                    flags = X509KeyStorageFlags.Exportable | X509KeyStorageFlags.DefaultKeySet;
-                    return new X509Certificate2(raw, pfxPassword, flags);
+                    return new X509Certificate2(pfxData, string.Empty, flags);
+                } catch (CryptographicException ex) {
+                    exceptions.Add(ex);
                 }
             }
         }
+
+        // Strategy 3: Try with null password
+        foreach (var flags in flagCombinations) {
+            try {
+                return new X509Certificate2(pfxData, (string?)null, flags);
+            } catch (CryptographicException ex) {
+                exceptions.Add(ex);
+            }
+        }
+
+        // Strategy 4: Try the simple constructor without flags
+        try {
+            return new X509Certificate2(pfxData, password);
+        } catch (CryptographicException ex) {
+            exceptions.Add(ex);
+        }
+
+        try {
+            return new X509Certificate2(pfxData);
+        } catch (CryptographicException ex) {
+            exceptions.Add(ex);
+        }
+
+        // If all strategies fail, throw the first exception with context
+        throw new CryptographicException(
+            $"Failed to create X509Certificate2 on {RuntimeInformation.OSDescription}. " +
+            $"Tried {exceptions.Count} different approaches. " +
+            $"First error: {exceptions[0].Message}",
+            exceptions[0]);
     }
 }
