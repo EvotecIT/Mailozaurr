@@ -17,16 +17,14 @@ namespace Mailozaurr;
 /// <summary>
 /// Helper methods for generating temporary S/MIME certificates.
 /// </summary>
-public static class TemporarySmimeCertificate
-{
+public static class TemporarySmimeCertificate {
     /// <summary>
     /// Creates a self-signed certificate for testing purposes.
     /// </summary>
     /// <param name="subjectName">Subject name of the certificate.</param>
     /// <param name="validDays">Number of days the certificate is valid.</param>
     /// <returns>A new <see cref="X509Certificate2"/> instance.</returns>
-    public static X509Certificate2 CreateSelfSigned(string subjectName = "CN=Mailozaurr Test", int validDays = 1, string? outputPath = null)
-    {
+    public static X509Certificate2 CreateSelfSigned(string subjectName = "CN=Mailozaurr Test", int validDays = 1, string? outputPath = null) {
 #if NETSTANDARD2_0
         throw new NotSupportedException("Temporary S/MIME certificates require .NET Framework 4.7.2 or later.");
 #elif NETFRAMEWORK
@@ -83,8 +81,7 @@ public static class TemporarySmimeCertificate
     }
 #endif
 
-    private static X509Certificate2 CreateWithBouncyCastle(string subjectName, int validDays, string? outputPath)
-    {
+    private static X509Certificate2 CreateWithBouncyCastle(string subjectName, int validDays, string? outputPath) {
         var random = new SecureRandom();
         var keyGen = new Org.BouncyCastle.Crypto.Generators.RsaKeyPairGenerator();
         keyGen.Init(new Org.BouncyCastle.Crypto.KeyGenerationParameters(random, 2048));
@@ -117,11 +114,36 @@ public static class TemporarySmimeCertificate
         store.Save(ms, pfxPassword.ToCharArray(), random);
         var raw = ms.ToArray();
 
-        if (outputPath != null)
-        {
+        if (outputPath != null) {
             File.WriteAllBytes(outputPath, raw);
         }
 
-        return new X509Certificate2(raw, pfxPassword, X509KeyStorageFlags.Exportable);
+        // Try different key storage flags for better cross-platform compatibility
+        var flags = X509KeyStorageFlags.Exportable;
+
+        // On macOS/Mono, add PersistKeySet flag for better compatibility
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
+            flags |= X509KeyStorageFlags.PersistKeySet;
+        }
+
+        try {
+            return new X509Certificate2(raw, pfxPassword, flags);
+        } catch (CryptographicException ex) when (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
+            // Fallback: Try without PersistKeySet flag on non-Windows platforms
+            flags = X509KeyStorageFlags.Exportable;
+            try {
+                return new X509Certificate2(raw, pfxPassword, flags);
+            } catch (CryptographicException) {
+                // Fallback: Try with MachineKeySet flag
+                flags = X509KeyStorageFlags.Exportable | X509KeyStorageFlags.MachineKeySet;
+                try {
+                    return new X509Certificate2(raw, pfxPassword, flags);
+                } catch (CryptographicException) {
+                    // Last resort: Try with DefaultKeySet
+                    flags = X509KeyStorageFlags.Exportable | X509KeyStorageFlags.DefaultKeySet;
+                    return new X509Certificate2(raw, pfxPassword, flags);
+                }
+            }
+        }
     }
 }
