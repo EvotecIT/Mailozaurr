@@ -10,6 +10,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Represents a mailbox permission entry returned by Microsoft Graph.
 /// </summary>
+/// <remarks>
+/// Provides parsing helpers to convert between Graph responses and
+/// strongly typed permission data.
+/// </remarks>
 public class GraphMailboxPermission {
     /// <summary>
     /// Initializes a new instance of the <see cref="GraphMailboxPermission"/> class.

@@ -5,6 +5,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Configures protocol logging for SMTP and other clients.
 /// </summary>
+/// <remarks>
+/// Enables capturing protocol transcripts either in memory or on
+/// disk so that troubleshooting information can be reviewed.
+/// </remarks>
 public class LoggingConfigurator {
     /// <summary>Gets the in-memory log stream when logging to an object.</summary>
     public MemoryStream? LogStream { get; private set; }

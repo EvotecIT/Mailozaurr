@@ -3,6 +3,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Static accessors for the global <see cref="InternalLogger"/> instance used throughout the library.
 /// </summary>
+/// <remarks>
+/// The logger can be enabled or disabled via these properties to
+/// control how much diagnostic information is emitted.
+/// </remarks>
 public class LoggingMessages {
     /// <summary>Gets the global logger.</summary>
     public static InternalLogger Logger = new InternalLogger();

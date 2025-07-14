@@ -6,6 +6,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Exception thrown when Microsoft Graph API returns an error.
 /// </summary>
+/// <remarks>
+/// Includes the HTTP status code and the response body so that
+/// callers can inspect additional error information.
+/// </remarks>
 public class GraphApiException : Exception {
     /// <summary>
     /// HTTP status code returned by the Graph API.

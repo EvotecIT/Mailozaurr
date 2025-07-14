@@ -9,6 +9,10 @@ namespace Mailozaurr;
 /// Provides a <see cref="GnuPGContext"/> that stores keys in a temporary
 /// directory which gets removed when the instance is disposed.
 /// </summary>
+/// <remarks>
+/// This context is useful when you need short‑lived OpenPGP
+/// encryption without leaving key material on disk.
+/// </remarks>
 public class EphemeralOpenPgpContext : GnuPGContext, IDisposable {
     private readonly string? _password;
     private readonly string _tempDirectory;

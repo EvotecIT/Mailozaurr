@@ -3,6 +3,10 @@
 /// <summary>
 /// Represents a simple file attachment used when sending messages.
 /// </summary>
+/// <remarks>
+/// This is the lightweight counterpart to <c>AttachmentItem</c>
+/// used during message creation.
+/// </remarks>
 public class GraphAttachment {
     /// <summary>
     /// Gets or sets the Graph type of the attachment.

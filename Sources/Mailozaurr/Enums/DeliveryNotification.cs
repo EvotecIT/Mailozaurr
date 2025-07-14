@@ -3,6 +3,10 @@
 /// <summary>
 /// Delivery status notification options.
 /// </summary>
+/// <remarks>
+/// These values map directly to SMTP <c>NOTIFY</c> settings when
+/// requesting delivery status notifications from the server.
+/// </remarks>
 public enum DeliveryNotification {
     /// <summary>
     /// No delivery status notifications are requested.

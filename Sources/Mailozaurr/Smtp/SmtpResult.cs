@@ -3,6 +3,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Class that holds the result of the SMTP operation
 /// </summary>
+/// <remarks>
+/// Used by various send methods to provide feedback about the
+/// outcome of sending an email.
+/// </remarks>
 public class SmtpResult {
     /// <summary>Whether the operation succeeded.</summary>
     public bool Status { get; set; }

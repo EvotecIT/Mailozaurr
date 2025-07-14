@@ -3,6 +3,9 @@ namespace Mailozaurr;
 /// <summary>
 /// Aggregated mailbox statistics retrieved from Microsoft Graph.
 /// </summary>
+/// <remarks>
+/// Useful for reporting or monitoring mailbox usage trends over time.
+/// </remarks>
 public class GraphMailboxStatistics {
     /// <summary>User principal name of the mailbox.</summary>
     public string UserPrincipalName { get; set; }

@@ -6,6 +6,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Provides a convenient view over a Graph email message.
 /// </summary>
+/// <remarks>
+/// Parses JSON dictionaries returned by the Graph API into strongly
+/// typed properties that are easier to consume.
+/// </remarks>
 public class GraphMessageInfo {
     /// <summary>
     /// Initializes a new instance of the <see cref="GraphMessageInfo"/> class.

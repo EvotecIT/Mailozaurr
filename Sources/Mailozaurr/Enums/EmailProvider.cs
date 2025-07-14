@@ -2,6 +2,10 @@
 /// <summary>
 /// Supported external email providers.
 /// </summary>
+/// <remarks>
+/// These values determine which implementation class is
+/// instantiated when a provider is selected.
+/// </remarks>
 public enum EmailProvider {
     /// <summary>
     /// Use the built-in SMTP client.

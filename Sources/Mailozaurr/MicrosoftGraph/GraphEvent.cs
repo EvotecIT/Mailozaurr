@@ -6,6 +6,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Represents a calendar event used with Microsoft Graph.
 /// </summary>
+/// <remarks>
+/// This type mirrors the <c>event</c> resource and exposes only
+/// commonly used properties.
+/// </remarks>
 public class GraphEvent {
     /// <summary>Event identifier.</summary>
     [JsonPropertyName("id")]
