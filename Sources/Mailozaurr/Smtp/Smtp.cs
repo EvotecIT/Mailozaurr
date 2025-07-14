@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography.X509Certificates;
 using Org.BouncyCastle.Bcpg.OpenPgp;
+using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using System.Threading;
 
@@ -14,11 +15,19 @@ namespace Mailozaurr;
 /// High level wrapper around <see cref="ClientSmtp"/> that exposes convenient methods and retry logic.
 /// </summary>
 public class Smtp {
+    private static readonly ConcurrentDictionary<string, ConcurrentBag<ClientSmtp>> _connectionPool = new();
+    /// <summary>Maximum number of pooled connections per server/port.</summary>
+    public static int MaxPoolSize { get; set; } = 2;
+    /// <summary>Enables or disables connection pooling.</summary>
+    public static bool PoolingEnabled { get; set; } = false;
+
+    /// <summary>Factory used to create <see cref="ClientSmtp"/> instances.</summary>
+    internal static Func<ProtocolLogger?, ClientSmtp> ClientFactory { get; set; } = logger => logger == null ? new ClientSmtp() : new ClientSmtp(logger);
     /// <summary>Configuration used for protocol logging.</summary>
     public LoggingConfigurator? Logging;
 
     /// <summary>Underlying SMTP client used to send messages.</summary>
-    public ClientSmtp Client { get; }
+    public ClientSmtp Client { get; private set; }
 
     /// <summary>Subject of the message.</summary>
     public string Subject {
@@ -206,7 +215,7 @@ public class Smtp {
     public Smtp(LoggingConfigurator? logging = null) {
         Stopwatch = Stopwatch.StartNew();
         Logging = logging;
-        Client = logging?.ProtocolLogger == null ? new ClientSmtp() : new ClientSmtp(logging.ProtocolLogger);
+        Client = ClientFactory(logging?.ProtocolLogger);
     }
 
     /// <summary>
@@ -228,8 +237,118 @@ public class Smtp {
         LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Logging configuration: Path: {logPath}, Console: {logConsole}, Object: {logObject}, Timestamps: {logTimestamps}, Secrets: {logSecrets}, TimestampsFormat: {logTimestampsFormat}, ServerPrefix: {logServerPrefix}, ClientPrefix: {logClientPrefix}, Overwrite: {logOverwrite}");
         Logging = new LoggingConfigurator();
         Logging.ConfigureLogging(logPath, logConsole, logObject, logTimestamps, logSecrets, logTimestampsFormat, logServerPrefix, logClientPrefix, logOverwrite);
-        Client = Logging.ProtocolLogger == null ? new ClientSmtp() : new ClientSmtp(Logging.ProtocolLogger);
+        Client = ClientFactory(Logging.ProtocolLogger);
         Stopwatch = Stopwatch.StartNew();
+    }
+
+    private ClientSmtp? TryRentClient(string server, int port)
+    {
+        if (!PoolingEnabled)
+        {
+            return null;
+        }
+
+        var key = $"{server}:{port}";
+        if (_connectionPool.TryGetValue(key, out var bag))
+        {
+            while (bag.TryTake(out var pooled))
+            {
+                if (pooled.IsConnected)
+                {
+                    return pooled;
+                }
+                pooled.Dispose();
+            }
+        }
+        return null;
+    }
+
+    private static void ReturnClient(string server, int port, ClientSmtp client)
+    {
+        if (!PoolingEnabled)
+        {
+            client.Dispose();
+            return;
+        }
+
+        var key = $"{server}:{port}";
+        var bag = _connectionPool.GetOrAdd(key, _ => new ConcurrentBag<ClientSmtp>());
+        if (bag.Count >= MaxPoolSize)
+        {
+            client.Dispose();
+        }
+        else
+        {
+            bag.Add(client);
+        }
+    }
+
+    public static void ClearConnectionPool()
+    {
+        foreach (var bag in _connectionPool.Values)
+        {
+            while (bag.TryTake(out var client))
+            {
+                client.Dispose();
+            }
+        }
+        _connectionPool.Clear();
+    }
+
+    /// <summary>
+    /// Connects to the specified SMTP server and returns detailed information about the connection.
+    /// </summary>
+    /// <param name="server">SMTP server name.</param>
+    /// <param name="port">Port number.</param>
+    /// <param name="secureSocketOptions">Controls SSL/TLS usage.</param>
+    /// <param name="useSsl">Compatibility flag overriding <paramref name="secureSocketOptions"/> when set.</param>
+    public static SmtpConnectionInfo TestConnection(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false)
+    {
+        var logging = new LoggingConfigurator();
+        logging.ConfigureLogging(null!, false, true, false, false);
+
+        var smtp = new Smtp(logging);
+        _ = smtp.Connect(server, port, secureSocketOptions, useSsl);
+
+        string? banner = null;
+        string? software = null;
+
+        if (logging.LogStream != null)
+        {
+            logging.LogStream.Position = 0;
+            using var reader = new StreamReader(logging.LogStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 1024, leaveOpen: true);
+            var line = reader.ReadLine();
+            if (!string.IsNullOrWhiteSpace(line))
+            {
+                var trimmed = line.Trim();
+                if (trimmed.StartsWith("<--", StringComparison.Ordinal))
+                {
+                    trimmed = trimmed.Substring(3).Trim();
+                }
+                banner = trimmed;
+                var parts = trimmed.Split(new[] { ' ' }, 3, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 3)
+                {
+                    software = parts[2];
+                }
+            }
+        }
+
+        var persistent = false;
+        try
+        {
+            smtp.Client.NoOp();
+            persistent = smtp.Client.IsConnected;
+        }
+        catch
+        {
+            persistent = false;
+        }
+
+        var info = new SmtpConnectionInfo(server, port, banner, software, smtp.Client.Capabilities, persistent);
+        smtp.Disconnect();
+        smtp.Dispose();
+        return info;
     }
 
     /// <summary>
@@ -274,16 +393,39 @@ public class Smtp {
     /// option is left as <see cref="SecureSocketOptions.Auto"/>.</param>
     /// <returns></returns>
     public SmtpResult Connect(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false) {
+        var oldServer = Server;
+        var oldPort = Port;
         Server = server;
         Port = port;
-        try {
-            if (useSsl && secureSocketOptions == SecureSocketOptions.Auto) {
-                // Maintain backwards compatibility with Send-MailMessage by
-                // defaulting to StartTls when the UseSsl flag is supplied and
-                // no explicit option was provided.
-                secureSocketOptions = SecureSocketOptions.StartTls;
+        if (Client.IsConnected)
+        {
+            if (PoolingEnabled)
+            {
+                ReturnClient(oldServer, oldPort, Client);
             }
-            Client.Connect(server, port, secureSocketOptions);
+            else
+            {
+                Client.Disconnect(true);
+            }
+            Client = ClientFactory(Logging?.ProtocolLogger);
+        }
+
+        var pooled = PoolingEnabled ? TryRentClient(server, port) : null;
+        if (pooled != null)
+        {
+            Client = pooled;
+        }
+        try {
+            if (!Client.IsConnected)
+            {
+                if (useSsl && secureSocketOptions == SecureSocketOptions.Auto) {
+                    // Maintain backwards compatibility with Send-MailMessage by
+                    // defaulting to StartTls when the UseSsl flag is supplied and
+                    // no explicit option was provided.
+                    secureSocketOptions = SecureSocketOptions.StartTls;
+                }
+                Client.Connect(server, port, secureSocketOptions);
+            }
             LoggingMessages.Logger.WriteVerbose($"Connected to {server} on {port} port using SSL: {secureSocketOptions}");
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "");
         } catch (Exception ex) {
@@ -309,16 +451,39 @@ public class Smtp {
     /// option is left as <see cref="SecureSocketOptions.Auto"/>.</param>
     /// <returns></returns>
     public async Task<SmtpResult> ConnectAsync(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false) {
+        var oldServer = Server;
+        var oldPort = Port;
         Server = server;
         Port = port;
-        try {
-            if (useSsl && secureSocketOptions == SecureSocketOptions.Auto) {
-                // Maintain backwards compatibility with Send-MailMessage by
-                // defaulting to StartTls when the UseSsl flag is supplied and
-                // no explicit option was provided.
-                secureSocketOptions = SecureSocketOptions.StartTls;
+        if (Client.IsConnected)
+        {
+            if (PoolingEnabled)
+            {
+                ReturnClient(oldServer, oldPort, Client);
             }
-            await Client.ConnectAsync(server, port, secureSocketOptions);
+            else
+            {
+                Client.Disconnect(true);
+            }
+            Client = ClientFactory(Logging?.ProtocolLogger);
+        }
+
+        var pooled = PoolingEnabled ? TryRentClient(server, port) : null;
+        if (pooled != null)
+        {
+            Client = pooled;
+        }
+        try {
+            if (!Client.IsConnected)
+            {
+                if (useSsl && secureSocketOptions == SecureSocketOptions.Auto) {
+                    // Maintain backwards compatibility with Send-MailMessage by
+                    // defaulting to StartTls when the UseSsl flag is supplied and
+                    // no explicit option was provided.
+                    secureSocketOptions = SecureSocketOptions.StartTls;
+                }
+                await Client.ConnectAsync(server, port, secureSocketOptions);
+            }
             LoggingMessages.Logger.WriteVerbose($"Connected to {server} on {port} port using SSL: {secureSocketOptions}");
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "");
         } catch (Exception ex) {
@@ -539,7 +704,12 @@ public class Smtp {
     /// </summary>
     public void Disconnect() {
         if (Client.IsConnected) {
-            Client.Disconnect(true);
+            if (PoolingEnabled) {
+                ReturnClient(Server, Port, Client);
+                Client = ClientFactory(Logging?.ProtocolLogger);
+            } else {
+                Client.Disconnect(true);
+            }
         }
         Stopwatch.Stop();
     }
@@ -549,7 +719,11 @@ public class Smtp {
     /// </summary>
     public void Dispose() {
         if (Client.IsConnected) {
-            Client.Disconnect(true);
+            if (PoolingEnabled) {
+                ReturnClient(Server, Port, Client);
+            } else {
+                Client.Disconnect(true);
+            }
         }
         Client.Dispose();
         Stopwatch.Stop();

@@ -94,6 +94,7 @@ This will make sure the project has required libraries.
   - [x] Office 365 Graph API
   - [x] PGP/MIME encryption and signature verification
   - Optional retry logic for `Send-EmailMessage` via `-RetryCount`, `-RetryDelayMilliseconds`, `-RetryDelayBackoff` and `-RetryAlways`.  Retries are only attempted for transient errors by default, but `-RetryAlways` forces retries on all errors.
+  - Optional SMTP connection pooling via `-UseConnectionPool` and `-ConnectionPoolSize` for faster repeated sends. Use `Clear-SmtpConnectionPool` to reset the pool and `Test-SmtpConnection` to check if your server keeps connections open.
 - POP3
   - [x] Connect to POP3
   - [x] Get POP3 Emails
@@ -285,6 +286,8 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - Use `Connect-EmailGraph` and `Disconnect-EmailGraph` to authenticate and release application credentials for Microsoft Graph. The connection cmdlet supports both client secret and certificate authentication modes.
 - `Connect-EmailGraph`, `Connect-IMAP` and `Connect-POP3` store the last successful connection in module variables. Subsequent cmdlets use these defaults when `-Connection` or `-Client` is omitted.
 - [Example-SendEmail-Attachments.ps1](Examples/Example-SendEmail-Attachments.ps1) - demonstrate file and in-memory attachments.
+- [Example-SendEmail-ConnectionPool.ps1](Examples/Example-SendEmail-ConnectionPool.ps1) - basic connection pool usage.
+- [Example-SendEmail-ConnectionPool-Advanced.ps1](Examples/Example-SendEmail-ConnectionPool-Advanced.ps1) - reuse the connection while sending multiple different messages.
 - [Example-WaitImapMessage.ps1](Examples/Example-WaitImapMessage.ps1) - wait for new mail from PowerShell.
 - [Example-DeleteImapMessages.ps1](Examples/Example-DeleteImapMessages.ps1) - delete messages from an IMAP mailbox.
 - [Example-DeletePop3Messages.ps1](Examples/Example-DeletePop3Messages.ps1) - delete messages from a POP3 mailbox.
@@ -338,6 +341,10 @@ Get-EmailGraphMessage -UserPrincipalName 'user@example.com' -Filter "receivedDat
 See the [Microsoft Graph query parameters documentation](https://learn.microsoft.com/en-us/graph/query-parameters#filter-parameter) for details.
 
 Keep in mind PSSharedGoods is only required for development. When you use this module from PowerShellGallery it's not installed as everything is merged.
+
+### SMTP connection pooling
+
+You can reuse SMTP connections by enabling the connection pool with the `-UseConnectionPool` switch of `Send-EmailMessage`. The `-ConnectionPoolSize` parameter controls how many connections are kept alive. Use `Test-SmtpConnection` to check whether your SMTP server keeps connections alive. If needed, call `Clear-SmtpConnectionPool` to discard existing pooled clients.
 
 ### Limiting access to mailboxes (Microsoft Graph API)
 
