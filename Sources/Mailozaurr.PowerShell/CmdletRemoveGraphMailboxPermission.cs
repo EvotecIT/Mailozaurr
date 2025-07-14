@@ -169,7 +169,9 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
     }
 
     private void InvokeMgGraph(string id) {
-        var uri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/permissions/{id}";
+        var uri = MicrosoftGraphUtils.BuildGraphUri(
+            GraphEndpoint.V1,
+            $"/users/{UserPrincipalName}/permissions/{id}");
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "DELETE")

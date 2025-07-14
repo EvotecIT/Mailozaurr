@@ -149,7 +149,7 @@ public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
 
     private void ProcessMgGraph() {
         var uri = MicrosoftGraphUtils.JoinUriQuery(
-            "https://graph.microsoft.com/v1.0",
+            GraphEndpoint.V1,
             $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules");
         var bodyObj = RuleBuilder != null
             ? RuleBuilder.Build()

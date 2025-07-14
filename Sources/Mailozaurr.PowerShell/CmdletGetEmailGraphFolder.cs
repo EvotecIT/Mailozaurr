@@ -106,7 +106,9 @@ public class CmdletGetEmailGraphFolder : AsyncPSCmdlet {
     }
 
     private Task ProcessMgGraph() {
-        var uri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/mailFolders";
+        var uri = MicrosoftGraphUtils.BuildGraphUri(
+            GraphEndpoint.V1,
+            $"/users/{UserPrincipalName}/mailFolders");
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "GET")

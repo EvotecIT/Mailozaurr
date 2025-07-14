@@ -917,7 +917,10 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                     graph.LogCollector.LogVerbose("PlaceHolders not working?");
                 }
             }
-            InvokeMgGraphRequest($"https://graph.microsoft.com/v1.0/users('{graph.SentFrom}')/messages/{draftMessageId}/send", EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+            var sendUri = MicrosoftGraphUtils.BuildGraphUri(
+                GraphEndpoint.V1,
+                $"/users('{graph.SentFrom}')/messages/{draftMessageId}/send");
+            InvokeMgGraphRequest(sendUri, EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
             LogEmitter.EmitLogs(graph.LogCollector, this);
         } else {
             graph.CreateMessage();

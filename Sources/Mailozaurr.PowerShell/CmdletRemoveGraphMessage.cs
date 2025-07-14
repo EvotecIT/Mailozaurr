@@ -109,7 +109,9 @@ public class CmdletRemoveGraphMessage : AsyncPSCmdlet {
         if (!ShouldProcess(MessageId!, "Deleting message via Graph")) {
             return;
         }
-        var uri = $"https://graph.microsoft.com/v1.0/users/{UserPrincipalName}/messages/{MessageId}";
+        var uri = MicrosoftGraphUtils.BuildGraphUri(
+            GraphEndpoint.V1,
+            $"/users/{UserPrincipalName}/messages/{MessageId}");
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "DELETE")

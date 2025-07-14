@@ -201,7 +201,10 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
         if (!string.IsNullOrWhiteSpace(filter)) query["$filter"] = filter;
         if (Property != null && Property.Length > 0) query["$select"] = string.Join(",", Property);
         if (Limit.HasValue) query["$top"] = Limit.Value.ToString();
-        var uri = MicrosoftGraphUtils.JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{UserPrincipalName}/messages", query);
+        var uri = MicrosoftGraphUtils.JoinUriQuery(
+            GraphEndpoint.V1,
+            $"/users/{UserPrincipalName}/messages",
+            query);
 
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         var parameters = new Hashtable { { "Method", "GET" }, { "Uri", uri } };
