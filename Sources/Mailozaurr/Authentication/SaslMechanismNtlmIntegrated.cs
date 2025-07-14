@@ -7,8 +7,9 @@ namespace Mailozaurr {
     /// The NTLM Integrated Auth SASL mechanism.
     /// </summary>
     /// <remarks>
-    /// A SASL mechanism based on NTLM using the credentials of the current user 
-    /// via Windows Integrated Authentication (SSPI).
+    /// A SASL mechanism based on NTLM using the credentials of the current user
+    /// via Windows Integrated Authentication (SSPI). It allows MailKit
+    /// to authenticate without explicit user credentials.
     /// </remarks>
     /// <inheritdoc cref="SaslMechanism"/>
     public class SaslMechanismNtlmIntegrated : SaslMechanism {

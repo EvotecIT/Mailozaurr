@@ -7,6 +7,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Helper class for sending messages via Microsoft Graph API.
 /// </summary>
+/// <remarks>
+/// Provides convenience methods for constructing requests and
+/// uploading attachments without having to manually craft HTTP calls.
+/// </remarks>
 public class Graph : IDisposable {
     private readonly HttpClient _client;
     /// <summary>

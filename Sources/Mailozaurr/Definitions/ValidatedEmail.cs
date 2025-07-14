@@ -3,8 +3,11 @@
 namespace Mailozaurr;
 
 /// <summary>
-/// Validated email class
+/// Wraps an email address that has been validated for correct syntax.
 /// </summary>
+/// <remarks>
+/// Validation is performed using the <c>EmailValidation</c> library.
+/// </remarks>
 public class ValidatedEmail {
     /// <summary>
     /// Email address

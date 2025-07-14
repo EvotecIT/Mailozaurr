@@ -3,6 +3,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Represents a POP3 email message along with its index.
 /// </summary>
+/// <remarks>
+/// Similar to <see cref="ImapEmailMessage"/> but used when retrieving
+/// messages from a POP3 server.
+/// </remarks>
 public class Pop3EmailMessage {
     /// <summary>
     /// Creates a new instance of <see cref="Pop3EmailMessage"/>.

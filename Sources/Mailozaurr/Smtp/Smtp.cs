@@ -14,6 +14,10 @@ namespace Mailozaurr;
 /// <summary>
 /// High level wrapper around <see cref="ClientSmtp"/> that exposes convenient methods and retry logic.
 /// </summary>
+/// <remarks>
+/// Provides connection pooling and supports authentication using
+/// multiple mechanisms depending on server capabilities.
+/// </remarks>
 public class Smtp {
     private static readonly ConcurrentDictionary<string, ConcurrentBag<ClientSmtp>> _connectionPool = new();
     /// <summary>Maximum number of pooled connections per server/port.</summary>

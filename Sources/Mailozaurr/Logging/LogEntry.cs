@@ -4,6 +4,10 @@ namespace Mailozaurr;
 /// Represents a single log entry, including its message and type.
 /// Used to collect logs in client classes and emit them in cmdlets.
 /// </summary>
+/// <remarks>
+/// The <see cref="LogCollector"/> class stores collections of these
+/// entries until they are written to output.
+/// </remarks>
 public class LogEntry {
     /// <summary>The log message.</summary>
     public string Message { get; set; }

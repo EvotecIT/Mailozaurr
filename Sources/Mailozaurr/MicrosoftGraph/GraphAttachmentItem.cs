@@ -3,6 +3,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Metadata describing an attachment for upload.
 /// </summary>
+/// <remarks>
+/// This type mirrors the <c>attachmentItem</c> resource used
+/// when creating an upload session in the Graph API.
+/// </remarks>
 public class GraphAttachmentItem {
     /// <summary>
     /// Gets or sets the type of the attachment being uploaded.

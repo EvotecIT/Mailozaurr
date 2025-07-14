@@ -3,6 +3,10 @@
 /// <summary>
 /// Specifies encryption or signing actions for S/MIME operations.
 /// </summary>
+/// <remarks>
+/// The order of the enum values mirrors the processing flow when
+/// applying signatures or encryption to a message.
+/// </remarks>
 public enum EmailActionEncryption {
     /// <summary>
     /// No signing or encryption is applied.

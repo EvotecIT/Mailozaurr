@@ -3,6 +3,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Represents a placeholder for an attachment upload session.
 /// </summary>
+/// <remarks>
+/// Used when streaming large files to the Graph API in multiple
+/// requests.
+/// </remarks>
 public class GraphAttachmentPlaceHolder {
     /// <summary>Serialized attachment metadata.</summary>
     public string Json { get; set; }

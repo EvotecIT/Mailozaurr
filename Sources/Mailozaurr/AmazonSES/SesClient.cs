@@ -7,6 +7,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Simple client for sending emails using the Amazon SES REST API.
 /// </summary>
+/// <remarks>
+/// Only a subset of the SES API is implemented, focused on
+/// sending MIME messages with minimal configuration.
+/// </remarks>
 public class SesClient : IDisposable {
     private readonly HttpClient _client;
 

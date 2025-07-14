@@ -8,6 +8,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Polls Microsoft Graph for new messages and raises events when they arrive.
 /// </summary>
+/// <remarks>
+/// The listener keeps track of message IDs to avoid raising duplicate
+/// notifications during polling.
+/// </remarks>
 public class GraphMessageListener : IDisposable {
     private readonly GraphCredential _credential;
     private readonly string _userPrincipalName;

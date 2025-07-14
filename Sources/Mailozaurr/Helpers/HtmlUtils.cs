@@ -7,6 +7,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Helper utilities for working with HTML content.
 /// </summary>
+/// <remarks>
+/// Methods on this class assist with embedding images and
+/// performing minor HTML transformations.
+/// </remarks>
 public static class HtmlUtils {
     internal static HttpClient HttpClient { get; set; }
 
@@ -14,9 +18,16 @@ public static class HtmlUtils {
         HttpClient = new HttpClient();
     }
 
+    /// <summary>
+    /// Represents an image downloaded from a remote location for
+    /// embedding into an HTML message.
+    /// </summary>
     public class RemoteImage {
+        /// <summary>Content identifier used when embedding.</summary>
         public string ContentId { get; set; } = string.Empty;
+        /// <summary>Binary data of the image.</summary>
         public byte[] Data { get; set; } = Array.Empty<byte>();
+        /// <summary>MIME type of the image data.</summary>
         public string MediaType { get; set; } = string.Empty;
     }
     /// <summary>

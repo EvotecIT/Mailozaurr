@@ -3,6 +3,10 @@
 /// <summary>
 /// Represents a message to be sent using SendGrid.
 /// </summary>
+/// <remarks>
+/// This is a simplified model tailored for the module and does not
+/// expose every SendGrid feature.
+/// </remarks>
 public class SendGridMessage {
     /// <summary>
     /// Gets or sets the list of personalizations for the message.

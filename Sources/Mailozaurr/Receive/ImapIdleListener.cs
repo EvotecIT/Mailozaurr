@@ -11,6 +11,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Listens for new mail using the IMAP IDLE command and raises events when messages arrive.
 /// </summary>
+/// <remarks>
+/// An internal cache of <see cref="IMessageSummary"/> objects is maintained
+/// to ensure each message is reported only once per session.
+/// </remarks>
 public class ImapIdleListener : IDisposable {
     private readonly ImapClient _client;
     private readonly string? _folderName;

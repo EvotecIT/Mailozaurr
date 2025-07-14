@@ -6,6 +6,10 @@ namespace Mailozaurr;
 /// Collects log entries in a thread-safe queue for later emission by PowerShell cmdlets.
 /// Intended for use in client classes (e.g., SendGridClient) to decouple logging from cmdlet pipeline output.
 /// </summary>
+/// <remarks>
+/// Items remain in the queue until consumed by a cmdlet that flushes
+/// the log collector's contents to the appropriate stream.
+/// </remarks>
 public class LogCollector {
     /// <summary>
     /// The thread-safe queue of log entries.

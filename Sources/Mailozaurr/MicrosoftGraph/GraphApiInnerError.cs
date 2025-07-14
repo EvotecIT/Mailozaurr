@@ -3,6 +3,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Additional error details returned by the Graph API.
 /// </summary>
+/// <remarks>
+/// This object is nested inside <see cref="GraphApiErrorDetail"/> when
+/// the service includes extra context about a failure.
+/// </remarks>
 public class GraphApiInnerError {
     /// <summary>
     /// Gets or sets the request identifier associated with the error.

@@ -3,6 +3,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Represents credentials required for Microsoft Graph authentication.
 /// </summary>
+/// <remarks>
+/// This POCO is typically deserialized from a secure source
+/// and passed to the <c>Graph</c> helper class.
+/// </remarks>
 public class GraphCredential {
     /// <summary>
     /// Gets or sets the application (client) identifier.

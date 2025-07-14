@@ -3,6 +3,10 @@
 /// <summary>
 /// Represents an email message for use with the Graph API.
 /// </summary>
+/// <remarks>
+/// Includes only a subset of message properties commonly used when
+/// sending mail via Microsoft Graph.
+/// </remarks>
 public class GraphMessage {
     /// <summary>
     /// Gets or sets the message identifier.

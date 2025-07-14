@@ -3,6 +3,10 @@
 /// <summary>
 /// Represents actions performed when sending or preparing an email.
 /// </summary>
+/// <remarks>
+/// These values are used internally when tracing the steps of
+/// the email sending pipeline.
+/// </remarks>
 public enum EmailAction {
     /// <summary>
     /// Authenticate with the mail server or provider.

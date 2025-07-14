@@ -5,6 +5,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Represents a message rule as used by Microsoft Graph.
 /// </summary>
+/// <remarks>
+/// Only a subset of rule properties are implemented to keep the
+/// wrapper light-weight.
+/// </remarks>
 public class GraphInboxRule
 {
     /// <summary>The rule identifier.</summary>

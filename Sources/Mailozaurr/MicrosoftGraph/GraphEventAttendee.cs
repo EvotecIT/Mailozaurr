@@ -5,6 +5,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Represents an attendee for a calendar event.
 /// </summary>
+/// <remarks>
+/// This mirrors the <c>attendee</c> resource when creating or
+/// updating events via Graph.
+/// </remarks>
 public class GraphEventAttendee {
     /// <summary>Email address of the attendee.</summary>
     [JsonPropertyName("emailAddress")]

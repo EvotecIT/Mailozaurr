@@ -3,6 +3,9 @@ namespace Mailozaurr;
 /// <summary>
 /// Represents a file attachment from Microsoft Graph.
 /// </summary>
+/// <remarks>
+/// Only basic metadata required for upload is exposed.
+/// </remarks>
 public class Attachment {
     /// <summary>
     /// Gets or sets the file name of the attachment.

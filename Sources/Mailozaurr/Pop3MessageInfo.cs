@@ -7,6 +7,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Provides a user friendly view over a POP3 email message.
 /// </summary>
+/// <remarks>
+/// Exposes common message properties to simplify scripting scenarios
+/// when dealing with POP3 servers.
+/// </remarks>
 public class Pop3MessageInfo {
     /// <summary>
     /// Initializes a new instance of the <see cref="Pop3MessageInfo"/> class.

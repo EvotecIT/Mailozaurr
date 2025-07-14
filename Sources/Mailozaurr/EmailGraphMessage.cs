@@ -3,6 +3,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Simplified representation of an email message returned from Graph.
 /// </summary>
+/// <remarks>
+/// Only a subset of fields are exposed to keep the object light‑weight
+/// when fetching lists of messages.
+/// </remarks>
 public class EmailGraphMessage {
     /// <summary>
     /// Gets or sets the unique identifier of the message.

@@ -3,6 +3,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Specifies how the client should react when an error occurs.
 /// </summary>
+/// <remarks>
+/// This enumeration is used by cmdlets to determine the level of
+/// interaction required when an operation encounters an issue.
+/// </remarks>
 public enum ActionPreference {
     /// <summary>
     /// Stop execution when an error occurs.

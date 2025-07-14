@@ -3,6 +3,10 @@
 /// <summary>
 /// Represents OAuth credentials.
 /// </summary>
+/// <remarks>
+/// This structure is used by various helper classes to cache
+/// tokens acquired from identity providers.
+/// </remarks>
 public class OAuthCredential {
     /// <summary>
     /// The username associated with the OAuth credential.

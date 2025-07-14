@@ -8,6 +8,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Represents the entity receiving mailbox permissions.
 /// </summary>
+/// <remarks>
+/// Only minimal details are stored for the grantee as typically
+/// only the user principal name is required.
+/// </remarks>
 public class GraphMailboxGrantee {
     /// <summary>User principal name of the grantee.</summary>
     [JsonPropertyName("user")]

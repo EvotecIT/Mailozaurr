@@ -5,6 +5,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Represents an IMAP email message along with its unique identifier.
 /// </summary>
+/// <remarks>
+/// Provides a small wrapper over <see cref="MimeMessage"/> so that
+/// metadata such as encryption state can be carried with the message.
+/// </remarks>
 public class ImapEmailMessage {
     /// <summary>
     /// Creates a new instance of <see cref="ImapEmailMessage"/>.

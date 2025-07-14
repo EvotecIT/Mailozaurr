@@ -3,6 +3,10 @@
 /// <summary>
 /// Supported SASL authentication mechanisms.
 /// </summary>
+/// <remarks>
+/// Values correspond to mechanisms understood by <c>MailKit</c>
+/// and can be used when configuring SMTP connections.
+/// </remarks>
 public enum AuthenticationMechanism {
     /// <summary>
     /// Plain text authentication mechanism.

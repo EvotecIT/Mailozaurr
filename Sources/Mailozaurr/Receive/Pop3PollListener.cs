@@ -10,6 +10,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Polls a POP3 mailbox for new messages and raises events when they arrive.
 /// </summary>
+/// <remarks>
+/// Uses basic polling rather than the IMAP IDLE approach and is
+/// therefore best suited for servers without IDLE support.
+/// </remarks>
 public class Pop3PollListener : IDisposable {
     private readonly Pop3Client _client;
     private int _seenCount;

@@ -1,8 +1,12 @@
 ﻿namespace Mailozaurr;
 
 /// <summary>
-/// Eml conversion result
+/// Result information returned when converting an EML file to MSG.
 /// </summary>
+/// <remarks>
+/// Used by <see cref="EmailMessage.ConvertEmlToMsg"/> to report
+/// the path of the generated message and whether the operation succeeded.
+/// </remarks>
 public class EmlConversionResult {
     /// <summary>
     /// Eml file path to file that was converted

@@ -5,6 +5,10 @@ namespace Mailozaurr;
 /// <summary>
 /// A client for sending emails using the SendGrid API.
 /// </summary>
+/// <remarks>
+/// Only key functionality required by the module is implemented;
+/// it is not intended as a full wrapper of the SendGrid SDK.
+/// </remarks>
 public class SendGridClient {
     /// <summary>
     /// Gets the JSON representation of the message to be sent.

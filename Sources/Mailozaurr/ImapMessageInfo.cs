@@ -8,6 +8,11 @@ namespace Mailozaurr;
 /// <summary>
 /// Provides a user friendly view over an IMAP email message.
 /// </summary>
+/// <remarks>
+/// This class flattens common message properties so that scripts
+/// can easily inspect or output them without navigating the full
+/// MIME structure.
+/// </remarks>
 public class ImapMessageInfo {
     /// <summary>
     /// Initializes a new instance of the <see cref="ImapMessageInfo"/> class.

@@ -3,6 +3,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Represents an attachment in a SendGrid message.
 /// </summary>
+/// <remarks>
+/// The file content is stored as a Base64 string as required by the
+/// SendGrid API.
+/// </remarks>
 public class SendGridAttachment {
     /// <summary>Gets or sets the filename of the attachment.</summary>
     public string Filename { get; set; }

@@ -3,6 +3,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Represents the arguments for a log event.
 /// </summary>
+/// <remarks>
+/// Provides progress information and message text when writing
+/// verbose, warning or error messages during operations.
+/// </remarks>
 public class LogEventArgs : EventArgs {
     /// <summary>Progress percentage.</summary>
     public int? ProgressPercentage { get; set; }

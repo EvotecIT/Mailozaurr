@@ -1,8 +1,12 @@
 ﻿namespace Mailozaurr;
 
 /// <summary>
-/// Internal logger that allows to write to console, error or wherever else is needed
+/// Internal logger that allows writing diagnostic messages to various streams.
 /// </summary>
+/// <remarks>
+/// This logger provides the base implementation for the public
+/// cmdlet logging interface.
+/// </remarks>
 public class InternalLogger {
     private readonly object _lock = new object();
 
