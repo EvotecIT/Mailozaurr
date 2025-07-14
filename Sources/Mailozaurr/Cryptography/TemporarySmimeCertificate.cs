@@ -29,6 +29,7 @@ public static class TemporarySmimeCertificate {
 #if NETSTANDARD2_0
         throw new NotSupportedException("Temporary S/MIME certificates require .NET Framework 4.7.2 or later.");
 #elif NETFRAMEWORK
+        // On .NET Framework, only use CertificateRequest on non-Windows platforms if available
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && Type.GetType("System.Security.Cryptography.X509Certificates.CertificateRequest") != null)
         {
             return CreateWithCertificateRequest(subjectName, validDays, outputPath);
@@ -36,20 +37,14 @@ public static class TemporarySmimeCertificate {
 
         return CreateWithBouncyCastle(subjectName, validDays, outputPath);
 #else
+        // On .NET Core/.NET 5+, CertificateRequest is always available
         // On Unix systems, prioritize CertificateRequest as it's more compatible with the platform
         // BouncyCastle PKCS#12 certificates are often incompatible with Mono's X509Certificate2 implementation
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
-            if (Type.GetType("System.Security.Cryptography.X509Certificates.CertificateRequest") != null) {
-                return CreateWithCertificateRequest(subjectName, validDays, outputPath);
-            }
+            return CreateWithCertificateRequest(subjectName, validDays, outputPath);
         }
 
-        // CertificateRequest is unavailable on some platforms such as Mono.
-        if (Type.GetType("System.Security.Cryptography.X509Certificates.CertificateRequest") == null)
-        {
-            return CreateWithBouncyCastle(subjectName, validDays, outputPath);
-        }
-
+        // On Windows, use CertificateRequest by default
         return CreateWithCertificateRequest(subjectName, validDays, outputPath);
 #endif
     }
@@ -67,26 +62,22 @@ public static class TemporarySmimeCertificate {
                 System.Security.Cryptography.X509Certificates.X509KeyUsageFlags.KeyEncipherment,
                 true));
         req.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(req.PublicKey, false));
-        var notBefore = DateTimeOffset.UtcNow.AddMinutes(-5);
+
+        // Add Enhanced Key Usage extension for S/MIME certificates
+        var ekuOids = new OidCollection();
+        ekuOids.Add(new Oid("1.3.6.1.5.5.7.3.2")); // Client Authentication
+        ekuOids.Add(new Oid("1.3.6.1.5.5.7.3.4")); // Email Protection
+        req.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(ekuOids, true));
+                var notBefore = DateTimeOffset.UtcNow.AddMinutes(-5);
         var notAfter = notBefore.AddDays(validDays);
-        using X509Certificate2 cert = req.CreateSelfSigned(notBefore, notAfter);
-
-        var flags = X509KeyStorageFlags.Exportable;
-#if NET5_0_OR_GREATER
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            flags |= X509KeyStorageFlags.EphemeralKeySet;
-        }
-#endif
-
-        var result = new X509Certificate2(cert.Export(X509ContentType.Pfx), string.Empty, flags);
+        X509Certificate2 cert = req.CreateSelfSigned(notBefore, notAfter);
 
         if (outputPath != null)
         {
             File.WriteAllBytes(outputPath, cert.Export(X509ContentType.Pfx));
         }
 
-        return result;
+        return cert;
     }
 #endif
 
