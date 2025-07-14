@@ -288,6 +288,7 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - [Example-SendEmail-Attachments.ps1](Examples/Example-SendEmail-Attachments.ps1) - demonstrate file and in-memory attachments.
 - [Example-SendEmail-ConnectionPool.ps1](Examples/Example-SendEmail-ConnectionPool.ps1) - basic connection pool usage.
 - [Example-SendEmail-ConnectionPool-Advanced.ps1](Examples/Example-SendEmail-ConnectionPool-Advanced.ps1) - reuse the connection while sending multiple different messages.
+- [Example-TestSmtpConnection.ps1](Examples/Example-TestSmtpConnection.ps1) - verify if the server keeps connections alive before enabling pooling.
 - [Example-WaitImapMessage.ps1](Examples/Example-WaitImapMessage.ps1) - wait for new mail from PowerShell.
 - [Example-DeleteImapMessages.ps1](Examples/Example-DeleteImapMessages.ps1) - delete messages from an IMAP mailbox.
 - [Example-DeletePop3Messages.ps1](Examples/Example-DeletePop3Messages.ps1) - delete messages from a POP3 mailbox.
@@ -344,7 +345,7 @@ Keep in mind PSSharedGoods is only required for development. When you use this m
 
 ### SMTP connection pooling
 
-You can reuse SMTP connections by enabling the connection pool with the `-UseConnectionPool` switch of `Send-EmailMessage`. The `-ConnectionPoolSize` parameter controls how many connections are kept alive. Use `Test-SmtpConnection` to check whether your SMTP server keeps connections alive. If needed, call `Clear-SmtpConnectionPool` to discard existing pooled clients.
+You can reuse SMTP connections by enabling the connection pool with the `-UseConnectionPool` switch of `Send-EmailMessage`. The `-ConnectionPoolSize` parameter controls how many connections are kept alive. Use `Test-SmtpConnection` to examine the banner and capabilities and to check whether the connection remains open after a `NOOP` command. If the returned object has `Persistent` set to `True`, you can safely enable pooling. Call `Clear-SmtpConnectionPool` whenever you need to discard existing pooled clients.
 
 ### Limiting access to mailboxes (Microsoft Graph API)
 
