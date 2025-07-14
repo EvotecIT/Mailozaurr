@@ -1,6 +1,7 @@
 using System;
 using System.Management.Automation;
 using System.IO;
+using System.Security.Cryptography.X509Certificates;
 using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
@@ -568,6 +569,15 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     public string? CertificateThumbprint { get; set; }
 
     /// <summary>
+    /// <para>Provides a certificate object used for S/MIME operations.</para>
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
+    [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
+    [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
+    [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
+    public X509Certificate2? Certificate { get; set; }
+
+    /// <summary>
     /// Path to the recipient's public key used for PGP operations.
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
@@ -985,6 +995,8 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 status = smtpClient.PgpSign(PublicKeyPath, PrivateKeyPath, PrivateKeyPassword ?? string.Empty, PrivateKeyPasswordAsSecureString);
             } else if (SignOrEncrypt == EmailActionEncryption.PGPSignAndEncrypt && PublicKeyPath != null && PrivateKeyPath != null) {
                 status = smtpClient.PgpSignAndEncrypt(PublicKeyPath, PrivateKeyPath, PrivateKeyPassword ?? string.Empty, PrivateKeyPasswordAsSecureString);
+            } else if (Certificate != null) {
+                status = smtpClient.Encrypt(SignOrEncrypt, Certificate);
             } else if (CertificateThumbprint != null) {
                 status = smtpClient.Encrypt(SignOrEncrypt, CertificateThumbprint);
             } else if (CertificatePath != null && CertificatePassword != null) {

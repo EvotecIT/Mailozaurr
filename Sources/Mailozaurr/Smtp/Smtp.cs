@@ -1012,6 +1012,39 @@ public class Smtp {
     }
 
     /// <summary>
+    /// Performs the specified S/MIME action using the provided certificate.
+    /// </summary>
+    /// <param name="emailActionEncryption">The operation to perform.</param>
+    /// <param name="certificate">Certificate instance.</param>
+    public SmtpResult Encrypt(EmailActionEncryption emailActionEncryption, X509Certificate2 certificate) {
+        return emailActionEncryption switch {
+            EmailActionEncryption.SMIMESign => Sign(certificate),
+            EmailActionEncryption.SMIMESignPkcs7 => Pkcs7Sign(certificate),
+            EmailActionEncryption.SMIMEEncrypt => Encrypt(certificate),
+            EmailActionEncryption.SMIMESignAndEncrypt => SignAndEncrypt(certificate),
+            _ => new SmtpResult(true, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", "EmailActionEncryption None")
+        };
+    }
+
+    /// <summary>
+    /// S/MIME Sign and encrypt the email using the provided certificate.
+    /// </summary>
+    /// <param name="certificate">Certificate to use.</param>
+    public SmtpResult SignAndEncrypt(X509Certificate2 certificate) {
+        SmtpResult signResult = Sign(certificate);
+        if (!signResult.Status) {
+            return signResult;
+        }
+
+        SmtpResult encryptResult = Encrypt(certificate);
+        if (!encryptResult.Status) {
+            return encryptResult;
+        }
+
+        return new SmtpResult(true, EmailAction.SMimeSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+    }
+
+    /// <summary>
     /// Encrypts the current message using the specified OpenPGP public key.
     /// </summary>
     /// <param name="publicKeyPath">Path to the recipient public key.</param>
