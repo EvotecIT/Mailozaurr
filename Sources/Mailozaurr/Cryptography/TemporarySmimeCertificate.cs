@@ -47,6 +47,7 @@ public static class TemporarySmimeCertificate
 #endif
     }
 
+#if !NETSTANDARD2_0
     private static X509Certificate2 CreateWithCertificateRequest(string subjectName, int validDays, string? outputPath)
     {
         using RSA rsa = RSA.Create();
@@ -80,6 +81,7 @@ public static class TemporarySmimeCertificate
 
         return result;
     }
+#endif
 
     private static X509Certificate2 CreateWithBouncyCastle(string subjectName, int validDays, string? outputPath)
     {

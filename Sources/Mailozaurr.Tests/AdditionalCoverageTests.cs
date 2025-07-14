@@ -39,10 +39,10 @@ public class AdditionalCoverageTests
     }
 
     [Fact]
-    public void MessageFlagSetter_Pop3ReadState()
+    public async Task MessageFlagSetter_Pop3ReadState()
     {
         var client = new MailKit.Net.Pop3.Pop3Client();
-        MessageFlagSetter.SetReadAsync(client, 5, true).Wait();
+        await MessageFlagSetter.SetReadAsync(client, 5, true);
         Assert.True(MessageFlagSetter.TryGetPop3Read(client, 5, out var read) && read);
     }
 
