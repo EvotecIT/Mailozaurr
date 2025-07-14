@@ -8,7 +8,7 @@ namespace Mailozaurr;
 /// Helper utilities for working with HTML content.
 /// </summary>
 public static class HtmlUtils {
-    internal static readonly HttpClient HttpClient;
+    internal static HttpClient HttpClient { get; set; }
 
     static HtmlUtils() {
         HttpClient = new HttpClient();
@@ -59,7 +59,7 @@ public static class HtmlUtils {
             try {
                 using var response = await HttpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
                 if (!response.IsSuccessStatusCode) continue;
-#if NETFRAMEWORK
+#if NETFRAMEWORK || NETSTANDARD2_0
                 var data = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
 #else
                 var data = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
