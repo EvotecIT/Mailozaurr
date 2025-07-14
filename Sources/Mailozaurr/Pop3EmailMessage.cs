@@ -12,6 +12,7 @@ public class Pop3EmailMessage {
     public Pop3EmailMessage(int index, MimeMessage message) {
         Index = index;
         Message = message;
+        Encryption = MimeKitUtils.GetEncryption(message);
     }
 
     /// <summary>Index of the message within the mailbox.</summary>
@@ -19,6 +20,9 @@ public class Pop3EmailMessage {
 
     /// <summary>The underlying <see cref="MimeMessage"/>.</summary>
     public MimeMessage Message { get; }
+
+    /// <summary>Detected encryption or signature type.</summary>
+    public EmailEncryption Encryption { get; }
 
     /// <inheritdoc />
     public override string ToString() => Message.Subject ?? base.ToString();

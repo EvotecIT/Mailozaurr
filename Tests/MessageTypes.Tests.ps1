@@ -18,4 +18,8 @@ Describe 'Message wrapper types' {
     It 'GraphMessageInfo type is available' {
         [Mailozaurr.GraphMessageInfo] | Should -Not -BeNullOrEmpty
     }
+
+    It 'GraphEmailMessage type is available' {
+        [Mailozaurr.GraphEmailMessage] | Should -Not -BeNullOrEmpty
+    }
 }
