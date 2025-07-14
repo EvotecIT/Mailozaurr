@@ -11,6 +11,7 @@ using System.IO;
 using System.Text.Json.Serialization;
 using System.Collections.Concurrent;
 using System.Threading;
+using MimeKit;
 
 namespace Mailozaurr {
 
@@ -630,6 +631,24 @@ namespace Mailozaurr {
         /// </summary>
         public static async Task DeleteMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId) {
             await ExecuteMailMessageActionAsync(credential, userPrincipalName, messageId, GraphMessageAction.Delete);
+        }
+
+        /// <summary>
+        /// Retrieves the raw MIME content of a mail message.
+        /// </summary>
+        public static async Task<MimeMessage> GetMailMessageMimeAsync(GraphCredential credential, string userPrincipalName, string messageId) {
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            var request = new HttpRequestMessage(HttpMethod.Get, $"https://graph.microsoft.com/v1.0/users/{userPrincipalName}/messages/{messageId}/$value");
+            request.Headers.TryAddWithoutValidation("Authorization", token);
+            await ConcurrencySemaphore.WaitAsync();
+            try {
+                using var response = await HttpClient.SendAsync(request).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
+                using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+                return await MimeMessage.LoadAsync(stream).ConfigureAwait(false);
+            } finally {
+                ConcurrencySemaphore.Release();
+            }
         }
 
         /// <summary>

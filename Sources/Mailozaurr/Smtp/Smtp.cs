@@ -781,8 +781,8 @@ public class Smtp {
     /// <returns></returns>
     public SmtpResult Encrypt(X509Certificate2 certificate) {
         MimeMessage message = Message;
-        // encrypt our message body using our custom S/MIME cryptography context
-        using (var ctx = new DefaultSecureMimeContext()) {
+        // encrypt our message body using a temporary S/MIME context to avoid SQLite dependency
+        using (var ctx = new TemporarySecureMimeContext()) {
             try {
                 // Create a CmsRecipientCollection and add the CmsRecipient to it
                 var recipients = new CmsRecipientCollection();
@@ -811,9 +811,9 @@ public class Smtp {
     /// <returns></returns>
     public SmtpResult Sign(X509Certificate2 certificate) {
         MimeMessage message = Message;
-        // digitally sign our message body using our custom S/MIME cryptography context
-        //Exception calling "MultipartSignFromStore" with "1" argument(s): "SQLite is not available. Install the System.Data.SQLite nuget package."
-        using (var ctx = new DefaultSecureMimeContext()) {
+        // digitally sign our message body using a temporary S/MIME context
+        // TemporarySecureMimeContext avoids the SQLite dependency of DefaultSecureMimeContext
+        using (var ctx = new TemporarySecureMimeContext()) {
             try {
                 var signer = new CmsSigner(certificate) {
                     DigestAlgorithm = DigestAlgorithm.Sha1
