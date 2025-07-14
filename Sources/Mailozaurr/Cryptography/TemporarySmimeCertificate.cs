@@ -95,13 +95,14 @@ public static class TemporarySmimeCertificate
         Org.BouncyCastle.X509.X509Certificate bouncyCert = certGen.Generate(signatureFactory);
 
         var store = new Pkcs12StoreBuilder().Build();
+        const string pfxPassword = "pass";
         string friendlyName = subjectName;
         var certEntry = new X509CertificateEntry(bouncyCert);
         store.SetCertificateEntry(friendlyName, certEntry);
         store.SetKeyEntry(friendlyName, new AsymmetricKeyEntry(keyPair.Private), new[] { certEntry });
 
         using var ms = new MemoryStream();
-        store.Save(ms, Array.Empty<char>(), random);
+        store.Save(ms, pfxPassword.ToCharArray(), random);
         var raw = ms.ToArray();
 
         if (outputPath != null)
@@ -109,6 +110,6 @@ public static class TemporarySmimeCertificate
             File.WriteAllBytes(outputPath, raw);
         }
 
-        return new X509Certificate2(raw, string.Empty, X509KeyStorageFlags.Exportable);
+        return new X509Certificate2(raw, pfxPassword, X509KeyStorageFlags.Exportable);
     }
 }
