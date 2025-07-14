@@ -7,7 +7,7 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// Verifies PGP or S/MIME signatures on a <see cref="MimeMessage"/>.
 /// </summary>
-[Cmdlet(VerbsDiagnostic.Test, "MimeMessageSignature")]
+[Cmdlet(VerbsDiagnostic.Test, "MimeMessageSignature", DefaultParameterSetName = "Auto")]
 [OutputType(typeof(bool))]
 public sealed class CmdletTestMimeMessageSignature : PSCmdlet {
     /// <summary>Message to verify.</summary>
@@ -16,11 +16,11 @@ public sealed class CmdletTestMimeMessageSignature : PSCmdlet {
     public MimeMessage? Message { get; set; }
 
     /// <summary>Public key for PGP signature verification.</summary>
-    [Parameter(ParameterSetName = "Pgp", Mandatory = true)]
+    [Parameter(ParameterSetName = "Pgp")]
     public string? PublicKeyPath { get; set; }
 
     /// <summary>Certificates for S/MIME signature verification.</summary>
-    [Parameter(ParameterSetName = "Smime", Mandatory = true)]
+    [Parameter(ParameterSetName = "Smime")]
     public X509Certificate2[]? Certificate { get; set; }
 
     /// <inheritdoc />

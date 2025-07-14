@@ -22,7 +22,7 @@ Describe 'Unprotect-MimeMessage' {
         ($out.TextBody) | Should -Be 'body'
     }
 
-    It 'Decrypts SMIME message' {
+    It 'Decrypts SMIME message' -Skip:(-not $IsWindows) {
         $rsa = [System.Security.Cryptography.RSA]::Create(2048)
         $req = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new('cn=test',$rsa,[System.Security.Cryptography.HashAlgorithmName]::SHA256,[System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
         $cert = $req.CreateSelfSigned([System.DateTimeOffset]::Now.AddDays(-1),[System.DateTimeOffset]::Now.AddDays(1))

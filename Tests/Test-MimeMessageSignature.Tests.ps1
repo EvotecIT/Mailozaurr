@@ -6,7 +6,7 @@ Describe 'Test-MimeMessageSignature' {
         $result | Should -Be $false
     }
 
-    It 'Verifies PGP signature' {
+    It 'Verifies PGP signature' -Skip:(-not $IsWindows) {
         $base = Join-Path $PSScriptRoot '..'
         $pub = Join-Path $base 'Examples/PGPKeys/mimekit.gpg.pub'
         $sec = Join-Path $base 'Examples/PGPKeys/mimekit.gpg.sec'
@@ -22,7 +22,7 @@ Describe 'Test-MimeMessageSignature' {
         $result | Should -Be $true
     }
 
-    It 'Verifies SMIME signature' {
+    It 'Verifies SMIME signature' -Skip:(-not $IsWindows) {
         $rsa = [System.Security.Cryptography.RSA]::Create(2048)
         $req = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new('cn=test',$rsa,[System.Security.Cryptography.HashAlgorithmName]::SHA256,[System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
         $cert = $req.CreateSelfSigned([System.DateTimeOffset]::Now.AddDays(-1),[System.DateTimeOffset]::Now.AddDays(1))
