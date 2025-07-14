@@ -354,6 +354,20 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     public string? GmailAccount { get; set; }
 
     /// <summary>
+    /// <para>Enables reuse of SMTP connections via a connection pool.</para>
+    /// </summary>
+    [Parameter(Mandatory = false)]
+    public SwitchParameter UseConnectionPool { get; set; }
+
+    /// <summary>
+    /// <para>Maximum number of connections to keep in the pool.</para>
+    /// </summary>
+    [Parameter(Mandatory = false)]
+    [ValidateRange(1, int.MaxValue)]
+    public int ConnectionPoolSize { get; set; } = 2;
+
+
+    /// <summary>
     /// <para>Specifies chunk size in bytes used for Graph attachment uploads. Default is 9MB.</para>
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "Graph")]
@@ -626,6 +640,9 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
                 errorAction = actionPreference;
             }
         }
+
+        Smtp.MaxPoolSize = ConnectionPoolSize;
+        Smtp.PoolingEnabled = UseConnectionPool.IsPresent;
     }
     /// <summary>
     /// Process the record.

@@ -1,24 +1,24 @@
-using MailKit;
-
 namespace Mailozaurr;
 
+using MimeKit;
+
 /// <summary>
-/// Represents an IMAP email message along with its unique identifier.
+/// Represents a MIME message retrieved via Microsoft Graph along with its identifier.
 /// </summary>
-public class ImapEmailMessage {
+public class GraphEmailMessage {
     /// <summary>
-    /// Creates a new instance of <see cref="ImapEmailMessage"/>.
+    /// Creates a new instance of <see cref="GraphEmailMessage"/>.
     /// </summary>
-    /// <param name="uid">Unique identifier of the message.</param>
-    /// <param name="message">The actual MIME message.</param>
-    public ImapEmailMessage(UniqueId uid, MimeMessage message) {
-        Uid = uid;
+    /// <param name="id">Unique identifier of the message.</param>
+    /// <param name="message">The MIME message.</param>
+    public GraphEmailMessage(string id, MimeMessage message) {
+        Id = id;
         Message = message;
         Encryption = MimeKitUtils.GetEncryption(message);
     }
 
     /// <summary>Unique identifier of the message.</summary>
-    public UniqueId Uid { get; }
+    public string Id { get; }
 
     /// <summary>The underlying <see cref="MimeMessage"/>.</summary>
     public MimeMessage Message { get; }
