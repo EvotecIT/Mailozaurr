@@ -50,6 +50,9 @@ public class Pop3MessageInfo {
     /// <summary>Whether the message has any attachments.</summary>
     public bool HasAttachments => Raw.Message.Attachments.Any();
 
+    /// <summary>Encryption or signature detected.</summary>
+    public EmailEncryption Encryption => Raw.Encryption;
+
     /// <inheritdoc />
     public override string ToString() => Subject ?? base.ToString();
 }
