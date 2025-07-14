@@ -36,6 +36,14 @@ public static class TemporarySmimeCertificate {
 
         return CreateWithBouncyCastle(subjectName, validDays, outputPath);
 #else
+        // On Unix systems, prioritize CertificateRequest as it's more compatible with the platform
+        // BouncyCastle PKCS#12 certificates are often incompatible with Mono's X509Certificate2 implementation
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
+            if (Type.GetType("System.Security.Cryptography.X509Certificates.CertificateRequest") != null) {
+                return CreateWithCertificateRequest(subjectName, validDays, outputPath);
+            }
+        }
+
         // CertificateRequest is unavailable on some platforms such as Mono.
         if (Type.GetType("System.Security.Cryptography.X509Certificates.CertificateRequest") == null)
         {
