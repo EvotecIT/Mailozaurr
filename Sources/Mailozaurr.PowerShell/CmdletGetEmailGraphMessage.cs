@@ -136,6 +136,10 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
+    /// <summary>
+    /// Retrieves messages using either built-in logic or Invoke-MgGraphRequest.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override Task ProcessRecordAsync() {
         if (ParameterSetName == "MgGraphRequest") {
             return ProcessMgGraph();
@@ -150,6 +154,9 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
         return ProcessGraphAsync(conn.Credential);
     }
 
+    /// <summary>
+    /// Executes the Graph API calls to fetch messages.
+    /// </summary>
     private async Task ProcessGraphAsync(GraphCredential cred) {
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         MicrosoftGraphUtils.MaxConcurrentRequests = MaxConcurrentRequests;
@@ -195,6 +202,9 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
         }
     }
 
+    /// <summary>
+    /// Uses Invoke-MgGraphRequest to retrieve messages.
+    /// </summary>
     private Task ProcessMgGraph() {
         var filter = BuildFilter(Filter);
         var query = new Dictionary<string, object>();

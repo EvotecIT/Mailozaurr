@@ -58,6 +58,12 @@ public static class HtmlUtils {
         return (html, paths);
     }
 
+    /// <summary>
+    /// Downloads externally referenced images and replaces their sources with cid links.
+    /// </summary>
+    /// <param name="html">HTML content to inspect.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    /// <returns>Modified HTML and list of downloaded images.</returns>
     public static async Task<(string Html, List<RemoteImage> Images)> DownloadRemoteImagesAsync(string html, CancellationToken cancellationToken = default) {
         var images = new List<RemoteImage>();
         if (string.IsNullOrWhiteSpace(html)) return (html, images);

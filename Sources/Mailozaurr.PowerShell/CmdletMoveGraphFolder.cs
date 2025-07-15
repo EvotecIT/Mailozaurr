@@ -56,6 +56,10 @@ public class CmdletMoveGraphFolder : AsyncPSCmdlet {
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
+    /// <summary>
+    /// Moves a folder within a mailbox using Microsoft Graph.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override Task ProcessRecordAsync() {
         switch (ParameterSetName) {
             case ParentParameterSet:

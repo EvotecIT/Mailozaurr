@@ -21,6 +21,9 @@ public class CmdletConvertToMailgunCredential : PSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? ApiKey { get; set; }
 
+    /// <summary>
+    /// Converts the provided API key into a PSCredential for Mailgun.
+    /// </summary>
     protected override void ProcessRecord() {
         SecureString secret = CredentialHelpers.ToSecureString(ApiKey);
         var credential = new PSCredential("Mailgun", secret);

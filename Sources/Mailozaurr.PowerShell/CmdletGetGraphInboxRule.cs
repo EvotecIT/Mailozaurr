@@ -58,6 +58,10 @@ public sealed class CmdletGetGraphInboxRule : AsyncPSCmdlet {
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
+    /// <summary>
+    /// Retrieves inbox rules using Graph or Invoke-MgGraphRequest.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override Task ProcessRecordAsync() {
         if (ParameterSetName == "MgGraphRequest") {
             return ProcessMgGraph();

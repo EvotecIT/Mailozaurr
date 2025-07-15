@@ -96,6 +96,9 @@ public sealed class CmdletNewGraphInboxRuleObject : PSCmdlet
     [Parameter(ParameterSetName = "Params")]
     public string? Importance { get; set; }
 
+    /// <summary>
+    /// Creates a <see cref="GraphInboxRule"/> instance from the supplied parameters.
+    /// </summary>
     protected override void ProcessRecord()
     {
         if (ParameterSetName == "Builder")

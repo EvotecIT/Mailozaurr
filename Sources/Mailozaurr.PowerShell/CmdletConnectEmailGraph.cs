@@ -116,12 +116,22 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
     [Parameter]
     public double RetryDelayBackoff { get; set; } = 1.0;
 
+    /// <summary>
+    /// Request timeout for Microsoft Graph operations in seconds.
+    /// </summary>
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
+    /// <summary>
+    /// Maximum number of concurrent Microsoft Graph requests.
+    /// </summary>
     [Parameter]
     public int MaxConcurrentRequests { get; set; } = 5;
 
+    /// <summary>
+    /// Connects to Microsoft Graph using the provided authentication details.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override async Task ProcessRecordAsync() {
         GraphCredential cred;
         OAuthCredential? oauth = null;

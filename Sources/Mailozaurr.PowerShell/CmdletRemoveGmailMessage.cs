@@ -8,16 +8,29 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Remove, "GmailMessage", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 public sealed class CmdletRemoveGmailMessage : AsyncPSCmdlet {
+    /// <summary>
+    /// Gmail account containing the message.
+    /// </summary>
     [Parameter(Mandatory = true)]
     public string? GmailAccount { get; set; }
 
+    /// <summary>
+    /// OAuth credential used to authenticate.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNull]
     public PSCredential? Credential { get; set; }
 
+    /// <summary>
+    /// Identifier of the Gmail message to remove.
+    /// </summary>
     [Parameter(Mandatory = true)]
     public string? Id { get; set; }
 
+    /// <summary>
+    /// Deletes the specified Gmail message.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override async Task ProcessRecordAsync() {
         if (!ShouldProcess(Id!, "Deleting Gmail message")) {
             return;

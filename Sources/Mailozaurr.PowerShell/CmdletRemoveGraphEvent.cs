@@ -9,25 +9,47 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Remove, "GraphEvent", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 public sealed class CmdletRemoveGraphEvent : AsyncPSCmdlet {
+    /// <summary>
+    /// User principal name owning the event.
+    /// </summary>
     [Parameter(Mandatory = true)]
     public string? UserPrincipalName { get; set; }
 
+    /// <summary>
+    /// Identifier of the event to remove.
+    /// </summary>
     [Parameter(Mandatory = true)]
     public string? EventId { get; set; }
 
+    /// <summary>
+    /// Graph connection context.
+    /// </summary>
     [Parameter(ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
+    /// <summary>
+    /// Request timeout in seconds.
+    /// </summary>
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
+    /// <summary>
+    /// Number of retry attempts on failure.
+    /// </summary>
     [Parameter]
     public int RetryCount { get; set; } = 0;
 
+    /// <summary>
+    /// Delay between retries in milliseconds.
+    /// </summary>
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
+    /// <summary>
+    /// Removes the specified event via Microsoft Graph.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override Task ProcessRecordAsync() {
         var conn = Connection ?? DefaultSessions.GraphSession;
         if (conn == null) {

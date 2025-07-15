@@ -11,16 +11,28 @@ namespace Mailozaurr.PowerShell;
 [Cmdlet(VerbsCommunications.Send, "GmailMessage")]
 [OutputType(typeof(GmailMessage))]
 public sealed class CmdletSendGmailMessage : AsyncPSCmdlet {
+    /// <summary>
+    /// Gmail account used to send the message.
+    /// </summary>
     [Parameter(Mandatory = true)]
     public string? GmailAccount { get; set; }
 
+    /// <summary>
+    /// OAuth credential used for authentication.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNull]
     public PSCredential? Credential { get; set; }
 
+    /// <summary>
+    /// Address used in the From header.
+    /// </summary>
     [Parameter(Mandatory = true)]
     public object? From { get; set; }
 
+    /// <summary>
+    /// Recipients of the message.
+    /// </summary>
     [Parameter(Mandatory = true)]
     public object[]? To { get; set; }
 

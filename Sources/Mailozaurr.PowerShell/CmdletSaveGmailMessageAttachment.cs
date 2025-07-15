@@ -9,20 +9,36 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsData.Save, "GmailMessageAttachment")]
 public sealed class CmdletSaveGmailMessageAttachment : AsyncPSCmdlet {
+    /// <summary>
+    /// Gmail account containing the message.
+    /// </summary>
     [Parameter(Mandatory = true)]
     public string? GmailAccount { get; set; }
 
+    /// <summary>
+    /// OAuth credential used for authentication.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNull]
     public PSCredential? Credential { get; set; }
 
+    /// <summary>
+    /// Identifier of the Gmail message.
+    /// </summary>
     [Parameter(Mandatory = true)]
     public string? Id { get; set; }
 
+    /// <summary>
+    /// Destination path for saving attachments.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? Path { get; set; }
 
+    /// <summary>
+    /// Downloads attachments from the specified Gmail message.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override async Task ProcessRecordAsync() {
         var net = Credential!.GetNetworkCredential();
         var oauth = new OAuthCredential {

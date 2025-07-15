@@ -10,22 +10,41 @@ namespace Mailozaurr.PowerShell;
 [Cmdlet(VerbsCommon.Get, "GmailMessage")]
 [OutputType(typeof(GmailMessage))]
 public sealed class CmdletGetGmailMessage : AsyncPSCmdlet {
+    /// <summary>
+    /// Gmail account address to operate on.
+    /// </summary>
     [Parameter(Mandatory = true)]
     public string? GmailAccount { get; set; }
 
+    /// <summary>
+    /// OAuth credential used to authenticate to Gmail.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNull]
     public PSCredential? Credential { get; set; }
 
+    /// <summary>
+    /// Search query used when listing messages.
+    /// </summary>
     [Parameter(ParameterSetName = "List")]
     public string? Query { get; set; }
 
+    /// <summary>
+    /// Maximum number of messages to return when listing.
+    /// </summary>
     [Parameter(ParameterSetName = "List")]
     public int? MaxResults { get; set; }
 
+    /// <summary>
+    /// Identifier of a specific Gmail message.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "Id")]
     public string? Id { get; set; }
 
+    /// <summary>
+    /// Retrieves Gmail messages based on the specified parameters.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override async Task ProcessRecordAsync() {
         var net = Credential!.GetNetworkCredential();
         var oauth = new OAuthCredential {

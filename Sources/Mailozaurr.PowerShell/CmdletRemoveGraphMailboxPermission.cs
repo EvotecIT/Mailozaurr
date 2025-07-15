@@ -13,13 +13,22 @@ namespace Mailozaurr.PowerShell;
 [Cmdlet(VerbsCommon.Remove, "GraphMailboxPermission", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
     [Parameter(Mandatory = true)]
+    /// <summary>
+    /// Mailbox owner user principal name.
+    /// </summary>
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
+    /// <summary>
+    /// Identifier of permissions to remove.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNullOrEmpty]
     public string[]? PermissionId { get; set; }
 
+    /// <summary>
+    /// Mailbox permission objects to remove.
+    /// </summary>
     [Parameter(ParameterSetName = "Object", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphMailboxPermission[]? MailboxPermission { get; set; }
@@ -30,10 +39,16 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
     [Parameter(ParameterSetName = "Filter")]
     public string[]? GrantedToUser { get; set; }
 
+    /// <summary>
+    /// Path to CSV file containing permission entries.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "Csv")]
     [ValidateNotNullOrEmpty]
     public string? CsvPath { get; set; }
 
+    /// <summary>
+    /// Graph connection to use for the request.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph", ValueFromPipeline = true)]
     [Parameter(ParameterSetName = "Object", ValueFromPipeline = true)]
     [Parameter(ParameterSetName = "Csv", ValueFromPipeline = true)]
@@ -43,15 +58,28 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 
+    /// <summary>
+    /// Request timeout in seconds.
+    /// </summary>
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
+    /// <summary>
+    /// Number of retry attempts on failure.
+    /// </summary>
     [Parameter]
     public int RetryCount { get; set; } = 0;
 
+    /// <summary>
+    /// Delay between retries in milliseconds.
+    /// </summary>
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
+    /// <summary>
+    /// Removes mailbox permissions based on the provided input.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override async Task ProcessRecordAsync() {
         if (ParameterSetName == "MgGraphRequest") {
             ProcessMgGraph();

@@ -18,15 +18,28 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsDiagnostic.Test, "SmtpConnection")]
 public sealed class CmdletTestSmtpConnection : AsyncPSCmdlet {
+    /// <summary>
+    /// SMTP server hostname to test.
+    /// </summary>
     [Parameter(Mandatory = true)]
     public string? Server { get; set; }
 
+    /// <summary>
+    /// TCP port used for the SMTP connection.
+    /// </summary>
     [Parameter]
     public int Port { get; set; } = 587;
 
+    /// <summary>
+    /// Indicates whether to test SSL connectivity.
+    /// </summary>
     [Parameter]
     public SwitchParameter UseSsl { get; set; }
 
+    /// <summary>
+    /// Tests the SMTP server connection and outputs capability information.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override Task ProcessRecordAsync() {
         var info = Smtp.TestConnection(Server!, Port, SecureSocketOptions.Auto, UseSsl.IsPresent);
         WriteObject(info);

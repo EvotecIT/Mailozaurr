@@ -89,6 +89,9 @@ public sealed class CmdletNewGraphInboxRuleBuilder : PSCmdlet
     [Parameter]
     public string? Importance { get; set; }
 
+    /// <summary>
+    /// Builds the <see cref="GraphInboxRule"/> based on provided parameters.
+    /// </summary>
     protected override void ProcessRecord()
     {
         var builder = new GraphInboxRuleBuilder()

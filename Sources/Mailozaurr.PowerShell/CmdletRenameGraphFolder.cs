@@ -50,6 +50,10 @@ public class CmdletRenameGraphFolder : AsyncPSCmdlet {
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
+    /// <summary>
+    /// Renames a folder using Microsoft Graph.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override Task ProcessRecordAsync() {
         switch (ParameterSetName) {
             case "Graph":
