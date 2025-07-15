@@ -104,6 +104,10 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
+    /// <summary>
+    /// Executes the cmdlet logic based on the provided parameter set.
+    /// </summary>
+    /// <returns>The asynchronous task representing the operation.</returns>
     protected override Task ProcessRecordAsync() {
         switch (ParameterSetName) {
             case "Graph":

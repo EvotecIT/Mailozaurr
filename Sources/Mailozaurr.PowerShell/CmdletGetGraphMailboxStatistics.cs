@@ -12,23 +12,42 @@ namespace Mailozaurr.PowerShell;
 [Cmdlet(VerbsCommon.Get, "GraphMailboxStatistics")]
 [OutputType(typeof(GraphMailboxStatistics))]
 public class CmdletGetGraphMailboxStatistics : AsyncPSCmdlet {
+    /// <summary>
+    /// User principal name for the mailbox being queried.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
+    /// <summary>
+    /// Existing Graph connection to use for requests.
+    /// </summary>
     [Parameter(ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
+    /// <summary>
+    /// Request timeout in seconds.
+    /// </summary>
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
+    /// <summary>
+    /// Number of retry attempts on failure.
+    /// </summary>
     [Parameter]
     public int RetryCount { get; set; } = 0;
 
+    /// <summary>
+    /// Delay between retries in milliseconds.
+    /// </summary>
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
+    /// <summary>
+    /// Retrieves mailbox statistics for the specified user.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override Task ProcessRecordAsync() {
         var conn = Connection ?? DefaultSessions.GraphSession;
         if (conn == null) {

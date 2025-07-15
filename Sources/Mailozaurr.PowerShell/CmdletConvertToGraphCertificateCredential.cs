@@ -52,6 +52,9 @@ public class CmdletConvertToGraphCertificateCredential : PSCmdlet {
     [Parameter]
     public string[]? Scopes { get; set; }
 
+    /// <summary>
+    /// Acquires an app-only access token using certificate authentication and returns it as a credential.
+    /// </summary>
     protected override void ProcessRecord() {
         GraphAuthorization token;
         try {

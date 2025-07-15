@@ -17,20 +17,35 @@ namespace Mailozaurr.PowerShell;
 [OutputType(typeof(GraphInboxRule))]
 public sealed class CmdletSetGraphInboxRule : AsyncPSCmdlet
 {
+    /// <summary>
+    /// User principal name owning the rule.
+    /// </summary>
     [Parameter(Mandatory = true)]
     public string? UserPrincipalName { get; set; }
 
+    /// <summary>
+    /// Identifier of the rule to update.
+    /// </summary>
     [Parameter(Mandatory = true)]
     public string? RuleId { get; set; }
 
+    /// <summary>
+    /// Hashtable representing the rule properties.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNull]
     public Hashtable? Rule { get; set; }
 
+    /// <summary>
+    /// Existing rule object used for update.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNull]
     public GraphInboxRule? RuleObject { get; set; }
 
+    /// <summary>
+    /// Graph connection context used for the update.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }

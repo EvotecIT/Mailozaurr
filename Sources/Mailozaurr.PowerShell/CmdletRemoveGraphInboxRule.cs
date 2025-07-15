@@ -11,14 +11,23 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Remove, "GraphInboxRule", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 public sealed class CmdletRemoveGraphInboxRule : AsyncPSCmdlet {
+    /// <summary>
+    /// User principal name owning the inbox rule.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
+    /// <summary>
+    /// Identifier of the rule to remove.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? RuleId { get; set; }
 
+    /// <summary>
+    /// Graph connection context.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }

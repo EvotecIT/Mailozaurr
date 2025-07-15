@@ -11,30 +11,57 @@ namespace Mailozaurr.PowerShell;
 [OutputType(typeof(GraphEventBuilder))]
 public sealed class CmdletNewGraphEventBuilder : PSCmdlet
 {
+    /// <summary>
+    /// Subject of the new event.
+    /// </summary>
     [Parameter]
     public string? Subject { get; set; }
 
+    /// <summary>
+    /// Start time of the event.
+    /// </summary>
     [Parameter]
     public DateTime? Start { get; set; }
 
+    /// <summary>
+    /// Time zone for the start time.
+    /// </summary>
     [Parameter]
     public string StartTimeZone { get; set; } = "UTC";
 
+    /// <summary>
+    /// End time of the event.
+    /// </summary>
     [Parameter]
     public DateTime? End { get; set; }
 
+    /// <summary>
+    /// Time zone for the end time.
+    /// </summary>
     [Parameter]
     public string EndTimeZone { get; set; } = "UTC";
 
+    /// <summary>
+    /// Body content of the event.
+    /// </summary>
     [Parameter]
     public string? Body { get; set; }
 
+    /// <summary>
+    /// Type of the body content: HTML or Text.
+    /// </summary>
     [Parameter]
     public string BodyType { get; set; } = "HTML";
 
+    /// <summary>
+    /// List of attendee email addresses.
+    /// </summary>
     [Parameter]
     public string[]? Attendees { get; set; }
 
+    /// <summary>
+    /// Builds the <see cref="GraphEventBuilder"/> object from provided parameters.
+    /// </summary>
     protected override void ProcessRecord()
     {
         var builder = new GraphEventBuilder();

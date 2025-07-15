@@ -296,6 +296,9 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// Disposes all SMTP clients stored in the connection pool.
+    /// </summary>
     public static void ClearConnectionPool()
     {
         foreach (var bag in _connectionPool.Values)

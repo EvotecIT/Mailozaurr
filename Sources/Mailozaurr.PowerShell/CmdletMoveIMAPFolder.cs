@@ -31,6 +31,10 @@ public sealed class CmdletMoveIMAPFolder : AsyncPSCmdlet {
     [Parameter(ParameterSetName = RootParameterSet)]
     public SwitchParameter Root { get; set; }
 
+    /// <summary>
+    /// Moves an IMAP folder to the specified destination.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {

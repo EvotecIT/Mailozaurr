@@ -73,6 +73,10 @@ public sealed class CmdletSearchPOP3Mailbox : AsyncPSCmdlet {
     [ValidateRange(1, int.MaxValue)]
     public int Count { get; set; }
 
+    /// <summary>
+    /// Searches the POP3 mailbox using the specified criteria.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.Pop3Session;
         if (conn != null && conn.Data != null) {

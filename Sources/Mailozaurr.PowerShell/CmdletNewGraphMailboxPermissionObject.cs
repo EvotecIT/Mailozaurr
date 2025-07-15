@@ -39,6 +39,9 @@ public sealed class CmdletNewGraphMailboxPermissionObject : PSCmdlet {
     [Parameter(Mandatory = true, ValueFromPipeline = true, ParameterSetName = "Builder")]
     public GraphMailboxPermissionBuilder? Builder { get; set; }
 
+    /// <summary>
+    /// Constructs the <see cref="GraphMailboxPermission"/> from parameters or builder.
+    /// </summary>
     protected override void ProcessRecord() {
         GraphMailboxPermission permission;
         if (ParameterSetName == "Builder") {

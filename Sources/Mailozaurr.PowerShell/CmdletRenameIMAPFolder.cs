@@ -25,6 +25,10 @@ public sealed class CmdletRenameIMAPFolder : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? NewName { get; set; }
 
+    /// <summary>
+    /// Renames an IMAP folder on the connected server.
+    /// </summary>
+    /// <returns>A task representing the asynchronous operation.</returns>
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
