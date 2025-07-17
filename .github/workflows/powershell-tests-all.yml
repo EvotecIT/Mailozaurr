@@ -13,6 +13,7 @@ jobs:
   refresh-psd1:
     name: 'Refresh PSD1'
     runs-on: windows-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -50,6 +51,7 @@ jobs:
     needs: refresh-psd1
     name: 'Windows PowerShell 5.1'
     runs-on: windows-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -85,6 +87,7 @@ jobs:
     needs: refresh-psd1
     name: 'Windows PowerShell 7'
     runs-on: windows-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -120,6 +123,7 @@ jobs:
     needs: refresh-psd1
     name: 'Ubuntu PowerShell 7'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -162,6 +166,7 @@ jobs:
     needs: refresh-psd1
     name: 'macOS PowerShell 7'
     runs-on: macos-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
