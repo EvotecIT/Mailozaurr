@@ -12,10 +12,10 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Remove, "GraphMailboxPermission", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
-    [Parameter(Mandatory = true)]
     /// <summary>
     /// Mailbox owner user principal name.
     /// </summary>
+    [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
@@ -33,9 +33,15 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
     [ValidateNotNull]
     public GraphMailboxPermission[]? MailboxPermission { get; set; }
 
+    /// <summary>
+    /// Filters permissions by mailbox role.
+    /// </summary>
     [Parameter(ParameterSetName = "Filter")]
     public GraphMailboxRole[]? Role { get; set; }
 
+    /// <summary>
+    /// Filters permissions by assigned users.
+    /// </summary>
     [Parameter(ParameterSetName = "Filter")]
     public string[]? GrantedToUser { get; set; }
 
@@ -55,6 +61,9 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
+    /// <summary>
+    /// Switch to use <c>Invoke-MgGraphRequest</c> instead of built-in logic.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 

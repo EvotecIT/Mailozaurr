@@ -45,6 +45,9 @@ public class CmdletMoveGraphFolder : AsyncPSCmdlet {
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
+    /// <summary>
+    /// Maximum number of concurrent requests during the move operation.
+    /// </summary>
     [Parameter]
     public int MaxConcurrentRequests { get; set; } = 5;
 

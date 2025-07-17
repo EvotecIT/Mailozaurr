@@ -297,6 +297,9 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Alias("InlineAttachments")]
     public object[]? InlineAttachment { get; set; }
 
+    /// <summary>
+    /// Custom message headers to include with the email.
+    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
     [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
@@ -304,9 +307,6 @@ public sealed class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
     [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
-    /// <summary>
-    /// Custom message headers to include with the email.
-    /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
     public Hashtable? Headers { get; set; }
 
