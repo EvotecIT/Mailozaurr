@@ -36,15 +36,27 @@ public sealed class CmdletSendGmailMessage : AsyncPSCmdlet {
     [Parameter(Mandatory = true)]
     public object[]? To { get; set; }
 
+    /// <summary>
+    /// Subject line for the email message.
+    /// </summary>
     [Parameter]
     public string? Subject { get; set; }
 
+    /// <summary>
+    /// HTML body content of the message.
+    /// </summary>
     [Parameter]
     public string[]? HtmlBody { get; set; }
 
+    /// <summary>
+    /// Plain text body content of the message.
+    /// </summary>
     [Parameter]
     public string[]? TextBody { get; set; }
 
+    /// <summary>
+    /// Attachments to include with the message.
+    /// </summary>
     [Parameter]
     public object[]? Attachment { get; set; }
 

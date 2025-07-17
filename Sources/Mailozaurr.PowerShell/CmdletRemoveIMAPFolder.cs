@@ -24,6 +24,9 @@ public sealed class CmdletRemoveIMAPFolder : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter Recursive { get; set; }
 
+    /// <summary>
+    /// Removes the specified folder from the connected IMAP server.
+    /// </summary>
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {

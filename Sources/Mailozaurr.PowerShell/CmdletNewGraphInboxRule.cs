@@ -16,75 +16,141 @@ namespace Mailozaurr.PowerShell;
 [Cmdlet(VerbsCommon.New, "GraphInboxRule")]
 [OutputType(typeof(GraphInboxRule))]
 public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
+    /// <summary>
+    /// User principal name owning the mailbox.
+    /// </summary>
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
     public string? UserPrincipalName { get; set; }
 
+    /// <summary>
+    /// Hashtable definition of the rule.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNull]
     public Hashtable? Rule { get; set; }
 
+    /// <summary>
+    /// Rule object describing the inbox rule.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNull]
     public GraphInboxRule? RuleObject { get; set; }
 
+    /// <summary>
+    /// Builder used to create a rule object.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph")]
     [ValidateNotNull]
     public GraphInboxRuleBuilder? RuleBuilder { get; set; }
 
+    /// <summary>
+    /// Display name for the new rule.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "Params")]
     public string DisplayName { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Order in which the rule is processed.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public int Sequence { get; set; }
 
+    /// <summary>
+    /// Determines if the rule is enabled.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public SwitchParameter Enabled { get; set; }
 
+    /// <summary>
+    /// Destination folder to move messages to.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public string? MoveToFolder { get; set; }
 
+    /// <summary>
+    /// Destination folder to copy messages to.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public string? CopyToFolder { get; set; }
 
+    /// <summary>
+    /// Deletes messages matching the rule.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public SwitchParameter Delete { get; set; }
 
+    /// <summary>
+    /// Addresses to forward matching messages to.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public string[]? ForwardTo { get; set; }
 
+    /// <summary>
+    /// Stops processing additional rules when this rule matches.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public SwitchParameter StopProcessing { get; set; }
 
+    /// <summary>
+    /// Sender addresses that trigger the rule.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public string[]? SenderContains { get; set; }
 
+    /// <summary>
+    /// Recipients that trigger the rule.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public string[]? RecipientContains { get; set; }
 
+    /// <summary>
+    /// Strings that must appear in the subject.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public string[]? SubjectContains { get; set; }
 
+    /// <summary>
+    /// Strings that must appear in the body.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public string[]? BodyContains { get; set; }
 
+    /// <summary>
+    /// Message importance level to match.
+    /// </summary>
     [Parameter(ParameterSetName = "Params")]
     public string? Importance { get; set; }
 
+    /// <summary>
+    /// Connection information for Microsoft Graph.
+    /// </summary>
     [Parameter(ParameterSetName = "Graph", ValueFromPipeline = true)]
     [Parameter(ParameterSetName = "Params", ValueFromPipeline = true)]
     [ValidateNotNull]
     public GraphConnectionInfo? Connection { get; set; }
 
+    /// <summary>
+    /// Use <c>Invoke-MgGraphRequest</c> for sending requests.
+    /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     public SwitchParameter MgGraphRequest { get; set; }
 
+    /// <summary>
+    /// Request timeout in seconds.
+    /// </summary>
     [Parameter]
     public int TimeoutSeconds { get; set; } = 100;
 
+    /// <summary>
+    /// Number of retry attempts on failure.
+    /// </summary>
     [Parameter]
     public int RetryCount { get; set; } = 0;
 
+    /// <summary>
+    /// Delay between retries in milliseconds.
+    /// </summary>
     [Parameter]
     public int RetryDelayMilliseconds { get; set; } = 0;
 
