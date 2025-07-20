@@ -45,7 +45,10 @@ public class GraphMessageInfo {
         if (raw.TryGetValue("isRead", out var readObj) && bool.TryParse(readObj?.ToString(), out var read)) {
             IsRead = read;
         }
-        if (raw.TryGetValue("importance", out var importanceObj)) Importance = importanceObj as string;
+        if (raw.TryGetValue("importance", out var importanceObj) &&
+            Enum.TryParse<GraphImportance>(importanceObj?.ToString(), true, out var importance)) {
+            Importance = importance;
+        }
     }
 
     /// <summary>The dictionary returned from Microsoft Graph.</summary>
@@ -82,7 +85,7 @@ public class GraphMessageInfo {
     public bool? IsRead { get; set; }
 
     /// <summary>Message importance.</summary>
-    public string? Importance { get; set; }
+    public GraphImportance? Importance { get; set; }
 
     /// <summary>Snippet extracted by the search service highlighting the match.</summary>
     public string? Summary { get; set; }

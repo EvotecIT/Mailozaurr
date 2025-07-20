@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using MimeKit;
 using MailKit;
+using Mailozaurr;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -75,6 +76,6 @@ public class MessageInfoTests {
         Assert.Equal("preview", info.BodyPreview);
         Assert.Equal("gcontent", info.Content);
         Assert.True(info.IsRead);
-        Assert.Equal("high", info.Importance);
+        Assert.Equal(GraphImportance.High, info.Importance);
     }
 }
