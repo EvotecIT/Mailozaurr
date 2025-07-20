@@ -8,7 +8,7 @@ public class GraphBatchRequest {
     /// <summary>Unique request identifier.</summary>
     public string Id { get; set; } = string.Empty;
     /// <summary>HTTP method to execute.</summary>
-    public string Method { get; set; } = string.Empty;
+    public GraphHttpMethod Method { get; set; }
     /// <summary>Relative request URL (e.g. <c>/me/messages</c>).</summary>
     public string Url { get; set; } = string.Empty;
     /// <summary>Optional headers to include with the request.</summary>

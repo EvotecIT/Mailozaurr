@@ -594,7 +594,7 @@ public class Graph : IDisposable {
         var bodyObj = JsonSerializer.Deserialize<object>(MessageJson);
         var request = new GraphBatchRequest {
             Id = "1",
-            Method = "POST",
+            Method = GraphHttpMethod.POST,
             Url = $"/users/{MessageContainer.Message.From.Email.Address}/sendMail",
             Headers = new Dictionary<string, string> { ["Content-Type"] = "application/json" },
             Body = bodyObj

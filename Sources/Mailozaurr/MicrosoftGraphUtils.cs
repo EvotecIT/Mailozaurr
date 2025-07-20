@@ -314,7 +314,7 @@ namespace Mailozaurr {
         public static async Task<IReadOnlyList<GraphBatchResult>> SendBatchAsync(GraphCredential credential, IEnumerable<GraphBatchRequest> requests) {
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
             var headers = new Dictionary<string, string> { { "Authorization", token } };
-            var batchPayload = new { requests = requests.Select(r => new { id = r.Id, method = r.Method, url = r.Url.TrimStart('/') , headers = r.Headers, body = r.Body }) };
+            var batchPayload = new { requests = requests.Select(r => new { id = r.Id, method = r.Method.ToString(), url = r.Url.TrimStart('/') , headers = r.Headers, body = r.Body }) };
             var jsonBody = JsonSerializer.Serialize(batchPayload);
             var batchUri = BuildGraphUri(GraphEndpoint.V1, "/$batch");
             var doc = await InvokeGraphApiAsync("POST", batchUri, headers, jsonBody);
