@@ -18,8 +18,8 @@ public class FakeClientPs : ClientSmtp {
 }
 "@
 
-        [Mailozaurr.Smtp]::PoolingEnabled = $true
-        [Mailozaurr.Smtp]::ClearConnectionPool()
+        [Mailozaurr.SmtpConnectionPool]::PoolingEnabled = $true
+        [Mailozaurr.SmtpConnectionPool]::ClearConnectionPool()
         $fake = [FakeClientPs]::new()
         [Mailozaurr.Smtp]::ClientFactory = { $fake }
 
@@ -30,7 +30,7 @@ public class FakeClientPs : ClientSmtp {
         $fake.ConnectCalls | Should -Be 1
 
         [Mailozaurr.Smtp]::ClientFactory = { [Mailozaurr.ClientSmtp]::new() }
-        [Mailozaurr.Smtp]::ClearConnectionPool()
-        [Mailozaurr.Smtp]::PoolingEnabled = $false
+        [Mailozaurr.SmtpConnectionPool]::ClearConnectionPool()
+        [Mailozaurr.SmtpConnectionPool]::PoolingEnabled = $false
     }
 }

@@ -5,7 +5,6 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography.X509Certificates;
 using Org.BouncyCastle.Bcpg.OpenPgp;
-using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using System.Threading;
 
@@ -19,11 +18,6 @@ namespace Mailozaurr;
 /// multiple mechanisms depending on server capabilities.
 /// </remarks>
 public class Smtp {
-    private static readonly ConcurrentDictionary<string, ConcurrentBag<ClientSmtp>> _connectionPool = new();
-    /// <summary>Maximum number of pooled connections per server/port.</summary>
-    public static int MaxPoolSize { get; set; } = 2;
-    /// <summary>Enables or disables connection pooling.</summary>
-    public static bool PoolingEnabled { get; set; } = false;
 
     /// <summary>Factory used to create <see cref="ClientSmtp"/> instances.</summary>
     internal static Func<ProtocolLogger?, ClientSmtp> ClientFactory { get; set; } = logger => logger == null ? new ClientSmtp() : new ClientSmtp(logger);
@@ -254,62 +248,6 @@ public class Smtp {
         Stopwatch = Stopwatch.StartNew();
     }
 
-    private ClientSmtp? TryRentClient(string server, int port)
-    {
-        if (!PoolingEnabled)
-        {
-            return null;
-        }
-
-        var key = $"{server}:{port}";
-        if (_connectionPool.TryGetValue(key, out var bag))
-        {
-            while (bag.TryTake(out var pooled))
-            {
-                if (pooled.IsConnected)
-                {
-                    return pooled;
-                }
-                pooled.Dispose();
-            }
-        }
-        return null;
-    }
-
-    private static void ReturnClient(string server, int port, ClientSmtp client)
-    {
-        if (!PoolingEnabled)
-        {
-            client.Dispose();
-            return;
-        }
-
-        var key = $"{server}:{port}";
-        var bag = _connectionPool.GetOrAdd(key, _ => new ConcurrentBag<ClientSmtp>());
-        if (bag.Count >= MaxPoolSize)
-        {
-            client.Dispose();
-        }
-        else
-        {
-            bag.Add(client);
-        }
-    }
-
-    /// <summary>
-    /// Disposes all SMTP clients stored in the connection pool.
-    /// </summary>
-    public static void ClearConnectionPool()
-    {
-        foreach (var bag in _connectionPool.Values)
-        {
-            while (bag.TryTake(out var client))
-            {
-                client.Dispose();
-            }
-        }
-        _connectionPool.Clear();
-    }
 
     /// <summary>
     /// Connects to the specified SMTP server and returns detailed information about the connection.
@@ -415,9 +353,9 @@ public class Smtp {
         Port = port;
         if (Client.IsConnected)
         {
-            if (PoolingEnabled)
+            if (SmtpConnectionPool.PoolingEnabled)
             {
-                ReturnClient(oldServer, oldPort, Client);
+                SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client);
             }
             else
             {
@@ -426,7 +364,7 @@ public class Smtp {
             Client = ClientFactory(Logging?.ProtocolLogger);
         }
 
-        var pooled = PoolingEnabled ? TryRentClient(server, port) : null;
+        var pooled = SmtpConnectionPool.PoolingEnabled ? SmtpConnectionPool.TryRentClient(server, port) : null;
         if (pooled != null)
         {
             Client = pooled;
@@ -473,9 +411,9 @@ public class Smtp {
         Port = port;
         if (Client.IsConnected)
         {
-            if (PoolingEnabled)
+            if (SmtpConnectionPool.PoolingEnabled)
             {
-                ReturnClient(oldServer, oldPort, Client);
+                SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client);
             }
             else
             {
@@ -484,7 +422,7 @@ public class Smtp {
             Client = ClientFactory(Logging?.ProtocolLogger);
         }
 
-        var pooled = PoolingEnabled ? TryRentClient(server, port) : null;
+        var pooled = SmtpConnectionPool.PoolingEnabled ? SmtpConnectionPool.TryRentClient(server, port) : null;
         if (pooled != null)
         {
             Client = pooled;
@@ -720,8 +658,8 @@ public class Smtp {
     /// </summary>
     public void Disconnect() {
         if (Client.IsConnected) {
-            if (PoolingEnabled) {
-                ReturnClient(Server, Port, Client);
+            if (SmtpConnectionPool.PoolingEnabled) {
+                SmtpConnectionPool.ReturnClient(Server, Port, Client);
                 Client = ClientFactory(Logging?.ProtocolLogger);
             } else {
                 Client.Disconnect(true);
@@ -735,8 +673,8 @@ public class Smtp {
     /// </summary>
     public void Dispose() {
         if (Client.IsConnected) {
-            if (PoolingEnabled) {
-                ReturnClient(Server, Port, Client);
+            if (SmtpConnectionPool.PoolingEnabled) {
+                SmtpConnectionPool.ReturnClient(Server, Port, Client);
             } else {
                 Client.Disconnect(true);
             }

@@ -18,7 +18,7 @@ namespace Mailozaurr.PowerShell;
 public sealed class CmdletClearSmtpConnectionPool : AsyncPSCmdlet {
     /// <summary>Clears all connections from the pool.</summary>
     protected override Task ProcessRecordAsync() {
-        Smtp.ClearConnectionPool();
+        SmtpConnectionPool.ClearConnectionPool();
         return Task.CompletedTask;
     }
 }
