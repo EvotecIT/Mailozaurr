@@ -29,6 +29,8 @@ public static class SendEmailGmailApi {
             message.Body = new TextPart("plain") { Text = "Hello from Mailozaurr via Gmail API!" };
             var sent = await client.SendAsync("me", message);
             Console.WriteLine($"Gmail API: sent id {sent.Id}");
+        } catch (GmailAuthenticationException ex) {
+            Console.WriteLine($"Gmail API Authentication Error: {ex.Message}");
         } catch (Exception ex) {
             Console.WriteLine($"Gmail API Example Error: {ex.Message}");
         }
