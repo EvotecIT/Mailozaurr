@@ -29,9 +29,13 @@ public class MsgToEmlHandleTests
             Force = true
         };
 
-        cmd.BeginProcessing();
-        cmd.ProcessRecord();
-        cmd.EndProcessing();
+        var type = typeof(Mailozaurr.PowerShell.CmdletConvertFromMsgToEml);
+        type.GetMethod("BeginProcessing", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .Invoke(cmd, null);
+        type.GetMethod("ProcessRecord", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .Invoke(cmd, null);
+        type.GetMethod("EndProcessing", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .Invoke(cmd, null);
 
         File.Delete(msgFile);
         Assert.False(File.Exists(msgFile));
