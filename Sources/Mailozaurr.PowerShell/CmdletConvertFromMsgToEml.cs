@@ -1,3 +1,7 @@
+using System.IO;
+using MsgReader.Outlook.Storage;
+using MimeKit;
+
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
@@ -49,10 +53,49 @@ public sealed class CmdletConvertFromMsgToEml : AsyncPSCmdlet {
     /// Converts the specified MSG files to EML format.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        var outputMessage = EmailMessage.ConvertMsgToEml(InputPath, OutputFolder, Force);
-        foreach (var obj in outputMessage) {
-            WriteObject(obj);
+        if (InputPath == null || string.IsNullOrEmpty(OutputFolder)) {
+            return Task.CompletedTask;
         }
+
+        foreach (var msgPath in InputPath) {
+            var fileName = Path.GetFileNameWithoutExtension(msgPath);
+            var targetFile = Path.Combine(OutputFolder, $"{fileName}.eml");
+
+            try {
+                if (File.Exists(targetFile)) {
+                    if (!Force) {
+                        WriteObject(new MsgConversionResult {
+                            MsgFile = msgPath,
+                            EmlFile = targetFile,
+                            Status = false,
+                            Error = "EML file already exists"
+                        });
+                        continue;
+                    }
+                    File.Delete(targetFile);
+                }
+
+                using (var message = new Message(msgPath)) {
+                    using var stream = File.Create(targetFile);
+                    var mime = message.ToMimeMessage();
+                    mime.WriteTo(stream);
+                }
+
+                WriteObject(new MsgConversionResult {
+                    MsgFile = msgPath,
+                    EmlFile = targetFile,
+                    Status = true
+                });
+            } catch (IOException ex) {
+                WriteObject(new MsgConversionResult {
+                    MsgFile = msgPath,
+                    EmlFile = targetFile,
+                    Status = false,
+                    Error = ex.Message
+                });
+            }
+        }
+
         return Task.CompletedTask;
     }
 }
