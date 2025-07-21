@@ -32,7 +32,7 @@ public class GraphMailboxPermission {
         UserPrincipalName = userPrincipalName;
         if (raw.TryGetValue("id", out var idObj)) Id = idObj as string;
         if (raw.TryGetValue("roles", out var rolesObj) && rolesObj is object[] arr)
-            Roles = arr.Select(r => Enum.TryParse<GraphMailboxRole>(r?.ToString(), true, out var role) ? role : GraphMailboxRole.Custom).ToArray();
+            Roles = arr.Select(r => Enum.TryParse<GraphMailboxRole>(r?.ToString(), ignoreCase: true, out var role) ? role : GraphMailboxRole.Custom).ToArray();
         if (raw.TryGetValue("grantedTo", out var granted) && granted is Dictionary<string, object> gdict)
             GrantedTo = GraphMailboxGrantee.FromDictionary(gdict);
     }
