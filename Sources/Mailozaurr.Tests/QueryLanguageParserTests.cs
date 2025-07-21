@@ -21,4 +21,12 @@ public class QueryLanguageParserTests {
         Assert.True(result.HasAttachment);
         Assert.Equal(MessagePriority.High, result.Priority);
     }
+
+    [Fact]
+    public void ParseQuery_IsCaseInsensitive() {
+        var result = MailboxSearcher.ParseQuery("FROM:Boss SUBJECT:\"Report\" HAS:ATTACHMENT");
+        Assert.Equal("Boss", result.FromContains);
+        Assert.Equal("Report", result.Subject);
+        Assert.True(result.HasAttachment);
+    }
 }
