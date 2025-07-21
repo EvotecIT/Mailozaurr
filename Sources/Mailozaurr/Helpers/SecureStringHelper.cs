@@ -5,6 +5,8 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Mailozaurr {
     /// <summary>
@@ -255,6 +257,54 @@ namespace Mailozaurr {
         }
 
         /// <summary>
+        /// Asynchronously encrypts the SecureString using the specified key and
+        /// returns the encrypted blob with the initialization vector.
+        /// </summary>
+        internal static async Task<EncryptionResult> EncryptAsync(
+            SecureString input,
+            byte[] key,
+            byte[]? iv = null,
+            CancellationToken cancellationToken = default) {
+            using Aes aes = Aes.Create();
+            iv ??= aes.IV;
+
+            byte[] data = GetData(input);
+            try {
+                using ICryptoTransform encryptor = aes.CreateEncryptor(key, iv);
+#if NETFRAMEWORK || NETSTANDARD2_0
+                using var sourceStream = new MemoryStream(data);
+                using var encryptedStream = new MemoryStream();
+                using var cryptoStream = new CryptoStream(encryptedStream, encryptor, CryptoStreamMode.Write);
+                await sourceStream.CopyToAsync(cryptoStream, 81920, cancellationToken).ConfigureAwait(false);
+                cryptoStream.FlushFinalBlock();
+#else
+                await using var sourceStream = new MemoryStream(data);
+                await using var encryptedStream = new MemoryStream();
+                await using var cryptoStream = new CryptoStream(encryptedStream, encryptor, CryptoStreamMode.Write);
+                await sourceStream.CopyToAsync(cryptoStream, cancellationToken).ConfigureAwait(false);
+                await cryptoStream.FlushAsync(cancellationToken).ConfigureAwait(false);
+                cryptoStream.FlushFinalBlock();
+#endif
+                byte[] encryptedData = encryptedStream.ToArray();
+                return new EncryptionResult(ByteArrayToString(encryptedData), Convert.ToBase64String(iv));
+            } finally {
+                Array.Clear(data, 0, data.Length);
+            }
+        }
+
+        internal static async Task<EncryptionResult> EncryptAsync(
+            SecureString input,
+            SecureString key,
+            CancellationToken cancellationToken = default) {
+            byte[] keyBlob = GetData(key);
+            try {
+                return await EncryptAsync(input, keyBlob, null, cancellationToken).ConfigureAwait(false);
+            } finally {
+                Array.Clear(keyBlob, 0, keyBlob.Length);
+            }
+        }
+
+        /// <summary>
         /// Decrypts the specified string using the specified key
         /// and return equivalent SecureString.
         ///
@@ -315,6 +365,48 @@ namespace Mailozaurr {
                         Array.Clear(decryptedData, 0, decryptedData.Length);
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Asynchronously decrypts the specified string using the provided key.
+        /// </summary>
+        internal static async Task<SecureString> DecryptAsync(
+            string input,
+            byte[] key,
+            byte[] iv,
+            CancellationToken cancellationToken = default) {
+            using var aes = Aes.Create();
+            using ICryptoTransform decryptor = aes.CreateDecryptor(key, iv ?? aes.IV);
+#if NETFRAMEWORK || NETSTANDARD2_0
+            using var encryptedStream = new MemoryStream(ByteArrayFromString(input));
+            using var targetStream = new MemoryStream();
+            using var sourceStream = new CryptoStream(encryptedStream, decryptor, CryptoStreamMode.Read);
+            await sourceStream.CopyToAsync(targetStream, 81920, cancellationToken).ConfigureAwait(false);
+#else
+            await using var encryptedStream = new MemoryStream(ByteArrayFromString(input));
+            await using var targetStream = new MemoryStream();
+            await using var sourceStream = new CryptoStream(encryptedStream, decryptor, CryptoStreamMode.Read);
+            await sourceStream.CopyToAsync(targetStream, cancellationToken).ConfigureAwait(false);
+#endif
+            byte[] decryptedData = targetStream.ToArray();
+            try {
+                return New(decryptedData);
+            } finally {
+                Array.Clear(decryptedData, 0, decryptedData.Length);
+            }
+        }
+
+        internal static async Task<SecureString> DecryptAsync(
+            string input,
+            SecureString key,
+            byte[] iv,
+            CancellationToken cancellationToken = default) {
+            byte[] keyBlob = GetData(key);
+            try {
+                return await DecryptAsync(input, keyBlob, iv, cancellationToken).ConfigureAwait(false);
+            } finally {
+                Array.Clear(keyBlob, 0, keyBlob.Length);
             }
         }
 
