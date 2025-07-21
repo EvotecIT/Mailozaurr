@@ -140,36 +140,26 @@ public static class MailboxSearcher {
         foreach (var token in SplitTokens(query)) {
             var parts = token.Split(new[] { ':' }, 2);
             if (parts.Length == 2) {
-                var key = parts[0].ToLowerInvariant();
+                var key = parts[0];
                 var value = Unquote(parts[1]);
-                switch (key) {
-                    case "from":
-                        result.FromContains = value;
-                        break;
-                    case "to":
-                        result.ToContains = value;
-                        break;
-                    case "subject":
-                        result.Subject = value;
-                        break;
-                    case "since":
-                        if (DateTime.TryParse(value, out var sd)) result.Since = sd;
-                        break;
-                    case "before":
-                        if (DateTime.TryParse(value, out var bd)) result.Before = bd;
-                        break;
-                    case "priority":
-                        if (Enum.TryParse(value, true, out MessagePriority pr)) result.Priority = pr;
-                        break;
-                    case "has":
-                        if (value.Equals("attachment", StringComparison.OrdinalIgnoreCase) || value.Equals("attachments", StringComparison.OrdinalIgnoreCase)) result.HasAttachment = true;
-                        break;
-                    case "body":
-                        result.AdditionalQueries.Add(SearchQuery.BodyContains(value));
-                        break;
-                    default:
-                        result.AdditionalQueries.Add(SearchQuery.MessageContains(token));
-                        break;
+                if (string.Equals(key, "from", StringComparison.OrdinalIgnoreCase)) {
+                    result.FromContains = value;
+                } else if (string.Equals(key, "to", StringComparison.OrdinalIgnoreCase)) {
+                    result.ToContains = value;
+                } else if (string.Equals(key, "subject", StringComparison.OrdinalIgnoreCase)) {
+                    result.Subject = value;
+                } else if (string.Equals(key, "since", StringComparison.OrdinalIgnoreCase)) {
+                    if (DateTime.TryParse(value, out var sd)) result.Since = sd;
+                } else if (string.Equals(key, "before", StringComparison.OrdinalIgnoreCase)) {
+                    if (DateTime.TryParse(value, out var bd)) result.Before = bd;
+                } else if (string.Equals(key, "priority", StringComparison.OrdinalIgnoreCase)) {
+                    if (Enum.TryParse(value, true, out MessagePriority pr)) result.Priority = pr;
+                } else if (string.Equals(key, "has", StringComparison.OrdinalIgnoreCase)) {
+                    if (value.Equals("attachment", StringComparison.OrdinalIgnoreCase) || value.Equals("attachments", StringComparison.OrdinalIgnoreCase)) result.HasAttachment = true;
+                } else if (string.Equals(key, "body", StringComparison.OrdinalIgnoreCase)) {
+                    result.AdditionalQueries.Add(SearchQuery.BodyContains(value));
+                } else {
+                    result.AdditionalQueries.Add(SearchQuery.MessageContains(token));
                 }
             } else {
                 var text = Unquote(token);
