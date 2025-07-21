@@ -1,6 +1,9 @@
 using System;
 using System.IO;
 using System.Reflection;
+#if NET5_0_OR_GREATER
+using System.Runtime.Loader;
+#endif
 
 /// <summary>
 /// OnModuleImportAndRemove is a class that implements the IModuleAssemblyInitializer and IModuleAssemblyCleanup interfaces.
@@ -14,6 +17,11 @@ public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemb
         if (IsNetFramework()) {
             AppDomain.CurrentDomain.AssemblyResolve += MyResolveEventHandler;
         }
+#if NET5_0_OR_GREATER
+        else {
+            AssemblyLoadContext.Default.Resolving += ResolveAlc;
+        }
+#endif
     }
 
     /// <summary>
@@ -24,6 +32,11 @@ public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemb
         if (IsNetFramework()) {
             AppDomain.CurrentDomain.AssemblyResolve -= MyResolveEventHandler;
         }
+#if NET5_0_OR_GREATER
+        else {
+            AssemblyLoadContext.Default.Resolving -= ResolveAlc;
+        }
+#endif
     }
 
     /// <summary>
@@ -32,7 +45,7 @@ public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemb
     /// <param name="sender"></param>
     /// <param name="args"></param>
     /// <returns></returns>
-    private static Assembly MyResolveEventHandler(object sender, ResolveEventArgs args) {
+    private static Assembly? MyResolveEventHandler(object? sender, ResolveEventArgs args) {
         var libDirectory = Path.GetDirectoryName(typeof(OnModuleImportAndRemove).Assembly.Location);
         var directoriesToSearch = new List<string> { libDirectory };
 
@@ -56,6 +69,47 @@ public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemb
 
         return null;
     }
+
+#if NET5_0_OR_GREATER
+    private sealed class LoadContext : AssemblyLoadContext {
+        private readonly string _assemblyDir;
+
+        public LoadContext(string assemblyDir)
+            : base(name: "Mailozaurr", isCollectible: false) {
+            _assemblyDir = assemblyDir;
+        }
+
+        protected override Assembly? Load(AssemblyName assemblyName) {
+            string asmPath = Path.Combine(_assemblyDir, $"{assemblyName.Name}.dll");
+            return File.Exists(asmPath) ? LoadFromAssemblyPath(asmPath) : null;
+        }
+    }
+
+    private static readonly string _assemblyDir =
+        Path.GetDirectoryName(typeof(OnModuleImportAndRemove).Assembly.Location)!;
+
+    private static readonly LoadContext _alc = new LoadContext(_assemblyDir);
+
+    private static Assembly? ResolveAlc(AssemblyLoadContext defaultAlc, AssemblyName assemblyToResolve) {
+        string asmPath = Path.Combine(_assemblyDir, $"{assemblyToResolve.Name}.dll");
+        if (IsSatisfyingAssembly(assemblyToResolve, asmPath)) {
+            return _alc.LoadFromAssemblyName(assemblyToResolve);
+        }
+
+        return null;
+    }
+
+    private static bool IsSatisfyingAssembly(AssemblyName requiredAssemblyName, string assemblyPath) {
+        if (requiredAssemblyName.Name == "Mailozaurr.PowerShell" || !File.Exists(assemblyPath)) {
+            return false;
+        }
+
+        AssemblyName asmToLoadName = AssemblyName.GetAssemblyName(assemblyPath);
+
+        return string.Equals(asmToLoadName.Name, requiredAssemblyName.Name, StringComparison.OrdinalIgnoreCase)
+            && asmToLoadName.Version >= requiredAssemblyName.Version;
+    }
+#endif
 
     /// <summary>
     /// Determine if the current runtime is .NET Framework
