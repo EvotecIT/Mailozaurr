@@ -64,19 +64,29 @@ public sealed class GmailApiClient {
     /// Lists messages matching the supplied query.
     /// </summary>
     public async Task<IList<GmailMessage>> ListAsync(string userId, string? query = null, int? maxResults = null, CancellationToken cancellationToken = default) {
-        var url = new StringBuilder($"users/{userId}/messages");
-        var qs = new List<string>();
-        if (!string.IsNullOrWhiteSpace(query)) qs.Add($"q={Uri.EscapeDataString(query)}");
-        if (maxResults.HasValue) qs.Add($"maxResults={maxResults.Value}");
-        if (qs.Count > 0) {
-            url.Append('?').Append(string.Join("&", qs));
-        }
-        using var response = await _client.GetAsync(url.ToString(), cancellationToken);
-        await ThrowIfAuthErrorAsync(response);
-        response.EnsureSuccessStatusCode();
-        var json = await response.Content.ReadAsStringAsync();
-        var list = JsonSerializer.Deserialize<GmailListResponse>(json, s_jsonOptions);
-        return list?.Messages ?? new List<GmailMessage>();
+        var messages = new List<GmailMessage>();
+        string? pageToken = null;
+        do {
+            var url = new StringBuilder($"users/{userId}/messages");
+            var qs = new List<string>();
+            if (!string.IsNullOrWhiteSpace(query)) qs.Add($"q={Uri.EscapeDataString(query)}");
+            if (maxResults.HasValue) qs.Add($"maxResults={maxResults.Value}");
+            if (!string.IsNullOrEmpty(pageToken)) qs.Add($"pageToken={pageToken}");
+            if (qs.Count > 0) {
+                url.Append('?').Append(string.Join("&", qs));
+            }
+            using var response = await _client.GetAsync(url.ToString(), cancellationToken);
+            await ThrowIfAuthErrorAsync(response);
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            var list = JsonSerializer.Deserialize<GmailListResponse>(json, s_jsonOptions);
+            if (list?.Messages != null) {
+                messages.AddRange(list.Messages);
+            }
+            pageToken = list?.NextPageToken;
+        } while (!string.IsNullOrEmpty(pageToken));
+
+        return messages;
     }
 
     /// <summary>
@@ -153,5 +163,7 @@ public sealed class GmailApiClient {
     private sealed class GmailListResponse {
         /// <summary>Messages returned by the API.</summary>
         public List<GmailMessage>? Messages { get; set; }
+        /// <summary>Token for the next page of results.</summary>
+        public string? NextPageToken { get; set; }
     }
 }
