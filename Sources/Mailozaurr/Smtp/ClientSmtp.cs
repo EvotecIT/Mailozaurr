@@ -63,11 +63,15 @@ public partial class ClientSmtp : SmtpClient {
     }
 
     /// <summary>Initializes a new instance of the <see cref="ClientSmtp"/> class.</summary>
-    public ClientSmtp() { }
+    public ClientSmtp() {
+        Priority = MessagePriority.Normal;
+    }
 
     /// <summary>Initializes a new instance of the <see cref="ClientSmtp"/> class using the specified logger.</summary>
     /// <param name="protocolLogger">The protocol logger.</param>
-    public ClientSmtp(ProtocolLogger protocolLogger) : base(protocolLogger) { }
+    public ClientSmtp(ProtocolLogger protocolLogger) : base(protocolLogger) {
+        Priority = MessagePriority.Normal;
+    }
 
     /// <summary>
     /// Determines which delivery status notifications should be requested for the specified recipient.
