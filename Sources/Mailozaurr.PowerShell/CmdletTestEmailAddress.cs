@@ -47,6 +47,7 @@ public sealed class CmdletTestEmailAddress : AsyncPSCmdlet {
     public SwitchParameter AllowTopLevelDomains { get; set; }
 
     private InternalLogger _logger;
+    private InternalLoggerPowerShell? _listener;
 
     /// <summary>
     /// Initializes the logger for verbose, warning, debug, error, progress, and information messages.
@@ -54,7 +55,7 @@ public sealed class CmdletTestEmailAddress : AsyncPSCmdlet {
     protected override Task BeginProcessingAsync() {
         // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
         _logger = new InternalLogger(false);
-        var internalLoggerPowerShell = new InternalLoggerPowerShell(_logger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
+        _listener = new InternalLoggerPowerShell(_logger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
         return Task.CompletedTask;
     }
 
@@ -66,5 +67,11 @@ public sealed class CmdletTestEmailAddress : AsyncPSCmdlet {
             _logger.WriteVerbose("Processing email: {0}", email);
             WriteObject(Validator.ValidateEmail(email, AllowInternational, AllowTopLevelDomains));
         }
+    }
+
+    protected override Task EndProcessingAsync() {
+        _listener?.Dispose();
+        _listener = null;
+        return Task.CompletedTask;
     }
 }
