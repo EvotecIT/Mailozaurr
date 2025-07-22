@@ -365,7 +365,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             return;
         }
 
-        var status = smtpClient.Connect(Server, Port, SecureSocketOptions, UseSsl);
+        var useSslFlag = UseSsl.IsPresent && !this.MyInvocation.BoundParameters.ContainsKey(nameof(SecureSocketOptions));
+        var status = smtpClient.Connect(Server, Port, SecureSocketOptions, useSslFlag);
         if (!status.Status) {
             if (!Suppress) {
                 WriteObject(status);
