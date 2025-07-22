@@ -33,10 +33,14 @@ public sealed class GmailApiClient {
         _client = client;
     }
 
-    private static async Task ThrowIfAuthErrorAsync(HttpResponseMessage response) {
+    private static async Task ThrowIfAuthErrorAsync(HttpResponseMessage response, CancellationToken cancellationToken) {
         if (response.StatusCode == HttpStatusCode.Unauthorized ||
             response.StatusCode == HttpStatusCode.Forbidden) {
+#if NET5_0_OR_GREATER
+            string content = await response.Content.ReadAsStringAsync(cancellationToken);
+#else
             string content = await response.Content.ReadAsStringAsync();
+#endif
             throw new GmailAuthenticationException(response.StatusCode, content);
         }
     }
@@ -54,9 +58,13 @@ public sealed class GmailApiClient {
         var json = JsonSerializer.Serialize(new { raw }, s_jsonOptions);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
         using var response = await _client.PostAsync($"users/{userId}/messages/send", content, cancellationToken);
-        await ThrowIfAuthErrorAsync(response);
+        await ThrowIfAuthErrorAsync(response, cancellationToken);
         response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+        var resultJson = await response.Content.ReadAsStringAsync(cancellationToken);
+#else
         var resultJson = await response.Content.ReadAsStringAsync();
+#endif
         return JsonSerializer.Deserialize<GmailMessage>(resultJson, s_jsonOptions)!;
     }
 
@@ -76,9 +84,13 @@ public sealed class GmailApiClient {
                 url.Append('?').Append(string.Join("&", qs));
             }
             using var response = await _client.GetAsync(url.ToString(), cancellationToken);
-            await ThrowIfAuthErrorAsync(response);
+            await ThrowIfAuthErrorAsync(response, cancellationToken);
             response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+#else
             var json = await response.Content.ReadAsStringAsync();
+#endif
             var list = JsonSerializer.Deserialize<GmailListResponse>(json, s_jsonOptions);
             if (list?.Messages != null) {
                 messages.AddRange(list.Messages);
@@ -94,9 +106,13 @@ public sealed class GmailApiClient {
     /// </summary>
     public async Task<GmailMessage> GetAsync(string userId, string id, CancellationToken cancellationToken = default) {
         using var response = await _client.GetAsync($"users/{userId}/messages/{id}", cancellationToken);
-        await ThrowIfAuthErrorAsync(response);
+        await ThrowIfAuthErrorAsync(response, cancellationToken);
         response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+#else
         var json = await response.Content.ReadAsStringAsync();
+#endif
         return JsonSerializer.Deserialize<GmailMessage>(json, s_jsonOptions)!;
     }
 
@@ -105,7 +121,7 @@ public sealed class GmailApiClient {
     /// </summary>
     public async Task DeleteAsync(string userId, string id, CancellationToken cancellationToken = default) {
         using var response = await _client.DeleteAsync($"users/{userId}/messages/{id}", cancellationToken);
-        await ThrowIfAuthErrorAsync(response);
+        await ThrowIfAuthErrorAsync(response, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 
@@ -114,9 +130,13 @@ public sealed class GmailApiClient {
     /// </summary>
     public async Task<IList<GmailAttachmentInfo>> ListAttachmentsAsync(string userId, string id, CancellationToken cancellationToken = default) {
         using var response = await _client.GetAsync($"users/{userId}/messages/{id}?format=full", cancellationToken);
-        await ThrowIfAuthErrorAsync(response);
+        await ThrowIfAuthErrorAsync(response, cancellationToken);
         response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+#else
         using var stream = await response.Content.ReadAsStreamAsync();
+#endif
         using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
         var list = new List<GmailAttachmentInfo>();
         if (doc.RootElement.TryGetProperty("payload", out var payload)) {
@@ -130,9 +150,13 @@ public sealed class GmailApiClient {
     /// </summary>
     public async Task<byte[]> DownloadAttachmentAsync(string userId, string messageId, string attachmentId, CancellationToken cancellationToken = default) {
         using var response = await _client.GetAsync($"users/{userId}/messages/{messageId}/attachments/{attachmentId}", cancellationToken);
-        await ThrowIfAuthErrorAsync(response);
+        await ThrowIfAuthErrorAsync(response, cancellationToken);
         response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+#else
         var json = await response.Content.ReadAsStringAsync();
+#endif
         var result = JsonSerializer.Deserialize<AttachmentResponse>(json, s_jsonOptions)!;
         var data = result.Data?.Replace('-', '+').Replace('_', '/') ?? string.Empty;
         int padding = (4 - data.Length % 4) % 4;
