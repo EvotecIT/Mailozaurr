@@ -13,6 +13,8 @@ namespace Mailozaurr;
 /// </remarks>
 public class Graph : IDisposable {
     private readonly HttpClient _client;
+    public const int MaxChunkSize = 4 * 1024 * 1024;
+    private int _chunkSize = MaxChunkSize;
     /// <summary>
     /// Serialized JSON representation of the current Graph message.
     /// </summary>
@@ -164,9 +166,12 @@ public class Graph : IDisposable {
 
     /// <summary>
     /// Size in bytes of the chunks used when uploading attachments. Defaults to
-    /// 9MB.
+    /// <see cref="MaxChunkSize"/> and cannot exceed this value.
     /// </summary>
-    public int ChunkSize { get; set; } = 9000000;
+    public int ChunkSize {
+        get => _chunkSize;
+        set => _chunkSize = value > MaxChunkSize ? MaxChunkSize : value;
+    }
 
     /// <summary>
     /// The type of token that was issued.
@@ -773,12 +778,13 @@ public class Graph : IDisposable {
     }
 
     /// <summary>
-    /// 9000000 = 9MB
+    /// Splits <paramref name="filePath"/> into chunks no larger than <see cref="MaxChunkSize"/>.
     /// </summary>
     /// <param name="filePath"></param>
     /// <param name="chunkSize"></param>
     /// <returns></returns>
-    private List<StreamContent> PrepareByteArrayContentForUpload(string filePath, int chunkSize = 9000000, CancellationToken cancellationToken = default) {
+    private List<StreamContent> PrepareByteArrayContentForUpload(string filePath, int chunkSize = MaxChunkSize, CancellationToken cancellationToken = default) {
+        chunkSize = Math.Min(chunkSize, MaxChunkSize);
         var fileContents = new List<StreamContent>();
         var fileSize = new FileInfo(filePath).Length;
 
