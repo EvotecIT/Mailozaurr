@@ -52,4 +52,23 @@ public class GmailApiClientTests {
         await Assert.ThrowsAsync<GmailAuthenticationException>(() => client.SendAsync("me", message));
         Assert.Single(handler.Requests);
     }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ListAsync_PaginatesUntilTokenNull() {
+        var page1 = "{\"messages\":[{\"id\":\"1\"}],\"nextPageToken\":\"tok\"}";
+        var page2 = "{\"messages\":[{\"id\":\"2\"}]}";
+        var handler = new RecordingHandler(
+            new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(page1) },
+            new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(page2) });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+        var list = await client.ListAsync("me");
+        Assert.Equal(2, list.Count);
+        Assert.Equal("1", list[0].Id);
+        Assert.Equal("2", list[1].Id);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Equal(string.Empty, handler.Requests[0].RequestUri!.Query);
+        Assert.Equal("?pageToken=tok", handler.Requests[1].RequestUri!.Query);
+    }
 }
