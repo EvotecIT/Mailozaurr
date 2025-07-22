@@ -1,26 +1,23 @@
-using System.Threading;
 using MailKit.Security;
+using System.Threading;
 using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class SmtpConnectionPoolTests
-{
-    private class FakeClient : ClientSmtp
-    {
+public class SmtpConnectionPoolTests {
+    private class FakeClient : ClientSmtp {
         public int ConnectCalls;
         private bool _connected;
         public override bool IsConnected => _connected;
-        public override void Connect(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default)
-        {
+        public void SetConnected(bool value) => _connected = value;
+        public override void Connect(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default) {
             ConnectCalls++;
             _connected = true;
         }
     }
 
     [Fact]
-    public void Disconnect_ReturnsClientToPool()
-    {
+    public void Disconnect_ReturnsClientToPool() {
         SmtpConnectionPool.PoolingEnabled = true;
         SmtpConnectionPool.ClearConnectionPool();
         var fake = new FakeClient();
@@ -38,6 +35,22 @@ public class SmtpConnectionPoolTests
         Assert.Equal(1, fake.ConnectCalls);
 
         Smtp.ClientFactory = logger => new ClientSmtp();
+        SmtpConnectionPool.ClearConnectionPool();
+        SmtpConnectionPool.PoolingEnabled = false;
+    }
+
+    [Fact]
+    public void ReturnClosedClient_IsDiscarded() {
+        SmtpConnectionPool.PoolingEnabled = true;
+        SmtpConnectionPool.ClearConnectionPool();
+
+        var fake = new FakeClient();
+        fake.SetConnected(false);
+        SmtpConnectionPool.ReturnClient("h", 25, fake);
+
+        var pooled = SmtpConnectionPool.TryRentClient("h", 25);
+        Assert.Null(pooled);
+
         SmtpConnectionPool.ClearConnectionPool();
         SmtpConnectionPool.PoolingEnabled = false;
     }
