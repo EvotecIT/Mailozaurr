@@ -341,11 +341,12 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
 
 
     /// <summary>
-    /// <para>Specifies chunk size in bytes used for Graph attachment uploads. Default is 9MB.</para>
+    /// <para>Specifies chunk size in bytes used for Graph attachment uploads. Default is 4MB.</para>
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "Graph")]
     [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
-    public int ChunkSize { get; set; } = 9000000;
+    [ValidateRange(1, Mailozaurr.Graph.MaxChunkSize)]
+    public int ChunkSize { get; set; } = Mailozaurr.Graph.MaxChunkSize;
 
     /// <summary>
     /// <para>Enables sending email via OAuth2 authentication for SMTP.</para>
