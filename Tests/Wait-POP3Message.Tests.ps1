@@ -17,4 +17,10 @@ Describe 'Wait-POP3Message' {
         $field = $cmd.GetType().BaseType.GetField('_cancelSource', [System.Reflection.BindingFlags] 'NonPublic, Instance')
         ($field.GetValue($cmd)).IsCancellationRequested | Should -Be $true
     }
+
+    It 'Dispose can be called multiple times' {
+        $cmd = [Mailozaurr.PowerShell.CmdletWaitPOP3Message]::new()
+        $cmd.Dispose()
+        { $cmd.Dispose() } | Should -Not -Throw
+    }
 }
