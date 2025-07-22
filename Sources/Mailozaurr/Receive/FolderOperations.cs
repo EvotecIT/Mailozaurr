@@ -34,6 +34,10 @@ public static class FolderOperations {
             destParent = client.GetCachedFolder(destinationFolder, FolderAccess.ReadWrite);
         }
         await source.RenameAsync(destParent, source.Name, cancellationToken).ConfigureAwait(false);
+        if (source.IsOpen)
+            await source.CloseAsync(false, cancellationToken).ConfigureAwait(false);
+        if (destParent.IsOpen)
+            await destParent.CloseAsync(false, cancellationToken).ConfigureAwait(false);
         client.ClearFolderCache();
     }
 
