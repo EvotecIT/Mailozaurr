@@ -95,6 +95,14 @@ public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
     public SecureSocketOptions Options { get; set; } = SecureSocketOptions.Auto;
 
     /// <summary>
+    /// <para type="description">When <see cref="Options"/> remains <c>Auto</c>, this switch forces the use of <c>StartTls</c>.</para>
+    /// </summary>
+    [Parameter(ParameterSetName = "OAuth2")]
+    [Parameter(ParameterSetName = "Credential")]
+    [Parameter(ParameterSetName = "ClearText")]
+    public SwitchParameter EnableExplicit { get; set; }
+
+    /// <summary>
     /// <para type="description">Specifies the connection timeout in milliseconds. Default is 120000 (2 minutes).</para>
     /// </summary>
     [Parameter(ParameterSetName = "OAuth2")]
@@ -157,11 +165,15 @@ public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
         }
 
         Pop3Client client;
+        var opts = Options;
+        if (EnableExplicit.IsPresent && opts == SecureSocketOptions.Auto) {
+            opts = SecureSocketOptions.StartTls;
+        }
         try {
             client = await Pop3Connector.ConnectAsync(
                 Server,
                 Port,
-                Options,
+                opts,
                 TimeOut,
                 SkipCertificateRevocation.IsPresent,
                 SkipCertificateValidation.IsPresent,
