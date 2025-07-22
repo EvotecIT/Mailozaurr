@@ -105,7 +105,10 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
 
     /// <inheritdoc />
     protected override Task EndProcessingAsync() {
-        _listener?.Dispose();
+        if (_listener != null) {
+            _listener.MessageArrived -= OnMessageArrived;
+            _listener.Dispose();
+        }
         _timeoutSource?.Dispose();
         _linkedSource?.Dispose();
         return Task.CompletedTask;
@@ -113,7 +116,10 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
 
     /// <inheritdoc />
     public void Dispose() {
-        _listener?.Dispose();
+        if (_listener != null) {
+            _listener.MessageArrived -= OnMessageArrived;
+            _listener.Dispose();
+        }
         _timeoutSource?.Dispose();
         _linkedSource?.Dispose();
     }

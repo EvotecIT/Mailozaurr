@@ -2,7 +2,7 @@
 /// <summary>
 /// This class allow connecting to the InternalLogger class of ADPlayground and act on events from it in different streams
 /// </summary>
-public class InternalLoggerPowerShell {
+public class InternalLoggerPowerShell : IDisposable {
     private readonly InternalLogger _logger;
     private readonly Action<string> _writeVerboseAction;
     private readonly Action<string> _writeDebugAction;
@@ -154,5 +154,27 @@ public class InternalLoggerPowerShell {
     private void WriteProgress(ProgressRecord progressRecord) {
         // Write to PowerShell progress stream
         _writeProgressAction?.Invoke(progressRecord);
+    }
+
+    /// <inheritdoc />
+    public void Dispose() {
+        if (_writeVerboseAction != null) {
+            _logger.OnVerboseMessage -= Logger_OnVerboseMessage;
+        }
+        if (_writeWarningAction != null) {
+            _logger.OnWarningMessage -= Logger_OnWarningMessage;
+        }
+        if (_writeDebugAction != null) {
+            _logger.OnDebugMessage -= Logger_OnDebugMessage;
+        }
+        if (_writeErrorAction != null) {
+            _logger.OnErrorMessage -= Logger_OnErrorMessage;
+        }
+        if (_writeProgressAction != null) {
+            _logger.OnProgressMessage -= Logger_OnProgressMessage;
+        }
+        if (_writeInformationAction != null) {
+            _logger.OnInformationMessage -= Logger_OnInformationMessage;
+        }
     }
 }
