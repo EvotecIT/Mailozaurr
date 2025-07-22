@@ -82,7 +82,7 @@ public sealed class CmdletClearIMAPJunk : AsyncPSCmdlet {
                     SkipTo,
                     SkipSubjectContains,
                     SkipMessageId,
-                    SkipUid?.Select(id => new UniqueId(id)),
+                    SkipUid,
                     SkipHasAttachment.IsPresent,
                     SkipAttachmentExtension,
                     CancelToken)) {
@@ -98,7 +98,7 @@ public sealed class CmdletClearIMAPJunk : AsyncPSCmdlet {
                 SkipTo,
                 SkipSubjectContains,
                 SkipMessageId,
-                SkipUid?.Select(id => new UniqueId(id)),
+                SkipUid,
                 SkipHasAttachment.IsPresent,
                 SkipAttachmentExtension,
                 CancelToken);
