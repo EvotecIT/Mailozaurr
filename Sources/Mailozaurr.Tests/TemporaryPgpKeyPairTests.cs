@@ -1,4 +1,5 @@
 using Mailozaurr;
+using System.IO;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -43,5 +44,26 @@ public class TemporaryPgpKeyPairTests
         smtp.Message.WriteTo(path);
         string decrypted = keys.DecryptToString(path);
         Assert.Contains("secret", decrypted);
+        File.Delete(path);
+    }
+
+    [Fact]
+    public void Dispose_RemovesGeneratedFiles()
+    {
+        string pub;
+        string priv;
+        string dir;
+        using (var keys = TemporaryPgpKeyPair.Create("a@b.com"))
+        {
+            pub = keys.PublicKeyPath;
+            priv = keys.PrivateKeyPath;
+            dir = Path.GetDirectoryName(pub)!;
+            Assert.True(File.Exists(pub));
+            Assert.True(File.Exists(priv));
+        }
+
+        Assert.False(File.Exists(pub));
+        Assert.False(File.Exists(priv));
+        Assert.False(Directory.Exists(dir));
     }
 }
