@@ -7,4 +7,8 @@ Describe 'Get-IMAPMessage' {
         $info = [Mailozaurr.PowerShell.ImapConnectionInfo]::new()
         { Get-IMAPMessage -Client $info -Delete } | Should -Throw
     }
+    It 'Throws when mixing UID and sequence parameters' {
+        $info = [Mailozaurr.PowerShell.ImapConnectionInfo]::new()
+        { Get-IMAPMessage -Client $info -SequenceStart 1 -UidStart 1 } | Should -Throw
+    }
 }

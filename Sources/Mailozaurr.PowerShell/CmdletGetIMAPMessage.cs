@@ -25,9 +25,16 @@ namespace Mailozaurr.PowerShell;
 /// <seealso cref="CmdletConnectIMAP"/>
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
-[Cmdlet(VerbsCommon.Get, "IMAPMessage", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
+[Cmdlet(
+    VerbsCommon.Get,
+    "IMAPMessage",
+    DefaultParameterSetName = SequenceParameterSet,
+    SupportsShouldProcess = true,
+    ConfirmImpact = ConfirmImpact.High)]
 [OutputType(typeof(ImapMessageInfo))]
 public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
+    private const string SequenceParameterSet = "Sequence";
+    private const string UidParameterSet = "Uid";
     /// <summary>
     /// <para type="description">The <see cref="ImapConnectionInfo"/> object representing the active IMAP connection. This is the object returned by <c>Connect-IMAP</c>.</para>
     /// </summary>
@@ -44,25 +51,25 @@ public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Specifies the starting sequence number of messages to retrieve.</para>
     /// </summary>
-    [Parameter(Position = 2)]
+    [Parameter(Position = 2, ParameterSetName = SequenceParameterSet)]
     public int? SequenceStart { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the ending sequence number of messages to retrieve. If not provided, only <c>SequenceStart</c> is fetched.</para>
     /// </summary>
-    [Parameter(Position = 3)]
+    [Parameter(Position = 3, ParameterSetName = SequenceParameterSet)]
     public int? SequenceEnd { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the starting UID of messages to retrieve.</para>
     /// </summary>
-    [Parameter(Position = 2)]
+    [Parameter(Position = 2, ParameterSetName = UidParameterSet)]
     public uint? UidStart { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the ending UID of messages to retrieve. If not provided, only <c>UidStart</c> is fetched.</para>
     /// </summary>
-    [Parameter(Position = 3)]
+    [Parameter(Position = 3, ParameterSetName = UidParameterSet)]
     public uint? UidEnd { get; set; }
 
     /// <summary>
