@@ -25,7 +25,7 @@ public static class JunkCleaner {
         IEnumerable<string>? skipTo = null,
         IEnumerable<string>? skipSubjectContains = null,
         IEnumerable<string>? skipMessageId = null,
-        IEnumerable<UniqueId>? skipUid = null,
+        IEnumerable<uint>? skipUid = null,
         bool skipHasAttachment = false,
         IEnumerable<string>? skipAttachmentExtension = null,
         CancellationToken cancellationToken = default) {
@@ -35,10 +35,10 @@ public static class JunkCleaner {
             return;
         }
 
-        var skipUidSet = skipUid != null ? new HashSet<UniqueId>(skipUid) : null;
+        var skipUidSet = skipUid != null ? new HashSet<uint>(skipUid) : null;
         var toDelete = new List<UniqueId>(uids.Count);
         foreach (var uid in uids) {
-            if (skipUidSet != null && skipUidSet.Contains(uid)) continue;
+            if (skipUidSet != null && skipUidSet.Contains(uid.Id)) continue;
             var message = await junk.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
             if (skipMessageId != null && message.MessageId != null && skipMessageId.Contains(message.MessageId)) continue;
             if (skipFrom != null && message.From.Mailboxes.Any(m => skipFrom.Contains(m.Address, StringComparer.OrdinalIgnoreCase))) continue;
@@ -73,15 +73,15 @@ public static class JunkCleaner {
         IEnumerable<string>? skipTo = null,
         IEnumerable<string>? skipSubjectContains = null,
         IEnumerable<string>? skipMessageId = null,
-        IEnumerable<UniqueId>? skipUid = null,
+        IEnumerable<uint>? skipUid = null,
         bool skipHasAttachment = false,
         IEnumerable<string>? skipAttachmentExtension = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default) {
         var junk = client.GetCachedFolder(folder ?? "Junk", FolderAccess.ReadOnly);
         var uids = await junk.SearchAsync(SearchQuery.All, cancellationToken).ConfigureAwait(false);
-        var skipUidSet = skipUid != null ? new HashSet<UniqueId>(skipUid) : null;
+        var skipUidSet = skipUid != null ? new HashSet<uint>(skipUid) : null;
         foreach (var uid in uids) {
-            if (skipUidSet != null && skipUidSet.Contains(uid)) continue;
+            if (skipUidSet != null && skipUidSet.Contains(uid.Id)) continue;
             var message = await junk.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
             if (skipMessageId != null && message.MessageId != null && skipMessageId.Contains(message.MessageId)) continue;
             if (skipFrom != null && message.From.Mailboxes.Any(m => skipFrom.Contains(m.Address, StringComparer.OrdinalIgnoreCase))) continue;
