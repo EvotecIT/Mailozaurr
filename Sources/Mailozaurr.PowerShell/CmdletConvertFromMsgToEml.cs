@@ -14,6 +14,8 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsData.ConvertFrom, "MsgToEml")]
 public sealed class CmdletConvertFromMsgToEml : AsyncPSCmdlet {
+    private InternalLogger? _logger;
+    private InternalLoggerPowerShell? _listener;
     /// <summary>
     /// <para type="description">Paths to the MSG files to convert.</para>
     /// </summary>
@@ -39,9 +41,9 @@ public sealed class CmdletConvertFromMsgToEml : AsyncPSCmdlet {
     /// Initializes logging for the conversion process.
     /// </summary>
     protected override Task BeginProcessingAsync() {
-        var internalLogger = new InternalLogger();
-        var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
-        LoggingMessages.Logger = internalLogger;
+        _logger = new InternalLogger();
+        _listener = new InternalLoggerPowerShell(_logger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
+        LoggingMessages.Logger = _logger;
         return Task.CompletedTask;
     }
 
@@ -53,6 +55,12 @@ public sealed class CmdletConvertFromMsgToEml : AsyncPSCmdlet {
         foreach (var obj in outputMessage) {
             WriteObject(obj);
         }
+        return Task.CompletedTask;
+    }
+
+    protected override Task EndProcessingAsync() {
+        _listener?.Dispose();
+        _listener = null;
         return Task.CompletedTask;
     }
 }

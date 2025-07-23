@@ -18,6 +18,8 @@
 /// </summary>
 [Cmdlet(VerbsData.ConvertFrom, "EmlToMsg")]
 public sealed class CmdletConvertFromEmlToMsg : AsyncPSCmdlet {
+    private InternalLogger? _logger;
+    private InternalLoggerPowerShell? _listener;
 
     /// <summary>
     /// <para type="description">Specifies the paths to the EML files to convert. Accepts an array of strings. This parameter is mandatory.</para>
@@ -45,9 +47,9 @@ public sealed class CmdletConvertFromEmlToMsg : AsyncPSCmdlet {
     /// </summary>
     protected override Task BeginProcessingAsync() {
         // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
-        var internalLogger = new InternalLogger();
-        var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
-        LoggingMessages.Logger = internalLogger;
+        _logger = new InternalLogger();
+        _listener = new InternalLoggerPowerShell(_logger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
+        LoggingMessages.Logger = _logger;
         return Task.CompletedTask;
     }
     /// <summary>
@@ -58,6 +60,12 @@ public sealed class CmdletConvertFromEmlToMsg : AsyncPSCmdlet {
         foreach (var obj in outputMessage) {
             WriteObject(obj);
         }
+        return Task.CompletedTask;
+    }
+
+    protected override Task EndProcessingAsync() {
+        _listener?.Dispose();
+        _listener = null;
         return Task.CompletedTask;
     }
 }

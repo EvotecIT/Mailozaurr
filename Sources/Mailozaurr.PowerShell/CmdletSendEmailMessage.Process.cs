@@ -9,15 +9,17 @@ namespace Mailozaurr.PowerShell;
 public sealed partial class CmdletSendEmailMessage : PSCmdlet
 {
     private ActionPreference errorAction;
+    private InternalLogger? _logger;
+    private InternalLoggerPowerShell? _listener;
 
     /// <summary>
     /// Begin block
     /// </summary>
     protected override void BeginProcessing() {
         // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
-        var internalLogger = new InternalLogger();
-        var internalLoggerPowerShell = new InternalLoggerPowerShell(internalLogger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
-        LoggingMessages.Logger = internalLogger;
+        _logger = new InternalLogger();
+        _listener = new InternalLoggerPowerShell(_logger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
+        LoggingMessages.Logger = _logger;
 
         // Get the error action preference as user requested
         // It first sets the error action to the default error action preference
@@ -639,5 +641,11 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         }
 
         return valid.Count > 0 ? valid.ToArray() : null;
+    }
+
+    protected override void EndProcessing()
+    {
+        _listener?.Dispose();
+        _listener = null;
     }
 }
