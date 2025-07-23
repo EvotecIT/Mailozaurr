@@ -4,11 +4,18 @@ using System.Collections.Generic;
 using System.Linq;
 using MimeKit;
 using Xunit;
+using Mailozaurr;
 
 namespace Mailozaurr.Tests;
 
 public class ClientSmtpTests
 {
+    [Fact]
+    public void Ctor_DefaultsPriorityToNormal()
+    {
+        var client = new ClientSmtp();
+        Assert.Equal(MessagePriority.Normal, client.Priority);
+    }
     [Fact]
     public void ConvertToMailboxAddress_InvalidType_IncludesValueInException()
     {
