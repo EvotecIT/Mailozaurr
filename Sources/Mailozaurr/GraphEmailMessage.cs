@@ -1,5 +1,6 @@
 namespace Mailozaurr;
 
+using Mailozaurr.NonDeliveryReports;
 using MimeKit;
 
 /// <summary>
@@ -11,10 +12,11 @@ public class GraphEmailMessage {
     /// </summary>
     /// <param name="id">Unique identifier of the message.</param>
     /// <param name="message">The MIME message.</param>
-    public GraphEmailMessage(string id, MimeMessage message) {
+    public GraphEmailMessage(string id, MimeMessage message, NonDeliveryReport? nonDeliveryReport = null) {
         Id = id;
         Message = message;
         Encryption = MimeKitUtils.GetEncryption(message);
+        NonDeliveryReport = nonDeliveryReport ?? MimeKitUtils.GetNonDeliveryReport(message);
     }
 
     /// <summary>Unique identifier of the message.</summary>
@@ -25,6 +27,9 @@ public class GraphEmailMessage {
 
     /// <summary>Detected encryption or signature type.</summary>
     public EmailEncryption Encryption { get; }
+
+    /// <summary>Parsed Non-Delivery Report details, if available.</summary>
+    public NonDeliveryReport? NonDeliveryReport { get; }
 
     /// <inheritdoc />
     public override string ToString() => Message.Subject ?? base.ToString();
