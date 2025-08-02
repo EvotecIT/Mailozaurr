@@ -17,7 +17,7 @@ public sealed class DsnDiagnosticCode {
 
     /// <summary>Parses a diagnostic code string in the form "smtp; 550 5.1.1".</summary>
     public static DsnDiagnosticCode Parse(string value) {
-        var parts = value.Split(';', 2);
+        var parts = value.Split(new[] { ';' }, 2);
         var type = parts[0].Trim();
         var text = parts.Length > 1 ? parts[1].Trim() : string.Empty;
         return new DsnDiagnosticCode(type, text);

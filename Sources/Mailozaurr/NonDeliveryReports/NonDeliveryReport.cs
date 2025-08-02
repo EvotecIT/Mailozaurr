@@ -7,22 +7,22 @@ namespace Mailozaurr.NonDeliveryReports;
 /// </summary>
 public sealed class NonDeliveryReport {
     /// <summary>Original recipient as specified in the NDR.</summary>
-    public string? OriginalRecipient { get; init; }
+    public string? OriginalRecipient { get; set; }
 
     /// <summary>Final recipient that the report refers to.</summary>
-    public string? FinalRecipient { get; init; }
+    public string? FinalRecipient { get; set; }
 
     /// <summary>Reporting mail transfer agent.</summary>
-    public string? ReportingMta { get; init; }
+    public string? ReportingMta { get; set; }
 
     /// <summary>Diagnostic code explaining the failure.</summary>
-    public DsnDiagnosticCode? DiagnosticCode { get; init; }
+    public DsnDiagnosticCode? DiagnosticCode { get; set; }
 
     /// <summary>Status code for the delivery attempt.</summary>
-    public DsnStatus? Status { get; init; }
+    public DsnStatus? Status { get; set; }
 
     /// <summary>The time the message originally arrived at the reporting MTA.</summary>
-    public DateTimeOffset Timestamp { get; init; }
+    public DateTimeOffset Timestamp { get; set; }
 
     /// <summary>Determines the NDR type derived from the status code.</summary>
     public NonDeliveryReportType Type => GetReportType(Status);

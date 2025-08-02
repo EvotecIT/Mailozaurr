@@ -1,65 +1,57 @@
+using Mailozaurr;
 using System;
 using System.Collections.Generic;
-using System.Net;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
-using Mailozaurr;
 
 namespace Mailozaurr.Tests;
 
 /// <summary>
 /// Tests for miscellaneous helper methods.
 /// </summary>
-public class HelpersTests
-{
+public class HelpersTests {
     [Fact]
-    public void GetEmailAddress_ReturnsInputString_WhenStringProvided()
-    {
+    public void GetEmailAddress_ReturnsInputString_WhenStringProvided() {
         var result = Mailozaurr.Helpers.GetEmailAddress("test@example.com");
         Assert.Equal("test@example.com", result);
     }
 
     [Fact]
-    public void GetEmailAddress_ReturnsEmailFromDictionary_WhenEmailKeyPresent()
-    {
+    public void GetEmailAddress_ReturnsEmailFromDictionary_WhenEmailKeyPresent() {
         var dict = new Dictionary<string, object> { { "Email", "dict@example.com" } };
         var result = Mailozaurr.Helpers.GetEmailAddress(dict);
         Assert.Equal("dict@example.com", result);
     }
 
     [Fact]
-    public void GetEmailAddress_ReturnsEmpty_WhenEmailKeyMissing()
-    {
+    public void GetEmailAddress_ReturnsEmpty_WhenEmailKeyMissing() {
         var dict = new Dictionary<string, object> { { "Name", "John" } };
         var result = Mailozaurr.Helpers.GetEmailAddress(dict);
         Assert.Equal(string.Empty, result);
     }
 
-    private class CustomObject
-    {
+    private class CustomObject {
         public override string ToString() => "Custom";
     }
 
     [Fact]
-    public void GetEmailAddress_ReturnsObjectToString_WhenNotStringOrDictionary()
-    {
+    public void GetEmailAddress_ReturnsObjectToString_WhenNotStringOrDictionary() {
         var obj = new CustomObject();
         var result = Mailozaurr.Helpers.GetEmailAddress(obj);
         Assert.Equal("Custom", result);
     }
 
     [Fact]
-    public void ConvertFromOAuth2Credential_ThrowsArgumentNullException_WhenCredentialIsNull()
-    {
+    public void ConvertFromOAuth2Credential_ThrowsArgumentNullException_WhenCredentialIsNull() {
         Assert.Throws<ArgumentNullException>(() => Mailozaurr.Helpers.ConvertFromOAuth2Credential(null!));
     }
 
     [Fact]
-    public void ConvertFromPlainText_ReturnsNetworkCredentialWithSecurePassword()
-    {
+    public void ConvertFromPlainText_ReturnsNetworkCredentialWithSecurePassword() {
         var cred = Mailozaurr.Helpers.ConvertFromPlainText("user", "secret");
 
         Assert.Equal("user", cred.UserName);
@@ -68,8 +60,7 @@ public class HelpersTests
     }
 
     [Fact]
-    public void CredentialToApiKey_ReturnsPassword_WhenNetworkCredential()
-    {
+    public void CredentialToApiKey_ReturnsPassword_WhenNetworkCredential() {
         var cred = new NetworkCredential("apikey", "theKey");
 
         string result = Mailozaurr.Helpers.CredentialToApiKey(cred);
@@ -77,14 +68,12 @@ public class HelpersTests
         Assert.Equal("theKey", result);
     }
 
-    private class DummyCredentials : ICredentials
-    {
+    private class DummyCredentials : ICredentials {
         public NetworkCredential GetCredential(Uri uri, string authType) => new NetworkCredential();
     }
 
     [Fact]
-    public void CredentialToApiKey_ReturnsEmptyString_WhenNotNetworkCredential()
-    {
+    public void CredentialToApiKey_ReturnsEmptyString_WhenNotNetworkCredential() {
         ICredentials creds = new DummyCredentials();
 
         string result = Mailozaurr.Helpers.CredentialToApiKey(creds);
@@ -93,8 +82,7 @@ public class HelpersTests
     }
 
     [Fact]
-    public void GetEmailAndName_ReturnsTuple_WhenDictionaryProvided()
-    {
+    public void GetEmailAndName_ReturnsTuple_WhenDictionaryProvided() {
         var input = new Dictionary<string, object> { { "Email", "a@b.com" }, { "Name", "Alice" } };
 
         var (email, name) = Mailozaurr.Helpers.GetEmailAndName(input);
@@ -104,8 +92,7 @@ public class HelpersTests
     }
 
     [Fact]
-    public void GetEmailAndName_ReturnsEmailAndNullName_WhenStringProvided()
-    {
+    public void GetEmailAndName_ReturnsEmailAndNullName_WhenStringProvided() {
         var (email, name) = Mailozaurr.Helpers.GetEmailAndName("c@d.com");
 
         Assert.Equal("c@d.com", email);
@@ -113,8 +100,7 @@ public class HelpersTests
     }
 
     [Fact]
-    public void UniqueAddresses_RemovesDuplicates_IgnoringCaseAndWhitespace()
-    {
+    public void UniqueAddresses_RemovesDuplicates_IgnoringCaseAndWhitespace() {
         var addresses = new object[]
         {
             " Test@example.com ",
@@ -124,7 +110,7 @@ public class HelpersTests
         };
         var seen = new HashSet<string>();
         var result = Mailozaurr.Helpers
-            .UniqueAddresses(addresses, seen)
+            .UniqueAddresses(addresses!, seen)
             .Select(Mailozaurr.Helpers.GetEmailAddress)
             .ToArray();
 
@@ -132,8 +118,7 @@ public class HelpersTests
     }
 
     [Fact]
-    public void UniqueAddresses_SkipsNullOrInvalidEmails()
-    {
+    public void UniqueAddresses_SkipsNullOrInvalidEmails() {
         var addresses = new object?[]
         {
             null,
@@ -144,7 +129,7 @@ public class HelpersTests
         var seen = new HashSet<string>();
 
         var result = Mailozaurr.Helpers
-            .UniqueAddresses(addresses, seen)
+            .UniqueAddresses(addresses!, seen)
             .Select(Mailozaurr.Helpers.GetEmailAddress)
             .ToArray();
 
@@ -152,8 +137,7 @@ public class HelpersTests
     }
 
     [Fact]
-    public void UniqueAddresses_ReturnsFirstOccurrence_WhenDictionaryEmailsDuplicate()
-    {
+    public void UniqueAddresses_ReturnsFirstOccurrence_WhenDictionaryEmailsDuplicate() {
         var first = new Dictionary<string, object> { { "Email", "d@e.com" }, { "Name", "One" } };
         var second = new Dictionary<string, object> { { "Email", "D@e.com" }, { "Name", "Two" } };
         var addresses = new object[] { first, second };
@@ -167,21 +151,18 @@ public class HelpersTests
         Assert.Same(first, result[0]);
     }
 
-    private class CancelHandler : HttpMessageHandler
-    {
+    private class CancelHandler : HttpMessageHandler {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             => Task.FromCanceled<HttpResponseMessage>(cancellationToken);
     }
 
-    private class ThrowHandler : HttpMessageHandler
-    {
+    private class ThrowHandler : HttpMessageHandler {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             => throw new HttpRequestException("boom");
     }
 
     [Fact]
-    public async Task PostWebhookAsync_CancellationRequested_ThrowsAsync()
-    {
+    public async Task PostWebhookAsync_CancellationRequested_ThrowsAsync() {
         using var cts = new CancellationTokenSource();
         cts.Cancel();
         var client = new HttpClient(new CancelHandler());
@@ -192,8 +173,7 @@ public class HelpersTests
     }
 
     [Fact]
-    public async Task PostWebhookAsync_HttpRequestException_LogsWarning()
-    {
+    public async Task PostWebhookAsync_HttpRequestException_LogsWarning() {
         var client = new HttpClient(new ThrowHandler());
         var result = new SmtpResult(true, EmailAction.Send, string.Empty, string.Empty, string.Empty, 0, TimeSpan.Zero);
         var messages = new List<string>();
