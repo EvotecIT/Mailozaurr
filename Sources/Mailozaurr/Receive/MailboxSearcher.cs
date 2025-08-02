@@ -122,9 +122,7 @@ public static class MailboxSearcher {
         int maxResults = 0,
         CancellationToken cancellationToken = default) {
         var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadOnly);
-        SearchQuery search = SearchQuery.All;
-        if (since.HasValue) search = search.And(SearchQuery.DeliveredAfter(since.Value));
-        if (before.HasValue) search = search.And(SearchQuery.DeliveredBefore(before.Value));
+        var search = BuildNonDeliveryReportSearchQuery(since, before);
         var uids = await mailFolder.SearchAsync(search, cancellationToken).ConfigureAwait(false);
         var messages = new List<MimeMessage>(uids.Count);
         foreach (var uid in uids) {
@@ -178,14 +176,24 @@ public static class MailboxSearcher {
             filter,
             maxResults > 0 ? maxResults : (int?)null).ConfigureAwait(false);
         var mimeMessages = new List<MimeMessage>(msgs.Count);
+        using var semaphore = new SemaphoreSlim(4);
+        var tasks = new List<Task>();
         foreach (var m in msgs) {
             cancellationToken.ThrowIfCancellationRequested();
             if (m.TryGetValue("id", out var idObj) && idObj is string id) {
-                var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
-                mimeMessages.Add(mime);
-                if (maxResults > 0 && mimeMessages.Count >= maxResults) break;
+                tasks.Add(Task.Run(async () => {
+                    await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    try {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
+                        lock (mimeMessages) mimeMessages.Add(mime);
+                    } finally {
+                        semaphore.Release();
+                    }
+                }, cancellationToken));
             }
         }
+        await Task.WhenAll(tasks).ConfigureAwait(false);
         return FilterNonDeliveryReports(mimeMessages, since, before, recipientContains, messageId);
     }
 
@@ -229,6 +237,27 @@ public static class MailboxSearcher {
             if (!string.IsNullOrWhiteSpace(addr.Name) && addr.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) return true;
         }
         return false;
+    }
+
+    private static readonly string[] NdrSubjectPatterns = new[] {
+        "Undelivered Mail Returned to Sender",
+        "Delivery Status Notification",
+        "Mail delivery failed",
+        "Mail Delivery Subsystem",
+        "Failure Notice"
+    };
+
+    internal static SearchQuery BuildNonDeliveryReportSearchQuery(DateTime? since, DateTime? before) {
+        SearchQuery search = SearchQuery.HeaderContains("Content-Type", "delivery-status");
+        SearchQuery? subjectQuery = null;
+        foreach (var pattern in NdrSubjectPatterns) {
+            var q = SearchQuery.SubjectContains(pattern);
+            subjectQuery = subjectQuery == null ? q : subjectQuery.Or(q);
+        }
+        if (subjectQuery != null) search = search.Or(subjectQuery);
+        if (since.HasValue) search = search.And(SearchQuery.DeliveredAfter(since.Value));
+        if (before.HasValue) search = search.And(SearchQuery.DeliveredBefore(before.Value));
+        return search;
     }
 
     internal sealed class ParsedQuery {
