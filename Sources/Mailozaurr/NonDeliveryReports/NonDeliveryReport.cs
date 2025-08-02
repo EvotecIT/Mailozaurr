@@ -12,6 +12,9 @@ public sealed class NonDeliveryReport {
     /// <summary>Final recipient that the report refers to.</summary>
     public string? FinalRecipient { get; set; }
 
+    /// <summary>Identifier of the original message associated with this report.</summary>
+    public string? OriginalMessageId { get; set; }
+
     /// <summary>Reporting mail transfer agent.</summary>
     public string? ReportingMta { get; set; }
 
@@ -32,6 +35,7 @@ public sealed class NonDeliveryReport {
         headers.TryGetValue("Original-Recipient", out var originalRecipient);
         headers.TryGetValue("Final-Recipient", out var finalRecipient);
         headers.TryGetValue("Reporting-MTA", out var reportingMta);
+        headers.TryGetValue("Original-Message-ID", out var originalMessageId);
         headers.TryGetValue("Diagnostic-Code", out var diagnosticCode);
         headers.TryGetValue("Status", out var statusCode);
         headers.TryGetValue("Arrival-Date", out var arrivalDate);
@@ -39,6 +43,7 @@ public sealed class NonDeliveryReport {
         var ndr = new NonDeliveryReport {
             OriginalRecipient = originalRecipient,
             FinalRecipient = finalRecipient,
+            OriginalMessageId = originalMessageId,
             ReportingMta = reportingMta,
             DiagnosticCode = diagnosticCode is not null ? DsnDiagnosticCode.Parse(diagnosticCode) : null,
             Status = statusCode is not null && DsnStatus.TryParse(statusCode, out var status) ? status : null,
