@@ -197,13 +197,13 @@ public static class MailboxSearcher {
         string? messageId) {
         var results = new List<NonDeliveryReport>();
         foreach (var message in messages) {
-            var report = MimeKitUtils.GetNonDeliveryReport(message);
-            if (report == null) continue;
-            if (since.HasValue && report.Timestamp.DateTime < since.Value) continue;
-            if (before.HasValue && report.Timestamp.DateTime > before.Value) continue;
-            if (!string.IsNullOrWhiteSpace(recipientContains) && !RecipientMatches(report, recipientContains)) continue;
-            if (!string.IsNullOrWhiteSpace(messageId) && !string.Equals(report.OriginalMessageId, messageId, StringComparison.OrdinalIgnoreCase)) continue;
-            results.Add(report);
+            foreach (var report in MimeKitUtils.GetNonDeliveryReports(message)) {
+                if (since.HasValue && report.Timestamp.DateTime < since.Value) continue;
+                if (before.HasValue && report.Timestamp.DateTime > before.Value) continue;
+                if (!string.IsNullOrWhiteSpace(recipientContains) && !RecipientMatches(report, recipientContains)) continue;
+                if (!string.IsNullOrWhiteSpace(messageId) && !string.Equals(report.OriginalMessageId, messageId, StringComparison.OrdinalIgnoreCase)) continue;
+                results.Add(report);
+            }
         }
         return results;
     }

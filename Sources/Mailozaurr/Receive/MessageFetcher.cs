@@ -93,8 +93,8 @@ public static class MessageFetcher {
             if (priority.HasValue && msg.Priority != ConvertPriority(priority.Value)) {
                 continue;
             }
-            var ndr = MimeKitUtils.GetNonDeliveryReport(msg);
-            yield return new ImapEmailMessage(uid, msg, ndr);
+            var reports = MimeKitUtils.GetNonDeliveryReports(msg);
+            yield return new ImapEmailMessage(uid, msg, reports);
             if (delete) {
                 await mailFolder.AddFlagsAsync(uid, MessageFlags.Deleted, true, cancellationToken).ConfigureAwait(false);
             }
@@ -164,8 +164,8 @@ public static class MessageFetcher {
                 continue;
             }
 
-            var ndr = MimeKitUtils.GetNonDeliveryReport(message);
-            yield return new Pop3EmailMessage(i, message, ndr);
+            var reports = MimeKitUtils.GetNonDeliveryReports(message);
+            yield return new Pop3EmailMessage(i, message, reports);
             if (delete) {
                 await client.DeleteMessageAsync(i, cancellationToken).ConfigureAwait(false);
             }

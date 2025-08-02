@@ -19,23 +19,23 @@ public class NonDeliveryReportDetectionTests {
     public void ImapEmailMessageDetectsNdr() {
         var msg = CreateNdrMessage();
         var imap = new ImapEmailMessage(new UniqueId(1), msg);
-        Assert.NotNull(imap.NonDeliveryReport);
-        Assert.Equal(NonDeliveryReportType.UnknownRecipient, imap.NonDeliveryReport!.Type);
+        Assert.Single(imap.NonDeliveryReports);
+        Assert.Equal(NonDeliveryReportType.UnknownRecipient, imap.NonDeliveryReports[0].Type);
     }
 
     [Fact]
     public void Pop3EmailMessageDetectsNdr() {
         var msg = CreateNdrMessage();
         var pop3 = new Pop3EmailMessage(0, msg);
-        Assert.NotNull(pop3.NonDeliveryReport);
-        Assert.Equal(NonDeliveryReportType.UnknownRecipient, pop3.NonDeliveryReport!.Type);
+        Assert.Single(pop3.NonDeliveryReports);
+        Assert.Equal(NonDeliveryReportType.UnknownRecipient, pop3.NonDeliveryReports[0].Type);
     }
 
     [Fact]
     public void GraphEmailMessageDetectsNdr() {
         var msg = CreateNdrMessage();
         var graph = new GraphEmailMessage("id", msg);
-        Assert.NotNull(graph.NonDeliveryReport);
-        Assert.Equal(NonDeliveryReportType.UnknownRecipient, graph.NonDeliveryReport!.Type);
+        Assert.Single(graph.NonDeliveryReports);
+        Assert.Equal(NonDeliveryReportType.UnknownRecipient, graph.NonDeliveryReports[0].Type);
     }
 }
