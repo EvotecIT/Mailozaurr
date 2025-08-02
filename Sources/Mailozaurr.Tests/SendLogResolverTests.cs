@@ -34,4 +34,18 @@ public class SendLogResolverTests {
         var result = await resolver.ResolveAsync(report);
         Assert.Null(result);
     }
+
+    [Fact]
+    public async Task ResolveAsync_MatchesRecipientWithPrefix() {
+        var record = new SentMessageRecord { MessageId = "<id1>", Recipients = "user@example.com" };
+        var repo = new InMemoryRepository(record);
+        var resolver = new SendLogResolver(repo);
+        var headers = new Dictionary<string, string> {
+            ["Original-Message-ID"] = "<id1>",
+            ["Final-Recipient"] = "rfc822; user@example.com"
+        };
+        var report = NonDeliveryReport.FromHeaders(headers);
+        var result = await resolver.ResolveAsync(report);
+        Assert.Equal(record, result);
+    }
 }

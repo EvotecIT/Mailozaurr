@@ -9,8 +9,14 @@ public sealed class NonDeliveryReport {
     /// <summary>Original recipient as specified in the NDR.</summary>
     public string? OriginalRecipient { get; set; }
 
+    /// <summary>Normalized address extracted from <see cref="OriginalRecipient"/>.</summary>
+    public string? OriginalRecipientAddress { get; set; }
+
     /// <summary>Final recipient that the report refers to.</summary>
     public string? FinalRecipient { get; set; }
+
+    /// <summary>Normalized address extracted from <see cref="FinalRecipient"/>.</summary>
+    public string? FinalRecipientAddress { get; set; }
 
     /// <summary>Identifier of the original message associated with this report.</summary>
     public string? OriginalMessageId { get; set; }
@@ -42,7 +48,9 @@ public sealed class NonDeliveryReport {
 
         var ndr = new NonDeliveryReport {
             OriginalRecipient = originalRecipient,
+            OriginalRecipientAddress = ExtractAddress(originalRecipient),
             FinalRecipient = finalRecipient,
+            FinalRecipientAddress = ExtractAddress(finalRecipient),
             OriginalMessageId = originalMessageId,
             ReportingMta = reportingMta,
             DiagnosticCode = diagnosticCode is not null ? DsnDiagnosticCode.Parse(diagnosticCode) : null,
@@ -50,6 +58,14 @@ public sealed class NonDeliveryReport {
             Timestamp = ParseTimestamp(arrivalDate)
         };
         return ndr;
+    }
+
+    private static string? ExtractAddress(string? header) {
+        if (string.IsNullOrWhiteSpace(header)) {
+            return null;
+        }
+        var idx = header.IndexOf(';');
+        return idx >= 0 ? header.Substring(idx + 1).Trim() : header.Trim();
     }
 
     private static DateTimeOffset ParseTimestamp(string? value) {

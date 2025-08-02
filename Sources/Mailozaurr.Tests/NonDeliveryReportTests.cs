@@ -32,6 +32,8 @@ public class NonDeliveryReportTests {
         var report = NonDeliveryReport.FromHeaders(headers);
         Assert.Equal("rfc822; orig@example.com", report.OriginalRecipient);
         Assert.Equal("rfc822; final@example.com", report.FinalRecipient);
+        Assert.Equal("orig@example.com", report.OriginalRecipientAddress);
+        Assert.Equal("final@example.com", report.FinalRecipientAddress);
         Assert.Equal("dns; mx.example.com", report.ReportingMta);
         Assert.NotNull(report.DiagnosticCode);
         Assert.NotNull(report.Status);
