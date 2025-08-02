@@ -24,6 +24,18 @@ public sealed class NonDeliveryReport {
     /// <summary>Reporting mail transfer agent.</summary>
     public string? ReportingMta { get; set; }
 
+    /// <summary>Action taken by the server for the delivery attempt.</summary>
+    public string? Action { get; set; }
+
+    /// <summary>Remote mail transfer agent involved in the delivery.</summary>
+    public string? RemoteMta { get; set; }
+
+    /// <summary>Date of the last delivery attempt.</summary>
+    public DateTimeOffset LastAttemptDate { get; set; }
+
+    /// <summary>Identifier of the final log entry.</summary>
+    public string? FinalLogId { get; set; }
+
     /// <summary>Diagnostic code explaining the failure.</summary>
     public DsnDiagnosticCode? DiagnosticCode { get; set; }
 
@@ -41,6 +53,10 @@ public sealed class NonDeliveryReport {
         headers.TryGetValue("Original-Recipient", out var originalRecipient);
         headers.TryGetValue("Final-Recipient", out var finalRecipient);
         headers.TryGetValue("Reporting-MTA", out var reportingMta);
+        headers.TryGetValue("Action", out var action);
+        headers.TryGetValue("Remote-MTA", out var remoteMta);
+        headers.TryGetValue("Last-Attempt-Date", out var lastAttemptDate);
+        headers.TryGetValue("Final-Log-ID", out var finalLogId);
         headers.TryGetValue("Original-Message-ID", out var originalMessageId);
         headers.TryGetValue("Diagnostic-Code", out var diagnosticCode);
         headers.TryGetValue("Status", out var statusCode);
@@ -53,6 +69,10 @@ public sealed class NonDeliveryReport {
             FinalRecipientAddress = ExtractAddress(finalRecipient),
             OriginalMessageId = originalMessageId,
             ReportingMta = reportingMta,
+            Action = action,
+            RemoteMta = remoteMta,
+            LastAttemptDate = ParseTimestamp(lastAttemptDate),
+            FinalLogId = finalLogId,
             DiagnosticCode = diagnosticCode is not null ? DsnDiagnosticCode.Parse(diagnosticCode) : null,
             Status = statusCode is not null && DsnStatus.TryParse(statusCode, out var status) ? status : null,
             Timestamp = ParseTimestamp(arrivalDate)

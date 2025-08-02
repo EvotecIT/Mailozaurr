@@ -21,10 +21,16 @@ public class NonDeliveryReportTests {
 
     [Fact]
     public void ParseHeadersCreatesReport() {
+        var lastAttempt = DateTimeOffset.UtcNow;
+        var lastAttemptHeader = lastAttempt.ToString("R");
         var headers = new Dictionary<string, string> {
             ["Original-Recipient"] = "rfc822; orig@example.com",
             ["Final-Recipient"] = "rfc822; final@example.com",
             ["Reporting-MTA"] = "dns; mx.example.com",
+            ["Action"] = "failed",
+            ["Remote-MTA"] = "dns; remote.example.com",
+            ["Last-Attempt-Date"] = lastAttemptHeader,
+            ["Final-Log-ID"] = "ABC123",
             ["Diagnostic-Code"] = "smtp; 550 5.1.1 User unknown",
             ["Status"] = "5.1.1",
             ["Arrival-Date"] = DateTimeOffset.UtcNow.ToString("R")
@@ -35,6 +41,10 @@ public class NonDeliveryReportTests {
         Assert.Equal("orig@example.com", report.OriginalRecipientAddress);
         Assert.Equal("final@example.com", report.FinalRecipientAddress);
         Assert.Equal("dns; mx.example.com", report.ReportingMta);
+        Assert.Equal("failed", report.Action);
+        Assert.Equal("dns; remote.example.com", report.RemoteMta);
+        Assert.Equal(DateTimeOffset.Parse(lastAttemptHeader), report.LastAttemptDate);
+        Assert.Equal("ABC123", report.FinalLogId);
         Assert.NotNull(report.DiagnosticCode);
         Assert.NotNull(report.Status);
         Assert.Equal(NonDeliveryReportType.UnknownRecipient, report.Type);
