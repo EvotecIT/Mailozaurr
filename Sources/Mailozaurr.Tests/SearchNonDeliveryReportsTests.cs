@@ -31,4 +31,15 @@ public class SearchNonDeliveryReportsTests {
         Assert.Single(reports);
         Assert.Equal("<id1>", reports[0].OriginalMessageId);
     }
+
+    [Fact]
+    public void FilterNonDeliveryReports_FiltersByDate() {
+        var now = DateTimeOffset.UtcNow;
+        var msg1 = CreateNdr("user@example.com", "<id1>", now.AddMinutes(-10));
+        var msg2 = CreateNdr("user@example.com", "<id2>", now);
+        var list = new List<MimeMessage> { msg1, msg2 };
+        var reports = MailboxSearcher.FilterNonDeliveryReports(list, since: now.AddMinutes(-5).DateTime, before: null, recipientContains: null, messageId: null);
+        Assert.Single(reports);
+        Assert.Equal("<id2>", reports[0].OriginalMessageId);
+    }
 }
