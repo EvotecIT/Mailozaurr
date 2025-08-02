@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Mailozaurr.NonDeliveryReports;
 
 namespace Mailozaurr;
 
@@ -106,6 +107,113 @@ public static class MailboxSearcher {
             if (maxResults > 0 && results.Count >= maxResults) break;
         }
         return results;
+    }
+
+    /// <summary>
+    /// Searches for Non-Delivery Reports in an IMAP mailbox.
+    /// </summary>
+    public static async Task<IList<NonDeliveryReport>> SearchNonDeliveryReportsAsync(
+        ImapClient client,
+        string? folder = null,
+        DateTime? since = null,
+        DateTime? before = null,
+        string? recipientContains = null,
+        string? messageId = null,
+        int maxResults = 0,
+        CancellationToken cancellationToken = default) {
+        var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadOnly);
+        SearchQuery search = SearchQuery.All;
+        if (since.HasValue) search = search.And(SearchQuery.DeliveredAfter(since.Value));
+        if (before.HasValue) search = search.And(SearchQuery.DeliveredBefore(before.Value));
+        var uids = await mailFolder.SearchAsync(search, cancellationToken).ConfigureAwait(false);
+        var messages = new List<MimeMessage>(uids.Count);
+        foreach (var uid in uids) {
+            var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
+            messages.Add(msg);
+            if (maxResults > 0 && messages.Count >= maxResults) break;
+        }
+        return FilterNonDeliveryReports(messages, since, before, recipientContains, messageId);
+    }
+
+    /// <summary>
+    /// Searches for Non-Delivery Reports in a POP3 mailbox.
+    /// </summary>
+    public static async Task<IList<NonDeliveryReport>> SearchNonDeliveryReportsAsync(
+        Pop3Client client,
+        DateTime? since = null,
+        DateTime? before = null,
+        string? recipientContains = null,
+        string? messageId = null,
+        int maxResults = 0,
+        CancellationToken cancellationToken = default) {
+        var messages = new List<MimeMessage>();
+        for (int i = 0; i < client.Count; i++) {
+            var msg = await client.GetMessageAsync(i, cancellationToken).ConfigureAwait(false);
+            messages.Add(msg);
+            if (maxResults > 0 && messages.Count >= maxResults) break;
+        }
+        return FilterNonDeliveryReports(messages, since, before, recipientContains, messageId);
+    }
+
+    /// <summary>
+    /// Searches for Non-Delivery Reports using Microsoft Graph.
+    /// </summary>
+    public static async Task<IList<NonDeliveryReport>> SearchNonDeliveryReportsAsync(
+        GraphCredential credential,
+        string userPrincipalName,
+        DateTime? since = null,
+        DateTime? before = null,
+        string? recipientContains = null,
+        string? messageId = null,
+        int maxResults = 0,
+        CancellationToken cancellationToken = default) {
+        var filters = new List<string>();
+        if (since.HasValue) filters.Add($"receivedDateTime ge {since.Value:o}");
+        if (before.HasValue) filters.Add($"receivedDateTime le {before.Value:o}");
+        var filter = filters.Count > 0 ? string.Join(" and ", filters) : null;
+        var msgs = await MicrosoftGraphUtils.GetMailMessagesAsync(
+            credential,
+            userPrincipalName,
+            new[] { "id" },
+            filter,
+            maxResults > 0 ? maxResults : (int?)null).ConfigureAwait(false);
+        var mimeMessages = new List<MimeMessage>(msgs.Count);
+        foreach (var m in msgs) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (m.TryGetValue("id", out var idObj) && idObj is string id) {
+                var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
+                mimeMessages.Add(mime);
+                if (maxResults > 0 && mimeMessages.Count >= maxResults) break;
+            }
+        }
+        return FilterNonDeliveryReports(mimeMessages, since, before, recipientContains, messageId);
+    }
+
+    internal static IList<NonDeliveryReport> FilterNonDeliveryReports(
+        IEnumerable<MimeMessage> messages,
+        DateTime? since,
+        DateTime? before,
+        string? recipientContains,
+        string? messageId) {
+        var results = new List<NonDeliveryReport>();
+        foreach (var message in messages) {
+            var report = MimeKitUtils.GetNonDeliveryReport(message);
+            if (report == null) continue;
+            if (since.HasValue && report.Timestamp.DateTime < since.Value) continue;
+            if (before.HasValue && report.Timestamp.DateTime > before.Value) continue;
+            if (!string.IsNullOrWhiteSpace(recipientContains) && !RecipientMatches(report, recipientContains)) continue;
+            if (!string.IsNullOrWhiteSpace(messageId) && !string.Equals(report.OriginalMessageId, messageId, StringComparison.OrdinalIgnoreCase)) continue;
+            results.Add(report);
+        }
+        return results;
+    }
+
+    private static bool RecipientMatches(NonDeliveryReport report, string filter) {
+        if (!string.IsNullOrWhiteSpace(report.FinalRecipient) &&
+            report.FinalRecipient.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        if (!string.IsNullOrWhiteSpace(report.OriginalRecipient) &&
+            report.OriginalRecipient.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        return false;
     }
 
     private static MimeKit.MessagePriority ConvertPriority(MessagePriority priority)

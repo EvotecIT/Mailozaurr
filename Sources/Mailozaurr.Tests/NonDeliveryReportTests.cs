@@ -37,4 +37,13 @@ public class NonDeliveryReportTests {
         Assert.NotNull(report.Status);
         Assert.Equal(NonDeliveryReportType.UnknownRecipient, report.Type);
     }
+
+    [Fact]
+    public void ParsesOriginalMessageId() {
+        var headers = new Dictionary<string, string> {
+            ["Original-Message-ID"] = "<msg1@local>"
+        };
+        var report = NonDeliveryReport.FromHeaders(headers);
+        Assert.Equal("<msg1@local>", report.OriginalMessageId);
+    }
 }
