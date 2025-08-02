@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using MailKit.Search;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -41,5 +42,43 @@ public class SearchNonDeliveryReportsTests {
         var reports = MailboxSearcher.FilterNonDeliveryReports(list, since: now.AddMinutes(-5).DateTime, before: null, recipientContains: null, messageId: null);
         Assert.Single(reports);
         Assert.Equal("<id2>", reports[0].OriginalMessageId);
+    }
+
+    private static bool Contains(SearchQuery query, Func<SearchQuery, bool> predicate) {
+        if (predicate(query)) return true;
+        var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+        var leftProp = query.GetType().GetProperty("Left", flags);
+        var rightProp = query.GetType().GetProperty("Right", flags);
+        var left = leftProp?.GetValue(query) as SearchQuery;
+        var right = rightProp?.GetValue(query) as SearchQuery;
+        if (left != null && Contains(left, predicate)) return true;
+        if (right != null && Contains(right, predicate)) return true;
+        return false;
+    }
+
+    [Fact]
+    public void BuildNonDeliveryReportSearchQuery_ContainsFilters() {
+        var query = MailboxSearcher.BuildNonDeliveryReportSearchQuery(null, null);
+        var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+        bool hasHeader = Contains(query, q => {
+            var term = q.GetType().GetProperty("Term", flags)?.GetValue(q)?.ToString();
+            if (term == "HeaderContains") {
+                var field = q.GetType().GetProperty("Field", flags)?.GetValue(q)?.ToString();
+                var value = q.GetType().GetProperty("Value", flags)?.GetValue(q)?.ToString();
+                return string.Equals(field, "Content-Type", StringComparison.OrdinalIgnoreCase) &&
+                    value?.IndexOf("delivery-status", StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+            return false;
+        });
+        Assert.True(hasHeader);
+        bool hasSubject = Contains(query, q => {
+            var term = q.GetType().GetProperty("Term", flags)?.GetValue(q)?.ToString();
+            if (term == "SubjectContains") {
+                var text = q.GetType().GetProperty("Text", flags)?.GetValue(q)?.ToString();
+                return text?.IndexOf("Mail delivery failed", StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+            return false;
+        });
+        Assert.True(hasSubject);
     }
 }
