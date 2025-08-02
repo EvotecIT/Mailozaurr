@@ -30,29 +30,42 @@ public static class MimeKitUtils {
         }
     }
 
-    /// <summary>Attempts to extract a <see cref="NonDeliveryReport"/> from a message.</summary>
-    public static NonDeliveryReport? GetNonDeliveryReport(MimeMessage message) {
+    /// <summary>
+    /// Attempts to extract all <see cref="NonDeliveryReport"/> instances from a message.
+    /// </summary>
+    public static IList<NonDeliveryReport> GetNonDeliveryReports(MimeMessage message) {
+        var reports = new List<NonDeliveryReport>();
         if (message == null) {
-            return null;
+            return reports;
         }
 
         var status = FindDeliveryStatus(message.Body);
         if (status == null && !SubjectIndicatesNdr(message.Subject)) {
-            return null;
+            return reports;
         }
 
-        var headers = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
         if (status != null) {
             foreach (var group in status.StatusGroups) {
+                var headers = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
                 foreach (var header in group) {
                     if (!headers.ContainsKey(header.Field)) {
                         headers[header.Field] = header.Value;
                     }
                 }
+
+                reports.Add(headers.Count > 0 ? NonDeliveryReport.FromHeaders(headers) : new NonDeliveryReport());
             }
+        } else {
+            reports.Add(new NonDeliveryReport());
         }
 
-        return headers.Count > 0 ? NonDeliveryReport.FromHeaders(headers) : new NonDeliveryReport();
+        return reports;
+    }
+
+    /// <summary>Attempts to extract the first <see cref="NonDeliveryReport"/> from a message.</summary>
+    public static NonDeliveryReport? GetNonDeliveryReport(MimeMessage message) {
+        var reports = GetNonDeliveryReports(message);
+        return reports.Count > 0 ? reports[0] : null;
     }
 
     private static MessageDeliveryStatus? FindDeliveryStatus(MimeEntity entity) {

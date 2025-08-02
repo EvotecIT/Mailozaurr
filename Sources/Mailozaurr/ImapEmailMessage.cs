@@ -16,11 +16,11 @@ public class ImapEmailMessage {
     /// </summary>
     /// <param name="uid">Unique identifier of the message.</param>
     /// <param name="message">The actual MIME message.</param>
-    public ImapEmailMessage(UniqueId uid, MimeMessage message, NonDeliveryReport? nonDeliveryReport = null) {
+    public ImapEmailMessage(UniqueId uid, MimeMessage message, IList<NonDeliveryReport>? nonDeliveryReports = null) {
         Uid = uid;
         Message = message;
         Encryption = MimeKitUtils.GetEncryption(message);
-        NonDeliveryReport = nonDeliveryReport ?? MimeKitUtils.GetNonDeliveryReport(message);
+        NonDeliveryReports = nonDeliveryReports ?? MimeKitUtils.GetNonDeliveryReports(message);
     }
 
     /// <summary>Unique identifier of the message.</summary>
@@ -33,7 +33,7 @@ public class ImapEmailMessage {
     public EmailEncryption Encryption { get; }
 
     /// <summary>Parsed Non-Delivery Report details, if available.</summary>
-    public NonDeliveryReport? NonDeliveryReport { get; }
+    public IList<NonDeliveryReport> NonDeliveryReports { get; }
 
     /// <inheritdoc />
     public override string ToString() => Message.Subject ?? base.ToString();

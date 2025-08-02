@@ -9,12 +9,23 @@ namespace Mailozaurr.Tests;
 
 public class MimeKitNonDeliveryReportTests {
     [Fact]
-    public void GetNonDeliveryReport_ParsesMessage() {
+    public void GetNonDeliveryReports_ParsesSingleMessage() {
         const string raw = "Content-Type: multipart/report; report-type=delivery-status; boundary=\"XXX\"\n\n--XXX\nContent-Type: text/plain; charset=utf-8\n\ntext\n\n--XXX\nContent-Type: message/delivery-status\n\nOriginal-Recipient: rfc822; user@example.com\nFinal-Recipient: rfc822; user@example.com\nReporting-MTA: dns; mx.example.com\nDiagnostic-Code: smtp; 550 5.1.1 User unknown\nStatus: 5.1.1\nArrival-Date: Wed, 24 Jul 2024 10:00:00 +0000\n\n--XXX--";
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(raw));
         var message = MimeMessage.Load(stream);
-        NonDeliveryReport? report = MimeKitUtils.GetNonDeliveryReport(message);
-        Assert.NotNull(report);
-        Assert.Equal(NonDeliveryReportType.UnknownRecipient, report!.Type);
+        var reports = MimeKitUtils.GetNonDeliveryReports(message);
+        Assert.Single(reports);
+        Assert.Equal(NonDeliveryReportType.UnknownRecipient, reports[0].Type);
+    }
+
+    [Fact]
+    public void GetNonDeliveryReports_ParsesMultipleReports() {
+        const string raw = "Content-Type: multipart/report; report-type=delivery-status; boundary=\"XXX\"\n\n--XXX\nContent-Type: text/plain; charset=utf-8\n\ntext\n\n--XXX\nContent-Type: message/delivery-status\n\nOriginal-Recipient: rfc822; user1@example.com\nFinal-Recipient: rfc822; user1@example.com\nReporting-MTA: dns; mx.example.com\nDiagnostic-Code: smtp; 550 5.1.1 User unknown\nStatus: 5.1.1\nArrival-Date: Wed, 24 Jul 2024 10:00:00 +0000\n\nOriginal-Recipient: rfc822; user2@example.com\nFinal-Recipient: rfc822; user2@example.com\nReporting-MTA: dns; mx.example.com\nDiagnostic-Code: smtp; 550 5.2.2 Mailbox full\nStatus: 5.2.2\nArrival-Date: Wed, 24 Jul 2024 10:00:00 +0000\n\n--XXX--";
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(raw));
+        var message = MimeMessage.Load(stream);
+        var reports = MimeKitUtils.GetNonDeliveryReports(message);
+        Assert.Equal(2, reports.Count);
+        Assert.EndsWith("user1@example.com", reports[0].FinalRecipient);
+        Assert.EndsWith("user2@example.com", reports[1].FinalRecipient);
     }
 }

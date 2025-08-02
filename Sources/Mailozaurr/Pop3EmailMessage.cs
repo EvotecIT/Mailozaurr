@@ -15,11 +15,11 @@ public class Pop3EmailMessage {
     /// </summary>
     /// <param name="index">Index of the message within the mailbox.</param>
     /// <param name="message">The actual MIME message.</param>
-    public Pop3EmailMessage(int index, MimeMessage message, NonDeliveryReport? nonDeliveryReport = null) {
+    public Pop3EmailMessage(int index, MimeMessage message, IList<NonDeliveryReport>? nonDeliveryReports = null) {
         Index = index;
         Message = message;
         Encryption = MimeKitUtils.GetEncryption(message);
-        NonDeliveryReport = nonDeliveryReport ?? MimeKitUtils.GetNonDeliveryReport(message);
+        NonDeliveryReports = nonDeliveryReports ?? MimeKitUtils.GetNonDeliveryReports(message);
     }
 
     /// <summary>Index of the message within the mailbox.</summary>
@@ -32,7 +32,7 @@ public class Pop3EmailMessage {
     public EmailEncryption Encryption { get; }
 
     /// <summary>Parsed Non-Delivery Report details, if available.</summary>
-    public NonDeliveryReport? NonDeliveryReport { get; }
+    public IList<NonDeliveryReport> NonDeliveryReports { get; }
 
     /// <inheritdoc />
     public override string ToString() => Message.Subject ?? base.ToString();

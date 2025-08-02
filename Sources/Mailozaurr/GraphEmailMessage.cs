@@ -12,11 +12,11 @@ public class GraphEmailMessage {
     /// </summary>
     /// <param name="id">Unique identifier of the message.</param>
     /// <param name="message">The MIME message.</param>
-    public GraphEmailMessage(string id, MimeMessage message, NonDeliveryReport? nonDeliveryReport = null) {
+    public GraphEmailMessage(string id, MimeMessage message, IList<NonDeliveryReport>? nonDeliveryReports = null) {
         Id = id;
         Message = message;
         Encryption = MimeKitUtils.GetEncryption(message);
-        NonDeliveryReport = nonDeliveryReport ?? MimeKitUtils.GetNonDeliveryReport(message);
+        NonDeliveryReports = nonDeliveryReports ?? MimeKitUtils.GetNonDeliveryReports(message);
     }
 
     /// <summary>Unique identifier of the message.</summary>
@@ -29,7 +29,7 @@ public class GraphEmailMessage {
     public EmailEncryption Encryption { get; }
 
     /// <summary>Parsed Non-Delivery Report details, if available.</summary>
-    public NonDeliveryReport? NonDeliveryReport { get; }
+    public IList<NonDeliveryReport> NonDeliveryReports { get; }
 
     /// <inheritdoc />
     public override string ToString() => Message.Subject ?? base.ToString();
