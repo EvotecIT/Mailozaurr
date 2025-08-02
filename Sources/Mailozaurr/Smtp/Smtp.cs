@@ -24,6 +24,9 @@ public class Smtp {
     /// <summary>Configuration used for protocol logging.</summary>
     public LoggingConfigurator? Logging;
 
+    /// <summary>Repository used to persist sent message metadata.</summary>
+    public ISentMessageRepository? SentMessageRepository { get; set; }
+
     /// <summary>Underlying SMTP client used to send messages.</summary>
     public ClientSmtp Client { get; private set; }
 
@@ -624,6 +627,15 @@ public class Smtp {
             try {
                 await Client.SendAsync(Message, cancellationToken);
                 LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Sent email to {SentTo}");
+                if (SentMessageRepository != null) {
+                    var record = new SentMessageRecord {
+                        MessageId = Message.MessageId ?? string.Empty,
+                        Recipients = SentTo,
+                        Subject = Subject,
+                        Timestamp = DateTimeOffset.UtcNow
+                    };
+                    await SentMessageRepository.SaveAsync(record, cancellationToken);
+                }
                 var result = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
                 await Helpers.PostWebhookAsync(WebhookUrl, result, cancellationToken);
                 return result;

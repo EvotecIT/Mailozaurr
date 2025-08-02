@@ -426,6 +426,12 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
     public string? LogPath { get; set; }
 
     /// <summary>
+    /// <para>Specifies the path used to persist sent message metadata.</para>
+    /// </summary>
+    [Parameter(Mandatory = false)]
+    public string? SentLogPath { get; set; }
+
+    /// <summary>
     /// <para>Enables logging of communication with the server to the console.</para>
     /// </summary>
     [Parameter(Mandatory = false)]

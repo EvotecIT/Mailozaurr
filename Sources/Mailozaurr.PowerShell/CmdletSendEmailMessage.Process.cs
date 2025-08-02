@@ -332,6 +332,10 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
 
     private void ProcessSmtp(string? fromEmail, string? fromName) {
         Smtp smtpClient = new Smtp(LogPath, LogConsole, LogObject, LogTimestamps, LogSecrets, LogTimeStampsFormat, LogServerPrefix, LogClientPrefix, LogOverwrite);
+        var sentLogPath = string.IsNullOrWhiteSpace(SentLogPath)
+            ? Path.Combine(Path.GetTempPath(), "Mailozaurr", "sentlog.json")
+            : SentLogPath;
+        smtpClient.SentMessageRepository = new FileSentMessageRepository(sentLogPath);
         smtpClient.From = Helpers.GetFromObject(fromEmail, fromName);
         smtpClient.ReplyTo = ReplyTo;
         smtpClient.Cc = Cc;
