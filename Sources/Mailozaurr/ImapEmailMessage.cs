@@ -1,4 +1,5 @@
 using MailKit;
+using Mailozaurr.NonDeliveryReports;
 
 namespace Mailozaurr;
 
@@ -15,10 +16,11 @@ public class ImapEmailMessage {
     /// </summary>
     /// <param name="uid">Unique identifier of the message.</param>
     /// <param name="message">The actual MIME message.</param>
-    public ImapEmailMessage(UniqueId uid, MimeMessage message) {
+    public ImapEmailMessage(UniqueId uid, MimeMessage message, NonDeliveryReport? nonDeliveryReport = null) {
         Uid = uid;
         Message = message;
         Encryption = MimeKitUtils.GetEncryption(message);
+        NonDeliveryReport = nonDeliveryReport ?? MimeKitUtils.GetNonDeliveryReport(message);
     }
 
     /// <summary>Unique identifier of the message.</summary>
@@ -29,6 +31,9 @@ public class ImapEmailMessage {
 
     /// <summary>Detected encryption or signature type.</summary>
     public EmailEncryption Encryption { get; }
+
+    /// <summary>Parsed Non-Delivery Report details, if available.</summary>
+    public NonDeliveryReport? NonDeliveryReport { get; }
 
     /// <inheritdoc />
     public override string ToString() => Message.Subject ?? base.ToString();

@@ -1,3 +1,5 @@
+using Mailozaurr.NonDeliveryReports;
+
 namespace Mailozaurr;
 
 /// <summary>
@@ -13,10 +15,11 @@ public class Pop3EmailMessage {
     /// </summary>
     /// <param name="index">Index of the message within the mailbox.</param>
     /// <param name="message">The actual MIME message.</param>
-    public Pop3EmailMessage(int index, MimeMessage message) {
+    public Pop3EmailMessage(int index, MimeMessage message, NonDeliveryReport? nonDeliveryReport = null) {
         Index = index;
         Message = message;
         Encryption = MimeKitUtils.GetEncryption(message);
+        NonDeliveryReport = nonDeliveryReport ?? MimeKitUtils.GetNonDeliveryReport(message);
     }
 
     /// <summary>Index of the message within the mailbox.</summary>
@@ -27,6 +30,9 @@ public class Pop3EmailMessage {
 
     /// <summary>Detected encryption or signature type.</summary>
     public EmailEncryption Encryption { get; }
+
+    /// <summary>Parsed Non-Delivery Report details, if available.</summary>
+    public NonDeliveryReport? NonDeliveryReport { get; }
 
     /// <inheritdoc />
     public override string ToString() => Message.Subject ?? base.ToString();

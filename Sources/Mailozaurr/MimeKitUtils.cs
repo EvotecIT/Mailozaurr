@@ -1,3 +1,4 @@
+using Mailozaurr.NonDeliveryReports;
 using MimeKit;
 using System.Collections.Generic;
 using System.IO;
@@ -27,6 +28,67 @@ public static class MimeKitUtils {
                 msgPart.Message.WriteTo(file);
             }
         }
+    }
+
+    /// <summary>Attempts to extract a <see cref="NonDeliveryReport"/> from a message.</summary>
+    public static NonDeliveryReport? GetNonDeliveryReport(MimeMessage message) {
+        if (message == null) {
+            return null;
+        }
+
+        var status = FindDeliveryStatus(message.Body);
+        if (status == null && !SubjectIndicatesNdr(message.Subject)) {
+            return null;
+        }
+
+        var headers = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
+        if (status != null) {
+            foreach (var group in status.StatusGroups) {
+                foreach (var header in group) {
+                    if (!headers.ContainsKey(header.Field)) {
+                        headers[header.Field] = header.Value;
+                    }
+                }
+            }
+        }
+
+        return headers.Count > 0 ? NonDeliveryReport.FromHeaders(headers) : new NonDeliveryReport();
+    }
+
+    private static MessageDeliveryStatus? FindDeliveryStatus(MimeEntity entity) {
+        if (entity is MessageDeliveryStatus mds) {
+            return mds;
+        }
+        if (entity is Multipart multipart) {
+            foreach (var part in multipart) {
+                var found = FindDeliveryStatus(part);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static bool SubjectIndicatesNdr(string? subject) {
+        if (string.IsNullOrWhiteSpace(subject)) {
+            return false;
+        }
+        string[] patterns = {
+            "Undelivered Mail Returned to Sender",
+            "Mail delivery failed",
+            "Delivery Status Notification",
+            "Mail Delivery Subsystem",
+            "failure notice",
+            "Delivery failure"
+        };
+
+        foreach (var p in patterns) {
+            if (subject.IndexOf(p, System.StringComparison.OrdinalIgnoreCase) >= 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// <summary>Determines the encryption or signing type of a message.</summary>
