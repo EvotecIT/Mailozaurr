@@ -12,10 +12,13 @@ public sealed class SendLogResolver {
             return null;
         }
         var record = await repository.GetByMessageIdAsync(report.OriginalMessageId!, cancellationToken);
-        if (record != null && !string.IsNullOrWhiteSpace(report.FinalRecipient)) {
-            var recipients = record.Recipients.Split(',');
-            if (!recipients.Any(r => string.Equals(r, report.FinalRecipient, StringComparison.OrdinalIgnoreCase))) {
-                return null;
+        if (record != null) {
+            var recipient = report.FinalRecipientAddress ?? report.OriginalRecipientAddress;
+            if (!string.IsNullOrWhiteSpace(recipient)) {
+                var recipients = record.Recipients.Split(',').Select(r => r.Trim());
+                if (!recipients.Any(r => string.Equals(r, recipient, StringComparison.OrdinalIgnoreCase))) {
+                    return null;
+                }
             }
         }
         return record;
