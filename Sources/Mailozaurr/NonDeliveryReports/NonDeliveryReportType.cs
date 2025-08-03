@@ -13,5 +13,11 @@ public enum NonDeliveryReportType {
     /// <summary>The recipient's mailbox is full.</summary>
     MailboxFull,
     /// <summary>The recipient does not exist.</summary>
-    UnknownRecipient
+    UnknownRecipient,
+    /// <summary>The message was blocked due to policy or security settings.</summary>
+    PolicyBlock,
+    /// <summary>The message content was rejected or unsupported.</summary>
+    ContentRejected,
+    /// <summary>The message could not be delivered due to DNS or routing failures.</summary>
+    DnsFailure
 }

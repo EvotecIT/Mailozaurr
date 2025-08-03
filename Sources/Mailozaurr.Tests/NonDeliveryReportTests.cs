@@ -12,6 +12,9 @@ public class NonDeliveryReportTests {
     [InlineData("4.2.2", DsnStatusClass.PersistentTransientFailure, NonDeliveryReportType.MailboxFull)]
     [InlineData("4.1.0", DsnStatusClass.PersistentTransientFailure, NonDeliveryReportType.SoftBounce)]
     [InlineData("5.0.0", DsnStatusClass.PermanentFailure, NonDeliveryReportType.HardBounce)]
+    [InlineData("5.7.1", DsnStatusClass.PermanentFailure, NonDeliveryReportType.PolicyBlock)]
+    [InlineData("5.6.1", DsnStatusClass.PermanentFailure, NonDeliveryReportType.ContentRejected)]
+    [InlineData("4.4.1", DsnStatusClass.PersistentTransientFailure, NonDeliveryReportType.DnsFailure)]
     public void ParseStatusAndMapType(string code, DsnStatusClass expectedClass, NonDeliveryReportType expectedType) {
         var status = DsnStatus.Parse(code);
         Assert.Equal(expectedClass, status.Class);
