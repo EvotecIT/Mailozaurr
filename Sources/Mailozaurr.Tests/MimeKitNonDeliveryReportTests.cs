@@ -28,4 +28,13 @@ public class MimeKitNonDeliveryReportTests {
         Assert.EndsWith("user1@example.com", reports[0].FinalRecipient);
         Assert.EndsWith("user2@example.com", reports[1].FinalRecipient);
     }
+
+    [Fact]
+    public void GetNonDeliveryReports_DetectsReportViaSubject() {
+        const string raw = "Subject: Mail Delivery Subsystem\n\ntext";
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(raw));
+        var message = MimeMessage.Load(stream);
+        var reports = MimeKitUtils.GetNonDeliveryReports(message);
+        Assert.Single(reports);
+    }
 }
