@@ -22,5 +22,5 @@ public sealed class ImapNonDeliveryReportService : NonDeliveryReportServiceBase 
         string? messageId,
         int maxResults,
         CancellationToken cancellationToken) =>
-        MailboxSearcher.SearchNonDeliveryReportsAsync(client, folder, since, before, recipientContains, messageId, maxResults, cancellationToken);
+        MailboxSearcher.SearchNonDeliveryReportsAsync(client, folder, since, before, recipientContains, messageId, maxResults, cancellationToken: cancellationToken);
 }

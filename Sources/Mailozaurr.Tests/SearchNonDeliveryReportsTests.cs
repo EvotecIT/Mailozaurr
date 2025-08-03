@@ -6,6 +6,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using MailKit.Search;
+using MailKit.Net.Pop3;
+using MailKit;
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -80,5 +85,43 @@ public class SearchNonDeliveryReportsTests {
             return false;
         });
         Assert.True(hasSubject);
+    }
+
+    private class FakePop3Client : Pop3Client {
+        private readonly List<MimeMessage> _messages;
+        private readonly int _delay;
+        public FakePop3Client(IEnumerable<MimeMessage> messages, int delay) {
+            _messages = new List<MimeMessage>(messages);
+            _delay = delay;
+        }
+        public override bool IsConnected => true;
+        public override bool IsAuthenticated => true;
+        public override int Count => _messages.Count;
+        public override async Task<MimeMessage> GetMessageAsync(int index, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
+            await Task.Delay(_delay, cancellationToken).ConfigureAwait(false);
+            return _messages[index];
+        }
+    }
+
+    [Fact]
+    public async Task SearchNonDeliveryReportsAsync_Pop3_DownloadsInParallel() {
+        var now = DateTimeOffset.UtcNow;
+        var msgs = new List<MimeMessage>();
+        for (int i = 0; i < 4; i++) msgs.Add(CreateNdr($"u{i}@example.com", $"<id{i}>", now));
+        var client = new FakePop3Client(msgs, 500);
+        var seq = Stopwatch.StartNew();
+        _ = await MailboxSearcher.SearchNonDeliveryReportsAsync(
+            client,
+            parallelDownloadLimit: 0,
+            cancellationToken: CancellationToken.None);
+        seq.Stop();
+        var sw = Stopwatch.StartNew();
+        var reports = await MailboxSearcher.SearchNonDeliveryReportsAsync(
+            client,
+            parallelDownloadLimit: 4,
+            cancellationToken: CancellationToken.None);
+        sw.Stop();
+        Assert.Equal(4, reports.Count);
+        Assert.True(sw.Elapsed < seq.Elapsed, $"sequential: {seq.ElapsedMilliseconds}, parallel: {sw.ElapsedMilliseconds}");
     }
 }

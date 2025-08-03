@@ -18,5 +18,5 @@ public sealed class Pop3NonDeliveryReportService : NonDeliveryReportServiceBase 
         string? messageId,
         int maxResults,
         CancellationToken cancellationToken) =>
-        MailboxSearcher.SearchNonDeliveryReportsAsync(client, since, before, recipientContains, messageId, maxResults, cancellationToken);
+        MailboxSearcher.SearchNonDeliveryReportsAsync(client, since, before, recipientContains, messageId, maxResults, cancellationToken: cancellationToken);
 }

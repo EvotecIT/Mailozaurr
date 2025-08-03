@@ -120,15 +120,37 @@ public static class MailboxSearcher {
         string? recipientContains = null,
         string? messageId = null,
         int maxResults = 0,
+        int parallelDownloadLimit = 4,
         CancellationToken cancellationToken = default) {
         var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadOnly);
         var search = BuildNonDeliveryReportSearchQuery(since, before);
         var uids = await mailFolder.SearchAsync(search, cancellationToken).ConfigureAwait(false);
         var messages = new List<MimeMessage>(uids.Count);
-        foreach (var uid in uids) {
-            var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
-            messages.Add(msg);
-            if (maxResults > 0 && messages.Count >= maxResults) break;
+        if (parallelDownloadLimit <= 1) {
+            foreach (var uid in uids) {
+                cancellationToken.ThrowIfCancellationRequested();
+                var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
+                messages.Add(msg);
+                if (maxResults > 0 && messages.Count >= maxResults) break;
+            }
+        } else {
+            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
+            var tasks = new List<Task>();
+            foreach (var uid in uids) {
+                cancellationToken.ThrowIfCancellationRequested();
+                tasks.Add(Task.Run(async () => {
+                    await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    try {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
+                        lock (messages) messages.Add(msg);
+                    } finally {
+                        semaphore.Release();
+                    }
+                }, cancellationToken));
+                if (maxResults > 0 && tasks.Count >= maxResults) break;
+            }
+            await Task.WhenAll(tasks).ConfigureAwait(false);
         }
         return FilterNonDeliveryReports(messages, since, before, recipientContains, messageId);
     }
@@ -143,12 +165,37 @@ public static class MailboxSearcher {
         string? recipientContains = null,
         string? messageId = null,
         int maxResults = 0,
+        int parallelDownloadLimit = 4,
         CancellationToken cancellationToken = default) {
-        var messages = new List<MimeMessage>();
-        for (int i = 0; i < client.Count; i++) {
-            var msg = await client.GetMessageAsync(i, cancellationToken).ConfigureAwait(false);
-            messages.Add(msg);
-            if (maxResults > 0 && messages.Count >= maxResults) break;
+        var count = client.Count;
+        var indices = new List<int>(count);
+        for (int i = 0; i < count; i++) indices.Add(i);
+        var messages = new List<MimeMessage>(indices.Count);
+        if (parallelDownloadLimit <= 1) {
+            foreach (var idx in indices) {
+                cancellationToken.ThrowIfCancellationRequested();
+                var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
+                messages.Add(msg);
+                if (maxResults > 0 && messages.Count >= maxResults) break;
+            }
+        } else {
+            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
+            var tasks = new List<Task>();
+            foreach (var idx in indices) {
+                cancellationToken.ThrowIfCancellationRequested();
+                tasks.Add(Task.Run(async () => {
+                    await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    try {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
+                        lock (messages) messages.Add(msg);
+                    } finally {
+                        semaphore.Release();
+                    }
+                }, cancellationToken));
+                if (maxResults > 0 && tasks.Count >= maxResults) break;
+            }
+            await Task.WhenAll(tasks).ConfigureAwait(false);
         }
         return FilterNonDeliveryReports(messages, since, before, recipientContains, messageId);
     }
@@ -164,6 +211,7 @@ public static class MailboxSearcher {
         string? recipientContains = null,
         string? messageId = null,
         int maxResults = 0,
+        int parallelDownloadLimit = 4,
         CancellationToken cancellationToken = default) {
         var filters = new List<string>();
         if (since.HasValue) filters.Add($"receivedDateTime ge {since.Value:o}");
@@ -176,24 +224,34 @@ public static class MailboxSearcher {
             filter,
             maxResults > 0 ? maxResults : (int?)null).ConfigureAwait(false);
         var mimeMessages = new List<MimeMessage>(msgs.Count);
-        using var semaphore = new SemaphoreSlim(4);
-        var tasks = new List<Task>();
-        foreach (var m in msgs) {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (m.TryGetValue("id", out var idObj) && idObj is string id) {
-                tasks.Add(Task.Run(async () => {
-                    await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                    try {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
-                        lock (mimeMessages) mimeMessages.Add(mime);
-                    } finally {
-                        semaphore.Release();
-                    }
-                }, cancellationToken));
+        if (parallelDownloadLimit <= 1) {
+            foreach (var m in msgs) {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (m.TryGetValue("id", out var idObj) && idObj is string id) {
+                    var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
+                    mimeMessages.Add(mime);
+                }
             }
+        } else {
+            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
+            var tasks = new List<Task>();
+            foreach (var m in msgs) {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (m.TryGetValue("id", out var idObj) && idObj is string id) {
+                    tasks.Add(Task.Run(async () => {
+                        await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                        try {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
+                            lock (mimeMessages) mimeMessages.Add(mime);
+                        } finally {
+                            semaphore.Release();
+                        }
+                    }, cancellationToken));
+                }
+            }
+            await Task.WhenAll(tasks).ConfigureAwait(false);
         }
-        await Task.WhenAll(tasks).ConfigureAwait(false);
         return FilterNonDeliveryReports(mimeMessages, since, before, recipientContains, messageId);
     }
 
