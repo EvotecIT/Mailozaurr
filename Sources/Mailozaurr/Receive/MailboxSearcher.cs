@@ -217,10 +217,10 @@ public static class MailboxSearcher {
     }
 
     private static bool RecipientMatches(NonDeliveryReport report, string filter) {
-        if (!string.IsNullOrWhiteSpace(report.FinalRecipient) &&
-            report.FinalRecipient.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) return true;
-        if (!string.IsNullOrWhiteSpace(report.OriginalRecipient) &&
-            report.OriginalRecipient.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        if (!string.IsNullOrWhiteSpace(report.FinalRecipientAddress) &&
+            report.FinalRecipientAddress.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        if (!string.IsNullOrWhiteSpace(report.OriginalRecipientAddress) &&
+            report.OriginalRecipientAddress.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) return true;
         return false;
     }
 
