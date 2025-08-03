@@ -63,6 +63,13 @@ public sealed class CmdletGetEmailDeliveryStatus : AsyncPSCmdlet
     [Parameter]
     public string? UserPrincipalName { get; set; }
 
+    /// <summary>
+    /// <para type="description">Maximum concurrent MIME downloads; set to 1 to disable parallelism.</para>
+    /// </summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int ParallelDownloadLimit { get; set; } = 4;
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync()
     {
@@ -82,6 +89,7 @@ public sealed class CmdletGetEmailDeliveryStatus : AsyncPSCmdlet
                         Recipient,
                         MessageId,
                         max,
+                        parallelDownloadLimit: ParallelDownloadLimit,
                         cancellationToken: CancelToken);
                     foreach (var report in reports)
                     {
@@ -111,6 +119,7 @@ public sealed class CmdletGetEmailDeliveryStatus : AsyncPSCmdlet
                         Recipient,
                         MessageId,
                         max,
+                        parallelDownloadLimit: ParallelDownloadLimit,
                         cancellationToken: CancelToken);
                     foreach (var report in reports)
                     {
@@ -141,6 +150,7 @@ public sealed class CmdletGetEmailDeliveryStatus : AsyncPSCmdlet
                         Recipient,
                         MessageId,
                         max,
+                        parallelDownloadLimit: ParallelDownloadLimit,
                         cancellationToken: CancelToken);
                     foreach (var report in reports)
                     {
