@@ -100,16 +100,14 @@ public sealed class NonDeliveryReport {
         if (status is null) {
             return NonDeliveryReportType.Unknown;
         }
-        var statusCode = status.ToString();
-        if (statusCode == "5.1.1") {
-            return NonDeliveryReportType.UnknownRecipient;
-        }
-        if (statusCode == "5.2.2" || statusCode == "4.2.2") {
-            return NonDeliveryReportType.MailboxFull;
-        }
-        return status.Class switch {
-            DsnStatusClass.PermanentFailure => NonDeliveryReportType.HardBounce,
-            DsnStatusClass.PersistentTransientFailure => NonDeliveryReportType.SoftBounce,
+        return status switch {
+            { Subject: 1, Detail: 1 } => NonDeliveryReportType.UnknownRecipient,
+            { Subject: 2, Detail: 2 } => NonDeliveryReportType.MailboxFull,
+            { Subject: 7 } => NonDeliveryReportType.PolicyBlock,
+            { Subject: 6 } => NonDeliveryReportType.ContentRejected,
+            { Subject: 4 } => NonDeliveryReportType.DnsFailure,
+            { Class: DsnStatusClass.PermanentFailure } => NonDeliveryReportType.HardBounce,
+            { Class: DsnStatusClass.PersistentTransientFailure } => NonDeliveryReportType.SoftBounce,
             _ => NonDeliveryReportType.Unknown
         };
     }
