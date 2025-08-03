@@ -1,6 +1,7 @@
 using Mailozaurr.NonDeliveryReports;
 using System;
 using System.Collections.Generic;
+using MimeKit.Utils;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -57,5 +58,20 @@ public class NonDeliveryReportTests {
         };
         var report = NonDeliveryReport.FromHeaders(headers);
         Assert.Equal("<msg1@local>", report.OriginalMessageId);
+    }
+
+    [Theory]
+    [InlineData("Fri, 21 Jun 2024 10:12:34 +0000")]
+    [InlineData("Fri, 21 Jun 2024 10:12:34 +0000 (UTC)")]
+    [InlineData("21 Jun 2024 10:12:34 -0700")]
+    public void ParseTimestampHandlesVariousFormats(string dateHeader) {
+        var headers = new Dictionary<string, string> {
+            ["Arrival-Date"] = dateHeader,
+            ["Last-Attempt-Date"] = dateHeader
+        };
+        var report = NonDeliveryReport.FromHeaders(headers);
+        Assert.True(DateUtils.TryParse(dateHeader, out var expected));
+        Assert.Equal(expected, report.Timestamp);
+        Assert.Equal(expected, report.LastAttemptDate);
     }
 }
