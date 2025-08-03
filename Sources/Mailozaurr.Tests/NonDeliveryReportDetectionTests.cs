@@ -38,4 +38,15 @@ public class NonDeliveryReportDetectionTests {
         Assert.Single(graph.NonDeliveryReports);
         Assert.Equal(NonDeliveryReportType.UnknownRecipient, graph.NonDeliveryReports[0].Type);
     }
+
+    [Fact]
+    public void FilterNonDeliveryReports_IgnoresRecipientPrefixes() {
+        var msg = CreateNdrMessage();
+        var reports = MailboxSearcher.FilterNonDeliveryReports(new[] { msg }, null, null, "final@example.com", null);
+        Assert.Single(reports);
+        reports = MailboxSearcher.FilterNonDeliveryReports(new[] { msg }, null, null, "orig@example.com", null);
+        Assert.Single(reports);
+        reports = MailboxSearcher.FilterNonDeliveryReports(new[] { msg }, null, null, "rfc822", null);
+        Assert.Empty(reports);
+    }
 }
