@@ -16,6 +16,9 @@ namespace Mailozaurr;
 /// <remarks>
 /// Provides connection pooling and supports authentication using
 /// multiple mechanisms depending on server capabilities.
+/// <para>Instances are not thread-safe for concurrent operations. Calls to
+/// <see cref="Send"/> or <see cref="SendAsync(System.Threading.CancellationToken)"/>
+/// are serialized so that only one send executes at a time per instance.</para>
 /// </remarks>
 public class Smtp {
 
@@ -164,6 +167,7 @@ public class Smtp {
     }
 
     private bool _skipCertificateValidation;
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
     /// <summary>Skip server certificate validation.</summary>
     public bool SkipCertificateValidation {
         get => _skipCertificateValidation;
@@ -607,17 +611,35 @@ public class Smtp {
     /// <summary>
     /// Send the email message.
     /// </summary>
+    /// <remarks>
+    /// Concurrent calls are serialized so that only one send executes at a time for a
+    /// given instance.
+    /// </remarks>
     /// <returns></returns>
     public SmtpResult Send() {
-        return SendCoreAsync().GetAwaiter().GetResult();
+        _sendLock.Wait();
+        try {
+            return SendCoreAsync().GetAwaiter().GetResult();
+        } finally {
+            _sendLock.Release();
+        }
     }
 
     /// <summary>
     /// Send the email message asynchronously.
     /// </summary>
+    /// <remarks>
+    /// Concurrent calls are serialized so that only one send executes at a time for a
+    /// given instance.
+    /// </remarks>
     /// <returns></returns>
-    public Task<SmtpResult> SendAsync(CancellationToken cancellationToken = default) {
-        return SendCoreAsync(cancellationToken);
+    public async Task<SmtpResult> SendAsync(CancellationToken cancellationToken = default) {
+        await _sendLock.WaitAsync(cancellationToken);
+        try {
+            return await SendCoreAsync(cancellationToken);
+        } finally {
+            _sendLock.Release();
+        }
     }
 
     private async Task<SmtpResult> SendCoreAsync(CancellationToken cancellationToken = default) {
