@@ -82,7 +82,7 @@ public sealed class CmdletGetEmailDeliveryStatus : AsyncPSCmdlet
                         Recipient,
                         MessageId,
                         max,
-                        CancelToken);
+                        cancellationToken: CancelToken);
                     foreach (var report in reports)
                     {
                         WriteObject(report);
@@ -111,7 +111,7 @@ public sealed class CmdletGetEmailDeliveryStatus : AsyncPSCmdlet
                         Recipient,
                         MessageId,
                         max,
-                        CancelToken);
+                        cancellationToken: CancelToken);
                     foreach (var report in reports)
                     {
                         WriteObject(report);
@@ -141,7 +141,7 @@ public sealed class CmdletGetEmailDeliveryStatus : AsyncPSCmdlet
                         Recipient,
                         MessageId,
                         max,
-                        CancelToken);
+                        cancellationToken: CancelToken);
                     foreach (var report in reports)
                     {
                         WriteObject(report);
