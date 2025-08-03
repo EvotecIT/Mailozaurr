@@ -1,4 +1,7 @@
 using Mailozaurr.NonDeliveryReports;
+using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
 
 namespace Mailozaurr.Tests;
 
@@ -38,5 +41,55 @@ public class SentMessageRepositoryTests {
         } finally {
             if (File.Exists(path)) File.Delete(path);
         }
+    }
+
+    [Fact]
+    public async Task GetByMessageIdAsync_FastLookupInLargeLog() {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".json");
+        try {
+            const int count = 10000;
+            var newline = Encoding.UTF8.GetBytes(Environment.NewLine);
+            using (var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read)) {
+                for (int i = 0; i < count; i++) {
+                    var record = new SentMessageRecord {
+                        MessageId = i.ToString(),
+                        Recipients = "a@b.com",
+                        Subject = "s",
+                        Timestamp = DateTimeOffset.UtcNow
+                    };
+                    await JsonSerializer.SerializeAsync(stream, record);
+                    await stream.WriteAsync(newline, 0, newline.Length);
+                }
+            }
+            // Reinitialize repository to rebuild the index
+            var repo = new FileSentMessageRepository(path);
+            var targetId = (count - 1).ToString();
+            var seqWatch = Stopwatch.StartNew();
+            _ = await SequentialSearchAsync(path, targetId);
+            seqWatch.Stop();
+            var idxWatch = Stopwatch.StartNew();
+            var recordFound = await repo.GetByMessageIdAsync(targetId);
+            idxWatch.Stop();
+            Assert.NotNull(recordFound);
+            Assert.True(idxWatch.Elapsed < seqWatch.Elapsed);
+        } finally {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    private static async Task<SentMessageRecord?> SequentialSearchAsync(string path, string messageId) {
+        using var read = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = new StreamReader(read);
+        while (!reader.EndOfStream) {
+            string? line = await reader.ReadLineAsync();
+            if (string.IsNullOrWhiteSpace(line)) {
+                continue;
+            }
+            var record = JsonSerializer.Deserialize<SentMessageRecord>(line);
+            if (record != null && string.Equals(record.MessageId, messageId, StringComparison.OrdinalIgnoreCase)) {
+                return record;
+            }
+        }
+        return null;
     }
 }
