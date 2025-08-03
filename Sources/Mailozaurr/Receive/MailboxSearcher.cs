@@ -297,18 +297,10 @@ public static class MailboxSearcher {
         return false;
     }
 
-    private static readonly string[] NdrSubjectPatterns = new[] {
-        "Undelivered Mail Returned to Sender",
-        "Delivery Status Notification",
-        "Mail delivery failed",
-        "Mail Delivery Subsystem",
-        "Failure Notice"
-    };
-
     internal static SearchQuery BuildNonDeliveryReportSearchQuery(DateTime? since, DateTime? before) {
         SearchQuery search = SearchQuery.HeaderContains("Content-Type", "delivery-status");
         SearchQuery? subjectQuery = null;
-        foreach (var pattern in NdrSubjectPatterns) {
+        foreach (var pattern in NonDeliveryReportSubjectPatterns.Values) {
             var q = SearchQuery.SubjectContains(pattern);
             subjectQuery = subjectQuery == null ? q : subjectQuery.Or(q);
         }

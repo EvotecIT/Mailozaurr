@@ -87,16 +87,7 @@ public static class MimeKitUtils {
         if (string.IsNullOrWhiteSpace(subject)) {
             return false;
         }
-        string[] patterns = {
-            "Undelivered Mail Returned to Sender",
-            "Mail delivery failed",
-            "Delivery Status Notification",
-            "Mail Delivery Subsystem",
-            "failure notice",
-            "Delivery failure"
-        };
-
-        foreach (var p in patterns) {
+        foreach (var p in NonDeliveryReportSubjectPatterns.Values) {
             if (subject.IndexOf(p, System.StringComparison.OrdinalIgnoreCase) >= 0) {
                 return true;
             }
