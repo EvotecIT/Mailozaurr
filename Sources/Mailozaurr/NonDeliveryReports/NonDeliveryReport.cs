@@ -1,4 +1,4 @@
-using System.Globalization;
+using MimeKit.Utils;
 
 namespace Mailozaurr.NonDeliveryReports;
 
@@ -89,7 +89,7 @@ public sealed class NonDeliveryReport {
     }
 
     private static DateTimeOffset ParseTimestamp(string? value) {
-        if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt)) {
+        if (DateUtils.TryParse(value, out var dt)) {
             return dt;
         }
         return DateTimeOffset.MinValue;
