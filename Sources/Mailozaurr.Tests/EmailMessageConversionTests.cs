@@ -24,6 +24,28 @@ public class EmailMessageConversionTests {
     }
 
     [Fact]
+    public void ConvertEmlToMsg_MultipleFiles() {
+        var tmpDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tmpDir);
+
+        var eml1 = Path.Combine(tmpDir, "a.eml");
+        File.WriteAllText(eml1, "From: a@example.com\r\nTo: a@example.com\r\nSubject: A\r\nDate: Mon, 21 Jun 2021 10:00:00 +0000\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nHello");
+        var eml2 = Path.Combine(tmpDir, "b.eml");
+        File.WriteAllText(eml2, "From: b@example.com\r\nTo: b@example.com\r\nSubject: B\r\nDate: Mon, 21 Jun 2021 10:00:00 +0000\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nWorld");
+
+        var outputDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var results = EmailMessage.ConvertEmlToMsg(new[] { eml1, eml2 }, outputDir, true).ToList();
+
+        Assert.Equal(2, results.Count);
+        Assert.All(results, r => Assert.True(r.Status));
+        Assert.True(File.Exists(Path.Combine(outputDir, "a.msg")));
+        Assert.True(File.Exists(Path.Combine(outputDir, "b.msg")));
+
+        Directory.Delete(tmpDir, true);
+        Directory.Delete(outputDir, true);
+    }
+
+    [Fact]
     public void ConvertMsgToEml_CreatesOutputDirectory() {
         var tmpDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(tmpDir);
@@ -45,4 +67,3 @@ public class EmailMessageConversionTests {
         Directory.Delete(outputDir, true);
     }
 }
-
