@@ -53,10 +53,11 @@ public class HtmlAutoEmbedImageTests {
                 Headers = { ContentType = new MediaTypeHeaderValue("image/png") }
             }
         });
-        var property = typeof(HtmlUtils).GetProperty("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var client = new HttpClient(handler);
-        var original = (HttpClient)property.GetValue(null)!;
-        property.SetValue(null, client);
+        var client = HtmlUtils.HttpClient;
+        var handlerField = typeof(HttpMessageInvoker).GetField("_handler", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? typeof(HttpMessageInvoker).GetField("handler", BindingFlags.Instance | BindingFlags.NonPublic);
+        var original = (HttpMessageHandler)handlerField!.GetValue(client)!;
+        handlerField.SetValue(client, handler);
         try {
             var smtp = new Smtp { AutoEmbedRemoteImages = true };
             smtp.From = "a@b.com";
@@ -70,7 +71,7 @@ public class HtmlAutoEmbedImageTests {
             Assert.Contains("cid:img.png", smtp.HtmlBody);
             Assert.Single(handler.Requests);
         } finally {
-            property.SetValue(null, original);
+            handlerField.SetValue(client, original);
         }
     }
 }

@@ -12,10 +12,10 @@ namespace Mailozaurr;
 /// performing minor HTML transformations.
 /// </remarks>
 public static class HtmlUtils {
-    internal static HttpClient HttpClient { get; set; }
+    internal static HttpClient HttpClient { get; } = new HttpClient();
 
     static HtmlUtils() {
-        HttpClient = new HttpClient();
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => HttpClient.Dispose();
     }
 
     /// <summary>

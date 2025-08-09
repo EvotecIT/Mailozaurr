@@ -39,9 +39,11 @@ public class HtmlUtilsTests
                 Headers = { ContentType = new MediaTypeHeaderValue("image/png") }
             }
         });
-        var property = typeof(HtmlUtils).GetProperty("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var original = (HttpClient)property.GetValue(null)!;
-        property.SetValue(null, new HttpClient(handler));
+        var client = HtmlUtils.HttpClient;
+        var handlerField = typeof(HttpMessageInvoker).GetField("_handler", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? typeof(HttpMessageInvoker).GetField("handler", BindingFlags.Instance | BindingFlags.NonPublic);
+        var original = (HttpMessageHandler)handlerField!.GetValue(client)!;
+        handlerField.SetValue(client, handler);
         try
         {
             var (result, images) = await HtmlUtils.DownloadRemoteImagesAsync(html);
@@ -53,7 +55,38 @@ public class HtmlUtilsTests
         }
         finally
         {
-            property.SetValue(null, original);
+            handlerField.SetValue(client, original);
+        }
+    }
+
+    [Fact]
+    public async Task DownloadRemoteImagesAsync_DoesNotCreateExtraHandlers()
+    {
+        const string url = "https://example.com/img.png";
+        var html = $"<img src=\"{url}\">";
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(new byte[] { 1, 2, 3 })
+            {
+                Headers = { ContentType = new MediaTypeHeaderValue("image/png") }
+            }
+        });
+        var client = HtmlUtils.HttpClient;
+        var handlerField = typeof(HttpMessageInvoker).GetField("_handler", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? typeof(HttpMessageInvoker).GetField("handler", BindingFlags.Instance | BindingFlags.NonPublic);
+        var original = (HttpMessageHandler)handlerField!.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        try
+        {
+            await HtmlUtils.DownloadRemoteImagesAsync(html);
+            await HtmlUtils.DownloadRemoteImagesAsync(html);
+
+            Assert.Equal(2, handler.Requests.Count);
+            Assert.Same(handler, handlerField!.GetValue(HtmlUtils.HttpClient));
+        }
+        finally
+        {
+            handlerField.SetValue(client, original);
         }
     }
 }
