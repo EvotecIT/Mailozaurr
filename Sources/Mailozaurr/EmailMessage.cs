@@ -16,15 +16,7 @@ public static class EmailMessage {
     /// <returns>A collection of conversion results for each processed file.</returns>
     public static IEnumerable<EmlConversionResult> ConvertEmlToMsg(string[] emlFile, string outputFolder, bool force) {
         LoggingMessages.Logger.WriteVerbose($"Converting {emlFile.Length} EML file(s) to MSG file(s)...");
-        if (!Directory.Exists(outputFolder)) {
-            Directory.CreateDirectory(outputFolder);
-        }
-        foreach (var eml in emlFile) {
-            var fileName = Path.GetFileNameWithoutExtension(eml);
-            var targetFile = Path.Combine(outputFolder, $"{fileName}.msg");
-            var msg = ConvertEmlToMsg(new FileInfo(eml), new FileInfo(targetFile), force);
-            yield return msg;
-        }
+        return ConvertFiles(emlFile, outputFolder, ".msg", ConvertEmlToMsg, force);
     }
 
     /// <summary>
@@ -70,15 +62,7 @@ public static class EmailMessage {
     /// <returns>A collection of conversion results for each processed file.</returns>
     public static IEnumerable<MsgConversionResult> ConvertMsgToEml(string[] msgFile, string outputFolder, bool force) {
         LoggingMessages.Logger.WriteVerbose($"Converting {msgFile.Length} MSG file(s) to EML file(s)...");
-        if (!Directory.Exists(outputFolder)) {
-            Directory.CreateDirectory(outputFolder);
-        }
-        foreach (var msg in msgFile) {
-            var fileName = Path.GetFileNameWithoutExtension(msg);
-            var targetFile = Path.Combine(outputFolder, $"{fileName}.eml");
-            var eml = ConvertMsgToEml(new FileInfo(msg), new FileInfo(targetFile), force);
-            yield return eml;
-        }
+        return ConvertFiles(msgFile, outputFolder, ".eml", ConvertMsgToEml, force);
     }
 
     /// <summary>
@@ -113,5 +97,16 @@ public static class EmailMessage {
             }
         }
         return new MsgConversionResult() { MsgFile = msgFile.FullName, EmlFile = emlFile.FullName, Status = false, Error = "MSG file does not exist" };
+    }
+
+    private static IEnumerable<TResult> ConvertFiles<TResult>(string[] inputFiles, string outputFolder, string targetExtension, Func<FileInfo, FileInfo, bool, TResult> converter, bool force) {
+        if (!Directory.Exists(outputFolder)) {
+            Directory.CreateDirectory(outputFolder);
+        }
+        foreach (var file in inputFiles) {
+            var fileName = Path.GetFileNameWithoutExtension(file);
+            var targetFile = Path.Combine(outputFolder, $"{fileName}{targetExtension}");
+            yield return converter(new FileInfo(file), new FileInfo(targetFile), force);
+        }
     }
 }
