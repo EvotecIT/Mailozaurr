@@ -102,7 +102,7 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
         }
 
         if (ParameterSetName == "Csv") {
-            await ProcessCsvAsync(conn.Credential).ConfigureAwait(false);
+            await ProcessCsvAsync(conn.Credential);
             return;
         }
 
@@ -110,18 +110,18 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
             foreach (var perm in MailboxPermission!) {
                 if (perm.UserPrincipalName == null)
                     perm.UserPrincipalName = UserPrincipalName;
-                await ProcessGraphAsync(conn.Credential, perm).ConfigureAwait(false);
+                await ProcessGraphAsync(conn.Credential, perm);
             }
             return;
         }
 
         if (ParameterSetName == "Filter") {
-            await ProcessFilterAsync(conn.Credential).ConfigureAwait(false);
+            await ProcessFilterAsync(conn.Credential);
             return;
         }
 
         foreach (var id in PermissionId!)
-            await ProcessGraphAsync(conn.Credential, id).ConfigureAwait(false);
+            await ProcessGraphAsync(conn.Credential, id);
         return;
     }
 
@@ -132,19 +132,19 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
         foreach (var row in rows.OfType<PSObject>()) {
             var id = row.Properties["PermissionId"].Value?.ToString();
             if (!string.IsNullOrWhiteSpace(id))
-                await ProcessGraphAsync(cred, id).ConfigureAwait(false);
+                await ProcessGraphAsync(cred, id);
         }
     }
 
     private async Task ProcessFilterAsync(GraphCredential cred) {
-        var perms = await MicrosoftGraphUtils.GetMailboxPermissionsAsync(cred, UserPrincipalName!).ConfigureAwait(false);
+        var perms = await MicrosoftGraphUtils.GetMailboxPermissionsAsync(cred, UserPrincipalName!);
         var filtered = perms.AsEnumerable();
         if (Role != null && Role.Length > 0)
             filtered = filtered.Where(p => p.Roles != null && p.Roles.Intersect(Role).Any());
         if (GrantedToUser != null && GrantedToUser.Length > 0)
             filtered = filtered.Where(p => p.GrantedTo?.User != null && GrantedToUser.Contains(p.GrantedTo.User, StringComparer.OrdinalIgnoreCase));
         foreach (var p in filtered)
-            await ProcessGraphAsync(cred, p).ConfigureAwait(false);
+            await ProcessGraphAsync(cred, p);
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred, object permission) {
