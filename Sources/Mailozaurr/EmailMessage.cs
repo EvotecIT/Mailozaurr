@@ -16,6 +16,9 @@ public static class EmailMessage {
     /// <returns>A collection of conversion results for each processed file.</returns>
     public static IEnumerable<EmlConversionResult> ConvertEmlToMsg(string[] emlFile, string outputFolder, bool force) {
         LoggingMessages.Logger.WriteVerbose($"Converting {emlFile.Length} EML file(s) to MSG file(s)...");
+        if (!Directory.Exists(outputFolder)) {
+            Directory.CreateDirectory(outputFolder);
+        }
         foreach (var eml in emlFile) {
             var fileName = Path.GetFileNameWithoutExtension(eml);
             var targetFile = Path.Combine(outputFolder, $"{fileName}.msg");
@@ -34,6 +37,10 @@ public static class EmailMessage {
     public static EmlConversionResult ConvertEmlToMsg(FileInfo emlFile, FileInfo msgFile, bool force) {
         if (File.Exists(emlFile.FullName)) {
             LoggingMessages.Logger.WriteVerbose("Processing EML file: {0}", emlFile);
+            var dir = msgFile.DirectoryName;
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) {
+                Directory.CreateDirectory(dir);
+            }
             try {
                 if (File.Exists(msgFile.FullName) && !force) {
                     LoggingMessages.Logger.WriteWarning("MSG file already exists: {0}", msgFile);
@@ -63,6 +70,9 @@ public static class EmailMessage {
     /// <returns>A collection of conversion results for each processed file.</returns>
     public static IEnumerable<MsgConversionResult> ConvertMsgToEml(string[] msgFile, string outputFolder, bool force) {
         LoggingMessages.Logger.WriteVerbose($"Converting {msgFile.Length} MSG file(s) to EML file(s)...");
+        if (!Directory.Exists(outputFolder)) {
+            Directory.CreateDirectory(outputFolder);
+        }
         foreach (var msg in msgFile) {
             var fileName = Path.GetFileNameWithoutExtension(msg);
             var targetFile = Path.Combine(outputFolder, $"{fileName}.eml");
@@ -81,6 +91,10 @@ public static class EmailMessage {
     public static MsgConversionResult ConvertMsgToEml(FileInfo msgFile, FileInfo emlFile, bool force) {
         if (File.Exists(msgFile.FullName)) {
             LoggingMessages.Logger.WriteVerbose("Processing MSG file: {0}", msgFile);
+            var dir = emlFile.DirectoryName;
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) {
+                Directory.CreateDirectory(dir);
+            }
             try {
                 if (File.Exists(emlFile.FullName) && !force) {
                     LoggingMessages.Logger.WriteWarning("EML file already exists: {0}", emlFile);
