@@ -13,7 +13,7 @@ public class OAuthHelpersCachedTokenTests {
             AccessToken = "token",
             ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
         };
-        OAuthTokenCache.Set(cacheKey, credential);
+        await OAuthTokenCache.SetAsync(cacheKey, credential);
 
         var result = await OAuthHelpers.AcquireO365TokenCachedAsync(
             "test@example.com",

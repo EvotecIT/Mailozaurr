@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace Mailozaurr;
 
@@ -17,17 +18,27 @@ internal static class OAuthTokenCache {
 
     private static Dictionary<string, OAuthCredential>? _cache;
 
-    private static Dictionary<string, OAuthCredential> LoadCache() {
+    private static async Task<Dictionary<string, OAuthCredential>> LoadCacheAsync() {
+        if (_cache != null) {
+            return _cache;
+        }
+        Dictionary<string, OAuthCredential> cache;
+        if (File.Exists(CacheFilePath)) {
+#if NETFRAMEWORK || NETSTANDARD2_0
+            string json;
+            using (var stream = new FileStream(CacheFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true))
+            using (var reader = new StreamReader(stream)) {
+                json = await reader.ReadToEndAsync().ConfigureAwait(false);
+            }
+#else
+            var json = await File.ReadAllTextAsync(CacheFilePath).ConfigureAwait(false);
+#endif
+            cache = JsonSerializer.Deserialize<Dictionary<string, OAuthCredential>>(json) ?? new();
+        } else {
+            cache = new Dictionary<string, OAuthCredential>();
+        }
         lock (LockObj) {
-            if (_cache != null) {
-                return _cache;
-            }
-            if (File.Exists(CacheFilePath)) {
-                var json = File.ReadAllText(CacheFilePath);
-                _cache = JsonSerializer.Deserialize<Dictionary<string, OAuthCredential>>(json) ?? new();
-            } else {
-                _cache = new Dictionary<string, OAuthCredential>();
-            }
+            _cache ??= cache;
             return _cache;
         }
     }
@@ -37,10 +48,12 @@ internal static class OAuthTokenCache {
     /// </summary>
     /// <param name="key">Unique cache key.</param>
     /// <returns>The cached credential or <c>null</c> if not found.</returns>
-    public static OAuthCredential? Get(string key) {
-        var cache = LoadCache();
-        cache.TryGetValue(key, out var cred);
-        return cred;
+    public static async Task<OAuthCredential?> GetAsync(string key) {
+        var cache = await LoadCacheAsync().ConfigureAwait(false);
+        lock (LockObj) {
+            cache.TryGetValue(key, out var cred);
+            return cred;
+        }
     }
 
     /// <summary>
@@ -48,16 +61,25 @@ internal static class OAuthTokenCache {
     /// </summary>
     /// <param name="key">Unique cache key.</param>
     /// <param name="credential">Credential to cache.</param>
-    public static void Set(string key, OAuthCredential credential) {
-        var cache = LoadCache();
-        cache[key] = credential;
+    public static async Task SetAsync(string key, OAuthCredential credential) {
+        var cache = await LoadCacheAsync().ConfigureAwait(false);
+        string? dir;
+        string json;
         lock (LockObj) {
-            var dir = Path.GetDirectoryName(CacheFilePath);
+            cache[key] = credential;
+            dir = Path.GetDirectoryName(CacheFilePath);
             if (!Directory.Exists(dir)) {
                 Directory.CreateDirectory(dir!);
             }
-            var json = JsonSerializer.Serialize(cache);
-            File.WriteAllText(CacheFilePath, json);
+            json = JsonSerializer.Serialize(cache);
         }
+#if NETFRAMEWORK || NETSTANDARD2_0
+        using (var stream = new FileStream(CacheFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, true))
+        using (var writer = new StreamWriter(stream)) {
+            await writer.WriteAsync(json).ConfigureAwait(false);
+        }
+#else
+        await File.WriteAllTextAsync(CacheFilePath, json).ConfigureAwait(false);
+#endif
     }
 }
