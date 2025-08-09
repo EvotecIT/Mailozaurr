@@ -22,6 +22,7 @@ public class ConnectorTests
         private int _timeout;
         public override bool IsConnected => _connected;
         public override int Timeout { get => _timeout; set => _timeout = value; }
+        public bool Disposed { get; private set; }
         public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default)
         {
             ConnectCalls++;
@@ -36,6 +37,11 @@ public class ConnectorTests
         {
             _connected = false;
             return Task.CompletedTask;
+        }
+        protected override void Dispose(bool disposing)
+        {
+            Disposed = true;
+            base.Dispose(disposing);
         }
     }
 
@@ -165,6 +171,43 @@ public class ConnectorTests
         LoggingMessages.Logger.OnWarningMessage -= Handler;
         ImapConnector.ClientFactory = () => new ImapClient();
         Assert.Contains(messages, static m => m.Contains("disconnect"));
+    }
+
+    [Fact]
+    public async Task ImapConnector_DisposesClientBeforeRetry()
+    {
+        var first = new FakeImapClient { FailuresBeforeSuccess = 1 };
+        var second = new FakeImapClient();
+        var call = 0;
+        ImapConnector.ClientFactory = () =>
+        {
+            call++;
+            if (call == 2)
+            {
+                Assert.True(first.Disposed);
+                return second;
+            }
+            return first;
+        };
+        var client = await ImapConnector.ConnectAsync(
+            "s", 1, SecureSocketOptions.Auto, 0, false, false,
+            c => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; },
+            1, 0, 1);
+        ImapConnector.ClientFactory = () => new ImapClient();
+        Assert.Same(second, client);
+    }
+
+    [Fact]
+    public async Task ImapConnector_DisposesClientAfterFinalFailure()
+    {
+        var fake = new FakeImapClient { FailuresBeforeSuccess = 1 };
+        ImapConnector.ClientFactory = () => fake;
+        await Assert.ThrowsAsync<HttpRequestException>(() => ImapConnector.ConnectAsync(
+            "s", 1, SecureSocketOptions.Auto, 0, false, false,
+            c => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; },
+            0, 0, 1));
+        ImapConnector.ClientFactory = () => new ImapClient();
+        Assert.True(fake.Disposed);
     }
 
     [Fact]
