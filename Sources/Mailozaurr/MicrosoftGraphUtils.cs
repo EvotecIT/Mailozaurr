@@ -232,7 +232,7 @@ namespace Mailozaurr {
                 }
                 attempts++;
             } while (attempts <= retryCount);
-            throw lastException!;
+            throw lastException ?? new InvalidOperationException("Operation failed without exception");
         }
 
         /// <summary>

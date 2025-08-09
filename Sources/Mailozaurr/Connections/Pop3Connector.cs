@@ -89,6 +89,6 @@ public static class Pop3Connector {
             }
             attempts++;
         } while (attempts <= retryCount);
-        throw lastException!;
+        throw lastException ?? new InvalidOperationException("Operation failed without exception");
     }
 }

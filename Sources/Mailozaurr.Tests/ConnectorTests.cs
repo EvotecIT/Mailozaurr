@@ -155,6 +155,32 @@ public class ConnectorTests
     }
 
     [Fact]
+    public async Task ImapConnector_NoRetriesThrowsOriginalException()
+    {
+        var fake = new FakeImapClient { FailuresBeforeSuccess = 1 };
+        ImapConnector.ClientFactory = () => fake;
+        await Assert.ThrowsAsync<HttpRequestException>(() => ImapConnector.ConnectAsync(
+            "s", 1, SecureSocketOptions.Auto, 0, false, false,
+            c => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; },
+            0, 10, 2));
+        ImapConnector.ClientFactory = () => new ImapClient();
+        Assert.Equal(1, fake.ConnectCalls);
+    }
+
+    [Fact]
+    public async Task Pop3Connector_NoRetriesThrowsOriginalException()
+    {
+        var fake = new FakePop3Client { FailuresBeforeSuccess = 1 };
+        Pop3Connector.ClientFactory = () => fake;
+        await Assert.ThrowsAsync<HttpRequestException>(() => Pop3Connector.ConnectAsync(
+            "s", 1, SecureSocketOptions.Auto, 0, false, false,
+            c => { ((FakePop3Client)c).Authenticated = true; return Task.CompletedTask; },
+            0, 10, 2));
+        Pop3Connector.ClientFactory = () => new Pop3Client();
+        Assert.Equal(1, fake.ConnectCalls);
+    }
+
+    [Fact]
     public async Task ImapConnector_LogsDisconnectException()
     {
         var fake = new FakeImapDisconnectFailClient();
