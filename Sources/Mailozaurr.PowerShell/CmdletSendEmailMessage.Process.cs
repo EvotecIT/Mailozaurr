@@ -2,6 +2,7 @@ using System;
 using System.Management.Automation;
 using System.IO;
 using System.Security.Cryptography.X509Certificates;
+using System.Threading.Tasks;
 using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
@@ -54,7 +55,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         } else if (Graph) {
             ProcessGraph(fromEmail, fromName);
         } else if (MgGraphRequest) {
-            ProcessMgGraphRequest(fromEmail, fromName);
+            ProcessMgGraphRequest(fromEmail, fromName).GetAwaiter().GetResult();
         } else {
             ProcessSmtp(fromEmail, fromName);
         }
@@ -275,7 +276,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         LogEmitter.EmitLogs(graph.LogCollector, this);
     }
 
-    private void ProcessMgGraphRequest(string? fromEmail, string? fromName) {
+    private async Task ProcessMgGraphRequest(string? fromEmail, string? fromName) {
         using Graph graph = new Graph();
         graph.ChunkSize = ChunkSize;
         graph.From = Helpers.GetFromObject(fromEmail, fromName);
@@ -309,11 +310,11 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         if (graph.IsLargerAttachment) {
             var json = graph.CreateDraftForMg();
             var draftMessageId = InvokeMgGraphRequestPOST1($"v1.0/users/{graph.From}/mailfolders/drafts/messages", EmailAction.SendDraftMessage, json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
-            graph.PrepareAttachments().GetAwaiter().GetResult();
+            await graph.PrepareAttachments();
             foreach (var attachment in graph.AttachmentsPlaceHolders) {
                 var uploadUrl = InvokeMgGraphRequestPOST(attachment.Json, EmailAction.Send, attachment.Json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
                 if (uploadUrl != string.Empty) {
-                    InvokeMgGraphRequestPUT(uploadUrl, EmailAction.SendAttachment, attachment, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+                    await InvokeMgGraphRequestPUT(uploadUrl, EmailAction.SendAttachment, attachment, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
                 } else {
                     graph.LogCollector.LogVerbose("PlaceHolders not working?");
                 }
@@ -478,13 +479,13 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         }
     }
 
-    private void InvokeMgGraphRequestPUT(string uri, EmailAction action, GraphAttachmentPlaceHolder attachment, string sentFrom, string sentTo, TimeSpan elapsed) {
+    private async Task InvokeMgGraphRequestPUT(string uri, EmailAction action, GraphAttachmentPlaceHolder attachment, string sentFrom, string sentTo, TimeSpan elapsed) {
         foreach (var body in attachment.Content) {
             var parameters = new Hashtable {
                 { "Method", "PUT" },
                 { "Uri", uri },
                 { "ContentType", "application/json; charset=UTF-8" },
-                { "Body",  body.ReadAsByteArrayAsync().Result },
+                { "Body",  await body.ReadAsByteArrayAsync() },
                 { "Headers", new Hashtable {
                          { "Content-Range", body.Headers.ContentRange },
                         // { "AnchorMailbox", sentFrom }

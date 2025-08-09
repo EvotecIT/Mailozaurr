@@ -89,7 +89,7 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
         }
 
         if (ParameterSetName == "Csv") {
-            await ProcessCsvAsync(conn.Credential).ConfigureAwait(false);
+            await ProcessCsvAsync(conn.Credential);
             return;
         }
 
@@ -97,13 +97,13 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
             foreach (var perm in MailboxPermission!) {
                 if (perm.UserPrincipalName == null)
                     perm.UserPrincipalName = UserPrincipalName;
-                await ProcessGraphAsync(conn.Credential, perm).ConfigureAwait(false);
+                await ProcessGraphAsync(conn.Credential, perm);
             }
             return;
         }
 
         foreach (var ht in Permission!)
-            await ProcessGraphAsync(conn.Credential, ht).ConfigureAwait(false);
+            await ProcessGraphAsync(conn.Credential, ht);
         return;
     }
 
@@ -113,7 +113,7 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
         var rows = ps.Invoke();
         foreach (var row in rows.OfType<PSObject>()) {
             var dict = row.Properties.ToDictionary(p => p.Name, p => p.Value);
-            await ProcessGraphAsync(cred, new Hashtable(dict)).ConfigureAwait(false);
+            await ProcessGraphAsync(cred, new Hashtable(dict));
         }
     }
 
