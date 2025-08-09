@@ -24,7 +24,7 @@ public static class OAuthHelpers {
     /// <param name="scopes">The scopes to request for the token.</param>
     /// <returns>A credential containing the access token.</returns>
     public static async Task<OAuthCredential> AcquireO365TokenInteractiveAsync(
-        string login,
+        string? login,
         string clientId,
         string tenantId,
         string redirectUri,
@@ -70,7 +70,7 @@ public static class OAuthHelpers {
     /// Attempts to silently acquire a new Office 365 access token using the cached refresh token.
     /// </summary>
     private static async Task<OAuthCredential?> AcquireO365TokenSilentAsync(
-        string login,
+        string? login,
         string clientId,
         string tenantId,
         string redirectUri,
@@ -147,26 +147,30 @@ public static class OAuthHelpers {
     /// Attempts to retrieve a cached Office 365 token or acquire a new one if necessary.
     /// </summary>
     public static async Task<OAuthCredential> AcquireO365TokenCachedAsync(
-        string login,
+        string? login,
         string clientId,
         string tenantId,
         string redirectUri,
         IEnumerable<string> scopes) {
-        var cacheKey = $"o365:{login}";
-        var cached = OAuthTokenCache.Get(cacheKey);
-        if (cached != null && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
-            return cached;
-        }
-        if (cached != null) {
-            var refreshed = await AcquireO365TokenSilentAsync(login, clientId, tenantId, redirectUri, scopes);
-            if (refreshed != null) {
-                OAuthTokenCache.Set(cacheKey, refreshed);
-                return refreshed;
+        var cacheKey = string.IsNullOrWhiteSpace(login) ? null : $"o365:{login}";
+        if (cacheKey != null) {
+            var cached = OAuthTokenCache.Get(cacheKey);
+            if (cached != null && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
+                return cached;
+            }
+            if (cached != null) {
+                var refreshed = await AcquireO365TokenSilentAsync(login, clientId, tenantId, redirectUri, scopes);
+                if (refreshed != null) {
+                    OAuthTokenCache.Set(cacheKey, refreshed);
+                    return refreshed;
+                }
             }
         }
 
         var cred = await AcquireO365TokenInteractiveAsync(login, clientId, tenantId, redirectUri, scopes);
-        OAuthTokenCache.Set(cacheKey, cred);
+        if (cacheKey != null) {
+            OAuthTokenCache.Set(cacheKey, cred);
+        }
         return cred;
     }
 

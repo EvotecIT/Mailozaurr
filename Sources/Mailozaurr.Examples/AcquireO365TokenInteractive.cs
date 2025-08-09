@@ -9,7 +9,7 @@ public static class AcquireO365TokenInteractive {
     /// <summary>Runs the example.</summary>
     public static async Task RunAsync() {
         // === CONFIGURATION ===
-        string login = "user@example.com";
+        string? login = "user@example.com";
         string clientId = "your-client-id";
         string tenantId = "your-tenant-id";
         string redirectUri = "https://login.microsoftonline.com/common/oauth2/nativeclient";
