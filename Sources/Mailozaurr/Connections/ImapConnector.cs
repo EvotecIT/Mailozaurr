@@ -73,6 +73,8 @@ public static class ImapConnector {
                     }
                 } catch (Exception ex2) {
                     LoggingMessages.Logger.WriteWarning($"Connect-IMAP - {ex2.Message}");
+                } finally {
+                    client.Dispose();
                 }
                 if ((!Helpers.IsTransient(ex)) || attempts >= retryCount) {
                     throw;
