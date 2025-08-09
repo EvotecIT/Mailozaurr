@@ -161,6 +161,11 @@ public class HelpersTests {
             => throw new HttpRequestException("boom");
     }
 
+    private class FailStatusHandler : HttpMessageHandler {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+    }
+
     [Fact]
     public async Task PostWebhookAsync_CancellationRequested_ThrowsAsync() {
         using var cts = new CancellationTokenSource();
@@ -175,6 +180,20 @@ public class HelpersTests {
     [Fact]
     public async Task PostWebhookAsync_HttpRequestException_LogsWarning() {
         var client = new HttpClient(new ThrowHandler());
+        var result = new SmtpResult(true, EmailAction.Send, string.Empty, string.Empty, string.Empty, 0, TimeSpan.Zero);
+        var messages = new List<string>();
+        void Handler(object? _, LogEventArgs e) => messages.Add(e.Message);
+        Mailozaurr.LoggingMessages.Logger.OnWarningMessage += Handler;
+
+        await Mailozaurr.Helpers.PostWebhookAsync("http://localhost", result, default, client);
+
+        Mailozaurr.LoggingMessages.Logger.OnWarningMessage -= Handler;
+        Assert.Contains(messages, static m => m.Contains("Failed to post webhook"));
+    }
+
+    [Fact]
+    public async Task PostWebhookAsync_NonSuccessStatus_LogsWarning() {
+        var client = new HttpClient(new FailStatusHandler());
         var result = new SmtpResult(true, EmailAction.Send, string.Empty, string.Empty, string.Empty, 0, TimeSpan.Zero);
         var messages = new List<string>();
         void Handler(object? _, LogEventArgs e) => messages.Add(e.Message);
