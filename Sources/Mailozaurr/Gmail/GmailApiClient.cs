@@ -157,11 +157,27 @@ public sealed class GmailApiClient {
 #else
         var json = await response.Content.ReadAsStringAsync();
 #endif
-        var result = JsonSerializer.Deserialize<AttachmentResponse>(json, s_jsonOptions)!;
-        var data = result.Data?.Replace('-', '+').Replace('_', '/') ?? string.Empty;
+        var result = JsonSerializer.Deserialize<AttachmentResponse>(json, s_jsonOptions);
+        if (string.IsNullOrEmpty(result?.Data)) {
+            return Array.Empty<byte>();
+        }
+
+        var data = result.Data.Replace('-', '+').Replace('_', '/');
+
+        if (data.Length % 4 == 1) {
+            throw new InvalidDataException("Attachment data is not a valid Base64 string.");
+        }
+
         int padding = (4 - data.Length % 4) % 4;
-        if (padding > 0) data = data.PadRight(data.Length + padding, '=');
-        return Convert.FromBase64String(data);
+        if (padding > 0) {
+            data = data.PadRight(data.Length + padding, '=');
+        }
+
+        try {
+            return Convert.FromBase64String(data);
+        } catch (FormatException ex) {
+            throw new InvalidDataException("Attachment data is not a valid Base64 string.", ex);
+        }
     }
 
     private static void ExtractAttachments(JsonElement part, List<GmailAttachmentInfo> list) {
