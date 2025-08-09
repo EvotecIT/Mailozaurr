@@ -90,6 +90,6 @@ public static class ImapConnector {
             }
             attempts++;
         } while (attempts <= retryCount);
-        throw lastException!;
+        throw lastException ?? new InvalidOperationException("Operation failed without exception");
     }
 }
