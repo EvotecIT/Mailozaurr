@@ -1,5 +1,8 @@
 using Mailozaurr;
+using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Reflection;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -65,5 +68,50 @@ public class TemporaryPgpKeyPairTests
         Assert.False(File.Exists(pub));
         Assert.False(File.Exists(priv));
         Assert.False(Directory.Exists(dir));
+    }
+
+    [Fact]
+    public void Dispose_WhenDeletionFails_LogsWarnings()
+    {
+        var pair = TemporaryPgpKeyPair.Create("a@b.com");
+        string originalDir = Path.GetDirectoryName(pair.PublicKeyPath)!;
+
+        string protectedFile;
+        string protectedDir;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            protectedFile = Path.Combine(Environment.SystemDirectory, "kernel32.dll");
+            protectedDir = Path.Combine(Environment.SystemDirectory, "drivers");
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            protectedFile = "/System/Library/CoreServices/SystemVersion.plist";
+            protectedDir = "/System/Library";
+        }
+        else
+        {
+            protectedFile = "/proc/version";
+            protectedDir = "/proc/self/fd";
+        }
+
+        var type = typeof(TemporaryPgpKeyPair);
+        type.GetField("<PublicKeyPath>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(pair, protectedFile);
+        type.GetField("_tempDirectory", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(pair, protectedDir);
+
+        var messages = new List<string>();
+        void Handler(object? _, LogEventArgs e) => messages.Add(e.Message);
+        LoggingMessages.Logger.OnWarningMessage += Handler;
+
+        pair.Dispose();
+
+        LoggingMessages.Logger.OnWarningMessage -= Handler;
+
+        if (Directory.Exists(originalDir))
+            Directory.Delete(originalDir, true);
+
+        Assert.Contains(messages, static m => m.Contains("Failed to delete public key"));
+        Assert.Contains(messages, static m => m.Contains("Failed to delete temporary directory"));
     }
 }

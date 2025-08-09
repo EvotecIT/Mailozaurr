@@ -92,11 +92,52 @@ public sealed class TemporaryPgpKeyPair : IDisposable
     {
         if (_deleteOnDispose)
         {
-            try { File.Delete(PublicKeyPath); } catch { }
-            try { File.Delete(PrivateKeyPath); } catch { }
-            if (_removeDirectory)
+            if (File.Exists(PublicKeyPath))
             {
-                try { Directory.Delete(_tempDirectory, true); } catch { }
+                try
+                {
+                    File.Delete(PublicKeyPath);
+                }
+                catch (IOException ex)
+                {
+                    LoggingMessages.Logger.WriteWarning($"Failed to delete public key: {ex.Message}");
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    LoggingMessages.Logger.WriteWarning($"Failed to delete public key due to unauthorized access: {ex.Message}");
+                }
+            }
+
+            if (File.Exists(PrivateKeyPath))
+            {
+                try
+                {
+                    File.Delete(PrivateKeyPath);
+                }
+                catch (IOException ex)
+                {
+                    LoggingMessages.Logger.WriteWarning($"Failed to delete private key: {ex.Message}");
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    LoggingMessages.Logger.WriteWarning($"Failed to delete private key due to unauthorized access: {ex.Message}");
+                }
+            }
+
+            if (_removeDirectory && Directory.Exists(_tempDirectory))
+            {
+                try
+                {
+                    Directory.Delete(_tempDirectory, true);
+                }
+                catch (IOException ex)
+                {
+                    LoggingMessages.Logger.WriteWarning($"Failed to delete temporary directory: {ex.Message}");
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    LoggingMessages.Logger.WriteWarning($"Failed to delete temporary directory due to unauthorized access: {ex.Message}");
+                }
             }
         }
     }
