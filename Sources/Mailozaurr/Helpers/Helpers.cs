@@ -39,11 +39,14 @@ public static class Helpers {
     /// <summary>Extracts the API key from a credential object.</summary>
     /// <param name="credentials">Credential containing the key.</param>
     /// <returns>The API key.</returns>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="credentials"/> is not a <see cref="NetworkCredential"/>.
+    /// </exception>
     public static string CredentialToApiKey(ICredentials credentials) {
         if (credentials is NetworkCredential networkCredential) {
             return networkCredential.Password;
         }
-        return string.Empty;
+        throw new ArgumentException("Credential must be of type NetworkCredential", nameof(credentials));
     }
 
     /// <summary>Retrieves the email address string from various types of objects.</summary>

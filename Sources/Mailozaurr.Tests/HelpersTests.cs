@@ -73,12 +73,10 @@ public class HelpersTests {
     }
 
     [Fact]
-    public void CredentialToApiKey_ReturnsEmptyString_WhenNotNetworkCredential() {
+    public void CredentialToApiKey_ThrowsArgumentException_WhenNotNetworkCredential() {
         ICredentials creds = new DummyCredentials();
 
-        string result = Mailozaurr.Helpers.CredentialToApiKey(creds);
-
-        Assert.Equal(string.Empty, result);
+        Assert.Throws<ArgumentException>(() => Mailozaurr.Helpers.CredentialToApiKey(creds));
     }
 
     [Fact]
