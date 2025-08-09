@@ -65,7 +65,11 @@ public sealed class GmailApiClient {
 #else
         var resultJson = await response.Content.ReadAsStringAsync();
 #endif
-        return JsonSerializer.Deserialize<GmailMessage>(resultJson, s_jsonOptions)!;
+        var result = JsonSerializer.Deserialize<GmailMessage>(resultJson, s_jsonOptions);
+        if (result is null) {
+            throw new InvalidDataException("Gmail API returned an invalid send response.");
+        }
+        return result;
     }
 
     /// <summary>
@@ -113,7 +117,11 @@ public sealed class GmailApiClient {
 #else
         var json = await response.Content.ReadAsStringAsync();
 #endif
-        return JsonSerializer.Deserialize<GmailMessage>(json, s_jsonOptions)!;
+        var message = JsonSerializer.Deserialize<GmailMessage>(json, s_jsonOptions);
+        if (message is null) {
+            throw new InvalidDataException("Gmail API returned an invalid message response.");
+        }
+        return message;
     }
 
     /// <summary>

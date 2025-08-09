@@ -1088,7 +1088,11 @@ namespace Mailozaurr {
             var body = JsonSerializer.Serialize(rule, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/mailFolders/inbox/messageRules");
             var doc = await InvokeGraphApiAsync("POST", uri, headers, body);
-            return JsonSerializer.Deserialize<GraphInboxRule>(doc.RootElement.GetRawText())!;
+            var created = JsonSerializer.Deserialize<GraphInboxRule>(doc.RootElement.GetRawText());
+            if (created is null) {
+                throw new InvalidDataException("Microsoft Graph returned an invalid inbox rule response.");
+            }
+            return created;
         }
 
         /// <summary>
@@ -1105,7 +1109,11 @@ namespace Mailozaurr {
             var body = JsonSerializer.Serialize(rule, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/mailFolders/inbox/messageRules/{ruleId}");
             var doc = await InvokeGraphApiAsync("PATCH", uri, headers, body);
-            return JsonSerializer.Deserialize<GraphInboxRule>(doc.RootElement.GetRawText())!;
+            var updated = JsonSerializer.Deserialize<GraphInboxRule>(doc.RootElement.GetRawText());
+            if (updated is null) {
+                throw new InvalidDataException("Microsoft Graph returned an invalid inbox rule response.");
+            }
+            return updated;
         }
 
         /// <summary>
@@ -1167,7 +1175,11 @@ namespace Mailozaurr {
             var body = JsonSerializer.Serialize(ev, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
             var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/events");
             var doc = await InvokeGraphApiAsync("POST", uri, headers, body);
-            return JsonSerializer.Deserialize<GraphEvent>(doc.RootElement.GetRawText())!;
+            var created = JsonSerializer.Deserialize<GraphEvent>(doc.RootElement.GetRawText());
+            if (created is null) {
+                throw new InvalidDataException("Microsoft Graph returned an invalid event response.");
+            }
+            return created;
         }
 
         /// <summary>
@@ -1184,7 +1196,11 @@ namespace Mailozaurr {
             var body = JsonSerializer.Serialize(ev, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
             var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/events/{eventId}");
             var doc = await InvokeGraphApiAsync("PATCH", uri, headers, body);
-            return JsonSerializer.Deserialize<GraphEvent>(doc.RootElement.GetRawText())!;
+            var updated = JsonSerializer.Deserialize<GraphEvent>(doc.RootElement.GetRawText());
+            if (updated is null) {
+                throw new InvalidDataException("Microsoft Graph returned an invalid event response.");
+            }
+            return updated;
         }
 
         /// <summary>
