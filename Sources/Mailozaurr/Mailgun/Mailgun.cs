@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Diagnostics;
 using System.Threading;
@@ -14,7 +15,15 @@ public class MailgunClient : IDisposable {
     /// <summary>Measures total time spent sending.</summary>
     public readonly Stopwatch Stopwatch;
 
-    private string ApiKey => Helpers.CredentialToApiKey(Credentials);
+    private string ApiKey {
+        get {
+            try {
+                return Helpers.CredentialToApiKey(Credentials);
+            } catch (ArgumentException ex) {
+                throw new InvalidOperationException("Credentials must be a NetworkCredential", ex);
+            }
+        }
+    }
     private string EmailDomain {
         get {
             var address = Helpers.GetEmailAddress(From);
@@ -26,6 +35,7 @@ public class MailgunClient : IDisposable {
     }
 
     /// <summary>Credentials used to authenticate to the API.</summary>
+    /// <remarks>Must be <see cref="NetworkCredential"/>.</remarks>
     public ICredentials Credentials { get; set; }
     /// <summary>Determines how errors are handled.</summary>
     public ActionPreference? ErrorAction { get; set; }
