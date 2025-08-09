@@ -76,12 +76,23 @@ public class TemporaryPgpKeyPairTests
         var pair = TemporaryPgpKeyPair.Create("a@b.com");
         string originalDir = Path.GetDirectoryName(pair.PublicKeyPath)!;
 
-        string protectedFile = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-            ? Path.Combine(Environment.SystemDirectory, "kernel32.dll")
-            : "/proc/version";
-        string protectedDir = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-            ? Path.Combine(Environment.SystemDirectory, "drivers")
-            : "/proc/self/fd";
+        string protectedFile;
+        string protectedDir;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            protectedFile = Path.Combine(Environment.SystemDirectory, "kernel32.dll");
+            protectedDir = Path.Combine(Environment.SystemDirectory, "drivers");
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            protectedFile = "/System/Library/CoreServices/SystemVersion.plist";
+            protectedDir = "/System/Library";
+        }
+        else
+        {
+            protectedFile = "/proc/version";
+            protectedDir = "/proc/self/fd";
+        }
 
         var type = typeof(TemporaryPgpKeyPair);
         type.GetField("<PublicKeyPath>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
