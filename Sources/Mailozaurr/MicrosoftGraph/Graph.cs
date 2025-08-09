@@ -577,10 +577,12 @@ public class Graph : IDisposable {
             var sendErrorMessage = (sendError == null || sendError.Error == null || sendError.Error.InnerError == null)
                 ? $"Unknown error: {sendContent}"
                 : $"Error code: {sendError.Error.Code}, message: {sendError.Error.Message}, request ID: {sendError.Error.InnerError.RequestId}, date: {sendError.Error.InnerError.Date}";
-            var ex = new GraphApiException(sendResponse.StatusCode, sendErrorMessage, sendContent);
-            var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, sendContent, ex.Message);
+            throw new GraphApiException(sendResponse.StatusCode, sendErrorMessage, sendContent);
+        } catch (GraphApiException ex) {
+            LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
+            var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, ex.ResponseContent, ex.Message);
             await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
-            throw ex;
+            throw;
         } finally {
             MicrosoftGraphUtils.ConcurrencySemaphore.Release();
         }
