@@ -7,7 +7,7 @@ public static class SendEmailRemoteImages
 {
     public static void Run()
     {
-        var smtp = new Smtp { AutoEmbedRemoteImages = true };
+        var smtp = new Smtp { AutoEmbedRemoteImages = true, RemoteImageDownloadParallelism = 2 };
         smtp.From = "sender@example.com";
         smtp.To = new[] { "recipient@example.com" };
         smtp.Subject = "Remote Images";

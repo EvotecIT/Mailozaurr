@@ -152,6 +152,14 @@ public class Smtp {
     }
 
     /// <summary>
+    /// Maximum number of remote images to download in parallel when embedding.
+    /// </summary>
+    public int RemoteImageDownloadParallelism {
+        get => Client.RemoteImageDownloadParallelism;
+        set => Client.RemoteImageDownloadParallelism = value;
+    }
+
+    /// <summary>
     /// Forces retries even when the encountered error is not considered
     /// transient. By default retries occur only for transient failures.
     /// </summary>

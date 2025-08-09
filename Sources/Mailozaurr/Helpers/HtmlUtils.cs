@@ -62,20 +62,33 @@ public static class HtmlUtils {
     /// Downloads externally referenced images and replaces their sources with cid links.
     /// </summary>
     /// <param name="html">HTML content to inspect.</param>
+    /// <param name="maxParallelism">Maximum number of concurrent downloads.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     /// <returns>Modified HTML and list of downloaded images.</returns>
-    public static async Task<(string Html, List<RemoteImage> Images)> DownloadRemoteImagesAsync(string html, CancellationToken cancellationToken = default) {
+    public static async Task<(string Html, List<RemoteImage> Images)> DownloadRemoteImagesAsync(string html, int maxParallelism = 4, CancellationToken cancellationToken = default) {
         var images = new List<RemoteImage>();
         if (string.IsNullOrWhiteSpace(html)) return (html, images);
 
         string pattern = "<img[^>]+src=['\"]([^'\"]+)['\"]";
+        var urls = new List<string>();
         foreach (Match match in Regex.Matches(html, pattern, RegexOptions.IgnoreCase)) {
             var url = match.Groups[1].Value;
             if (string.IsNullOrWhiteSpace(url)) continue;
             if (!url.StartsWith("http", StringComparison.OrdinalIgnoreCase)) continue;
+            urls.Add(url);
+        }
+
+        var semaphore = new SemaphoreSlim(maxParallelism <= 0 ? 1 : maxParallelism);
+        var tasks = new List<Task<(string Url, RemoteImage? Image)>>();
+        foreach (var url in urls) {
+            tasks.Add(DownloadAsync(url));
+        }
+
+        async Task<(string Url, RemoteImage? Image)> DownloadAsync(string url) {
+            await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
             try {
                 using var response = await HttpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
-                if (!response.IsSuccessStatusCode) continue;
+                if (!response.IsSuccessStatusCode) return (url, null);
 #if NETFRAMEWORK || NETSTANDARD2_0
                 var data = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
 #else
@@ -84,11 +97,20 @@ public static class HtmlUtils {
                 var mediaType = response.Content.Headers.ContentType?.MediaType ?? MimeTypes.GetMimeType(Path.GetFileName(url));
                 var fileName = Path.GetFileName(new Uri(url).AbsolutePath);
                 if (string.IsNullOrEmpty(fileName)) fileName = Guid.NewGuid().ToString("N");
-                html = html.Replace(url, $"cid:{fileName}");
-                images.Add(new RemoteImage { ContentId = fileName, Data = data, MediaType = mediaType });
+                return (url, new RemoteImage { ContentId = fileName, Data = data, MediaType = mediaType });
             } catch (Exception ex) {
                 LoggingMessages.Logger.WriteWarning($"Failed to download image '{url}': {ex.Message}");
+                return (url, null);
+            } finally {
+                semaphore.Release();
             }
+        }
+
+        var results = await Task.WhenAll(tasks).ConfigureAwait(false);
+        foreach (var (url, image) in results) {
+            if (image == null) continue;
+            html = html.Replace(url, $"cid:{image.ContentId}");
+            images.Add(image);
         }
 
         return (html, images);

@@ -36,6 +36,8 @@ public partial class ClientSmtp : SmtpClient {
     public IDictionary<string, string>? Headers { get; set; }
     /// <summary>Download remote images referenced in HtmlBody and embed them.</summary>
     public bool AutoEmbedRemoteImages { get; set; } = false;
+    /// <summary>Maximum number of remote images to download in parallel.</summary>
+    public int RemoteImageDownloadParallelism { get; set; } = 4;
     /// <summary>Comma separated list of all recipients.</summary>
     public string SentTo {
         get {
@@ -229,7 +231,7 @@ public partial class ClientSmtp : SmtpClient {
             }
         }
         if (AutoEmbedRemoteImages && !string.IsNullOrWhiteSpace(bodyBuilder.HtmlBody)) {
-            var (html, images) = HtmlUtils.DownloadRemoteImagesAsync(bodyBuilder.HtmlBody).GetAwaiter().GetResult();
+            var (html, images) = HtmlUtils.DownloadRemoteImagesAsync(bodyBuilder.HtmlBody, RemoteImageDownloadParallelism).GetAwaiter().GetResult();
             bodyBuilder.HtmlBody = html;
             HtmlBody = html;
             foreach (var img in images) {
