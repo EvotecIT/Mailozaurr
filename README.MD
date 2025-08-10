@@ -26,7 +26,7 @@ Mailozaurr is a PowerShell module that aims to provide SMTP, POP3, IMAP and few 
 
 This project has 2 branches:
 - `v1-legacy` - this is the old version of the module. It's working, it's stable and has been around for a while. It's written entirely in PowerShell, and has nice features. It will be maintained until v2 is ready.
-- `v2-speedygonzales` - this is the new version of the module. It's a complete rewrite. It's written in C#, and slowly all functions from V1 will be replaced by their C# alternative. It's faster, and has couple of new features. It's still in development, but it's already usable.
+- `v2-speedygonzales` - this is the new version of the module. It's a complete rewrite. It's written in C#, it's faster, and has couple of new features. To simplify the support and functionality:
   - Removed **DNS** functions as they are moved to [DnsClientX](https://github.com/EvotecIT/DnsClientX) module
   - Removed **EmailValidation/SPF/DKIM/DMARC/MX/DMARC** functions as they are moved to [DomainDetective](https://github.com/EvotecIT/DomainDetective) module
 
