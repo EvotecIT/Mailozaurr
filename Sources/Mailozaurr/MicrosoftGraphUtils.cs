@@ -94,6 +94,22 @@ namespace Mailozaurr {
         /// Converts a credential string (username@directory) and secret to a GraphCredential object.
         /// </summary>
         public static GraphCredential ConvertFromGraphCredential(string username, string password) {
+            if (username == null) {
+                throw new ArgumentNullException(nameof(username));
+            }
+
+            if (string.IsNullOrWhiteSpace(username)) {
+                throw new ArgumentException("Value cannot be null or whitespace.", nameof(username));
+            }
+
+            if (password == null) {
+                throw new ArgumentNullException(nameof(password));
+            }
+
+            if (string.IsNullOrWhiteSpace(password)) {
+                throw new ArgumentException("Value cannot be null or whitespace.", nameof(password));
+            }
+
             username = username.Trim();
             var parts = username.Split('@');
             if (parts.Length != 2) {
