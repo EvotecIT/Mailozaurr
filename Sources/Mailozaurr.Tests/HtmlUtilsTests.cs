@@ -1,8 +1,10 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -23,6 +25,42 @@ public class HtmlUtilsTests
         Assert.Contains($"<p>{tmp}</p>", result);
         var path = Assert.Single(paths);
         Assert.Equal(tmp, path);
+
+        File.Delete(tmp);
+    }
+
+    [Fact]
+    public void ExtractLocalImagePaths_PrecompiledRegex_MatchesInlineImplementation()
+    {
+        var tmp = Path.GetTempFileName();
+        File.WriteAllText(tmp, "data");
+        var html = $"<IMG SRC=\"{tmp}\"><p>{tmp}</p>";
+
+        var expectedPaths = new List<string>();
+        const string pattern = @"(?<=<img[^>]+src=['""])([^'""]+)(?=['""])";
+        var expectedHtml = Regex.Replace(html, pattern, match =>
+        {
+            var path = match.Value;
+            if (string.IsNullOrWhiteSpace(path)) return path;
+            if (path.StartsWith("http", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("cid:", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            {
+                return path;
+            }
+            if (File.Exists(path))
+            {
+                var fileName = Path.GetFileName(path);
+                expectedPaths.Add(path);
+                return $"cid:{fileName}";
+            }
+            return path;
+        }, RegexOptions.IgnoreCase);
+
+        var (actualHtml, actualPaths) = HtmlUtils.ExtractLocalImagePaths(html);
+
+        Assert.Equal(expectedHtml, actualHtml);
+        Assert.Equal(expectedPaths, actualPaths);
 
         File.Delete(tmp);
     }

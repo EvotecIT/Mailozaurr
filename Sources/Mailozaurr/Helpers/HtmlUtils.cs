@@ -14,6 +14,8 @@ namespace Mailozaurr;
 public static class HtmlUtils {
     internal static HttpClient HttpClient { get; } = new HttpClient();
 
+    private static readonly Regex ImageSrcRegex = new("(?<=<img[^>]+src=[\"'])([^\"']+)(?=[\"'])", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     static HtmlUtils() {
         AppDomain.CurrentDomain.ProcessExit += (_, _) => HttpClient.Dispose();
     }
@@ -40,8 +42,7 @@ public static class HtmlUtils {
         var paths = new List<string>();
         if (string.IsNullOrWhiteSpace(html)) return (html, paths);
 
-        string pattern = "(?<=<img[^>]+src=[\"'])([^\"']+)(?=[\"'])";
-        html = Regex.Replace(html, pattern, match => {
+        html = ImageSrcRegex.Replace(html, match => {
             var path = match.Value;
             if (string.IsNullOrWhiteSpace(path)) return path;
             if (path.StartsWith("http", StringComparison.OrdinalIgnoreCase) ||
@@ -55,7 +56,7 @@ public static class HtmlUtils {
                 return $"cid:{fileName}";
             }
             return path;
-        }, RegexOptions.IgnoreCase);
+        });
         return (html, paths);
     }
 
