@@ -3,6 +3,7 @@ using System.Management.Automation;
 using System.IO;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
+using System.Threading;
 using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
@@ -186,7 +187,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         smtp.Attachments = Attachment?.ToList();
         smtp.InlineAttachments = InlineAttachment?.ToList();
         smtp.Priority = Priority;
-        smtp.CreateMessage();
+        smtp.CreateMessage(CancellationToken.None);
 
         var net = Credential!.GetNetworkCredential();
         var oauth = new OAuthCredential {
@@ -383,7 +384,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             return;
         }
 
-        smtpClient.CreateMessage();
+        smtpClient.CreateMessage(CancellationToken.None);
 
         if (SignOrEncrypt != EmailActionEncryption.None) {
             if (SignOrEncrypt == EmailActionEncryption.PGPEncrypt && PublicKeyPath != null) {
