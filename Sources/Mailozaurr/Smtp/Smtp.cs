@@ -315,7 +315,7 @@ public class Smtp {
     /// <summary>
     /// Creates the MIME message using the current property values.
     /// </summary>
-    public void CreateMessage() {
+    public void CreateMessage(CancellationToken cancellationToken = default) {
         if (AutoEmbedImages) {
             var (html, paths) = HtmlUtils.ExtractLocalImagePaths(HtmlBody);
             HtmlBody = html;
@@ -328,7 +328,7 @@ public class Smtp {
                 }
             }
         }
-        Client.CreateMessage();
+        Client.CreateMessage(cancellationToken);
     }
 
     /// <summary>

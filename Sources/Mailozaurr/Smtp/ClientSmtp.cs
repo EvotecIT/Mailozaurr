@@ -1,3 +1,4 @@
+using System.Threading;
 using MimeKit.Utils;
 
 namespace Mailozaurr;
@@ -107,12 +108,13 @@ public partial class ClientSmtp : SmtpClient {
     /// <summary>
     /// Builds the <see cref="MimeMessage"/> based on the configured properties.
     /// </summary>
-    public void CreateMessage() {
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    public void CreateMessage(CancellationToken cancellationToken = default) {
         InlineAttachments ??= new List<object>();
         var message = new MimeMessage();
         AddAddressesToMessage(message);
         SetMessagePriority(message);
-        BuildMessageBody(message);
+        BuildMessageBody(message, cancellationToken);
         message.Subject = Subject;
         AddHeaders(message);
         Message = message;
@@ -162,7 +164,7 @@ public partial class ClientSmtp : SmtpClient {
         }
     }
 
-    private void BuildMessageBody(MimeMessage message) {
+    private void BuildMessageBody(MimeMessage message, CancellationToken cancellationToken) {
         var bodyBuilder = new BodyBuilder();
         if (!string.IsNullOrWhiteSpace(HtmlBody)) {
             bodyBuilder.HtmlBody = HtmlBody;
@@ -229,7 +231,7 @@ public partial class ClientSmtp : SmtpClient {
             }
         }
         if (AutoEmbedRemoteImages && !string.IsNullOrWhiteSpace(bodyBuilder.HtmlBody)) {
-            var (html, images) = HtmlUtils.DownloadRemoteImagesAsync(bodyBuilder.HtmlBody).GetAwaiter().GetResult();
+            var (html, images) = HtmlUtils.DownloadRemoteImagesAsync(bodyBuilder.HtmlBody, cancellationToken).GetAwaiter().GetResult();
             bodyBuilder.HtmlBody = html;
             HtmlBody = html;
             foreach (var img in images) {

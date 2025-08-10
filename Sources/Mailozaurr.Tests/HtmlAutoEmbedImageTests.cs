@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
+using System.Threading;
 using MimeKit;
 using Xunit;
 
@@ -19,7 +20,7 @@ public class HtmlAutoEmbedImageTests {
         smtp.To = new object[] { "c@d.com" };
         smtp.Subject = "test";
         smtp.HtmlBody = $"<img src=\"{tmp}\">";
-        smtp.CreateMessage();
+        smtp.CreateMessage(CancellationToken.None);
         var body = (MultipartRelated)smtp.Message.Body;
         var inline = body.OfType<MimePart>().FirstOrDefault(p => p.ContentDisposition?.Disposition == ContentDisposition.Inline);
         File.Delete(tmp);
@@ -64,7 +65,7 @@ public class HtmlAutoEmbedImageTests {
             smtp.To = new object[] { "c@d.com" };
             smtp.Subject = "test";
             smtp.HtmlBody = "<img src=\"https://example.com/img.png\">";
-            smtp.CreateMessage();
+            smtp.CreateMessage(CancellationToken.None);
             var body = (MultipartRelated)smtp.Message.Body!;
             var inline = body.OfType<MimePart>().FirstOrDefault(p => p.ContentDisposition?.Disposition == ContentDisposition.Inline);
             Assert.NotNull(inline);
