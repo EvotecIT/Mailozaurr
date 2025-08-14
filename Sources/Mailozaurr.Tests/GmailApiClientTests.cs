@@ -13,6 +13,19 @@ public class GmailApiClientTests {
             return Task.FromResult(_response);
         }
     }
+
+    private sealed class DisposingHandler : HttpMessageHandler {
+        public bool Disposed { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK));
+
+        protected override void Dispose(bool disposing) {
+            if (disposing) {
+                Disposed = true;
+            }
+            base.Dispose(disposing);
+        }
+    }
     [Fact]
     public void Constructor_SetsAuthorizationHeader() {
         var cred = new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue };
@@ -226,5 +239,17 @@ public class GmailApiClientTests {
         var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
         field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
         await Assert.ThrowsAsync<System.IO.InvalidDataException>(() => client.GetThreadAsync("me", "id"));
+    }
+     
+    [Fact]
+    public void Dispose_DisposesHttpClient() {
+        var cred = new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue };
+        var client = new GmailApiClient(cred);
+        var handler = new DisposingHandler();
+        var httpClient = new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") };
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, httpClient);
+        client.Dispose();
+        Assert.True(handler.Disposed);
     }
 }

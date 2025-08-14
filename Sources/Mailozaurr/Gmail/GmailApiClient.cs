@@ -15,9 +15,10 @@ namespace Mailozaurr;
 /// <summary>
 /// Lightweight client for sending and retrieving messages using Gmail REST API.
 /// </summary>
-public sealed class GmailApiClient {
+public sealed class GmailApiClient : IDisposable {
     private static readonly JsonSerializerOptions s_jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _client;
+    private bool _disposed;
 
     /// <summary>
     /// Initializes the client using the provided OAuth credential.
@@ -31,6 +32,17 @@ public sealed class GmailApiClient {
 
     internal GmailApiClient(HttpClient client) {
         _client = client;
+    }
+
+    /// <inheritdoc />
+    public void Dispose() {
+        if (_disposed) {
+            return;
+        }
+
+        _client.Dispose();
+        _disposed = true;
+        GC.SuppressFinalize(this);
     }
 
     private static async Task ThrowIfAuthErrorAsync(HttpResponseMessage response, CancellationToken cancellationToken) {

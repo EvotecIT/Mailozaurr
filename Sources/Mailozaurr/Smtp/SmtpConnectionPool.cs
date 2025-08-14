@@ -1,12 +1,18 @@
 namespace Mailozaurr;
 
 using System.Collections.Concurrent;
+using System.Threading;
 
 /// <summary>
 /// Manages SMTP connection pooling.
 /// </summary>
 public static class SmtpConnectionPool {
-    private static readonly ConcurrentDictionary<string, ConcurrentBag<ClientSmtp>> _connectionPool = new();
+    private sealed class PoolEntry {
+        public readonly ConcurrentBag<ClientSmtp> Bag = new();
+        public int Count;
+    }
+
+    private static readonly ConcurrentDictionary<string, PoolEntry> _connectionPool = new();
 
     /// <summary>Maximum number of pooled connections per server/port.</summary>
     public static int MaxPoolSize { get; set; } = 2;
@@ -20,8 +26,9 @@ public static class SmtpConnectionPool {
         }
 
         var key = $"{server}:{port}";
-        if (_connectionPool.TryGetValue(key, out var bag)) {
-            while (bag.TryTake(out var pooled)) {
+        if (_connectionPool.TryGetValue(key, out var entry)) {
+            while (entry.Bag.TryTake(out var pooled)) {
+                Interlocked.Decrement(ref entry.Count);
                 if (pooled.IsConnected) {
                     return pooled;
                 }
@@ -45,18 +52,21 @@ public static class SmtpConnectionPool {
         }
 
         var key = $"{server}:{port}";
-        var bag = _connectionPool.GetOrAdd(key, _ => new ConcurrentBag<ClientSmtp>());
-        if (bag.Count >= MaxPoolSize) {
+        var entry = _connectionPool.GetOrAdd(key, _ => new PoolEntry());
+        var current = Interlocked.Increment(ref entry.Count);
+        if (current > MaxPoolSize) {
+            Interlocked.Decrement(ref entry.Count);
             client.Dispose();
         } else {
-            bag.Add(client);
+            entry.Bag.Add(client);
         }
     }
 
     /// <summary>Disposes all SMTP clients stored in the connection pool.</summary>
     public static void ClearConnectionPool() {
-        foreach (var bag in _connectionPool.Values) {
-            while (bag.TryTake(out var client)) {
+        foreach (var entry in _connectionPool.Values) {
+            while (entry.Bag.TryTake(out var client)) {
+                Interlocked.Decrement(ref entry.Count);
                 if (!client.IsConnected) {
                     client.Dispose();
                     continue;
