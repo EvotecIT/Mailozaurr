@@ -146,6 +146,58 @@ public sealed class GmailApiClient : IDisposable {
     }
 
     /// <summary>
+    /// Lists threads matching the supplied query.
+    /// </summary>
+    public async Task<IList<GmailThreadInfo>> ListThreadsAsync(string userId, string? query = null, int? maxResults = null, CancellationToken cancellationToken = default) {
+        var threads = new List<GmailThreadInfo>();
+        string? pageToken = null;
+        do {
+            var url = new StringBuilder($"users/{userId}/threads");
+            var qs = new List<string>();
+            if (!string.IsNullOrWhiteSpace(query)) qs.Add($"q={Uri.EscapeDataString(query)}");
+            if (maxResults.HasValue) qs.Add($"maxResults={maxResults.Value}");
+            if (!string.IsNullOrEmpty(pageToken)) qs.Add($"pageToken={pageToken}");
+            if (qs.Count > 0) {
+                url.Append('?').Append(string.Join("&", qs));
+            }
+            using var response = await _client.GetAsync(url.ToString(), cancellationToken);
+            await ThrowIfAuthErrorAsync(response, cancellationToken);
+            response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+#else
+            var json = await response.Content.ReadAsStringAsync();
+#endif
+            var list = JsonSerializer.Deserialize<GmailThreadListResponse>(json, s_jsonOptions);
+            if (list?.Threads != null) {
+                threads.AddRange(list.Threads);
+            }
+            pageToken = list?.NextPageToken;
+        } while (!string.IsNullOrEmpty(pageToken));
+
+        return threads;
+    }
+
+    /// <summary>
+    /// Retrieves a single thread by id.
+    /// </summary>
+    public async Task<GmailThread> GetThreadAsync(string userId, string id, CancellationToken cancellationToken = default) {
+        using var response = await _client.GetAsync($"users/{userId}/threads/{id}", cancellationToken);
+        await ThrowIfAuthErrorAsync(response, cancellationToken);
+        response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+#else
+        var json = await response.Content.ReadAsStringAsync();
+#endif
+        var thread = JsonSerializer.Deserialize<GmailThread>(json, s_jsonOptions);
+        if (thread is null) {
+            throw new InvalidDataException("Gmail API returned an invalid thread response.");
+        }
+        return thread;
+    }
+
+    /// <summary>
     /// Lists attachment metadata for a message.
     /// </summary>
     public async Task<IList<GmailAttachmentInfo>> ListAttachmentsAsync(string userId, string id, CancellationToken cancellationToken = default) {
@@ -223,6 +275,13 @@ public sealed class GmailApiClient : IDisposable {
     private sealed class GmailListResponse {
         /// <summary>Messages returned by the API.</summary>
         public List<GmailMessage>? Messages { get; set; }
+        /// <summary>Token for the next page of results.</summary>
+        public string? NextPageToken { get; set; }
+    }
+
+    private sealed class GmailThreadListResponse {
+        /// <summary>Threads returned by the API.</summary>
+        public List<GmailThreadInfo>? Threads { get; set; }
         /// <summary>Token for the next page of results.</summary>
         public string? NextPageToken { get; set; }
     }
