@@ -29,4 +29,10 @@ public class QueryLanguageParserTests {
         Assert.Equal("Report", result.Subject);
         Assert.True(result.HasAttachment);
     }
+
+    [Fact]
+    public void ParseQuery_ParsesBodyContains() {
+        var result = MailboxSearcher.ParseQuery("body:invoice");
+        Assert.Equal("invoice", result.BodyContains);
+    }
 }

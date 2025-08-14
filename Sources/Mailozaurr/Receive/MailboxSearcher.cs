@@ -24,6 +24,7 @@ public static class MailboxSearcher {
         string? subject = null,
         string? fromContains = null,
         string? toContains = null,
+        string? bodyContains = null,
         MessagePriority? priority = null,
         DateTime? since = null,
         DateTime? before = null,
@@ -37,6 +38,7 @@ public static class MailboxSearcher {
         if (!string.IsNullOrWhiteSpace(subject)) search = search.And(SearchQuery.SubjectContains(subject));
         if (!string.IsNullOrWhiteSpace(fromContains)) search = search.And(SearchQuery.FromContains(fromContains));
         if (!string.IsNullOrWhiteSpace(toContains)) search = search.And(SearchQuery.ToContains(toContains));
+        if (!string.IsNullOrWhiteSpace(bodyContains)) search = search.And(SearchQuery.BodyContains(bodyContains));
         if (since.HasValue) search = search.And(SearchQuery.DeliveredAfter(since.Value));
         if (before.HasValue) search = search.And(SearchQuery.DeliveredBefore(before.Value));
         if (additionalQueries != null) {
@@ -49,6 +51,7 @@ public static class MailboxSearcher {
             if (!string.IsNullOrWhiteSpace(parsed.Subject)) search = search.And(SearchQuery.SubjectContains(parsed.Subject));
             if (!string.IsNullOrWhiteSpace(parsed.FromContains)) search = search.And(SearchQuery.FromContains(parsed.FromContains));
             if (!string.IsNullOrWhiteSpace(parsed.ToContains)) search = search.And(SearchQuery.ToContains(parsed.ToContains));
+            if (!string.IsNullOrWhiteSpace(parsed.BodyContains)) search = search.And(SearchQuery.BodyContains(parsed.BodyContains));
             if (parsed.Since.HasValue) search = search.And(SearchQuery.DeliveredAfter(parsed.Since.Value));
             if (parsed.Before.HasValue) search = search.And(SearchQuery.DeliveredBefore(parsed.Before.Value));
             foreach (var q in parsed.AdditionalQueries) search = search.And(q);
@@ -75,6 +78,7 @@ public static class MailboxSearcher {
         string? subject = null,
         string? fromContains = null,
         string? toContains = null,
+        string? bodyContains = null,
         MessagePriority? priority = null,
         DateTime? since = null,
         DateTime? before = null,
@@ -87,6 +91,7 @@ public static class MailboxSearcher {
             if (string.IsNullOrWhiteSpace(subject)) subject = parsed.Subject;
             if (string.IsNullOrWhiteSpace(fromContains)) fromContains = parsed.FromContains;
             if (string.IsNullOrWhiteSpace(toContains)) toContains = parsed.ToContains;
+            if (string.IsNullOrWhiteSpace(bodyContains)) bodyContains = parsed.BodyContains;
             if (!since.HasValue) since = parsed.Since;
             if (!before.HasValue) before = parsed.Before;
             if (!priority.HasValue) priority = parsed.Priority;
@@ -98,6 +103,12 @@ public static class MailboxSearcher {
             if (!string.IsNullOrWhiteSpace(subject) && (message.Subject == null || message.Subject.IndexOf(subject, StringComparison.OrdinalIgnoreCase) < 0)) continue;
             if (!string.IsNullOrWhiteSpace(fromContains) && !AddressMatches(message.From, fromContains)) continue;
             if (!string.IsNullOrWhiteSpace(toContains) && !AddressMatches(message.To, toContains)) continue;
+            if (!string.IsNullOrWhiteSpace(bodyContains)) {
+                var textBody = message.TextBody ?? string.Empty;
+                var htmlBody = message.HtmlBody ?? string.Empty;
+                if (textBody.IndexOf(bodyContains, StringComparison.OrdinalIgnoreCase) < 0 &&
+                    htmlBody.IndexOf(bodyContains, StringComparison.OrdinalIgnoreCase) < 0) continue;
+            }
             var msgDate = message.Date.DateTime;
             if (since.HasValue && msgDate < since.Value) continue;
             if (before.HasValue && msgDate > before.Value) continue;
@@ -314,6 +325,7 @@ public static class MailboxSearcher {
         public string? Subject { get; set; }
         public string? FromContains { get; set; }
         public string? ToContains { get; set; }
+        public string? BodyContains { get; set; }
         public MessagePriority? Priority { get; set; }
         public DateTime? Since { get; set; }
         public DateTime? Before { get; set; }
@@ -344,7 +356,7 @@ public static class MailboxSearcher {
                 } else if (string.Equals(key, "has", StringComparison.OrdinalIgnoreCase)) {
                     if (value.Equals("attachment", StringComparison.OrdinalIgnoreCase) || value.Equals("attachments", StringComparison.OrdinalIgnoreCase)) result.HasAttachment = true;
                 } else if (string.Equals(key, "body", StringComparison.OrdinalIgnoreCase)) {
-                    result.AdditionalQueries.Add(SearchQuery.BodyContains(value));
+                    result.BodyContains = value;
                 } else {
                     result.AdditionalQueries.Add(SearchQuery.MessageContains(token));
                 }
