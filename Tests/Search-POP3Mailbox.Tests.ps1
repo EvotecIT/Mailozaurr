@@ -3,4 +3,9 @@ Describe 'Search-POP3Mailbox' {
         $info = [Mailozaurr.PowerShell.PopConnectionInfo]::new()
         { Search-POP3Mailbox -Client $info } | Should -Throw
     }
+
+    It 'Supports BodyContains parameter' {
+        $info = [Mailozaurr.PowerShell.PopConnectionInfo]::new()
+        { Search-POP3Mailbox -Client $info -BodyContains 'test' } | Should -Throw
+    }
 }
