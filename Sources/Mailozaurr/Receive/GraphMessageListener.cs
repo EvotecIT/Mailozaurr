@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 namespace Mailozaurr;
 
 /// <summary>
-/// Polls Microsoft Graph for new messages and raises events when they arrive.
+/// Polls Microsoft Graph for new messages using delta queries and raises events when they arrive.
 /// </summary>
 /// <remarks>
-/// The listener keeps track of message IDs to avoid raising duplicate
+/// The listener maintains a delta token and message IDs to avoid raising duplicate
 /// notifications during polling.
 /// </remarks>
 public class GraphMessageListener : IDisposable {
@@ -19,6 +19,7 @@ public class GraphMessageListener : IDisposable {
     private CancellationTokenSource? _cancel;
     private Task? _pollTask;
     private readonly TimeSpan _interval;
+    private string? _deltaToken;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="GraphMessageListener"/> class.
@@ -52,8 +53,9 @@ public class GraphMessageListener : IDisposable {
 
         _cancel = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-        var initial = await MicrosoftGraphUtils.GetMailMessagesAsync(_credential, _userPrincipalName).ConfigureAwait(false);
-        foreach (var msg in initial) {
+        var initial = await MicrosoftGraphUtils.GetMailMessagesDeltaAsync(_credential, _userPrincipalName).ConfigureAwait(false);
+        _deltaToken = initial.DeltaToken;
+        foreach (var msg in initial.Messages) {
             if (msg.TryGetValue("id", out var idObj) && idObj is string id) {
                 _seenIds.Add(id);
             }
@@ -86,8 +88,9 @@ public class GraphMessageListener : IDisposable {
         while (!_cancel!.IsCancellationRequested) {
             try {
                 await Task.Delay(_interval, _cancel.Token).ConfigureAwait(false);
-                var messages = await MicrosoftGraphUtils.GetMailMessagesAsync(_credential, _userPrincipalName).ConfigureAwait(false);
-                foreach (var msg in messages) {
+                var response = await MicrosoftGraphUtils.GetMailMessagesDeltaAsync(_credential, _userPrincipalName, _deltaToken).ConfigureAwait(false);
+                _deltaToken = response.DeltaToken;
+                foreach (var msg in response.Messages) {
                     if (msg.TryGetValue("id", out var idObj) && idObj is string id && !_seenIds.Contains(id)) {
                         _seenIds.Add(id);
                         MessageArrived?.Invoke(this, msg);

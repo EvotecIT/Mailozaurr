@@ -38,9 +38,9 @@ public class GraphMessageListenerTests {
     public async Task Listener_StartStopMultipleTimes_DoesNotLeakResources() {
         var responses = new[] {
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"access_token\":\"token\",\"token_type\":\"Bearer\"}") },
-            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"value\":[]}") },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"value\":[],\"@odata.deltaLink\":\"https://example.com/link1\"}") },
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"access_token\":\"token\",\"token_type\":\"Bearer\"}") },
-            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"value\":[]}") }
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"value\":[],\"@odata.deltaLink\":\"https://example.com/link2\"}") }
         };
         var handler = new QueueHandler(responses);
         var clientField = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -87,4 +87,34 @@ public class GraphMessageListenerTests {
         } finally {
             handlerField.SetValue(client, original);
         }
-    }}
+    }
+
+    [Fact(Skip = "Requires HTTP stack")] 
+    public async Task GetMailMessagesDeltaAsync_ReturnsIncrementalChanges() {
+        var responses = new[] {
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"access_token\":\"token\",\"token_type\":\"Bearer\"}") },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"value\":[],\"@odata.deltaLink\":\"https://graph.microsoft.com/v1.0/users/user/messages/delta?%24deltatoken=1\"}") },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"value\":[{\"id\":\"2\"}],\"@odata.deltaLink\":\"https://graph.microsoft.com/v1.0/users/user/messages/delta?%24deltatoken=2\"}") }
+        };
+        var handler = new QueueHandler(responses);
+        var clientField = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var client = (HttpClient)clientField.GetValue(null)!;
+        var handlerField = GetHandlerField();
+        var original = (HttpMessageHandler)handlerField.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var cache = (ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
+        cache.Clear();
+        try {
+            var cred = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
+            var first = await MicrosoftGraphUtils.GetMailMessagesDeltaAsync(cred, "user");
+            var second = await MicrosoftGraphUtils.GetMailMessagesDeltaAsync(cred, "user", first.DeltaToken);
+            Assert.Equal("https://graph.microsoft.com/v1.0/users/user/messages/delta?%24deltatoken=2", second.DeltaToken);
+            Assert.Single(second.Messages);
+            Assert.Equal("2", second.Messages[0]["id"]);
+        } finally {
+            handlerField.SetValue(client, original);
+        }
+    }
+}
+}

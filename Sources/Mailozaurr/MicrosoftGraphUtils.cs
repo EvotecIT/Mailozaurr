@@ -475,6 +475,37 @@ namespace Mailozaurr {
         }
 
         /// <summary>
+        /// Retrieves new or updated mail messages using the Graph delta query.
+        /// </summary>
+        public static async Task<(List<Dictionary<string, object>> Messages, string DeltaToken)> GetMailMessagesDeltaAsync(GraphCredential credential, string userPrincipalName, string? deltaToken = null) {
+            var headers = new Dictionary<string, string>();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
+            headers["Authorization"] = token;
+            var uri = deltaToken ?? JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages/delta");
+            var messages = new List<Dictionary<string, object>>();
+            string? next = uri;
+            string? delta = null;
+            while (next != null) {
+                var doc = await InvokeGraphApiAsync("GET", next, headers);
+                if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
+                    foreach (var item in valueElement.EnumerateArray()) {
+                        var native = ConvertJsonElementToNativeObject(item) as Dictionary<string, object>;
+                        if (native != null) messages.Add(native);
+                    }
+                }
+                if (doc.RootElement.TryGetProperty("@odata.deltaLink", out var deltaElement) && deltaElement.ValueKind == JsonValueKind.String) {
+                    delta = deltaElement.GetString();
+                    next = null;
+                } else if (doc.RootElement.TryGetProperty("@odata.nextLink", out var nextElement) && nextElement.ValueKind == JsonValueKind.String) {
+                    next = nextElement.GetString();
+                } else {
+                    next = null;
+                }
+            }
+            return (messages, delta ?? deltaToken ?? string.Empty);
+        }
+
+        /// <summary>
         /// Retrieves attachments for a specific message.
         /// </summary>
         public static async Task<List<Attachment>> GetMailMessageAttachmentsAsync(GraphCredential credential, string userPrincipalName, string messageId, IEnumerable<string> properties = null) {
