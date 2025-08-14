@@ -3,7 +3,11 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Threading.Tasks;
+using Mailozaurr;
+using MimeKit;
+using MimeKit.Cryptography;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -46,5 +50,32 @@ public class EphemeralOpenPgpContextTests
 
         var ex = Record.Exception(() => ctx.Dispose());
         Assert.Null(ex);
+    }
+
+    [Fact]
+    public void ImportKeys_FromStreamAndString_AllowsEncryptionAndDecryption()
+    {
+        using var pair = TemporaryPgpKeyPair.Create("a@b.com", "pass");
+        var publicKey = pair.ExportPublicKey();
+        var privateKey = pair.ExportPrivateKey();
+
+        using var ctx = new EphemeralOpenPgpContext(pair.PassPhrase);
+        ctx.ImportKeys(publicKey);
+        using var privStream = new MemoryStream(Encoding.UTF8.GetBytes(privateKey));
+        ctx.ImportKeys(privStream);
+
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse("a@b.com"));
+        message.To.Add(MailboxAddress.Parse("a@b.com"));
+        message.Subject = "test";
+        var body = new TextPart("plain") { Text = "secret" };
+        var recipients = message.To.Mailboxes;
+        var encKeys = ctx.GetPublicKeys(recipients);
+        message.Body = MultipartEncrypted.Encrypt(ctx, encKeys, body);
+
+        var encrypted = (MultipartEncrypted)message.Body;
+        var decrypted = encrypted.Decrypt(ctx);
+        var text = ((TextPart)decrypted).Text;
+        Assert.Equal("secret", text);
     }
 }

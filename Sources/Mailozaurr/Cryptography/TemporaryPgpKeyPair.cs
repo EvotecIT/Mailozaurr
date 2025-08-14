@@ -24,6 +24,11 @@ public sealed class TemporaryPgpKeyPair : IDisposable
     /// <summary>Passphrase used for the private key.</summary>
     public string PassPhrase { get; }
 
+    /// <summary>Gets the ASCII-armored public key.</summary>
+    public string ExportPublicKey() => File.ReadAllText(PublicKeyPath);
+    /// <summary>Gets the ASCII-armored private key.</summary>
+    public string ExportPrivateKey() => File.ReadAllText(PrivateKeyPath);
+
     private readonly string _tempDirectory;
     private readonly bool _removeDirectory;
     private readonly bool _deleteOnDispose;

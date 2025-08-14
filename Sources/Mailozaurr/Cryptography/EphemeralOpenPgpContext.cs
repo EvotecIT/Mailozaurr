@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Text;
+using Org.BouncyCastle.Bcpg;
 using Org.BouncyCastle.Bcpg.OpenPgp;
 using MimeKit.Cryptography;
 
@@ -54,6 +56,44 @@ public class EphemeralOpenPgpContext : GnuPGContext, IDisposable {
     /// <returns>The passphrase to use.</returns>
     protected override string GetPasswordForKey(PgpSecretKey key) {
         return _password ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Imports PGP key material from a stream. The method automatically detects
+    /// whether the stream contains a public or a private key and imports it
+    /// into the context.
+    /// </summary>
+    /// <param name="stream">The stream containing ASCII-armored key data.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="stream"/> is <c>null</c>.</exception>
+    public void ImportKeys(Stream stream) {
+        if (stream == null)
+            throw new ArgumentNullException(nameof(stream));
+
+        using var ms = new MemoryStream();
+        stream.CopyTo(ms);
+        ms.Position = 0;
+
+        try {
+            base.Import(new PgpSecretKeyRingBundle(new ArmoredInputStream(ms)));
+            return;
+        } catch {
+            ms.Position = 0;
+            base.Import(ms);
+        }
+    }
+
+    /// <summary>
+    /// Imports PGP key material from a raw string.
+    /// </summary>
+    /// <param name="keyData">ASCII-armored key data.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="keyData"/> is <c>null</c>.</exception>
+    public void ImportKeys(string keyData) {
+        if (keyData == null)
+            throw new ArgumentNullException(nameof(keyData));
+
+        var bytes = Encoding.UTF8.GetBytes(keyData);
+        using var ms = new MemoryStream(bytes);
+        ImportKeys(ms);
     }
 
     /// <summary>
