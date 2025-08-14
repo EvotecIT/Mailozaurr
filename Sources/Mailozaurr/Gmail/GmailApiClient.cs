@@ -18,20 +18,23 @@ namespace Mailozaurr;
 public sealed class GmailApiClient : IDisposable {
     private static readonly JsonSerializerOptions s_jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _client;
+    private readonly Func<CancellationToken, Task<string>>? _refreshToken;
     private bool _disposed;
 
     /// <summary>
     /// Initializes the client using the provided OAuth credential.
     /// </summary>
-    public GmailApiClient(OAuthCredential credential) {
+    public GmailApiClient(OAuthCredential credential, Func<CancellationToken, Task<string>>? refreshToken = null) {
         _client = new HttpClient {
             BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/")
         };
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credential.AccessToken);
+        _refreshToken = refreshToken;
     }
 
-    internal GmailApiClient(HttpClient client) {
+    internal GmailApiClient(HttpClient client, Func<CancellationToken, Task<string>>? refreshToken = null) {
         _client = client;
+        _refreshToken = refreshToken;
     }
 
     /// <inheritdoc />
@@ -45,9 +48,13 @@ public sealed class GmailApiClient : IDisposable {
         GC.SuppressFinalize(this);
     }
 
-    private static async Task ThrowIfAuthErrorAsync(HttpResponseMessage response, CancellationToken cancellationToken) {
+    private async Task ThrowIfAuthErrorAsync(HttpResponseMessage response, CancellationToken cancellationToken) {
         if (response.StatusCode == HttpStatusCode.Unauthorized ||
             response.StatusCode == HttpStatusCode.Forbidden) {
+            if (_refreshToken != null) {
+                string token = await _refreshToken(cancellationToken);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
 #if NET5_0_OR_GREATER
             string content = await response.Content.ReadAsStringAsync(cancellationToken);
 #else
