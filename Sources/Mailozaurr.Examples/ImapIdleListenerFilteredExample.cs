@@ -1,13 +1,13 @@
 using MailKit.Net.Imap;
 using MailKit.Security;
+using MailKit.Search;
 using System;
 using System.Threading.Tasks;
 
 /// <summary>
-/// Demonstrates how to use <see cref="Mailozaurr.ImapIdleListener"/> to
-/// receive IMAP messages as they arrive.
+/// Demonstrates filtering when using <see cref="Mailozaurr.ImapIdleListener"/>.
 /// </summary>
-public static class ImapIdleListenerExample {
+public static class ImapIdleListenerFilteredExample {
     /// <summary>Runs the example.</summary>
     public static async Task RunAsync() {
         // === CONFIGURATION ===
@@ -21,9 +21,11 @@ public static class ImapIdleListenerExample {
         await client.ConnectAsync(server, port, SecureSocketOptions.SslOnConnect);
         await client.AuthenticateAsync(username, password);
 
-        var listener = new Mailozaurr.ImapIdleListener(client);
+        // Listen only for messages from a specific sender
+        var query = SearchQuery.FromContains("alice@example.com");
+        var listener = new Mailozaurr.ImapIdleListener(client, searchQuery: query);
         listener.MessageArrived += (s, msg) =>
-            Console.WriteLine($"New message: {msg.Message.Subject}");
+            Console.WriteLine($"New message from Alice: {msg.Message.Subject}");
 
         await listener.StartAsync();
 
