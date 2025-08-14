@@ -96,6 +96,29 @@ public class GmailApiClientTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task SendAsync_ExpiredToken_InvokesRefresh() {
+        var handler = new RecordingHandler(
+            new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.Unauthorized) { Content = new System.Net.Http.StringContent("error") },
+            new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent("{\"id\":\"1\"}") });
+        int refreshes = 0;
+        System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<string>> refresher = _ => {
+            refreshes++;
+            return System.Threading.Tasks.Task.FromResult("new");
+        };
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "old", ExpiresOn = System.DateTimeOffset.MaxValue }, refresher);
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var httpClient = new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") };
+        httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "old");
+        field.SetValue(client, httpClient);
+        var message = new MimeKit.MimeMessage();
+        await Assert.ThrowsAsync<GmailAuthenticationException>(() => client.SendAsync("me", message));
+        Assert.Equal(1, refreshes);
+        await client.SendAsync("me", message);
+        Assert.Equal("Bearer old", handler.Requests[0].Headers.Authorization!.ToString());
+        Assert.Equal("Bearer new", handler.Requests[1].Headers.Authorization!.ToString());
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task ListAsync_PaginatesUntilTokenNull() {
         var page1 = "{\"messages\":[{\"id\":\"1\"}],\"nextPageToken\":\"tok\"}";
         var page2 = "{\"messages\":[{\"id\":\"2\"}]}";
