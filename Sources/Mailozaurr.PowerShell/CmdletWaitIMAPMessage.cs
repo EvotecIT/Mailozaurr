@@ -2,6 +2,7 @@ using System;
 using System.Management.Automation;
 using System.Threading;
 using System.Threading.Tasks;
+using MailKit.Search;
 
 namespace Mailozaurr.PowerShell;
 
@@ -34,6 +35,12 @@ public sealed class CmdletWaitIMAPMessage : AsyncPSCmdlet, System.IDisposable {
     /// </summary>
     [Parameter]
     public string? Folder { get; set; }
+
+    /// <summary>
+    /// Additional MailKit search queries applied when listening for messages.
+    /// </summary>
+    [Parameter]
+    public SearchQuery[]? SearchQuery { get; set; }
 
     /// <summary>
     /// Optional action executed for each received message.
@@ -78,7 +85,15 @@ public sealed class CmdletWaitIMAPMessage : AsyncPSCmdlet, System.IDisposable {
             return;
         }
 
-        _listener = new ImapIdleListener(conn.Data, Folder);
+        SearchQuery? query = null;
+        if (SearchQuery != null && SearchQuery.Length > 0) {
+            query = SearchQuery[0];
+            for (int i = 1; i < SearchQuery.Length; i++) {
+                query = query.And(SearchQuery[i]);
+            }
+        }
+
+        _listener = new ImapIdleListener(conn.Data, Folder, query);
         _listener.MessageArrived += OnMessageArrived;
         await _listener.StartAsync(CancelToken);
 
