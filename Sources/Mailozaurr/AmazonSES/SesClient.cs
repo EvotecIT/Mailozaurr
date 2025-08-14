@@ -1,6 +1,7 @@
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace Mailozaurr;
 
@@ -42,6 +43,11 @@ public class SesClient : IDisposable {
     public string[]? Attachment { get; set; }
     /// <summary>Paths to inline attachments to include.</summary>
     public string[]? InlineAttachment { get; set; }
+
+    /// <summary>Name of the SES template to use.</summary>
+    public string? TemplateName { get; set; }
+    /// <summary>Template data variables.</summary>
+    public Dictionary<string, string>? TemplateData { get; set; }
 
     /// <summary>Custom headers to include with the message.</summary>
     public Dictionary<string, string>? Headers { get; set; }
@@ -162,23 +168,10 @@ public class SesClient : IDisposable {
         return request;
     }
 
-    /// <summary>
-    /// Sends the email using Amazon SES.
-    /// </summary>
-    public Task<SmtpResult> SendEmailAsync() => SendEmailAsync(CancellationToken.None);
-
-    /// <summary>
-    /// Sends the email using Amazon SES.
-    /// </summary>
-    public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken)
+    private async Task<SmtpResult> SendSesRequestAsync(string body, CancellationToken cancellationToken)
     {
         int attempts = 0;
         Exception? lastException = null;
-        MimeMessage message = BuildMessage();
-        using MemoryStream stream = new();
-        await message.WriteToAsync(stream, cancellationToken);
-        string raw = Convert.ToBase64String(stream.ToArray());
-        string body = $"Action=SendRawEmail&RawMessage.Data={Uri.EscapeDataString(raw)}&Version=2010-12-01";
         do
         {
             try
@@ -229,6 +222,55 @@ public class SesClient : IDisposable {
         SmtpResult final = new(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, lastException?.Message);
         await Helpers.PostWebhookAsync(WebhookUrl, final, cancellationToken, _client);
         return final;
+    }
+
+    /// <summary>
+    /// Sends the email using Amazon SES.
+    /// </summary>
+    public Task<SmtpResult> SendEmailAsync() => SendEmailAsync(CancellationToken.None);
+
+    /// <summary>
+    /// Sends the email using Amazon SES.
+    /// </summary>
+    public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken)
+    {
+        MimeMessage message = BuildMessage();
+        using MemoryStream stream = new();
+        await message.WriteToAsync(stream, cancellationToken);
+        string raw = Convert.ToBase64String(stream.ToArray());
+        string body = $"Action=SendRawEmail&RawMessage.Data={Uri.EscapeDataString(raw)}&Version=2010-12-01";
+        return await SendSesRequestAsync(body, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sends a templated email using Amazon SES.
+    /// </summary>
+    public Task<SmtpResult> SendTemplatedEmailAsync() => SendTemplatedEmailAsync(CancellationToken.None);
+
+    /// <summary>
+    /// Sends a templated email using Amazon SES.
+    /// </summary>
+    public async Task<SmtpResult> SendTemplatedEmailAsync(CancellationToken cancellationToken)
+    {
+        StringBuilder sb = new("Action=SendTemplatedEmail&Version=2010-12-01");
+        if (!string.IsNullOrEmpty(TemplateName)) sb.Append("&Template=").Append(Uri.EscapeDataString(TemplateName));
+        sb.Append("&Source=").Append(Uri.EscapeDataString(SentFrom));
+        if (To != null)
+        {
+            for (int i = 0; i < To.Count; i++) sb.Append("&Destination.ToAddresses.member.").Append(i + 1).Append("=").Append(Uri.EscapeDataString(Helpers.GetEmailAddress(To[i])));
+        }
+        if (Cc != null)
+        {
+            for (int i = 0; i < Cc.Count; i++) sb.Append("&Destination.CcAddresses.member.").Append(i + 1).Append("=").Append(Uri.EscapeDataString(Helpers.GetEmailAddress(Cc[i])));
+        }
+        if (Bcc != null)
+        {
+            for (int i = 0; i < Bcc.Count; i++) sb.Append("&Destination.BccAddresses.member.").Append(i + 1).Append("=").Append(Uri.EscapeDataString(Helpers.GetEmailAddress(Bcc[i])));
+        }
+        if (ReplyTo != null) sb.Append("&ReplyToAddresses.member.1=").Append(Uri.EscapeDataString(Helpers.GetEmailAddress(ReplyTo)));
+        string json = TemplateData != null ? JsonSerializer.Serialize(TemplateData) : "{}";
+        sb.Append("&TemplateData=").Append(Uri.EscapeDataString(json));
+        return await SendSesRequestAsync(sb.ToString(), cancellationToken);
     }
 
     /// <summary>
