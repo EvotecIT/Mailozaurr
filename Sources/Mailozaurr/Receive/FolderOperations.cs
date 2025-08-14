@@ -33,12 +33,15 @@ public static class FolderOperations {
         } else {
             destParent = client.GetCachedFolder(destinationFolder, FolderAccess.ReadWrite);
         }
-        await source.RenameAsync(destParent, source.Name, cancellationToken).ConfigureAwait(false);
-        if (source.IsOpen)
-            await source.CloseAsync(false, cancellationToken).ConfigureAwait(false);
-        if (destParent.IsOpen)
-            await destParent.CloseAsync(false, cancellationToken).ConfigureAwait(false);
-        client.ClearFolderCache();
+        try {
+            await source.RenameAsync(destParent, source.Name, cancellationToken).ConfigureAwait(false);
+        } finally {
+            if (source.IsOpen)
+                await source.CloseAsync(false, cancellationToken).ConfigureAwait(false);
+            if (destParent.IsOpen)
+                await destParent.CloseAsync(false, cancellationToken).ConfigureAwait(false);
+            client.ClearFolderCache();
+        }
     }
 
     /// <summary>
@@ -55,8 +58,13 @@ public static class FolderOperations {
         string newName,
         CancellationToken cancellationToken = default) {
         var src = client.GetCachedFolder(folder, FolderAccess.ReadWrite);
-        await src.RenameAsync(src.ParentFolder, newName, cancellationToken).ConfigureAwait(false);
-        client.ClearFolderCache();
+        try {
+            await src.RenameAsync(src.ParentFolder, newName, cancellationToken).ConfigureAwait(false);
+        } finally {
+            if (src.IsOpen)
+                await src.CloseAsync(false, cancellationToken).ConfigureAwait(false);
+            client.ClearFolderCache();
+        }
     }
 
     /// <summary>
@@ -73,13 +81,21 @@ public static class FolderOperations {
         bool recursive = false,
         CancellationToken cancellationToken = default) {
         var src = client.GetCachedFolder(folder, FolderAccess.ReadWrite);
-        if (recursive) {
-            foreach (var sub in await src.GetSubfoldersAsync(false, cancellationToken).ConfigureAwait(false)) {
-                await RemoveFolderAsync(client, sub.FullName, true, cancellationToken).ConfigureAwait(false);
+        try {
+            if (recursive) {
+                foreach (var sub in await src.GetSubfoldersAsync(false, cancellationToken).ConfigureAwait(false))
+                    await RemoveFolderAsync(client, sub.FullName, true, cancellationToken).ConfigureAwait(false);
+
+                if (src.IsOpen)
+                    await src.CloseAsync(false, cancellationToken).ConfigureAwait(false);
+                src = client.GetCachedFolder(folder, FolderAccess.ReadWrite);
             }
-            src = client.GetCachedFolder(folder, FolderAccess.ReadWrite);
+
+            await src.DeleteAsync(cancellationToken).ConfigureAwait(false);
+        } finally {
+            if (src.IsOpen)
+                await src.CloseAsync(false, cancellationToken).ConfigureAwait(false);
+            client.ClearFolderCache();
         }
-        await src.DeleteAsync(cancellationToken).ConfigureAwait(false);
-        client.ClearFolderCache();
     }
 }
