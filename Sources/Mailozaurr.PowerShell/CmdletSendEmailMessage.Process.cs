@@ -27,9 +27,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         // It first sets the error action to the default error action preference
         // If the user has specified the error action, it will set the error action to the user specified error action
         errorAction = (ActionPreference)this.SessionState.PSVariable.GetValue("ErrorActionPreference");
-        if (this.MyInvocation.BoundParameters.ContainsKey("ErrorAction")) {
-            string errorActionString = this.MyInvocation.BoundParameters["ErrorAction"].ToString();
-            if (Enum.TryParse(errorActionString, true, out ActionPreference actionPreference)) {
+            if (this.MyInvocation.BoundParameters.ContainsKey("ErrorAction")) {
+            string? errorActionString = this.MyInvocation.BoundParameters["ErrorAction"]?.ToString();
+            if (errorActionString != null && Enum.TryParse(errorActionString, true, out ActionPreference actionPreference)) {
                 errorAction = actionPreference;
             }
         }
@@ -78,7 +78,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         if (Attachment != null) {
             sendGrid.Attachment = Attachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
         }
-        if (Headers != null) sendGrid.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => (string)d.Key, d => (string)d.Value);
+        if (Headers != null) sendGrid.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         sendGrid.SeparateTo = SeparateTo;
         sendGrid.ErrorAction = errorAction;
         sendGrid.RetryCount = RetryCount;
@@ -117,7 +117,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         if (InlineAttachment != null) {
             mailgun.InlineAttachment = InlineAttachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
         }
-        if (Headers != null) mailgun.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => (string)d.Key, d => (string)d.Value);
+        if (Headers != null) mailgun.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         mailgun.ErrorAction = errorAction;
         mailgun.RetryCount = RetryCount;
         mailgun.RetryDelayMilliseconds = RetryDelayMilliseconds;
@@ -154,7 +154,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         if (InlineAttachment != null) {
             ses.InlineAttachment = InlineAttachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
         }
-        if (Headers != null) ses.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => (string)d.Key, d => (string)d.Value);
+        if (Headers != null) ses.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         ses.ErrorAction = errorAction;
         ses.RetryCount = RetryCount;
         ses.RetryDelayMilliseconds = RetryDelayMilliseconds;
@@ -231,7 +231,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         graph.HTML = string.Join("", HTML);
         graph.ContentType = "HTML";
         graph.Attachments = Attachment;
-        if (Headers != null) graph.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => (string)d.Key, d => (string)d.Value);
+        if (Headers != null) graph.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         graph.CreateAttachments();
         long graphSize = GetTotalAttachmentSize(graph.ConvertedAttachments);
         if (graphSize > GraphAttachmentLimitBytes) {
@@ -296,7 +296,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         graph.HTML = string.Join("", HTML);
         graph.ContentType = "HTML";
         graph.Attachments = Attachment;
-        if (Headers != null) graph.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => (string)d.Key, d => (string)d.Value);
+        if (Headers != null) graph.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         graph.CreateAttachments();
         long size = GetTotalAttachmentSize(graph.ConvertedAttachments);
         if (size > GraphAttachmentLimitBytes) {
@@ -356,7 +356,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
 
         smtpClient.Attachments = Attachment?.ToList();
         smtpClient.InlineAttachments = InlineAttachment?.ToList();
-        if (Headers != null) smtpClient.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => (string)d.Key, d => (string)d.Value);
+        if (Headers != null) smtpClient.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         smtpClient.Timeout = Timeout;
 
         smtpClient.ErrorAction = errorAction;
