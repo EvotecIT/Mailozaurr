@@ -10,7 +10,7 @@ namespace Mailozaurr;
 /// </remarks>
 public class LogEntry {
     /// <summary>The log message.</summary>
-    public string Message { get; set; }
+    public string Message { get; set; } = string.Empty;
     /// <summary>The type of log (warning, error, etc.).</summary>
     public LogType Type { get; set; }
 }

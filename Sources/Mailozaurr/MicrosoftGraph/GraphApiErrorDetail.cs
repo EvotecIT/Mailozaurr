@@ -12,17 +12,17 @@ public class GraphApiErrorDetail {
     /// Gets or sets the error code returned by the API.
     /// </summary>
     [JsonPropertyName("code")]
-    public string Code { get; set; }
+    public string Code { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the human readable error message.
     /// </summary>
     [JsonPropertyName("message")]
-    public string Message { get; set; }
+    public string Message { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets additional error details.
     /// </summary>
     [JsonPropertyName("innerError")]
-    public GraphApiInnerError InnerError { get; set; }
+    public GraphApiInnerError InnerError { get; set; } = new();
 }

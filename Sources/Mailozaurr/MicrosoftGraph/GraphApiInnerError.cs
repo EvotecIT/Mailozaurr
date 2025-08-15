@@ -12,13 +12,13 @@ public class GraphApiInnerError {
     /// Gets or sets the request identifier associated with the error.
     /// </summary>
     [JsonPropertyName("request-id")]
-    public string RequestId { get; set; }
+    public string RequestId { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the client request identifier associated with the error.
     /// </summary>
     [JsonPropertyName("client-request-id")]
-    public string ClientRequestId { get; set; }
+    public string ClientRequestId { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the timestamp of when the error occurred.

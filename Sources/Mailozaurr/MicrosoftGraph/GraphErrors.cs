@@ -12,5 +12,5 @@ public class GraphApiError {
     /// Gets or sets the error details returned by the API.
     /// </summary>
     [JsonPropertyName("error")]
-    public GraphApiErrorDetail Error { get; set; }
+    public GraphApiErrorDetail Error { get; set; } = new();
 }
