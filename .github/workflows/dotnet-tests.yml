@@ -118,6 +118,9 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      - name: Install Mono for .NET Framework tests
+        run: brew install mono
+
       - name: Restore dependencies
         run: dotnet restore Sources/Mailozaurr.sln
 
