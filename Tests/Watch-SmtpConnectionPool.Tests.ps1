@@ -6,8 +6,8 @@ Describe 'Watch-SmtpConnectionPool' {
         [Mailozaurr.SmtpConnectionPool]::ClearConnectionPool()
         $values = [System.Collections.Generic.List[int]]::new()
         $watcher = Watch-SmtpConnectionPool -Action { param($s) $values.Add($s.CurrentPoolSize) }
-        [Mailozaurr.SmtpConnectionPool]::PoolSizeChanged.Invoke(0)
-        [Mailozaurr.SmtpConnectionPool]::PoolSizeChanged.remove($watcher)
+        [Mailozaurr.SmtpConnectionPool]::ClearConnectionPool()
+        [Mailozaurr.SmtpConnectionPool]::remove_PoolSizeChanged($watcher)
         [Mailozaurr.SmtpConnectionPool]::PoolingEnabled = $false
         $values.Count | Should -BeGreaterThan 0
     }
