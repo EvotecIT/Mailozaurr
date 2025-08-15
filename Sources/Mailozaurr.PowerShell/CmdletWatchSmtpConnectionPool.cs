@@ -1,11 +1,13 @@
-using System.Management.Automation;
-using Mailozaurr;
-
-namespace Mailozaurr.PowerShell;
-
-/// <summary>
-/// Watches the SMTP connection pool for size changes and invokes <see cref="Action"/> for each update.
-/// </summary>
+[Cmdlet("Watch", "SmtpConnectionPool")]
+[OutputType(typeof(Action<int>))]
+public sealed class CmdletWatchSmtpConnectionPool : PSCmdlet {
+        Action<int> handler = _ => Action.Invoke(SmtpConnectionPool.GetSnapshot());
+        SmtpConnectionPool.PoolSizeChanged += handler;
+        Action.Invoke(SmtpConnectionPool.GetSnapshot());
+        WriteObject(handler);
+    }
+}
+
 [Cmdlet("Watch", "SmtpConnectionPool")]
 [OutputType(typeof(PSEventSubscriber))]
 public sealed class CmdletWatchSmtpConnectionPool : PSCmdlet {

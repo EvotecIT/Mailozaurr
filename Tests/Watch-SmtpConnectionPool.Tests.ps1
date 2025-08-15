@@ -7,7 +7,7 @@ Describe 'Watch-SmtpConnectionPool' {
         $values = [System.Collections.Generic.List[int]]::new()
         $watcher = Watch-SmtpConnectionPool -Action { param($s) $values.Add($s.CurrentPoolSize) }
         [Mailozaurr.SmtpConnectionPool]::PoolSizeChanged.Invoke(0)
-        Unregister-Event -SubscriptionId $watcher.Id
+        [Mailozaurr.SmtpConnectionPool]::PoolSizeChanged.remove($watcher)
         [Mailozaurr.SmtpConnectionPool]::PoolingEnabled = $false
         $values.Count | Should -BeGreaterThan 0
     }
