@@ -131,8 +131,8 @@ namespace Mailozaurr {
             //Utils.CheckSecureStringArg(input, "input");
 
             string output = string.Empty;
-            byte[] data = null;
-            byte[] protectedData = null;
+            byte[] data = Array.Empty<byte>();
+            byte[] protectedData = Array.Empty<byte>();
 
             data = GetData(input);
 #if UNIX
@@ -165,8 +165,8 @@ namespace Mailozaurr {
             //    throw PSTraceSource.NewArgumentException(nameof(input), Serialization.InvalidEncryptedString, input);
             //}
 
-            byte[] data = null;
-            byte[] protectedData = null;
+            byte[] data = Array.Empty<byte>();
+            byte[] protectedData = Array.Empty<byte>();
             SecureString s;
 
             protectedData = ByteArrayFromString(input);
