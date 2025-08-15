@@ -481,7 +481,14 @@ namespace Mailozaurr {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
             headers["Authorization"] = token;
-            var uri = deltaToken ?? JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages/delta");
+
+            string uri;
+            if (!string.IsNullOrEmpty(deltaToken)) {
+                uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages/delta", new Dictionary<string, object> { ["$deltatoken"] = deltaToken });
+            } else {
+                uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages/delta");
+            }
+
             var messages = new List<Dictionary<string, object>>();
             string? next = uri;
             string? delta = null;
@@ -493,8 +500,10 @@ namespace Mailozaurr {
                         if (native != null) messages.Add(native);
                     }
                 }
+
                 if (doc.RootElement.TryGetProperty("@odata.deltaLink", out var deltaElement) && deltaElement.ValueKind == JsonValueKind.String) {
-                    delta = deltaElement.GetString();
+                    var link = deltaElement.GetString();
+                    delta = ExtractDeltaToken(link);
                     next = null;
                 } else if (doc.RootElement.TryGetProperty("@odata.nextLink", out var nextElement) && nextElement.ValueKind == JsonValueKind.String) {
                     next = nextElement.GetString();
@@ -502,7 +511,29 @@ namespace Mailozaurr {
                     next = null;
                 }
             }
+
             return (messages, delta ?? deltaToken ?? string.Empty);
+        }
+
+        private static string ExtractDeltaToken(string? deltaLink) {
+            if (string.IsNullOrEmpty(deltaLink)) {
+                return string.Empty;
+            }
+
+            try {
+                var uri = new Uri(deltaLink);
+                var query = uri.Query.TrimStart('?').Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var part in query) {
+                    var kv = part.Split(new[] { '=' }, 2);
+                    if (kv.Length == 2 && kv[0] == "$deltatoken") {
+                        return Uri.UnescapeDataString(kv[1]);
+                    }
+                }
+            } catch {
+                // ignore
+            }
+
+            return string.Empty;
         }
 
         /// <summary>
