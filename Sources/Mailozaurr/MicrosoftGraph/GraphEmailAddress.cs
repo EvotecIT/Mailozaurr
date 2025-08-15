@@ -11,5 +11,5 @@ public class GraphEmailAddress {
     /// Gets or sets the email details.
     /// </summary>
     [JsonPropertyName("emailAddress")]
-    public GraphEmail Email { get; set; }
+    public GraphEmail Email { get; set; } = new();
 }

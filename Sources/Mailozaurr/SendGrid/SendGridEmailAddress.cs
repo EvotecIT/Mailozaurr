@@ -10,7 +10,7 @@ namespace Mailozaurr;
 public class SendGridEmailAddress {
     /// <summary>Gets or sets the email address.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string Email { get; set; }
+    public string Email { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the name associated with the email address.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

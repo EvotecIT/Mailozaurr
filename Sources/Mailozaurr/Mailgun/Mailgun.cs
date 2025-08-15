@@ -36,7 +36,7 @@ public class MailgunClient : IDisposable {
 
     /// <summary>Credentials used to authenticate to the API.</summary>
     /// <remarks>Must be <see cref="NetworkCredential"/>.</remarks>
-    public ICredentials Credentials { get; set; }
+    public ICredentials Credentials { get; set; } = null!;
     /// <summary>Determines how errors are handled.</summary>
     public ActionPreference? ErrorAction { get; set; }
 
@@ -47,7 +47,7 @@ public class MailgunClient : IDisposable {
     /// <summary>Blind carbon copy recipients.</summary>
     public List<object> Bcc { get; set; } = new();
     /// <summary>The sender address.</summary>
-    public object From { get; set; }
+    public object From { get; set; } = null!;
     /// <summary>Reply-to address.</summary>
     public object? ReplyTo { get; set; }
     /// <summary>Message subject.</summary>

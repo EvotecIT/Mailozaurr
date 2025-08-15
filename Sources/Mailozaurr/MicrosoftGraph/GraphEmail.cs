@@ -8,5 +8,5 @@ public class GraphEmail {
     /// Gets or sets the email address value.
     /// </summary>
     [JsonPropertyName("address")]
-    public string Address { get; set; }
+    public string Address { get; set; } = string.Empty;
 }

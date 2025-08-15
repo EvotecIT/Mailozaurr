@@ -18,19 +18,19 @@ public class LogEventArgs : EventArgs {
     public int? ProgressCurrentSteps { get; set; }
 
     /// <summary>Progress current operation.</summary>
-    public string ProgressCurrentOperation { get; set; }
+    public string ProgressCurrentOperation { get; set; } = string.Empty;
 
     /// <summary>Progress activity.</summary>
-    public string ProgressActivity { get; set; }
+    public string ProgressActivity { get; set; } = string.Empty;
 
     /// <summary>Message to be written including arguments substitution.</summary>
-    public string FullMessage { get; set; }
+    public string FullMessage { get; set; } = string.Empty;
 
     /// <summary>Message to be written.</summary>
-    public string Message { get; set; }
+    public string Message { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the arguments.</summary>
-    public object[] Args { get; set; }
+    public object[] Args { get; set; } = Array.Empty<object>();
 
     /// <summary>Initializes a new instance of the <see cref="LogEventArgs"/> class.</summary>
     public LogEventArgs(string message, object[] args) {
