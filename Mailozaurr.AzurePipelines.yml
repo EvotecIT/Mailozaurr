@@ -60,6 +60,11 @@ stages:
           packageType: 'sdk'
           version: $(dotNetVersion)
 
+      - script: |
+          sudo apt-get update
+          sudo apt-get install -y mono-complete
+        displayName: 'Install Mono for .NET Framework tests'
+
       - task: DotNetCoreCLI@2
         displayName: 'Restore .NET Dependencies'
         inputs:
@@ -90,6 +95,11 @@ stages:
         inputs:
           packageType: 'sdk'
           version: $(dotNetVersion)
+
+      - script: |
+          brew update
+          brew install mono
+        displayName: 'Install Mono for .NET Framework tests'
 
       - task: DotNetCoreCLI@2
         displayName: 'Restore .NET Dependencies'
@@ -190,6 +200,9 @@ stages:
           sudo apt-get install -y powershell
         displayName: "Install PowerShell Core"
 
+      - script: sudo apt-get install -y mono-complete
+        displayName: 'Install Mono for .NET Framework tests'
+
       - task: DotNetCoreCLI@2
         displayName: 'Build .NET Solution'
         inputs:
@@ -226,6 +239,9 @@ stages:
       - bash: |
           brew install --cask powershell
         displayName: "Install PowerShell 7"
+
+      - bash: brew install mono
+        displayName: 'Install Mono for .NET Framework tests'
 
       - task: DotNetCoreCLI@2
         displayName: 'Build .NET Solution'
