@@ -31,6 +31,3 @@ public sealed class CmdletWatchSmtpConnectionPool : PSCmdlet
         WriteObject(handler);
     }
 }
-
-    }
-}
