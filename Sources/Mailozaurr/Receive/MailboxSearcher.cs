@@ -46,8 +46,8 @@ public static class MailboxSearcher {
                 if (q != null) search = search.And(q);
             }
         }
-        if (!string.IsNullOrWhiteSpace(queryString)) {
-            var parsed = ParseQuery(queryString);
+          if (!string.IsNullOrWhiteSpace(queryString)) {
+              var parsed = ParseQuery(queryString);
             if (!string.IsNullOrWhiteSpace(parsed.Subject)) search = search.And(SearchQuery.SubjectContains(parsed.Subject));
             if (!string.IsNullOrWhiteSpace(parsed.FromContains)) search = search.And(SearchQuery.FromContains(parsed.FromContains));
             if (!string.IsNullOrWhiteSpace(parsed.ToContains)) search = search.And(SearchQuery.ToContains(parsed.ToContains));
@@ -86,8 +86,8 @@ public static class MailboxSearcher {
         int maxResults = 0,
         CancellationToken cancellationToken = default,
         string? queryString = null) {
-        if (!string.IsNullOrWhiteSpace(queryString)) {
-            var parsed = ParseQuery(queryString);
+          if (!string.IsNullOrWhiteSpace(queryString)) {
+              var parsed = ParseQuery(queryString);
             if (string.IsNullOrWhiteSpace(subject)) subject = parsed.Subject;
             if (string.IsNullOrWhiteSpace(fromContains)) fromContains = parsed.FromContains;
             if (string.IsNullOrWhiteSpace(toContains)) toContains = parsed.ToContains;
@@ -101,8 +101,8 @@ public static class MailboxSearcher {
         for (int i = 0; i < client.Count; i++) {
             var message = await client.GetMessageAsync(i, cancellationToken).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(subject) && (message.Subject == null || message.Subject.IndexOf(subject, StringComparison.OrdinalIgnoreCase) < 0)) continue;
-            if (!string.IsNullOrWhiteSpace(fromContains) && !AddressMatches(message.From, fromContains)) continue;
-            if (!string.IsNullOrWhiteSpace(toContains) && !AddressMatches(message.To, toContains)) continue;
+              if (!string.IsNullOrWhiteSpace(fromContains) && !AddressMatches(message.From, fromContains!)) continue;
+              if (!string.IsNullOrWhiteSpace(toContains) && !AddressMatches(message.To, toContains!)) continue;
             if (!string.IsNullOrWhiteSpace(bodyContains)) {
                 var textBody = message.TextBody ?? string.Empty;
                 var htmlBody = message.HtmlBody ?? string.Empty;
@@ -232,7 +232,7 @@ public static class MailboxSearcher {
             credential,
             userPrincipalName,
             new[] { "id" },
-            filter,
+            filter!,
             maxResults > 0 ? maxResults : (int?)null).ConfigureAwait(false);
         var mimeMessages = new List<MimeMessage>(msgs.Count);
         if (parallelDownloadLimit <= 1) {
@@ -277,7 +277,7 @@ public static class MailboxSearcher {
             foreach (var report in MimeKitUtils.GetNonDeliveryReports(message)) {
                 if (since.HasValue && report.Timestamp.DateTime < since.Value) continue;
                 if (before.HasValue && report.Timestamp.DateTime > before.Value) continue;
-                if (!string.IsNullOrWhiteSpace(recipientContains) && !RecipientMatches(report, recipientContains)) continue;
+                  if (!string.IsNullOrWhiteSpace(recipientContains) && !RecipientMatches(report, recipientContains!)) continue;
                 if (!string.IsNullOrWhiteSpace(messageId) && !string.Equals(report.OriginalMessageId, messageId, StringComparison.OrdinalIgnoreCase)) continue;
                 results.Add(report);
             }
@@ -285,13 +285,15 @@ public static class MailboxSearcher {
         return results;
     }
 
-    private static bool RecipientMatches(NonDeliveryReport report, string filter) {
-        if (!string.IsNullOrWhiteSpace(report.FinalRecipientAddress) &&
-            report.FinalRecipientAddress.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) return true;
-        if (!string.IsNullOrWhiteSpace(report.OriginalRecipientAddress) &&
-            report.OriginalRecipientAddress.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) return true;
-        return false;
-    }
+      private static bool RecipientMatches(NonDeliveryReport report, string filter) {
+          var final = report.FinalRecipientAddress;
+          if (final != null &&
+              final.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+          var original = report.OriginalRecipientAddress;
+          if (original != null &&
+              original.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+          return false;
+      }
 
     private static MimeKit.MessagePriority ConvertPriority(MessagePriority priority)
         => priority switch {
@@ -333,10 +335,10 @@ public static class MailboxSearcher {
         public List<SearchQuery> AdditionalQueries { get; } = new();
     }
 
-    internal static ParsedQuery ParseQuery(string query) {
-        var result = new ParsedQuery();
-        if (string.IsNullOrWhiteSpace(query)) return result;
-        foreach (var token in SplitTokens(query)) {
+      internal static ParsedQuery ParseQuery(string? query) {
+          var result = new ParsedQuery();
+          if (string.IsNullOrWhiteSpace(query)) return result;
+          foreach (var token in SplitTokens(query!)) {
             var parts = token.Split(new[] { ':' }, 2);
             if (parts.Length == 2) {
                 var key = parts[0];

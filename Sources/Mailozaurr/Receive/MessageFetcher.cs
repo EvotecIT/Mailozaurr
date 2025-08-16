@@ -27,7 +27,9 @@ public static class MessageFetcher {
     /// <param name="before">Latest delivery date.</param>
     /// <param name="all">If set, ignores other filters.</param>
     /// <param name="delete">If set, messages are deleted after fetching.</param>
+    /// <param name="hasAttachment">When set, only messages with attachments are returned.</param>
     /// <param name="additionalQueries">Additional <see cref="SearchQuery"/> filters.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
     /// <returns>Collection of matching messages.</returns>
     public static async IAsyncEnumerable<ImapEmailMessage> Fetch(
         ImapClient client,
@@ -116,6 +118,8 @@ public static class MessageFetcher {
     /// <param name="before">Latest delivery date.</param>
     /// <param name="all">If set, ignores other filters.</param>
     /// <param name="delete">If set, messages are deleted after fetching.</param>
+    /// <param name="hasAttachment">When set, only messages with attachments are returned.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
     /// <returns>Collection of matching messages.</returns>
     public static async IAsyncEnumerable<Pop3EmailMessage> Fetch(
         Pop3Client client,
@@ -142,10 +146,10 @@ public static class MessageFetcher {
                 if (!string.IsNullOrWhiteSpace(subject) && (message.Subject == null || message.Subject.IndexOf(subject, StringComparison.OrdinalIgnoreCase) < 0)) {
                     continue;
                 }
-                if (!string.IsNullOrWhiteSpace(fromContains) && !AddressMatches(message.From, fromContains)) {
+                if (!string.IsNullOrWhiteSpace(fromContains) && !AddressMatches(message.From, fromContains!)) {
                     continue;
                 }
-                if (!string.IsNullOrWhiteSpace(toContains) && !AddressMatches(message.To, toContains)) {
+                if (!string.IsNullOrWhiteSpace(toContains) && !AddressMatches(message.To, toContains!)) {
                     continue;
                 }
                 var msgDate = message.Date.DateTime;
