@@ -79,7 +79,7 @@ public static class Helpers {
     /// <summary>Parses an object into an email and optional name.</summary>
     /// <param name="from">String or dictionary representation.</param>
     /// <returns>Tuple containing the email and name.</returns>
-    public static (string Email, string? Name) GetEmailAndName(object from) {
+    public static (string? Email, string? Name) GetEmailAndName(object? from) {
         if (from is string s) {
             return (s, null);
         }

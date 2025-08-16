@@ -218,7 +218,7 @@ namespace Mailozaurr {
             return Encrypt(input, key, null);
         }
 
-        internal static EncryptionResult Encrypt(SecureString input, byte[] key, byte[] iv) {
+        internal static EncryptionResult Encrypt(SecureString input, byte[] key, byte[]? iv) {
             //Utils.CheckSecureStringArg(input, "input");
             //Utils.CheckKeyArg(key, "key");
 
@@ -414,16 +414,19 @@ namespace Mailozaurr {
         /// <summary>Creates a new <see cref="SecureString"/> from a <see cref="string"/>.</summary>
         /// <param name="plainTextString">Plain text string. Must not be null.</param>
         /// <returns>A new SecureString.</returns>
-        internal static unsafe SecureString FromPlainTextString(string plainTextString) {
-            Debug.Assert(plainTextString is not null);
-
-            if (string.IsNullOrWhiteSpace(plainTextString)) {
+        internal static SecureString FromPlainTextString(string? plainTextString) {
+            if (string.IsNullOrEmpty(plainTextString)) {
                 return new SecureString();
             }
 
-            fixed (char* charsPtr = plainTextString) {
-                return new SecureString(charsPtr, plainTextString.Length);
+            string inputString = plainTextString!;
+            SecureString secureString = new();
+            foreach (char c in inputString) {
+                secureString.AppendChar(c);
             }
+
+            secureString.MakeReadOnly();
+            return secureString;
         }
 #nullable restore
     }
