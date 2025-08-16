@@ -146,6 +146,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y powershell
 
+      - name: Install Mono for .NET Framework tests
+        run: sudo apt-get install -y mono-complete
+
       - name: Install PowerShell modules
         shell: pwsh
         run: |
@@ -184,6 +187,9 @@ jobs:
 
       - name: Install PowerShell
         run: brew install --cask powershell
+
+      - name: Install Mono for .NET Framework tests
+        run: brew install mono
 
       - name: Install PowerShell modules
         shell: pwsh

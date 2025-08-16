@@ -1,5 +1,6 @@
 using MailKit;
 using MailKit.Net.Imap;
+using MailKit.Search;
 using MimeKit;
 using System;
 using System.Collections.Generic;
@@ -19,7 +20,9 @@ public class ImapIdleListener : IDisposable {
     private readonly ImapClient _client;
     private readonly string? _folderName;
     private readonly List<IMessageSummary> _summaries = new();
+    private readonly HashSet<UniqueId> _known = new();
     private readonly FetchRequest _fetchRequest = new(MessageSummaryItems.Full | MessageSummaryItems.UniqueId);
+    private readonly SearchQuery? _searchQuery;
     private IMailFolder? _folder;
     private CancellationTokenSource? _cancel;
     private CancellationTokenSource? _done;
@@ -30,9 +33,11 @@ public class ImapIdleListener : IDisposable {
     /// </summary>
     /// <param name="client">Connected IMAP client.</param>
     /// <param name="folder">Folder to monitor or <c>null</c> for the inbox.</param>
-    public ImapIdleListener(ImapClient client, string? folder = null) {
+    /// <param name="searchQuery">Optional search query to filter incoming messages.</param>
+    public ImapIdleListener(ImapClient client, string? folder = null, SearchQuery? searchQuery = null) {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _folderName = folder;
+        _searchQuery = searchQuery;
     }
 
     /// <summary>
@@ -58,8 +63,13 @@ public class ImapIdleListener : IDisposable {
         _folder = _client.GetCachedFolder(_folderName, FolderAccess.ReadOnly);
         await _folder.OpenAsync(FolderAccess.ReadOnly, _cancel.Token).ConfigureAwait(false);
 
-        var initial = await _folder.FetchAsync(0, -1, _fetchRequest, _cancel.Token).ConfigureAwait(false);
-        _summaries.AddRange(initial);
+        var search = _searchQuery ?? SearchQuery.All;
+        var initialUids = await _folder.SearchAsync(search, _cancel.Token).ConfigureAwait(false);
+        var initial = await _folder.FetchAsync(initialUids, _fetchRequest, _cancel.Token).ConfigureAwait(false);
+        foreach (var summary in initial) {
+            _summaries.Add(summary);
+            _known.Add(summary.UniqueId);
+        }
 
         _folder.CountChanged += OnCountChanged;
         _folder.MessageExpunged += OnMessageExpunged;
@@ -106,7 +116,18 @@ public class ImapIdleListener : IDisposable {
     }
 
     private async Task FetchNewMessagesAsync() {
-        var fetched = await _folder!.FetchAsync(_summaries.Count, -1, _fetchRequest, _cancel!.Token).ConfigureAwait(false);
+        var search = _searchQuery ?? SearchQuery.All;
+        var uids = await _folder!.SearchAsync(search, _cancel!.Token).ConfigureAwait(false);
+        var newUids = new List<UniqueId>();
+        foreach (var uid in uids) {
+            if (_known.Add(uid)) {
+                newUids.Add(uid);
+            }
+        }
+
+        if (newUids.Count == 0) return;
+
+        var fetched = await _folder.FetchAsync(newUids, _fetchRequest, _cancel.Token).ConfigureAwait(false);
         foreach (var summary in fetched) {
             var message = await _folder.GetMessageAsync(summary.UniqueId, _cancel.Token).ConfigureAwait(false);
             _summaries.Add(summary);
@@ -115,15 +136,18 @@ public class ImapIdleListener : IDisposable {
     }
 
     private void OnCountChanged(object? sender, EventArgs e) {
-        if (_folder!.Count > _summaries.Count) {
-            _messagesArrived = true;
-            _done?.Cancel();
-        }
+        _messagesArrived = true;
+        _done?.Cancel();
     }
 
     private void OnMessageExpunged(object? sender, MessageEventArgs e) {
-        if (e.Index < _summaries.Count) {
+        if (e.UniqueId.HasValue) {
+            _known.Remove(e.UniqueId.Value);
+            _summaries.RemoveAll(s => s.UniqueId == e.UniqueId.Value);
+        } else if (e.Index < _summaries.Count) {
+            var removed = _summaries[e.Index];
             _summaries.RemoveAt(e.Index);
+            _known.Remove(removed.UniqueId);
         }
     }
 

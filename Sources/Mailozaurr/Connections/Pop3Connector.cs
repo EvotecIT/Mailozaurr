@@ -32,7 +32,7 @@ public static class Pop3Connector {
     /// <param name="retryDelayMilliseconds">Initial delay between retries.</param>
     /// <param name="retryDelayBackoff">Multiplier for delay backoff.</param>
     /// <returns>Authenticated <see cref="Pop3Client"/> instance.</returns>
-    public static async Task<Pop3Client> ConnectAsync(
+    public static Task<Pop3Client> ConnectAsync(
         string server,
         int port,
         SecureSocketOptions options,
@@ -42,51 +42,19 @@ public static class Pop3Connector {
         Func<Pop3Client, Task> authenticateAsync,
         int retryCount,
         int retryDelayMilliseconds,
-        double retryDelayBackoff) {
-        int attempts = 0;
-        Exception? lastException = null;
-        do {
-            var client = ClientFactory();
-            try {
-                await client.ConnectAsync(server, port, options).ConfigureAwait(false);
-                if (skipCertificateRevocation) {
-                    client.CheckCertificateRevocation = false;
-                }
-                if (skipCertificateValidation) {
-                    client.ServerCertificateValidationCallback = (s, c, h, e) => true;
-                }
-                if (client.Timeout != timeout) {
-                    client.Timeout = timeout;
-                }
-                await authenticateAsync(client).ConfigureAwait(false);
-                if (!client.IsAuthenticated) {
-                    throw new InvalidOperationException("Authentication failed.");
-                }
-                return client;
-            } catch (Exception ex) {
-                lastException = ex;
-                LoggingMessages.Logger.WriteWarning($"Connect-POP3 - {ex.Message}");
-                try {
-                    if (client.IsConnected) {
-                        await client.DisconnectAsync(true).ConfigureAwait(false);
-                    }
-                } catch (Exception ex2) {
-                    LoggingMessages.Logger.WriteWarning($"Connect-POP3 - {ex2.Message}");
-                }
-                if ((!Helpers.IsTransient(ex)) || attempts >= retryCount) {
-                    throw;
-                }
-                var delay = (int)Math.Round(retryDelayMilliseconds * Math.Pow(retryDelayBackoff, attempts));
-                if (delay > 0) {
-                    if (DelayAsync != null) {
-                        await DelayAsync(delay).ConfigureAwait(false);
-                    } else {
-                        await Task.Delay(delay).ConfigureAwait(false);
-                    }
-                }
-            }
-            attempts++;
-        } while (attempts <= retryCount);
-        throw lastException!;
-    }
+        double retryDelayBackoff) =>
+        ConnectionRetrier.ConnectAsync(
+            ClientFactory,
+            "POP3",
+            server,
+            port,
+            options,
+            timeout,
+            skipCertificateRevocation,
+            skipCertificateValidation,
+            authenticateAsync,
+            retryCount,
+            retryDelayMilliseconds,
+            retryDelayBackoff,
+            DelayAsync);
 }

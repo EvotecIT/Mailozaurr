@@ -22,6 +22,7 @@ public class ConnectorTests
         private int _timeout;
         public override bool IsConnected => _connected;
         public override int Timeout { get => _timeout; set => _timeout = value; }
+        public bool Disposed { get; private set; }
         public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default)
         {
             ConnectCalls++;
@@ -36,6 +37,11 @@ public class ConnectorTests
         {
             _connected = false;
             return Task.CompletedTask;
+        }
+        protected override void Dispose(bool disposing)
+        {
+            Disposed = true;
+            base.Dispose(disposing);
         }
     }
 
@@ -49,6 +55,7 @@ public class ConnectorTests
         private int _timeout;
         public override bool IsConnected => _connected;
         public override int Timeout { get => _timeout; set => _timeout = value; }
+        public bool Disposed { get; private set; }
         public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default)
         {
             ConnectCalls++;
@@ -63,6 +70,11 @@ public class ConnectorTests
         {
             _connected = false;
             return Task.CompletedTask;
+        }
+        protected override void Dispose(bool disposing)
+        {
+            Disposed = true;
+            base.Dispose(disposing);
         }
     }
 
@@ -149,6 +161,32 @@ public class ConnectorTests
     }
 
     [Fact]
+    public async Task ImapConnector_NoRetriesThrowsOriginalException()
+    {
+        var fake = new FakeImapClient { FailuresBeforeSuccess = 1 };
+        ImapConnector.ClientFactory = () => fake;
+        await Assert.ThrowsAsync<HttpRequestException>(() => ImapConnector.ConnectAsync(
+            "s", 1, SecureSocketOptions.Auto, 0, false, false,
+            c => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; },
+            0, 10, 2));
+        ImapConnector.ClientFactory = () => new ImapClient();
+        Assert.Equal(1, fake.ConnectCalls);
+    }
+
+    [Fact]
+    public async Task Pop3Connector_NoRetriesThrowsOriginalException()
+    {
+        var fake = new FakePop3Client { FailuresBeforeSuccess = 1 };
+        Pop3Connector.ClientFactory = () => fake;
+        await Assert.ThrowsAsync<HttpRequestException>(() => Pop3Connector.ConnectAsync(
+            "s", 1, SecureSocketOptions.Auto, 0, false, false,
+            c => { ((FakePop3Client)c).Authenticated = true; return Task.CompletedTask; },
+            0, 10, 2));
+        Pop3Connector.ClientFactory = () => new Pop3Client();
+        Assert.Equal(1, fake.ConnectCalls);
+    }
+
+    [Fact]
     public async Task ImapConnector_LogsDisconnectException()
     {
         var fake = new FakeImapDisconnectFailClient();
@@ -168,6 +206,43 @@ public class ConnectorTests
     }
 
     [Fact]
+    public async Task ImapConnector_DisposesClientBeforeRetry()
+    {
+        var first = new FakeImapClient { FailuresBeforeSuccess = 1 };
+        var second = new FakeImapClient();
+        var call = 0;
+        ImapConnector.ClientFactory = () =>
+        {
+            call++;
+            if (call == 2)
+            {
+                Assert.True(first.Disposed);
+                return second;
+            }
+            return first;
+        };
+        var client = await ImapConnector.ConnectAsync(
+            "s", 1, SecureSocketOptions.Auto, 0, false, false,
+            c => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; },
+            1, 0, 1);
+        ImapConnector.ClientFactory = () => new ImapClient();
+        Assert.Same(second, client);
+    }
+
+    [Fact]
+    public async Task ImapConnector_DisposesClientAfterFinalFailure()
+    {
+        var fake = new FakeImapClient { FailuresBeforeSuccess = 1 };
+        ImapConnector.ClientFactory = () => fake;
+        await Assert.ThrowsAsync<HttpRequestException>(() => ImapConnector.ConnectAsync(
+            "s", 1, SecureSocketOptions.Auto, 0, false, false,
+            c => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; },
+            0, 0, 1));
+        ImapConnector.ClientFactory = () => new ImapClient();
+        Assert.True(fake.Disposed);
+    }
+
+    [Fact]
     public async Task Pop3Connector_LogsDisconnectException()
     {
         var fake = new FakePop3DisconnectFailClient();
@@ -184,5 +259,42 @@ public class ConnectorTests
         LoggingMessages.Logger.OnWarningMessage -= Handler;
         Pop3Connector.ClientFactory = () => new Pop3Client();
         Assert.Contains(messages, static m => m.Contains("disconnect"));
+    }
+
+    [Fact]
+    public async Task Pop3Connector_DisposesClientBeforeRetry()
+    {
+        var first = new FakePop3Client { FailuresBeforeSuccess = 1 };
+        var second = new FakePop3Client();
+        var call = 0;
+        Pop3Connector.ClientFactory = () =>
+        {
+            call++;
+            if (call == 2)
+            {
+                Assert.True(first.Disposed);
+                return second;
+            }
+            return first;
+        };
+        var client = await Pop3Connector.ConnectAsync(
+            "s", 1, SecureSocketOptions.Auto, 0, false, false,
+            c => { ((FakePop3Client)c).Authenticated = true; return Task.CompletedTask; },
+            1, 0, 1);
+        Pop3Connector.ClientFactory = () => new Pop3Client();
+        Assert.Same(second, client);
+    }
+
+    [Fact]
+    public async Task Pop3Connector_DisposesClientAfterFinalFailure()
+    {
+        var fake = new FakePop3Client { FailuresBeforeSuccess = 1 };
+        Pop3Connector.ClientFactory = () => fake;
+        await Assert.ThrowsAsync<HttpRequestException>(() => Pop3Connector.ConnectAsync(
+            "s", 1, SecureSocketOptions.Auto, 0, false, false,
+            c => { ((FakePop3Client)c).Authenticated = true; return Task.CompletedTask; },
+            0, 0, 1));
+        Pop3Connector.ClientFactory = () => new Pop3Client();
+        Assert.True(fake.Disposed);
     }
 }

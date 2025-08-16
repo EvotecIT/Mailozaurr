@@ -18,13 +18,13 @@ public class GraphAttachment {
     /// Gets or sets the attachment file name.
     /// </summary>
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the file content encoded as a Base64 string.
     /// </summary>
     [JsonPropertyName("contentBytes")]
-    public string ContentBytes { get; set; }
+    public string ContentBytes { get; set; } = string.Empty;
 
     /// <summary>
     /// Indicates whether this attachment should be rendered inline in the

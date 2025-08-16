@@ -24,7 +24,7 @@ public static class OAuthHelpers {
     /// <param name="scopes">The scopes to request for the token.</param>
     /// <returns>A credential containing the access token.</returns>
     public static async Task<OAuthCredential> AcquireO365TokenInteractiveAsync(
-        string login,
+        string? login,
         string clientId,
         string tenantId,
         string redirectUri,
@@ -62,7 +62,7 @@ public static class OAuthHelpers {
             AccessToken = result.AccessToken,
             ExpiresOn = result.ExpiresOn
         };
-        OAuthTokenCache.Set($"o365:{cred.UserName}", cred);
+        await OAuthTokenCache.SetAsync($"o365:{cred.UserName}", cred);
         return cred;
     }
 
@@ -70,7 +70,7 @@ public static class OAuthHelpers {
     /// Attempts to silently acquire a new Office 365 access token using the cached refresh token.
     /// </summary>
     private static async Task<OAuthCredential?> AcquireO365TokenSilentAsync(
-        string login,
+        string? login,
         string clientId,
         string tenantId,
         string redirectUri,
@@ -139,7 +139,7 @@ public static class OAuthHelpers {
             RefreshToken = credential.Token.RefreshToken,
             ExpiresOn = credential.Token.IssuedUtc + TimeSpan.FromSeconds(credential.Token.ExpiresInSeconds ?? 0)
         };
-        OAuthTokenCache.Set($"google:{cred.UserName}", cred);
+        await OAuthTokenCache.SetAsync($"google:{cred.UserName}", cred);
         return cred;
     }
 
@@ -147,26 +147,30 @@ public static class OAuthHelpers {
     /// Attempts to retrieve a cached Office 365 token or acquire a new one if necessary.
     /// </summary>
     public static async Task<OAuthCredential> AcquireO365TokenCachedAsync(
-        string login,
+        string? login,
         string clientId,
         string tenantId,
         string redirectUri,
         IEnumerable<string> scopes) {
-        var cacheKey = $"o365:{login}";
-        var cached = OAuthTokenCache.Get(cacheKey);
-        if (cached != null && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
-            return cached;
-        }
-        if (cached != null) {
-            var refreshed = await AcquireO365TokenSilentAsync(login, clientId, tenantId, redirectUri, scopes);
-            if (refreshed != null) {
-                OAuthTokenCache.Set(cacheKey, refreshed);
-                return refreshed;
+        var cacheKey = string.IsNullOrWhiteSpace(login) ? null : $"o365:{login}";
+        if (cacheKey != null) {
+            var cached = await OAuthTokenCache.GetAsync(cacheKey);
+            if (cached != null && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
+                return cached;
+            }
+            if (cached != null) {
+                var refreshed = await AcquireO365TokenSilentAsync(login, clientId, tenantId, redirectUri, scopes);
+                if (refreshed != null) {
+                    await OAuthTokenCache.SetAsync(cacheKey, refreshed);
+                    return refreshed;
+                }
             }
         }
 
         var cred = await AcquireO365TokenInteractiveAsync(login, clientId, tenantId, redirectUri, scopes);
-        OAuthTokenCache.Set(cacheKey, cred);
+        if (cacheKey != null) {
+            await OAuthTokenCache.SetAsync(cacheKey, cred);
+        }
         return cred;
     }
 
@@ -179,7 +183,7 @@ public static class OAuthHelpers {
         string clientSecret,
         IEnumerable<string> scopes) {
         var cacheKey = $"google:{gmailAccount}";
-        var cached = OAuthTokenCache.Get(cacheKey);
+        var cached = await OAuthTokenCache.GetAsync(cacheKey);
         if (cached != null && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
             return cached;
         }
@@ -201,13 +205,13 @@ public static class OAuthHelpers {
                     RefreshToken = userCred.Token.RefreshToken,
                     ExpiresOn = userCred.Token.IssuedUtc + TimeSpan.FromSeconds(userCred.Token.ExpiresInSeconds ?? 0)
                 };
-                OAuthTokenCache.Set(cacheKey, newCred);
+                await OAuthTokenCache.SetAsync(cacheKey, newCred);
                 return newCred;
             }
         }
 
         var cred = await AcquireGoogleTokenInteractiveAsync(gmailAccount, clientId, clientSecret, scopes);
-        OAuthTokenCache.Set(cacheKey, cred);
+        await OAuthTokenCache.SetAsync(cacheKey, cred);
         return cred;
     }
 
@@ -240,7 +244,7 @@ public static class OAuthHelpers {
             AccessToken = result.AccessToken,
             ExpiresOn = result.ExpiresOn
         };
-        OAuthTokenCache.Set($"o365:{cred.UserName}", cred);
+        await OAuthTokenCache.SetAsync($"o365:{cred.UserName}", cred);
         return cred;
     }
 

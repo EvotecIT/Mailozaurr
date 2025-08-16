@@ -11,12 +11,12 @@ public class SendGridMessage {
     /// <summary>
     /// Gets or sets the list of personalizations for the message.
     /// </summary>
-    public List<SendGridPersonalization> Personalizations { get; set; }
+    public List<SendGridPersonalization> Personalizations { get; set; } = [];
 
     /// <summary>
     /// Gets or sets the sender of the message.
     /// </summary>
-    public SendGridEmailAddress From { get; set; }
+    public SendGridEmailAddress From { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the subject of the message.
@@ -27,7 +27,7 @@ public class SendGridMessage {
     /// <summary>
     /// Gets or sets the content of the message.
     /// </summary>
-    public List<SendGridContent> Content { get; set; }
+    public List<SendGridContent> Content { get; set; } = [];
 
     /// <summary>
     /// Gets or sets the reply-to address for the message.

@@ -56,6 +56,12 @@ public sealed class CmdletSearchIMAPMailbox : AsyncPSCmdlet {
     public string? ToContains { get; set; }
 
     /// <summary>
+    /// Filters messages where the body contains this text.
+    /// </summary>
+    [Parameter]
+    public string? BodyContains { get; set; }
+
+    /// <summary>
     /// Filters messages by priority.
     /// </summary>
     [Parameter]
@@ -99,6 +105,7 @@ public sealed class CmdletSearchIMAPMailbox : AsyncPSCmdlet {
                 Subject,
                 FromContains,
                 ToContains,
+                BodyContains,
                 Priority,
                 Since,
                 Before,

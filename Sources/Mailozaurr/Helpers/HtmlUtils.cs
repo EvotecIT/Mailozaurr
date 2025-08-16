@@ -12,10 +12,12 @@ namespace Mailozaurr;
 /// performing minor HTML transformations.
 /// </remarks>
 public static class HtmlUtils {
-    internal static HttpClient HttpClient { get; set; }
+    internal static HttpClient HttpClient { get; } = new HttpClient();
+
+    private static readonly Regex ImageSrcRegex = new("(?<=<img[^>]+src=[\"'])([^\"']+)(?=[\"'])", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     static HtmlUtils() {
-        HttpClient = new HttpClient();
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => HttpClient.Dispose();
     }
 
     /// <summary>
@@ -40,21 +42,21 @@ public static class HtmlUtils {
         var paths = new List<string>();
         if (string.IsNullOrWhiteSpace(html)) return (html, paths);
 
-        string pattern = "<img[^>]+src=[\"']([^\"']+)[\"']";
-        foreach (Match match in Regex.Matches(html, pattern, RegexOptions.IgnoreCase)) {
-            var path = match.Groups[1].Value;
-            if (string.IsNullOrWhiteSpace(path)) continue;
+        html = ImageSrcRegex.Replace(html, match => {
+            var path = match.Value;
+            if (string.IsNullOrWhiteSpace(path)) return path;
             if (path.StartsWith("http", StringComparison.OrdinalIgnoreCase) ||
                 path.StartsWith("cid:", StringComparison.OrdinalIgnoreCase) ||
                 path.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) {
-                continue;
+                return path;
             }
             if (File.Exists(path)) {
                 var fileName = Path.GetFileName(path);
-                html = html.Replace(path, $"cid:{fileName}");
                 paths.Add(path);
+                return $"cid:{fileName}";
             }
-        }
+            return path;
+        });
         return (html, paths);
     }
 
@@ -68,11 +70,15 @@ public static class HtmlUtils {
         var images = new List<RemoteImage>();
         if (string.IsNullOrWhiteSpace(html)) return (html, images);
 
-        string pattern = "<img[^>]+src=['\"]([^'\"]+)['\"]";
-        foreach (Match match in Regex.Matches(html, pattern, RegexOptions.IgnoreCase)) {
-            var url = match.Groups[1].Value;
+        string pattern = "(?<=<img[^>]+src=['\"])([^'\"]+)(?=['\"])";
+        var matches = Regex.Matches(html, pattern, RegexOptions.IgnoreCase);
+        var replacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (Match match in matches) {
+            var url = match.Value;
             if (string.IsNullOrWhiteSpace(url)) continue;
             if (!url.StartsWith("http", StringComparison.OrdinalIgnoreCase)) continue;
+            if (replacements.ContainsKey(url)) continue;
             try {
                 using var response = await HttpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
                 if (!response.IsSuccessStatusCode) continue;
@@ -84,12 +90,14 @@ public static class HtmlUtils {
                 var mediaType = response.Content.Headers.ContentType?.MediaType ?? MimeTypes.GetMimeType(Path.GetFileName(url));
                 var fileName = Path.GetFileName(new Uri(url).AbsolutePath);
                 if (string.IsNullOrEmpty(fileName)) fileName = Guid.NewGuid().ToString("N");
-                html = html.Replace(url, $"cid:{fileName}");
+                replacements[url] = $"cid:{fileName}";
                 images.Add(new RemoteImage { ContentId = fileName, Data = data, MediaType = mediaType });
             } catch (Exception ex) {
                 LoggingMessages.Logger.WriteWarning($"Failed to download image '{url}': {ex.Message}");
             }
         }
+
+        html = Regex.Replace(html, pattern, m => replacements.TryGetValue(m.Value, out var value) ? value : m.Value, RegexOptions.IgnoreCase);
 
         return (html, images);
     }

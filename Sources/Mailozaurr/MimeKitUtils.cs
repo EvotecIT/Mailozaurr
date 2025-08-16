@@ -48,9 +48,7 @@ public static class MimeKitUtils {
             foreach (var group in status.StatusGroups) {
                 var headers = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
                 foreach (var header in group) {
-                    if (!headers.ContainsKey(header.Field)) {
-                        headers[header.Field] = header.Value;
-                    }
+                    headers.TryAdd(header.Field, header.Value);
                 }
 
                 reports.Add(headers.Count > 0 ? NonDeliveryReport.FromHeaders(headers) : new NonDeliveryReport());

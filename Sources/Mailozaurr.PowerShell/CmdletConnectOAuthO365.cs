@@ -62,7 +62,7 @@ public class CmdletConnectOAuthO365 : PSCmdlet {
     /// Performs the interactive OAuth2 authentication and returns a PSCredential with the access token.
     /// </summary>
     protected override void ProcessRecord() {
-        Mailozaurr.OAuthCredential cred = null;
+        Mailozaurr.OAuthCredential? cred = null;
         try {
             cred = Task.Run(() => Mailozaurr.OAuthHelpers.AcquireO365TokenCachedAsync(Login, ClientID, TenantID, RedirectUri, Scopes)).GetAwaiter().GetResult();
         } catch (System.Exception ex) {

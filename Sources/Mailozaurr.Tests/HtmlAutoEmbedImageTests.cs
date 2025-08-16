@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
+using System.Threading;
 using MimeKit;
 using Xunit;
 
@@ -19,7 +20,7 @@ public class HtmlAutoEmbedImageTests {
         smtp.To = new object[] { "c@d.com" };
         smtp.Subject = "test";
         smtp.HtmlBody = $"<img src=\"{tmp}\">";
-        smtp.CreateMessage();
+        smtp.CreateMessage(CancellationToken.None);
         var body = (MultipartRelated)smtp.Message.Body;
         var inline = body.OfType<MimePart>().FirstOrDefault(p => p.ContentDisposition?.Disposition == ContentDisposition.Inline);
         File.Delete(tmp);
@@ -53,24 +54,25 @@ public class HtmlAutoEmbedImageTests {
                 Headers = { ContentType = new MediaTypeHeaderValue("image/png") }
             }
         });
-        var property = typeof(HtmlUtils).GetProperty("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var client = new HttpClient(handler);
-        var original = (HttpClient)property.GetValue(null)!;
-        property.SetValue(null, client);
+        var client = HtmlUtils.HttpClient;
+        var handlerField = typeof(HttpMessageInvoker).GetField("_handler", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? typeof(HttpMessageInvoker).GetField("handler", BindingFlags.Instance | BindingFlags.NonPublic);
+        var original = (HttpMessageHandler)handlerField!.GetValue(client)!;
+        handlerField.SetValue(client, handler);
         try {
             var smtp = new Smtp { AutoEmbedRemoteImages = true };
             smtp.From = "a@b.com";
             smtp.To = new object[] { "c@d.com" };
             smtp.Subject = "test";
             smtp.HtmlBody = "<img src=\"https://example.com/img.png\">";
-            smtp.CreateMessage();
+            smtp.CreateMessage(CancellationToken.None);
             var body = (MultipartRelated)smtp.Message.Body!;
             var inline = body.OfType<MimePart>().FirstOrDefault(p => p.ContentDisposition?.Disposition == ContentDisposition.Inline);
             Assert.NotNull(inline);
             Assert.Contains("cid:img.png", smtp.HtmlBody);
             Assert.Single(handler.Requests);
         } finally {
-            property.SetValue(null, original);
+            handlerField.SetValue(client, original);
         }
     }
 }

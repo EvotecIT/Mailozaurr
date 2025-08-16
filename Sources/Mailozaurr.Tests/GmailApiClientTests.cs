@@ -13,6 +13,19 @@ public class GmailApiClientTests {
             return Task.FromResult(_response);
         }
     }
+
+    private sealed class DisposingHandler : HttpMessageHandler {
+        public bool Disposed { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK));
+
+        protected override void Dispose(bool disposing) {
+            if (disposing) {
+                Disposed = true;
+            }
+            base.Dispose(disposing);
+        }
+    }
     [Fact]
     public void Constructor_SetsAuthorizationHeader() {
         var cred = new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue };
@@ -49,6 +62,26 @@ public class GmailApiClientTests {
         Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/messages/123/attachments/att", handler.Requests[0].RequestUri!.ToString());
     }
 
+    [Fact]
+    public async System.Threading.Tasks.Task DownloadAttachmentAsync_NoData_ReturnsEmptyArray() {
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent("{}") });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+        var data = await client.DownloadAttachmentAsync("me", "123", "att");
+        Assert.Empty(data);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task DownloadAttachmentAsync_InvalidData_Throws() {
+        var json = "{\"data\":\"abcde\"}"; // invalid length base64url
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+        await Assert.ThrowsAsync<System.IO.InvalidDataException>(() => client.DownloadAttachmentAsync("me", "123", "att"));
+    }
+
     [Theory]
     [InlineData(System.Net.HttpStatusCode.Unauthorized)]
     [InlineData(System.Net.HttpStatusCode.Forbidden)]
@@ -60,6 +93,29 @@ public class GmailApiClientTests {
         var message = new MimeKit.MimeMessage();
         await Assert.ThrowsAsync<GmailAuthenticationException>(() => client.SendAsync("me", message));
         Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task SendAsync_ExpiredToken_InvokesRefresh() {
+        var handler = new RecordingHandler(
+            new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.Unauthorized) { Content = new System.Net.Http.StringContent("error") },
+            new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent("{\"id\":\"1\"}") });
+        int refreshes = 0;
+        System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<string>> refresher = _ => {
+            refreshes++;
+            return System.Threading.Tasks.Task.FromResult("new");
+        };
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "old", ExpiresOn = System.DateTimeOffset.MaxValue }, refresher);
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var httpClient = new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") };
+        httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "old");
+        field.SetValue(client, httpClient);
+        var message = new MimeKit.MimeMessage();
+        await Assert.ThrowsAsync<GmailAuthenticationException>(() => client.SendAsync("me", message));
+        Assert.Equal(1, refreshes);
+        await client.SendAsync("me", message);
+        Assert.Equal("Bearer old", handler.Requests[0].Headers.Authorization!.ToString());
+        Assert.Equal("Bearer new", handler.Requests[1].Headers.Authorization!.ToString());
     }
 
     [Fact]
@@ -124,5 +180,99 @@ public class GmailApiClientTests {
         using var cts = new System.Threading.CancellationTokenSource();
         cts.Cancel();
         await Assert.ThrowsAnyAsync<System.OperationCanceledException>(() => client.DownloadAttachmentAsync("me", "m", "a", cts.Token));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task SendAsync_NullResponse_Throws() {
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent("null") });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+        var message = new MimeKit.MimeMessage();
+        await Assert.ThrowsAsync<System.IO.InvalidDataException>(() => client.SendAsync("me", message));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetAsync_NullResponse_Throws() {
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent("null") });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+        await Assert.ThrowsAsync<System.IO.InvalidDataException>(() => client.GetAsync("me", "id"));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ListThreadsAsync_PaginatesUntilTokenNull() {
+        var page1 = "{\"threads\":[{\"id\":\"1\"}],\"nextPageToken\":\"tok\"}";
+        var page2 = "{\"threads\":[{\"id\":\"2\"}]}";
+        var handler = new RecordingHandler(
+            new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(page1) },
+            new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(page2) });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+        var list = await client.ListThreadsAsync("me");
+        Assert.Equal(2, list.Count);
+        Assert.Equal("1", list[0].Id);
+        Assert.Equal("2", list[1].Id);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Equal(string.Empty, handler.Requests[0].RequestUri!.Query);
+        Assert.Equal("?pageToken=tok", handler.Requests[1].RequestUri!.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetThreadAsync_ReturnsThread() {
+        var json = "{\"id\":\"t1\",\"messages\":[{\"id\":\"m1\"}]}";
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+        var thread = await client.GetThreadAsync("me", "t1");
+        Assert.Equal("t1", thread.Id);
+        Assert.Single(thread.Messages!);
+        Assert.Equal("m1", thread.Messages![0].Id);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ListThreadsAsync_CanBeCancelled() {
+        var handler = new CancelAwareHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent("{}") });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+        using var cts = new System.Threading.CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<System.OperationCanceledException>(() => client.ListThreadsAsync("me", cancellationToken: cts.Token));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetThreadAsync_CanBeCancelled() {
+        var handler = new CancelAwareHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent("{}") });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+        using var cts = new System.Threading.CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<System.OperationCanceledException>(() => client.GetThreadAsync("me", "id", cts.Token));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetThreadAsync_NullResponse_Throws() {
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent("null") });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+        await Assert.ThrowsAsync<System.IO.InvalidDataException>(() => client.GetThreadAsync("me", "id"));
+    }
+     
+    [Fact]
+    public void Dispose_DisposesHttpClient() {
+        var cred = new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue };
+        var client = new GmailApiClient(cred);
+        var handler = new DisposingHandler();
+        var httpClient = new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") };
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, httpClient);
+        client.Dispose();
+        Assert.True(handler.Disposed);
     }
 }
