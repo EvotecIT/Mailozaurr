@@ -8,12 +8,13 @@
         <AssemblyName>Mailozaurr.PowerShell</AssemblyName>
         <Nullable>enable</Nullable>
         <Copyright>(c) 2011 - 2024 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
-        <LangVersion>latest</LangVersion>
-        <RepositoryUrl>https://github.com/EvotecIT/Mailozaurr</RepositoryUrl>
-        <PackageTags>
-            Windows;MacOS;Linux;Mail;Email;MX;SPF;DMARC;DKIM;GraphApi;SendGrid;Graph;IMAP;POP3</PackageTags>
-        <PackageIconUrl>https://evotec.xyz/wp-content/uploads/2020/07/MailoZaurr.png</PackageIconUrl>
-    </PropertyGroup>
+         <LangVersion>latest</LangVersion>
+         <ImplicitUsings>enable</ImplicitUsings>
+         <RepositoryUrl>https://github.com/EvotecIT/Mailozaurr</RepositoryUrl>
+         <PackageTags>
+             Windows;MacOS;Linux;Mail;Email;MX;SPF;DMARC;DKIM;GraphApi;SendGrid;Graph;IMAP;POP3</PackageTags>
+         <PackageIconUrl>https://evotec.xyz/wp-content/uploads/2020/07/MailoZaurr.png</PackageIconUrl>
+     </PropertyGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
@@ -34,21 +35,6 @@
         <Delete Files="$(OutDir)System.Management.dll" />
     </Target>
 
-    <ItemGroup>
-        <Using Include="Mailozaurr" />
-        <Using Include="System.Collections" />
-        <Using Include="System.Management.Automation" />
-        <Using Include="System.Threading.Tasks" />
-        <Using Include="System.Collections.Concurrent" />
-        <Using Include="System.Threading" />
-        <Using Include="System" />
-        <Using Include="System.Collections.Generic" />
-        <Using Include="System.Linq" />
-        <Using Include="System.Text" />
-        <Using Include="System.IO" />
-        <Using Include="System.Net" />
-        <Using Include="System.Diagnostics" />
-    </ItemGroup>
 
     <PropertyGroup>
         <!-- This is needed for XmlDoc2CmdletDoc to generate a PowerShell documentation file. -->

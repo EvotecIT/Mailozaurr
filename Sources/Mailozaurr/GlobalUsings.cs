@@ -1,0 +1,16 @@
+global using MailKit;
+global using MailKit.Net.Smtp;
+global using MailKit.Security;
+global using MailKit.Net.Pop3;
+global using MailKit.Net.Imap;
+global using MailKit.Net;
+global using MimeKit;
+global using MimeKit.Cryptography;
+global using System.Collections;
+global using System.Collections.Generic;
+global using System.Diagnostics;
+global using System.Net;
+global using System.Net.Http;
+global using System.Text;
+global using System.Text.Json;
+global using System.Text.Json.Serialization;
