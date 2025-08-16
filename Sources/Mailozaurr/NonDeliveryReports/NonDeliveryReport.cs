@@ -84,7 +84,7 @@ public sealed class NonDeliveryReport {
         if (string.IsNullOrWhiteSpace(header)) {
             return null;
         }
-        var idx = header.IndexOf(';');
+        var idx = header!.IndexOf(';');
         return idx >= 0 ? header.Substring(idx + 1).Trim() : header.Trim();
     }
 

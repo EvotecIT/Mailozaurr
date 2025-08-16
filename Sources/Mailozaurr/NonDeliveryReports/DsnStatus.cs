@@ -33,7 +33,7 @@ public sealed class DsnStatus {
         if (string.IsNullOrWhiteSpace(value)) {
             return false;
         }
-        var parts = value.Trim().Split('.');
+        var parts = value!.Trim().Split('.');
         if (parts.Length != 3 || !int.TryParse(parts[0], out var cls) || !int.TryParse(parts[1], out var subj) || !int.TryParse(parts[2], out var detail)) {
             return false;
         }
