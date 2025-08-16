@@ -31,8 +31,6 @@ public sealed class CmdletWatchSmtpConnectionPool : PSCmdlet
         WriteObject(handler);
     }
 }
-
-        Action.Invoke(SmtpConnectionPool.GetSnapshot());
-        WriteObject(subscriber);
+
     }
 }

@@ -574,6 +574,7 @@ public class Smtp {
     /// </param>
     /// <param name="isSecureString">Indicates whether the password was
     /// previously protected.</param>
+    /// <param name="mechanism">Authentication mechanism to use.</param>
     /// <returns>An <see cref="SmtpResult"/> representing the outcome.</returns>
     public SmtpResult Authenticate(string username, string password, bool isSecureString, AuthenticationMechanism mechanism = AuthenticationMechanism.Plain) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
