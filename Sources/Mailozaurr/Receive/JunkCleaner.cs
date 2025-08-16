@@ -17,6 +17,13 @@ public static class JunkCleaner {
     /// </summary>
     /// <param name="client">Connected IMAP client.</param>
     /// <param name="folder">Folder name or <c>null</c> for "Junk".</param>
+    /// <param name="skipFrom">Sender addresses to exclude.</param>
+    /// <param name="skipTo">Recipient addresses to exclude.</param>
+    /// <param name="skipSubjectContains">Subjects that, if contained, will exclude the message.</param>
+    /// <param name="skipMessageId">Message IDs to exclude.</param>
+    /// <param name="skipUid">Message UIDs to exclude.</param>
+    /// <param name="skipHasAttachment">When set, skip messages that contain attachments.</param>
+    /// <param name="skipAttachmentExtension">Attachment extensions that, if present, will cause skipping.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     public static async Task ClearImapJunkAsync(
         ImapClient client,
@@ -65,6 +72,13 @@ public static class JunkCleaner {
     /// </summary>
     /// <param name="client">Connected IMAP client.</param>
     /// <param name="folder">Folder name or <c>null</c> for "Junk".</param>
+    /// <param name="skipFrom">Sender addresses to exclude.</param>
+    /// <param name="skipTo">Recipient addresses to exclude.</param>
+    /// <param name="skipSubjectContains">Subjects that, if contained, will exclude the message.</param>
+    /// <param name="skipMessageId">Message IDs to exclude.</param>
+    /// <param name="skipUid">Message UIDs to exclude.</param>
+    /// <param name="skipHasAttachment">When set, skip messages that contain attachments.</param>
+    /// <param name="skipAttachmentExtension">Attachment extensions that, if present, will cause skipping.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     public static async IAsyncEnumerable<ImapEmailMessage> GetImapJunkAsync(
         ImapClient client,
