@@ -37,6 +37,7 @@ public class SmtpResult {
     /// <param name="port">The port.</param>
     /// <param name="timeToExecute">The time to execute.</param>
     /// <param name="outputMessage">The output message.</param>
+    /// <param name="error">Error information if the operation failed.</param>
     public SmtpResult(bool status, EmailAction emailAction, string sentTo, string sentFrom, string server, int port, TimeSpan timeToExecute, string? outputMessage = null, string? error = null) {
         Status = status;
         SentTo = sentTo;

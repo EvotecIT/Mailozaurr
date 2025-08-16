@@ -1,6 +1,8 @@
 namespace Mailozaurr;
 
+using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading;
 
 /// <summary>
@@ -14,11 +16,32 @@ public static class SmtpConnectionPool {
 
     private static readonly ConcurrentDictionary<string, PoolEntry> _connectionPool = new();
 
+
     /// <summary>Maximum number of pooled connections per server/port.</summary>
     public static int MaxPoolSize { get; set; } = 2;
 
     /// <summary>Enables or disables connection pooling.</summary>
     public static bool PoolingEnabled { get; set; } = false;
+
+    /// <summary>Number of pooled SMTP clients across all servers.</summary>
+    public static int CurrentPoolSize {
+        get {
+            var total = 0;
+            foreach (var entry in _connectionPool.Values) {
+                total += entry.Count;
+            }
+
+            return total;
+        }
+    }
+
+    /// <summary>Raised whenever the pool size changes.</summary>
+    public static event Action<int>? PoolSizeChanged;
+
+    private static void OnPoolSizeChanged() {
+        var size = CurrentPoolSize;
+        PoolSizeChanged?.Invoke(size);
+    }
 
     internal static ClientSmtp? TryRentClient(string server, int port) {
         if (!PoolingEnabled) {
@@ -29,6 +52,7 @@ public static class SmtpConnectionPool {
         if (_connectionPool.TryGetValue(key, out var entry)) {
             while (entry.Bag.TryTake(out var pooled)) {
                 Interlocked.Decrement(ref entry.Count);
+                OnPoolSizeChanged();
                 if (pooled.IsConnected) {
                     return pooled;
                 }
@@ -60,6 +84,8 @@ public static class SmtpConnectionPool {
         } else {
             entry.Bag.Add(client);
         }
+
+        OnPoolSizeChanged();
     }
 
     /// <summary>Disposes all SMTP clients stored in the connection pool.</summary>
@@ -77,5 +103,56 @@ public static class SmtpConnectionPool {
         }
 
         _connectionPool.Clear();
+        OnPoolSizeChanged();
+    }
+
+    /// <summary>Gets a snapshot of the current connection pool state.</summary>
+    /// <returns>Snapshot containing all pooled connections.</returns>
+    public static SmtpConnectionPoolSnapshot GetSnapshot() {
+        var entries = new List<SmtpConnectionPoolEntry>();
+        foreach (var kv in _connectionPool) {
+            var key = kv.Key;
+            var index = key.LastIndexOf(':');
+            var server = index >= 0 ? key.Substring(0, index) : key;
+            var port = 0;
+            if (index >= 0) {
+                int.TryParse(key.Substring(index + 1), out port);
+            }
+            entries.Add(new SmtpConnectionPoolEntry(server, port, kv.Value.Count));
+        }
+
+        return new SmtpConnectionPoolSnapshot(CurrentPoolSize, entries);
+    }
+}
+
+/// <summary>Information about a single SMTP connection pool entry.</summary>
+public sealed class SmtpConnectionPoolEntry {
+    /// <summary>Server hostname for the pooled connections.</summary>
+    public string Server { get; }
+
+    /// <summary>TCP port for the pooled connections.</summary>
+    public int Port { get; }
+
+    /// <summary>Number of clients in the pool for this server and port.</summary>
+    public int Count { get; }
+
+    internal SmtpConnectionPoolEntry(string server, int port, int count) {
+        Server = server;
+        Port = port;
+        Count = count;
+    }
+}
+
+/// <summary>Represents a snapshot of the SMTP connection pool.</summary>
+public sealed class SmtpConnectionPoolSnapshot {
+    /// <summary>Total number of pooled SMTP clients.</summary>
+    public int CurrentPoolSize { get; }
+
+    /// <summary>Entries for each server and port combination.</summary>
+    public IReadOnlyList<SmtpConnectionPoolEntry> Entries { get; }
+
+    internal SmtpConnectionPoolSnapshot(int currentPoolSize, IReadOnlyList<SmtpConnectionPoolEntry> entries) {
+        CurrentPoolSize = currentPoolSize;
+        Entries = entries;
     }
 }
