@@ -13,11 +13,6 @@ namespace Mailozaurr {
     /// </remarks>
     /// <inheritdoc cref="SaslMechanism"/>
     public class SaslMechanismNtlmIntegrated : SaslMechanism {
-        enum LoginState {
-            Initial,
-            Challenge
-        }
-
         LoginState state;
         ClientContext sspiContext;
 
