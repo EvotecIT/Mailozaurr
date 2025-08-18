@@ -127,7 +127,7 @@ namespace Mailozaurr {
                 var auth = await OAuthHelpers.AcquireGraphCertificateTokenAsync(
                     credential.ClientId,
                     tenantDomain,
-                    credential.CertificatePath,
+                    credential.CertificatePath!,
                     credential.CertificatePassword ?? string.Empty,
                     scopes);
                 TokenCache[key] = auth;
@@ -148,7 +148,7 @@ namespace Mailozaurr {
                 var auth = await OAuthHelpers.AcquireGraphCertificatePemTokenAsync(
                     credential.ClientId,
                     tenantDomain,
-                    credential.CertificatePemPath,
+                    credential.CertificatePemPath!,
                     scopes);
                 return $"{auth.TokenType} {auth.AccessToken}";
             }
@@ -157,9 +157,11 @@ namespace Mailozaurr {
             {
                 { "grant_type", "client_credentials" },
                 { "resource", resource },
-                { "client_id", credential.ClientId },
-                { "client_secret", credential.ClientSecret }
+                { "client_id", credential.ClientId }
             };
+            if (!string.IsNullOrEmpty(credential.ClientSecret)) {
+                body.Add("client_secret", credential.ClientSecret!);
+            }
             var content = new FormUrlEncodedContent(body);
             var url = $"https://login.microsoftonline.com/{tenantDomain}/oauth2/token";
             await ConcurrencySemaphore.WaitAsync();
@@ -193,10 +195,10 @@ namespace Mailozaurr {
                         expiresOn = DateTimeOffset.FromUnixTimeSeconds(expSeconds);
                     }
                 }
-                TokenCache[key] = new GraphAuthorization { AccessToken = accessToken, TokenType = tokenType, ExpiresOn = expiresOn };
+                TokenCache[key] = new GraphAuthorization { AccessToken = accessToken ?? string.Empty, TokenType = tokenType ?? string.Empty, ExpiresOn = expiresOn };
                 await OAuthTokenCache.SetAsync($"graph:{key}", new OAuthCredential {
                     UserName = credential.ClientId,
-                    AccessToken = accessToken,
+                    AccessToken = accessToken ?? string.Empty,
                     ExpiresOn = expiresOn
                 });
                 return $"{tokenType} {accessToken}";
@@ -273,8 +275,8 @@ namespace Mailozaurr {
         public static async Task<JsonDocument> InvokeGraphApiAsync(
             string method,
             string uri,
-            IDictionary<string, string> headers = null,
-            string body = null) {
+            IDictionary<string, string>? headers = null,
+            string? body = null) {
             var request = new HttpRequestMessage(new HttpMethod(method), uri);
             if (headers != null) {
                 foreach (var kvp in headers) {
@@ -324,12 +326,12 @@ namespace Mailozaurr {
             if (doc.RootElement.TryGetProperty("responses", out var responses) && responses.ValueKind == JsonValueKind.Array) {
                 foreach (var item in responses.EnumerateArray()) {
                     var result = new GraphBatchResult();
-                    if (item.TryGetProperty("id", out var idEl) && idEl.ValueKind == JsonValueKind.String) result.Id = idEl.GetString();
+                    if (item.TryGetProperty("id", out var idEl) && idEl.ValueKind == JsonValueKind.String) result.Id = idEl.GetString() ?? string.Empty;
                     if (item.TryGetProperty("status", out var statusEl) && statusEl.TryGetInt32(out var status)) result.Status = status;
                     if (item.TryGetProperty("headers", out var headersEl) && headersEl.ValueKind == JsonValueKind.Object) {
                         var h = new Dictionary<string, string>();
                         foreach (var prop in headersEl.EnumerateObject()) {
-                            if (prop.Value.ValueKind == JsonValueKind.String) h[prop.Name] = prop.Value.GetString();
+                            if (prop.Value.ValueKind == JsonValueKind.String) h[prop.Name] = prop.Value.GetString() ?? string.Empty;
                         }
                         result.Headers = h;
                     }
@@ -345,7 +347,7 @@ namespace Mailozaurr {
         /// <summary>
         /// Removes empty values from a dictionary recursively (null, empty string, empty array, empty dictionary).
         /// </summary>
-        public static void RemoveEmptyValues(IDictionary<string, object> dict, HashSet<string> exclude = null, bool recursive = true, int rerun = 0) {
+        public static void RemoveEmptyValues(IDictionary<string, object> dict, HashSet<string>? exclude = null, bool recursive = true, int rerun = 0) {
             exclude ??= new HashSet<string>();
             var keys = dict.Keys.ToList();
             foreach (var key in keys) {
@@ -385,9 +387,12 @@ namespace Mailozaurr {
         /// Joins a base URI, optional relative URI, and query parameters into a full URI string.
         /// </summary>
         public static string JoinUriQuery(string baseUri, string? relativeOrAbsoluteUri = null, IDictionary<string, object>? queryParameters = null, bool escapeUriString = false) {
+            if (baseUri == null) {
+                throw new ArgumentNullException(nameof(baseUri));
+            }
             string url = baseUri.TrimEnd('/');
             if (!string.IsNullOrWhiteSpace(relativeOrAbsoluteUri)) {
-                url += "/" + relativeOrAbsoluteUri.TrimStart('/');
+                url += "/" + relativeOrAbsoluteUri!.TrimStart('/');
             }
             var uriBuilder = new UriBuilder(url);
             if (queryParameters != null && queryParameters.Count > 0) {
@@ -410,17 +415,17 @@ namespace Mailozaurr {
             return result;
         }
 
-        private static object ConvertJsonElementToNativeObject(JsonElement element) {
+        private static object? ConvertJsonElementToNativeObject(JsonElement element) {
             switch (element.ValueKind) {
                 case JsonValueKind.Object:
                     var dict = new Dictionary<string, object>();
                     foreach (var prop in element.EnumerateObject())
-                        dict[prop.Name] = ConvertJsonElementToNativeObject(prop.Value);
+                        dict[prop.Name] = ConvertJsonElementToNativeObject(prop.Value)!;
                     return dict;
                 case JsonValueKind.Array:
                     var list = new List<object>();
                     foreach (var item in element.EnumerateArray())
-                        list.Add(ConvertJsonElementToNativeObject(item));
+                        list.Add(ConvertJsonElementToNativeObject(item)!);
                     return list.ToArray();
                 case JsonValueKind.String:
                     return element.GetString();
@@ -440,12 +445,12 @@ namespace Mailozaurr {
         /// <summary>
         /// Retrieves mail messages for the specified user.
         /// </summary>
-        public static async Task<List<Dictionary<string, object>>> GetMailMessagesAsync(GraphCredential credential, string userPrincipalName, IEnumerable<string> properties = null, string filter = null, int? limit = null) {
+        public static async Task<List<Dictionary<string, object>>> GetMailMessagesAsync(GraphCredential credential, string userPrincipalName, IEnumerable<string>? properties = null, string? filter = null, int? limit = null) {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
-            headers["Authorization"] = token;
+            headers["Authorization"] = token ?? string.Empty;
             var queryParams = new Dictionary<string, object>();
-            if (!string.IsNullOrWhiteSpace(filter)) queryParams["$filter"] = filter;
+            if (!string.IsNullOrWhiteSpace(filter)) queryParams["$filter"] = filter!;
             if (properties != null && properties.Any()) queryParams["$select"] = string.Join(",", properties);
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages", queryParams);
             var doc = await InvokeGraphApiAsync("GET", uri, headers);
@@ -453,8 +458,10 @@ namespace Mailozaurr {
             if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
                 foreach (var item in valueElement.EnumerateArray()) {
                     var native = ConvertJsonElementToNativeObject(item) as Dictionary<string, object>;
-                    messages.Add(native);
-                    if (limit.HasValue && messages.Count >= limit.Value) break;
+                    if (native != null) {
+                        messages.Add(native);
+                        if (limit.HasValue && messages.Count >= limit.Value) break;
+                    }
                 }
             }
             return messages;
@@ -463,7 +470,7 @@ namespace Mailozaurr {
         /// <summary>
         /// Retrieves attachments for a specific message.
         /// </summary>
-        public static async Task<List<Attachment>> GetMailMessageAttachmentsAsync(GraphCredential credential, string userPrincipalName, string messageId, IEnumerable<string> properties = null) {
+        public static async Task<List<Attachment>> GetMailMessageAttachmentsAsync(GraphCredential credential, string userPrincipalName, string messageId, IEnumerable<string>? properties = null) {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
             headers["Authorization"] = token;
@@ -475,7 +482,9 @@ namespace Mailozaurr {
             if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
                 foreach (var item in valueElement.EnumerateArray()) {
                     var att = JsonSerializer.Deserialize<Attachment>(item.GetRawText());
-                    attachments.Add(att);
+                    if (att != null) {
+                        attachments.Add(att);
+                    }
                 }
             }
             return attachments;
@@ -720,7 +729,7 @@ namespace Mailozaurr {
             foreach (var msg in messages) {
                 var id = msg["id"] as string;
                 if (string.IsNullOrWhiteSpace(id)) continue;
-                await DeleteMailMessageAsync(credential, userPrincipalName, id);
+                await DeleteMailMessageAsync(credential, userPrincipalName, id!);
             }
         }
 
@@ -745,7 +754,7 @@ namespace Mailozaurr {
             var skipIdsSet = skipIds != null ? new HashSet<string>(skipIds, StringComparer.OrdinalIgnoreCase) : null;
             foreach (var msg in messages) {
                 var id = msg.TryGetValue("id", out var idObj) ? idObj as string : null;
-                if (!string.IsNullOrWhiteSpace(id) && skipIdsSet != null && skipIdsSet.Contains(id)) {
+                if (!string.IsNullOrWhiteSpace(id) && skipIdsSet != null && skipIdsSet.Contains(id!)) {
                     continue;
                 }
 
@@ -815,7 +824,7 @@ namespace Mailozaurr {
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/mailFolders/junkemail/messages", query);
             var messages = new List<Dictionary<string, object>>();
             while (!string.IsNullOrWhiteSpace(uri)) {
-                var doc = await InvokeGraphApiAsync("GET", uri, headers);
+                var doc = await InvokeGraphApiAsync("GET", uri!, headers);
                 if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
                     foreach (var item in valueElement.EnumerateArray()) {
                         var native = ConvertJsonElementToNativeObject(item) as Dictionary<string, object>;
@@ -974,12 +983,12 @@ namespace Mailozaurr {
             int folderCount = 0;
             var foldersStats = new List<GraphMailboxFolderStatistics>();
             while (!string.IsNullOrWhiteSpace(folderUri)) {
-                var doc = await InvokeGraphApiAsync("GET", folderUri, headers);
+                var doc = await InvokeGraphApiAsync("GET", folderUri!, headers);
                 if (doc.RootElement.TryGetProperty("value", out var folders) && folders.ValueKind == JsonValueKind.Array) {
                     foreach (var item in folders.EnumerateArray()) {
                         var stat = new GraphMailboxFolderStatistics {
-                            Id = item.GetProperty("id").GetString(),
-                            DisplayName = item.GetProperty("displayName").GetString(),
+                            Id = item.GetProperty("id").GetString() ?? string.Empty,
+                            DisplayName = item.GetProperty("displayName").GetString() ?? string.Empty,
                             WellKnownName = item.TryGetProperty("wellKnownName", out var wn) ? wn.GetString() : null,
                             TotalItemCount = item.TryGetProperty("totalItemCount", out var tic) && tic.TryGetInt32(out var c) ? c : 0,
                             UnreadItemCount = item.TryGetProperty("unreadItemCount", out var uic) && uic.TryGetInt32(out var u) ? u : 0,
@@ -1004,7 +1013,7 @@ namespace Mailozaurr {
             };
             var msgUri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages", msgQuery);
             while (!string.IsNullOrWhiteSpace(msgUri)) {
-                var doc = await InvokeGraphApiAsync("GET", msgUri, headers);
+                var doc = await InvokeGraphApiAsync("GET", msgUri!, headers);
                 if (doc.RootElement.TryGetProperty("value", out var msgs) && msgs.ValueKind == JsonValueKind.Array) {
                     foreach (var msg in msgs.EnumerateArray()) {
                         if (!msg.TryGetProperty("id", out var idEl) || idEl.ValueKind != JsonValueKind.String) {
@@ -1051,6 +1060,7 @@ namespace Mailozaurr {
         /// </summary>
         /// <param name="credential">Credential used to authenticate to Microsoft Graph.</param>
         /// <param name="userPrincipalName">User principal name owning the mailbox.</param>
+        /// <param name="filter">Optional OData filter to apply to the query.</param>
         /// <returns>List of inbox rules represented as dictionaries.</returns>
         public static async Task<List<GraphInboxRule>> GetRulesAsync(
             GraphCredential credential,
@@ -1060,7 +1070,7 @@ namespace Mailozaurr {
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
             headers["Authorization"] = token;
             Dictionary<string, object>? qp = null;
-            if (!string.IsNullOrWhiteSpace(filter)) qp = new Dictionary<string, object> { ["$filter"] = filter };
+            if (!string.IsNullOrWhiteSpace(filter)) qp = new Dictionary<string, object> { ["$filter"] = filter! };
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/mailFolders/inbox/messageRules", qp);
             var doc = await InvokeGraphApiAsync("GET", uri, headers);
             var rules = new List<GraphInboxRule>();
@@ -1149,7 +1159,7 @@ namespace Mailozaurr {
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
             headers["Authorization"] = token;
             var qp = new Dictionary<string, object>();
-            if (!string.IsNullOrWhiteSpace(filter)) qp["$filter"] = filter;
+            if (!string.IsNullOrWhiteSpace(filter)) qp["$filter"] = filter!;
             if (properties != null && properties.Any()) qp["$select"] = string.Join(",", properties);
             var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/events", qp);
             var doc = await InvokeGraphApiAsync("GET", uri, headers);

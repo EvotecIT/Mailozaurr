@@ -13,7 +13,7 @@ public class SendGridClient {
     /// <summary>
     /// Gets the JSON representation of the message to be sent.
     /// </summary>
-    private string MessageJson { get; set; }
+    private string MessageJson { get; set; } = string.Empty;
 
     /// <summary>
     /// The HttpClient used to send HTTP requests.
@@ -28,22 +28,22 @@ public class SendGridClient {
     /// <summary>
     /// Gets or sets the sender of the email.
     /// </summary>
-    public object From { get; set; }
+    public object? From { get; set; }
 
     /// <summary>
     /// Gets or sets the list of primary recipients of the email.
     /// </summary>
-    public List<object> To { get; set; }
+    public List<object>? To { get; set; }
 
     /// <summary>
     /// Gets or sets the list of carbon copy (CC) recipients of the email.
     /// </summary>
-    public List<object> Cc { get; set; }
+    public List<object>? Cc { get; set; }
 
     /// <summary>
     /// Gets or sets the list of blind carbon copy (BCC) recipients of the email.
     /// </summary>
-    public List<object> Bcc { get; set; }
+    public List<object>? Bcc { get; set; }
 
     /// <summary>
     /// Gets or sets the reply-to address for the email.
@@ -66,12 +66,12 @@ public class SendGridClient {
     /// <summary>
     /// Gets or sets the plain text content of the email.
     /// </summary>
-    public string Text { get; set; }
+    public string Text { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the HTML content of the email.
     /// </summary>
-    public string Html { get; set; }
+    public string Html { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the priority of the email.
@@ -86,7 +86,7 @@ public class SendGridClient {
     /// <summary>
     /// Gets or sets the credentials used for authentication with the SendGrid API.
     /// </summary>
-    public ICredentials Credentials { get; set; }
+    public ICredentials? Credentials { get; set; }
 
     /// <summary>
     /// Gets or sets the action to take when an error occurs.
@@ -126,13 +126,13 @@ public class SendGridClient {
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var addresses = new List<string>();
             if (To != null) {
-                addresses.AddRange(To.Select(ConvertToEmailObject).Where(x => x != null && seen.Add(x.Email)).Select(x => x.Email));
+                addresses.AddRange(To.Select(ConvertToEmailObject).Where(x => x != null && seen.Add(x.Email)).Select(x => x!.Email));
             }
             if (Cc != null) {
-                addresses.AddRange(Cc.Select(ConvertToEmailObject).Where(x => x != null && seen.Add(x.Email)).Select(x => x.Email));
+                addresses.AddRange(Cc.Select(ConvertToEmailObject).Where(x => x != null && seen.Add(x.Email)).Select(x => x!.Email));
             }
             if (Bcc != null) {
-                addresses.AddRange(Bcc.Select(ConvertToEmailObject).Where(x => x != null && seen.Add(x.Email)).Select(x => x.Email));
+                addresses.AddRange(Bcc.Select(ConvertToEmailObject).Where(x => x != null && seen.Add(x.Email)).Select(x => x!.Email));
             }
             return string.Join(",", addresses);
         }
@@ -141,7 +141,7 @@ public class SendGridClient {
     /// <summary>
     /// Gets the email address of the sender of the email.
     /// </summary>
-    public string SentFrom => Helpers.GetEmailAddress(From);
+    public string SentFrom => From != null ? Helpers.GetEmailAddress(From) : string.Empty;
 
     /// <summary>
     /// Gets or sets the log collector for this client.
@@ -177,7 +177,7 @@ public class SendGridClient {
             }
 
             var nameValue = emailDict.ContainsKey("Name") ? emailDict["Name"] as string : null;
-            return new SendGridEmailAddress { Email = emailValue, Name = nameValue };
+            return new SendGridEmailAddress { Email = emailValue!, Name = nameValue };
         } else {
             throw new ArgumentException($"email object type {emailAddress.GetType().Name} requires addition");
         }
@@ -242,14 +242,17 @@ public class SendGridClient {
                     To = To?.Where(t => t != null)
                         .Select(ConvertToEmailObject)
                         .Where(x => x != null && seen.Add(x.Email))
+                        .Select(x => x!)
                         .ToList(),
                     Cc = Cc?.Where(c => c != null)
                         .Select(ConvertToEmailObject)
                         .Where(x => x != null && seen.Add(x.Email))
+                        .Select(x => x!)
                         .ToList(),
                     Bcc = Bcc?.Where(b => b != null)
                         .Select(ConvertToEmailObject)
                         .Where(x => x != null && seen.Add(x.Email))
+                        .Select(x => x!)
                         .ToList()
                 }
             }
@@ -262,9 +265,11 @@ public class SendGridClient {
             }.Where(c => c.Value != null).ToList();
 
 
+        var fromAddress = ConvertToEmailObject(From) ?? throw new InvalidOperationException("From address is required.");
+
         var message = new SendGridMessage {
             Personalizations = personalizations,
-            From = ConvertToEmailObject(From),
+            From = fromAddress,
             Subject = Subject,
             Content = content,
             ReplyTo = ConvertToEmailObject(ReplyTo),
