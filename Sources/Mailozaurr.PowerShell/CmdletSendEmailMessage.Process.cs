@@ -43,7 +43,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
     protected override void ProcessRecord() {
         Attachment = FilterExistingPaths(Attachment, nameof(Attachment));
         InlineAttachment = FilterExistingPaths(InlineAttachment, nameof(InlineAttachment));
-        var (fromEmail, fromName) = Helpers.GetEmailAndName(From);
+        var (fromEmailRaw, fromNameRaw) = Helpers.GetEmailAndName(From);
+        string fromEmail = fromEmailRaw ?? string.Empty;
+        string fromName = fromNameRaw ?? string.Empty;
 
         if (SendGrid || EmailProvider == EmailProvider.SendGrid) {
             ProcessSendGrid(fromEmail, fromName);
@@ -62,7 +64,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         }
     }
 
-    private void ProcessSendGrid(string? fromEmail, string? fromName) {
+    private void ProcessSendGrid(string fromEmail, string fromName) {
         var logCollector = new LogCollector();
         SendGridClient sendGrid = new SendGridClient();
         sendGrid.LogCollector = logCollector;
@@ -71,7 +73,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         if (Cc != null) sendGrid.Cc = Cc.ToList();
         if (To != null) sendGrid.To = To.ToList();
         sendGrid.ReplyTo = ReplyTo;
-        sendGrid.Subject = Subject;
+        sendGrid.Subject = Subject ?? string.Empty;
         if (Text != null) sendGrid.Text = string.Join("", Text);
         if (HTML != null) sendGrid.Html = string.Join("", HTML);
         sendGrid.Priority = Priority;
@@ -99,7 +101,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         }
     }
 
-    private void ProcessMailgun(string? fromEmail, string? fromName) {
+    private void ProcessMailgun(string fromEmail, string fromName) {
         var logCollector = new LogCollector();
         using MailgunClient mailgun = new MailgunClient();
         mailgun.LogCollector = logCollector;
@@ -108,7 +110,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         if (Cc != null) mailgun.Cc = Cc.ToList();
         if (To != null) mailgun.To = To.ToList();
         mailgun.ReplyTo = ReplyTo;
-        mailgun.Subject = Subject;
+        mailgun.Subject = Subject ?? string.Empty;
         if (Text != null) mailgun.Text = string.Join("", Text);
         if (HTML != null) mailgun.Html = string.Join("", HTML);
         if (Attachment != null) {
@@ -136,7 +138,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         }
     }
 
-    private void ProcessSes(string? fromEmail, string? fromName) {
+    private void ProcessSes(string fromEmail, string fromName) {
         var logCollector = new LogCollector();
         using SesClient ses = new SesClient();
         ses.LogCollector = logCollector;
@@ -145,7 +147,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         if (Cc != null) ses.Cc = Cc.ToList();
         if (To != null) ses.To = To.ToList();
         ses.ReplyTo = ReplyTo;
-        ses.Subject = Subject;
+        ses.Subject = Subject ?? string.Empty;
         if (Text != null) ses.Text = string.Join("", Text);
         if (HTML != null) ses.Html = string.Join("", HTML);
         if (Attachment != null) {
@@ -160,7 +162,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         ses.RetryDelayMilliseconds = RetryDelayMilliseconds;
         ses.RetryDelayBackoff = RetryDelayBackoff;
         ses.RetryAlways = RetryAlways.IsPresent;
-        if (!string.IsNullOrEmpty(Region)) ses.Region = Region;
+        if (!string.IsNullOrEmpty(Region)) ses.Region = Region!;
         NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
         ses.Credentials = networkCredential;
         if (ShouldProcess(ses.SentTo, "Sending email message via SES")) {
@@ -174,14 +176,14 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         }
     }
 
-    private void ProcessGmail(string? fromEmail, string? fromName) {
+    private void ProcessGmail(string fromEmail, string fromName) {
         var smtp = new Smtp();
         smtp.From = Helpers.GetFromObject(fromEmail, fromName);
         if (Bcc != null) smtp.Bcc = Bcc.ToList();
         if (Cc != null) smtp.Cc = Cc.ToList();
         if (To != null) smtp.To = To.ToList();
         smtp.ReplyTo = ReplyTo;
-        smtp.Subject = Subject;
+        smtp.Subject = Subject ?? string.Empty;
         if (Text != null) smtp.TextBody = string.Join("", Text);
         if (HTML != null) smtp.HtmlBody = string.Join("", HTML);
         smtp.Attachments = Attachment?.ToList();
@@ -212,7 +214,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         }
     }
 
-    private void ProcessGraph(string? fromEmail, string? fromName) {
+    private void ProcessGraph(string fromEmail, string fromName) {
         using Graph graph = new Graph();
         graph.ChunkSize = ChunkSize;
         graph.From = Helpers.GetFromObject(fromEmail, fromName);
@@ -220,7 +222,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         graph.Cc = Cc;
         graph.Bcc = Bcc;
         graph.ReplyTo = ReplyTo;
-        graph.Subject = Subject;
+        graph.Subject = Subject ?? string.Empty;
         graph.DoNotSaveToSentItems = DoNotSaveToSentItems;
         graph.ErrorAction = errorAction;
         graph.RetryCount = RetryCount;
@@ -229,7 +231,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         graph.RetryAlways = RetryAlways.IsPresent;
         graph.RequestReadReceipt = RequestReadReceipt;
         graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
-        graph.HTML = string.Join("", HTML);
+        graph.HTML = string.Join("", HTML ?? Array.Empty<string>());
         graph.ContentType = "HTML";
         graph.Attachments = Attachment;
         if (Headers != null) graph.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
@@ -278,7 +280,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         LogEmitter.EmitLogs(graph.LogCollector, this);
     }
 
-    private async Task ProcessMgGraphRequest(string? fromEmail, string? fromName) {
+    private async Task ProcessMgGraphRequest(string fromEmail, string fromName) {
         using Graph graph = new Graph();
         graph.ChunkSize = ChunkSize;
         graph.From = Helpers.GetFromObject(fromEmail, fromName);
@@ -286,7 +288,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         graph.Cc = Cc;
         graph.Bcc = Bcc;
         graph.ReplyTo = ReplyTo;
-        graph.Subject = Subject;
+        graph.Subject = Subject ?? string.Empty;
         graph.DoNotSaveToSentItems = DoNotSaveToSentItems;
         graph.ErrorAction = errorAction;
         graph.RetryCount = RetryCount;
@@ -294,7 +296,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         graph.RetryDelayBackoff = RetryDelayBackoff;
         graph.RequestReadReceipt = RequestReadReceipt;
         graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
-        graph.HTML = string.Join("", HTML);
+        graph.HTML = string.Join("", HTML ?? Array.Empty<string>());
         graph.ContentType = "HTML";
         graph.Attachments = Attachment;
         if (Headers != null) graph.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
@@ -333,18 +335,18 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         }
     }
 
-    private void ProcessSmtp(string? fromEmail, string? fromName) {
-        Smtp smtpClient = new Smtp(LogPath, LogConsole, LogObject, LogTimestamps, LogSecrets, LogTimeStampsFormat, LogServerPrefix, LogClientPrefix, LogOverwrite);
-        var sentLogPath = string.IsNullOrWhiteSpace(SentLogPath)
+    private void ProcessSmtp(string fromEmail, string fromName) {
+        Smtp smtpClient = new Smtp(LogPath ?? string.Empty, LogConsole, LogObject, LogTimestamps, LogSecrets, LogTimeStampsFormat, LogServerPrefix, LogClientPrefix, LogOverwrite);
+        string sentLogPath = string.IsNullOrWhiteSpace(SentLogPath)
             ? Path.Combine(Path.GetTempPath(), "Mailozaurr", "sentlog.json")
-            : SentLogPath;
+            : SentLogPath!;
         smtpClient.SentMessageRepository = new FileSentMessageRepository(sentLogPath);
         smtpClient.From = Helpers.GetFromObject(fromEmail, fromName);
         smtpClient.ReplyTo = ReplyTo;
         smtpClient.Cc = Cc;
         smtpClient.Bcc = Bcc;
         smtpClient.To = To;
-        smtpClient.Subject = Subject;
+        smtpClient.Subject = Subject ?? string.Empty;
         smtpClient.Priority = Priority;
 
         smtpClient.DeliveryNotificationOption = DeliveryNotificationOption;
@@ -369,13 +371,13 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         if (!ShouldProcess(smtpClient.SentTo, "Sending email message")) {
             LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
             if (!Suppress) {
-                WriteObject(new SmtpResult(false, EmailAction.Send, smtpClient.SentTo, smtpClient.SentFrom, Server, Port, TimeSpan.Zero, string.Empty, "Email not sent (WhatIf)"));
+                WriteObject(new SmtpResult(false, EmailAction.Send, smtpClient.SentTo, smtpClient.SentFrom, Server ?? string.Empty, Port, TimeSpan.Zero, string.Empty, "Email not sent (WhatIf)"));
             }
             return;
         }
 
         var useSslFlag = UseSsl.IsPresent && !this.MyInvocation.BoundParameters.ContainsKey(nameof(SecureSocketOptions));
-        var status = smtpClient.Connect(Server, Port, SecureSocketOptions, useSslFlag);
+        var status = smtpClient.Connect(Server ?? string.Empty, Port, SecureSocketOptions, useSslFlag);
         if (!status.Status) {
             if (!Suppress) {
                 WriteObject(status);
@@ -419,7 +421,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
             status = smtpClient.Authenticate(networkCredential, OAuth2);
         } else if (!string.IsNullOrWhiteSpace(Username) || !string.IsNullOrWhiteSpace(Password)) {
-            status = smtpClient.Authenticate(Username, Password, AsSecureString, AuthenticationMechanism);
+            status = smtpClient.Authenticate(Username ?? string.Empty, Password ?? string.Empty, AsSecureString, AuthenticationMechanism);
         } else {
             LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
             status = new SmtpResult(true, EmailAction.Authenticate, smtpClient.SentTo, smtpClient.SentFrom, smtpClient.Server, smtpClient.Port, smtpClient.Stopwatch.Elapsed, "Authentication skipped");
@@ -439,7 +441,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             WriteObject(status);
         }
 
-        smtpClient.SaveMessage(MimeMessagePath);
+        if (!string.IsNullOrEmpty(MimeMessagePath)) {
+            smtpClient.SaveMessage(MimeMessagePath!);
+        }
 
         smtpClient.Dispose();
     }
@@ -532,7 +536,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
                 var result = results[0];
                 //var result = results[0];
                 if (result.BaseObject is IDictionary dictionary && dictionary.Contains("uploadUrl")) {
-                    return dictionary["uploadUrl"].ToString();
+                    return dictionary["uploadUrl"]?.ToString() ?? string.Empty;
                 } else {
                     // Handle the case where the property is not present
                     throw new InvalidOperationException("The result does not contain an 'uploadUrl' property.");
@@ -570,7 +574,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
                 // Assuming the first result contains the property you're interested in
                 var result = results[0];
                 if (result.BaseObject is IDictionary dictionary && dictionary.Contains("id")) {
-                    return dictionary["id"].ToString();
+                    return dictionary["id"]?.ToString() ?? string.Empty;
                 } else {
                     // Handle the case where the property is not present
                     throw new InvalidOperationException("The result does not contain an 'id' property.");
@@ -650,6 +654,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         return valid.Count > 0 ? valid.ToArray() : null;
     }
 
+    /// <summary>
+    /// Cleans up logging resources after the cmdlet finishes executing.
+    /// </summary>
     protected override void EndProcessing()
     {
         _listener?.Dispose();

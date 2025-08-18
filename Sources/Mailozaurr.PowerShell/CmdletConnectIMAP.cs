@@ -41,7 +41,7 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
     [Parameter(ParameterSetName = "ClearText")]
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
-    public string Server { get; set; }
+    public string Server { get; set; } = string.Empty;
 
     /// <summary>
     /// <para type="description">Specifies the port to use for the IMAP connection. Default is 993 (IMAPS).</para>
@@ -72,21 +72,21 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
     /// </summary>
     [Parameter(ParameterSetName = "ClearText", Mandatory = true)]
     [ValidateNotNullOrEmpty]
-    public string UserName { get; set; }
+    public string UserName { get; set; } = string.Empty;
 
     /// <summary>
     /// <para type="description">Specifies the password for clear text authentication. Required for the ClearText parameter set.</para>
     /// </summary>
     [Parameter(ParameterSetName = "ClearText", Mandatory = true)]
     [ValidateNotNullOrEmpty]
-    public string Password { get; set; }
+    public string Password { get; set; } = string.Empty;
 
     /// <summary>
     /// <para type="description">Specifies a PSCredential object for authentication. Used for OAuth2 or standard credential-based authentication.</para>
     /// </summary>
     [Parameter(ParameterSetName = "OAuth2")]
     [Parameter(ParameterSetName = "Credential")]
-    public PSCredential Credential { get; set; }
+    public PSCredential? Credential { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the secure socket options for the IMAP connection. Default is Auto. Options: None, Auto, SslOnConnect, StartTls, StartTlsWhenAvailable.</para>
@@ -143,6 +143,9 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         async Task Authenticate(ImapClient c) {
             if (ParameterSetName == "OAuth2" && OAuth2.IsPresent) {
+                if (Credential == null) {
+                    throw new System.Security.Authentication.AuthenticationException("Credential is required for OAuth2 authentication.");
+                }
                 var username = Credential.UserName;
                 var token = new System.Net.NetworkCredential(string.Empty, Credential.Password).Password;
                 var sasl = new MailKit.Security.SaslMechanismOAuth2(username, token);
