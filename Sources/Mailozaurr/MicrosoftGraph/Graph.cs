@@ -11,9 +11,12 @@ namespace Mailozaurr;
 /// Provides convenience methods for constructing requests and
 /// uploading attachments without having to manually craft HTTP calls.
 /// </remarks>
-public class Graph : IDisposable {
-    private readonly HttpClient _client;
-    public const int MaxChunkSize = 4 * 1024 * 1024;
+    public class Graph : IDisposable {
+        private readonly HttpClient _client;
+        /// <summary>
+        /// Maximum size of an attachment chunk when uploading large files (4 MB).
+        /// </summary>
+        public const int MaxChunkSize = 4 * 1024 * 1024;
     private int _chunkSize = MaxChunkSize;
     /// <summary>
     /// Serialized JSON representation of the current Graph message.
@@ -23,7 +26,7 @@ public class Graph : IDisposable {
     /// <summary>
     /// Container object used when building a Graph message.
     /// </summary>
-    public GraphMessageContainer MessageContainer;
+    public GraphMessageContainer MessageContainer = new();
 
     /// <summary>Measures elapsed time spent during send operations.</summary>
     public readonly Stopwatch Stopwatch;
@@ -80,17 +83,17 @@ public class Graph : IDisposable {
     /// <summary>
     /// Gets or sets the subject of the email.
     /// </summary>
-    public string Subject { get; set; }
+    public string Subject { get; set; } = string.Empty;
 
     /// <summary>
     /// HTML content of the email.
     /// </summary>
-    public string HTML { get; set; }
+    public string HTML { get; set; } = string.Empty;
 
     /// <summary>
     /// Content type of the email.
     /// </summary>
-    public string ContentType { get; set; }
+    public string ContentType { get; set; } = string.Empty;
 
     /// <summary>
     /// Value indicating whether the message should not be saved to the Sent Items folder.
@@ -100,22 +103,22 @@ public class Graph : IDisposable {
     /// <summary>
     /// Access token for the Graph API.
     /// </summary>
-    public string AccessToken { get; set; }
+    public string AccessToken { get; set; } = string.Empty;
 
     /// <summary>
     /// Application ID for the Graph API.
     /// </summary>
-    private string ApplicationID { get; set; }
+    private string ApplicationID { get; set; } = string.Empty;
 
     /// <summary>
     /// Application key for the Graph API.
     /// </summary>
-    private string ApplicationKey { get; set; }
+    private string ApplicationKey { get; set; } = string.Empty;
 
     /// <summary>
     /// Tenant domain for the Graph API.
     /// </summary>
-    private string TenantDomain { get; set; }
+    private string TenantDomain { get; set; } = string.Empty;
 
     /// <summary>
     /// Action to take when an error occurs based on the ErrorAction preference.
@@ -176,7 +179,7 @@ public class Graph : IDisposable {
     /// <summary>
     /// The type of token that was issued.
     /// </summary>
-    public string TokenType { get; set; }
+    public string TokenType { get; set; } = string.Empty;
 
     /// <summary>
     /// The email address that the message was sent from.
@@ -399,8 +402,8 @@ public class Graph : IDisposable {
                 }
 
                 var authorization = JsonSerializer.Deserialize<GraphAuthorization>(content);
-                AccessToken = authorization.AccessToken;
-                TokenType = authorization.TokenType;
+                AccessToken = authorization?.AccessToken ?? string.Empty;
+                TokenType = authorization?.TokenType ?? string.Empty;
                 return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", "");
             } finally {
                 MicrosoftGraphUtils.ConcurrencySemaphore.Release();
@@ -428,7 +431,7 @@ public class Graph : IDisposable {
         // Create the request URI outside the loop.
         var requestUri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
-            $"/users/{MessageContainer.Message.From.Email.Address}/sendMail");
+            $"/users/{MessageContainer.Message.From!.Email.Address}/sendMail");
 
         int attempts = 0;
         Exception? lastException = null;
@@ -544,16 +547,17 @@ public class Graph : IDisposable {
         return finalResult;
     }
 
-    /// <summary>
-    /// Sends a previously created draft message.
-    /// </summary>
-    /// <param name="draftMessage">The draft message to send.</param>
-    /// <returns>The result of the send operation.</returns>
-    public async Task<SmtpResult> SendDraftMessage(GraphMessage draftMessage, CancellationToken cancellationToken = default) {
+        /// <summary>
+        /// Sends a previously created draft message.
+        /// </summary>
+        /// <param name="draftMessage">The draft message to send.</param>
+        /// <param name="cancellationToken">Token used to cancel the operation.</param>
+        /// <returns>The result of the send operation.</returns>
+        public async Task<SmtpResult> SendDraftMessage(GraphMessage draftMessage, CancellationToken cancellationToken = default) {
         // Send the draft message
         var sendRequestUri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
-            $"/users/{MessageContainer.Message.From.Email.Address}/messages/{draftMessage.Id}/send");
+            $"/users/{MessageContainer.Message.From!.Email.Address}/messages/{draftMessage.Id!}/send");
         using var sendRequest = new HttpRequestMessage(HttpMethod.Post, sendRequestUri);
 
         // Add the authorization header
@@ -602,7 +606,7 @@ public class Graph : IDisposable {
         var request = new GraphBatchRequest {
             Id = "1",
             Method = GraphHttpMethod.POST,
-            Url = $"/users/{MessageContainer.Message.From.Email.Address}/sendMail",
+            Url = $"/users/{MessageContainer.Message.From!.Email.Address}/sendMail",
             Headers = new Dictionary<string, string> { ["Content-Type"] = "application/json" },
             Body = bodyObj
         };
@@ -640,7 +644,7 @@ public class Graph : IDisposable {
 
         var draftRequestUri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
-            $"/users/{MessageContainer.Message.From.Email.Address}/mailfolders/drafts/messages");
+            $"/users/{MessageContainer.Message.From!.Email.Address}/mailfolders/drafts/messages");
         var draftRequest = new HttpRequestMessage(HttpMethod.Post, draftRequestUri) {
             Content = new StringContent(messageJson, Encoding.UTF8, "application/json")
         };
@@ -708,12 +712,13 @@ public class Graph : IDisposable {
     }
 
 
-    /// <summary>
-    /// Creates the metadata and content placeholders required for uploading a file attachment.
-    /// </summary>
-    /// <param name="attachmentPath">Path to the attachment file.</param>
-    /// <returns>The placeholder representing the attachment.</returns>
-    public Task<GraphAttachmentPlaceHolder> CreateGraphAttachment(string attachmentPath, CancellationToken cancellationToken = default) {
+        /// <summary>
+        /// Creates the metadata and content placeholders required for uploading a file attachment.
+        /// </summary>
+        /// <param name="attachmentPath">Path to the attachment file.</param>
+        /// <param name="cancellationToken">Token used to cancel the operation.</param>
+        /// <returns>The placeholder representing the attachment.</returns>
+        public Task<GraphAttachmentPlaceHolder> CreateGraphAttachment(string attachmentPath, CancellationToken cancellationToken = default) {
         var fileName = Path.GetFileName(attachmentPath);
         var fileSize = new FileInfo(attachmentPath).Length;
 
@@ -735,13 +740,14 @@ public class Graph : IDisposable {
         return Task.FromResult(placeholder);
     }
 
-    /// <summary>
-    /// Creates an upload session for a large attachment.
-    /// </summary>
-    /// <param name="draftMessage">The draft message the attachment belongs to.</param>
-    /// <param name="attachmentItemJson">The serialized attachment item.</param>
-    /// <returns>The upload session URL.</returns>
-    public async Task<string> CreateUploadSession(GraphMessage draftMessage, string attachmentItemJson, CancellationToken cancellationToken = default) {
+        /// <summary>
+        /// Creates an upload session for a large attachment.
+        /// </summary>
+        /// <param name="draftMessage">The draft message the attachment belongs to.</param>
+        /// <param name="attachmentItemJson">The serialized attachment item.</param>
+        /// <param name="cancellationToken">Token used to cancel the operation.</param>
+        /// <returns>The upload session URL.</returns>
+        public async Task<string> CreateUploadSession(GraphMessage draftMessage, string attachmentItemJson, CancellationToken cancellationToken = default) {
         var uploadSessionUrl = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
             $"/users('{SentFrom}')/messages/{draftMessage.Id}/attachments/createUploadSession");
@@ -779,13 +785,14 @@ public class Graph : IDisposable {
         return uploadSessionResult.UploadUrl;
     }
 
-    /// <summary>
-    /// Splits <paramref name="filePath"/> into chunks no larger than <see cref="MaxChunkSize"/>.
-    /// </summary>
-    /// <param name="filePath"></param>
-    /// <param name="chunkSize"></param>
-    /// <returns></returns>
-    private List<StreamContent> PrepareByteArrayContentForUpload(string filePath, int chunkSize = MaxChunkSize, CancellationToken cancellationToken = default) {
+        /// <summary>
+        /// Splits <paramref name="filePath"/> into chunks no larger than <see cref="MaxChunkSize"/>.
+        /// </summary>
+        /// <param name="filePath">Path to the file to split.</param>
+        /// <param name="chunkSize">Desired size of each chunk in bytes.</param>
+        /// <param name="cancellationToken">Token used to cancel the operation.</param>
+        /// <returns>List of stream contents representing file chunks.</returns>
+        private List<StreamContent> PrepareByteArrayContentForUpload(string filePath, int chunkSize = MaxChunkSize, CancellationToken cancellationToken = default) {
         chunkSize = Math.Min(chunkSize, MaxChunkSize);
         var fileContents = new List<StreamContent>();
         var fileSize = new FileInfo(filePath).Length;
@@ -812,11 +819,12 @@ public class Graph : IDisposable {
         return fileContents;
     }
 
-    /// <summary>
-    /// Uploads all attachments for the specified draft message.
-    /// </summary>
-    /// <param name="draftMessage">The draft message to attach the files to.</param>
-    public async Task UploadAttachmentsAsync(GraphMessage draftMessage, CancellationToken cancellationToken = default) {
+        /// <summary>
+        /// Uploads all attachments for the specified draft message.
+        /// </summary>
+        /// <param name="draftMessage">The draft message to attach the files to.</param>
+        /// <param name="cancellationToken">Token used to cancel the operation.</param>
+        public async Task UploadAttachmentsAsync(GraphMessage draftMessage, CancellationToken cancellationToken = default) {
         if (Attachments != null && Attachments.Length > 0) {
             foreach (var attachmentPath in Attachments) {
                 if (attachmentPath is string path) {
@@ -828,10 +836,11 @@ public class Graph : IDisposable {
         }
     }
 
-    /// <summary>
-    /// Prepares attachments for upload by creating placeholders.
-    /// </summary>
-    public async Task PrepareAttachments(CancellationToken cancellationToken = default) {
+        /// <summary>
+        /// Prepares attachments for upload by creating placeholders.
+        /// </summary>
+        /// <param name="cancellationToken">Token used to cancel the operation.</param>
+        public async Task PrepareAttachments(CancellationToken cancellationToken = default) {
         if (Attachments != null && Attachments.Length > 0) {
             foreach (var attachmentPath in Attachments) {
                 if (attachmentPath is string path) {
@@ -842,23 +851,25 @@ public class Graph : IDisposable {
         }
     }
 
-    /// <summary>
-    /// Uploads all chunks of a file to the provided upload session URL.
-    /// </summary>
-    /// <param name="uploadUrl">The upload session URL.</param>
-    /// <param name="fileChunks">The file chunks to upload.</param>
-    public async Task SendFileChunks(string uploadUrl, IEnumerable<StreamContent> fileChunks, CancellationToken cancellationToken = default) {
+        /// <summary>
+        /// Uploads all chunks of a file to the provided upload session URL.
+        /// </summary>
+        /// <param name="uploadUrl">The upload session URL.</param>
+        /// <param name="fileChunks">The file chunks to upload.</param>
+        /// <param name="cancellationToken">Token used to cancel the operation.</param>
+        public async Task SendFileChunks(string uploadUrl, IEnumerable<StreamContent> fileChunks, CancellationToken cancellationToken = default) {
         foreach (var chunk in fileChunks) {
             await SendAttachmentChunk(uploadUrl, chunk, cancellationToken);
         }
     }
 
-    /// <summary>
-    /// Uploads a single attachment chunk to the Graph API.
-    /// </summary>
-    /// <param name="uploadUrl">The upload session URL.</param>
-    /// <param name="byteArrayContent">The chunk to send.</param>
-    public async Task SendAttachmentChunk(string uploadUrl, StreamContent byteArrayContent, CancellationToken cancellationToken = default) {
+        /// <summary>
+        /// Uploads a single attachment chunk to the Graph API.
+        /// </summary>
+        /// <param name="uploadUrl">The upload session URL.</param>
+        /// <param name="byteArrayContent">The chunk to send.</param>
+        /// <param name="cancellationToken">Token used to cancel the operation.</param>
+        public async Task SendAttachmentChunk(string uploadUrl, StreamContent byteArrayContent, CancellationToken cancellationToken = default) {
         using var requestMessage = new HttpRequestMessage(HttpMethod.Put, uploadUrl) {
             Content = byteArrayContent
         };

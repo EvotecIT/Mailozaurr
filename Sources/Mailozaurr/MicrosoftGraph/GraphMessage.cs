@@ -13,12 +13,12 @@ public class GraphMessage {
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonPropertyName("id")]
-    public string Id { get; set; }
+    public string? Id { get; set; }
     /// <summary>
     /// Gets or sets the sender address.
     /// </summary>
     [JsonPropertyName("from")]
-    public GraphEmailAddress From { get; set; }
+    public GraphEmailAddress? From { get; set; }
 
     /// <summary>
     /// Gets or sets the primary recipients of the message.
@@ -52,13 +52,13 @@ public class GraphMessage {
     /// Gets or sets the subject line of the message.
     /// </summary>
     [JsonPropertyName("subject")]
-    public string Subject { get; set; }
+    public string? Subject { get; set; }
 
     /// <summary>
     /// Gets or sets the message body.
     /// </summary>
     [JsonPropertyName("body")]
-    public GraphContent Body { get; set; }
+    public GraphContent? Body { get; set; }
 
     /// <summary>
     /// Gets or sets the importance of the message.

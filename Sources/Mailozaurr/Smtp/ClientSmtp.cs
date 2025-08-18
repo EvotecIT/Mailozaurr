@@ -18,7 +18,7 @@ public partial class ClientSmtp : SmtpClient {
     /// <summary>Inline attachments to embed in the message.</summary>
     public List<object>? InlineAttachments { get; set; } = new List<object>();
     /// <summary>The sender address.</summary>
-    public object From { get; set; }
+    public object? From { get; set; }
     /// <summary>Primary recipients.</summary>
     public IEnumerable<object>? To { get; set; } = new List<object>();
     /// <summary>Carbon copy recipients.</summary>
@@ -28,7 +28,7 @@ public partial class ClientSmtp : SmtpClient {
     /// <summary>Reply-to address.</summary>
     public object? ReplyTo { get; set; }
     /// <summary>The underlying MIME message.</summary>
-    public MimeMessage Message { get; set; }
+    public MimeMessage Message { get; set; } = new MimeMessage();
     /// <summary>Priority of the message.</summary>
     public MessagePriority Priority { get; set; }
     /// <summary>Delivery notification options.</summary>
@@ -58,7 +58,9 @@ public partial class ClientSmtp : SmtpClient {
     /// <summary>The address(es) the message is sent from.</summary>
     public string SentFrom {
         get {
-            var addresses = ConvertToMailboxAddress(From).Select(x => x.Address);
+            var addresses = From != null
+                ? ConvertToMailboxAddress(From).Select(x => x.Address)
+                : Enumerable.Empty<string>();
             return string.Join(",", addresses);
         }
     }
@@ -121,7 +123,7 @@ public partial class ClientSmtp : SmtpClient {
     }
 
     private void AddAddressesToMessage(MimeMessage message) {
-        var fromAddresses = ConvertToMailboxAddress(From).ToList();
+        var fromAddresses = From != null ? ConvertToMailboxAddress(From).ToList() : new List<MailboxAddress>();
         if (fromAddresses.Any()) {
             LoggingMessages.Logger.WriteVerbose("Adding from address to message: {0}", fromAddresses.First());
             message.From.Add(fromAddresses.First());
