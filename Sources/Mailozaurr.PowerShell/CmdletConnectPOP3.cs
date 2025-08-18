@@ -39,7 +39,7 @@ public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
     [Parameter(ParameterSetName = "ClearText")]
     [Parameter(Mandatory = true)]
     [ValidateNotNullOrEmpty]
-    public string? Server { get; set; }
+    public string Server { get; set; } = string.Empty;
 
     /// <summary>
     /// <para type="description">Specifies the port to use for the POP3 connection. Default is 995 (POPS).</para>
@@ -54,14 +54,14 @@ public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
     /// </summary>
     [Parameter(ParameterSetName = "ClearText", Mandatory = true)]
     [ValidateNotNullOrEmpty]
-    public string? UserName { get; set; }
+    public string UserName { get; set; } = string.Empty;
 
     /// <summary>
     /// <para type="description">Specifies the password for clear text authentication. Required for the ClearText parameter set.</para>
     /// </summary>
     [Parameter(ParameterSetName = "ClearText", Mandatory = true)]
     [ValidateNotNullOrEmpty]
-    public string? Password { get; set; }
+    public string Password { get; set; } = string.Empty;
 
     /// <summary>
     /// <para type="description">Specifies a PSCredential object for authentication. Used for OAuth2 or standard credential-based authentication.</para>
@@ -149,6 +149,9 @@ public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         async Task Authenticate(Pop3Client c) {
             if (ParameterSetName == "OAuth2" && OAuth2.IsPresent) {
+                if (Credential == null) {
+                    throw new System.Security.Authentication.AuthenticationException("Credential is required for OAuth2 authentication.");
+                }
                 var username = Credential.UserName;
                 var token = new System.Net.NetworkCredential(string.Empty, Credential.Password).Password;
                 var sasl = new MailKit.Security.SaslMechanismOAuth2(username, token);
