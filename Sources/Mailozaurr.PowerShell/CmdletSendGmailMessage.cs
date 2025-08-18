@@ -1,14 +1,16 @@
+using System.Collections;
 using System.Linq;
 using System.Management.Automation;
 using System.Threading.Tasks;
 using MimeKit;
+using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
 /// Sends an email using the Gmail API.
 /// </summary>
-[Cmdlet(VerbsCommunications.Send, "GmailMessage")]
+[Cmdlet(VerbsCommunications.Send, "GmailMessage", SupportsShouldProcess = true)]
 [OutputType(typeof(GmailMessage))]
 public sealed class CmdletSendGmailMessage : AsyncPSCmdlet {
     /// <summary>
@@ -61,6 +63,12 @@ public sealed class CmdletSendGmailMessage : AsyncPSCmdlet {
     public object[]? Attachment { get; set; }
 
     /// <summary>
+    /// Custom headers to include with the message.
+    /// </summary>
+    [Parameter]
+    public Hashtable? Headers { get; set; }
+
+    /// <summary>
     /// Executes the cmdlet logic asynchronously.
     /// </summary>
     protected override async Task ProcessRecordAsync() {
@@ -79,11 +87,19 @@ public sealed class CmdletSendGmailMessage : AsyncPSCmdlet {
             TextBody = TextBody is null ? string.Empty : string.Join(System.Environment.NewLine, TextBody),
             Attachments = Attachment?.ToList()
         };
+        if (Headers != null) {
+            smtp.Headers = Headers.Cast<DictionaryEntry>()
+                .ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
+        }
         try {
             smtp.CreateMessage();
             var client = new GmailApiClient(oauth);
-            var result = await client.SendAsync(GmailAccount!, smtp.Message, CancelToken);
-            WriteObject(result);
+            if (ShouldProcess(GmailAccount!, "Sending email message via Gmail API")) {
+                var result = await client.SendAsync(GmailAccount!, smtp.Message, CancelToken);
+                WriteObject(result);
+            } else {
+                WriteObject(new SmtpResult(false, EmailAction.Send, smtp.SentTo, smtp.SentFrom, "GmailApi", 0, smtp.Stopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)"));
+            }
         } finally {
             smtp.Dispose();
         }

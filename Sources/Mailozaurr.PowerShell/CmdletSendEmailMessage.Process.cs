@@ -187,6 +187,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         smtp.Attachments = Attachment?.ToList();
         smtp.InlineAttachments = InlineAttachment?.ToList();
         smtp.Priority = Priority;
+        if (Headers != null) smtp.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         smtp.CreateMessage(CancellationToken.None);
 
         var net = Credential!.GetNetworkCredential();
