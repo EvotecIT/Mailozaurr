@@ -12,7 +12,8 @@ public sealed class SendLogResolver {
     /// Initializes a new instance of the <see cref="SendLogResolver"/> class.
     /// </summary>
     /// <param name="repository">Repository used to look up sent messages.</param>
-    public SendLogResolver(ISentMessageRepository repository) => this.repository = repository;
+    public SendLogResolver(ISentMessageRepository repository) =>
+        this.repository = repository ?? throw new ArgumentNullException(nameof(repository));
 
     /// <summary>
     /// Attempts to resolve a sent message record from a non-delivery report.

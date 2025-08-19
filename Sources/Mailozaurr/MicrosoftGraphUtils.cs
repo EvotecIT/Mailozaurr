@@ -399,18 +399,29 @@ namespace Mailozaurr {
                 var query = new StringBuilder();
                 bool first = true;
                 foreach (var kvp in queryParameters) {
-                    if (kvp.Value == null) continue;
-                    if (!first) query.Append('&');
+                    if (kvp.Value == null) {
+                        continue;
+                    }
+
+                    if (!first) {
+                        query.Append('&');
+                    }
+
                     query.Append(Uri.EscapeDataString(kvp.Key));
                     query.Append('=');
-                    query.Append(Uri.EscapeDataString(kvp.Value.ToString()));
+                    var valueString = kvp.Value.ToString() ?? string.Empty;
+                    query.Append(Uri.EscapeDataString(valueString));
                     first = false;
                 }
                 uriBuilder.Query = query.ToString();
             }
             var result = uriBuilder.Uri.AbsoluteUri;
             if (escapeUriString) {
-                result = Uri.EscapeUriString(result);
+                if (Uri.TryCreate(result, UriKind.Absolute, out var uri)) {
+                    result = uri.GetComponents(UriComponents.AbsoluteUri, UriFormat.UriEscaped);
+                } else {
+                    result = Uri.EscapeDataString(result);
+                }
             }
             return result;
         }
