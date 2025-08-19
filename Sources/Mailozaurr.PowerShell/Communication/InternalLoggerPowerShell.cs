@@ -1,6 +1,10 @@
-﻿namespace Mailozaurr.PowerShell;
+using System;
+using System.Management.Automation;
+
+namespace Mailozaurr.PowerShell;
+
 /// <summary>
-/// This class allow connecting to the InternalLogger class of ADPlayground and act on events from it in different streams
+/// Enables routing of <see cref="InternalLogger"/> events to PowerShell streams.
 /// </summary>
 public class InternalLoggerPowerShell : IDisposable {
     private readonly InternalLogger _logger;
@@ -12,15 +16,15 @@ public class InternalLoggerPowerShell : IDisposable {
     private readonly Action<ProgressRecord>? _writeProgressAction;
 
     /// <summary>
-    /// Initialize the InternalLoggerPowerShell class
+    /// Creates a new instance of the <see cref="InternalLoggerPowerShell"/> class.
     /// </summary>
-    /// <param name="logger"></param>
-    /// <param name="writeVerboseAction"></param>
-    /// <param name="writeWarningAction"></param>
-    /// <param name="writeDebugAction"></param>
-    /// <param name="writeErrorAction"></param>
-    /// <param name="writeProgressAction"></param>
-    /// <param name="writeInformationAction"></param>
+    /// <param name="logger">Source logger that exposes events.</param>
+    /// <param name="writeVerboseAction">Delegate used to write verbose messages.</param>
+    /// <param name="writeWarningAction">Delegate used to write warning messages.</param>
+    /// <param name="writeDebugAction">Delegate used to write debug messages.</param>
+    /// <param name="writeErrorAction">Delegate used to write error records.</param>
+    /// <param name="writeProgressAction">Delegate used to write progress records.</param>
+    /// <param name="writeInformationAction">Delegate used to write information records.</param>
     public InternalLoggerPowerShell(InternalLogger logger, Action<string>? writeVerboseAction = null, Action<string>? writeWarningAction = null, Action<string>? writeDebugAction = null, Action<ErrorRecord>? writeErrorAction = null, Action<ProgressRecord>? writeProgressAction = null, Action<InformationRecord>? writeInformationAction = null) {
         _logger = logger;
 
@@ -56,10 +60,10 @@ public class InternalLoggerPowerShell : IDisposable {
     }
 
     /// <summary>
-    /// Message event handler
+    /// Handles verbose messages from the logger.
     /// </summary>
-    /// <param name="sender"></param>
-    /// <param name="e"></param>
+    /// <param name="sender">Event source.</param>
+    /// <param name="e">Event data.</param>
     private void Logger_OnVerboseMessage(object? sender, LogEventArgs e) {
         if (e.Args != null && e.Args.Length > 0) {
             WriteVerbose(e.Message, e.Args);
@@ -67,24 +71,28 @@ public class InternalLoggerPowerShell : IDisposable {
             WriteVerbose(e.Message);
         }
     }
+
     private void Logger_OnDebugMessage(object? sender, LogEventArgs e) {
         WriteDebug(e.Message);
     }
+
     private void Logger_OnWarningMessage(object? sender, LogEventArgs e) {
         WriteWarning(e.Message);
     }
+
     private void Logger_OnErrorMessage(object? sender, LogEventArgs e) {
         ErrorRecord errorRecord = new ErrorRecord(new Exception(e.Message), "1", ErrorCategory.NotSpecified, null);
         WriteError(errorRecord);
     }
-    private int _activityIdCounter = 0;
 
+    private int _activityIdCounter = 0;
     private int _currentActivityId = 1;
     private bool _isCurrentActivityCompleted = true;
 
     private int GetNextActivityId() {
         return ++_activityIdCounter;
     }
+
     private void Logger_OnProgressMessage(object? sender, LogEventArgs e) {
         if (_isCurrentActivityCompleted) {
             _currentActivityId = GetNextActivityId();
@@ -107,6 +115,7 @@ public class InternalLoggerPowerShell : IDisposable {
         }
         WriteProgress(progressRecord);
     }
+
     private void Logger_OnInformationMessage(object? sender, LogEventArgs e) {
         WriteInformation(e.Message);
     }
@@ -116,43 +125,33 @@ public class InternalLoggerPowerShell : IDisposable {
     }
 
     /// <summary>
-    /// Method to write verbose message to PowerShell
+    /// Writes a formatted verbose message.
     /// </summary>
-    /// <param name="message"></param>
-    /// <param name="eArgs"></param>
+    /// <param name="message">Message template.</param>
+    /// <param name="eArgs">Arguments for the template.</param>
     private void WriteVerbose(string message, object[] eArgs) {
-        // Write to PowerShell verbose stream
         var fullMessage = string.Format(message, eArgs);
         _writeVerboseAction?.Invoke(fullMessage);
     }
 
     private void WriteDebug(string message) {
-        // Write to PowerShell debug stream
         _writeDebugAction?.Invoke(message);
     }
 
     private void WriteInformation(string message) {
         InformationRecord informationRecord = new InformationRecord(message, "Mailozaurr");
-        // Write to PowerShell information stream
         _writeInformationAction?.Invoke(informationRecord);
     }
 
     private void WriteWarning(string message) {
-        // Write to PowerShell warning stream
         _writeWarningAction?.Invoke(message);
     }
 
-    //private void WriteError(string message) {
-    //    // Write to PowerShell error stream
-    //    _writeErrorAction?.Invoke(message);
-    //}
     private void WriteError(ErrorRecord errorRecord) {
-        // Write to PowerShell error stream
         _writeErrorAction?.Invoke(errorRecord);
     }
 
     private void WriteProgress(ProgressRecord progressRecord) {
-        // Write to PowerShell progress stream
         _writeProgressAction?.Invoke(progressRecord);
     }
 
@@ -176,5 +175,7 @@ public class InternalLoggerPowerShell : IDisposable {
         if (_writeInformationAction != null) {
             _logger.OnInformationMessage -= Logger_OnInformationMessage;
         }
+        GC.SuppressFinalize(this);
     }
 }
+
