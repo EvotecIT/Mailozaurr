@@ -16,6 +16,7 @@ public class ImapEmailMessage {
     /// </summary>
     /// <param name="uid">Unique identifier of the message.</param>
     /// <param name="message">The actual MIME message.</param>
+    /// <param name="nonDeliveryReports">Optional pre-parsed non delivery reports.</param>
     public ImapEmailMessage(UniqueId uid, MimeMessage message, IList<NonDeliveryReport>? nonDeliveryReports = null) {
         Uid = uid;
         Message = message;
@@ -36,5 +37,5 @@ public class ImapEmailMessage {
     public IList<NonDeliveryReport> NonDeliveryReports { get; }
 
     /// <inheritdoc />
-    public override string ToString() => Message.Subject ?? base.ToString();
+    public override string ToString() => Message.Subject ?? base.ToString()!;
 }

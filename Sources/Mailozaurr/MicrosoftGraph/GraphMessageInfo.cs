@@ -91,7 +91,7 @@ public class GraphMessageInfo {
     public string? Summary { get; set; }
 
     /// <inheritdoc />
-    public override string ToString() => Subject ?? base.ToString();
+    public override string ToString() => Subject ?? base.ToString()!;
 
     private static string? ExtractAddress(object obj) {
         if (obj is Dictionary<string, object> dict &&

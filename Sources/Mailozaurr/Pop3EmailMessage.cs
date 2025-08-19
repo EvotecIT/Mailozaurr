@@ -15,6 +15,7 @@ public class Pop3EmailMessage {
     /// </summary>
     /// <param name="index">Index of the message within the mailbox.</param>
     /// <param name="message">The actual MIME message.</param>
+    /// <param name="nonDeliveryReports">Optional pre-parsed non delivery reports.</param>
     public Pop3EmailMessage(int index, MimeMessage message, IList<NonDeliveryReport>? nonDeliveryReports = null) {
         Index = index;
         Message = message;
@@ -35,5 +36,5 @@ public class Pop3EmailMessage {
     public IList<NonDeliveryReport> NonDeliveryReports { get; }
 
     /// <inheritdoc />
-    public override string ToString() => Message.Subject ?? base.ToString();
+    public override string ToString() => Message.Subject ?? base.ToString()!;
 }

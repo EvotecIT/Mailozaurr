@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Mailozaurr;
 
 /// <summary>
@@ -12,7 +14,7 @@ public class GraphMessageContainer {
     /// Gets or sets the message payload.
     /// </summary>
     [JsonPropertyName("message")]
-    public GraphMessage Message { get; set; }
+    public GraphMessage Message { get; set; } = new();
 
     /// <summary>
     /// Gets or sets a value indicating whether the message should be saved to the Sent Items folder.

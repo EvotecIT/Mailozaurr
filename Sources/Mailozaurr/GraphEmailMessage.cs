@@ -12,6 +12,7 @@ public class GraphEmailMessage {
     /// </summary>
     /// <param name="id">Unique identifier of the message.</param>
     /// <param name="message">The MIME message.</param>
+    /// <param name="nonDeliveryReports">Optional pre-parsed non delivery reports.</param>
     public GraphEmailMessage(string id, MimeMessage message, IList<NonDeliveryReport>? nonDeliveryReports = null) {
         Id = id;
         Message = message;
@@ -32,5 +33,5 @@ public class GraphEmailMessage {
     public IList<NonDeliveryReport> NonDeliveryReports { get; }
 
     /// <inheritdoc />
-    public override string ToString() => Message.Subject ?? base.ToString();
+    public override string ToString() => Message.Subject ?? base.ToString()!;
 }

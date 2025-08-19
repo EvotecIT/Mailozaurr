@@ -44,6 +44,8 @@ public sealed class TemporaryPgpKeyPair : IDisposable
     /// <param name="identity">Identity for the key pair.</param>
     /// <param name="passPhrase">Passphrase protecting the private key.</param>
     /// <param name="keySize">RSA key size.</param>
+    /// <param name="outputDirectory">Directory where the keys should be written.</param>
+    /// <param name="deleteOnDispose">Whether generated files should be removed on disposal.</param>
     /// <returns>Instance representing the created key pair.</returns>
     public static TemporaryPgpKeyPair Create(string identity = "Mailozaurr Test", string passPhrase = "", int keySize = 2048, string? outputDirectory = null, bool deleteOnDispose = true)
     {

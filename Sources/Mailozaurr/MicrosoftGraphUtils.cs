@@ -403,14 +403,14 @@ namespace Mailozaurr {
                     if (!first) query.Append('&');
                     query.Append(Uri.EscapeDataString(kvp.Key));
                     query.Append('=');
-                    query.Append(Uri.EscapeDataString(kvp.Value.ToString()));
+                    query.Append(Uri.EscapeDataString(kvp.Value.ToString()!));
                     first = false;
                 }
                 uriBuilder.Query = query.ToString();
             }
             var result = uriBuilder.Uri.AbsoluteUri;
             if (escapeUriString) {
-                result = Uri.EscapeUriString(result);
+                result = Uri.EscapeDataString(result);
             }
             return result;
         }
@@ -936,7 +936,7 @@ namespace Mailozaurr {
             var result = new List<GraphMailboxPermission>();
             if (doc.RootElement.TryGetProperty("value", out var val) && val.ValueKind == JsonValueKind.Array) {
                 foreach (var item in val.EnumerateArray()) {
-                    var dict = ConvertJsonElementToNativeObject(item) as Dictionary<string, object>;
+                    var dict = ConvertJsonElementToNativeObject(item) as Dictionary<string, object?>;
                     if (dict != null) result.Add(new GraphMailboxPermission(dict, userPrincipalName));
                 }
             }
