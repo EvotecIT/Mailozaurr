@@ -162,7 +162,10 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         ses.RetryDelayMilliseconds = RetryDelayMilliseconds;
         ses.RetryDelayBackoff = RetryDelayBackoff;
         ses.RetryAlways = RetryAlways.IsPresent;
-        if (!string.IsNullOrEmpty(Region)) ses.Region = Region!;
+        var region = Region;
+        if (region != null && region.Length > 0) {
+            ses.Region = region;
+        }
         NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
         ses.Credentials = networkCredential;
         if (ShouldProcess(ses.SentTo, "Sending email message via SES")) {
@@ -192,7 +195,11 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         if (Headers != null) smtp.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         smtp.CreateMessage(CancellationToken.None);
 
-        var net = Credential!.GetNetworkCredential();
+        if (Credential == null) {
+            throw new InvalidOperationException("Credential is required for Gmail processing.");
+        }
+
+        var net = Credential.GetNetworkCredential();
         var oauth = new OAuthCredential {
             UserName = net.UserName,
             AccessToken = net.Password,
@@ -202,7 +209,11 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         var client = new GmailApiClient(oauth);
         try {
             if (ShouldProcess(smtp.SentTo, "Sending email message via Gmail API")) {
-                var msg = client.SendAsync(GmailAccount!, smtp.Message).GetAwaiter().GetResult();
+                var account = GmailAccount;
+                if (account == null || account.Length == 0) {
+                    throw new ArgumentException("GmailAccount is required when using Gmail API.", nameof(GmailAccount));
+                }
+                var msg = client.SendAsync(account, smtp.Message).GetAwaiter().GetResult();
                 if (!Suppress) {
                     WriteObject(new SmtpResult(true, EmailAction.Send, smtp.SentTo, smtp.SentFrom, "GmailApi", 0, smtp.Stopwatch.Elapsed, msg.Id));
                 }
@@ -337,9 +348,13 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
 
     private void ProcessSmtp(string fromEmail, string fromName) {
         Smtp smtpClient = new Smtp(LogPath ?? string.Empty, LogConsole, LogObject, LogTimestamps, LogSecrets, LogTimeStampsFormat, LogServerPrefix, LogClientPrefix, LogOverwrite);
-        string sentLogPath = string.IsNullOrWhiteSpace(SentLogPath)
-            ? Path.Combine(Path.GetTempPath(), "Mailozaurr", "sentlog.json")
-            : SentLogPath!;
+        string sentLogPath;
+        var providedSentLogPath = SentLogPath;
+        if (providedSentLogPath == null || providedSentLogPath.Trim().Length == 0) {
+            sentLogPath = Path.Combine(Path.GetTempPath(), "Mailozaurr", "sentlog.json");
+        } else {
+            sentLogPath = providedSentLogPath;
+        }
         smtpClient.SentMessageRepository = new FileSentMessageRepository(sentLogPath);
         smtpClient.From = Helpers.GetFromObject(fromEmail, fromName);
         smtpClient.ReplyTo = ReplyTo;
@@ -441,8 +456,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             WriteObject(status);
         }
 
-        if (!string.IsNullOrEmpty(MimeMessagePath)) {
-            smtpClient.SaveMessage(MimeMessagePath!);
+        var mimePath = MimeMessagePath;
+        if (mimePath != null && mimePath.Length > 0) {
+            smtpClient.SaveMessage(mimePath);
         }
 
         smtpClient.Dispose();
