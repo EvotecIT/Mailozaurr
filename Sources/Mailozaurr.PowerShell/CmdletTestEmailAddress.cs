@@ -32,7 +32,7 @@ public sealed class CmdletTestEmailAddress : AsyncPSCmdlet {
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
     [ValidateNotNullOrEmpty]
-    public string[]? EmailAddress;
+    public string[]? EmailAddress { get; set; }
 
     /// <summary>
     /// <para type="description">If set, the cmdlet will use the newer international email standards to validate the email addresses.</para>
@@ -67,6 +67,9 @@ public sealed class CmdletTestEmailAddress : AsyncPSCmdlet {
             return Task.CompletedTask;
         }
         foreach (var email in EmailAddress) {
+            if (string.IsNullOrWhiteSpace(email)) {
+                continue;
+            }
             _logger.WriteVerbose("Processing email: {0}", email);
             WriteObject(Validator.ValidateEmail(email, AllowInternational, AllowTopLevelDomains));
         }

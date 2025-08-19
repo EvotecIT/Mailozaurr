@@ -26,7 +26,7 @@ public sealed class CmdletConvertFromEmlToMsg : AsyncPSCmdlet {
     /// </summary>
     [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
     [ValidateNotNullOrEmpty]
-    public string[]? InputPath;
+    public string[]? InputPath { get; set; }
 
     /// <summary>
     /// <para type="description">Specifies the folder where the converted MSG files will be saved. This parameter is mandatory.</para>
@@ -56,7 +56,11 @@ public sealed class CmdletConvertFromEmlToMsg : AsyncPSCmdlet {
     /// Converts the specified EML files to MSG format and writes the results to the output folder.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        var outputMessage = EmailMessage.ConvertEmlToMsg(InputPath!, OutputFolder!, Force);
+        if (InputPath is null || OutputFolder is null) {
+            return Task.CompletedTask;
+        }
+
+        var outputMessage = EmailMessage.ConvertEmlToMsg(InputPath, OutputFolder, Force);
         foreach (var obj in outputMessage) {
             WriteObject(obj);
         }

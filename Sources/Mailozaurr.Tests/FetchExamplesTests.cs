@@ -109,6 +109,7 @@ namespace Mailozaurr.Tests {
             await client.ConnectAsync("imap.example.com", 993, SecureSocketOptions.SslOnConnect);
             await client.AuthenticateAsync("user@example.com", "Pa55w0rd");
             var folder = client.GetFolder("Inbox/Reports");
+            Assert.NotNull(folder);
             await folder.OpenAsync(FolderAccess.ReadWrite);
             var uids = await folder.SearchAsync(null);
             foreach (var uid in uids) {

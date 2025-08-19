@@ -34,14 +34,15 @@ public class CmdletSaveGraphMessage : PSCmdlet {
     /// Saves the specified mail messages to disk at the given path.
     /// </summary>
     protected override void ProcessRecord() {
-        if (Message is null || Path is null) {
+        var targetPath = Path;
+        if (Message is null || string.IsNullOrEmpty(targetPath)) {
             return;
         }
         foreach (var m in Message) {
             if (m.BaseObject is EmailGraphMessage gm) {
-                MicrosoftGraphUtils.SaveMailMessages(new[] { gm }, Path!);
+                MicrosoftGraphUtils.SaveMailMessages(new[] { gm }, targetPath!);
             } else if (m.BaseObject is MimeKit.MimeMessage mm) {
-                var resolved = System.IO.Path.GetFullPath(Path!);
+                var resolved = System.IO.Path.GetFullPath(targetPath!);
                 if (!System.IO.Directory.Exists(resolved)) System.IO.Directory.CreateDirectory(resolved);
                 var file = System.IO.Path.Combine(resolved, System.IO.Path.ChangeExtension(System.IO.Path.GetRandomFileName(), "eml"));
                 mm.WriteTo(file);

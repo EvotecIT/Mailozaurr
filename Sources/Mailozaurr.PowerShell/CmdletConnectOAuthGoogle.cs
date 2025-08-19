@@ -50,10 +50,15 @@ public sealed class CmdletConnectOAuthGoogle : AsyncPSCmdlet {
     /// Performs the interactive OAuth2 authentication and returns a PSCredential with the access token.
     /// </summary>
     protected override async Task ProcessRecordAsync() {
+        if (GmailAccount is null || ClientID is null || ClientSecret is null || Scope is null) {
+            WriteError(new ErrorRecord(new PSArgumentNullException("GmailAccount"), "OAuthGoogleInvalidParameters", ErrorCategory.InvalidArgument, null));
+            return;
+        }
+
         OAuthCredential? cred = null;
         try {
             cred = await Mailozaurr.OAuthHelpers
-                .AcquireGoogleTokenCachedAsync(GmailAccount!, ClientID!, ClientSecret!, Scope!);
+                .AcquireGoogleTokenCachedAsync(GmailAccount, ClientID, ClientSecret, Scope);
         } catch (System.Exception ex) {
             WriteError(new ErrorRecord(ex, "OAuthGoogleAuthFailed", ErrorCategory.AuthenticationError, null));
             return;

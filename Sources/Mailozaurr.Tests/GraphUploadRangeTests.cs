@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -21,7 +22,8 @@ public class GraphUploadRangeTests
             "PrepareByteArrayContentForUpload",
             BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.NotNull(method);
-        List<StreamContent> chunks = (List<StreamContent>)method!.Invoke(graph, new object[] { tmp, 10, default(System.Threading.CancellationToken) })!;
+        var nonNullMethod = method!;
+        List<StreamContent> chunks = (List<StreamContent>)nonNullMethod.Invoke(graph, new object[] { tmp, 10, CancellationToken.None })!;
         File.Delete(tmp);
         Assert.Equal(3, chunks.Count);
         Assert.Equal("bytes 0-9/25", chunks[0].Headers.GetValues("Content-Range").First());
@@ -40,9 +42,10 @@ public class GraphUploadRangeTests
             "PrepareByteArrayContentForUpload",
             BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.NotNull(method);
-        List<StreamContent> chunks = (List<StreamContent>)method!.Invoke(
+        var nonNullMethod = method!;
+        List<StreamContent> chunks = (List<StreamContent>)nonNullMethod.Invoke(
             graph,
-            new object[] { tmp, 10, default(System.Threading.CancellationToken) })!;
+            new object[] { tmp, 10, CancellationToken.None })!;
         File.Delete(tmp);
         byte[] chunk0 = await chunks[0].ReadAsByteArrayAsync();
         byte[] chunk1 = await chunks[1].ReadAsByteArrayAsync();
