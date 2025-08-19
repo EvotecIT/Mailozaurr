@@ -19,7 +19,7 @@ public class NonDeliveryReportServiceTests {
 
         public Task<SentMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) {
             store.TryGetValue(messageId, out SentMessageRecord? record);
-            return Task.FromResult(record);
+            return Task.FromResult<SentMessageRecord?>(record);
         }
     }
 

@@ -108,6 +108,7 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
 
         if (ParameterSetName == "Object") {
             foreach (var perm in MailboxPermission!) {
+                if (perm is null) continue;
                 if (perm.UserPrincipalName == null)
                     perm.UserPrincipalName = UserPrincipalName;
                 await ProcessGraphAsync(conn.Credential, perm);
@@ -120,8 +121,11 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
             return;
         }
 
-        foreach (var id in PermissionId!)
-            await ProcessGraphAsync(conn.Credential, id);
+        foreach (var id in PermissionId!) {
+            if (id is not null) {
+                await ProcessGraphAsync(conn.Credential, id);
+            }
+        }
         return;
     }
 
@@ -132,7 +136,7 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
         foreach (var row in rows.OfType<PSObject>()) {
             var id = row.Properties["PermissionId"].Value?.ToString();
             if (!string.IsNullOrWhiteSpace(id))
-                await ProcessGraphAsync(cred, id);
+                await ProcessGraphAsync(cred, id!);
         }
     }
 
@@ -188,13 +192,13 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
             foreach (var row in rows.OfType<PSObject>()) {
                 var id = row.Properties["PermissionId"].Value?.ToString();
                 if (!string.IsNullOrWhiteSpace(id))
-                    InvokeMgGraph(id);
+                    InvokeMgGraph(id!);
             }
         } else if (MailboxPermission != null) {
             foreach (var perm in MailboxPermission) {
                 if (perm.Id != null) {
                     if (!ShouldProcess(perm.Id, "Removing mailbox permission")) continue;
-                    InvokeMgGraph(perm.Id);
+                    InvokeMgGraph(perm.Id!);
                 }
             }
         } else if (PermissionId != null) {

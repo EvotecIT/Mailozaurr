@@ -46,7 +46,7 @@ public sealed class CmdletTestEmailAddress : AsyncPSCmdlet {
     [Parameter(Mandatory = false, Position = 2)]
     public SwitchParameter AllowTopLevelDomains { get; set; }
 
-    private InternalLogger _logger;
+    private InternalLogger _logger = null!;
     private InternalLoggerPowerShell? _listener;
 
     /// <summary>
@@ -62,13 +62,20 @@ public sealed class CmdletTestEmailAddress : AsyncPSCmdlet {
     /// <summary>
     /// Processes each email address and checks if it is valid. Writes results to the output pipeline.
     /// </summary>
-    protected override async Task ProcessRecordAsync() {
+    protected override Task ProcessRecordAsync() {
+        if (EmailAddress is null) {
+            return Task.CompletedTask;
+        }
         foreach (var email in EmailAddress) {
             _logger.WriteVerbose("Processing email: {0}", email);
             WriteObject(Validator.ValidateEmail(email, AllowInternational, AllowTopLevelDomains));
         }
+        return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Cleans up resources used by the cmdlet.
+    /// </summary>
     protected override Task EndProcessingAsync() {
         _listener?.Dispose();
         _listener = null;

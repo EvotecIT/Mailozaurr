@@ -7,7 +7,7 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 public class GraphConnectionInfo : ConnectionInfoBase {
     /// <summary>Graph credentials.</summary>
-    public GraphCredential Credential { get; set; }
+    public GraphCredential Credential { get; set; } = null!;
 
     /// <summary>
     /// OAuth credential obtained using device code or on-behalf-of flow.

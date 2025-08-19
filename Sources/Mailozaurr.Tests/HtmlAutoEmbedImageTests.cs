@@ -42,7 +42,9 @@ public class HtmlAutoEmbedImageTests {
         };
         graph.CreateMessage();
         File.Delete(tmp);
-        var attachment = Assert.Single(graph.MessageContainer.Message.Attachments);
+        var message = graph.MessageContainer?.Message;
+        Assert.NotNull(message);
+        var attachment = Assert.Single(message!.Attachments!);
         Assert.True(attachment.IsInline);
         Assert.Contains("cid:" + attachment.ContentId, graph.HTML);
     }

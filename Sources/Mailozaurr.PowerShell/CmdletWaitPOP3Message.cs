@@ -106,7 +106,7 @@ public sealed class CmdletWaitPOP3Message : AsyncPSCmdlet, IDisposable {
     }
 
     /// <inheritdoc />
-    public void Dispose() {
+    public new void Dispose() {
         if (_listener != null) {
             _listener.MessageArrived -= OnMessageArrived;
             _listener.Dispose();

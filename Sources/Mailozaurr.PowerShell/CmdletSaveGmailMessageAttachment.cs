@@ -51,7 +51,7 @@ public sealed class CmdletSaveGmailMessageAttachment : AsyncPSCmdlet {
         Directory.CreateDirectory(Path!);
         foreach (var att in list) {
             var bytes = await client.DownloadAttachmentAsync(GmailAccount!, Id!, att.Id!, CancelToken);
-            var filePath = System.IO.Path.Combine(Path!, att.FileName ?? att.Id);
+            var filePath = System.IO.Path.Combine(Path!, att.FileName ?? att.Id!);
             File.WriteAllBytes(filePath, bytes);
         }
     }
