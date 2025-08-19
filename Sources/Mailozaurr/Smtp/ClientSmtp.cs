@@ -324,7 +324,11 @@ public partial class ClientSmtp : SmtpClient {
 
     private IEnumerable<MailboxAddress> ConvertDictionaryToMailboxAddresses(IDictionary dict) {
         if (dict.Contains("Name") && dict.Contains("Email")) {
-            yield return new MailboxAddress(dict["Name"]?.ToString(), dict["Email"]?.ToString());
+            var name = Convert.ToString(dict["Name"]) ?? string.Empty;
+            var email = Convert.ToString(dict["Email"]);
+            if (!string.IsNullOrWhiteSpace(email)) {
+                yield return new MailboxAddress(name, email);
+            }
         }
     }
 

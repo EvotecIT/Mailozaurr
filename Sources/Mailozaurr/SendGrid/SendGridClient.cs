@@ -162,25 +162,34 @@ public class SendGridClient {
     /// <param name="emailAddress">The object to convert.</param>
     /// <returns>A SendGridEmailAddress object, or null if the provided object is null or an empty string.</returns>
     private SendGridEmailAddress? ConvertToEmailObject(object? emailAddress) {
-        if (emailAddress == null || string.IsNullOrWhiteSpace(emailAddress.ToString())) {
+        if (emailAddress == null) {
             return null;
-        } else if (emailAddress is string emailString) {
+        }
+
+        var emailAsString = Convert.ToString(emailAddress);
+        if (string.IsNullOrWhiteSpace(emailAsString)) {
+            return null;
+        }
+
+        if (emailAddress is string emailString) {
             return new SendGridEmailAddress { Email = emailString };
-        } else if (emailAddress is IDictionary<string, object> emailDict) {
+        }
+
+        if (emailAddress is IDictionary<string, object> emailDict) {
             if (!emailDict.ContainsKey("Email")) {
                 throw new ArgumentException("Dictionary is missing required key 'Email'.", nameof(emailAddress));
             }
 
-            var emailValue = emailDict["Email"] as string;
+            var emailValue = Convert.ToString(emailDict["Email"]);
             if (string.IsNullOrWhiteSpace(emailValue)) {
                 return null;
             }
 
-            var nameValue = emailDict.ContainsKey("Name") ? emailDict["Name"] as string : null;
-            return new SendGridEmailAddress { Email = emailValue!, Name = nameValue };
-        } else {
-            throw new ArgumentException($"email object type {emailAddress.GetType().Name} requires addition");
+            var nameValue = emailDict.ContainsKey("Name") ? Convert.ToString(emailDict["Name"]) : null;
+            return new SendGridEmailAddress { Email = emailValue, Name = nameValue };
         }
+
+        throw new ArgumentException($"email object type {emailAddress.GetType().Name} requires addition");
     }
 
     /// <summary>
