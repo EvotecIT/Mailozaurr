@@ -38,7 +38,9 @@ public sealed class CmdletSavePOP3MessageAttachment : AsyncPSCmdlet {
         if (conn != null && conn.Data != null) {
             if (Index < conn.Data.Count) {
                 var message = conn.Data.GetMessage(Index);
-                MimeKitUtils.SaveAttachments(message.Attachments, Path);
+                if (Path is not null) {
+                    MimeKitUtils.SaveAttachments(message.Attachments, Path);
+                }
             } else {
                 WriteWarning($"Save-POP3MessageAttachment - Index is out of range. Use index less than {conn.Data.Count}.");
             }

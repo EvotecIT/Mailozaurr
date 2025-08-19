@@ -19,9 +19,9 @@ public static class CredentialHelpers {
         try {
             return new NetworkCredential("", s).SecurePassword;
         } catch (ArgumentException ex) {
-            LoggingMessages.Logger.WriteWarning($"Failed to convert to SecureString: {ex.Message}");
+            LoggingMessages.Logger?.WriteWarning($"Failed to convert to SecureString: {ex.Message}");
             var ss = new SecureString();
-            foreach (char c in s) ss.AppendChar(c);
+            foreach (char c in s!) ss.AppendChar(c);
             ss.MakeReadOnly();
             return ss;
         }

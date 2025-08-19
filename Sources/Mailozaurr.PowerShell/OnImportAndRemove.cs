@@ -47,10 +47,14 @@ public class OnModuleImportAndRemove : IModuleAssemblyInitializer, IModuleAssemb
     /// <returns></returns>
     private static Assembly? MyResolveEventHandler(object? sender, ResolveEventArgs args) {
         var libDirectory = Path.GetDirectoryName(typeof(OnModuleImportAndRemove).Assembly.Location);
-        var directoriesToSearch = new List<string> { libDirectory };
+        var directoriesToSearch = new List<string>();
 
-        if (Directory.Exists(libDirectory)) {
-            directoriesToSearch.AddRange(Directory.GetDirectories(libDirectory, "*", SearchOption.AllDirectories));
+        if (libDirectory is not null) {
+            directoriesToSearch.Add(libDirectory);
+
+            if (Directory.Exists(libDirectory)) {
+                directoriesToSearch.AddRange(Directory.GetDirectories(libDirectory, "*", SearchOption.AllDirectories));
+            }
         }
 
         var requestedAssemblyName = new AssemblyName(args.Name).Name + ".dll";

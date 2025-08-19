@@ -57,7 +57,7 @@ public sealed class CmdletNewGraphInboxRuleBuilder : PSCmdlet
     /// Stops processing further rules when this rule matches.
     /// </summary>
     [Parameter]
-    public SwitchParameter StopProcessing { get; set; }
+    public new SwitchParameter StopProcessing { get; set; }
 
     /// <summary>
     /// Sender address patterns to match.
@@ -108,11 +108,11 @@ public sealed class CmdletNewGraphInboxRuleBuilder : PSCmdlet
         if (BodyContains != null)
             builder.BodyContains(BodyContains!);
         if (!string.IsNullOrEmpty(Importance))
-            builder.Importance(Importance);
+            builder.Importance(Importance!);
         if (!string.IsNullOrEmpty(MoveToFolder))
-            builder.MoveToFolder(MoveToFolder);
+            builder.MoveToFolder(MoveToFolder!);
         if (!string.IsNullOrEmpty(CopyToFolder))
-            builder.CopyToFolder(CopyToFolder);
+            builder.CopyToFolder(CopyToFolder!);
         if (Delete.IsPresent)
             builder.Delete();
         if (ForwardTo != null)

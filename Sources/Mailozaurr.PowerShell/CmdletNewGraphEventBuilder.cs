@@ -66,13 +66,13 @@ public sealed class CmdletNewGraphEventBuilder : PSCmdlet
     {
         var builder = new GraphEventBuilder();
         if (!string.IsNullOrEmpty(Subject))
-            builder.Subject(Subject);
+            builder.Subject(Subject!);
         if (Start.HasValue)
             builder.Start(Start.Value, StartTimeZone);
         if (End.HasValue)
             builder.End(End.Value, EndTimeZone);
         if (!string.IsNullOrEmpty(Body))
-            builder.Body(Body, BodyType);
+            builder.Body(Body!, BodyType);
         if (Attendees != null)
         {
             foreach (var addr in Attendees)

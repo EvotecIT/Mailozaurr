@@ -90,7 +90,7 @@ public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
     /// Stops processing additional rules when this rule matches.
     /// </summary>
     [Parameter(ParameterSetName = "Params")]
-    public SwitchParameter StopProcessing { get; set; }
+    public new SwitchParameter StopProcessing { get; set; }
 
     /// <summary>
     /// Sender addresses that trigger the rule.

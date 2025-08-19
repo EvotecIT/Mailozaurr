@@ -56,13 +56,16 @@ public sealed class CmdletConvertFromEmlToMsg : AsyncPSCmdlet {
     /// Converts the specified EML files to MSG format and writes the results to the output folder.
     /// </summary>
     protected override Task ProcessRecordAsync() {
-        var outputMessage = EmailMessage.ConvertEmlToMsg(InputPath, OutputFolder, Force);
+        var outputMessage = EmailMessage.ConvertEmlToMsg(InputPath!, OutputFolder!, Force);
         foreach (var obj in outputMessage) {
             WriteObject(obj);
         }
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Releases logging resources.
+    /// </summary>
     protected override Task EndProcessingAsync() {
         _listener?.Dispose();
         _listener = null;

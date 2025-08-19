@@ -12,7 +12,7 @@ namespace Mailozaurr.Tests;
 public class GraphUploadRangeTests
 {
     [Fact]
-    public async Task PrepareByteArrayContentForUpload_ComputesRangesCorrectly()
+    public void PrepareByteArrayContentForUpload_ComputesRangesCorrectly()
     {
         string tmp = Path.GetTempFileName();
         File.WriteAllBytes(tmp, Enumerable.Range(0, 25).Select(b => (byte)b).ToArray());

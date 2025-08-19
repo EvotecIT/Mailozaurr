@@ -234,13 +234,13 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
         var filters = new List<string>();
         if (!All.IsPresent) {
             if (!string.IsNullOrWhiteSpace(Subject)) {
-                filters.Add($"contains(subject,'{Subject.Replace("'", "''")}')");
+                filters.Add($"contains(subject,'{Subject!.Replace("'", "''")}')");
             }
             if (!string.IsNullOrWhiteSpace(FromContains)) {
-                filters.Add($"contains(from/emailAddress/address,'{FromContains.Replace("'", "''")}')");
+                filters.Add($"contains(from/emailAddress/address,'{FromContains!.Replace("'", "''")}')");
             }
             if (!string.IsNullOrWhiteSpace(ToContains)) {
-                filters.Add($"toRecipients/any(r:contains(r/emailAddress/address,'{ToContains.Replace("'", "''")}'))");
+                filters.Add($"toRecipients/any(r:contains(r/emailAddress/address,'{ToContains!.Replace("'", "''")}'))");
             }
             if (Since.HasValue) {
                 filters.Add($"receivedDateTime ge {Since.Value.ToUniversalTime():yyyy-MM-ddTHH:mm:ssZ}");
@@ -254,7 +254,7 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
         }
         var filter = string.Join(" and ", filters);
         if (!string.IsNullOrWhiteSpace(rawFilter)) {
-            filter = string.IsNullOrWhiteSpace(filter) ? rawFilter : $"{filter} and {rawFilter}";
+            filter = string.IsNullOrWhiteSpace(filter) ? rawFilter! : $"{filter} and {rawFilter}";
         }
         return filter;
     }

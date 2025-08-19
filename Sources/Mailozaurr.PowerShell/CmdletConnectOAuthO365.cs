@@ -64,7 +64,7 @@ public class CmdletConnectOAuthO365 : PSCmdlet {
     protected override void ProcessRecord() {
         Mailozaurr.OAuthCredential? cred = null;
         try {
-            cred = Task.Run(() => Mailozaurr.OAuthHelpers.AcquireO365TokenCachedAsync(Login, ClientID, TenantID, RedirectUri, Scopes)).GetAwaiter().GetResult();
+            cred = Task.Run(() => Mailozaurr.OAuthHelpers.AcquireO365TokenCachedAsync(Login, ClientID!, TenantID!, RedirectUri!, Scopes!)).GetAwaiter().GetResult();
         } catch (System.Exception ex) {
             WriteError(new ErrorRecord(ex, "OAuthO365AuthFailed", ErrorCategory.AuthenticationError, null));
             return;

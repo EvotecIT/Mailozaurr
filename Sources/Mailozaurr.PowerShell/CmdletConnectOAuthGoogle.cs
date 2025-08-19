@@ -53,7 +53,7 @@ public sealed class CmdletConnectOAuthGoogle : AsyncPSCmdlet {
         OAuthCredential? cred = null;
         try {
             cred = await Mailozaurr.OAuthHelpers
-                .AcquireGoogleTokenCachedAsync(GmailAccount, ClientID, ClientSecret, Scope);
+                .AcquireGoogleTokenCachedAsync(GmailAccount!, ClientID!, ClientSecret!, Scope!);
         } catch (System.Exception ex) {
             WriteError(new ErrorRecord(ex, "OAuthGoogleAuthFailed", ErrorCategory.AuthenticationError, null));
             return;

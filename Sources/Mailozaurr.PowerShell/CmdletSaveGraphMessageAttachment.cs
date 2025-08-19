@@ -26,7 +26,7 @@ public class CmdletSaveGraphMessageAttachment : PSCmdlet {
     /// Processes the cmdlet invocation.
     /// </summary>
     protected override void ProcessRecord() {
-        if (Attachment?.Length > 0) {
+        if (Attachment?.Length > 0 && Path is not null) {
             MicrosoftGraphUtils.SaveAttachments(Attachment, Path);
         }
     }

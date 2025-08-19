@@ -20,7 +20,7 @@ namespace Mailozaurr.Tests {
                 return Task.CompletedTask;
             }
 
-            public Task<IList<int>> SearchAsync(object query)
+            public Task<IList<int>> SearchAsync(object? query)
                 => Task.FromResult<IList<int>>(new List<int> { 1, 2 });
 
             public Task<MimeMessage> GetMessageAsync(int id)

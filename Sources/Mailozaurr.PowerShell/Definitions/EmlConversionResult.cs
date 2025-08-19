@@ -7,11 +7,11 @@ public class EmlConversionResult {
     /// <summary>
     /// Eml file path to file that was converted
     /// </summary>
-    public string EmlFile { get; set; }
+    public string EmlFile { get; set; } = string.Empty;
     /// <summary>
     /// Msg file path to file that was created
     /// </summary>
-    public string MsgFile { get; set; }
+    public string MsgFile { get; set; } = string.Empty;
     /// <summary>
     /// Status of the conversion
     /// </summary>
@@ -19,5 +19,5 @@ public class EmlConversionResult {
     /// <summary>
     /// Error message if conversion failed
     /// </summary>
-    public string Error { get; set; }
+    public string? Error { get; set; }
 }
