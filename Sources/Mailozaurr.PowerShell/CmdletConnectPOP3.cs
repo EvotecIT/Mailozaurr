@@ -195,7 +195,7 @@ public sealed class CmdletConnectPOP3 : AsyncPSCmdlet {
                 AuthenticationMechanisms = client.AuthenticationMechanisms,
                 Capabilities = client.Capabilities,
                 Stream = null, // Not exposed
-                State = null, // Not exposed
+                State = null,
                 IsConnected = client.IsConnected,
                 ApopToken = null, // Not directly available
                 ExpirePolicy = null, // Not directly available

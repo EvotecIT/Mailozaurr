@@ -191,7 +191,12 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
                     LoggingMessages.Logger.WriteWarning($"Connect-IMAP - Failed to open inbox: {ex.Message}");
                 }
             }
-            var inbox = (ImapFolder)client.GetCachedFolder(null, MailKit.FolderAccess.ReadOnly);
+            var folder = client.GetCachedFolder(null, MailKit.FolderAccess.ReadOnly);
+            if (folder is not ImapFolder inbox) {
+                WriteWarning("Connect-IMAP - Inbox folder not found.");
+                await client.DisconnectAsync(true);
+                return;
+            }
             var info = new ImapConnectionInfo {
                 Uri = $"imaps://{Server}:{Port}/",
                 AuthenticationMechanisms = client.AuthenticationMechanisms,

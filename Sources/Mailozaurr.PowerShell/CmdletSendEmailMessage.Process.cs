@@ -65,6 +65,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
     }
 
     private void ProcessSendGrid(string fromEmail, string fromName) {
+        if (Credential == null) {
+            throw new InvalidOperationException("Credential is required for SendGrid processing.");
+        }
         var logCollector = new LogCollector();
         SendGridClient sendGrid = new SendGridClient();
         sendGrid.LogCollector = logCollector;
@@ -87,7 +90,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         sendGrid.RetryDelayMilliseconds = RetryDelayMilliseconds;
         sendGrid.RetryDelayBackoff = RetryDelayBackoff;
         sendGrid.RetryAlways = RetryAlways.IsPresent;
-        NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
+        NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
         sendGrid.Credentials = networkCredential;
         sendGrid.CreateMessage();
         if (ShouldProcess(sendGrid.SentTo, "Sending email message via SendGrid")) {
@@ -102,6 +105,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
     }
 
     private void ProcessMailgun(string fromEmail, string fromName) {
+        if (Credential == null) {
+            throw new InvalidOperationException("Credential is required for Mailgun processing.");
+        }
         var logCollector = new LogCollector();
         using MailgunClient mailgun = new MailgunClient();
         mailgun.LogCollector = logCollector;
@@ -125,7 +131,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         mailgun.RetryDelayMilliseconds = RetryDelayMilliseconds;
         mailgun.RetryDelayBackoff = RetryDelayBackoff;
         mailgun.RetryAlways = RetryAlways.IsPresent;
-        NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
+        NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
         mailgun.Credentials = networkCredential;
         if (ShouldProcess(mailgun.SentTo, "Sending email message via Mailgun")) {
             var result = mailgun.SendEmailAsync().GetAwaiter().GetResult();
@@ -139,6 +145,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
     }
 
     private void ProcessSes(string fromEmail, string fromName) {
+        if (Credential == null) {
+            throw new InvalidOperationException("Credential is required for SES processing.");
+        }
         var logCollector = new LogCollector();
         using SesClient ses = new SesClient();
         ses.LogCollector = logCollector;
@@ -166,7 +175,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         if (region != null && region.Length > 0) {
             ses.Region = region;
         }
-        NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
+        NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
         ses.Credentials = networkCredential;
         if (ShouldProcess(ses.SentTo, "Sending email message via SES")) {
             var result = ses.SendEmailAsync().GetAwaiter().GetResult();
@@ -226,6 +235,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
     }
 
     private void ProcessGraph(string fromEmail, string fromName) {
+        if (Credential == null) {
+            throw new InvalidOperationException("Credential is required for Graph processing.");
+        }
         using Graph graph = new Graph();
         graph.ChunkSize = ChunkSize;
         graph.From = Helpers.GetFromObject(fromEmail, fromName);
@@ -267,7 +279,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             return;
         }
 
-        NetworkCredential networkCredential = new NetworkCredential(Credential?.UserName, Credential?.Password);
+        NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
         graph.Authenticate(networkCredential);
         try {
             var status = graph.ConnectO365GraphAsync().GetAwaiter().GetResult();
