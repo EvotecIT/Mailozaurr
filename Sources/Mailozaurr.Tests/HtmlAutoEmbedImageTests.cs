@@ -21,7 +21,9 @@ public class HtmlAutoEmbedImageTests {
         smtp.Subject = "test";
         smtp.HtmlBody = $"<img src=\"{tmp}\">";
         smtp.CreateMessage(CancellationToken.None);
-        var body = (MultipartRelated)smtp.Message.Body;
+        var message = smtp.Message;
+        Assert.NotNull(message);
+        var body = Assert.IsType<MultipartRelated>(message!.Body!);
         var inline = body.OfType<MimePart>().FirstOrDefault(p => p.ContentDisposition?.Disposition == ContentDisposition.Inline);
         File.Delete(tmp);
         Assert.NotNull(inline);
@@ -68,7 +70,9 @@ public class HtmlAutoEmbedImageTests {
             smtp.Subject = "test";
             smtp.HtmlBody = "<img src=\"https://example.com/img.png\">";
             smtp.CreateMessage(CancellationToken.None);
-            var body = (MultipartRelated)smtp.Message.Body!;
+            var message = smtp.Message;
+            Assert.NotNull(message);
+            var body = Assert.IsType<MultipartRelated>(message!.Body!);
             var inline = body.OfType<MimePart>().FirstOrDefault(p => p.ContentDisposition?.Disposition == ContentDisposition.Inline);
             Assert.NotNull(inline);
             Assert.Contains("cid:img.png", smtp.HtmlBody);

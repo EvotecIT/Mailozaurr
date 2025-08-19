@@ -21,7 +21,7 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "Graph")]
     [Parameter(Mandatory = true, ParameterSetName = "MgGraphRequest")]
     [ValidateNotNullOrEmpty]
-    public string? UserPrincipalName { get; set; }
+    public string UserPrincipalName { get; set; } = string.Empty;
 
     /// <summary>
     /// Graph connection information.
@@ -141,8 +141,10 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
     /// </summary>
     /// <returns>A task representing the asynchronous operation.</returns>
     protected override Task ProcessRecordAsync() {
+        var upn = UserPrincipalName;
+
         if (ParameterSetName == "MgGraphRequest") {
-            return ProcessMgGraph();
+            return ProcessMgGraph(upn);
         }
 
         var conn = Connection ?? DefaultSessions.GraphSession;
@@ -151,13 +153,13 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
             return Task.CompletedTask;
         }
 
-        return ProcessGraphAsync(conn.Credential);
+        return ProcessGraphAsync(conn.Credential, upn);
     }
 
     /// <summary>
     /// Executes the Graph API calls to fetch messages.
     /// </summary>
-    private async Task ProcessGraphAsync(GraphCredential cred) {
+    private async Task ProcessGraphAsync(GraphCredential cred, string userPrincipalName) {
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         MicrosoftGraphUtils.MaxConcurrentRequests = MaxConcurrentRequests;
         int attempts = 0;
@@ -167,16 +169,16 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
                 var filter = BuildFilter(Filter);
                 var messages = await MicrosoftGraphUtils.GetMailMessagesAsync(
                     cred,
-                    UserPrincipalName!,
+                    userPrincipalName,
                     Property,
                     filter,
                     Limit);
 
                 foreach (var msg in messages) {
-                    var info = new GraphMessageInfo(msg, UserPrincipalName!);
+                    var info = new GraphMessageInfo(msg, userPrincipalName);
                     WriteObject(info);
                     if (Delete.IsPresent && msg.TryGetValue("id", out var idObj) && idObj is string id) {
-                        await MicrosoftGraphUtils.DeleteMailMessageAsync(cred, UserPrincipalName!, id);
+                        await MicrosoftGraphUtils.DeleteMailMessageAsync(cred, userPrincipalName, id);
                     }
                 }
                 return;
@@ -205,7 +207,7 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
     /// <summary>
     /// Uses Invoke-MgGraphRequest to retrieve messages.
     /// </summary>
-    private Task ProcessMgGraph() {
+    private Task ProcessMgGraph(string userPrincipalName) {
         var filter = BuildFilter(Filter);
         var query = new Dictionary<string, object>();
         if (!string.IsNullOrWhiteSpace(filter)) query["$filter"] = filter;
@@ -213,7 +215,7 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
         if (Limit.HasValue) query["$top"] = Limit.Value.ToString();
         var uri = MicrosoftGraphUtils.JoinUriQuery(
             GraphEndpoint.V1,
-            $"/users/{UserPrincipalName}/messages",
+            $"/users/{userPrincipalName}/messages",
             query);
 
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
