@@ -8,7 +8,7 @@ namespace Mailozaurr.PowerShell;
 
 /// <summary>
 /// <para type="synopsis">Searches for non-delivery reports in a mailbox.</para>
-/// <para type="description">The <c>Get-EmailDeliveryStatus</c> cmdlet queries IMAP, POP3, or Microsoft Graph to find non-delivery reports using optional filters.</para>
+/// <para type="description">The <c>Get-EmailDeliveryStatus</c> cmdlet queries IMAP, POP3, Microsoft Graph, or Gmail API to find non-delivery reports using optional filters.</para>
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "EmailDeliveryStatus")]
 [OutputType(typeof(NonDeliveryReport))]
@@ -62,6 +62,19 @@ public sealed class CmdletGetEmailDeliveryStatus : AsyncPSCmdlet
     /// </summary>
     [Parameter]
     public string? UserPrincipalName { get; set; }
+
+    /// <summary>
+    /// <para type="description">Gmail account address when using Gmail API.</para>
+    /// </summary>
+    [Parameter(Mandatory = true, ParameterSetName = "GmailApi")]
+    public string? GmailAccount { get; set; }
+
+    /// <summary>
+    /// <para type="description">OAuth credential used for Gmail API authentication.</para>
+    /// </summary>
+    [Parameter(Mandatory = true, ParameterSetName = "GmailApi")]
+    [ValidateNotNull]
+    public PSCredential? Credential { get; set; }
 
     /// <summary>
     /// <para type="description">Maximum concurrent MIME downloads; set to 1 to disable parallelism.</para>
@@ -161,6 +174,39 @@ public sealed class CmdletGetEmailDeliveryStatus : AsyncPSCmdlet
                 {
                     ThrowTerminatingError(new ErrorRecord(
                         new InvalidOperationException("Get-EmailDeliveryStatus - Graph connection or UserPrincipalName missing."),
+                        "ClientNotConnected",
+                        ErrorCategory.InvalidOperation,
+                        null));
+                }
+
+                break;
+            }
+            case EmailProtocol.GmailApi:
+            {
+                if (Credential != null && !string.IsNullOrWhiteSpace(GmailAccount))
+                {
+                    var net = Credential.GetNetworkCredential();
+                    var oauth = new OAuthCredential { UserName = net.UserName, AccessToken = net.Password, ExpiresOn = DateTimeOffset.MaxValue };
+                    var client = new GmailApiClient(oauth);
+                    var reports = await MailboxSearcher.SearchNonDeliveryReportsAsync(
+                        client,
+                        GmailAccount!,
+                        Since,
+                        Before,
+                        Recipient,
+                        MessageId,
+                        max,
+                        parallelDownloadLimit: ParallelDownloadLimit,
+                        cancellationToken: CancelToken);
+                    foreach (var report in reports)
+                    {
+                        WriteObject(report);
+                    }
+                }
+                else
+                {
+                    ThrowTerminatingError(new ErrorRecord(
+                        new InvalidOperationException("Get-EmailDeliveryStatus - Gmail account or Credential missing."),
                         "ClientNotConnected",
                         ErrorCategory.InvalidOperation,
                         null));

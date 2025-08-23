@@ -18,5 +18,10 @@ public enum EmailProtocol
     /// <summary>
     /// <para type="description">Use Microsoft Graph.</para>
     /// </summary>
-    Graph
+    Graph,
+
+    /// <summary>
+    /// <para type="description">Use the Gmail REST API.</para>
+    /// </summary>
+    GmailApi
 }
