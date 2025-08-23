@@ -8,8 +8,8 @@ Connect-EmailGraph -ClientId $ClientId -DirectoryId $TenantId -DeviceCode -Scope
 Get-DmarcReport -Protocol Graph -UserPrincipalName 'user@example.com' -Since (Get-Date).AddDays(-7) |
     ForEach-Object {
         foreach ($att in $_.Attachments) {
-            # Pass the zipped XML to Domain Detective for analysis
-            # Invoke-DomainDetective -InputObject $att.Content -Name $att.Name
+            # Pass the zipped XML stream to Domain Detective for analysis
+            # Invoke-DomainDetective -InputStream $att.Content -Name $att.Name
         }
     }
 Disconnect-EmailGraph

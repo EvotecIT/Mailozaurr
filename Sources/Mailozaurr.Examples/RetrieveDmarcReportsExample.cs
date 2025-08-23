@@ -11,14 +11,16 @@ public static class RetrieveDmarcReportsExample {
         var reports = await MailboxSearcher.SearchDmarcReportsAsync(client, "INBOX", since: DateTime.UtcNow.AddDays(-7));
         foreach (var report in reports) {
             foreach (var att in report.Attachments) {
-                DomainDetective.Process(att.Content, att.Name);
+                using (att) {
+                    DomainDetective.Process(att.Content, att.Name);
+                }
             }
         }
     }
 }
 
 public static class DomainDetective {
-    public static void Process(byte[] zip, string name) {
+    public static void Process(Stream zip, string name) {
         // Placeholder for integration with Domain Detective analysis
         Console.WriteLine($"Processing {name} ({zip.Length} bytes)");
     }

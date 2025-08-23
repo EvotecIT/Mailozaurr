@@ -5,7 +5,7 @@ $cred = Connect-OAuthGoogle -GmailAccount 'user@gmail.com' -ClientID 'id' -Clien
 Get-DmarcReport -Protocol GmailApi -GmailAccount 'user@gmail.com' -Credential $cred -Since (Get-Date).AddDays(-7) |
     ForEach-Object {
         foreach ($att in $_.Attachments) {
-            # Pass the zipped XML to Domain Detective for analysis
-            # Invoke-DomainDetective -InputObject $att.Content -Name $att.Name
+            # Pass the zipped XML stream to Domain Detective for analysis
+            # Invoke-DomainDetective -InputStream $att.Content -Name $att.Name
         }
     }
