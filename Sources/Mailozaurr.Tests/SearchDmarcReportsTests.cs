@@ -1,0 +1,71 @@
+using Mailozaurr;
+using Mailozaurr.DmarcReports;
+using MimeKit;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
+using Xunit;
+
+namespace Mailozaurr.Tests;
+
+public class SearchDmarcReportsTests {
+    private static MimeMessage CreateDmarc(string domain, DateTimeOffset date) {
+        var message = new MimeMessage();
+        message.Subject = $"Report domain: {domain}";
+        message.Date = date;
+        message.From.Add(new MailboxAddress("reporter", "reporter@example.com"));
+        var builder = new BodyBuilder();
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes("dummy"));
+        var part = new MimePart("application", "zip") {
+            Content = new MimeContent(ms),
+            FileName = $"{domain}.zip"
+        };
+        builder.Attachments.Add(part);
+        message.Body = builder.ToMessageBody();
+        return message;
+    }
+
+    [Fact]
+    public void FilterDmarcReports_ExtractsAttachments() {
+        var now = DateTimeOffset.UtcNow;
+        var msg = CreateDmarc("example.com", now);
+        var list = new List<MimeMessage> { msg };
+        var reports = MailboxSearcher.FilterDmarcReports(list, since: now.AddMinutes(-1).DateTime, before: now.AddMinutes(1).DateTime, domain: "example.com");
+        Assert.Single(reports);
+        var report = reports[0];
+        Assert.Equal("reporter@example.com", report.From);
+        Assert.Single(report.Attachments);
+        Assert.EndsWith(".zip", report.Attachments[0].Name);
+        Assert.True(report.Attachments[0].Content.Length > 0);
+    }
+
+    [Fact]
+    public void BuildDmarcReportSearchQuery_ContainsSubject() {
+        var query = MailboxSearcher.BuildDmarcReportSearchQuery(null, null, "example.com");
+        bool Contains(MailKit.Search.SearchQuery q) {
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+            var term = q.GetType().GetProperty("Term", flags)?.GetValue(q)?.ToString();
+            if (term == "SubjectContains") {
+                var text = q.GetType().GetProperty("Text", flags)?.GetValue(q)?.ToString();
+                if (text?.IndexOf("example.com", StringComparison.OrdinalIgnoreCase) >= 0 == true) return true;
+            }
+            var left = q.GetType().GetProperty("Left", flags)?.GetValue(q) as MailKit.Search.SearchQuery;
+            var right = q.GetType().GetProperty("Right", flags)?.GetValue(q) as MailKit.Search.SearchQuery;
+            if (left != null && Contains(left)) return true;
+            if (right != null && Contains(right)) return true;
+            return false;
+        }
+        Assert.True(Contains(query));
+    }
+
+    [Fact]
+    public void BuildGmailDmarcReportQuery_IncludesDomainAndDates() {
+        var since = new DateTime(2024, 1, 1);
+        var before = new DateTime(2024, 2, 1);
+        var q = MailboxSearcher.BuildGmailDmarcReportQuery(since, before, "example.com");
+        Assert.Contains("example.com", q);
+        Assert.Contains("after:2024/01/01", q);
+        Assert.Contains("before:2024/02/01", q);
+    }
+}

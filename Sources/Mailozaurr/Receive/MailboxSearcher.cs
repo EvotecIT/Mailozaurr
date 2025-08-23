@@ -6,9 +6,12 @@ using MimeKit;
 using System.Text;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Mailozaurr.NonDeliveryReports;
+using Mailozaurr.DmarcReports;
 
 namespace Mailozaurr;
 
@@ -316,7 +319,257 @@ public static class MailboxSearcher {
         return FilterNonDeliveryReports(mimeMessages, since, before, recipientContains, messageId);
     }
 
-    internal static IList<NonDeliveryReport> FilterNonDeliveryReports(
+    // DMARC report helpers
+
+    /// <summary>
+    /// Searches for DMARC aggregate reports in an IMAP mailbox.
+    /// </summary>
+    public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
+        ImapClient client,
+        string? folder = null,
+        DateTime? since = null,
+        DateTime? before = null,
+        string? domain = null,
+        int maxResults = 0,
+        int parallelDownloadLimit = 4,
+        CancellationToken cancellationToken = default) {
+        var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadOnly);
+        var search = BuildDmarcReportSearchQuery(since, before, domain);
+        var uids = await mailFolder.SearchAsync(search, cancellationToken).ConfigureAwait(false);
+        var messages = new List<MimeMessage>(uids.Count);
+        if (parallelDownloadLimit <= 1) {
+            foreach (var uid in uids) {
+                cancellationToken.ThrowIfCancellationRequested();
+                var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
+                messages.Add(msg);
+                if (maxResults > 0 && messages.Count >= maxResults) break;
+            }
+        } else {
+            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
+            var tasks = new List<Task>();
+            foreach (var uid in uids) {
+                cancellationToken.ThrowIfCancellationRequested();
+                tasks.Add(Task.Run(async () => {
+                    await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    try {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
+                        lock (messages) messages.Add(msg);
+                    } finally {
+                        semaphore.Release();
+                    }
+                }, cancellationToken));
+                if (maxResults > 0 && tasks.Count >= maxResults) break;
+            }
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+        }
+        return FilterDmarcReports(messages, since, before, domain);
+    }
+
+    /// <summary>
+    /// Searches for DMARC aggregate reports in a POP3 mailbox.
+    /// </summary>
+    public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
+        Pop3Client client,
+        DateTime? since = null,
+        DateTime? before = null,
+        string? domain = null,
+        int maxResults = 0,
+        int parallelDownloadLimit = 4,
+        CancellationToken cancellationToken = default) {
+        var count = client.Count;
+        var indices = new List<int>(count);
+        for (int i = 0; i < count; i++) indices.Add(i);
+        var messages = new List<MimeMessage>(indices.Count);
+        if (parallelDownloadLimit <= 1) {
+            foreach (var idx in indices) {
+                cancellationToken.ThrowIfCancellationRequested();
+                var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
+                messages.Add(msg);
+                if (maxResults > 0 && messages.Count >= maxResults) break;
+            }
+        } else {
+            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
+            var tasks = new List<Task>();
+            foreach (var idx in indices) {
+                cancellationToken.ThrowIfCancellationRequested();
+                tasks.Add(Task.Run(async () => {
+                    await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    try {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
+                        lock (messages) messages.Add(msg);
+                    } finally {
+                        semaphore.Release();
+                    }
+                }, cancellationToken));
+                if (maxResults > 0 && tasks.Count >= maxResults) break;
+            }
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+        }
+        return FilterDmarcReports(messages, since, before, domain);
+    }
+
+    /// <summary>
+    /// Searches for DMARC aggregate reports using Microsoft Graph.
+    /// </summary>
+    public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
+        GraphCredential credential,
+        string userPrincipalName,
+        DateTime? since = null,
+        DateTime? before = null,
+        string? domain = null,
+        int maxResults = 0,
+        int parallelDownloadLimit = 4,
+        CancellationToken cancellationToken = default) {
+        var filters = new List<string> { "hasAttachments eq true", "contains(subject,'report domain')" };
+        if (since.HasValue) filters.Add($"receivedDateTime ge {since.Value:o}");
+        if (before.HasValue) filters.Add($"receivedDateTime le {before.Value:o}");
+        if (!string.IsNullOrWhiteSpace(domain)) filters.Add($"contains(subject,'{domain.Replace("'", "''")}')");
+        var filter = string.Join(" and ", filters);
+        var msgs = await MicrosoftGraphUtils.GetMailMessagesAsync(
+            credential,
+            userPrincipalName,
+            new[] { "id" },
+            filter,
+            maxResults > 0 ? maxResults : (int?)null).ConfigureAwait(false);
+        var mimeMessages = new List<MimeMessage>(msgs.Count);
+        if (parallelDownloadLimit <= 1) {
+            foreach (var m in msgs) {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (m.TryGetValue("id", out var idObj) && idObj is string id) {
+                    var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
+                    mimeMessages.Add(mime);
+                }
+            }
+        } else {
+            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
+            var tasks = new List<Task>();
+            foreach (var m in msgs) {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (m.TryGetValue("id", out var idObj) && idObj is string id) {
+                    tasks.Add(Task.Run(async () => {
+                        await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                        try {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
+                            lock (mimeMessages) mimeMessages.Add(mime);
+                        } finally {
+                            semaphore.Release();
+                        }
+                    }, cancellationToken));
+                }
+            }
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+        }
+        return FilterDmarcReports(mimeMessages, since, before, domain);
+    }
+
+    /// <summary>
+    /// Searches for DMARC aggregate reports using the Gmail API.
+    /// </summary>
+    public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
+        GmailApiClient client,
+        string userId,
+        DateTime? since = null,
+        DateTime? before = null,
+        string? domain = null,
+        int maxResults = 0,
+        int parallelDownloadLimit = 4,
+        CancellationToken cancellationToken = default) {
+        string query = BuildGmailDmarcReportQuery(since, before, domain);
+        var msgs = await client.ListAsync(userId, query, maxResults > 0 ? maxResults : (int?)null, cancellationToken).ConfigureAwait(false);
+        var mimeMessages = new List<MimeMessage>(msgs.Count);
+        if (parallelDownloadLimit <= 1) {
+            foreach (var m in msgs) {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!string.IsNullOrEmpty(m.Id)) {
+                    var mime = await client.GetMimeMessageAsync(userId, m.Id, cancellationToken).ConfigureAwait(false);
+                    mimeMessages.Add(mime);
+                    if (maxResults > 0 && mimeMessages.Count >= maxResults) break;
+                }
+            }
+        } else {
+            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
+            var tasks = new List<Task>();
+            foreach (var m in msgs) {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!string.IsNullOrEmpty(m.Id)) {
+                    tasks.Add(Task.Run(async () => {
+                        await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                        try {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            var mime = await client.GetMimeMessageAsync(userId, m.Id, cancellationToken).ConfigureAwait(false);
+                            lock (mimeMessages) mimeMessages.Add(mime);
+                        } finally {
+                            semaphore.Release();
+                        }
+                    }, cancellationToken));
+                }
+                if (maxResults > 0 && tasks.Count >= maxResults) break;
+            }
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+        }
+        return FilterDmarcReports(mimeMessages, since, before, domain);
+    }
+
+    internal static IList<DmarcReport> FilterDmarcReports(
+        IEnumerable<MimeMessage> messages,
+        DateTime? since,
+        DateTime? before,
+        string? domain) {
+        var results = new List<DmarcReport>();
+        foreach (var message in messages) {
+            if (since.HasValue && message.Date.DateTime < since.Value) continue;
+            if (before.HasValue && message.Date.DateTime > before.Value) continue;
+            if (!string.IsNullOrWhiteSpace(domain) && (message.Subject == null || message.Subject.IndexOf(domain, StringComparison.OrdinalIgnoreCase) < 0)) continue;
+            var report = new DmarcReport {
+                From = message.From.Mailboxes.FirstOrDefault()?.Address,
+                Subject = message.Subject,
+                Date = message.Date
+            };
+            foreach (var att in message.Attachments) {
+                if (IsDmarcAttachment(att) && att is MimePart part) {
+                    using var ms = new MemoryStream();
+                    part.Content.DecodeTo(ms);
+                    report.Attachments.Add(new DmarcReportAttachment(part.FileName ?? "report.zip", ms.ToArray()));
+                }
+            }
+            if (report.Attachments.Count > 0) results.Add(report);
+        }
+        return results;
+    }
+
+    internal static SearchQuery BuildDmarcReportSearchQuery(DateTime? since, DateTime? before, string? domain) {
+        SearchQuery search = SearchQuery.SubjectContains("report domain");
+        if (!string.IsNullOrWhiteSpace(domain)) search = search.And(SearchQuery.SubjectContains(domain));
+        if (since.HasValue) search = search.And(SearchQuery.DeliveredAfter(since.Value));
+        if (before.HasValue) search = search.And(SearchQuery.DeliveredBefore(before.Value));
+        return search;
+    }
+
+    internal static string BuildGmailDmarcReportQuery(DateTime? since, DateTime? before, string? domain) {
+        var sb = new StringBuilder("subject:\"report domain\" has:attachment");
+        if (!string.IsNullOrWhiteSpace(domain)) sb.Append(' ').Append("subject:\"").Append(domain).Append("\"");
+        if (since.HasValue) sb.Append(' ').Append("after:").Append(since.Value.ToString("yyyy/MM/dd"));
+        if (before.HasValue) sb.Append(' ').Append("before:").Append(before.Value.ToString("yyyy/MM/dd"));
+        return sb.ToString().Trim();
+    }
+
+    private static bool IsDmarcAttachment(MimeEntity entity) {
+        if (entity is MimePart part) {
+            var name = part.FileName;
+            if (!string.IsNullOrEmpty(name) && (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".gz", StringComparison.OrdinalIgnoreCase))) return true;
+            var ct = part.ContentType;
+            if (ct != null && ct.MediaType.Equals("application", StringComparison.OrdinalIgnoreCase)) {
+                if (ct.MediaSubtype.Equals("zip", StringComparison.OrdinalIgnoreCase) || ct.MediaSubtype.Equals("gzip", StringComparison.OrdinalIgnoreCase)) return true;
+            }
+        }
+        return false;
+    }
+
+
+internal static IList<NonDeliveryReport> FilterNonDeliveryReports(
         IEnumerable<MimeMessage> messages,
         DateTime? since,
         DateTime? before,
