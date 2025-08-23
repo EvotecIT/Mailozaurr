@@ -41,7 +41,7 @@ public class GmailNonDeliveryReportsTests {
         var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = DateTimeOffset.MaxValue });
         var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
         field.SetValue(client, new HttpClient(handler) { BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/") });
-        var reports = await MailboxSearcher.SearchNonDeliveryReportsAsync(client, "me", cancellationToken: CancellationToken.None);
+        var reports = await MailboxSearcher.SearchNonDeliveryReportsAsync(client, "me", parallelDownloadLimit: 1, cancellationToken: CancellationToken.None);
         Assert.Single(reports);
         Assert.Equal("<id1>", reports[0].OriginalMessageId);
     }
