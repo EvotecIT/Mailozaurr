@@ -144,6 +144,30 @@ public sealed class GmailApiClient : IDisposable {
     }
 
     /// <summary>
+    /// Retrieves a MIME message by id.
+    /// </summary>
+    public async Task<MimeMessage> GetMimeMessageAsync(string userId, string id, CancellationToken cancellationToken = default) {
+        using var response = await _client.GetAsync($"users/{userId}/messages/{id}?format=raw", cancellationToken);
+        await ThrowIfAuthErrorAsync(response, cancellationToken);
+        response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+#else
+        var json = await response.Content.ReadAsStringAsync();
+#endif
+        var msg = JsonSerializer.Deserialize<GmailMessage>(json, s_jsonOptions);
+        if (string.IsNullOrEmpty(msg?.Raw)) {
+            throw new InvalidDataException("Gmail API returned an invalid message response.");
+        }
+        var data = msg.Raw.Replace('-', '+').Replace('_', '/');
+        int padding = (4 - data.Length % 4) % 4;
+        if (padding > 0) data = data.PadRight(data.Length + padding, '=');
+        var bytes = Convert.FromBase64String(data);
+        using var ms = new MemoryStream(bytes);
+        return MimeMessage.Load(ms);
+    }
+
+    /// <summary>
     /// Deletes a message by id.
     /// </summary>
     public async Task DeleteAsync(string userId, string id, CancellationToken cancellationToken = default) {

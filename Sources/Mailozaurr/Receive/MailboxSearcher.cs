@@ -3,6 +3,7 @@ using MailKit.Net.Imap;
 using MailKit.Net.Pop3;
 using MailKit.Search;
 using MimeKit;
+using System.Text;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -266,6 +267,55 @@ public static class MailboxSearcher {
         return FilterNonDeliveryReports(mimeMessages, since, before, recipientContains, messageId);
     }
 
+    /// <summary>
+    /// Searches for Non-Delivery Reports using the Gmail API.
+    /// </summary>
+    public static async Task<IList<NonDeliveryReport>> SearchNonDeliveryReportsAsync(
+        GmailApiClient client,
+        string userId,
+        DateTime? since = null,
+        DateTime? before = null,
+        string? recipientContains = null,
+        string? messageId = null,
+        int maxResults = 0,
+        int parallelDownloadLimit = 4,
+        CancellationToken cancellationToken = default) {
+        string query = BuildGmailNonDeliveryReportQuery(since, before);
+        var msgs = await client.ListAsync(userId, query, maxResults > 0 ? maxResults : (int?)null, cancellationToken).ConfigureAwait(false);
+        var mimeMessages = new List<MimeMessage>(msgs.Count);
+        if (parallelDownloadLimit <= 1) {
+            foreach (var m in msgs) {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!string.IsNullOrEmpty(m.Id)) {
+                    var mime = await client.GetMimeMessageAsync(userId, m.Id, cancellationToken).ConfigureAwait(false);
+                    mimeMessages.Add(mime);
+                    if (maxResults > 0 && mimeMessages.Count >= maxResults) break;
+                }
+            }
+        } else {
+            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
+            var tasks = new List<Task>();
+            foreach (var m in msgs) {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!string.IsNullOrEmpty(m.Id)) {
+                    tasks.Add(Task.Run(async () => {
+                        await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                        try {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            var mime = await client.GetMimeMessageAsync(userId, m.Id, cancellationToken).ConfigureAwait(false);
+                            lock (mimeMessages) mimeMessages.Add(mime);
+                        } finally {
+                            semaphore.Release();
+                        }
+                    }, cancellationToken));
+                }
+                if (maxResults > 0 && tasks.Count >= maxResults) break;
+            }
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+        }
+        return FilterNonDeliveryReports(mimeMessages, since, before, recipientContains, messageId);
+    }
+
     internal static IList<NonDeliveryReport> FilterNonDeliveryReports(
         IEnumerable<MimeMessage> messages,
         DateTime? since,
@@ -283,6 +333,23 @@ public static class MailboxSearcher {
             }
         }
         return results;
+    }
+
+    internal static string BuildGmailNonDeliveryReportQuery(DateTime? since, DateTime? before) {
+        var sb = new StringBuilder();
+        bool first = true;
+        foreach (var pattern in NonDeliveryReportSubjectPatterns.Values) {
+            if (!first) sb.Append(" OR ");
+            sb.Append("subject:\"").Append(pattern).Append("\"");
+            first = false;
+        }
+        if (sb.Length > 0) {
+            sb.Insert(0, "(");
+            sb.Append(')');
+        }
+        if (since.HasValue) sb.Append(' ').Append("after:").Append(since.Value.ToString("yyyy/MM/dd"));
+        if (before.HasValue) sb.Append(' ').Append("before:").Append(before.Value.ToString("yyyy/MM/dd"));
+        return sb.ToString().Trim();
     }
 
       private static bool RecipientMatches(NonDeliveryReport report, string filter) {

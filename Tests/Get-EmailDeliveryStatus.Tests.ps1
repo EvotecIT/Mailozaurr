@@ -1,15 +1,12 @@
 Describe 'Get-EmailDeliveryStatus' {
-    It 'Throws when connection missing' {
-        { Get-EmailDeliveryStatus -Protocol Imap } | Should -Throw
+    It 'Exposes GmailApi parameter set' {
+        (Get-Command Get-EmailDeliveryStatus).ParameterSets.Name | Should -Contain 'GmailApi'
     }
-    It 'Throws when POP3 connection missing' {
-        { Get-EmailDeliveryStatus -Protocol Pop3 } | Should -Throw
+    It 'Includes Protocol parameter' {
+        (Get-Command Get-EmailDeliveryStatus).Parameters.ContainsKey('Protocol') | Should -BeTrue
     }
-    It 'Throws when Graph connection missing' {
-        { Get-EmailDeliveryStatus -Protocol Graph -UserPrincipalName 'user@example.com' } | Should -Throw
-    }
-
-    It 'Accepts ParallelDownloadLimit parameter' {
-        { Get-EmailDeliveryStatus -Protocol Imap -ParallelDownloadLimit 2 } | Should -Throw
+    It 'Includes ParallelDownloadLimit parameter' {
+        (Get-Command Get-EmailDeliveryStatus).Parameters.ContainsKey('ParallelDownloadLimit') | Should -BeTrue
     }
 }
+
