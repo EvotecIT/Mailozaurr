@@ -68,4 +68,16 @@ public class SearchDmarcReportsTests {
         Assert.Contains("after:2024/01/01", q);
         Assert.Contains("before:2024/02/01", q);
     }
+
+    [Fact]
+    public void FilterDmarcReports_FiltersAcrossTimeZones() {
+        var msg1 = CreateDmarc("example.com", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.FromHours(2)));
+        var msg2 = CreateDmarc("example.com", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.FromHours(-5)));
+        var list = new List<MimeMessage> { msg1, msg2 };
+        var since = new DateTime(2023, 12, 31, 21, 0, 0, DateTimeKind.Utc);
+        var before = new DateTime(2024, 1, 1, 1, 0, 0, DateTimeKind.Utc);
+        var reports = MailboxSearcher.FilterDmarcReports(list, since, before, domain: null);
+        Assert.Single(reports);
+        Assert.Equal(msg1.Subject, reports[0].Subject);
+    }
 }

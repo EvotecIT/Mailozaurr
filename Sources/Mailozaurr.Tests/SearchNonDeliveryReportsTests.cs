@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Globalization;
 using MailKit.Search;
 using MailKit.Net.Pop3;
 using MailKit;
@@ -17,7 +18,8 @@ namespace Mailozaurr.Tests;
 
 public class SearchNonDeliveryReportsTests {
     private static MimeMessage CreateNdr(string recipient, string messageId, DateTimeOffset date) {
-        string raw = $"Content-Type: multipart/report; report-type=delivery-status; boundary=\"XXX\"\r\n\r\n--XXX\r\nContent-Type: text/plain; charset=utf-8\r\n\r\ntext\r\n\r\n--XXX\r\nContent-Type: message/delivery-status\r\n\r\nOriginal-Recipient: rfc822; {recipient}\r\nFinal-Recipient: rfc822; {recipient}\r\nOriginal-Message-ID: {messageId}\r\nReporting-MTA: dns; mx.example.com\r\nDiagnostic-Code: smtp; 550 5.1.1 User unknown\r\nStatus: 5.1.1\r\nArrival-Date: {date:R}\r\n\r\n--XXX--";
+        string arrival = date.ToString("ddd, dd MMM yyyy HH:mm:ss K", CultureInfo.InvariantCulture);
+        string raw = $"Content-Type: multipart/report; report-type=delivery-status; boundary=\"XXX\"\r\n\r\n--XXX\r\nContent-Type: text/plain; charset=utf-8\r\n\r\ntext\r\n\r\n--XXX\r\nContent-Type: message/delivery-status\r\n\r\nOriginal-Recipient: rfc822; {recipient}\r\nFinal-Recipient: rfc822; {recipient}\r\nOriginal-Message-ID: {messageId}\r\nReporting-MTA: dns; mx.example.com\r\nDiagnostic-Code: smtp; 550 5.1.1 User unknown\r\nStatus: 5.1.1\r\nArrival-Date: {arrival}\r\n\r\n--XXX--";
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(raw));
         return MimeMessage.Load(stream);
     }
@@ -47,6 +49,18 @@ public class SearchNonDeliveryReportsTests {
         var reports = MailboxSearcher.FilterNonDeliveryReports(list, since: now.AddMinutes(-5).DateTime, before: null, recipientContains: null, messageId: null);
         Assert.Single(reports);
         Assert.Equal("<id2>", reports[0].OriginalMessageId);
+    }
+
+    [Fact]
+    public void FilterNonDeliveryReports_FiltersAcrossTimeZones() {
+        var msg1 = CreateNdr("user@example.com", "<id1>", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.FromHours(2)));
+        var msg2 = CreateNdr("user@example.com", "<id2>", new DateTimeOffset(2024, 1, 1, 5, 0, 0, TimeSpan.FromHours(-5)));
+        var list = new List<MimeMessage> { msg1, msg2 };
+        var since = new DateTime(2023, 12, 31, 21, 0, 0, DateTimeKind.Utc);
+        var before = new DateTime(2024, 1, 1, 1, 0, 0, DateTimeKind.Utc);
+        var reports = MailboxSearcher.FilterNonDeliveryReports(list, since, before, recipientContains: null, messageId: null);
+        Assert.Single(reports);
+        Assert.Equal("<id1>", reports[0].OriginalMessageId);
     }
 
     private static bool Contains(SearchQuery query, Func<SearchQuery, bool> predicate) {

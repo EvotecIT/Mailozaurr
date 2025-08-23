@@ -22,6 +22,8 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches an IMAP mailbox and returns matching messages.
     /// </summary>
+    /// <param name="since">Optional UTC lower bound for message delivery dates.</param>
+    /// <param name="before">Optional UTC upper bound for message delivery dates.</param>
     public static async Task<IList<ImapEmailMessage>> SearchImapAsync(
         ImapClient client,
         string? folder = null,
@@ -43,8 +45,8 @@ public static class MailboxSearcher {
         if (!string.IsNullOrWhiteSpace(fromContains)) search = search.And(SearchQuery.FromContains(fromContains));
         if (!string.IsNullOrWhiteSpace(toContains)) search = search.And(SearchQuery.ToContains(toContains));
         if (!string.IsNullOrWhiteSpace(bodyContains)) search = search.And(SearchQuery.BodyContains(bodyContains));
-        if (since.HasValue) search = search.And(SearchQuery.DeliveredAfter(since.Value));
-        if (before.HasValue) search = search.And(SearchQuery.DeliveredBefore(before.Value));
+        if (since.HasValue) search = search.And(SearchQuery.DeliveredAfter(since.Value.ToUniversalTime()));
+        if (before.HasValue) search = search.And(SearchQuery.DeliveredBefore(before.Value.ToUniversalTime()));
         if (additionalQueries != null) {
             foreach (var q in additionalQueries) {
                 if (q != null) search = search.And(q);
@@ -56,8 +58,8 @@ public static class MailboxSearcher {
             if (!string.IsNullOrWhiteSpace(parsed.FromContains)) search = search.And(SearchQuery.FromContains(parsed.FromContains));
             if (!string.IsNullOrWhiteSpace(parsed.ToContains)) search = search.And(SearchQuery.ToContains(parsed.ToContains));
             if (!string.IsNullOrWhiteSpace(parsed.BodyContains)) search = search.And(SearchQuery.BodyContains(parsed.BodyContains));
-            if (parsed.Since.HasValue) search = search.And(SearchQuery.DeliveredAfter(parsed.Since.Value));
-            if (parsed.Before.HasValue) search = search.And(SearchQuery.DeliveredBefore(parsed.Before.Value));
+            if (parsed.Since.HasValue) search = search.And(SearchQuery.DeliveredAfter(parsed.Since.Value.ToUniversalTime()));
+            if (parsed.Before.HasValue) search = search.And(SearchQuery.DeliveredBefore(parsed.Before.Value.ToUniversalTime()));
             foreach (var q in parsed.AdditionalQueries) search = search.And(q);
             hasAttachment |= parsed.HasAttachment;
             if (!priority.HasValue) priority = parsed.Priority;
@@ -77,6 +79,8 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches a POP3 mailbox and returns matching messages.
     /// </summary>
+    /// <param name="since">Optional UTC lower bound for message delivery dates.</param>
+    /// <param name="before">Optional UTC upper bound for message delivery dates.</param>
     public static async Task<IList<Pop3EmailMessage>> SearchPop3Async(
         Pop3Client client,
         string? subject = null,
@@ -102,6 +106,8 @@ public static class MailboxSearcher {
             hasAttachment |= parsed.HasAttachment;
         }
         var results = new List<Pop3EmailMessage>();
+        var sinceUtc = since?.ToUniversalTime();
+        var beforeUtc = before?.ToUniversalTime();
         for (int i = 0; i < client.Count; i++) {
             var message = await client.GetMessageAsync(i, cancellationToken).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(subject) && (message.Subject == null || message.Subject.IndexOf(subject, StringComparison.OrdinalIgnoreCase) < 0)) continue;
@@ -113,9 +119,9 @@ public static class MailboxSearcher {
                 if (textBody.IndexOf(bodyContains, StringComparison.OrdinalIgnoreCase) < 0 &&
                     htmlBody.IndexOf(bodyContains, StringComparison.OrdinalIgnoreCase) < 0) continue;
             }
-            var msgDate = message.Date.DateTime;
-            if (since.HasValue && msgDate < since.Value) continue;
-            if (before.HasValue && msgDate > before.Value) continue;
+            var msgDate = message.Date.UtcDateTime;
+            if (sinceUtc.HasValue && msgDate < sinceUtc.Value) continue;
+            if (beforeUtc.HasValue && msgDate > beforeUtc.Value) continue;
             if (priority.HasValue && message.Priority != ConvertPriority(priority.Value)) continue;
             if (hasAttachment && !message.Attachments.Any()) continue;
             results.Add(new Pop3EmailMessage(i, message));
@@ -127,6 +133,8 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches for Non-Delivery Reports in an IMAP mailbox.
     /// </summary>
+    /// <param name="since">Optional UTC lower bound for report timestamps.</param>
+    /// <param name="before">Optional UTC upper bound for report timestamps.</param>
     public static async Task<IList<NonDeliveryReport>> SearchNonDeliveryReportsAsync(
         ImapClient client,
         string? folder = null,
@@ -173,6 +181,8 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches for Non-Delivery Reports in a POP3 mailbox.
     /// </summary>
+    /// <param name="since">Optional UTC lower bound for report timestamps.</param>
+    /// <param name="before">Optional UTC upper bound for report timestamps.</param>
     public static async Task<IList<NonDeliveryReport>> SearchNonDeliveryReportsAsync(
         Pop3Client client,
         DateTime? since = null,
@@ -218,6 +228,8 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches for Non-Delivery Reports using Microsoft Graph.
     /// </summary>
+    /// <param name="since">Optional UTC lower bound for report timestamps.</param>
+    /// <param name="before">Optional UTC upper bound for report timestamps.</param>
     public static async Task<IList<NonDeliveryReport>> SearchNonDeliveryReportsAsync(
         GraphCredential credential,
         string userPrincipalName,
@@ -229,8 +241,8 @@ public static class MailboxSearcher {
         int parallelDownloadLimit = 4,
         CancellationToken cancellationToken = default) {
         var filters = new List<string>();
-        if (since.HasValue) filters.Add($"receivedDateTime ge {since.Value:o}");
-        if (before.HasValue) filters.Add($"receivedDateTime le {before.Value:o}");
+        if (since.HasValue) filters.Add($"receivedDateTime ge {since.Value.ToUniversalTime():o}");
+        if (before.HasValue) filters.Add($"receivedDateTime le {before.Value.ToUniversalTime():o}");
         var filter = filters.Count > 0 ? string.Join(" and ", filters) : null;
         var msgs = await MicrosoftGraphUtils.GetMailMessagesAsync(
             credential,
@@ -273,6 +285,8 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches for Non-Delivery Reports using the Gmail API.
     /// </summary>
+    /// <param name="since">Optional UTC lower bound for report timestamps.</param>
+    /// <param name="before">Optional UTC upper bound for report timestamps.</param>
     public static async Task<IList<NonDeliveryReport>> SearchNonDeliveryReportsAsync(
         GmailApiClient client,
         string userId,
@@ -324,6 +338,8 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches for DMARC aggregate reports in an IMAP mailbox.
     /// </summary>
+    /// <param name="since">Optional UTC lower bound for message dates.</param>
+    /// <param name="before">Optional UTC upper bound for message dates.</param>
     public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
         ImapClient client,
         string? folder = null,
@@ -369,6 +385,8 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches for DMARC aggregate reports in a POP3 mailbox.
     /// </summary>
+    /// <param name="since">Optional UTC lower bound for message dates.</param>
+    /// <param name="before">Optional UTC upper bound for message dates.</param>
     public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
         Pop3Client client,
         DateTime? since = null,
@@ -413,6 +431,8 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches for DMARC aggregate reports using Microsoft Graph.
     /// </summary>
+    /// <param name="since">Optional UTC lower bound for message dates.</param>
+    /// <param name="before">Optional UTC upper bound for message dates.</param>
     public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
         GraphCredential credential,
         string userPrincipalName,
@@ -423,8 +443,8 @@ public static class MailboxSearcher {
         int parallelDownloadLimit = 4,
         CancellationToken cancellationToken = default) {
         var filters = new List<string> { "hasAttachments eq true", "contains(subject,'report domain')" };
-        if (since.HasValue) filters.Add($"receivedDateTime ge {since.Value:o}");
-        if (before.HasValue) filters.Add($"receivedDateTime le {before.Value:o}");
+        if (since.HasValue) filters.Add($"receivedDateTime ge {since.Value.ToUniversalTime():o}");
+        if (before.HasValue) filters.Add($"receivedDateTime le {before.Value.ToUniversalTime():o}");
         if (!string.IsNullOrWhiteSpace(domain)) filters.Add($"contains(subject,'{domain.Replace("'", "''")}')");
         var filter = string.Join(" and ", filters);
         var msgs = await MicrosoftGraphUtils.GetMailMessagesAsync(
@@ -468,6 +488,8 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches for DMARC aggregate reports using the Gmail API.
     /// </summary>
+    /// <param name="since">Optional UTC lower bound for message dates.</param>
+    /// <param name="before">Optional UTC upper bound for message dates.</param>
     public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
         GmailApiClient client,
         string userId,
@@ -513,15 +535,23 @@ public static class MailboxSearcher {
         return FilterDmarcReports(mimeMessages, since, before, domain);
     }
 
+    /// <summary>
+    /// Filters DMARC reports by date and domain.
+    /// </summary>
+    /// <param name="since">Optional UTC lower bound for the message date.</param>
+    /// <param name="before">Optional UTC upper bound for the message date.</param>
     internal static IList<DmarcReport> FilterDmarcReports(
         IEnumerable<MimeMessage> messages,
         DateTime? since,
         DateTime? before,
         string? domain) {
         var results = new List<DmarcReport>();
+        var sinceUtc = since?.ToUniversalTime();
+        var beforeUtc = before?.ToUniversalTime();
         foreach (var message in messages) {
-            if (since.HasValue && message.Date.DateTime < since.Value) continue;
-            if (before.HasValue && message.Date.DateTime > before.Value) continue;
+            var msgDate = message.Date.UtcDateTime;
+            if (sinceUtc.HasValue && msgDate < sinceUtc.Value) continue;
+            if (beforeUtc.HasValue && msgDate > beforeUtc.Value) continue;
             if (!string.IsNullOrWhiteSpace(domain) && (message.Subject == null || message.Subject.IndexOf(domain, StringComparison.OrdinalIgnoreCase) < 0)) continue;
             var report = new DmarcReport {
                 From = message.From.Mailboxes.FirstOrDefault()?.Address,
@@ -543,16 +573,16 @@ public static class MailboxSearcher {
     internal static SearchQuery BuildDmarcReportSearchQuery(DateTime? since, DateTime? before, string? domain) {
         SearchQuery search = SearchQuery.SubjectContains("report domain");
         if (!string.IsNullOrWhiteSpace(domain)) search = search.And(SearchQuery.SubjectContains(domain));
-        if (since.HasValue) search = search.And(SearchQuery.DeliveredAfter(since.Value));
-        if (before.HasValue) search = search.And(SearchQuery.DeliveredBefore(before.Value));
+        if (since.HasValue) search = search.And(SearchQuery.DeliveredAfter(since.Value.ToUniversalTime()));
+        if (before.HasValue) search = search.And(SearchQuery.DeliveredBefore(before.Value.ToUniversalTime()));
         return search;
     }
 
     internal static string BuildGmailDmarcReportQuery(DateTime? since, DateTime? before, string? domain) {
         var sb = new StringBuilder("subject:\"report domain\" has:attachment");
         if (!string.IsNullOrWhiteSpace(domain)) sb.Append(' ').Append("subject:\"").Append(domain).Append("\"");
-        if (since.HasValue) sb.Append(' ').Append("after:").Append(since.Value.ToString("yyyy/MM/dd"));
-        if (before.HasValue) sb.Append(' ').Append("before:").Append(before.Value.ToString("yyyy/MM/dd"));
+        if (since.HasValue) sb.Append(' ').Append("after:").Append(since.Value.ToUniversalTime().ToString("yyyy/MM/dd"));
+        if (before.HasValue) sb.Append(' ').Append("before:").Append(before.Value.ToUniversalTime().ToString("yyyy/MM/dd"));
         return sb.ToString().Trim();
     }
 
@@ -569,18 +599,26 @@ public static class MailboxSearcher {
     }
 
 
-internal static IList<NonDeliveryReport> FilterNonDeliveryReports(
+    /// <summary>
+    /// Filters Non-Delivery Reports by date, recipient and message id.
+    /// </summary>
+    /// <param name="since">Optional UTC lower bound for the report timestamp.</param>
+    /// <param name="before">Optional UTC upper bound for the report timestamp.</param>
+    internal static IList<NonDeliveryReport> FilterNonDeliveryReports(
         IEnumerable<MimeMessage> messages,
         DateTime? since,
         DateTime? before,
         string? recipientContains,
         string? messageId) {
         var results = new List<NonDeliveryReport>();
+        var sinceUtc = since?.ToUniversalTime();
+        var beforeUtc = before?.ToUniversalTime();
         foreach (var message in messages) {
             foreach (var report in MimeKitUtils.GetNonDeliveryReports(message)) {
-                if (since.HasValue && report.Timestamp.DateTime < since.Value) continue;
-                if (before.HasValue && report.Timestamp.DateTime > before.Value) continue;
-                  if (!string.IsNullOrWhiteSpace(recipientContains) && !RecipientMatches(report, recipientContains!)) continue;
+                var reportDate = report.Timestamp.UtcDateTime;
+                if (sinceUtc.HasValue && reportDate < sinceUtc.Value) continue;
+                if (beforeUtc.HasValue && reportDate > beforeUtc.Value) continue;
+                if (!string.IsNullOrWhiteSpace(recipientContains) && !RecipientMatches(report, recipientContains!)) continue;
                 if (!string.IsNullOrWhiteSpace(messageId) && !string.Equals(report.OriginalMessageId, messageId, StringComparison.OrdinalIgnoreCase)) continue;
                 results.Add(report);
             }
@@ -600,8 +638,8 @@ internal static IList<NonDeliveryReport> FilterNonDeliveryReports(
             sb.Insert(0, "(");
             sb.Append(')');
         }
-        if (since.HasValue) sb.Append(' ').Append("after:").Append(since.Value.ToString("yyyy/MM/dd"));
-        if (before.HasValue) sb.Append(' ').Append("before:").Append(before.Value.ToString("yyyy/MM/dd"));
+        if (since.HasValue) sb.Append(' ').Append("after:").Append(since.Value.ToUniversalTime().ToString("yyyy/MM/dd"));
+        if (before.HasValue) sb.Append(' ').Append("before:").Append(before.Value.ToUniversalTime().ToString("yyyy/MM/dd"));
         return sb.ToString().Trim();
     }
 
@@ -638,8 +676,8 @@ internal static IList<NonDeliveryReport> FilterNonDeliveryReports(
             subjectQuery = subjectQuery == null ? q : subjectQuery.Or(q);
         }
         if (subjectQuery != null) search = search.Or(subjectQuery);
-        if (since.HasValue) search = search.And(SearchQuery.DeliveredAfter(since.Value));
-        if (before.HasValue) search = search.And(SearchQuery.DeliveredBefore(before.Value));
+        if (since.HasValue) search = search.And(SearchQuery.DeliveredAfter(since.Value.ToUniversalTime()));
+        if (before.HasValue) search = search.And(SearchQuery.DeliveredBefore(before.Value.ToUniversalTime()));
         return search;
     }
 
