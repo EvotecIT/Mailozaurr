@@ -572,6 +572,8 @@ public static class MailboxSearcher {
 
     internal static SearchQuery BuildDmarcReportSearchQuery(DateTime? since, DateTime? before, string? domain) {
         SearchQuery search = SearchQuery.SubjectContains("report domain");
+        var hasAtt = typeof(SearchQuery).GetProperty("HasAttachment", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)?.GetValue(null) as SearchQuery;
+        search = search.And(hasAtt ?? SearchQuery.HeaderContains("Content-Disposition", "attachment"));
         if (!string.IsNullOrWhiteSpace(domain)) search = search.And(SearchQuery.SubjectContains(domain));
         if (since.HasValue) search = search.And(SearchQuery.DeliveredAfter(since.Value.ToUniversalTime()));
         if (before.HasValue) search = search.And(SearchQuery.DeliveredBefore(before.Value.ToUniversalTime()));

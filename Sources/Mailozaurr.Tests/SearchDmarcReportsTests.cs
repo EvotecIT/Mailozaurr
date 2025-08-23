@@ -60,6 +60,28 @@ public class SearchDmarcReportsTests {
     }
 
     [Fact]
+    public void BuildDmarcReportSearchQuery_RequiresAttachments() {
+        var query = MailboxSearcher.BuildDmarcReportSearchQuery(null, null, null);
+        bool ContainsAttachment(MailKit.Search.SearchQuery q) {
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+            var term = q.GetType().GetProperty("Term", flags)?.GetValue(q)?.ToString();
+            if (term == "HasAttachment") return true;
+            if (term == "HeaderContains") {
+                var field = q.GetType().GetProperty("Field", flags)?.GetValue(q)?.ToString();
+                var value = q.GetType().GetProperty("Value", flags)?.GetValue(q)?.ToString();
+                if (field?.Equals("Content-Disposition", StringComparison.OrdinalIgnoreCase) == true &&
+                    value?.IndexOf("attachment", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            }
+            var left = q.GetType().GetProperty("Left", flags)?.GetValue(q) as MailKit.Search.SearchQuery;
+            var right = q.GetType().GetProperty("Right", flags)?.GetValue(q) as MailKit.Search.SearchQuery;
+            if (left != null && ContainsAttachment(left)) return true;
+            if (right != null && ContainsAttachment(right)) return true;
+            return false;
+        }
+        Assert.True(ContainsAttachment(query));
+    }
+
+    [Fact]
     public void BuildGmailDmarcReportQuery_IncludesDomainAndDates() {
         var since = new DateTime(2024, 1, 1);
         var before = new DateTime(2024, 2, 1);
@@ -67,6 +89,7 @@ public class SearchDmarcReportsTests {
         Assert.Contains("example.com", q);
         Assert.Contains("after:2024/01/01", q);
         Assert.Contains("before:2024/02/01", q);
+        Assert.Contains("has:attachment", q);
     }
 
     [Fact]
