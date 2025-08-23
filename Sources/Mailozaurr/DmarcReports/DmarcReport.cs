@@ -20,15 +20,17 @@ public sealed class DmarcReport {
 /// <summary>
 /// Represents a zipped XML attachment belonging to a DMARC report.
 /// </summary>
-public sealed class DmarcReportAttachment {
+public sealed class DmarcReportAttachment : IDisposable {
     /// <summary>File name of the attachment.</summary>
     public string Name { get; }
 
-    /// <summary>Binary content of the zipped attachment.</summary>
-    public byte[] Content { get; }
+    /// <summary>Stream containing the zipped attachment.</summary>
+    public Stream Content { get; }
 
-    public DmarcReportAttachment(string name, byte[] content) {
+    public DmarcReportAttachment(string name, Stream content) {
         Name = name;
         Content = content;
     }
+
+    public void Dispose() => Content.Dispose();
 }

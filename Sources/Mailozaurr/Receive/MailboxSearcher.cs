@@ -560,9 +560,10 @@ public static class MailboxSearcher {
             };
             foreach (var att in message.Attachments) {
                 if (IsDmarcAttachment(att) && att is MimePart part) {
-                    using var ms = new MemoryStream();
+                    var ms = new MemoryStream();
                     part.Content.DecodeTo(ms);
-                    report.Attachments.Add(new DmarcReportAttachment(part.FileName ?? "report.zip", ms.ToArray()));
+                    ms.Position = 0;
+                    report.Attachments.Add(new DmarcReportAttachment(part.FileName ?? "report.zip", ms));
                 }
             }
             if (report.Attachments.Count > 0) results.Add(report);
