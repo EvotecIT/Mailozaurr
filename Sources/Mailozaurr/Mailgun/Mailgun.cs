@@ -201,9 +201,10 @@ public class MailgunClient : IDisposable {
                     Content = content
                 };
                 request.Headers.Authorization = new AuthenticationHeaderValue("Basic", auth);
-                var response = await _client.SendAsync(request, cancellationToken);
+                using var response = await _client.SendAsync(request, cancellationToken);
                 if (response.IsSuccessStatusCode) {
-                    var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, response.StatusCode.ToString(), "");
+                    var statusCode = response.StatusCode.ToString();
+                    var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, statusCode, "");
                     await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken);
                     return okResult;
                 }
