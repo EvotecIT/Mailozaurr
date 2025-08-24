@@ -4,6 +4,7 @@ using MimeKit;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Text;
 using Xunit;
 
@@ -32,10 +33,34 @@ public class SearchDmarcReportsTests {
         message.Date = date;
         message.From.Add(new MailboxAddress("reporter", "reporter@example.com"));
         var builder = new BodyBuilder();
-        var ms = new MemoryStream(Encoding.UTF8.GetBytes("<feedback/>"));
+        var xml = $"<feedback><policy_published><domain>{domain}</domain></policy_published></feedback>";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(xml));
         var part = new MimePart(mediaType, mediaSubtype) {
             Content = new MimeContent(ms),
             FileName = fileName
+        };
+        builder.Attachments.Add(part);
+        message.Body = builder.ToMessageBody();
+        return message;
+    }
+
+    private static MimeMessage CreateZippedXmlDmarc(string domain, DateTimeOffset date) {
+        var message = new MimeMessage();
+        message.Subject = "Report";
+        message.Date = date;
+        message.From.Add(new MailboxAddress("reporter", "reporter@example.com"));
+        var builder = new BodyBuilder();
+        var ms = new MemoryStream();
+        using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, true)) {
+            var entry = zip.CreateEntry("report.xml");
+            using var entryStream = entry.Open();
+            var bytes = Encoding.UTF8.GetBytes($"<feedback><policy_published><domain>{domain}</domain></policy_published></feedback>");
+            entryStream.Write(bytes, 0, bytes.Length);
+        }
+        ms.Position = 0;
+        var part = new MimePart("application", "zip") {
+            Content = new MimeContent(ms),
+            FileName = "report.zip"
         };
         builder.Attachments.Add(part);
         message.Body = builder.ToMessageBody();
@@ -53,7 +78,42 @@ public class SearchDmarcReportsTests {
         Assert.Equal("reporter@example.com", report.From);
         Assert.Single(report.Attachments);
         Assert.EndsWith(".zip", report.Attachments[0].Name);
-        Assert.True(report.Attachments[0].Content.Length > 0);
+        using var ms = new MemoryStream();
+        report.Attachments[0].Content.CopyTo(ms);
+        Assert.True(ms.Length > 0);
+    }
+
+    [Fact]
+    public void FilterDmarcReports_MatchesDomainInAttachmentName() {
+        var now = DateTimeOffset.UtcNow;
+        var msg = CreateDmarc("example.com", now);
+        msg.Subject = "Report";
+        var list = new List<MimeMessage> { msg };
+        var reports = MailboxSearcher.FilterDmarcReports(list, since: now.AddMinutes(-1).DateTime, before: now.AddMinutes(1).DateTime, domain: "example.com");
+        Assert.Single(reports);
+        Assert.Single(reports[0].Attachments);
+    }
+
+    [Fact]
+    public void FilterDmarcReports_MatchesDomainInXmlContent() {
+        var now = DateTimeOffset.UtcNow;
+        var msg = CreateZippedXmlDmarc("example.com", now);
+        var list = new List<MimeMessage> { msg };
+        var reports = MailboxSearcher.FilterDmarcReports(list, since: now.AddMinutes(-1).DateTime, before: now.AddMinutes(1).DateTime, domain: "example.com");
+        Assert.Single(reports);
+    }
+
+    [Fact]
+    public void FilterDmarcReports_FiltersOutMismatchedDomain() {
+        var now = DateTimeOffset.UtcNow;
+        var good = CreateDmarc("example.com", now);
+        good.Subject = "Report";
+        var bad = CreateDmarc("other.com", now);
+        bad.Subject = "Report";
+        var list = new List<MimeMessage> { good, bad };
+        var reports = MailboxSearcher.FilterDmarcReports(list, since: now.AddMinutes(-1).DateTime, before: now.AddMinutes(1).DateTime, domain: "example.com");
+        Assert.Single(reports);
+        Assert.All(reports[0].Attachments, a => Assert.Contains("example.com", a.Name, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

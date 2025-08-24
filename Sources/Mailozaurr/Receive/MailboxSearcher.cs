@@ -7,6 +7,7 @@ using System.Text;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -160,7 +161,7 @@ public static class MailboxSearcher {
             using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
             var tasks = new List<Task>();
 
-            async Task DownloadMessageAsync(UniqueId uid) {
+            async Task DownloadMessageAsync(MailKit.UniqueId uid) {
                 await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
                 try {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -384,7 +385,7 @@ public static class MailboxSearcher {
             using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
             var tasks = new List<Task>();
 
-            async Task DownloadMessageAsync(UniqueId uid) {
+            async Task DownloadMessageAsync(MailKit.UniqueId uid) {
                 await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
                 try {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -592,23 +593,57 @@ public static class MailboxSearcher {
             var msgDate = message.Date.UtcDateTime;
             if (sinceUtc.HasValue && msgDate < sinceUtc.Value) continue;
             if (beforeUtc.HasValue && msgDate > beforeUtc.Value) continue;
-            if (!string.IsNullOrWhiteSpace(domain) && (message.Subject == null || message.Subject.IndexOf(domain, StringComparison.OrdinalIgnoreCase) < 0)) continue;
             var report = new DmarcReport {
                 From = message.From.Mailboxes.FirstOrDefault()?.Address,
                 Subject = message.Subject,
                 Date = message.Date
             };
+            var domainMatched = string.IsNullOrWhiteSpace(domain);
             foreach (var att in message.Attachments) {
                 if (IsDmarcAttachment(att) && att is MimePart part) {
-                    var ms = new MemoryStream();
-                    part.Content.DecodeTo(ms);
-                    ms.Position = 0;
-                    report.Attachments.Add(new DmarcReportAttachment(part.FileName ?? "report.zip", ms));
+                    if (!string.IsNullOrWhiteSpace(domain) && !AttachmentMatchesDomain(part, domain!)) continue;
+                    var stream = part.Content.Open();
+                    report.Attachments.Add(new DmarcReportAttachment(part.FileName ?? "report.zip", stream));
+                    if (!domainMatched) domainMatched = true;
                 }
             }
-            if (report.Attachments.Count > 0) results.Add(report);
+            if (report.Attachments.Count > 0 && domainMatched) results.Add(report);
         }
         return results;
+    }
+
+    private static bool AttachmentMatchesDomain(MimePart part, string domain) {
+        if (part.FileName?.IndexOf(domain, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        try {
+            using var stream = part.Content.Open();
+            var name = part.FileName ?? string.Empty;
+            if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) {
+                using var zip = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false);
+                foreach (var entry in zip.Entries) {
+                    using var entryStream = entry.Open();
+                    if (XmlStreamContainsDomain(entryStream, domain)) return true;
+                }
+            } else if (name.EndsWith(".gz", StringComparison.OrdinalIgnoreCase)) {
+                using var gz = new GZipStream(stream, CompressionMode.Decompress);
+                if (XmlStreamContainsDomain(gz, domain)) return true;
+            } else {
+                if (XmlStreamContainsDomain(stream, domain)) return true;
+            }
+        } catch {
+        }
+        return false;
+    }
+
+    private static bool XmlStreamContainsDomain(Stream stream, string domain) {
+        var settings = new System.Xml.XmlReaderSettings { IgnoreComments = true, IgnoreWhitespace = true };
+        using var reader = System.Xml.XmlReader.Create(stream, settings);
+        while (reader.Read()) {
+            if (reader.NodeType == System.Xml.XmlNodeType.Element && reader.LocalName.Equals("domain", StringComparison.OrdinalIgnoreCase)) {
+                var value = reader.ReadElementContentAsString();
+                if (value.Equals(domain, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+        }
+        return false;
     }
 
     internal static SearchQuery BuildDmarcReportSearchQuery(DateTime? since, DateTime? before, string? domain) {
