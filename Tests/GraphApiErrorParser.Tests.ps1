@@ -13,8 +13,9 @@ Content-Type: application/json; odata.metadata=minimal; odata.streaming=true; IE
 {"error":{"code":"ErrorInvalidUser","message":"The requested user 'przemyslaw.klys@company.pl' is invalid."}}
 '@
         $parsed = [Mailozaurr.GraphApiErrorParser]::Parse($sample)
+        $parsed.Method | Should -Be ([Mailozaurr.GraphHttpMethod]::POST)
         $parsed.Headers.RequestId | Should -Be '2ff18766-1395-4fb9-abd1-162774d4b063'
         $parsed.Headers.Diagnostic.ServerInfo.DataCenter | Should -Be 'Poland Central'
-        $parsed.Error.Error.Code | Should -Be 'ErrorInvalidUser'
+        $parsed.Error.Code | Should -Be 'ErrorInvalidUser'
     }
 }

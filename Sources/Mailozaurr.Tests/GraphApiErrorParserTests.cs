@@ -18,8 +18,9 @@ public class GraphApiErrorParserTests {
         var parsed = GraphApiErrorParser.Parse(sample);
         Assert.NotNull(parsed);
         Assert.Equal(HttpStatusCode.NotFound, parsed!.StatusCode);
+        Assert.Equal(GraphHttpMethod.POST, parsed.Method);
         Assert.Equal("2ff18766-1395-4fb9-abd1-162774d4b063", parsed.Headers.RequestId);
         Assert.Equal("Poland Central", parsed.Headers.Diagnostic?.ServerInfo.DataCenter);
-        Assert.Equal("ErrorInvalidUser", parsed.Error?.Error.Code);
+        Assert.Equal("ErrorInvalidUser", parsed.Error?.Code);
     }
 }

@@ -12,4 +12,4 @@ Content-Type: application/json; odata.metadata=minimal; odata.streaming=true; IE
 
 $parsed = [Mailozaurr.GraphApiErrorParser]::Parse($sample)
 $parsed.Headers.Diagnostic.ServerInfo
-$parsed.Error.Error
+$parsed.Error

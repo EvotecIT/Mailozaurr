@@ -1,5 +1,6 @@
 using System;
 using System.Net;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -31,7 +32,9 @@ public static class GraphApiErrorParser {
         var first = lines[index++];
         var firstParts = first.Split(new[] { ' ' }, 2);
         if (firstParts.Length == 2) {
-            response.Method = firstParts[0];
+            if (Enum.TryParse<GraphHttpMethod>(firstParts[0], true, out var method)) {
+                response.Method = method;
+            }
             response.Uri = firstParts[1];
         }
 
@@ -48,7 +51,8 @@ public static class GraphApiErrorParser {
             if (line.StartsWith("{", StringComparison.Ordinal)) {
                 var body = string.Join(Environment.NewLine, lines, index, lines.Length - index);
                 try {
-                    response.Error = JsonSerializer.Deserialize<GraphApiError>(body);
+                    var error = JsonSerializer.Deserialize<GraphApiError>(body);
+                    response.Error = error?.Error;
                 } catch {
                     // ignore
                 }
@@ -76,7 +80,7 @@ public static class GraphApiErrorParser {
                     response.Headers.ClientRequestId = value;
                     break;
                 case "date":
-                    if (DateTime.TryParse(value, out var dt)) {
+                    if (DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out var dt)) {
                         response.Headers.Date = dt;
                     }
                     break;

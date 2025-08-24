@@ -7,7 +7,7 @@ namespace Mailozaurr;
 /// </summary>
 public class GraphApiErrorResponse {
     /// <summary>Gets or sets the HTTP method.</summary>
-    public string Method { get; set; } = string.Empty;
+    public GraphHttpMethod? Method { get; set; }
 
     /// <summary>Gets or sets the request URI.</summary>
     public string Uri { get; set; } = string.Empty;
@@ -18,6 +18,6 @@ public class GraphApiErrorResponse {
     /// <summary>Gets or sets the headers.</summary>
     public GraphApiErrorHeaders Headers { get; set; } = new();
 
-    /// <summary>Gets or sets the error body.</summary>
-    public GraphApiError? Error { get; set; }
+    /// <summary>Gets or sets the error details.</summary>
+    public GraphApiErrorDetail? Error { get; set; }
 }
