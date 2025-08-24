@@ -584,7 +584,8 @@ public static class MailboxSearcher {
         IEnumerable<MimeMessage> messages,
         DateTime? since,
         DateTime? before,
-        string? domain) {
+        string? domain,
+        long? maxAttachmentBytes = null) {
         var results = new List<DmarcReport>();
         var sinceUtc = since?.ToUniversalTime();
         var beforeUtc = before?.ToUniversalTime();
@@ -592,19 +593,20 @@ public static class MailboxSearcher {
             var msgDate = message.Date.UtcDateTime;
             if (sinceUtc.HasValue && msgDate < sinceUtc.Value) continue;
             if (beforeUtc.HasValue && msgDate > beforeUtc.Value) continue;
-            if (!string.IsNullOrWhiteSpace(domain) && (message.Subject == null || message.Subject.IndexOf(domain, StringComparison.OrdinalIgnoreCase) < 0)) continue;
             var report = new DmarcReport {
                 From = message.From.Mailboxes.FirstOrDefault()?.Address,
                 Subject = message.Subject,
                 Date = message.Date
             };
             foreach (var att in message.Attachments) {
-                if (IsDmarcAttachment(att) && att is MimePart part) {
-                    var ms = new MemoryStream();
-                    part.Content.DecodeTo(ms);
-                    ms.Position = 0;
-                    report.Attachments.Add(new DmarcReportAttachment(part.FileName ?? "report.zip", ms));
+                if (!IsDmarcAttachment(att) || att is not MimePart part) continue;
+                if (!string.IsNullOrWhiteSpace(domain) && !AttachmentMatchesDomain(part, domain!, maxAttachmentBytes)) continue;
+                var stream = part.Content.Open();
+                if (maxAttachmentBytes.HasValue && stream.CanSeek && stream.Length > maxAttachmentBytes.Value) {
+                    stream.Dispose();
+                    continue;
                 }
+                report.Attachments.Add(new DmarcReportAttachment(part.FileName ?? "report.zip", stream));
             }
             if (report.Attachments.Count > 0) results.Add(report);
         }
@@ -640,6 +642,36 @@ public static class MailboxSearcher {
                 } else if (ct.MediaType.Equals("text", StringComparison.OrdinalIgnoreCase)) {
                     if (ct.MediaSubtype.Equals("xml", StringComparison.OrdinalIgnoreCase)) return true;
                 }
+            }
+        }
+        return false;
+    }
+
+    private static bool AttachmentMatchesDomain(MimePart part, string domain, long? maxBytes) {
+        var name = part.FileName;
+        if (!string.IsNullOrEmpty(name) && name.IndexOf(domain, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        using var stream = part.Content.Open();
+        if (maxBytes.HasValue && stream.CanSeek && stream.Length > maxBytes.Value) return false;
+        if (!string.IsNullOrEmpty(name) && name.EndsWith(".gz", StringComparison.OrdinalIgnoreCase)) {
+            using var gzip = new System.IO.Compression.GZipStream(stream, System.IO.Compression.CompressionMode.Decompress, leaveOpen: true);
+            return XmlContainsDomain(gzip, domain);
+        }
+        if (!string.IsNullOrEmpty(name) && name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) {
+            using var archive = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Read, leaveOpen: true);
+            foreach (var entry in archive.Entries) {
+                using var entryStream = entry.Open();
+                if (XmlContainsDomain(entryStream, domain)) return true;
+            }
+            return false;
+        }
+        return XmlContainsDomain(stream, domain);
+    }
+
+    private static bool XmlContainsDomain(Stream xml, string domain) {
+        using var reader = System.Xml.XmlReader.Create(xml, new System.Xml.XmlReaderSettings { IgnoreComments = true, IgnoreWhitespace = true });
+        while (reader.Read()) {
+            if (reader.NodeType == System.Xml.XmlNodeType.Element && reader.Name.Equals("domain", StringComparison.OrdinalIgnoreCase)) {
+                if (reader.ReadElementContentAsString().Equals(domain, StringComparison.OrdinalIgnoreCase)) return true;
             }
         }
         return false;

@@ -32,7 +32,8 @@ public class SearchDmarcReportsTests {
         message.Date = date;
         message.From.Add(new MailboxAddress("reporter", "reporter@example.com"));
         var builder = new BodyBuilder();
-        var ms = new MemoryStream(Encoding.UTF8.GetBytes("<feedback/>"));
+        var xml = $"<feedback><policy_published><domain>{domain}</domain></policy_published></feedback>";
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes(xml));
         var part = new MimePart(mediaType, mediaSubtype) {
             Content = new MimeContent(ms),
             FileName = fileName
@@ -53,7 +54,7 @@ public class SearchDmarcReportsTests {
         Assert.Equal("reporter@example.com", report.From);
         Assert.Single(report.Attachments);
         Assert.EndsWith(".zip", report.Attachments[0].Name);
-        Assert.True(report.Attachments[0].Content.Length > 0);
+        Assert.True(report.Attachments[0].Content.CanRead);
     }
 
     [Fact]
@@ -142,5 +143,33 @@ public class SearchDmarcReportsTests {
         Assert.Single(reports);
         Assert.Single(reports[0].Attachments);
         Assert.Equal("example", reports[0].Attachments[0].Name);
+    }
+
+    [Fact]
+    public void FilterDmarcReports_VerifiesDomainFromAttachment() {
+        var now = DateTimeOffset.UtcNow;
+        var msg = new MimeMessage();
+        msg.Subject = "Report domain";
+        msg.Date = now;
+        msg.From.Add(new MailboxAddress("reporter", "reporter@example.com"));
+        var builder = new BodyBuilder();
+        var xml = "<feedback><policy_published><domain>example.com</domain></policy_published></feedback>";
+        using var xmlStream = new MemoryStream(Encoding.UTF8.GetBytes(xml));
+        using var zipStream = new MemoryStream();
+        using (var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Create, true)) {
+            var entry = archive.CreateEntry("report.xml");
+            using var entryStream = entry.Open();
+            xmlStream.CopyTo(entryStream);
+        }
+        zipStream.Position = 0;
+        var part = new MimePart("application", "zip") {
+            Content = new MimeContent(zipStream),
+            FileName = "report.zip"
+        };
+        builder.Attachments.Add(part);
+        msg.Body = builder.ToMessageBody();
+        var list = new List<MimeMessage> { msg };
+        var reports = MailboxSearcher.FilterDmarcReports(list, since: now.AddMinutes(-1).DateTime, before: now.AddMinutes(1).DateTime, domain: "example.com");
+        Assert.Single(reports);
     }
 }
