@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -13,6 +14,44 @@ public class MailgunClientTests
     private class DummyCredentials : ICredentials
     {
         public NetworkCredential GetCredential(Uri uri, string authType) => new NetworkCredential();
+    }
+
+    private sealed class TrackingHandler : HttpMessageHandler
+    {
+        private readonly HttpStatusCode _statusCode;
+        private readonly string _content;
+        public bool ResponseDisposed { get; private set; }
+
+        public TrackingHandler(HttpStatusCode statusCode, string content = "")
+        {
+            _statusCode = statusCode;
+            _content = content;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var response = new HttpResponseMessage(_statusCode)
+            {
+                Content = new TrackingContent(_content, () => ResponseDisposed = true)
+            };
+            return Task.FromResult(response);
+        }
+
+        private sealed class TrackingContent : StringContent
+        {
+            private readonly Action _onDispose;
+
+            public TrackingContent(string content, Action onDispose) : base(content)
+            {
+                _onDispose = onDispose;
+            }
+
+            protected override void Dispose(bool disposing)
+            {
+                base.Dispose(disposing);
+                _onDispose();
+            }
+        }
     }
 
     [Fact]
@@ -54,5 +93,39 @@ public class MailgunClientTests
         };
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => client.SendEmailAsync());
+    }
+
+    [Fact]
+    public async Task SendEmailAsync_DisposesResponse_OnSuccess()
+    {
+        var handler = new TrackingHandler(HttpStatusCode.OK);
+        using var client = CreateClient(handler);
+        var result = await client.SendEmailAsync();
+        Assert.True(result.Status);
+        Assert.True(handler.ResponseDisposed);
+    }
+
+    [Fact]
+    public async Task SendEmailAsync_DisposesResponse_OnFailure()
+    {
+        var handler = new TrackingHandler(HttpStatusCode.BadRequest, "bad");
+        using var client = CreateClient(handler);
+        var result = await client.SendEmailAsync();
+        Assert.False(result.Status);
+        Assert.True(handler.ResponseDisposed);
+    }
+
+    private static MailgunClient CreateClient(HttpMessageHandler handler)
+    {
+        var httpClient = new HttpClient(handler);
+        var client = new MailgunClient
+        {
+            From = "sender@example.com",
+            To = new List<object> { "to@example.com" },
+            Credentials = new NetworkCredential(string.Empty, "key")
+        };
+        var field = typeof(MailgunClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance);
+        field!.SetValue(client, httpClient);
+        return client;
     }
 }
