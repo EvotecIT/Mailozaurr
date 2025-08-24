@@ -26,6 +26,22 @@ public class SearchDmarcReportsTests {
         return message;
     }
 
+    private static MimeMessage CreateXmlDmarc(string domain, DateTimeOffset date, string mediaType, string mediaSubtype, string fileName) {
+        var message = new MimeMessage();
+        message.Subject = $"Report domain: {domain}";
+        message.Date = date;
+        message.From.Add(new MailboxAddress("reporter", "reporter@example.com"));
+        var builder = new BodyBuilder();
+        var ms = new MemoryStream(Encoding.UTF8.GetBytes("<feedback/>"));
+        var part = new MimePart(mediaType, mediaSubtype) {
+            Content = new MimeContent(ms),
+            FileName = fileName
+        };
+        builder.Attachments.Add(part);
+        message.Body = builder.ToMessageBody();
+        return message;
+    }
+
     [Fact]
     public void FilterDmarcReports_ExtractsAttachments() {
         var now = DateTimeOffset.UtcNow;
@@ -102,5 +118,29 @@ public class SearchDmarcReportsTests {
         var reports = MailboxSearcher.FilterDmarcReports(list, since, before, domain: null);
         Assert.Single(reports);
         Assert.Equal(msg1.Subject, reports[0].Subject);
+    }
+
+    [Fact]
+    public void FilterDmarcReports_ExtractsXmlAttachmentByExtension() {
+        var now = DateTimeOffset.UtcNow;
+        var msg = CreateXmlDmarc("example.com", now, "application", "octet-stream", "example.xml");
+        var list = new List<MimeMessage> { msg };
+        var reports = MailboxSearcher.FilterDmarcReports(list, since: now.AddMinutes(-1).DateTime, before: now.AddMinutes(1).DateTime, domain: "example.com");
+        Assert.Single(reports);
+        Assert.Single(reports[0].Attachments);
+        Assert.EndsWith(".xml", reports[0].Attachments[0].Name);
+    }
+
+    [Theory]
+    [InlineData("application")]
+    [InlineData("text")]
+    public void FilterDmarcReports_ExtractsXmlAttachmentByContentType(string mediaType) {
+        var now = DateTimeOffset.UtcNow;
+        var msg = CreateXmlDmarc("example.com", now, mediaType, "xml", "example");
+        var list = new List<MimeMessage> { msg };
+        var reports = MailboxSearcher.FilterDmarcReports(list, since: now.AddMinutes(-1).DateTime, before: now.AddMinutes(1).DateTime, domain: "example.com");
+        Assert.Single(reports);
+        Assert.Single(reports[0].Attachments);
+        Assert.Equal("example", reports[0].Attachments[0].Name);
     }
 }
