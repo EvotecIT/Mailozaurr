@@ -98,6 +98,34 @@ public class SearchDmarcReportsTests {
     }
 
     [Fact]
+    public void BuildDmarcReportSearchQuery_ReusesAttachmentQueryInstance() {
+        var q1 = MailboxSearcher.BuildDmarcReportSearchQuery(null, null, null);
+        var q2 = MailboxSearcher.BuildDmarcReportSearchQuery(null, null, null);
+
+        MailKit.Search.SearchQuery? FindAttachment(MailKit.Search.SearchQuery q) {
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+            var term = q.GetType().GetProperty("Term", flags)?.GetValue(q)?.ToString();
+            if (term == "HasAttachment") return q;
+            if (term == "HeaderContains") {
+                var field = q.GetType().GetProperty("Field", flags)?.GetValue(q)?.ToString();
+                var value = q.GetType().GetProperty("Value", flags)?.GetValue(q)?.ToString();
+                if (field?.Equals("Content-Disposition", StringComparison.OrdinalIgnoreCase) == true &&
+                    value?.IndexOf("attachment", StringComparison.OrdinalIgnoreCase) >= 0) return q;
+            }
+            var left = q.GetType().GetProperty("Left", flags)?.GetValue(q) as MailKit.Search.SearchQuery;
+            var right = q.GetType().GetProperty("Right", flags)?.GetValue(q) as MailKit.Search.SearchQuery;
+            var leftRes = left != null ? FindAttachment(left) : null;
+            return leftRes ?? (right != null ? FindAttachment(right) : null);
+        }
+
+        var a1 = FindAttachment(q1);
+        var a2 = FindAttachment(q2);
+
+        Assert.NotNull(a1);
+        Assert.Same(a1, a2);
+    }
+
+    [Fact]
     public void BuildGmailDmarcReportQuery_IncludesDomainAndDates() {
         var since = new DateTime(2024, 1, 1);
         var before = new DateTime(2024, 2, 1);

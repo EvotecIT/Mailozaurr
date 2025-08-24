@@ -19,6 +19,8 @@ namespace Mailozaurr;
 /// Provides mailbox search helpers for IMAP and POP3.
 /// </summary>
 public static class MailboxSearcher {
+    private static readonly SearchQuery HasAttachmentSearchQuery = InitializeHasAttachmentQuery();
+
     /// <summary>
     /// Searches an IMAP mailbox and returns matching messages.
     /// </summary>
@@ -612,13 +614,20 @@ public static class MailboxSearcher {
     }
 
     internal static SearchQuery BuildDmarcReportSearchQuery(DateTime? since, DateTime? before, string? domain) {
-        SearchQuery search = SearchQuery.SubjectContains("report domain");
-        var hasAtt = typeof(SearchQuery).GetProperty("HasAttachment", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)?.GetValue(null) as SearchQuery;
-        search = search.And(hasAtt ?? SearchQuery.HeaderContains("Content-Disposition", "attachment"));
+        SearchQuery search = SearchQuery.SubjectContains("report domain").And(HasAttachmentSearchQuery);
         if (!string.IsNullOrWhiteSpace(domain)) search = search.And(SearchQuery.SubjectContains(domain));
         if (since.HasValue) search = search.And(SearchQuery.DeliveredAfter(since.Value.ToUniversalTime()));
         if (before.HasValue) search = search.And(SearchQuery.DeliveredBefore(before.Value.ToUniversalTime()));
         return search;
+    }
+
+    private static SearchQuery InitializeHasAttachmentQuery() {
+#if MAILKIT_HAS_HASATTACHMENT
+        return SearchQuery.HasAttachment;
+#else
+        var prop = typeof(SearchQuery).GetProperty("HasAttachment", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+        return prop?.GetValue(null) as SearchQuery ?? SearchQuery.HeaderContains("Content-Disposition", "attachment");
+#endif
     }
 
     internal static string BuildGmailDmarcReportQuery(DateTime? since, DateTime? before, string? domain) {
