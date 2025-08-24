@@ -149,39 +149,67 @@ public static class MailboxSearcher {
         var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadOnly);
         var search = BuildNonDeliveryReportSearchQuery(since, before);
         var uids = await mailFolder.SearchAsync(search, cancellationToken).ConfigureAwait(false);
-        var messages = new List<MimeMessage>(uids.Count);
+        var results = new List<NonDeliveryReport>();
         if (parallelDownloadLimit <= 1) {
             foreach (var uid in uids) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
-                messages.Add(msg);
-                if (maxResults > 0 && messages.Count >= maxResults) break;
-            }
-        } else {
-            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
-            var tasks = new List<Task>();
-
-            async Task DownloadMessageAsync(MailKit.UniqueId uid) {
-                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                try {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
-                    lock (messages) messages.Add(msg);
-                } finally {
-                    semaphore.Release();
+                var reports = FilterNonDeliveryReports(new[] { msg }, since, before, recipientContains, messageId);
+                if (reports.Count > 0) {
+                    foreach (var r in reports) {
+                        if (maxResults > 0 && results.Count >= maxResults) break;
+                        results.Add(r);
+                    }
+                    if (maxResults > 0 && results.Count >= maxResults) break;
                 }
             }
-
-            foreach (var uid in uids) {
-                cancellationToken.ThrowIfCancellationRequested();
-                tasks.Add(DownloadMessageAsync(uid));
-                if (maxResults > 0 && tasks.Count >= maxResults) break;
+        } else {
+            var uidArray = uids.ToArray();
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var workers = new Task[Math.Min(parallelDownloadLimit, uidArray.Length)];
+            int next = 0;
+            int resultCount = 0;
+            var gate = new object();
+            for (int i = 0; i < workers.Length; i++) {
+                workers[i] = Task.Run(async () => {
+                    while (true) {
+                        int current;
+                        lock (gate) {
+                            if (cts.IsCancellationRequested || next >= uidArray.Length || (maxResults > 0 && resultCount >= maxResults)) return;
+                            current = next++;
+                        }
+                        MimeMessage msg;
+                        try {
+                            msg = await mailFolder.GetMessageAsync(uidArray[current], cts.Token).ConfigureAwait(false);
+                        } catch (OperationCanceledException) {
+                            return;
+                        }
+                        var reports = FilterNonDeliveryReports(new[] { msg }, since, before, recipientContains, messageId);
+                        if (reports.Count == 0) continue;
+                        lock (gate) {
+                            foreach (var r in reports) {
+                                if (maxResults > 0 && resultCount >= maxResults) {
+                                    cts.Cancel();
+                                    break;
+                                }
+                                results.Add(r);
+                                resultCount++;
+                                if (maxResults > 0 && resultCount >= maxResults) {
+                                    cts.Cancel();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }, CancellationToken.None);
             }
-
-            await Task.WhenAll(tasks).ConfigureAwait(false);
+            try {
+                await Task.WhenAll(workers).ConfigureAwait(false);
+            } catch (OperationCanceledException) {
+            }
         }
 
-        return FilterNonDeliveryReports(messages, since, before, recipientContains, messageId);
+        return maxResults > 0 && results.Count > maxResults ? results.GetRange(0, maxResults) : results;
     }
 
     /// <summary>
@@ -198,42 +226,66 @@ public static class MailboxSearcher {
         int maxResults = 0,
         int parallelDownloadLimit = 4,
         CancellationToken cancellationToken = default) {
-        var count = client.Count;
-        var indices = new List<int>(count);
-        for (int i = 0; i < count; i++) indices.Add(i);
-        var messages = new List<MimeMessage>(indices.Count);
+        var results = new List<NonDeliveryReport>();
         if (parallelDownloadLimit <= 1) {
-            foreach (var idx in indices) {
+            for (int idx = 0; idx < client.Count; idx++) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
-                messages.Add(msg);
-                if (maxResults > 0 && messages.Count >= maxResults) break;
-            }
-        } else {
-            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
-            var tasks = new List<Task>();
-
-            async Task DownloadMessageAsync(int idx) {
-                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                try {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
-                    lock (messages) messages.Add(msg);
-                } finally {
-                    semaphore.Release();
+                var reports = FilterNonDeliveryReports(new[] { msg }, since, before, recipientContains, messageId);
+                if (reports.Count > 0) {
+                    foreach (var r in reports) {
+                        if (maxResults > 0 && results.Count >= maxResults) break;
+                        results.Add(r);
+                    }
+                    if (maxResults > 0 && results.Count >= maxResults) break;
                 }
             }
-
-            foreach (var idx in indices) {
-                cancellationToken.ThrowIfCancellationRequested();
-                tasks.Add(DownloadMessageAsync(idx));
-                if (maxResults > 0 && tasks.Count >= maxResults) break;
+        } else {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var workers = new Task[Math.Min(parallelDownloadLimit, client.Count)];
+            int next = 0;
+            int resultCount = 0;
+            var gate = new object();
+            for (int i = 0; i < workers.Length; i++) {
+                workers[i] = Task.Run(async () => {
+                    while (true) {
+                        int current;
+                        lock (gate) {
+                            if (cts.IsCancellationRequested || next >= client.Count || (maxResults > 0 && resultCount >= maxResults)) return;
+                            current = next++;
+                        }
+                        MimeMessage msg;
+                        try {
+                            msg = await client.GetMessageAsync(current, cts.Token).ConfigureAwait(false);
+                        } catch (OperationCanceledException) {
+                            return;
+                        }
+                        var reports = FilterNonDeliveryReports(new[] { msg }, since, before, recipientContains, messageId);
+                        if (reports.Count == 0) continue;
+                        lock (gate) {
+                            foreach (var r in reports) {
+                                if (maxResults > 0 && resultCount >= maxResults) {
+                                    cts.Cancel();
+                                    break;
+                                }
+                                results.Add(r);
+                                resultCount++;
+                                if (maxResults > 0 && resultCount >= maxResults) {
+                                    cts.Cancel();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }, CancellationToken.None);
             }
-
-            await Task.WhenAll(tasks).ConfigureAwait(false);
+            try {
+                await Task.WhenAll(workers).ConfigureAwait(false);
+            } catch (OperationCanceledException) {
+            }
         }
 
-        return FilterNonDeliveryReports(messages, since, before, recipientContains, messageId);
+        return maxResults > 0 && results.Count > maxResults ? results.GetRange(0, maxResults) : results;
     }
 
     /// <summary>
@@ -373,39 +425,67 @@ public static class MailboxSearcher {
         var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadOnly);
         var search = BuildDmarcReportSearchQuery(since, before, domain);
         var uids = await mailFolder.SearchAsync(search, cancellationToken).ConfigureAwait(false);
-        var messages = new List<MimeMessage>(uids.Count);
+        var results = new List<DmarcReport>();
         if (parallelDownloadLimit <= 1) {
             foreach (var uid in uids) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
-                messages.Add(msg);
-                if (maxResults > 0 && messages.Count >= maxResults) break;
-            }
-        } else {
-            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
-            var tasks = new List<Task>();
-
-            async Task DownloadMessageAsync(MailKit.UniqueId uid) {
-                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                try {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
-                    lock (messages) messages.Add(msg);
-                } finally {
-                    semaphore.Release();
+                var reports = FilterDmarcReports(new[] { msg }, since, before, domain);
+                if (reports.Count > 0) {
+                    foreach (var r in reports) {
+                        if (maxResults > 0 && results.Count >= maxResults) break;
+                        results.Add(r);
+                    }
+                    if (maxResults > 0 && results.Count >= maxResults) break;
                 }
             }
-
-            foreach (var uid in uids) {
-                cancellationToken.ThrowIfCancellationRequested();
-                tasks.Add(DownloadMessageAsync(uid));
-                if (maxResults > 0 && tasks.Count >= maxResults) break;
+        } else {
+            var uidArray = uids.ToArray();
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var workers = new Task[Math.Min(parallelDownloadLimit, uidArray.Length)];
+            int next = 0;
+            int resultCount = 0;
+            var gate = new object();
+            for (int i = 0; i < workers.Length; i++) {
+                workers[i] = Task.Run(async () => {
+                    while (true) {
+                        int current;
+                        lock (gate) {
+                            if (cts.IsCancellationRequested || next >= uidArray.Length || (maxResults > 0 && resultCount >= maxResults)) return;
+                            current = next++;
+                        }
+                        MimeMessage msg;
+                        try {
+                            msg = await mailFolder.GetMessageAsync(uidArray[current], cts.Token).ConfigureAwait(false);
+                        } catch (OperationCanceledException) {
+                            return;
+                        }
+                        var reports = FilterDmarcReports(new[] { msg }, since, before, domain);
+                        if (reports.Count == 0) continue;
+                        lock (gate) {
+                            foreach (var r in reports) {
+                                if (maxResults > 0 && resultCount >= maxResults) {
+                                    cts.Cancel();
+                                    break;
+                                }
+                                results.Add(r);
+                                resultCount++;
+                                if (maxResults > 0 && resultCount >= maxResults) {
+                                    cts.Cancel();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }, CancellationToken.None);
             }
-
-            await Task.WhenAll(tasks).ConfigureAwait(false);
+            try {
+                await Task.WhenAll(workers).ConfigureAwait(false);
+            } catch (OperationCanceledException) {
+            }
         }
 
-        return FilterDmarcReports(messages, since, before, domain);
+        return maxResults > 0 && results.Count > maxResults ? results.GetRange(0, maxResults) : results;
     }
 
     /// <summary>
@@ -421,42 +501,66 @@ public static class MailboxSearcher {
         int maxResults = 0,
         int parallelDownloadLimit = 4,
         CancellationToken cancellationToken = default) {
-        var count = client.Count;
-        var indices = new List<int>(count);
-        for (int i = 0; i < count; i++) indices.Add(i);
-        var messages = new List<MimeMessage>(indices.Count);
+        var results = new List<DmarcReport>();
         if (parallelDownloadLimit <= 1) {
-            foreach (var idx in indices) {
+            for (int idx = 0; idx < client.Count; idx++) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
-                messages.Add(msg);
-                if (maxResults > 0 && messages.Count >= maxResults) break;
-            }
-        } else {
-            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
-            var tasks = new List<Task>();
-
-            async Task DownloadMessageAsync(int idx) {
-                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                try {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
-                    lock (messages) messages.Add(msg);
-                } finally {
-                    semaphore.Release();
+                var reports = FilterDmarcReports(new[] { msg }, since, before, domain);
+                if (reports.Count > 0) {
+                    foreach (var r in reports) {
+                        if (maxResults > 0 && results.Count >= maxResults) break;
+                        results.Add(r);
+                    }
+                    if (maxResults > 0 && results.Count >= maxResults) break;
                 }
             }
-
-            foreach (var idx in indices) {
-                cancellationToken.ThrowIfCancellationRequested();
-                tasks.Add(DownloadMessageAsync(idx));
-                if (maxResults > 0 && tasks.Count >= maxResults) break;
+        } else {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var workers = new Task[Math.Min(parallelDownloadLimit, client.Count)];
+            int next = 0;
+            int resultCount = 0;
+            var gate = new object();
+            for (int i = 0; i < workers.Length; i++) {
+                workers[i] = Task.Run(async () => {
+                    while (true) {
+                        int current;
+                        lock (gate) {
+                            if (cts.IsCancellationRequested || next >= client.Count || (maxResults > 0 && resultCount >= maxResults)) return;
+                            current = next++;
+                        }
+                        MimeMessage msg;
+                        try {
+                            msg = await client.GetMessageAsync(current, cts.Token).ConfigureAwait(false);
+                        } catch (OperationCanceledException) {
+                            return;
+                        }
+                        var reports = FilterDmarcReports(new[] { msg }, since, before, domain);
+                        if (reports.Count == 0) continue;
+                        lock (gate) {
+                            foreach (var r in reports) {
+                                if (maxResults > 0 && resultCount >= maxResults) {
+                                    cts.Cancel();
+                                    break;
+                                }
+                                results.Add(r);
+                                resultCount++;
+                                if (maxResults > 0 && resultCount >= maxResults) {
+                                    cts.Cancel();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }, CancellationToken.None);
             }
-
-            await Task.WhenAll(tasks).ConfigureAwait(false);
+            try {
+                await Task.WhenAll(workers).ConfigureAwait(false);
+            } catch (OperationCanceledException) {
+            }
         }
 
-        return FilterDmarcReports(messages, since, before, domain);
+        return maxResults > 0 && results.Count > maxResults ? results.GetRange(0, maxResults) : results;
     }
 
     /// <summary>
