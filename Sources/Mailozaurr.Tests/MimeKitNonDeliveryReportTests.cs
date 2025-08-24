@@ -40,6 +40,17 @@ public class MimeKitNonDeliveryReportTests {
     }
 
     [Fact]
+    public void GetNonDeliveryReports_SubjectReportUsesMessageDate() {
+        var date = new DateTimeOffset(2024, 7, 24, 10, 0, 0, TimeSpan.Zero);
+        string raw = $"Date: {date:R}\r\nSubject: Mail Delivery Subsystem\r\n\r\ntext";
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(raw));
+        var message = MimeMessage.Load(stream);
+        var reports = MimeKitUtils.GetNonDeliveryReports(message);
+        Assert.Single(reports);
+        Assert.Equal(date, reports[0].Timestamp);
+    }
+
+    [Fact]
     public void GetNonDeliveryReports_IgnoresDuplicateHeaders() {
         const string raw = "Content-Type: multipart/report; report-type=delivery-status; boundary=\"XXX\"\n\n--XXX\nContent-Type: text/plain; charset=utf-8\n\ntext\n\n--XXX\nContent-Type: message/delivery-status\n\nFinal-Recipient: rfc822; user@example.com\nFinal-Recipient: rfc822; other@example.com\nStatus: 5.1.1\n\n--XXX--";
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(raw));

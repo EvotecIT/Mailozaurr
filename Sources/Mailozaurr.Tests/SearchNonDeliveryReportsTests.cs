@@ -63,6 +63,21 @@ public class SearchNonDeliveryReportsTests {
         Assert.Equal("<id1>", reports[0].OriginalMessageId);
     }
 
+    [Fact]
+    public void FilterNonDeliveryReports_SubjectDetectedReportSurvivesDateFilter() {
+        var now = DateTimeOffset.UtcNow;
+        var date = new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second, now.Offset);
+        string raw = $"Date: {date:R}\r\nSubject: Mail Delivery Subsystem\r\n\r\ntext";
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(raw));
+        var message = MimeMessage.Load(stream);
+        var list = new List<MimeMessage> { message };
+        var since = date.AddMinutes(-5).UtcDateTime;
+        var before = date.AddMinutes(5).UtcDateTime;
+        var reports = MailboxSearcher.FilterNonDeliveryReports(list, since, before, recipientContains: null, messageId: null);
+        Assert.Single(reports);
+        Assert.Equal(date, reports[0].Timestamp);
+    }
+
     private static bool Contains(SearchQuery query, Func<SearchQuery, bool> predicate) {
         if (predicate(query)) return true;
         var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
