@@ -26,6 +26,9 @@ public class SmtpResult {
     public int Port { get; set; }
     /// <summary>Error information if the operation failed.</summary>
     public string? Error { get; set; }
+    /// <summary>Parsed Graph API error details if available.</summary>
+    public GraphApiErrorResponse? GraphError { get; set; }
+
     /// <summary>
     /// Initializes a new instance of the <see cref="SmtpResult"/> class.
     /// </summary>
