@@ -166,6 +166,10 @@ public class SendGridClient {
             return null;
         }
 
+        if (emailAddress is SendGridEmailAddress sendGridEmail) {
+            return sendGridEmail;
+        }
+
         var emailAsString = Convert.ToString(emailAddress);
         if (string.IsNullOrWhiteSpace(emailAsString)) {
             return null;
@@ -189,7 +193,9 @@ public class SendGridClient {
             return new SendGridEmailAddress { Email = emailValue, Name = nameValue };
         }
 
-        throw new ArgumentException($"email object type {emailAddress.GetType().Name} requires addition");
+        throw new ArgumentException(
+            $"Unsupported email address type {emailAddress.GetType().Name}. Expected string, SendGridEmailAddress, or IDictionary<string, object>.",
+            nameof(emailAddress));
     }
 
     /// <summary>
