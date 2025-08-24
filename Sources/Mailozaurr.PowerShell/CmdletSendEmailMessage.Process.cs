@@ -508,7 +508,10 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
                 throw;
             }
             if (!Suppress) {
-                WriteObject(new SmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message));
+                var result = new SmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
+                    GraphError = GraphApiErrorParser.Parse(ex.Message)
+                };
+                WriteObject(result);
             }
         }
     }
@@ -539,7 +542,10 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
                 }
 
                 if (!Suppress) {
-                    WriteObject(new SmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message));
+                    var result = new SmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
+                        GraphError = GraphApiErrorParser.Parse(ex.Message)
+                    };
+                    WriteObject(result);
                 }
             }
         }
@@ -579,7 +585,10 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
                 throw;
             }
             if (!Suppress) {
-                WriteObject(new SmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message));
+                var result = new SmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
+                    GraphError = GraphApiErrorParser.Parse(ex.Message)
+                };
+                WriteObject(result);
             }
         }
 
@@ -617,7 +626,10 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
                 throw;
             }
             if (!Suppress) {
-                WriteObject(new SmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message));
+                var result = new SmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
+                    GraphError = GraphApiErrorParser.Parse(ex.Message)
+                };
+                WriteObject(result);
             }
         }
 
