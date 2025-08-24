@@ -632,10 +632,14 @@ public static class MailboxSearcher {
     private static bool IsDmarcAttachment(MimeEntity entity) {
         if (entity is MimePart part) {
             var name = part.FileName;
-            if (!string.IsNullOrEmpty(name) && (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".gz", StringComparison.OrdinalIgnoreCase))) return true;
+            if (!string.IsNullOrEmpty(name) && (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".gz", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))) return true;
             var ct = part.ContentType;
-            if (ct != null && ct.MediaType.Equals("application", StringComparison.OrdinalIgnoreCase)) {
-                if (ct.MediaSubtype.Equals("zip", StringComparison.OrdinalIgnoreCase) || ct.MediaSubtype.Equals("gzip", StringComparison.OrdinalIgnoreCase)) return true;
+            if (ct != null) {
+                if (ct.MediaType.Equals("application", StringComparison.OrdinalIgnoreCase)) {
+                    if (ct.MediaSubtype.Equals("zip", StringComparison.OrdinalIgnoreCase) || ct.MediaSubtype.Equals("gzip", StringComparison.OrdinalIgnoreCase) || ct.MediaSubtype.Equals("xml", StringComparison.OrdinalIgnoreCase)) return true;
+                } else if (ct.MediaType.Equals("text", StringComparison.OrdinalIgnoreCase)) {
+                    if (ct.MediaSubtype.Equals("xml", StringComparison.OrdinalIgnoreCase)) return true;
+                }
             }
         }
         return false;
