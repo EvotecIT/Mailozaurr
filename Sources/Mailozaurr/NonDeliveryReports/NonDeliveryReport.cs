@@ -31,7 +31,7 @@ public sealed class NonDeliveryReport {
     public string? RemoteMta { get; set; }
 
     /// <summary>Date of the last delivery attempt.</summary>
-    public DateTimeOffset LastAttemptDate { get; set; }
+    public DateTimeOffset? LastAttemptDate { get; set; }
 
     /// <summary>Identifier of the final log entry.</summary>
     public string? FinalLogId { get; set; }
@@ -71,11 +71,11 @@ public sealed class NonDeliveryReport {
             ReportingMta = reportingMta,
             Action = action,
             RemoteMta = remoteMta,
-            LastAttemptDate = ParseTimestamp(lastAttemptDate),
+            LastAttemptDate = TryParseTimestamp(lastAttemptDate),
             FinalLogId = finalLogId,
             DiagnosticCode = diagnosticCode is not null ? DsnDiagnosticCode.Parse(diagnosticCode) : null,
             Status = statusCode is not null && DsnStatus.TryParse(statusCode, out var status) ? status : null,
-            Timestamp = ParseTimestamp(arrivalDate)
+            Timestamp = TryParseTimestamp(arrivalDate) ?? TryParseTimestamp(lastAttemptDate) ?? DateTimeOffset.MinValue
         };
         return ndr;
     }
@@ -88,12 +88,8 @@ public sealed class NonDeliveryReport {
         return idx >= 0 ? header.Substring(idx + 1).Trim() : header.Trim();
     }
 
-    private static DateTimeOffset ParseTimestamp(string? value) {
-        if (DateUtils.TryParse(value, out var dt)) {
-            return dt;
-        }
-        return DateTimeOffset.MinValue;
-    }
+    private static DateTimeOffset? TryParseTimestamp(string? value)
+        => DateUtils.TryParse(value, out var dt) ? dt : null;
 
     /// <summary>Maps a <see cref="DsnStatus"/> to an <see cref="NonDeliveryReportType"/>.</summary>
     public static NonDeliveryReportType GetReportType(DsnStatus? status) {
