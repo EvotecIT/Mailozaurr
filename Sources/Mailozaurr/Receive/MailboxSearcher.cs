@@ -159,22 +159,27 @@ public static class MailboxSearcher {
         } else {
             using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
             var tasks = new List<Task>();
+
+            async Task DownloadMessageAsync(UniqueId uid) {
+                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
+                    lock (messages) messages.Add(msg);
+                } finally {
+                    semaphore.Release();
+                }
+            }
+
             foreach (var uid in uids) {
                 cancellationToken.ThrowIfCancellationRequested();
-                tasks.Add(Task.Run(async () => {
-                    await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                    try {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
-                        lock (messages) messages.Add(msg);
-                    } finally {
-                        semaphore.Release();
-                    }
-                }, cancellationToken));
+                tasks.Add(DownloadMessageAsync(uid));
                 if (maxResults > 0 && tasks.Count >= maxResults) break;
             }
+
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
+
         return FilterNonDeliveryReports(messages, since, before, recipientContains, messageId);
     }
 
@@ -206,22 +211,27 @@ public static class MailboxSearcher {
         } else {
             using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
             var tasks = new List<Task>();
+
+            async Task DownloadMessageAsync(int idx) {
+                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
+                    lock (messages) messages.Add(msg);
+                } finally {
+                    semaphore.Release();
+                }
+            }
+
             foreach (var idx in indices) {
                 cancellationToken.ThrowIfCancellationRequested();
-                tasks.Add(Task.Run(async () => {
-                    await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                    try {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
-                        lock (messages) messages.Add(msg);
-                    } finally {
-                        semaphore.Release();
-                    }
-                }, cancellationToken));
+                tasks.Add(DownloadMessageAsync(idx));
                 if (maxResults > 0 && tasks.Count >= maxResults) break;
             }
+
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
+
         return FilterNonDeliveryReports(messages, since, before, recipientContains, messageId);
     }
 
@@ -262,23 +272,28 @@ public static class MailboxSearcher {
         } else {
             using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
             var tasks = new List<Task>();
+
+            async Task DownloadMessageAsync(string id) {
+                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
+                    lock (mimeMessages) mimeMessages.Add(mime);
+                } finally {
+                    semaphore.Release();
+                }
+            }
+
             foreach (var m in msgs) {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (m.TryGetValue("id", out var idObj) && idObj is string id) {
-                    tasks.Add(Task.Run(async () => {
-                        await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                        try {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
-                            lock (mimeMessages) mimeMessages.Add(mime);
-                        } finally {
-                            semaphore.Release();
-                        }
-                    }, cancellationToken));
+                    tasks.Add(DownloadMessageAsync(id));
                 }
             }
+
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
+
         return FilterNonDeliveryReports(mimeMessages, since, before, recipientContains, messageId);
     }
 
@@ -312,24 +327,29 @@ public static class MailboxSearcher {
         } else {
             using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
             var tasks = new List<Task>();
+
+            async Task DownloadMessageAsync(string id) {
+                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var mime = await client.GetMimeMessageAsync(userId, id, cancellationToken).ConfigureAwait(false);
+                    lock (mimeMessages) mimeMessages.Add(mime);
+                } finally {
+                    semaphore.Release();
+                }
+            }
+
             foreach (var m in msgs) {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!string.IsNullOrEmpty(m.Id)) {
-                    tasks.Add(Task.Run(async () => {
-                        await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                        try {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            var mime = await client.GetMimeMessageAsync(userId, m.Id, cancellationToken).ConfigureAwait(false);
-                            lock (mimeMessages) mimeMessages.Add(mime);
-                        } finally {
-                            semaphore.Release();
-                        }
-                    }, cancellationToken));
+                    tasks.Add(DownloadMessageAsync(m.Id));
                 }
                 if (maxResults > 0 && tasks.Count >= maxResults) break;
             }
+
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
+
         return FilterNonDeliveryReports(mimeMessages, since, before, recipientContains, messageId);
     }
 
@@ -363,22 +383,27 @@ public static class MailboxSearcher {
         } else {
             using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
             var tasks = new List<Task>();
+
+            async Task DownloadMessageAsync(UniqueId uid) {
+                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
+                    lock (messages) messages.Add(msg);
+                } finally {
+                    semaphore.Release();
+                }
+            }
+
             foreach (var uid in uids) {
                 cancellationToken.ThrowIfCancellationRequested();
-                tasks.Add(Task.Run(async () => {
-                    await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                    try {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
-                        lock (messages) messages.Add(msg);
-                    } finally {
-                        semaphore.Release();
-                    }
-                }, cancellationToken));
+                tasks.Add(DownloadMessageAsync(uid));
                 if (maxResults > 0 && tasks.Count >= maxResults) break;
             }
+
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
+
         return FilterDmarcReports(messages, since, before, domain);
     }
 
@@ -409,22 +434,27 @@ public static class MailboxSearcher {
         } else {
             using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
             var tasks = new List<Task>();
+
+            async Task DownloadMessageAsync(int idx) {
+                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
+                    lock (messages) messages.Add(msg);
+                } finally {
+                    semaphore.Release();
+                }
+            }
+
             foreach (var idx in indices) {
                 cancellationToken.ThrowIfCancellationRequested();
-                tasks.Add(Task.Run(async () => {
-                    await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                    try {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
-                        lock (messages) messages.Add(msg);
-                    } finally {
-                        semaphore.Release();
-                    }
-                }, cancellationToken));
+                tasks.Add(DownloadMessageAsync(idx));
                 if (maxResults > 0 && tasks.Count >= maxResults) break;
             }
+
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
+
         return FilterDmarcReports(messages, since, before, domain);
     }
 
@@ -465,23 +495,28 @@ public static class MailboxSearcher {
         } else {
             using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
             var tasks = new List<Task>();
+
+            async Task DownloadMessageAsync(string id) {
+                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
+                    lock (mimeMessages) mimeMessages.Add(mime);
+                } finally {
+                    semaphore.Release();
+                }
+            }
+
             foreach (var m in msgs) {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (m.TryGetValue("id", out var idObj) && idObj is string id) {
-                    tasks.Add(Task.Run(async () => {
-                        await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                        try {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
-                            lock (mimeMessages) mimeMessages.Add(mime);
-                        } finally {
-                            semaphore.Release();
-                        }
-                    }, cancellationToken));
+                    tasks.Add(DownloadMessageAsync(id));
                 }
             }
+
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
+
         return FilterDmarcReports(mimeMessages, since, before, domain);
     }
 
@@ -514,24 +549,29 @@ public static class MailboxSearcher {
         } else {
             using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
             var tasks = new List<Task>();
+
+            async Task DownloadMessageAsync(string id) {
+                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var mime = await client.GetMimeMessageAsync(userId, id, cancellationToken).ConfigureAwait(false);
+                    lock (mimeMessages) mimeMessages.Add(mime);
+                } finally {
+                    semaphore.Release();
+                }
+            }
+
             foreach (var m in msgs) {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!string.IsNullOrEmpty(m.Id)) {
-                    tasks.Add(Task.Run(async () => {
-                        await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                        try {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            var mime = await client.GetMimeMessageAsync(userId, m.Id, cancellationToken).ConfigureAwait(false);
-                            lock (mimeMessages) mimeMessages.Add(mime);
-                        } finally {
-                            semaphore.Release();
-                        }
-                    }, cancellationToken));
+                    tasks.Add(DownloadMessageAsync(m.Id));
                 }
                 if (maxResults > 0 && tasks.Count >= maxResults) break;
             }
+
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
+
         return FilterDmarcReports(mimeMessages, since, before, domain);
     }
 

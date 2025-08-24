@@ -117,6 +117,33 @@ public class SearchNonDeliveryReportsTests {
         }
     }
 
+    private class CountingPop3Client : Pop3Client {
+        private readonly List<MimeMessage> _messages;
+        private readonly int _delay;
+        private readonly object _lock = new();
+        private int _current;
+        public int MaxConcurrency { get; private set; }
+        public CountingPop3Client(IEnumerable<MimeMessage> messages, int delay) {
+            _messages = new List<MimeMessage>(messages);
+            _delay = delay;
+        }
+        public override bool IsConnected => true;
+        public override bool IsAuthenticated => true;
+        public override int Count => _messages.Count;
+        public override async Task<MimeMessage> GetMessageAsync(int index, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
+            lock (_lock) {
+                _current++;
+                if (_current > MaxConcurrency) MaxConcurrency = _current;
+            }
+            try {
+                await Task.Delay(_delay, cancellationToken).ConfigureAwait(false);
+            } finally {
+                lock (_lock) { _current--; }
+            }
+            return _messages[index];
+        }
+    }
+
     [Fact]
     public async Task SearchNonDeliveryReportsAsync_Pop3_DownloadsInParallel() {
         var now = DateTimeOffset.UtcNow;
@@ -137,5 +164,19 @@ public class SearchNonDeliveryReportsTests {
         sw.Stop();
         Assert.Equal(4, reports.Count);
         Assert.True(sw.Elapsed < seq.Elapsed, $"sequential: {seq.ElapsedMilliseconds}, parallel: {sw.ElapsedMilliseconds}");
+    }
+
+    [Fact]
+    public async Task SearchNonDeliveryReportsAsync_Pop3_RespectsParallelLimit() {
+        var now = DateTimeOffset.UtcNow;
+        var msgs = new List<MimeMessage>();
+        for (int i = 0; i < 20; i++) msgs.Add(CreateNdr($"u{i}@example.com", $"<id{i}>", now));
+        var client = new CountingPop3Client(msgs, 100);
+        var reports = await MailboxSearcher.SearchNonDeliveryReportsAsync(
+            client,
+            parallelDownloadLimit: 4,
+            cancellationToken: CancellationToken.None);
+        Assert.Equal(msgs.Count, reports.Count);
+        Assert.Equal(4, client.MaxConcurrency);
     }
 }
