@@ -3,6 +3,7 @@ using Mailozaurr.NonDeliveryReports;
 using MimeKit;
 using System.IO;
 using System.Text;
+using System.Collections.Generic;
 using System;
 using Xunit;
 
@@ -59,5 +60,23 @@ public class MimeKitNonDeliveryReportTests {
         Assert.Single(reports);
         Assert.EndsWith("user@example.com", reports[0].FinalRecipient);
         Assert.DoesNotContain("other@example.com", reports[0].FinalRecipient, StringComparison.OrdinalIgnoreCase);
+    }
+    [Fact]
+    public void GetNonDeliveryReports_UsesCustomSubjectPattern() {
+        var previous = NonDeliveryReportSubjectPatternProvider.Current;
+        try {
+            NonDeliveryReportSubjectPatternProvider.Current = new TestPatternProvider();
+            const string raw = "Subject: CustomPattern\n\ntext";
+            using var stream = new MemoryStream(Encoding.UTF8.GetBytes(raw));
+            var message = MimeMessage.Load(stream);
+            var reports = MimeKitUtils.GetNonDeliveryReports(message);
+            Assert.Single(reports);
+        } finally {
+            NonDeliveryReportSubjectPatternProvider.Current = previous;
+        }
+    }
+
+    private sealed class TestPatternProvider : INonDeliveryReportSubjectPatternProvider {
+        public ICollection<string> SubjectPatterns { get; } = new List<string> { "CustomPattern" };
     }
 }

@@ -676,7 +676,7 @@ public static class MailboxSearcher {
     internal static string BuildGmailNonDeliveryReportQuery(DateTime? since, DateTime? before) {
         var sb = new StringBuilder();
         bool first = true;
-        foreach (var pattern in NonDeliveryReportSubjectPatterns.Values) {
+        foreach (var pattern in NonDeliveryReportSubjectPatternProvider.Current.SubjectPatterns) {
             if (!first) sb.Append(" OR ");
             sb.Append("subject:\"").Append(pattern).Append("\"");
             first = false;
@@ -718,7 +718,7 @@ public static class MailboxSearcher {
     internal static SearchQuery BuildNonDeliveryReportSearchQuery(DateTime? since, DateTime? before) {
         SearchQuery search = SearchQuery.HeaderContains("Content-Type", "delivery-status");
         SearchQuery? subjectQuery = null;
-        foreach (var pattern in NonDeliveryReportSubjectPatterns.Values) {
+        foreach (var pattern in NonDeliveryReportSubjectPatternProvider.Current.SubjectPatterns) {
             var q = SearchQuery.SubjectContains(pattern);
             subjectQuery = subjectQuery == null ? q : subjectQuery.Or(q);
         }

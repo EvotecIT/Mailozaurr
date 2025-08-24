@@ -85,7 +85,7 @@ public static class MimeKitUtils {
         if (string.IsNullOrWhiteSpace(subject)) {
             return false;
         }
-        foreach (var p in NonDeliveryReportSubjectPatterns.Values) {
+        foreach (var p in NonDeliveryReportSubjectPatternProvider.Current.SubjectPatterns) {
             if (subject.IndexOf(p, System.StringComparison.OrdinalIgnoreCase) >= 0) {
                 return true;
             }
