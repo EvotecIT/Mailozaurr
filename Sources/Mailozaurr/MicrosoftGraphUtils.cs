@@ -464,16 +464,28 @@ namespace Mailozaurr {
             if (!string.IsNullOrWhiteSpace(filter)) queryParams["$filter"] = filter!;
             if (properties != null && properties.Any()) queryParams["$select"] = string.Join(",", properties);
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages", queryParams);
-            var doc = await InvokeGraphApiAsync("GET", uri, headers);
             var messages = new List<Dictionary<string, object>>();
-            if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
-                foreach (var item in valueElement.EnumerateArray()) {
-                    var native = ConvertJsonElementToNativeObject(item) as Dictionary<string, object>;
-                    if (native != null) {
-                        messages.Add(native);
-                        if (limit.HasValue && messages.Count >= limit.Value) break;
+            while (!string.IsNullOrEmpty(uri)) {
+                var doc = await InvokeGraphApiAsync("GET", uri, headers);
+                if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
+                    foreach (var item in valueElement.EnumerateArray()) {
+                        var native = ConvertJsonElementToNativeObject(item) as Dictionary<string, object>;
+                        if (native != null) {
+                            messages.Add(native);
+                            if (limit.HasValue && messages.Count >= limit.Value) {
+                                return messages;
+                            }
+                        }
                     }
                 }
+                if (!doc.RootElement.TryGetProperty("@odata.nextLink", out var nextLinkElement)) {
+                    break;
+                }
+                var nextLink = nextLinkElement.GetString();
+                if (string.IsNullOrEmpty(nextLink)) {
+                    break;
+                }
+                uri = nextLink;
             }
             return messages;
         }
