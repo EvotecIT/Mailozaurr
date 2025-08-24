@@ -5,6 +5,7 @@ using MailKit.Search;
 using MimeKit;
 using System.Text;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -148,36 +149,42 @@ public static class MailboxSearcher {
         var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadOnly);
         var search = BuildNonDeliveryReportSearchQuery(since, before);
         var uids = await mailFolder.SearchAsync(search, cancellationToken).ConfigureAwait(false);
-        var messages = new List<MimeMessage>(uids.Count);
+        IEnumerable<MimeMessage> messages;
         if (parallelDownloadLimit <= 1) {
+            var list = new List<MimeMessage>();
             foreach (var uid in uids) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
-                messages.Add(msg);
-                if (maxResults > 0 && messages.Count >= maxResults) break;
+                list.Add(msg);
+                if (maxResults > 0 && list.Count >= maxResults) break;
             }
+            messages = list;
         } else {
-            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
+            var bag = new ConcurrentBag<MimeMessage>();
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             var tasks = new List<Task>();
-
-            async Task DownloadMessageAsync(UniqueId uid) {
-                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                try {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
-                    lock (messages) messages.Add(msg);
-                } finally {
-                    semaphore.Release();
+            int collected = 0;
+            using var enumerator = uids.GetEnumerator();
+            while (!cts.IsCancellationRequested) {
+                while (tasks.Count < parallelDownloadLimit &&
+                       (maxResults <= 0 || Volatile.Read(ref collected) < maxResults) &&
+                       enumerator.MoveNext()) {
+                    var uid = enumerator.Current;
+                    tasks.Add(Task.Run(async () => {
+                        try {
+                            var msg = await mailFolder.GetMessageAsync(uid, cts.Token).ConfigureAwait(false);
+                            var current = Interlocked.Increment(ref collected);
+                            if (maxResults <= 0 || current <= maxResults) bag.Add(msg);
+                            if (maxResults > 0 && current >= maxResults) cts.Cancel();
+                        } catch (OperationCanceledException) { }
+                    }, CancellationToken.None));
                 }
+                if (tasks.Count == 0) break;
+                var finished = await Task.WhenAny(tasks).ConfigureAwait(false);
+                tasks.Remove(finished);
             }
-
-            foreach (var uid in uids) {
-                cancellationToken.ThrowIfCancellationRequested();
-                tasks.Add(DownloadMessageAsync(uid));
-                if (maxResults > 0 && tasks.Count >= maxResults) break;
-            }
-
             await Task.WhenAll(tasks).ConfigureAwait(false);
+            messages = bag;
         }
 
         return FilterNonDeliveryReports(messages, since, before, recipientContains, messageId);
@@ -197,39 +204,43 @@ public static class MailboxSearcher {
         int maxResults = 0,
         int parallelDownloadLimit = 4,
         CancellationToken cancellationToken = default) {
-        var count = client.Count;
-        var indices = new List<int>(count);
-        for (int i = 0; i < count; i++) indices.Add(i);
-        var messages = new List<MimeMessage>(indices.Count);
+        var indices = Enumerable.Range(0, client.Count);
+        IEnumerable<MimeMessage> messages;
         if (parallelDownloadLimit <= 1) {
+            var list = new List<MimeMessage>();
             foreach (var idx in indices) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
-                messages.Add(msg);
-                if (maxResults > 0 && messages.Count >= maxResults) break;
+                list.Add(msg);
+                if (maxResults > 0 && list.Count >= maxResults) break;
             }
+            messages = list;
         } else {
-            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
+            var bag = new ConcurrentBag<MimeMessage>();
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             var tasks = new List<Task>();
-
-            async Task DownloadMessageAsync(int idx) {
-                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                try {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
-                    lock (messages) messages.Add(msg);
-                } finally {
-                    semaphore.Release();
+            int collected = 0;
+            using var enumerator = indices.GetEnumerator();
+            while (!cts.IsCancellationRequested) {
+                while (tasks.Count < parallelDownloadLimit &&
+                       (maxResults <= 0 || Volatile.Read(ref collected) < maxResults) &&
+                       enumerator.MoveNext()) {
+                    var idx = enumerator.Current;
+                    tasks.Add(Task.Run(async () => {
+                        try {
+                            var msg = await client.GetMessageAsync(idx, cts.Token).ConfigureAwait(false);
+                            var current = Interlocked.Increment(ref collected);
+                            if (maxResults <= 0 || current <= maxResults) bag.Add(msg);
+                            if (maxResults > 0 && current >= maxResults) cts.Cancel();
+                        } catch (OperationCanceledException) { }
+                    }, CancellationToken.None));
                 }
+                if (tasks.Count == 0) break;
+                var finished = await Task.WhenAny(tasks).ConfigureAwait(false);
+                tasks.Remove(finished);
             }
-
-            foreach (var idx in indices) {
-                cancellationToken.ThrowIfCancellationRequested();
-                tasks.Add(DownloadMessageAsync(idx));
-                if (maxResults > 0 && tasks.Count >= maxResults) break;
-            }
-
             await Task.WhenAll(tasks).ConfigureAwait(false);
+            messages = bag;
         }
 
         return FilterNonDeliveryReports(messages, since, before, recipientContains, messageId);
@@ -372,36 +383,42 @@ public static class MailboxSearcher {
         var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadOnly);
         var search = BuildDmarcReportSearchQuery(since, before, domain);
         var uids = await mailFolder.SearchAsync(search, cancellationToken).ConfigureAwait(false);
-        var messages = new List<MimeMessage>(uids.Count);
+        IEnumerable<MimeMessage> messages;
         if (parallelDownloadLimit <= 1) {
+            var list = new List<MimeMessage>();
             foreach (var uid in uids) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
-                messages.Add(msg);
-                if (maxResults > 0 && messages.Count >= maxResults) break;
+                list.Add(msg);
+                if (maxResults > 0 && list.Count >= maxResults) break;
             }
+            messages = list;
         } else {
-            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
+            var bag = new ConcurrentBag<MimeMessage>();
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             var tasks = new List<Task>();
-
-            async Task DownloadMessageAsync(UniqueId uid) {
-                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                try {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
-                    lock (messages) messages.Add(msg);
-                } finally {
-                    semaphore.Release();
+            int collected = 0;
+            using var enumerator = uids.GetEnumerator();
+            while (!cts.IsCancellationRequested) {
+                while (tasks.Count < parallelDownloadLimit &&
+                       (maxResults <= 0 || Volatile.Read(ref collected) < maxResults) &&
+                       enumerator.MoveNext()) {
+                    var uid = enumerator.Current;
+                    tasks.Add(Task.Run(async () => {
+                        try {
+                            var msg = await mailFolder.GetMessageAsync(uid, cts.Token).ConfigureAwait(false);
+                            var current = Interlocked.Increment(ref collected);
+                            if (maxResults <= 0 || current <= maxResults) bag.Add(msg);
+                            if (maxResults > 0 && current >= maxResults) cts.Cancel();
+                        } catch (OperationCanceledException) { }
+                    }, CancellationToken.None));
                 }
+                if (tasks.Count == 0) break;
+                var finished = await Task.WhenAny(tasks).ConfigureAwait(false);
+                tasks.Remove(finished);
             }
-
-            foreach (var uid in uids) {
-                cancellationToken.ThrowIfCancellationRequested();
-                tasks.Add(DownloadMessageAsync(uid));
-                if (maxResults > 0 && tasks.Count >= maxResults) break;
-            }
-
             await Task.WhenAll(tasks).ConfigureAwait(false);
+            messages = bag;
         }
 
         return FilterDmarcReports(messages, since, before, domain);
@@ -420,39 +437,43 @@ public static class MailboxSearcher {
         int maxResults = 0,
         int parallelDownloadLimit = 4,
         CancellationToken cancellationToken = default) {
-        var count = client.Count;
-        var indices = new List<int>(count);
-        for (int i = 0; i < count; i++) indices.Add(i);
-        var messages = new List<MimeMessage>(indices.Count);
+        var indices = Enumerable.Range(0, client.Count);
+        IEnumerable<MimeMessage> messages;
         if (parallelDownloadLimit <= 1) {
+            var list = new List<MimeMessage>();
             foreach (var idx in indices) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
-                messages.Add(msg);
-                if (maxResults > 0 && messages.Count >= maxResults) break;
+                list.Add(msg);
+                if (maxResults > 0 && list.Count >= maxResults) break;
             }
+            messages = list;
         } else {
-            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
+            var bag = new ConcurrentBag<MimeMessage>();
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             var tasks = new List<Task>();
-
-            async Task DownloadMessageAsync(int idx) {
-                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                try {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
-                    lock (messages) messages.Add(msg);
-                } finally {
-                    semaphore.Release();
+            int collected = 0;
+            using var enumerator = indices.GetEnumerator();
+            while (!cts.IsCancellationRequested) {
+                while (tasks.Count < parallelDownloadLimit &&
+                       (maxResults <= 0 || Volatile.Read(ref collected) < maxResults) &&
+                       enumerator.MoveNext()) {
+                    var idx = enumerator.Current;
+                    tasks.Add(Task.Run(async () => {
+                        try {
+                            var msg = await client.GetMessageAsync(idx, cts.Token).ConfigureAwait(false);
+                            var current = Interlocked.Increment(ref collected);
+                            if (maxResults <= 0 || current <= maxResults) bag.Add(msg);
+                            if (maxResults > 0 && current >= maxResults) cts.Cancel();
+                        } catch (OperationCanceledException) { }
+                    }, CancellationToken.None));
                 }
+                if (tasks.Count == 0) break;
+                var finished = await Task.WhenAny(tasks).ConfigureAwait(false);
+                tasks.Remove(finished);
             }
-
-            foreach (var idx in indices) {
-                cancellationToken.ThrowIfCancellationRequested();
-                tasks.Add(DownloadMessageAsync(idx));
-                if (maxResults > 0 && tasks.Count >= maxResults) break;
-            }
-
             await Task.WhenAll(tasks).ConfigureAwait(false);
+            messages = bag;
         }
 
         return FilterDmarcReports(messages, since, before, domain);

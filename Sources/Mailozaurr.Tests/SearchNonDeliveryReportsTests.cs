@@ -138,6 +138,7 @@ public class SearchNonDeliveryReportsTests {
         private readonly object _lock = new();
         private int _current;
         public int MaxConcurrency { get; private set; }
+        public int CallCount { get; private set; }
         public CountingPop3Client(IEnumerable<MimeMessage> messages, int delay) {
             _messages = new List<MimeMessage>(messages);
             _delay = delay;
@@ -148,6 +149,7 @@ public class SearchNonDeliveryReportsTests {
         public override async Task<MimeMessage> GetMessageAsync(int index, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
             lock (_lock) {
                 _current++;
+                CallCount++;
                 if (_current > MaxConcurrency) MaxConcurrency = _current;
             }
             try {
@@ -193,5 +195,21 @@ public class SearchNonDeliveryReportsTests {
             cancellationToken: CancellationToken.None);
         Assert.Equal(msgs.Count, reports.Count);
         Assert.Equal(4, client.MaxConcurrency);
+    }
+
+    [Fact]
+    public async Task SearchNonDeliveryReportsAsync_Pop3_RespectsMaxResults() {
+        var now = DateTimeOffset.UtcNow;
+        var msgs = new List<MimeMessage>();
+        for (int i = 0; i < 10; i++) msgs.Add(CreateNdr($"u{i}@example.com", $"<id{i}>", now));
+        var client = new CountingPop3Client(msgs, 100);
+        var maxResults = 3;
+        var reports = await MailboxSearcher.SearchNonDeliveryReportsAsync(
+            client,
+            maxResults: maxResults,
+            parallelDownloadLimit: 2,
+            cancellationToken: CancellationToken.None);
+        Assert.Equal(maxResults, reports.Count);
+        Assert.True(client.CallCount <= maxResults + 1);
     }
 }

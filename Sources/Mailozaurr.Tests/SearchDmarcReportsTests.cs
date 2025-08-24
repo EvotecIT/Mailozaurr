@@ -1,6 +1,8 @@
 using Mailozaurr;
 using Mailozaurr.DmarcReports;
 using MimeKit;
+using MailKit;
+using MailKit.Net.Pop3;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -142,5 +144,52 @@ public class SearchDmarcReportsTests {
         Assert.Single(reports);
         Assert.Single(reports[0].Attachments);
         Assert.Equal("example", reports[0].Attachments[0].Name);
+    }
+
+    private class CountingPop3Client : Pop3Client {
+        private readonly List<MimeMessage> _messages;
+        private readonly int _delay;
+        private readonly object _lock = new();
+        private int _current;
+        public int MaxConcurrency { get; private set; }
+        public int CallCount { get; private set; }
+        public CountingPop3Client(IEnumerable<MimeMessage> messages, int delay) {
+            _messages = new List<MimeMessage>(messages);
+            _delay = delay;
+        }
+        public override bool IsConnected => true;
+        public override bool IsAuthenticated => true;
+        public override int Count => _messages.Count;
+        public override async Task<MimeMessage> GetMessageAsync(int index, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
+            lock (_lock) {
+                _current++;
+                CallCount++;
+                if (_current > MaxConcurrency) MaxConcurrency = _current;
+            }
+            try {
+                await Task.Delay(_delay, cancellationToken).ConfigureAwait(false);
+            } finally {
+                lock (_lock) { _current--; }
+            }
+            return _messages[index];
+        }
+    }
+
+    [Fact]
+    public async Task SearchDmarcReportsAsync_Pop3_RespectsParallelLimitAndMaxResults() {
+        var now = DateTimeOffset.UtcNow;
+        var msgs = new List<MimeMessage>();
+        for (int i = 0; i < 10; i++) msgs.Add(CreateDmarc("example.com", now));
+        var client = new CountingPop3Client(msgs, 100);
+        var maxResults = 3;
+        var reports = await MailboxSearcher.SearchDmarcReportsAsync(
+            client,
+            domain: "example.com",
+            maxResults: maxResults,
+            parallelDownloadLimit: 2,
+            cancellationToken: CancellationToken.None);
+        Assert.Equal(maxResults, reports.Count);
+        Assert.Equal(2, client.MaxConcurrency);
+        Assert.True(client.CallCount <= maxResults + 1);
     }
 }
