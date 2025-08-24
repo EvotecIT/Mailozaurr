@@ -15,25 +15,26 @@ public static class GraphApiErrorParser {
     /// Parses a raw error string returned by Graph API.
     /// </summary>
     /// <param name="message">Raw error message.</param>
-    /// <returns>Parsed <see cref="GraphApiErrorResponse"/> or <c>null</c> if parsing fails.</returns>
+    /// <returns>Parsed <see cref="GraphApiErrorResponse"/> or <c>null</c> if input is empty.</returns>
     public static GraphApiErrorResponse? Parse(string? message) {
         if (string.IsNullOrWhiteSpace(message)) {
             return null;
         }
 
+        var response = new GraphApiErrorResponse { Raw = message };
+
         try {
             var lines = message.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             if (lines.Length == 0) {
-                return null;
+                return response;
             }
 
-            var response = new GraphApiErrorResponse();
             var index = 0;
 
             var first = lines[index++];
             var firstParts = first.Split(new[] { ' ' }, 2);
             if (firstParts.Length != 2 || !Enum.TryParse<GraphHttpMethod>(firstParts[0], true, out var method)) {
-                return null;
+                return response;
             }
             response.Method = method;
             response.Uri = firstParts[1];
@@ -101,10 +102,10 @@ public static class GraphApiErrorParser {
                         break;
                 }
             }
-
-            return response;
         } catch {
-            return null;
+            // ignore failures and return raw response
         }
+
+        return response;
     }
 }

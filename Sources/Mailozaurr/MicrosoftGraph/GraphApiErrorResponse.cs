@@ -18,6 +18,9 @@ public class GraphApiErrorResponse {
     /// <summary>Gets or sets the headers.</summary>
     public GraphApiErrorHeaders Headers { get; set; } = new();
 
+    /// <summary>Gets or sets the original raw error message.</summary>
+    public string Raw { get; set; } = string.Empty;
+
     /// <summary>Gets or sets the error details.</summary>
     public GraphApiErrorDetail? Error { get; set; }
 }

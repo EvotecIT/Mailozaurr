@@ -25,8 +25,11 @@ public class GraphApiErrorParserTests {
     }
 
     [Fact]
-    public void Parse_InvalidInput_ReturnsNull() {
-        var parsed = GraphApiErrorParser.Parse("not a graph error");
-        Assert.Null(parsed);
+    public void Parse_InvalidInput_ReturnsRaw() {
+        const string sample = "not a graph error";
+        var parsed = GraphApiErrorParser.Parse(sample);
+        Assert.NotNull(parsed);
+        Assert.Equal(sample, parsed!.Raw);
+        Assert.Null(parsed.Error);
     }
 }

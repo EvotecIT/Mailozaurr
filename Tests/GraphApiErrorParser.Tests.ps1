@@ -19,8 +19,10 @@ Content-Type: application/json; odata.metadata=minimal; odata.streaming=true; IE
         $parsed.Error.Code | Should -Be 'ErrorInvalidUser'
     }
 
-    It 'returns null for invalid input' {
-        $parsed = [Mailozaurr.GraphApiErrorParser]::Parse('not a graph error')
-        $parsed | Should -Be $null
+    It 'returns raw message for invalid input' {
+        $sample = 'not a graph error'
+        $parsed = [Mailozaurr.GraphApiErrorParser]::Parse($sample)
+        $parsed.Raw | Should -Be $sample
+        $parsed.Error | Should -Be $null
     }
 }
