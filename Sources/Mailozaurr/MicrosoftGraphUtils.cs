@@ -276,7 +276,8 @@ namespace Mailozaurr {
             string method,
             string uri,
             IDictionary<string, string>? headers = null,
-            string? body = null) {
+            string? body = null,
+            CancellationToken cancellationToken = default) {
             var request = new HttpRequestMessage(new HttpMethod(method), uri);
             if (headers != null) {
                 foreach (var kvp in headers) {
@@ -286,19 +287,19 @@ namespace Mailozaurr {
             if (!string.IsNullOrWhiteSpace(body) && (method == "POST" || method == "PUT" || method == "PATCH")) {
                 request.Content = new StringContent(body, Encoding.UTF8, "application/json");
             }
-            await ConcurrencySemaphore.WaitAsync();
+            await ConcurrencySemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
             HttpResponseMessage? response = null;
             try {
-                response = await HttpClient.SendAsync(request);
+                response = await HttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
                 if ((int)response.StatusCode == 429) {
                     var delay = GetRetryAfterDelay(response);
                     response.Dispose();
                     if (delay > TimeSpan.Zero) {
-                        await Task.Delay(delay);
+                        await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                     }
-                    response = await HttpClient.SendAsync(request);
+                    response = await HttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
                 }
-                var responseContent = await response.Content.ReadAsStringAsync();
+                var responseContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 if (!response.IsSuccessStatusCode) {
                     throw new GraphApiException(
                         response.StatusCode,
@@ -456,7 +457,7 @@ namespace Mailozaurr {
         /// <summary>
         /// Retrieves mail messages for the specified user.
         /// </summary>
-        public static async Task<List<Dictionary<string, object>>> GetMailMessagesAsync(GraphCredential credential, string userPrincipalName, IEnumerable<string>? properties = null, string? filter = null, int? limit = null) {
+        public static async Task<List<Dictionary<string, object>>> GetMailMessagesAsync(GraphCredential credential, string userPrincipalName, IEnumerable<string>? properties = null, string? filter = null, int? limit = null, CancellationToken cancellationToken = default) {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
             headers["Authorization"] = token ?? string.Empty;
@@ -466,7 +467,7 @@ namespace Mailozaurr {
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages", queryParams);
             var messages = new List<Dictionary<string, object>>();
             while (!string.IsNullOrEmpty(uri)) {
-                var doc = await InvokeGraphApiAsync("GET", uri, headers);
+                var doc = await InvokeGraphApiAsync("GET", uri, headers, cancellationToken: cancellationToken).ConfigureAwait(false);
                 if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
                     foreach (var item in valueElement.EnumerateArray()) {
                         var native = ConvertJsonElementToNativeObject(item) as Dictionary<string, object>;
@@ -705,16 +706,16 @@ namespace Mailozaurr {
         /// <summary>
         /// Retrieves the raw MIME content of a mail message.
         /// </summary>
-        public static async Task<MimeMessage> GetMailMessageMimeAsync(GraphCredential credential, string userPrincipalName, string messageId) {
+        public static async Task<MimeMessage> GetMailMessageMimeAsync(GraphCredential credential, string userPrincipalName, string messageId, CancellationToken cancellationToken = default) {
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com");
             var request = new HttpRequestMessage(HttpMethod.Get, $"https://graph.microsoft.com/v1.0/users/{userPrincipalName}/messages/{messageId}/$value");
             request.Headers.TryAddWithoutValidation("Authorization", token);
-            await ConcurrencySemaphore.WaitAsync();
+            await ConcurrencySemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
             try {
-                using var response = await HttpClient.SendAsync(request).ConfigureAwait(false);
+                using var response = await HttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
                 using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-                return await MimeMessage.LoadAsync(stream).ConfigureAwait(false);
+                return await MimeMessage.LoadAsync(stream, cancellationToken).ConfigureAwait(false);
             } finally {
                 ConcurrencySemaphore.Release();
             }

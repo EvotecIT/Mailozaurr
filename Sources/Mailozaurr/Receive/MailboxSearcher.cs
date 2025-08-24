@@ -259,13 +259,14 @@ public static class MailboxSearcher {
             userPrincipalName,
             new[] { "id" },
             filter!,
-            maxResults > 0 ? maxResults : (int?)null).ConfigureAwait(false);
+            maxResults > 0 ? maxResults : (int?)null,
+            cancellationToken).ConfigureAwait(false);
         var mimeMessages = new List<MimeMessage>(msgs.Count);
         if (parallelDownloadLimit <= 1) {
             foreach (var m in msgs) {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (m.TryGetValue("id", out var idObj) && idObj is string id) {
-                    var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
+                    var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id, cancellationToken).ConfigureAwait(false);
                     mimeMessages.Add(mime);
                 }
             }
@@ -277,7 +278,7 @@ public static class MailboxSearcher {
                 await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
                 try {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
+                    var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id, cancellationToken).ConfigureAwait(false);
                     lock (mimeMessages) mimeMessages.Add(mime);
                 } finally {
                     semaphore.Release();
@@ -482,13 +483,14 @@ public static class MailboxSearcher {
             userPrincipalName,
             new[] { "id" },
             filter,
-            maxResults > 0 ? maxResults : (int?)null).ConfigureAwait(false);
+            maxResults > 0 ? maxResults : (int?)null,
+            cancellationToken).ConfigureAwait(false);
         var mimeMessages = new List<MimeMessage>(msgs.Count);
         if (parallelDownloadLimit <= 1) {
             foreach (var m in msgs) {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (m.TryGetValue("id", out var idObj) && idObj is string id) {
-                    var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
+                    var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id, cancellationToken).ConfigureAwait(false);
                     mimeMessages.Add(mime);
                 }
             }
@@ -500,7 +502,7 @@ public static class MailboxSearcher {
                 await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
                 try {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
+                    var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id, cancellationToken).ConfigureAwait(false);
                     lock (mimeMessages) mimeMessages.Add(mime);
                 } finally {
                     semaphore.Release();
