@@ -662,7 +662,7 @@ public static class MailboxSearcher {
         var beforeUtc = before?.ToUniversalTime();
         foreach (var message in messages) {
             foreach (var report in MimeKitUtils.GetNonDeliveryReports(message)) {
-                var reportDate = report.Timestamp.UtcDateTime;
+                var reportDate = (report.LastAttemptDate ?? report.Timestamp).UtcDateTime;
                 if (sinceUtc.HasValue && reportDate < sinceUtc.Value) continue;
                 if (beforeUtc.HasValue && reportDate > beforeUtc.Value) continue;
                 if (!string.IsNullOrWhiteSpace(recipientContains) && !RecipientMatches(report, recipientContains!)) continue;

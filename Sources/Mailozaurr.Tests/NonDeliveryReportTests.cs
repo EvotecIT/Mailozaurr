@@ -76,5 +76,16 @@ public class NonDeliveryReportTests {
         Assert.True(DateUtils.TryParse(dateHeader, out var expected));
         Assert.Equal(expected, report.Timestamp);
         Assert.Equal(expected, report.LastAttemptDate);
+
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("not a date")]
+    public void LastAttemptDateMissingOrInvalid_ReturnsNull(string? header) {
+        var headers = new Dictionary<string, string>();
+        if (header != null) headers["Last-Attempt-Date"] = header;
+        var report = NonDeliveryReport.FromHeaders(headers);
+        Assert.Null(report.LastAttemptDate);
     }
 }
