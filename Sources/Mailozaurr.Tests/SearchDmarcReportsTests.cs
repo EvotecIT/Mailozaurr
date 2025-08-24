@@ -1,11 +1,15 @@
 using Mailozaurr;
 using Mailozaurr.DmarcReports;
+using MailKit;
 using MimeKit;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using MailKit.Net.Pop3;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -65,6 +69,22 @@ public class SearchDmarcReportsTests {
         builder.Attachments.Add(part);
         message.Body = builder.ToMessageBody();
         return message;
+    }
+
+    private class TrackingPop3Client : Pop3Client {
+        private readonly List<MimeMessage> _messages;
+        public int FetchCount { get; private set; }
+        public TrackingPop3Client(IEnumerable<MimeMessage> messages) {
+            _messages = new List<MimeMessage>(messages);
+        }
+        public override bool IsConnected => true;
+        public override bool IsAuthenticated => true;
+        public override int Count => _messages.Count;
+        public override async Task<MimeMessage> GetMessageAsync(int index, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
+            await Task.Yield();
+            FetchCount++;
+            return _messages[index];
+        }
     }
 
     [Fact]
@@ -202,5 +222,23 @@ public class SearchDmarcReportsTests {
         Assert.Single(reports);
         Assert.Single(reports[0].Attachments);
         Assert.Equal("example", reports[0].Attachments[0].Name);
+    }
+
+    [Fact]
+    public async Task SearchDmarcReportsAsync_Pop3_StopsAfterMaxResults() {
+        var now = DateTimeOffset.UtcNow;
+        var msgs = new List<MimeMessage>();
+        msgs.Add(new MimeMessage());
+        msgs.Add(CreateDmarc("example.com", now));
+        msgs.Add(CreateDmarc("example.com", now));
+        msgs.Add(CreateDmarc("example.com", now));
+        var client = new TrackingPop3Client(msgs);
+        var reports = await MailboxSearcher.SearchDmarcReportsAsync(
+            client,
+            maxResults: 2,
+            parallelDownloadLimit: 2,
+            cancellationToken: CancellationToken.None);
+        Assert.Equal(2, reports.Count);
+        Assert.True(client.FetchCount <= 4, $"fetched {client.FetchCount}");
     }
 }

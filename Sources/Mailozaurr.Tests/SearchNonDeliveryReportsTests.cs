@@ -172,6 +172,22 @@ public class SearchNonDeliveryReportsTests {
         }
     }
 
+    private class TrackingPop3Client : Pop3Client {
+        private readonly List<MimeMessage> _messages;
+        public int FetchCount { get; private set; }
+        public TrackingPop3Client(IEnumerable<MimeMessage> messages) {
+            _messages = new List<MimeMessage>(messages);
+        }
+        public override bool IsConnected => true;
+        public override bool IsAuthenticated => true;
+        public override int Count => _messages.Count;
+        public override async Task<MimeMessage> GetMessageAsync(int index, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
+            await Task.Yield();
+            FetchCount++;
+            return _messages[index];
+        }
+    }
+
     [Fact]
     public async Task SearchNonDeliveryReportsAsync_Pop3_DownloadsInParallel() {
         var now = DateTimeOffset.UtcNow;
@@ -206,5 +222,23 @@ public class SearchNonDeliveryReportsTests {
             cancellationToken: CancellationToken.None);
         Assert.Equal(msgs.Count, reports.Count);
         Assert.Equal(4, client.MaxConcurrency);
+    }
+
+    [Fact]
+    public async Task SearchNonDeliveryReportsAsync_Pop3_StopsAfterMaxResults() {
+        var now = DateTimeOffset.UtcNow;
+        var msgs = new List<MimeMessage>();
+        msgs.Add(new MimeMessage());
+        msgs.Add(CreateNdr("u1@example.com", "<id1>", now));
+        msgs.Add(CreateNdr("u2@example.com", "<id2>", now));
+        msgs.Add(CreateNdr("u3@example.com", "<id3>", now));
+        var client = new TrackingPop3Client(msgs);
+        var reports = await MailboxSearcher.SearchNonDeliveryReportsAsync(
+            client,
+            maxResults: 2,
+            parallelDownloadLimit: 2,
+            cancellationToken: CancellationToken.None);
+        Assert.Equal(2, reports.Count);
+        Assert.True(client.FetchCount <= 4, $"fetched {client.FetchCount}");
     }
 }
