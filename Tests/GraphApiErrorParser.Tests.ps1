@@ -18,4 +18,9 @@ Content-Type: application/json; odata.metadata=minimal; odata.streaming=true; IE
         $parsed.Headers.Diagnostic.ServerInfo.DataCenter | Should -Be 'Poland Central'
         $parsed.Error.Code | Should -Be 'ErrorInvalidUser'
     }
+
+    It 'returns null for invalid input' {
+        $parsed = [Mailozaurr.GraphApiErrorParser]::Parse('not a graph error')
+        $parsed | Should -Be $null
+    }
 }

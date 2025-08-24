@@ -23,4 +23,10 @@ public class GraphApiErrorParserTests {
         Assert.Equal("Poland Central", parsed.Headers.Diagnostic?.ServerInfo.DataCenter);
         Assert.Equal("ErrorInvalidUser", parsed.Error?.Code);
     }
+
+    [Fact]
+    public void Parse_InvalidInput_ReturnsNull() {
+        var parsed = GraphApiErrorParser.Parse("not a graph error");
+        Assert.Null(parsed);
+    }
 }
