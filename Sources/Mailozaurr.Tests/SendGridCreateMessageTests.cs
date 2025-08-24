@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Reflection;
+using System.Text.Json;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -85,5 +86,33 @@ public class SendGridCreateMessageTests
         using var doc = System.Text.Json.JsonDocument.Parse(json!);
         var count = doc.RootElement.GetProperty("Attachments").GetArrayLength();
         Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public void CreateMessage_WithSeparateTo_CreatesPersonalizationsPerRecipient()
+    {
+        var client = new SendGridClient
+        {
+            From = "from@example.com",
+            To = new List<object> { "a@example.com", "b@example.com", "a@example.com" },
+            Cc = new List<object> { "cc@example.com" },
+            Bcc = new List<object> { "b@example.com", "bcc@example.com" },
+            Subject = "subject",
+            Text = "text",
+            SeparateTo = true,
+            Credentials = new NetworkCredential("apikey", "test")
+        };
+        client.CreateMessage();
+        PropertyInfo? prop = typeof(SendGridClient).GetProperty("MessageJson", BindingFlags.NonPublic | BindingFlags.Instance);
+        var json = prop?.GetValue(client) as string;
+        Assert.NotNull(json);
+        using var doc = JsonDocument.Parse(json!);
+        var pers = doc.RootElement.GetProperty("Personalizations");
+        Assert.Equal(2, pers.GetArrayLength());
+        foreach (var p in pers.EnumerateArray()) {
+            Assert.Equal(1, p.GetProperty("To").GetArrayLength());
+            Assert.Equal(1, p.GetProperty("Cc").GetArrayLength());
+            Assert.Equal(1, p.GetProperty("Bcc").GetArrayLength());
+        }
     }
 }

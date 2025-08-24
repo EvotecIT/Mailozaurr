@@ -244,29 +244,46 @@ public class SendGridClient {
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        var personalizations = new List<SendGridPersonalization>
-            {
-                new SendGridPersonalization
-                {
-                    To = To?.Where(t => t != null)
-                        .Select(ConvertToEmailObject)
-                        .Where(x => x != null && seen.Add(x.Email))
-                        .Select(x => x!)
-                        .ToList(),
-                    Cc = Cc?.Where(c => c != null)
-                        .Select(ConvertToEmailObject)
-                        .Where(x => x != null && seen.Add(x.Email))
-                        .Select(x => x!)
-                        .ToList(),
-                    Bcc = Bcc?.Where(b => b != null)
-                        .Select(ConvertToEmailObject)
-                        .Where(x => x != null && seen.Add(x.Email))
-                        .Select(x => x!)
-                        .ToList()
-                }
-            }
-            .Where(p => p.To != null || p.Cc != null || p.Bcc != null)
+        var toAddresses = To?.Where(t => t != null)
+            .Select(ConvertToEmailObject)
+            .Where(x => x != null && seen.Add(x.Email))
+            .Select(x => x!)
             .ToList();
+
+        var ccAddresses = Cc?.Where(c => c != null)
+            .Select(ConvertToEmailObject)
+            .Where(x => x != null && seen.Add(x.Email))
+            .Select(x => x!)
+            .ToList();
+
+        var bccAddresses = Bcc?.Where(b => b != null)
+            .Select(ConvertToEmailObject)
+            .Where(x => x != null && seen.Add(x.Email))
+            .Select(x => x!)
+            .ToList();
+
+        List<SendGridPersonalization> personalizations;
+        if (SeparateTo && toAddresses != null && toAddresses.Count > 0) {
+            personalizations = toAddresses
+                .Select(t => new SendGridPersonalization {
+                    To = new List<SendGridEmailAddress> { t },
+                    Cc = ccAddresses?.ToList(),
+                    Bcc = bccAddresses?.ToList()
+                })
+                .ToList();
+        } else {
+            personalizations = new List<SendGridPersonalization>
+                {
+                    new SendGridPersonalization
+                    {
+                        To = toAddresses,
+                        Cc = ccAddresses,
+                        Bcc = bccAddresses
+                    }
+                }
+                .Where(p => p.To != null || p.Cc != null || p.Bcc != null)
+                .ToList();
+        }
 
         var content = new List<SendGridContent> {
                 new SendGridContent { Type = "text/plain", Value = Text },
