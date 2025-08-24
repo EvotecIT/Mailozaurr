@@ -97,11 +97,12 @@ public sealed class GmailApiClient : IDisposable {
     public async Task<IList<GmailMessage>> ListAsync(string userId, string? query = null, int? maxResults = null, CancellationToken cancellationToken = default) {
         var messages = new List<GmailMessage>();
         string? pageToken = null;
-        do {
+        int? remaining = maxResults;
+        while (true) {
             var url = new StringBuilder($"users/{userId}/messages");
             var qs = new List<string>();
             if (!string.IsNullOrWhiteSpace(query)) qs.Add($"q={Uri.EscapeDataString(query)}");
-            if (maxResults.HasValue) qs.Add($"maxResults={maxResults.Value}");
+            if (remaining.HasValue) qs.Add($"maxResults={remaining.Value}");
             if (!string.IsNullOrEmpty(pageToken)) qs.Add($"pageToken={pageToken}");
             if (qs.Count > 0) {
                 url.Append('?').Append(string.Join("&", qs));
@@ -118,8 +119,17 @@ public sealed class GmailApiClient : IDisposable {
             if (list?.Messages != null) {
                 messages.AddRange(list.Messages);
             }
+            if (maxResults.HasValue && messages.Count >= maxResults.Value) {
+                break;
+            }
             pageToken = list?.NextPageToken;
-        } while (!string.IsNullOrEmpty(pageToken));
+            if (string.IsNullOrEmpty(pageToken)) {
+                break;
+            }
+            if (maxResults.HasValue) {
+                remaining = maxResults.Value - messages.Count;
+            }
+        }
 
         return messages;
     }

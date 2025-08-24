@@ -138,6 +138,36 @@ public class GmailApiClientTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task ListAsync_ExactMaxResults_StopsEarly() {
+        var page1 = "{\"messages\":[{\"id\":\"1\"},{\"id\":\"2\"}],\"nextPageToken\":\"tok\"}";
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(page1) });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+        var list = await client.ListAsync("me", maxResults: 2);
+        Assert.Equal(2, list.Count);
+        Assert.Single(handler.Requests);
+        Assert.Equal("?maxResults=2", handler.Requests[0].RequestUri!.Query);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ListAsync_PartialPageLimit_AdjustsRequests() {
+        var page1 = "{\"messages\":[{\"id\":\"1\"},{\"id\":\"2\"}],\"nextPageToken\":\"tok\"}";
+        var page2 = "{\"messages\":[{\"id\":\"3\"}],\"nextPageToken\":\"tok2\"}";
+        var handler = new RecordingHandler(
+            new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(page1) },
+            new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(page2) });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+        var list = await client.ListAsync("me", maxResults: 3);
+        Assert.Equal(3, list.Count);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Equal("?maxResults=3", handler.Requests[0].RequestUri!.Query);
+        Assert.Equal("?maxResults=1&pageToken=tok", handler.Requests[1].RequestUri!.Query);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task SendAsync_CanBeCancelled() {
         var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK));
         var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
