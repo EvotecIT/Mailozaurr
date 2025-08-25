@@ -43,7 +43,7 @@ public class GmailNonDeliveryReportsTests {
         field.SetValue(client, new HttpClient(handler) { BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/") });
         var reports = await MailboxSearcher.SearchNonDeliveryReportsAsync(client, "me", parallelDownloadLimit: 1, cancellationToken: CancellationToken.None);
         Assert.Single(reports);
-        Assert.Equal("<id1>", reports[0].OriginalMessageId);
+        Assert.Equal("id1", reports[0].OriginalMessageId);
     }
 }
 

@@ -60,7 +60,7 @@ public class NonDeliveryReportTests {
             ["Original-Message-ID"] = "<msg1@local>"
         };
         var report = NonDeliveryReport.FromHeaders(headers);
-        Assert.Equal("<msg1@local>", report.OriginalMessageId);
+        Assert.Equal("msg1@local", report.OriginalMessageId);
     }
 
     [Theory]

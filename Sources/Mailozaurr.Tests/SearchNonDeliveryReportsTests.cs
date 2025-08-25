@@ -39,9 +39,27 @@ public class SearchNonDeliveryReportsTests {
             since: now.AddMinutes(-5).DateTime,
             before: now.AddMinutes(5).DateTime,
             recipientContains: "user@example.com",
-            messageId: "<id1>");
+            messageId: "id1");
         Assert.Single(reports);
-        Assert.Equal("<id1>", reports[0].OriginalMessageId);
+        Assert.Equal("id1", reports[0].OriginalMessageId);
+    }
+
+    [Theory]
+    [InlineData("<id1>", "<id1>")]
+    [InlineData("<id1>", "id1")]
+    [InlineData("id1", "<id1>")]
+    [InlineData("id1", "id1")]
+    public void FilterNonDeliveryReports_MatchesMessageIdWithOrWithoutBrackets(string headerId, string filter) {
+        var now = DateTimeOffset.UtcNow;
+        var msg = CreateNdr("user@example.com", headerId, now);
+        var reports = MailboxSearcher.FilterNonDeliveryReports(
+            new List<MimeMessage> { msg },
+            since: now.AddMinutes(-5).DateTime,
+            before: now.AddMinutes(5).DateTime,
+            recipientContains: null,
+            messageId: filter);
+        Assert.Single(reports);
+        Assert.Equal("id1", reports[0].OriginalMessageId);
     }
 
     [Fact]
@@ -52,7 +70,7 @@ public class SearchNonDeliveryReportsTests {
         var list = new List<MimeMessage> { msg1, msg2 };
         var reports = MailboxSearcher.FilterNonDeliveryReports(list, since: now.AddMinutes(-5).DateTime, before: null, recipientContains: null, messageId: null);
         Assert.Single(reports);
-        Assert.Equal("<id2>", reports[0].OriginalMessageId);
+        Assert.Equal("id2", reports[0].OriginalMessageId);
     }
 
     [Fact]
@@ -62,7 +80,7 @@ public class SearchNonDeliveryReportsTests {
         var list = new List<MimeMessage> { msg };
         var reports = MailboxSearcher.FilterNonDeliveryReports(list, since: now.AddHours(-1).DateTime, before: null, recipientContains: null, messageId: null);
         Assert.Single(reports);
-        Assert.Equal("<id1>", reports[0].OriginalMessageId);
+        Assert.Equal("id1", reports[0].OriginalMessageId);
     }
 
     [Fact]
@@ -74,7 +92,7 @@ public class SearchNonDeliveryReportsTests {
         var before = new DateTime(2024, 1, 1, 1, 0, 0, DateTimeKind.Utc);
         var reports = MailboxSearcher.FilterNonDeliveryReports(list, since, before, recipientContains: null, messageId: null);
         Assert.Single(reports);
-        Assert.Equal("<id1>", reports[0].OriginalMessageId);
+        Assert.Equal("id1", reports[0].OriginalMessageId);
     }
 
     [Fact]

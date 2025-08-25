@@ -815,6 +815,7 @@ public static class MailboxSearcher {
         DateTime? before,
         string? recipientContains,
         string? messageId) {
+        messageId = NonDeliveryReport.NormalizeMessageId(messageId);
         var results = new List<NonDeliveryReport>();
         var sinceUtc = since?.ToUniversalTime();
         var beforeUtc = before?.ToUniversalTime();

@@ -73,10 +73,10 @@ public class NonDeliveryReportServiceTests {
     [Fact]
     public async Task SearchAsync_ResolvesSentMessage() {
         var repo = new InMemorySentMessageRepository();
-        var record = new SentMessageRecord { MessageId = "<id1>", Recipients = "user@example.com", Subject = "s", Timestamp = DateTimeOffset.UtcNow };
+        var record = new SentMessageRecord { MessageId = "id1", Recipients = "user@example.com", Subject = "s", Timestamp = DateTimeOffset.UtcNow };
         await repo.SaveAsync(record);
         var resolver = new SendLogResolver(repo);
-        var report = new NonDeliveryReport { OriginalMessageId = "<id1>", FinalRecipient = "user@example.com", Timestamp = DateTimeOffset.UtcNow };
+        var report = new NonDeliveryReport { OriginalMessageId = "id1", FinalRecipient = "user@example.com", Timestamp = DateTimeOffset.UtcNow };
         var service = new TestService(new List<NonDeliveryReport> { report }, resolver);
 
         IList<NonDeliveryReportResult> results = await service.SearchAsync();
