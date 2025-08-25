@@ -421,6 +421,7 @@ public static class MailboxSearcher {
         string? domain = null,
         int maxResults = 0,
         int parallelDownloadLimit = 4,
+        long maxUncompressedSize = 10 * 1024 * 1024,
         CancellationToken cancellationToken = default) {
         var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadOnly);
         var search = BuildDmarcReportSearchQuery(since, before, domain);
@@ -430,7 +431,7 @@ public static class MailboxSearcher {
             foreach (var uid in uids) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
-                var reports = FilterDmarcReports(new[] { msg }, since, before, domain);
+                var reports = FilterDmarcReports(new[] { msg }, since, before, domain, maxUncompressedSize);
                 if (reports.Count > 0) {
                     foreach (var r in reports) {
                         if (maxResults > 0 && results.Count >= maxResults) break;
@@ -460,7 +461,7 @@ public static class MailboxSearcher {
                         } catch (OperationCanceledException) {
                             return;
                         }
-                        var reports = FilterDmarcReports(new[] { msg }, since, before, domain);
+                        var reports = FilterDmarcReports(new[] { msg }, since, before, domain, maxUncompressedSize);
                         if (reports.Count == 0) continue;
                         lock (gate) {
                             foreach (var r in reports) {
@@ -500,13 +501,14 @@ public static class MailboxSearcher {
         string? domain = null,
         int maxResults = 0,
         int parallelDownloadLimit = 4,
+        long maxUncompressedSize = 10 * 1024 * 1024,
         CancellationToken cancellationToken = default) {
         var results = new List<DmarcReport>();
         if (parallelDownloadLimit <= 1) {
             for (int idx = 0; idx < client.Count; idx++) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
-                var reports = FilterDmarcReports(new[] { msg }, since, before, domain);
+                var reports = FilterDmarcReports(new[] { msg }, since, before, domain, maxUncompressedSize);
                 if (reports.Count > 0) {
                     foreach (var r in reports) {
                         if (maxResults > 0 && results.Count >= maxResults) break;
@@ -535,7 +537,7 @@ public static class MailboxSearcher {
                         } catch (OperationCanceledException) {
                             return;
                         }
-                        var reports = FilterDmarcReports(new[] { msg }, since, before, domain);
+                        var reports = FilterDmarcReports(new[] { msg }, since, before, domain, maxUncompressedSize);
                         if (reports.Count == 0) continue;
                         lock (gate) {
                             foreach (var r in reports) {
@@ -576,6 +578,7 @@ public static class MailboxSearcher {
         string? domain = null,
         int maxResults = 0,
         int parallelDownloadLimit = 4,
+        long maxUncompressedSize = 10 * 1024 * 1024,
         CancellationToken cancellationToken = default) {
         var filters = new List<string> { "hasAttachments eq true", "contains(subject,'report domain')" };
         if (since.HasValue) filters.Add($"receivedDateTime ge {since.Value.ToUniversalTime():o}");
@@ -622,7 +625,7 @@ public static class MailboxSearcher {
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
 
-        return FilterDmarcReports(mimeMessages, since, before, domain);
+        return FilterDmarcReports(mimeMessages, since, before, domain, maxUncompressedSize);
     }
 
     /// <summary>
@@ -638,6 +641,7 @@ public static class MailboxSearcher {
         string? domain = null,
         int maxResults = 0,
         int parallelDownloadLimit = 4,
+        long maxUncompressedSize = 10 * 1024 * 1024,
         CancellationToken cancellationToken = default) {
         string query = BuildGmailDmarcReportQuery(since, before, domain);
         var msgs = await client.ListAsync(userId, query, maxResults > 0 ? maxResults : (int?)null, cancellationToken).ConfigureAwait(false);
@@ -677,7 +681,7 @@ public static class MailboxSearcher {
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
 
-        return FilterDmarcReports(mimeMessages, since, before, domain);
+        return FilterDmarcReports(mimeMessages, since, before, domain, maxUncompressedSize);
     }
 
     /// <summary>
@@ -689,7 +693,8 @@ public static class MailboxSearcher {
         IEnumerable<MimeMessage> messages,
         DateTime? since,
         DateTime? before,
-        string? domain) {
+        string? domain,
+        long maxUncompressedSize = 10 * 1024 * 1024) {
         var results = new List<DmarcReport>();
         var sinceUtc = since?.ToUniversalTime();
         var beforeUtc = before?.ToUniversalTime();
@@ -705,7 +710,7 @@ public static class MailboxSearcher {
             var domainMatched = string.IsNullOrWhiteSpace(domain);
             foreach (var att in message.Attachments) {
                 if (IsDmarcAttachment(att) && att is MimePart part) {
-                    if (!string.IsNullOrWhiteSpace(domain) && !AttachmentMatchesDomain(part, domain!)) continue;
+                    if (!string.IsNullOrWhiteSpace(domain) && !AttachmentMatchesDomain(part, domain!, maxUncompressedSize)) continue;
                     var stream = part.Content.Open();
                     report.Attachments.Add(new DmarcReportAttachment(part.FileName ?? "report.zip", stream));
                     if (!domainMatched) domainMatched = true;
@@ -716,7 +721,7 @@ public static class MailboxSearcher {
         return results;
     }
 
-    private static bool AttachmentMatchesDomain(MimePart part, string domain) {
+    private static bool AttachmentMatchesDomain(MimePart part, string domain, long maxUncompressedSize) {
         if (part.FileName?.IndexOf(domain, StringComparison.OrdinalIgnoreCase) >= 0) return true;
         try {
             using var stream = part.Content.Open();
@@ -724,23 +729,28 @@ public static class MailboxSearcher {
             if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) {
                 using var zip = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false);
                 foreach (var entry in zip.Entries) {
+                    if (entry.Length > maxUncompressedSize) {
+                        LoggingMessages.Logger.WriteError("Zip entry {0} exceeds max size {1}", entry.FullName, maxUncompressedSize);
+                        continue;
+                    }
                     using var entryStream = entry.Open();
-                    if (XmlStreamContainsDomain(entryStream, domain)) return true;
+                    if (XmlStreamContainsDomain(entryStream, domain, maxUncompressedSize)) return true;
                 }
             } else if (name.EndsWith(".gz", StringComparison.OrdinalIgnoreCase)) {
                 using var gz = new GZipStream(stream, CompressionMode.Decompress);
-                if (XmlStreamContainsDomain(gz, domain)) return true;
+                if (XmlStreamContainsDomain(gz, domain, maxUncompressedSize)) return true;
             } else {
-                if (XmlStreamContainsDomain(stream, domain)) return true;
+                if (XmlStreamContainsDomain(stream, domain, maxUncompressedSize)) return true;
             }
-        } catch {
+        } catch (Exception ex) {
+            LoggingMessages.Logger.WriteError("Failed to process attachment {0}: {1}", part.FileName ?? string.Empty, ex.Message);
         }
         return false;
     }
 
-    private static bool XmlStreamContainsDomain(Stream stream, string domain) {
-        var settings = new System.Xml.XmlReaderSettings { IgnoreComments = true, IgnoreWhitespace = true };
-        using var reader = System.Xml.XmlReader.Create(stream, settings);
+    private static bool XmlStreamContainsDomain(Stream stream, string domain, long maxUncompressedSize) {
+        var settings = new System.Xml.XmlReaderSettings { IgnoreComments = true, IgnoreWhitespace = true, CloseInput = true };
+        using var reader = System.Xml.XmlReader.Create(new LimitedStream(stream, maxUncompressedSize), settings);
         while (reader.Read()) {
             if (reader.NodeType == System.Xml.XmlNodeType.Element && reader.LocalName.Equals("domain", StringComparison.OrdinalIgnoreCase)) {
                 var value = reader.ReadElementContentAsString();
