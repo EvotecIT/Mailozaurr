@@ -6,6 +6,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Globalization;
+using System.Net;
+using System.Net.Http;
+using System.Reflection;
 using MailKit.Search;
 using MailKit.Net.Pop3;
 using MailKit;
@@ -272,5 +275,66 @@ public class SearchNonDeliveryReportsTests {
             cancellationToken: CancellationToken.None);
         Assert.Equal(2, reports.Count);
         Assert.True(client.FetchCount <= 4, $"fetched {client.FetchCount}");
+    }
+
+    [Fact]
+    public async Task SearchNonDeliveryReportsAsync_Graph_FiltersBySubject() {
+        var handler = new NdrHandler();
+        var field = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var client = (HttpClient)field.GetValue(null)!;
+        var handlerField = GetHandlerField();
+        var original = (HttpMessageHandler)handlerField.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        try {
+            var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", ClientSecret = "secret" };
+            var reports = await MailboxSearcher.SearchNonDeliveryReportsAsync(
+                cred,
+                "user@example.com",
+                cancellationToken: CancellationToken.None);
+            Assert.Single(reports);
+            Assert.Equal(1, handler.MimeFetches);
+            Assert.NotNull(handler.Filter);
+            foreach (var pattern in NonDeliveryReportSubjectPatterns.Values) {
+                Assert.Contains(pattern, handler.Filter!);
+            }
+        } finally {
+            handlerField.SetValue(client, original);
+        }
+    }
+
+    private static FieldInfo GetHandlerField() =>
+        typeof(HttpMessageInvoker).GetField("_handler", BindingFlags.NonPublic | BindingFlags.Instance)
+        ?? typeof(HttpMessageInvoker).GetField("handler", BindingFlags.NonPublic | BindingFlags.Instance)
+        ?? throw new InvalidOperationException("HttpClient handler field not found");
+
+    private sealed class NdrHandler : HttpMessageHandler {
+        public string? Filter { get; private set; }
+        public int MimeFetches { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            var uri = request.RequestUri!;
+            if (uri.AbsoluteUri.Contains("oauth2")) {
+                var json = "{\"access_token\":\"token\",\"token_type\":\"Bearer\"}";
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
+            }
+
+            if (uri.AbsolutePath.EndsWith("/messages")) {
+                var query = uri.Query.TrimStart('?').Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var q in query) {
+                    var parts = q.Split(new[] { '=' }, 2);
+                    if (parts.Length == 2 && Uri.UnescapeDataString(parts[0]) == "$filter") Filter = Uri.UnescapeDataString(parts[1]);
+                }
+                var json = "{\"value\":[{\"id\":\"1\"}]}";
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
+            }
+
+            if (uri.AbsolutePath.Contains("/messages/") && uri.AbsolutePath.EndsWith("/$value")) {
+                MimeFetches++;
+                const string raw = "Date: Mon, 1 Jan 2024 00:00:00 +0000\r\nSubject: Mail Delivery Subsystem\r\n\r\nbody";
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(raw) });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
     }
 }

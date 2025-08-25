@@ -304,6 +304,11 @@ public static class MailboxSearcher {
         int parallelDownloadLimit = 4,
         CancellationToken cancellationToken = default) {
         var filters = new List<string>();
+        var subjectFilters = new List<string>();
+        foreach (var pattern in NonDeliveryReportSubjectPatterns.Values) {
+            subjectFilters.Add($"contains(subject,'{pattern.Replace("'", "''")}')");
+        }
+        if (subjectFilters.Count > 0) filters.Add($"({string.Join(" or ", subjectFilters)})");
         if (since.HasValue) filters.Add($"receivedDateTime ge {since.Value.ToUniversalTime():o}");
         if (before.HasValue) filters.Add($"receivedDateTime le {before.Value.ToUniversalTime():o}");
         var filter = filters.Count > 0 ? string.Join(" and ", filters) : null;
@@ -311,7 +316,7 @@ public static class MailboxSearcher {
             credential,
             userPrincipalName,
             new[] { "id" },
-            filter!,
+            filter,
             maxResults > 0 ? maxResults : (int?)null).ConfigureAwait(false);
         var mimeMessages = new List<MimeMessage>(msgs.Count);
         if (parallelDownloadLimit <= 1) {
