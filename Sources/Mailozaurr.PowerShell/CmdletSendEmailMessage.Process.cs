@@ -12,7 +12,11 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
 {
     private ActionPreference errorAction;
     private InternalLogger? _logger;
-    private InternalLoggerPowerShell? _listener;
+    private LogCollector? _logCollector;
+    private EventHandler<LogEventArgs>? _onVerbose;
+    private EventHandler<LogEventArgs>? _onWarning;
+    private EventHandler<LogEventArgs>? _onError;
+    private EventHandler<LogEventArgs>? _onInformation;
 
     /// <summary>
     /// Begin block
@@ -20,14 +24,25 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
     protected override void BeginProcessing() {
         // Initialize the logger to be able to see verbose, warning, debug, error, progress, and information messages.
         _logger = new InternalLogger();
-        _listener = new InternalLoggerPowerShell(_logger, this.WriteVerbose, this.WriteWarning, this.WriteDebug, this.WriteError, this.WriteProgress, this.WriteInformation);
+        _logCollector = new LogCollector();
+
+        _onVerbose = (_, e) => _logCollector!.LogVerbose(e.FullMessage);
+        _onWarning = (_, e) => _logCollector!.LogWarning(e.FullMessage);
+        _onError =  (_, e) => _logCollector!.LogError(e.FullMessage);
+        _onInformation = (_, e) => _logCollector!.LogInformation(e.FullMessage);
+
+        _logger.OnVerboseMessage += _onVerbose;
+        _logger.OnWarningMessage += _onWarning;
+        _logger.OnErrorMessage += _onError;
+        _logger.OnInformationMessage += _onInformation;
+
         LoggingMessages.Logger = _logger;
 
         // Get the error action preference as user requested
         // It first sets the error action to the default error action preference
         // If the user has specified the error action, it will set the error action to the user specified error action
         errorAction = (ActionPreference)this.SessionState.PSVariable.GetValue("ErrorActionPreference");
-            if (this.MyInvocation.BoundParameters.ContainsKey("ErrorAction")) {
+        if (this.MyInvocation.BoundParameters.ContainsKey("ErrorAction")) {
             string? errorActionString = this.MyInvocation.BoundParameters["ErrorAction"]?.ToString();
             if (errorActionString != null && Enum.TryParse(errorActionString, true, out ActionPreference actionPreference)) {
                 errorAction = actionPreference;
@@ -47,20 +62,26 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         string fromEmail = fromEmailRaw ?? string.Empty;
         string fromName = fromNameRaw ?? string.Empty;
 
-        if (SendGrid || EmailProvider == EmailProvider.SendGrid) {
-            ProcessSendGrid(fromEmail, fromName);
-        } else if (EmailProvider == EmailProvider.Mailgun) {
-            ProcessMailgun(fromEmail, fromName);
-        } else if (EmailProvider == EmailProvider.SES) {
-            ProcessSes(fromEmail, fromName);
-        } else if (EmailProvider == EmailProvider.Gmail) {
-            ProcessGmail(fromEmail, fromName);
-        } else if (Graph) {
-            ProcessGraph(fromEmail, fromName);
-        } else if (MgGraphRequest) {
-            ProcessMgGraphRequest(fromEmail, fromName).GetAwaiter().GetResult();
-        } else {
-            ProcessSmtp(fromEmail, fromName);
+        try {
+            if (SendGrid || EmailProvider == EmailProvider.SendGrid) {
+                ProcessSendGrid(fromEmail, fromName);
+            } else if (EmailProvider == EmailProvider.Mailgun) {
+                ProcessMailgun(fromEmail, fromName);
+            } else if (EmailProvider == EmailProvider.SES) {
+                ProcessSes(fromEmail, fromName);
+            } else if (EmailProvider == EmailProvider.Gmail) {
+                ProcessGmail(fromEmail, fromName);
+            } else if (Graph) {
+                ProcessGraph(fromEmail, fromName);
+            } else if (MgGraphRequest) {
+                ProcessMgGraphRequest(fromEmail, fromName).GetAwaiter().GetResult();
+            } else {
+                ProcessSmtp(fromEmail, fromName);
+            }
+        } finally {
+            if (_logCollector != null) {
+                LogEmitter.EmitLogs(_logCollector, this);
+            }
         }
     }
 
@@ -699,7 +720,14 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
     /// </summary>
     protected override void EndProcessing()
     {
-        _listener?.Dispose();
-        _listener = null;
+        if (_logger != null) {
+            if (_onVerbose != null) _logger.OnVerboseMessage -= _onVerbose;
+            if (_onWarning != null) _logger.OnWarningMessage -= _onWarning;
+            if (_onError != null) _logger.OnErrorMessage -= _onError;
+            if (_onInformation != null) _logger.OnInformationMessage -= _onInformation;
+        }
+        _logCollector = null;
+        LoggingMessages.Logger = new InternalLogger();
+        _logger = null;
     }
 }
