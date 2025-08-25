@@ -1,3 +1,5 @@
+using System.Threading;
+
 namespace Mailozaurr;
 
 /// <summary>
@@ -8,8 +10,13 @@ namespace Mailozaurr;
 /// control how much diagnostic information is emitted.
 /// </remarks>
 public class LoggingMessages {
-    /// <summary>Gets the global logger.</summary>
-    public static InternalLogger Logger = new InternalLogger();
+    private static readonly AsyncLocal<InternalLogger?> _logger = new AsyncLocal<InternalLogger?>();
+
+    /// <summary>Gets the global logger for the current asynchronous context.</summary>
+    public static InternalLogger Logger {
+        get => _logger.Value ??= new InternalLogger();
+        set => _logger.Value = value;
+    }
 
     /// <summary>Enable or disable error logging.</summary>
     public static bool Error {

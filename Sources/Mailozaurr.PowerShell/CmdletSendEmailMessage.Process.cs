@@ -12,6 +12,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
 {
     private ActionPreference errorAction;
     private InternalLogger? _logger;
+    private InternalLogger? _previousLogger;
     private LogCollector? _logCollector;
     private EventHandler<LogEventArgs>? _onVerbose;
     private EventHandler<LogEventArgs>? _onWarning;
@@ -36,6 +37,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         _logger.OnErrorMessage += _onError;
         _logger.OnInformationMessage += _onInformation;
 
+        _previousLogger = LoggingMessages.Logger;
         LoggingMessages.Logger = _logger;
 
         // Get the error action preference as user requested
@@ -726,8 +728,15 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             if (_onError != null) _logger.OnErrorMessage -= _onError;
             if (_onInformation != null) _logger.OnInformationMessage -= _onInformation;
         }
+        _onVerbose = null;
+        _onWarning = null;
+        _onError = null;
+        _onInformation = null;
         _logCollector = null;
-        LoggingMessages.Logger = new InternalLogger();
+        if (_previousLogger != null) {
+            LoggingMessages.Logger = _previousLogger;
+            _previousLogger = null;
+        }
         _logger = null;
     }
 }
