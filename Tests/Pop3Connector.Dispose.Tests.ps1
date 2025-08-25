@@ -1,16 +1,13 @@
 Describe 'Pop3Connector disposal' {
     BeforeAll {
-        $csc = Get-ChildItem "$HOME/.dotnet/sdk/*/Roslyn/bincore/csc.dll" | Sort-Object FullName -Descending | Select-Object -First 1
         $refs = @(
-            "$HOME/.nuget/packages/mailkit/4.12.1/lib/netstandard2.0/MailKit.dll",
-            "$HOME/.dotnet/packs/NETStandard.Library.Ref/2.1.0/ref/netstandard2.1/netstandard.dll"
+            [MailKit.Net.Pop3.Pop3Client].Assembly.Location,
+            [MailKit.Security.SecureSocketOptions].Assembly.Location
         )
-        $refArgs = $refs | ForEach-Object { "-r:" + $_ }
     }
 
     It 'Disposes client after failed connect' {
-        $csPath = Join-Path $TestDrive 'FailingPop3Client.cs'
-        @"
+        Add-Type -ReferencedAssemblies $refs -TypeDefinition @"
 using MailKit.Net.Pop3;
 using MailKit.Security;
 using System.Threading;
@@ -27,10 +24,7 @@ public class FailingPop3Client : Pop3Client {
         base.Dispose(disposing);
     }
 }
-"@ | Set-Content $csPath
-        $dllPath = Join-Path $TestDrive 'FailingPop3Client.dll'
-        & dotnet $csc.FullName $csPath -target:library -out:$dllPath $refArgs | Out-Null
-        Add-Type -Path $dllPath
+"@
 
         $fake = [FailingPop3Client]::new()
         [Mailozaurr.Pop3Connector]::ClientFactory = { $fake }
@@ -46,8 +40,7 @@ public class FailingPop3Client : Pop3Client {
     }
 
     It 'Disposes client even when DisconnectAsync throws' {
-        $csPath = Join-Path $TestDrive 'ThrowingDisconnectPop3Client.cs'
-        @"
+        Add-Type -ReferencedAssemblies $refs -TypeDefinition @"
 using MailKit.Net.Pop3;
 using MailKit.Security;
 using System.Threading;
@@ -69,10 +62,7 @@ public class ThrowingDisconnectPop3Client : Pop3Client {
         base.Dispose(disposing);
     }
 }
-"@ | Set-Content $csPath
-        $dllPath = Join-Path $TestDrive 'ThrowingDisconnectPop3Client.dll'
-        & dotnet $csc.FullName $csPath -target:library -out:$dllPath $refArgs | Out-Null
-        Add-Type -Path $dllPath
+"@
 
         $fake = [ThrowingDisconnectPop3Client]::new()
         [Mailozaurr.Pop3Connector]::ClientFactory = { $fake }

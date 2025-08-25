@@ -1,6 +1,10 @@
 Describe 'Clear-SmtpConnectionPool' {
     It 'Forces new connection after clearing pool' {
-        Add-Type -TypeDefinition @"
+        $refs = @(
+            [Mailozaurr.ClientSmtp].Assembly.Location,
+            [MailKit.Security.SecureSocketOptions].Assembly.Location
+        )
+        Add-Type -ReferencedAssemblies $refs -TypeDefinition @"
 using Mailozaurr;
 using MailKit.Security;
 using System.Threading;
