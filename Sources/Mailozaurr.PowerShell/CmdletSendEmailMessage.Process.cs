@@ -42,7 +42,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         // It first sets the error action to the default error action preference
         // If the user has specified the error action, it will set the error action to the user specified error action
         errorAction = (ActionPreference)this.SessionState.PSVariable.GetValue("ErrorActionPreference");
-            if (this.MyInvocation.BoundParameters.ContainsKey("ErrorAction")) {
+        if (this.MyInvocation.BoundParameters.ContainsKey("ErrorAction")) {
             string? errorActionString = this.MyInvocation.BoundParameters["ErrorAction"]?.ToString();
             if (errorActionString != null && Enum.TryParse(errorActionString, true, out ActionPreference actionPreference)) {
                 errorAction = actionPreference;
@@ -727,5 +727,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             if (_onInformation != null) _logger.OnInformationMessage -= _onInformation;
         }
         _logCollector = null;
+        LoggingMessages.Logger = new InternalLogger();
+        _logger = null;
     }
 }
