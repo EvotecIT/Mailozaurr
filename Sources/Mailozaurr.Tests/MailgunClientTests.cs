@@ -5,6 +5,8 @@ using System.Net.Http;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using System.IO;
+using System.Linq;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -80,6 +82,83 @@ public class MailgunClientTests
         string body = await content.ReadAsStringAsync();
         Assert.Contains("h:X-Test", body, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("123", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateContentAsync_DuplicateAttachmentPaths_SkipsDuplicates()
+    {
+        var file = Path.GetTempFileName();
+        try
+        {
+            using var client = new MailgunClient
+            {
+                From = "sender@example.com",
+                To = new List<object> { "to@example.com" },
+                Attachment = new[] { file, file }
+            };
+            MethodInfo? method = typeof(MailgunClient).GetMethod("CreateContentAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+            var task = (Task<MultipartFormDataContent>)method!.Invoke(client, new object[] { default(CancellationToken) })!;
+            using var content = await task;
+            var parts = content.Count(c => c.Headers.ContentDisposition?.Name?.Trim('"') == "attachment");
+            Assert.Equal(1, parts);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public async Task CreateContentAsync_DuplicateInlineAttachmentPaths_SkipsDuplicates()
+    {
+        var file = Path.GetTempFileName();
+        try
+        {
+            using var client = new MailgunClient
+            {
+                From = "sender@example.com",
+                To = new List<object> { "to@example.com" },
+                InlineAttachment = new[] { file, file }
+            };
+            MethodInfo? method = typeof(MailgunClient).GetMethod("CreateContentAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+            var task = (Task<MultipartFormDataContent>)method!.Invoke(client, new object[] { default(CancellationToken) })!;
+            using var content = await task;
+            var parts = content.Count(c => c.Headers.ContentDisposition?.Name?.Trim('"') == "inline");
+            Assert.Equal(1, parts);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public async Task CreateContentAsync_AttachmentAndInlineDuplicatePaths_SkipsDuplicates()
+    {
+        var file1 = Path.GetTempFileName();
+        var file2 = Path.GetTempFileName();
+        try
+        {
+            using var client = new MailgunClient
+            {
+                From = "sender@example.com",
+                To = new List<object> { "to@example.com" },
+                Attachment = new[] { file1 },
+                InlineAttachment = new[] { file1, file2, file2 }
+            };
+            MethodInfo? method = typeof(MailgunClient).GetMethod("CreateContentAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+            var task = (Task<MultipartFormDataContent>)method!.Invoke(client, new object[] { default(CancellationToken) })!;
+            using var content = await task;
+            var attachments = content.Count(c => c.Headers.ContentDisposition?.Name?.Trim('"') == "attachment");
+            var inlines = content.Count(c => c.Headers.ContentDisposition?.Name?.Trim('"') == "inline");
+            Assert.Equal(1, attachments);
+            Assert.Equal(1, inlines);
+        }
+        finally
+        {
+            File.Delete(file1);
+            File.Delete(file2);
+        }
     }
 
     [Fact]

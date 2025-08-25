@@ -142,8 +142,10 @@ public class MailgunClient : IDisposable {
         if (!string.IsNullOrWhiteSpace(Subject)) content.Add(new StringContent(Subject), "subject");
         if (!string.IsNullOrWhiteSpace(Text)) content.Add(new StringContent(Text), "text");
         if (!string.IsNullOrWhiteSpace(Html)) content.Add(new StringContent(Html), "html");
+        var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (Attachment != null) {
             foreach (var path in Attachment) {
+                if (!files.Add(path)) continue;
                 if (!File.Exists(path)) {
                     LogCollector.LogWarning($"Send-EmailMessage - Attachment file not found: {path}");
                     LogCollector.LogWarning($"Send-EmailMessage - Possible issue: Path '{path}' is invalid. Verify the file exists and the path is correct.");
@@ -158,6 +160,7 @@ public class MailgunClient : IDisposable {
         }
         if (InlineAttachment != null) {
             foreach (var path in InlineAttachment) {
+                if (!files.Add(path)) continue;
                 if (!File.Exists(path)) {
                     LogCollector.LogWarning($"Send-EmailMessage - Inline attachment file not found: {path}");
                     LogCollector.LogWarning($"Send-EmailMessage - Possible issue: Path '{path}' is invalid. Verify the file exists and the path is correct.");
