@@ -67,7 +67,7 @@ public sealed class NonDeliveryReport {
             OriginalRecipientAddress = ExtractAddress(originalRecipient),
             FinalRecipient = finalRecipient,
             FinalRecipientAddress = ExtractAddress(finalRecipient),
-            OriginalMessageId = originalMessageId,
+            OriginalMessageId = NormalizeMessageId(originalMessageId),
             ReportingMta = reportingMta,
             Action = action,
             RemoteMta = remoteMta,
@@ -86,6 +86,17 @@ public sealed class NonDeliveryReport {
         }
         var idx = header!.IndexOf(';');
         return idx >= 0 ? header.Substring(idx + 1).Trim() : header.Trim();
+    }
+
+    internal static string? NormalizeMessageId(string? value) {
+        if (string.IsNullOrWhiteSpace(value)) {
+            return null;
+        }
+        var trimmed = value.Trim();
+        if (trimmed.Length > 1 && trimmed[0] == '<' && trimmed[trimmed.Length - 1] == '>') {
+            trimmed = trimmed.Substring(1, trimmed.Length - 2);
+        }
+        return trimmed;
     }
 
     private static DateTimeOffset? TryParseTimestamp(string? value)
