@@ -86,4 +86,28 @@ public class SendGridCreateMessageTests
         var count = doc.RootElement.GetProperty("Attachments").GetArrayLength();
         Assert.Equal(1, count);
     }
+
+    [Theory]
+    [InlineData("", "<b>body</b>", "text/html")]
+    [InlineData("text", "", "text/plain")]
+    public void CreateMessage_WithoutBody_OmitsCorrespondingContent(string text, string html, string expectedType)
+    {
+        var client = new SendGridClient
+        {
+            From = "from@example.com",
+            To = new List<object> { "to@example.com" },
+            Subject = "subject",
+            Text = text,
+            Html = html,
+            Credentials = new NetworkCredential("apikey", "test")
+        };
+        client.CreateMessage();
+        PropertyInfo? prop = typeof(SendGridClient).GetProperty("MessageJson", BindingFlags.NonPublic | BindingFlags.Instance);
+        var json = prop?.GetValue(client) as string;
+        Assert.NotNull(json);
+        using var doc = System.Text.Json.JsonDocument.Parse(json!);
+        var content = doc.RootElement.GetProperty("Content");
+        Assert.Equal(1, content.GetArrayLength());
+        Assert.Equal(expectedType, content[0].GetProperty("Type").GetString());
+    }
 }

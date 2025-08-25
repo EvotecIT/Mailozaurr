@@ -277,7 +277,7 @@ public class SendGridClient {
         var content = new List<SendGridContent> {
                 new SendGridContent { Type = "text/plain", Value = Text },
                 new SendGridContent { Type = "text/html", Value = Html }
-            }.Where(c => c.Value != null).ToList();
+            }.Where(c => !string.IsNullOrEmpty(c.Value)).ToList();
 
 
         var fromAddress = ConvertToEmailObject(From) ?? throw new InvalidOperationException("From address is required.");
