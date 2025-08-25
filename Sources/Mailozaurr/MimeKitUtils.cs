@@ -51,7 +51,11 @@ public static class MimeKitUtils {
                     headers.TryAdd(header.Field, header.Value);
                 }
 
-                reports.Add(headers.Count > 0 ? NonDeliveryReport.FromHeaders(headers) : new NonDeliveryReport());
+                var report = headers.Count > 0 ? NonDeliveryReport.FromHeaders(headers) : new NonDeliveryReport();
+                if (report.Timestamp == System.DateTimeOffset.MinValue) {
+                    report.Timestamp = message.Date;
+                }
+                reports.Add(report);
             }
         } else {
             reports.Add(new NonDeliveryReport { Timestamp = message.Date });
