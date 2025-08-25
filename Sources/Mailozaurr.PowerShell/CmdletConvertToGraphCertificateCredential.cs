@@ -17,7 +17,7 @@ using System.Threading.Tasks;
 /// </summary>
 [Cmdlet(VerbsData.ConvertTo, "GraphCertificateCredential")]
 [OutputType(typeof(PSCredential))]
-public class CmdletConvertToGraphCertificateCredential : PSCmdlet {
+public class CmdletConvertToGraphCertificateCredential : AsyncPSCmdlet {
     /// <summary>
     /// Azure AD application (client) identifier.
     /// </summary>
@@ -55,15 +55,15 @@ public class CmdletConvertToGraphCertificateCredential : PSCmdlet {
     /// <summary>
     /// Acquires an app-only access token using certificate authentication and returns it as a credential.
     /// </summary>
-    protected override void ProcessRecord() {
+    protected override async Task ProcessRecordAsync() {
         GraphAuthorization token;
         try {
-            token = Task.Run(() => Mailozaurr.OAuthHelpers.AcquireGraphCertificateTokenAsync(
+            token = await Mailozaurr.OAuthHelpers.AcquireGraphCertificateTokenAsync(
                     ClientId!,
                     TenantId!,
                     CertificatePath!,
                     CertificatePassword!,
-                    Scopes)).GetAwaiter().GetResult();
+                    Scopes);
         } catch (System.Exception ex) {
             WriteError(new ErrorRecord(ex, "GraphCertificateAuthFailed", ErrorCategory.AuthenticationError, null));
             return;

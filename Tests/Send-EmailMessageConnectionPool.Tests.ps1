@@ -1,6 +1,10 @@
 Describe 'Send-EmailMessage connection pool' {
     It 'Reuses connection when pool enabled' {
-        Add-Type -TypeDefinition @"
+        $refs = @(
+            [Mailozaurr.ClientSmtp].Assembly.Location,
+            [MailKit.Security.SecureSocketOptions].Assembly.Location
+        )
+        Add-Type -ReferencedAssemblies $refs -TypeDefinition @"
 using Mailozaurr;
 using MailKit.Security;
 using System.Threading;

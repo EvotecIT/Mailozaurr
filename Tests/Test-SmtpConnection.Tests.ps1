@@ -1,6 +1,10 @@
 Describe 'Test-SmtpConnection' {
     It 'Returns capabilities object' {
-        Add-Type -TypeDefinition @"
+        $refs = @(
+            [Mailozaurr.ClientSmtp].Assembly.Location,
+            [MailKit.Security.SecureSocketOptions].Assembly.Location
+        )
+        Add-Type -ReferencedAssemblies $refs -TypeDefinition @"
 using Mailozaurr;
 using MailKit.Security;
 using System.Threading;

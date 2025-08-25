@@ -19,7 +19,7 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommunications.Connect, "OAuthO365")]
 [OutputType(typeof(PSCredential))]
-public class CmdletConnectOAuthO365 : PSCmdlet {
+public class CmdletConnectOAuthO365 : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Specifies the login (user principal name) for the Office 365 account. Optional; if not provided, interactive login is used.</para>
     /// </summary>
@@ -61,7 +61,7 @@ public class CmdletConnectOAuthO365 : PSCmdlet {
     /// <summary>
     /// Performs the interactive OAuth2 authentication and returns a PSCredential with the access token.
     /// </summary>
-    protected override void ProcessRecord() {
+    protected override async Task ProcessRecordAsync() {
         if (ClientID is null || TenantID is null || RedirectUri is null || Scopes is null) {
             WriteError(new ErrorRecord(new PSArgumentNullException("ClientID"), "OAuthO365InvalidParameters", ErrorCategory.InvalidArgument, null));
             return;
@@ -69,11 +69,12 @@ public class CmdletConnectOAuthO365 : PSCmdlet {
 
         Mailozaurr.OAuthCredential? cred = null;
         try {
-            cred = Task.Run(() => Mailozaurr.OAuthHelpers.AcquireO365TokenCachedAsync(Login, ClientID, TenantID, RedirectUri, Scopes)).GetAwaiter().GetResult();
+            cred = await Mailozaurr.OAuthHelpers.AcquireO365TokenCachedAsync(Login, ClientID, TenantID, RedirectUri, Scopes);
         } catch (System.Exception ex) {
             WriteError(new ErrorRecord(ex, "OAuthO365AuthFailed", ErrorCategory.AuthenticationError, null));
             return;
         }
+
         if (cred != null) {
             var secure = CredentialHelpers.ToSecureString(cred.AccessToken);
             var psCred = new PSCredential(cred.UserName, secure);

@@ -733,10 +733,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         _onError = null;
         _onInformation = null;
         _logCollector = null;
-        if (_previousLogger != null) {
-            LoggingMessages.Logger = _previousLogger;
-            _previousLogger = null;
-        }
+        LoggingMessages.Logger = _previousLogger;
+        _previousLogger = null;
         _logger = null;
     }
 }
