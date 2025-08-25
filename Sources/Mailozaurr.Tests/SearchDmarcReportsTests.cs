@@ -189,6 +189,20 @@ public class SearchDmarcReportsTests {
     }
 
     [Fact]
+    public void BuildGmailDmarcReportQuery_DomainWithDots_ReturnsQuery() {
+        var domain = "sub.example.co.uk";
+        var q = MailboxSearcher.BuildGmailDmarcReportQuery(null, null, domain);
+        Assert.Contains(domain, q);
+    }
+
+    [Fact]
+    public void BuildGmailDmarcReportQuery_DomainWithQuotes_EscapesQuotes() {
+        var domain = "exa\"mple.com";
+        var q = MailboxSearcher.BuildGmailDmarcReportQuery(null, null, domain);
+        Assert.Contains("exa\\\"mple.com", q);
+    }
+
+    [Fact]
     public void FilterDmarcReports_FiltersAcrossTimeZones() {
         var msg1 = CreateDmarc("example.com", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.FromHours(2)));
         var msg2 = CreateDmarc("example.com", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.FromHours(-5)));

@@ -760,9 +760,18 @@ public static class MailboxSearcher {
         return search;
     }
 
+    private static string EscapeGmailQueryValue(string value) {
+        var sb = new StringBuilder(value.Length);
+        foreach (var c in value) {
+            if (c == '\\' || c == '"' || c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}') sb.Append('\\');
+            sb.Append(c);
+        }
+        return sb.ToString();
+    }
+
     internal static string BuildGmailDmarcReportQuery(DateTime? since, DateTime? before, string? domain) {
         var sb = new StringBuilder("subject:\"report domain\" has:attachment");
-        if (!string.IsNullOrWhiteSpace(domain)) sb.Append(' ').Append("subject:\"").Append(domain).Append("\"");
+        if (!string.IsNullOrWhiteSpace(domain)) sb.Append(' ').Append("subject:\"").Append(EscapeGmailQueryValue(domain)).Append("\"");
         if (since.HasValue) sb.Append(' ').Append("after:").Append(since.Value.ToUniversalTime().ToString("yyyy/MM/dd"));
         if (before.HasValue) sb.Append(' ').Append("before:").Append(before.Value.ToUniversalTime().ToString("yyyy/MM/dd"));
         return sb.ToString().Trim();
@@ -817,7 +826,7 @@ public static class MailboxSearcher {
         bool first = true;
         foreach (var pattern in NonDeliveryReportSubjectPatterns.Values) {
             if (!first) sb.Append(" OR ");
-            sb.Append("subject:\"").Append(pattern).Append("\"");
+            sb.Append("subject:\"").Append(EscapeGmailQueryValue(pattern)).Append("\"");
             first = false;
         }
         if (sb.Length > 0) {
