@@ -17,10 +17,11 @@ using Xunit;
 namespace Mailozaurr.Tests;
 
 public class SearchNonDeliveryReportsTests {
-    private static MimeMessage CreateNdr(string recipient, string messageId, DateTimeOffset date, DateTimeOffset? lastAttempt = null) {
+    private static MimeMessage CreateNdr(string recipient, string messageId, DateTimeOffset date, DateTimeOffset? lastAttempt = null, bool includeArrival = true) {
         string arrival = date.ToString("ddd, dd MMM yyyy HH:mm:ss K", CultureInfo.InvariantCulture);
         string? lastAttemptStr = lastAttempt?.ToString("ddd, dd MMM yyyy HH:mm:ss K", CultureInfo.InvariantCulture);
-        string raw = $"Content-Type: multipart/report; report-type=delivery-status; boundary=\"XXX\"\r\n\r\n--XXX\r\nContent-Type: text/plain; charset=utf-8\r\n\r\ntext\r\n\r\n--XXX\r\nContent-Type: message/delivery-status\r\n\r\nOriginal-Recipient: rfc822; {recipient}\r\nFinal-Recipient: rfc822; {recipient}\r\nOriginal-Message-ID: {messageId}\r\nReporting-MTA: dns; mx.example.com\r\nDiagnostic-Code: smtp; 550 5.1.1 User unknown\r\nStatus: 5.1.1\r\nArrival-Date: {arrival}\r\n";
+        string raw = $"Date: {arrival}\r\nContent-Type: multipart/report; report-type=delivery-status; boundary=\"XXX\"\r\n\r\n--XXX\r\nContent-Type: text/plain; charset=utf-8\r\n\r\ntext\r\n\r\n--XXX\r\nContent-Type: message/delivery-status\r\n\r\nOriginal-Recipient: rfc822; {recipient}\r\nFinal-Recipient: rfc822; {recipient}\r\nOriginal-Message-ID: {messageId}\r\nReporting-MTA: dns; mx.example.com\r\nDiagnostic-Code: smtp; 550 5.1.1 User unknown\r\nStatus: 5.1.1\r\n";
+        if (includeArrival) raw += $"Arrival-Date: {arrival}\r\n";
         if (lastAttemptStr != null) raw += $"Last-Attempt-Date: {lastAttemptStr}\r\n";
         raw += "\r\n--XXX--";
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(raw));
@@ -89,6 +90,19 @@ public class SearchNonDeliveryReportsTests {
         var reports = MailboxSearcher.FilterNonDeliveryReports(list, since, before, recipientContains: null, messageId: null);
         Assert.Single(reports);
         Assert.Equal(date, reports[0].Timestamp);
+    }
+
+    [Fact]
+    public void FilterNonDeliveryReports_ReportWithoutTimestampUsesMessageDate() {
+        var now = DateTimeOffset.UtcNow;
+        now = new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, now.Minute, now.Second, now.Offset);
+        var msg = CreateNdr("user@example.com", "<id1>", now, includeArrival: false);
+        var list = new List<MimeMessage> { msg };
+        var since = now.AddMinutes(-5).UtcDateTime;
+        var before = now.AddMinutes(5).UtcDateTime;
+        var reports = MailboxSearcher.FilterNonDeliveryReports(list, since, before, recipientContains: null, messageId: null);
+        Assert.Single(reports);
+        Assert.Equal(now, reports[0].Timestamp);
     }
 
     private static bool Contains(SearchQuery query, Func<SearchQuery, bool> predicate) {
