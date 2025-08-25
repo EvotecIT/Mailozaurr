@@ -241,4 +241,66 @@ public class SearchDmarcReportsTests {
         Assert.Equal(2, reports.Count);
         Assert.True(client.FetchCount <= 4, $"fetched {client.FetchCount}");
     }
+
+    [Fact]
+    public void FilterDmarcReports_IgnoresMalformedArchive() {
+        var now = DateTimeOffset.UtcNow;
+        var message = new MimeMessage();
+        message.Subject = "Report";
+        message.Date = now;
+        message.From.Add(new MailboxAddress("reporter", "reporter@example.com"));
+        var builder = new BodyBuilder();
+        var ms = new MemoryStream(new byte[] { 1, 2, 3, 4 });
+        var part = new MimePart("application", "zip") {
+            Content = new MimeContent(ms),
+            FileName = "report.zip"
+        };
+        builder.Attachments.Add(part);
+        message.Body = builder.ToMessageBody();
+        bool logged = false;
+        void Handler(object? s, LogEventArgs e) => logged = true;
+        LoggingMessages.Logger.OnErrorMessage += Handler;
+        try {
+            var reports = MailboxSearcher.FilterDmarcReports(new[] { message }, since: now.AddMinutes(-1).DateTime, before: now.AddMinutes(1).DateTime, domain: "example.com", maxUncompressedSize: 1024);
+            Assert.Empty(reports);
+            Assert.True(logged);
+        } finally {
+            LoggingMessages.Logger.OnErrorMessage -= Handler;
+        }
+    }
+
+    [Fact]
+    public void FilterDmarcReports_SkipsOversizedAttachment() {
+        var now = DateTimeOffset.UtcNow;
+        var message = new MimeMessage();
+        message.Subject = "Report";
+        message.Date = now;
+        message.From.Add(new MailboxAddress("reporter", "reporter@example.com"));
+        var builder = new BodyBuilder();
+        var ms = new MemoryStream();
+        using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, true)) {
+            var entry = zip.CreateEntry("report.xml");
+            using var entryStream = entry.Open();
+            var large = new string('a', 2048);
+            var bytes = Encoding.UTF8.GetBytes($"<feedback><policy_published><domain>example.com</domain></policy_published><data>{large}</data></feedback>");
+            entryStream.Write(bytes, 0, bytes.Length);
+        }
+        ms.Position = 0;
+        var part = new MimePart("application", "zip") {
+            Content = new MimeContent(ms),
+            FileName = "report.zip"
+        };
+        builder.Attachments.Add(part);
+        message.Body = builder.ToMessageBody();
+        bool logged = false;
+        void Handler(object? s, LogEventArgs e) => logged = true;
+        LoggingMessages.Logger.OnErrorMessage += Handler;
+        try {
+            var reports = MailboxSearcher.FilterDmarcReports(new[] { message }, since: now.AddMinutes(-1).DateTime, before: now.AddMinutes(1).DateTime, domain: "example.com", maxUncompressedSize: 512);
+            Assert.Empty(reports);
+            Assert.True(logged);
+        } finally {
+            LoggingMessages.Logger.OnErrorMessage -= Handler;
+        }
+    }
 }
