@@ -26,7 +26,7 @@ Build-Module -ModuleName 'Mailozaurr' {
 
         ProjectUri           = 'https://github.com/EvotecIT/MailoZaurr'
 
-        PreReleaseTag        = 'Preview8'
+        PreReleaseTag        = 'Preview9'
     }
     New-ConfigurationManifest @Manifest
 
