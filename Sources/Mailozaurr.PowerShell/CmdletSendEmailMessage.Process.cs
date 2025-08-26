@@ -51,8 +51,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             }
         }
 
-        SmtpConnectionPool.MaxPoolSize = ConnectionPoolSize;
-        SmtpConnectionPool.PoolingEnabled = UseConnectionPool.IsPresent;
+        SmtpConnectionPool.Configure(UseConnectionPool.IsPresent, ConnectionPoolSize);
     }
     /// <summary>
     /// Process the record.

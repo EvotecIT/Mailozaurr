@@ -18,7 +18,7 @@ public class SmtpConnectionPoolTests {
 
     [Fact]
     public void Disconnect_ReturnsClientToPool() {
-        SmtpConnectionPool.PoolingEnabled = true;
+        SmtpConnectionPool.SetPoolingEnabled(true);
         SmtpConnectionPool.ClearConnectionPool();
         var fake = new FakeClient();
         Smtp.ClientFactory = _ => fake;
@@ -36,12 +36,12 @@ public class SmtpConnectionPoolTests {
 
         Smtp.ClientFactory = logger => new ClientSmtp();
         SmtpConnectionPool.ClearConnectionPool();
-        SmtpConnectionPool.PoolingEnabled = false;
+        SmtpConnectionPool.SetPoolingEnabled(false);
     }
 
     [Fact]
     public void ReturnClosedClient_IsDiscarded() {
-        SmtpConnectionPool.PoolingEnabled = true;
+        SmtpConnectionPool.SetPoolingEnabled(true);
         SmtpConnectionPool.ClearConnectionPool();
 
         var fake = new FakeClient();
@@ -52,6 +52,6 @@ public class SmtpConnectionPoolTests {
         Assert.Null(pooled);
 
         SmtpConnectionPool.ClearConnectionPool();
-        SmtpConnectionPool.PoolingEnabled = false;
+        SmtpConnectionPool.SetPoolingEnabled(false);
     }
 }
