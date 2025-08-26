@@ -14,9 +14,8 @@ public class SmtpConnectionPoolConcurrencyTests {
 
     [Fact]
     public void ReturnClient_ConcurrentCallsRespectMaxPoolSize() {
-        SmtpConnectionPool.PoolingEnabled = true;
+        SmtpConnectionPool.Configure(true, 2);
         SmtpConnectionPool.ClearConnectionPool();
-        SmtpConnectionPool.MaxPoolSize = 2;
 
         var clients = Enumerable.Range(0, 20).Select(_ => new FakeClient()).ToArray();
         Parallel.ForEach(clients, c => SmtpConnectionPool.ReturnClient("h", 25, c));
@@ -31,14 +30,13 @@ public class SmtpConnectionPoolConcurrencyTests {
         Assert.Equal(SmtpConnectionPool.MaxPoolSize, rented);
 
         SmtpConnectionPool.ClearConnectionPool();
-        SmtpConnectionPool.PoolingEnabled = false;
+        SmtpConnectionPool.SetPoolingEnabled(false);
     }
 
     [Fact]
     public void TryRentClient_ConcurrentCallsEmptyPool() {
-        SmtpConnectionPool.PoolingEnabled = true;
+        SmtpConnectionPool.Configure(true, 5);
         SmtpConnectionPool.ClearConnectionPool();
-        SmtpConnectionPool.MaxPoolSize = 5;
 
         foreach (var _ in Enumerable.Range(0, SmtpConnectionPool.MaxPoolSize)) {
             SmtpConnectionPool.ReturnClient("h", 25, new FakeClient());
@@ -57,6 +55,6 @@ public class SmtpConnectionPoolConcurrencyTests {
         Assert.Null(SmtpConnectionPool.TryRentClient("h", 25));
 
         SmtpConnectionPool.ClearConnectionPool();
-        SmtpConnectionPool.PoolingEnabled = false;
+        SmtpConnectionPool.SetPoolingEnabled(false);
     }
 }

@@ -16,12 +16,23 @@ public static class SmtpConnectionPool {
 
     private static readonly ConcurrentDictionary<string, PoolEntry> _connectionPool = new();
 
+    private static int _maxPoolSize = 2;
+    private static int _poolingEnabled = 0;
 
     /// <summary>Maximum number of pooled connections per server/port.</summary>
-    public static int MaxPoolSize { get; set; } = 2;
+    public static int MaxPoolSize => Volatile.Read(ref _maxPoolSize);
 
     /// <summary>Enables or disables connection pooling.</summary>
-    public static bool PoolingEnabled { get; set; } = false;
+    public static bool PoolingEnabled => Volatile.Read(ref _poolingEnabled) == 1;
+
+    public static void SetMaxPoolSize(int value) => Interlocked.Exchange(ref _maxPoolSize, value);
+
+    public static void SetPoolingEnabled(bool enabled) => Interlocked.Exchange(ref _poolingEnabled, enabled ? 1 : 0);
+
+    public static void Configure(bool poolingEnabled, int maxPoolSize) {
+        SetPoolingEnabled(poolingEnabled);
+        SetMaxPoolSize(maxPoolSize);
+    }
 
     /// <summary>Number of pooled SMTP clients across all servers.</summary>
     public static int CurrentPoolSize {

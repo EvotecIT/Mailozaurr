@@ -12,7 +12,7 @@ public class SmtpConnectionPoolMetricsTests {
 
     [Fact]
     public void CurrentPoolSize_TracksClients() {
-        SmtpConnectionPool.PoolingEnabled = true;
+        SmtpConnectionPool.SetPoolingEnabled(true);
         SmtpConnectionPool.ClearConnectionPool();
 
         Assert.Equal(0, SmtpConnectionPool.CurrentPoolSize);
@@ -26,12 +26,12 @@ public class SmtpConnectionPoolMetricsTests {
         Assert.Equal(0, SmtpConnectionPool.CurrentPoolSize);
 
         SmtpConnectionPool.ClearConnectionPool();
-        SmtpConnectionPool.PoolingEnabled = false;
+        SmtpConnectionPool.SetPoolingEnabled(false);
     }
 
     [Fact]
     public void PoolSizeChanged_Raised() {
-        SmtpConnectionPool.PoolingEnabled = true;
+        SmtpConnectionPool.SetPoolingEnabled(true);
         SmtpConnectionPool.ClearConnectionPool();
 
         var values = new List<int>();
@@ -47,14 +47,14 @@ public class SmtpConnectionPoolMetricsTests {
         SmtpConnectionPool.ClearConnectionPool();
 
         SmtpConnectionPool.PoolSizeChanged -= Handler;
-        SmtpConnectionPool.PoolingEnabled = false;
+        SmtpConnectionPool.SetPoolingEnabled(false);
 
         Assert.Equal(new[] { 1, 0, 0 }, values);
     }
 
     [Fact]
     public void GetSnapshot_ReturnsEntries() {
-        SmtpConnectionPool.PoolingEnabled = true;
+        SmtpConnectionPool.SetPoolingEnabled(true);
         SmtpConnectionPool.ClearConnectionPool();
 
         var client = new FakeClient();
@@ -69,7 +69,7 @@ public class SmtpConnectionPoolMetricsTests {
         Assert.Equal(1, entry.Count);
 
         SmtpConnectionPool.ClearConnectionPool();
-        SmtpConnectionPool.PoolingEnabled = false;
+        SmtpConnectionPool.SetPoolingEnabled(false);
     }
 }
 
