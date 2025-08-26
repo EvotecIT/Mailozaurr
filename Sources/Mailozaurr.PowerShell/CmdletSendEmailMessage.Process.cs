@@ -381,7 +381,14 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
     }
 
     private void ProcessSmtp(string fromEmail, string fromName) {
+        // Create a LogCollector to capture logs from async operations
+        var logCollector = new LogCollector();
+        
         Smtp smtpClient = new Smtp(LogPath ?? string.Empty, LogConsole, LogObject, LogTimestamps, LogSecrets, LogTimeStampsFormat, LogServerPrefix, LogClientPrefix, LogOverwrite);
+        
+        // Attach the LogCollector to the SMTP client's logger
+        smtpClient.LogCollector = logCollector;
+        
         string sentLogPath;
         var providedSentLogPath = SentLogPath;
         if (providedSentLogPath == null || providedSentLogPath.Trim().Length == 0) {
@@ -418,7 +425,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         smtpClient.RetryAlways = RetryAlways.IsPresent;
 
         if (!ShouldProcess(smtpClient.SentTo, "Sending email message")) {
-            LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
+            logCollector.LogVerbose("Send-EmailMessage - Skipping authentication");
+            LogEmitter.EmitLogs(logCollector, this);
             if (!Suppress) {
                 WriteObject(new SmtpResult(false, EmailAction.Send, smtpClient.SentTo, smtpClient.SentFrom, Server ?? string.Empty, Port, TimeSpan.Zero, string.Empty, "Email not sent (WhatIf)"));
             }
@@ -427,6 +435,10 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
 
         var useSslFlag = UseSsl.IsPresent && !this.MyInvocation.BoundParameters.ContainsKey(nameof(SecureSocketOptions));
         var status = smtpClient.Connect(Server ?? string.Empty, Port, SecureSocketOptions, useSslFlag);
+        
+        // Emit logs after Connect operation
+        LogEmitter.EmitLogs(logCollector, this);
+        
         if (!status.Status) {
             if (!Suppress) {
                 WriteObject(status);
@@ -472,9 +484,12 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         } else if (!string.IsNullOrWhiteSpace(Username) || !string.IsNullOrWhiteSpace(Password)) {
             status = smtpClient.Authenticate(Username ?? string.Empty, Password ?? string.Empty, AsSecureString, AuthenticationMechanism);
         } else {
-            LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
+            logCollector.LogVerbose("Send-EmailMessage - Skipping authentication");
             status = new SmtpResult(true, EmailAction.Authenticate, smtpClient.SentTo, smtpClient.SentFrom, smtpClient.Server, smtpClient.Port, smtpClient.Stopwatch.Elapsed, "Authentication skipped");
         }
+
+        // Emit logs after Authentication operation
+        LogEmitter.EmitLogs(logCollector, this);
 
         if (!status.Status) {
             if (!Suppress) {
@@ -486,6 +501,10 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         }
 
         status = smtpClient.Send();
+        
+        // Emit logs after Send operation
+        LogEmitter.EmitLogs(logCollector, this);
+        
         if (!Suppress) {
             WriteObject(status);
         }

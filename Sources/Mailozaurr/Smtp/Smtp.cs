@@ -27,6 +27,9 @@ public class Smtp {
     /// <summary>Configuration used for protocol logging.</summary>
     public LoggingConfigurator? Logging;
 
+    /// <summary>LogCollector for capturing logs from async operations.</summary>
+    public LogCollector? LogCollector { get; set; }
+
     /// <summary>Repository used to persist sent message metadata.</summary>
     public ISentMessageRepository? SentMessageRepository { get; set; }
 
@@ -248,7 +251,7 @@ public class Smtp {
         string? logTimestampsFormat = null, string? logServerPrefix = null, string? logClientPrefix = null,
         bool logOverwrite = false) {
 
-        LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Logging configuration: Path: {logPath}, Console: {logConsole}, Object: {logObject}, Timestamps: {logTimestamps}, Secrets: {logSecrets}, TimestampsFormat: {logTimestampsFormat}, ServerPrefix: {logServerPrefix}, ClientPrefix: {logClientPrefix}, Overwrite: {logOverwrite}");
+        LogVerbose($"Send-EmailMessage - Logging configuration: Path: {logPath}, Console: {logConsole}, Object: {logObject}, Timestamps: {logTimestamps}, Secrets: {logSecrets}, TimestampsFormat: {logTimestampsFormat}, ServerPrefix: {logServerPrefix}, ClientPrefix: {logClientPrefix}, Overwrite: {logOverwrite}");
         Logging = new LoggingConfigurator();
         Logging.ConfigureLogging(logPath, logConsole, logObject, logTimestamps, logSecrets, logTimestampsFormat, logServerPrefix, logClientPrefix, logOverwrite);
         Client = ClientFactory(Logging.ProtocolLogger);
@@ -387,11 +390,11 @@ public class Smtp {
                 }
                 Client.Connect(server, port, secureSocketOptions);
             }
-            LoggingMessages.Logger.WriteVerbose($"Connected to {server} on {port} port using SSL: {secureSocketOptions}");
+            LogVerbose($"Connected to {server} on {port} port using SSL: {secureSocketOptions}");
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "");
         } catch (Exception ex) {
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during connect: {ex.Message}");
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Port? ({port} was used), Using SSL? ({secureSocketOptions}, was used). You can also try 'SkipCertificateValidation' or 'SkipCertificateRevocation'.");
+            LogWarning($"Send-EmailMessage - Error during connect: {ex.Message}");
+            LogWarning($"Send-EmailMessage - Possible issue: Port? ({port} was used), Using SSL? ({secureSocketOptions}, was used). You can also try 'SkipCertificateValidation' or 'SkipCertificateRevocation'.");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
@@ -445,11 +448,11 @@ public class Smtp {
                 }
                 await Client.ConnectAsync(server, port, secureSocketOptions);
             }
-            LoggingMessages.Logger.WriteVerbose($"Connected to {server} on {port} port using SSL: {secureSocketOptions}");
+            LogVerbose($"Connected to {server} on {port} port using SSL: {secureSocketOptions}");
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "");
         } catch (Exception ex) {
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during connect: {ex.Message}");
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Port? ({port} was used), Using SSL? ({secureSocketOptions}, was used). You can also try 'SkipCertificateValidation' or 'SkipCertificateRevocation'.");
+            LogWarning($"Send-EmailMessage - Error during connect: {ex.Message}");
+            LogWarning($"Send-EmailMessage - Possible issue: Port? ({port} was used), Using SSL? ({secureSocketOptions}, was used). You can also try 'SkipCertificateValidation' or 'SkipCertificateRevocation'.");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
@@ -473,15 +476,15 @@ public class Smtp {
                     Client.Authenticate(oauth2);
                     //  Settings.Logger.WriteVerbose($"Send-EmailMessage - Authenticated using OAuth");
                 }
-                LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Authenticated using oAuth");
+                LogVerbose($"Send-EmailMessage - Authenticated using oAuth");
             } else {
                 Client.Authenticate(Credentials);
                 //  Settings.Logger.WriteVerbose($"Send-EmailMessage - Authenticated using ICredentials");
             }
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (Exception ex) {
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during authentication (oAuth): {ex.Message}");
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: OAuth? ({isOAuth} was used), ICredentials? ({Credentials}, was used).");
+            LogWarning($"Send-EmailMessage - Error during authentication (oAuth): {ex.Message}");
+            LogWarning($"Send-EmailMessage - Possible issue: OAuth? ({isOAuth} was used), ICredentials? ({Credentials}, was used).");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
@@ -504,14 +507,14 @@ public class Smtp {
                     var oauth2 = new SaslMechanismOAuth2(userName, token);
                     await Client.AuthenticateAsync(oauth2);
                 }
-                LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Authenticated using oAuth");
+                LogVerbose($"Send-EmailMessage - Authenticated using oAuth");
             } else {
                 await Client.AuthenticateAsync(Credentials);
             }
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (Exception ex) {
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during authentication (oAuth): {ex.Message}");
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: OAuth? ({isOAuth} was used), ICredentials? ({Credentials}, was used).");
+            LogWarning($"Send-EmailMessage - Error during authentication (oAuth): {ex.Message}");
+            LogWarning($"Send-EmailMessage - Possible issue: OAuth? ({isOAuth} was used), ICredentials? ({Credentials}, was used).");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
@@ -527,10 +530,10 @@ public class Smtp {
         try {
             var mechanism = new SaslMechanismNtlmIntegrated();
             Client.Authenticate(mechanism);
-            LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Authenticated using default credentials");
+            LogVerbose($"Send-EmailMessage - Authenticated using default credentials");
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (Exception ex) {
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Could not authenticate using default credentials. Error: {ex.Message}");
+            LogWarning($"Send-EmailMessage - Could not authenticate using default credentials. Error: {ex.Message}");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
@@ -590,11 +593,11 @@ public class Smtp {
                     Client.Authenticate(new SaslMechanismPlain(username, password));
                     break;
             }
-            LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Authenticated as {username}");
+            LogVerbose($"Send-EmailMessage - Authenticated as {username}");
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (Exception ex) {
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during authentication: {ex.Message}");
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Username? ({username} was used), Password?.");
+            LogWarning($"Send-EmailMessage - Error during authentication: {ex.Message}");
+            LogWarning($"Send-EmailMessage - Possible issue: Username? ({username} was used), Password?.");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
@@ -643,13 +646,35 @@ public class Smtp {
         }
     }
 
+    /// <summary>
+    /// Logs a verbose message using LogCollector if available, otherwise uses LoggingMessages.Logger.
+    /// </summary>
+    private void LogVerbose(string message) {
+        if (LogCollector != null) {
+            LogCollector.LogVerbose(message);
+        } else {
+            LoggingMessages.Logger.WriteVerbose(message);
+        }
+    }
+
+    /// <summary>
+    /// Logs a warning message using LogCollector if available, otherwise uses LoggingMessages.Logger.
+    /// </summary>
+    private void LogWarning(string message) {
+        if (LogCollector != null) {
+            LogCollector.LogWarning(message);
+        } else {
+            LoggingMessages.Logger.WriteWarning(message);
+        }
+    }
+
     private async Task<SmtpResult> SendCoreAsync(CancellationToken cancellationToken = default) {
         int attempts = 0;
         Exception? lastException = null;
         do {
             try {
                 await Client.SendAsync(Message, cancellationToken);
-                LoggingMessages.Logger.WriteVerbose($"Send-EmailMessage - Sent email to {SentTo}");
+                LogVerbose($"Send-EmailMessage - Sent email to {SentTo}");
                 if (SentMessageRepository != null) {
                     var record = new SentMessageRecord {
                         MessageId = Message.MessageId ?? string.Empty,
@@ -664,7 +689,7 @@ public class Smtp {
                 return result;
             } catch (Exception ex) {
                 lastException = ex;
-                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending: {ex.Message}");
+                LogWarning($"Send-EmailMessage - Error during sending: {ex.Message}");
                 if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
@@ -780,8 +805,8 @@ public class Smtp {
                 // Encrypt the message body with the certificate
                 message.Body = ApplicationPkcs7Mime.Encrypt(ctx, recipients, message.Body);
             } catch (Exception ex) {
-                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during encryption: {ex.Message}");
-                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Certificate? ({certificate.Thumbprint} was used).");
+                LogWarning($"Send-EmailMessage - Error during encryption: {ex.Message}");
+                LogWarning($"Send-EmailMessage - Possible issue: Certificate? ({certificate.Thumbprint} was used).");
                 if (ErrorAction == ActionPreference.Stop) {
                     throw;
                 }
@@ -809,8 +834,8 @@ public class Smtp {
                 };
                 message.Body = MultipartSigned.Create(ctx, signer, message.Body);
             } catch (Exception ex) {
-                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during signing: {ex.Message}");
-                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Certificate? ({certificate.Thumbprint} was used).");
+                LogWarning($"Send-EmailMessage - Error during signing: {ex.Message}");
+                LogWarning($"Send-EmailMessage - Possible issue: Certificate? ({certificate.Thumbprint} was used).");
                 if (ErrorAction == ActionPreference.Stop) {
                     throw;
                 }
@@ -861,8 +886,8 @@ public class Smtp {
         }
 
         var messageText = "Certificate not found in the store.";
-        LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
-        LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Thumbprint '{certificateThumbprint}' is invalid or the certificate is missing.");
+        LogWarning($"Send-EmailMessage - {messageText}");
+        LogWarning($"Send-EmailMessage - Possible issue: Thumbprint '{certificateThumbprint}' is invalid or the certificate is missing.");
 
         if (ErrorAction == ActionPreference.Stop) {
             throw new Exception(messageText);
@@ -938,8 +963,8 @@ public class Smtp {
             Message = message;
             return new SmtpResult(true, EmailAction.SMimeSignaturePKCS7, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (Exception ex) {
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error: {ex.Message}");
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Certificate? ({certificate.Thumbprint} was used).");
+            LogWarning($"Send-EmailMessage - Error: {ex.Message}");
+            LogWarning($"Send-EmailMessage - Possible issue: Certificate? ({certificate.Thumbprint} was used).");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
@@ -1032,8 +1057,8 @@ public class Smtp {
     public SmtpResult PgpEncrypt(string publicKeyPath) {
         if (!File.Exists(publicKeyPath)) {
             string messageText = $"Public key file not found: {publicKeyPath}";
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{publicKeyPath}' is invalid. Verify the file exists and the path is correct.");
+            LogWarning($"Send-EmailMessage - {messageText}");
+            LogWarning($"Send-EmailMessage - Possible issue: Path '{publicKeyPath}' is invalid. Verify the file exists and the path is correct.");
             return new SmtpResult(false, EmailAction.PgpEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
         }
 
@@ -1069,14 +1094,14 @@ public class Smtp {
             using (var ctx = new EphemeralOpenPgpContext(password)) {
                 if (!File.Exists(publicKeyPath)) {
                     string messageText = $"Public key file not found: {publicKeyPath}";
-                    LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
-                    LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{publicKeyPath}' is invalid. Verify the file exists and the path is correct.");
+                    LogWarning($"Send-EmailMessage - {messageText}");
+                    LogWarning($"Send-EmailMessage - Possible issue: Path '{publicKeyPath}' is invalid. Verify the file exists and the path is correct.");
                     return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
                 }
                 if (!File.Exists(privateKeyPath)) {
                     string messageText = $"Private key file not found: {privateKeyPath}";
-                    LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
-                    LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{privateKeyPath}' is invalid. Verify the file exists and the path is correct.");
+                    LogWarning($"Send-EmailMessage - {messageText}");
+                    LogWarning($"Send-EmailMessage - Possible issue: Path '{privateKeyPath}' is invalid. Verify the file exists and the path is correct.");
                     return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
                 }
 
@@ -1124,14 +1149,14 @@ public class Smtp {
             using (var ctx = new EphemeralOpenPgpContext(password)) {
                 if (!File.Exists(publicKeyPath)) {
                     string messageText = $"Public key file not found: {publicKeyPath}";
-                    LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
-                    LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{publicKeyPath}' is invalid. Verify the file exists and the path is correct.");
+                    LogWarning($"Send-EmailMessage - {messageText}");
+                    LogWarning($"Send-EmailMessage - Possible issue: Path '{publicKeyPath}' is invalid. Verify the file exists and the path is correct.");
                     return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
                 }
                 if (!File.Exists(privateKeyPath)) {
                     string messageText = $"Private key file not found: {privateKeyPath}";
-                    LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - {messageText}");
-                    LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Possible issue: Path '{privateKeyPath}' is invalid. Verify the file exists and the path is correct.");
+                    LogWarning($"Send-EmailMessage - {messageText}");
+                    LogWarning($"Send-EmailMessage - Possible issue: Path '{privateKeyPath}' is invalid. Verify the file exists and the path is correct.");
                     return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
                 }
 
