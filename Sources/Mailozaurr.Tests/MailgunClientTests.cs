@@ -56,6 +56,34 @@ public class MailgunClientTests
         }
     }
 
+    private sealed class DisposingHandler : HttpMessageHandler
+    {
+        public bool Disposed { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            Disposed = true;
+        }
+    }
+
+    private sealed class DerivedMailgunClient : MailgunClient
+    {
+        public bool Disposed { get; private set; }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                Disposed = true;
+            }
+            base.Dispose(disposing);
+        }
+    }
+
     [Fact]
     public void EmailDomain_InvalidAddress_ThrowsArgumentException()
     {
@@ -192,6 +220,26 @@ public class MailgunClientTests
         var result = await client.SendEmailAsync();
         Assert.False(result.Status);
         Assert.True(handler.ResponseDisposed);
+    }
+
+    [Fact]
+    public void Dispose_DerivedType_DisposesHttpClient()
+    {
+        var handler = new DisposingHandler();
+        var httpClient = new HttpClient(handler);
+        var client = new DerivedMailgunClient
+        {
+            From = "sender@example.com",
+            To = new List<object> { "to@example.com" },
+            Credentials = new NetworkCredential(string.Empty, "key")
+        };
+        var field = typeof(MailgunClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance);
+        field!.SetValue(client, httpClient);
+
+        client.Dispose();
+
+        Assert.True(handler.Disposed);
+        Assert.True(client.Disposed);
     }
 
     private static MailgunClient CreateClient(HttpMessageHandler handler)
