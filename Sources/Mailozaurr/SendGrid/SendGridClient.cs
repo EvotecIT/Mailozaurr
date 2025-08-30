@@ -9,7 +9,7 @@ namespace Mailozaurr;
 /// Only key functionality required by the module is implemented;
 /// it is not intended as a full wrapper of the SendGrid SDK.
 /// </remarks>
-public class SendGridClient {
+public sealed class SendGridClient : IDisposable {
     /// <summary>
     /// Gets the JSON representation of the message to be sent.
     /// </summary>
@@ -19,6 +19,7 @@ public class SendGridClient {
     /// The HttpClient used to send HTTP requests.
     /// </summary>
     private readonly HttpClient _client;
+    private bool _disposed;
 
     /// <summary>
     /// Stopwatch to measure the time taken to send an email.
@@ -393,9 +394,22 @@ public class SendGridClient {
     }
 
     /// <summary>
-    /// Releases the unmanaged resources used by the SendGridClient and optionally releases the managed resources.
+    /// Releases resources used by the <see cref="SendGridClient"/>.
     /// </summary>
     public void Dispose() {
-        _client.Dispose();
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    private void Dispose(bool disposing) {
+        if (_disposed) {
+            return;
+        }
+
+        if (disposing) {
+            _client.Dispose();
+        }
+
+        _disposed = true;
     }
 }
