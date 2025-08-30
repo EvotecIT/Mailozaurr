@@ -119,7 +119,7 @@ public class MailgunClient : IDisposable {
         var bytes = new byte[fs.Length];
         var read = 0;
         while (read < bytes.Length) {
-            var r = await fs.ReadAsync(bytes, read, bytes.Length - read, cancellationToken);
+            var r = await fs.ReadAsync(bytes, read, bytes.Length - read, cancellationToken).ConfigureAwait(false);
             if (r == 0) break;
             read += r;
         }
@@ -152,7 +152,7 @@ public class MailgunClient : IDisposable {
                     continue;
                 }
 
-                var bytes = await ReadFileBytesAsync(path, cancellationToken);
+                var bytes = await ReadFileBytesAsync(path, cancellationToken).ConfigureAwait(false);
                 var fileContent = new ByteArrayContent(bytes);
                 fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                 content.Add(fileContent, "attachment", Path.GetFileName(path));
@@ -167,7 +167,7 @@ public class MailgunClient : IDisposable {
                     continue;
                 }
 
-                var bytes = await ReadFileBytesAsync(path, cancellationToken);
+                var bytes = await ReadFileBytesAsync(path, cancellationToken).ConfigureAwait(false);
                 var fileContent = new ByteArrayContent(bytes);
                 fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                 content.Add(fileContent, "inline", Path.GetFileName(path));
@@ -199,22 +199,22 @@ public class MailgunClient : IDisposable {
         Exception? lastException = null;
         do {
             try {
-                using var content = await CreateContentAsync(cancellationToken);
+                using var content = await CreateContentAsync(cancellationToken).ConfigureAwait(false);
                 using var request = new HttpRequestMessage(HttpMethod.Post, url) {
                     Content = content
                 };
                 request.Headers.Authorization = new AuthenticationHeaderValue("Basic", auth);
-                using var response = await _client.SendAsync(request, cancellationToken);
+                using var response = await _client.SendAsync(request, cancellationToken).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode) {
                     var statusCode = response.StatusCode.ToString();
                     var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, statusCode, "");
-                    await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken);
+                    await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken).ConfigureAwait(false);
                     return okResult;
                 }
 #if NET5_0_OR_GREATER
-                var error = await response.Content.ReadAsStringAsync(cancellationToken);
+                var error = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 #else
-                var error = await response.Content.ReadAsStringAsync();
+                var error = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
                 throw new HttpRequestException(error);
             } catch (HttpRequestException ex) {
@@ -223,16 +223,16 @@ public class MailgunClient : IDisposable {
                 if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
                     if (ErrorAction == ActionPreference.Stop) throw;
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", ex.Message);
-                    await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
+                    await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
                     return failResult;
                 }
                 var delay = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
-                if (delay > 0) await Task.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken);
+                if (delay > 0) await Task.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken).ConfigureAwait(false);
             }
             attempts++;
         } while (attempts <= RetryCount);
         var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", lastException?.Message);
-        await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken);
+        await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken).ConfigureAwait(false);
         return finalResult;
     }
 

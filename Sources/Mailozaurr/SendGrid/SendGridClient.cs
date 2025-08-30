@@ -321,7 +321,7 @@ public class SendGridClient {
                 throw new InvalidCastException(message);
             }
             var credFail = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, string.Empty, message);
-            await Helpers.PostWebhookAsync(WebhookUrl, credFail, cancellationToken);
+            await Helpers.PostWebhookAsync(WebhookUrl, credFail, cancellationToken).ConfigureAwait(false);
             return credFail;
         }
 
@@ -335,17 +335,17 @@ public class SendGridClient {
                 };
                 request.Headers.Add("Authorization", $"Bearer {apiKey}");
 
-                using var response = await _client.SendAsync(request, cancellationToken);
+                using var response = await _client.SendAsync(request, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
-                lastContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                lastContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 #else
-                lastContent = await response.Content.ReadAsStringAsync();
+                lastContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
                 LogCollector.LogVerbose($"Send-EmailMessage - Sent email to {SentTo} using SendGrid");
 
                 if (response.IsSuccessStatusCode) {
                     var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, response.StatusCode.ToString());
-                    await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken);
+                    await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken).ConfigureAwait(false);
                     return okResult;
                 }
 
@@ -360,13 +360,13 @@ public class SendGridClient {
                         throw lastException;
                     }
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
-                    await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
+                    await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
                     return failResult;
                 }
 
                 var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
                 if (delayMilliseconds > 0) {
-                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken);
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken).ConfigureAwait(false);
                 }
             } catch (TaskCanceledException ex) {
                 lastException = ex;
@@ -376,19 +376,19 @@ public class SendGridClient {
                         throw lastException;
                     }
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
-                    await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
+                    await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
                     return failResult;
                 }
                 var delayMs = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
                 if (delayMs > 0) {
-                    await Task.Delay(TimeSpan.FromMilliseconds(delayMs), cancellationToken);
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMs), cancellationToken).ConfigureAwait(false);
                 }
             }
             attempts++;
         } while (attempts <= RetryCount);
 
         var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
-        await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken);
+        await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken).ConfigureAwait(false);
         return finalResult;
     }
 
