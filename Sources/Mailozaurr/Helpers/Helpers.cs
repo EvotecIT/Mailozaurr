@@ -13,6 +13,12 @@ namespace Mailozaurr;
 /// Utility methods used throughout the library.
 /// </summary>
 public static class Helpers {
+    private static HttpClient s_sharedHttpClient = new HttpClient();
+
+    internal static HttpClient SharedHttpClient {
+        get => s_sharedHttpClient;
+        set => s_sharedHttpClient = value ?? throw new ArgumentNullException(nameof(value));
+    }
     /// <summary>Converts a credential into an OAuth token tuple.</summary>
     /// <param name="credential">The credential containing the token.</param>
     /// <returns>The username and token.</returns>
@@ -154,13 +160,9 @@ public static class Helpers {
             return;
         }
 
-        HttpClient? ownedClient = null;
+        client ??= SharedHttpClient;
 
         try {
-            if (client == null) {
-                ownedClient = new HttpClient();
-                client = ownedClient;
-            }
             var json = JsonSerializer.Serialize(result);
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
             using var response = await client.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
@@ -170,8 +172,6 @@ public static class Helpers {
             }
         } catch (HttpRequestException ex) {
             LoggingMessages.Logger.WriteWarning($"Failed to post webhook: {ex.Message}");
-        } finally {
-            ownedClient?.Dispose();
         }
     }
 }
