@@ -164,6 +164,15 @@ public class HelpersTests {
             => Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError));
     }
 
+    private class CountingHandler : HttpMessageHandler {
+        public int Calls;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            Calls++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        }
+    }
+
     [Fact]
     public async Task PostWebhookAsync_CancellationRequested_ThrowsAsync() {
         using var cts = new CancellationTokenSource();
@@ -201,5 +210,23 @@ public class HelpersTests {
 
         Mailozaurr.LoggingMessages.Logger.OnWarningMessage -= Handler;
         Assert.Contains(messages, static m => m.Contains("Failed to post webhook"));
+    }
+
+    [Fact]
+    public async Task PostWebhookAsync_UsesSharedClient_WhenClientNotProvided() {
+        var original = Mailozaurr.Helpers.SharedHttpClient;
+        var handler = new CountingHandler();
+        var client = new HttpClient(handler);
+        Mailozaurr.Helpers.SharedHttpClient = client;
+
+        try {
+            var result = new SmtpResult(true, EmailAction.Send, string.Empty, string.Empty, string.Empty, 0, TimeSpan.Zero);
+            await Mailozaurr.Helpers.PostWebhookAsync("http://localhost", result);
+            await Mailozaurr.Helpers.PostWebhookAsync("http://localhost", result);
+            Assert.Equal(2, handler.Calls);
+        } finally {
+            Mailozaurr.Helpers.SharedHttpClient = original;
+            client.Dispose();
+        }
     }
 }
