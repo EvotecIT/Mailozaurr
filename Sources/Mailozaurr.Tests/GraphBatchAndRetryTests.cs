@@ -120,6 +120,22 @@ public class GraphBatchAndRetryTests {
         }
     }
 
+    private class HangingHandler : HttpMessageHandler {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
+            throw new InvalidOperationException("Unreachable");
+        }
+    }
+
+    private class TransientFailHandler : HttpMessageHandler {
+        public int CallCount;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            CallCount++;
+            throw new HttpRequestException("fail");
+        }
+    }
+
     [Fact]
     public async Task ConnectO365GraphWithRetryAsync_RetriesUntilSuccess() {
         var handler = new RetryHandler();
@@ -192,6 +208,57 @@ public class GraphBatchAndRetryTests {
             string token = await MicrosoftGraphUtils.ConnectO365GraphAsync(credential, "tenant", "https://graph.microsoft.com");
             Assert.Equal("Bearer token", token);
             Assert.Equal(2, handler.CallCount);
+        } finally {
+            handlerField.SetValue(client, original);
+        }
+    }
+
+    [Fact]
+    public async Task ConnectO365GraphAsync_CancellationRequested_Throws() {
+        var handler = new HangingHandler();
+        var field = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var client = (HttpClient)field.GetValue(null)!;
+        var handlerField = GetHandlerField();
+        var original = (HttpMessageHandler)handlerField.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var cache = (System.Collections.Concurrent.ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
+        cache.Clear();
+        var oauthType = typeof(MicrosoftGraphUtils).Assembly.GetType("Mailozaurr.OAuthTokenCache");
+        var oauthField = oauthType?.GetField("_cache", BindingFlags.NonPublic | BindingFlags.Static);
+        oauthField?.SetValue(null, null);
+        string cachePath = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "Mailozaurr", "oauth_cache.json");
+        if (System.IO.File.Exists(cachePath)) System.IO.File.Delete(cachePath);
+        var cts = new CancellationTokenSource(100);
+        try {
+            var credential = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => MicrosoftGraphUtils.ConnectO365GraphAsync(credential, "tenant", "https://graph.microsoft.com", cts.Token));
+        } finally {
+            handlerField.SetValue(client, original);
+        }
+    }
+
+    [Fact]
+    public async Task ConnectO365GraphWithRetryAsync_CancelledDuringDelay_Throws() {
+        var handler = new TransientFailHandler();
+        var field = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var client = (HttpClient)field.GetValue(null)!;
+        var handlerField = GetHandlerField();
+        var original = (HttpMessageHandler)handlerField.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var cache = (System.Collections.Concurrent.ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
+        cache.Clear();
+        var oauthType = typeof(MicrosoftGraphUtils).Assembly.GetType("Mailozaurr.OAuthTokenCache");
+        var oauthField = oauthType?.GetField("_cache", BindingFlags.NonPublic | BindingFlags.Static);
+        oauthField?.SetValue(null, null);
+        string cachePath = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "Mailozaurr", "oauth_cache.json");
+        if (System.IO.File.Exists(cachePath)) System.IO.File.Delete(cachePath);
+        var cts = new CancellationTokenSource(100);
+        try {
+            var credential = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => MicrosoftGraphUtils.ConnectO365GraphWithRetryAsync(credential, "tenant", 3, 10000, 1, "https://graph.microsoft.com", cts.Token));
         } finally {
             handlerField.SetValue(client, original);
         }
