@@ -9,7 +9,7 @@ namespace Mailozaurr;
 /// Only key functionality required by the module is implemented;
 /// it is not intended as a full wrapper of the SendGrid SDK.
 /// </remarks>
-public class SendGridClient {
+public sealed class SendGridClient : IDisposable {
     /// <summary>
     /// Gets the JSON representation of the message to be sent.
     /// </summary>
@@ -19,6 +19,7 @@ public class SendGridClient {
     /// The HttpClient used to send HTTP requests.
     /// </summary>
     private readonly HttpClient _client;
+    private bool _disposed;
 
     /// <summary>
     /// Stopwatch to measure the time taken to send an email.
@@ -153,7 +154,9 @@ public class SendGridClient {
     /// </summary>
     public SendGridClient() {
         Stopwatch = Stopwatch.StartNew();
-        _client = new HttpClient();
+        _client = new HttpClient {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
     }
 
     /// <summary>
@@ -245,6 +248,7 @@ public class SendGridClient {
     /// Creates a SendGridMessage object from the properties of this SendGridClient.
     /// </summary>
     public void CreateMessage() {
+        ThrowIfDisposed();
 
         var attachments = ConvertAttachments(Attachment);
 
@@ -311,6 +315,7 @@ public class SendGridClient {
     /// </summary>
     /// <returns>A Task that represents the asynchronous operation. The task result contains the result of the email sending operation.</returns>
     public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken) {
+        ThrowIfDisposed();
         string apiKey;
         if (Credentials is NetworkCredential networkCredential) {
             apiKey = networkCredential.Password;
@@ -392,10 +397,29 @@ public class SendGridClient {
         return finalResult;
     }
 
+    private void ThrowIfDisposed() {
+        if (_disposed) {
+            throw new ObjectDisposedException(nameof(SendGridClient));
+        }
+    }
+
     /// <summary>
-    /// Releases the unmanaged resources used by the SendGridClient and optionally releases the managed resources.
+    /// Releases resources used by the <see cref="SendGridClient"/>.
     /// </summary>
     public void Dispose() {
-        _client.Dispose();
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    private void Dispose(bool disposing) {
+        if (_disposed) {
+            return;
+        }
+
+        if (disposing) {
+            _client.Dispose();
+        }
+
+        _disposed = true;
     }
 }
