@@ -12,6 +12,7 @@ namespace Mailozaurr;
 /// </summary>
 public class MailgunClient : IDisposable {
     private readonly HttpClient _client;
+    private bool _disposed;
     /// <summary>Measures total time spent sending.</summary>
     public readonly Stopwatch Stopwatch;
 
@@ -239,7 +240,17 @@ public class MailgunClient : IDisposable {
     /// <summary>
     /// Releases resources used by the client.
     /// </summary>
+    protected virtual void Dispose(bool disposing) {
+        if (!_disposed) {
+            if (disposing) {
+                _client.Dispose();
+            }
+            _disposed = true;
+        }
+    }
+
     public void Dispose() {
-        _client.Dispose();
+        Dispose(true);
+        GC.SuppressFinalize(this);
     }
 }
