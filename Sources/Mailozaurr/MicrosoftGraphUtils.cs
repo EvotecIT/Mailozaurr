@@ -112,7 +112,7 @@ namespace Mailozaurr {
         /// <summary>
         /// Connects to O365 Graph and returns the Authorization header value ("Bearer ...").
         /// </summary>
-        public static async Task<string> ConnectO365GraphAsync(GraphCredential credential, string tenantDomain, string resource = "https://manage.office.com") {
+        public static async Task<string> ConnectO365GraphAsync(GraphCredential credential, string tenantDomain, string resource = "https://manage.office.com", CancellationToken cancellationToken = default) {
             var key = $"{credential.ClientId}|{tenantDomain}|{credential.CertificatePath}|{credential.ClientSecret}|{resource}";
             if (TokenCache.TryGetValue(key, out var cached) && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
                 return $"{cached.TokenType} {cached.AccessToken}";
@@ -164,19 +164,23 @@ namespace Mailozaurr {
             }
             var content = new FormUrlEncodedContent(body);
             var url = $"https://login.microsoftonline.com/{tenantDomain}/oauth2/token";
-            await ConcurrencySemaphore.WaitAsync().ConfigureAwait(false);
+            await ConcurrencySemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
             HttpResponseMessage? response = null;
             try {
-                response = await HttpClient.PostAsync(url, content).ConfigureAwait(false);
+                response = await HttpClient.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
                 if ((int)response.StatusCode == 429) {
                     var delay = GetRetryAfterDelay(response);
                     response.Dispose();
                     if (delay > TimeSpan.Zero) {
-                        await Task.Delay(delay).ConfigureAwait(false);
+                        await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                     }
-                    response = await HttpClient.PostAsync(url, content).ConfigureAwait(false);
+                    response = await HttpClient.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
                 }
+#if NET5_0_OR_GREATER
+                var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
                 var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
                 if (!response.IsSuccessStatusCode) {
                     throw new GraphApiException(
                         response.StatusCode,
@@ -217,12 +221,13 @@ namespace Mailozaurr {
             int retryCount,
             int retryDelayMilliseconds,
             double retryDelayBackoff,
-            string resource = "https://manage.office.com") {
+            string resource = "https://manage.office.com",
+            CancellationToken cancellationToken = default) {
             int attempts = 0;
             Exception? lastException = null;
             do {
                 try {
-                    return await ConnectO365GraphAsync(credential, tenantDomain, resource).ConfigureAwait(false);
+                    return await ConnectO365GraphAsync(credential, tenantDomain, resource, cancellationToken).ConfigureAwait(false);
                 } catch (Exception ex) {
                     lastException = ex;
                     LoggingMessages.Logger.WriteWarning($"Connect-EmailGraph - {ex.Message}");
@@ -231,7 +236,7 @@ namespace Mailozaurr {
                     }
                     var delay = (int)Math.Round(retryDelayMilliseconds * Math.Pow(retryDelayBackoff, attempts));
                     if (delay > 0) {
-                        await Task.Delay(delay).ConfigureAwait(false);
+                        await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                     }
                 }
                 attempts++;
@@ -276,7 +281,8 @@ namespace Mailozaurr {
             string method,
             string uri,
             IDictionary<string, string>? headers = null,
-            string? body = null) {
+            string? body = null,
+            CancellationToken cancellationToken = default) {
             var request = new HttpRequestMessage(new HttpMethod(method), uri);
             if (headers != null) {
                 foreach (var kvp in headers) {
@@ -286,19 +292,23 @@ namespace Mailozaurr {
             if (!string.IsNullOrWhiteSpace(body) && (method == "POST" || method == "PUT" || method == "PATCH")) {
                 request.Content = new StringContent(body, Encoding.UTF8, "application/json");
             }
-            await ConcurrencySemaphore.WaitAsync().ConfigureAwait(false);
+            await ConcurrencySemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
             HttpResponseMessage? response = null;
             try {
-                response = await HttpClient.SendAsync(request).ConfigureAwait(false);
+                response = await HttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
                 if ((int)response.StatusCode == 429) {
                     var delay = GetRetryAfterDelay(response);
                     response.Dispose();
                     if (delay > TimeSpan.Zero) {
-                        await Task.Delay(delay).ConfigureAwait(false);
+                        await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                     }
-                    response = await HttpClient.SendAsync(request).ConfigureAwait(false);
+                    response = await HttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
                 }
+#if NET5_0_OR_GREATER
+                var responseContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
                 var responseContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
                 if (!response.IsSuccessStatusCode) {
                     throw new GraphApiException(
                         response.StatusCode,
@@ -315,13 +325,13 @@ namespace Mailozaurr {
         /// <summary>
         /// Sends multiple requests to Microsoft Graph in a single batch.
         /// </summary>
-        public static async Task<IReadOnlyList<GraphBatchResult>> SendBatchAsync(GraphCredential credential, IEnumerable<GraphBatchRequest> requests) {
-            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
+        public static async Task<IReadOnlyList<GraphBatchResult>> SendBatchAsync(GraphCredential credential, IEnumerable<GraphBatchRequest> requests, CancellationToken cancellationToken = default) {
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com", cancellationToken).ConfigureAwait(false);
             var headers = new Dictionary<string, string> { { "Authorization", token } };
             var batchPayload = new { requests = requests.Select(r => new { id = r.Id, method = r.Method.ToString(), url = r.Url.TrimStart('/') , headers = r.Headers, body = r.Body }) };
             var jsonBody = JsonSerializer.Serialize(batchPayload);
             var batchUri = BuildGraphUri(GraphEndpoint.V1, "/$batch");
-            var doc = await InvokeGraphApiAsync("POST", batchUri, headers, jsonBody).ConfigureAwait(false);
+            var doc = await InvokeGraphApiAsync("POST", batchUri, headers, jsonBody, cancellationToken).ConfigureAwait(false);
             var results = new List<GraphBatchResult>();
             if (doc.RootElement.TryGetProperty("responses", out var responses) && responses.ValueKind == JsonValueKind.Array) {
                 foreach (var item in responses.EnumerateArray()) {
