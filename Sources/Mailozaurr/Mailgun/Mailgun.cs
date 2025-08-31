@@ -12,7 +12,7 @@ namespace Mailozaurr;
 /// </summary>
 public class MailgunClient : IDisposable {
     private readonly HttpClient _client;
-    private bool _disposed;
+    private int _disposed;
     /// <summary>Measures total time spent sending.</summary>
     public readonly Stopwatch Stopwatch;
 
@@ -186,13 +186,17 @@ public class MailgunClient : IDisposable {
     /// Sends the email using the Mailgun REST API.
     /// </summary>
     /// <returns>The result of the send operation.</returns>
-    public Task<SmtpResult> SendEmailAsync() => SendEmailAsync(CancellationToken.None);
+    public Task<SmtpResult> SendEmailAsync() {
+        ThrowIfDisposed();
+        return SendEmailAsync(CancellationToken.None);
+    }
 
     /// <summary>
     /// Sends the email using the Mailgun REST API.
     /// </summary>
     /// <returns>The result of the send operation.</returns>
     public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken) {
+        ThrowIfDisposed();
         var url = $"https://api.mailgun.net/v3/{EmailDomain}/messages";
         var auth = Convert.ToBase64String(Encoding.ASCII.GetBytes($"api:{ApiKey}"));
 
@@ -240,14 +244,20 @@ public class MailgunClient : IDisposable {
     /// <summary>
     /// Releases resources used by the client.
     /// </summary>
-    protected virtual void Dispose(bool disposing) {
-        if (!_disposed) {
-            if (disposing) {
-                _client.Dispose();
-            }
-            _disposed = true;
+    private void ThrowIfDisposed() {
+        if (Volatile.Read(ref _disposed) != 0) {
+            throw new ObjectDisposedException(nameof(MailgunClient));
         }
     }
+
+    protected virtual void Dispose(bool disposing) {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        if (disposing) {
+            _client.Dispose();
+        }
+    }
+
+    ~MailgunClient() => Dispose(false);
 
     public void Dispose() {
         Dispose(true);
