@@ -154,7 +154,9 @@ public sealed class SendGridClient : IDisposable {
     /// </summary>
     public SendGridClient() {
         Stopwatch = Stopwatch.StartNew();
-        _client = new HttpClient();
+        _client = new HttpClient {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
     }
 
     /// <summary>
@@ -246,6 +248,7 @@ public sealed class SendGridClient : IDisposable {
     /// Creates a SendGridMessage object from the properties of this SendGridClient.
     /// </summary>
     public void CreateMessage() {
+        ThrowIfDisposed();
 
         var attachments = ConvertAttachments(Attachment);
 
@@ -312,6 +315,7 @@ public sealed class SendGridClient : IDisposable {
     /// </summary>
     /// <returns>A Task that represents the asynchronous operation. The task result contains the result of the email sending operation.</returns>
     public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken) {
+        ThrowIfDisposed();
         string apiKey;
         if (Credentials is NetworkCredential networkCredential) {
             apiKey = networkCredential.Password;
@@ -391,6 +395,12 @@ public sealed class SendGridClient : IDisposable {
         var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
         await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken);
         return finalResult;
+    }
+
+    private void ThrowIfDisposed() {
+        if (_disposed) {
+            throw new ObjectDisposedException(nameof(SendGridClient));
+        }
     }
 
     /// <summary>
