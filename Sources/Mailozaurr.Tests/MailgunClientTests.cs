@@ -242,6 +242,21 @@ public class MailgunClientTests
         Assert.True(client.Disposed);
     }
 
+    [Fact]
+    public async Task SendEmailAsync_AfterDispose_ThrowsObjectDisposedException()
+    {
+        var client = new MailgunClient
+        {
+            From = "sender@example.com",
+            To = new List<object> { "to@example.com" },
+            Credentials = new NetworkCredential(string.Empty, "key")
+        };
+
+        client.Dispose();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => client.SendEmailAsync());
+    }
+
     private static MailgunClient CreateClient(HttpMessageHandler handler)
     {
         var httpClient = new HttpClient(handler);
