@@ -45,6 +45,9 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
             if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory)) {
                 Directory.CreateDirectory(directory);
             }
+            if (record.NextAttemptAt == default) {
+                record.NextAttemptAt = DateTimeOffset.UtcNow;
+            }
             using var write = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read);
             var offset = write.Position;
             await JsonSerializer.SerializeAsync(write, record, cancellationToken: cancellationToken);
