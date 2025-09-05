@@ -16,6 +16,8 @@ public class SmtpResult {
     public string SentTo { get; set; }
     /// <summary>The sender address.</summary>
     public string SentFrom { get; set; }
+    /// <summary>Identifier of the message associated with the result.</summary>
+    public string? MessageId { get; set; }
     /// <summary>Optional message returned by the operation.</summary>
     public string? Message { get; set; }
     /// <summary>Time taken to perform the action.</summary>
