@@ -22,7 +22,15 @@ public sealed class SmtpPendingMessageTests {
         public List<string> Removed { get; } = new();
 
         public Task SaveAsync(PendingMessageRecord record, CancellationToken cancellationToken = default) {
-            Saved.Add(record);
+            if (record.NextAttemptAt == default) {
+                record.NextAttemptAt = DateTimeOffset.UtcNow;
+            }
+            var existing = Saved.FindIndex(r => r.MessageId == record.MessageId);
+            if (existing >= 0) {
+                Saved[existing] = record;
+            } else {
+                Saved.Add(record);
+            }
             return Task.CompletedTask;
         }
 
@@ -30,7 +38,8 @@ public sealed class SmtpPendingMessageTests {
             Task.FromResult(Saved.FirstOrDefault(r => r.MessageId == messageId));
 
         public async IAsyncEnumerable<PendingMessageRecord> GetAllAsync(CancellationToken cancellationToken = default) {
-            foreach (var r in Saved) {
+            var snapshot = Saved.ToList();
+            foreach (var r in snapshot) {
                 yield return r;
                 await Task.Yield();
             }
@@ -156,6 +165,76 @@ public sealed class SmtpPendingMessageTests {
 
         Assert.Empty(pending.Removed);
         Assert.Empty(sent.Saved);
+    }
+
+    [Fact]
+    public async Task ProcessPendingMessages_SkipsFutureNextAttempt() {
+        var pending = new InMemoryPendingRepository();
+        var sent = new InMemorySentRepository();
+        var smtp = new Smtp { PendingMessageRepository = pending, SentMessageRepository = sent };
+        SetClient(smtp, new SuccessClient());
+
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse("a@b.com"));
+        message.To.Add(MailboxAddress.Parse("b@c.com"));
+        message.Subject = "queued";
+        message.Body = new TextPart("plain") { Text = "body" };
+        message.MessageId = "msg-3";
+        using (var ms = new MemoryStream()) {
+            await message.WriteToAsync(ms);
+            var record = new PendingMessageRecord {
+                MessageId = "msg-3",
+                MimeMessage = Convert.ToBase64String(ms.ToArray()),
+                Timestamp = DateTimeOffset.UtcNow,
+                NextAttemptAt = DateTimeOffset.UtcNow.AddDays(1)
+            };
+            await pending.SaveAsync(record);
+        }
+
+        await smtp.ProcessPendingMessagesAsync();
+
+        Assert.Empty(sent.Saved);
+        Assert.Empty(pending.Removed);
+    }
+
+    [Fact]
+    public async Task ProcessPendingMessages_SendsWhenNextAttemptReached() {
+        var pending = new InMemoryPendingRepository();
+        var sent = new InMemorySentRepository();
+        var smtp = new Smtp { PendingMessageRepository = pending, SentMessageRepository = sent };
+        SetClient(smtp, new SuccessClient());
+
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse("a@b.com"));
+        message.To.Add(MailboxAddress.Parse("b@c.com"));
+        message.Subject = "queued";
+        message.Body = new TextPart("plain") { Text = "body" };
+        message.MessageId = "msg-4";
+        using (var ms = new MemoryStream()) {
+            await message.WriteToAsync(ms);
+            var record = new PendingMessageRecord {
+                MessageId = "msg-4",
+                MimeMessage = Convert.ToBase64String(ms.ToArray()),
+                Timestamp = DateTimeOffset.UtcNow,
+                NextAttemptAt = DateTimeOffset.UtcNow.AddDays(1)
+            };
+            await pending.SaveAsync(record);
+        }
+
+        await smtp.ProcessPendingMessagesAsync();
+        Assert.Empty(sent.Saved);
+
+        var existing = await pending.GetByMessageIdAsync("msg-4");
+        Assert.NotNull(existing);
+        existing!.NextAttemptAt = DateTimeOffset.UtcNow;
+        await pending.SaveAsync(existing);
+
+        await smtp.ProcessPendingMessagesAsync();
+
+        Assert.Single(sent.Saved);
+        Assert.Equal("msg-4", sent.Saved[0].MessageId);
+        Assert.Single(pending.Removed);
+        Assert.Equal("msg-4", pending.Removed[0]);
     }
 }
 

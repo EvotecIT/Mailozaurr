@@ -26,6 +26,7 @@ public sealed class FilePendingMessageRepositoryTests {
 
             var loaded = await repo.GetByMessageIdAsync(record.MessageId);
             Assert.NotNull(loaded);
+            Assert.True(loaded!.NextAttemptAt <= DateTimeOffset.UtcNow);
             using var ms2 = new MemoryStream(Convert.FromBase64String(loaded!.MimeMessage));
             var restored = await MimeMessage.LoadAsync(ms2);
             Assert.Equal("Pending", restored.Subject);

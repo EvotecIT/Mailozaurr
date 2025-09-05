@@ -22,7 +22,8 @@ public static class PendingMessageRepositoryExample {
         var record = new PendingMessageRecord {
             MessageId = message.MessageId ?? MimeKit.Utils.MimeUtils.GenerateMessageId(),
             MimeMessage = Convert.ToBase64String(ms.ToArray()),
-            Timestamp = DateTimeOffset.UtcNow
+            Timestamp = DateTimeOffset.UtcNow,
+            NextAttemptAt = DateTimeOffset.UtcNow.AddMinutes(5)
         };
         await repository.SaveAsync(record);
 

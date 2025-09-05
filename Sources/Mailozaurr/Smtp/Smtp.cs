@@ -666,6 +666,9 @@ public class Smtp {
             if (string.IsNullOrWhiteSpace(record.MimeMessage) || string.IsNullOrEmpty(record.MessageId)) {
                 continue;
             }
+            if (record.NextAttemptAt > DateTimeOffset.UtcNow) {
+                continue;
+            }
 
             MimeMessage message;
             try {
@@ -692,6 +695,8 @@ public class Smtp {
                 await PendingMessageRepository.RemoveAsync(record.MessageId, cancellationToken);
             } catch (Exception ex) {
                 LogWarning($"ProcessPendingMessages - Error sending {record.MessageId}: {ex.Message}");
+                record.NextAttemptAt = DateTimeOffset.UtcNow;
+                await PendingMessageRepository.SaveAsync(record, cancellationToken);
             }
         }
     }
@@ -759,7 +764,8 @@ public class Smtp {
                         var record = new PendingMessageRecord {
                             MessageId = id,
                             MimeMessage = Convert.ToBase64String(ms.ToArray()),
-                            Timestamp = DateTimeOffset.UtcNow
+                            Timestamp = DateTimeOffset.UtcNow,
+                            NextAttemptAt = DateTimeOffset.UtcNow
                         };
                         await PendingMessageRepository.SaveAsync(record, cancellationToken);
                     }
@@ -788,7 +794,8 @@ public class Smtp {
             var record = new PendingMessageRecord {
                 MessageId = finalId,
                 MimeMessage = Convert.ToBase64String(ms.ToArray()),
-                Timestamp = DateTimeOffset.UtcNow
+                Timestamp = DateTimeOffset.UtcNow,
+                NextAttemptAt = DateTimeOffset.UtcNow
             };
             await PendingMessageRepository.SaveAsync(record, cancellationToken);
         }

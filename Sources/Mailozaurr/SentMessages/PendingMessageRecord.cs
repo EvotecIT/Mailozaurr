@@ -10,6 +10,9 @@ public sealed class PendingMessageRecord {
     /// <summary>Time at which the message was queued.</summary>
     public DateTimeOffset Timestamp { get; set; }
 
+    /// <summary>Time when the next send attempt should occur.</summary>
+    public DateTimeOffset NextAttemptAt { get; set; }
+
     /// <summary>Base64-encoded MIME message.</summary>
     public string MimeMessage { get; set; } = string.Empty;
 }
