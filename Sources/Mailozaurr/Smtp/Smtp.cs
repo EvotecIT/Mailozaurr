@@ -32,6 +32,8 @@ public class Smtp {
 
     /// <summary>Repository used to persist sent message metadata.</summary>
     public ISentMessageRepository? SentMessageRepository { get; set; }
+    /// <summary>Repository used to persist pending messages for later retry.</summary>
+    public IPendingMessageRepository? PendingMessageRepository { get; set; }
 
     /// <summary>Underlying SMTP client used to send messages.</summary>
     public ClientSmtp Client { get; private set; }
@@ -684,7 +686,12 @@ public class Smtp {
                     };
                     await SentMessageRepository.SaveAsync(record, cancellationToken);
                 }
-                var result = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+                if (PendingMessageRepository != null && !string.IsNullOrEmpty(Message.MessageId)) {
+                    await PendingMessageRepository.RemoveAsync(Message.MessageId, cancellationToken);
+                }
+                var result = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging) {
+                    MessageId = Message.MessageId
+                };
                 await Helpers.PostWebhookAsync(WebhookUrl, result, cancellationToken);
                 return result;
             } catch (Exception ex) {
@@ -694,7 +701,23 @@ public class Smtp {
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }
-                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
+                    var id = Message.MessageId;
+                    if (string.IsNullOrEmpty(id)) {
+                        Message.MessageId = id = MimeKit.Utils.MimeUtils.GenerateMessageId();
+                    }
+                    if (PendingMessageRepository != null) {
+                        using var ms = new MemoryStream();
+                        await Message.WriteToAsync(ms, cancellationToken);
+                        var record = new PendingMessageRecord {
+                            MessageId = id,
+                            MimeMessage = Convert.ToBase64String(ms.ToArray()),
+                            Timestamp = DateTimeOffset.UtcNow
+                        };
+                        await PendingMessageRepository.SaveAsync(record, cancellationToken);
+                    }
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message) {
+                        MessageId = id
+                    };
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
                     return failResult;
                 }
@@ -707,7 +730,23 @@ public class Smtp {
             attempts++;
         } while (attempts <= RetryCount);
 
-        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", lastException?.Message);
+        var finalId = Message.MessageId;
+        if (string.IsNullOrEmpty(finalId)) {
+            Message.MessageId = finalId = MimeKit.Utils.MimeUtils.GenerateMessageId();
+        }
+        if (PendingMessageRepository != null) {
+            using var ms = new MemoryStream();
+            await Message.WriteToAsync(ms, cancellationToken);
+            var record = new PendingMessageRecord {
+                MessageId = finalId,
+                MimeMessage = Convert.ToBase64String(ms.ToArray()),
+                Timestamp = DateTimeOffset.UtcNow
+            };
+            await PendingMessageRepository.SaveAsync(record, cancellationToken);
+        }
+        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", lastException?.Message) {
+            MessageId = finalId
+        };
         await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken);
         return finalResult;
     }
