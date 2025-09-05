@@ -649,6 +649,54 @@ public class Smtp {
     }
 
     /// <summary>
+    /// Attempts to send all messages stored in <see cref="PendingMessageRepository"/>.
+    /// </summary>
+    /// <remarks>
+    /// Messages are removed from the repository only when sending succeeds. On
+    /// success the message is also logged via <see cref="SentMessageRepository"/>,
+    /// if configured.
+    /// </remarks>
+    public async Task ProcessPendingMessagesAsync(CancellationToken cancellationToken = default) {
+        if (PendingMessageRepository == null) {
+            return;
+        }
+
+        await foreach (var record in PendingMessageRepository.GetAllAsync(cancellationToken)) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(record.MimeMessage) || string.IsNullOrEmpty(record.MessageId)) {
+                continue;
+            }
+
+            MimeMessage message;
+            try {
+                var bytes = Convert.FromBase64String(record.MimeMessage);
+                using var ms = new MemoryStream(bytes);
+                message = await MimeMessage.LoadAsync(ms, cancellationToken);
+            } catch (Exception ex) {
+                LogWarning($"ProcessPendingMessages - Failed to parse {record.MessageId}: {ex.Message}");
+                continue;
+            }
+
+            try {
+                await Client.SendAsync(message, cancellationToken);
+                LogVerbose($"Send-EmailMessage - Sent email to {message.To}");
+                if (SentMessageRepository != null) {
+                    var sentRecord = new SentMessageRecord {
+                        MessageId = message.MessageId ?? record.MessageId,
+                        Recipients = message.To.ToString(),
+                        Subject = message.Subject ?? string.Empty,
+                        Timestamp = DateTimeOffset.UtcNow
+                    };
+                    await SentMessageRepository.SaveAsync(sentRecord, cancellationToken);
+                }
+                await PendingMessageRepository.RemoveAsync(record.MessageId, cancellationToken);
+            } catch (Exception ex) {
+                LogWarning($"ProcessPendingMessages - Error sending {record.MessageId}: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
     /// Logs a verbose message using LogCollector if available, otherwise uses LoggingMessages.Logger.
     /// </summary>
     private void LogVerbose(string message) {
