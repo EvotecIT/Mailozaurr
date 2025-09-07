@@ -25,6 +25,8 @@ public sealed class PendingMessageRecord {
     /// <summary>User name for authentication.</summary>
     public string? UserName { get; set; }
 
-    /// <summary>Password for authentication.</summary>
+    /// <summary>
+    /// DPAPI protected password encoded as Base64.
+    /// </summary>
     public string? Password { get; set; }
 }

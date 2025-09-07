@@ -3,7 +3,9 @@ using System.Net;
 using System.Net.Security;
 using System.Runtime.InteropServices;
 using System.Security;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using Org.BouncyCastle.Bcpg.OpenPgp;
 using System.Threading.Tasks;
 using System.Threading;
@@ -691,7 +693,17 @@ public class Smtp {
                 if (!string.IsNullOrWhiteSpace(server)) {
                     Connect(server, port);
                     if (!string.IsNullOrEmpty(record.UserName)) {
-                        var cred = Helpers.ConvertFromPlainText(record.UserName, record.Password ?? string.Empty);
+                        var pwd = string.Empty;
+                        if (!string.IsNullOrEmpty(record.Password)) {
+                            try {
+                                var data = Convert.FromBase64String(record.Password);
+                                var unprotected = ProtectedData.Unprotect(data, null, DataProtectionScope.CurrentUser);
+                                pwd = Encoding.UTF8.GetString(unprotected);
+                            } catch {
+                                pwd = string.Empty;
+                            }
+                        }
+                        var cred = Helpers.ConvertFromPlainText(record.UserName, pwd);
                         Authenticate(cred);
                     }
                 }
@@ -786,7 +798,9 @@ public class Smtp {
                             Server = Server,
                             Port = Port,
                             UserName = Credential?.UserName,
-                            Password = Credential?.Password
+                            Password = string.IsNullOrEmpty(Credential?.Password)
+                                ? null
+                                : Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(Credential!.Password), null, DataProtectionScope.CurrentUser))
                         };
                         await PendingMessageRepository.SaveAsync(record, cancellationToken);
                     }
@@ -820,7 +834,9 @@ public class Smtp {
                 Server = Server,
                 Port = Port,
                 UserName = Credential?.UserName,
-                Password = Credential?.Password
+                Password = string.IsNullOrEmpty(Credential?.Password)
+                    ? null
+                    : Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(Credential!.Password), null, DataProtectionScope.CurrentUser))
             };
             await PendingMessageRepository.SaveAsync(record, cancellationToken);
         }
