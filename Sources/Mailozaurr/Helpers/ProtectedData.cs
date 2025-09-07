@@ -1,4 +1,4 @@
-#if !UNIX
+#if WINDOWS
 using System;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -7,7 +7,7 @@ namespace Mailozaurr;
 
 internal static class ProtectedData {
     /// <summary>Protect.</summary>
-    public static byte[] Protect(byte[] userData, byte[]? optionalEntropy, DataProtectionScope scope) {
+    public static byte[] Protect(byte[] userData, byte[]? optionalEntropy, System.Security.Cryptography.DataProtectionScope scope) {
         if (userData.Length == 0) {
             throw new ArgumentException("Cryptography_DpApi_InvalidDataToProtect", nameof(userData));
         }
@@ -62,7 +62,7 @@ internal static class ProtectedData {
     }
 
     /// <summary>Unprotect.</summary>
-    public static byte[] Unprotect(byte[] encryptedData, byte[]? optionalEntropy, DataProtectionScope scope) {
+    public static byte[] Unprotect(byte[] encryptedData, byte[]? optionalEntropy, System.Security.Cryptography.DataProtectionScope scope) {
         if (encryptedData.Length == 0) {
             throw new ArgumentException("Cryptography_DpApi_InvalidDataToUnprotect", nameof(encryptedData));
         }

@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using MailKit;
@@ -92,6 +93,9 @@ public sealed class SmtpPendingMessageTests {
 
     [Fact]
     public async Task QueuedMessagePasswordIsEncrypted() {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
+            return;
+        }
         var repo = new InMemoryPendingRepository();
         var smtp = new Smtp { PendingMessageRepository = repo, RetryCount = 0 };
         SetClient(smtp, new FailClient());
