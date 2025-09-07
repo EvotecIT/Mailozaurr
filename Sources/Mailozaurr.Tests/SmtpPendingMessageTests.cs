@@ -1,4 +1,7 @@
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 using MailKit;
 using MimeKit;
 
@@ -86,6 +89,30 @@ public sealed class SmtpPendingMessageTests {
         Assert.Single(repo.Saved);
         Assert.Equal(result.MessageId, repo.Saved[0].MessageId);
         Assert.False(string.IsNullOrWhiteSpace(repo.Saved[0].MimeMessage));
+    }
+
+    [Fact]
+    public async Task QueuedMessagePasswordIsEncrypted() {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
+            return;
+        }
+        var repo = new InMemoryPendingRepository();
+        var smtp = new Smtp { PendingMessageRepository = repo, RetryCount = 0 };
+        SetClient(smtp, new FailClient());
+        smtp.From = "a@b.com";
+        smtp.To = new object[] { "b@c.com" };
+        smtp.Subject = "test";
+        smtp.TextBody = "body";
+        smtp.CreateMessage();
+        smtp.Authenticate("user", "secret", false);
+
+        await smtp.SendAsync();
+
+        var record = Assert.Single(repo.Saved);
+        Assert.NotEqual("secret", record.Password);
+        var bytes = Convert.FromBase64String(record.Password!);
+        var decrypted = ProtectedData.Unprotect(bytes, null, DataProtectionScope.CurrentUser);
+        Assert.Equal("secret", Encoding.UTF8.GetString(decrypted));
     }
 
     [Fact]

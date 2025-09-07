@@ -15,4 +15,18 @@ public sealed class PendingMessageRecord {
 
     /// <summary>Base64-encoded MIME message.</summary>
     public string MimeMessage { get; set; } = string.Empty;
+
+    /// <summary>SMTP server used when the message was queued.</summary>
+    public string? Server { get; set; }
+
+    /// <summary>Port of the SMTP server.</summary>
+    public int? Port { get; set; }
+
+    /// <summary>User name for authentication.</summary>
+    public string? UserName { get; set; }
+
+    /// <summary>
+    /// DPAPI protected password encoded as Base64.
+    /// </summary>
+    public string? Password { get; set; }
 }
