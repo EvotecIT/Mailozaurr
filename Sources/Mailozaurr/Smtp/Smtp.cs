@@ -38,6 +38,9 @@ public class Smtp {
     /// <summary>Underlying SMTP client used to send messages.</summary>
     public ClientSmtp Client { get; private set; }
 
+    /// <summary>Credentials used during authentication.</summary>
+    public NetworkCredential? Credential { get; private set; }
+
     /// <summary>Subject of the message.</summary>
     public string Subject {
         get => Client.Subject;
@@ -473,15 +476,15 @@ public class Smtp {
             if (isOAuth) {
                 var networkCredential = Credentials as NetworkCredential;
                 if (networkCredential != null) {
+                    Credential = networkCredential;
                     var (userName, token) = Helpers.ConvertFromOAuth2Credential(networkCredential);
                     var oauth2 = new SaslMechanismOAuth2(userName, token);
                     Client.Authenticate(oauth2);
-                    //  Settings.Logger.WriteVerbose($"Send-EmailMessage - Authenticated using OAuth");
                 }
                 LogVerbose($"Send-EmailMessage - Authenticated using oAuth");
             } else {
+                Credential = Credentials as NetworkCredential;
                 Client.Authenticate(Credentials);
-                //  Settings.Logger.WriteVerbose($"Send-EmailMessage - Authenticated using ICredentials");
             }
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (Exception ex) {
@@ -505,12 +508,14 @@ public class Smtp {
             if (isOAuth) {
                 var networkCredential = Credentials as NetworkCredential;
                 if (networkCredential != null) {
+                    Credential = networkCredential;
                     var (userName, token) = Helpers.ConvertFromOAuth2Credential(networkCredential);
                     var oauth2 = new SaslMechanismOAuth2(userName, token);
                     await Client.AuthenticateAsync(oauth2);
                 }
                 LogVerbose($"Send-EmailMessage - Authenticated using oAuth");
             } else {
+                Credential = Credentials as NetworkCredential;
                 await Client.AuthenticateAsync(Credentials);
             }
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
@@ -681,6 +686,16 @@ public class Smtp {
             }
 
             try {
+                var server = record.Server ?? Server;
+                var port = record.Port ?? Port;
+                if (!string.IsNullOrWhiteSpace(server)) {
+                    Connect(server, port);
+                    if (!string.IsNullOrEmpty(record.UserName)) {
+                        var cred = Helpers.ConvertFromPlainText(record.UserName, record.Password ?? string.Empty);
+                        Authenticate(cred);
+                    }
+                }
+
                 await Client.SendAsync(message, cancellationToken);
                 LogVerbose($"Send-EmailMessage - Sent email to {message.To}");
                 if (SentMessageRepository != null) {
@@ -697,6 +712,8 @@ public class Smtp {
                 LogWarning($"ProcessPendingMessages - Error sending {record.MessageId}: {ex.Message}");
                 record.NextAttemptAt = DateTimeOffset.UtcNow;
                 await PendingMessageRepository.SaveAsync(record, cancellationToken);
+            } finally {
+                Disconnect();
             }
         }
     }
@@ -765,7 +782,11 @@ public class Smtp {
                             MessageId = id,
                             MimeMessage = Convert.ToBase64String(ms.ToArray()),
                             Timestamp = DateTimeOffset.UtcNow,
-                            NextAttemptAt = DateTimeOffset.UtcNow
+                            NextAttemptAt = DateTimeOffset.UtcNow,
+                            Server = Server,
+                            Port = Port,
+                            UserName = Credential?.UserName,
+                            Password = Credential?.Password
                         };
                         await PendingMessageRepository.SaveAsync(record, cancellationToken);
                     }
@@ -795,7 +816,11 @@ public class Smtp {
                 MessageId = finalId,
                 MimeMessage = Convert.ToBase64String(ms.ToArray()),
                 Timestamp = DateTimeOffset.UtcNow,
-                NextAttemptAt = DateTimeOffset.UtcNow
+                NextAttemptAt = DateTimeOffset.UtcNow,
+                Server = Server,
+                Port = Port,
+                UserName = Credential?.UserName,
+                Password = Credential?.Password
             };
             await PendingMessageRepository.SaveAsync(record, cancellationToken);
         }
