@@ -135,6 +135,14 @@ public sealed class SmtpPendingMessageTests {
     }
 
     [Fact]
+    public void SettingPendingMessagesPathCreatesRepository() {
+        var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var smtp = new Smtp { PendingMessagesPath = path };
+        Assert.IsType<FilePendingMessageRepository>(smtp.PendingMessageRepository);
+        Assert.Equal(path, ((FilePendingMessageRepository)smtp.PendingMessageRepository!).FilePath);
+    }
+
+    [Fact]
     public async Task ProcessPendingMessages_SendsAndLogs() {
         var pending = new InMemoryPendingRepository();
         var sent = new InMemorySentRepository();

@@ -36,6 +36,13 @@ public class Smtp {
     public ISentMessageRepository? SentMessageRepository { get; set; }
     /// <summary>Repository used to persist pending messages for later retry.</summary>
     public IPendingMessageRepository? PendingMessageRepository { get; set; }
+    /// <summary>Path to the file used for storing pending messages.</summary>
+    public string? PendingMessagesPath {
+        get => (PendingMessageRepository as FilePendingMessageRepository)?.FilePath;
+        set => PendingMessageRepository = string.IsNullOrWhiteSpace(value)
+            ? null
+            : new FilePendingMessageRepository(value!);
+    }
 
     /// <summary>Underlying SMTP client used to send messages.</summary>
     public ClientSmtp Client { get; private set; }

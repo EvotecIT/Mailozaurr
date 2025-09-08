@@ -432,6 +432,15 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
     public string? SentLogPath { get; set; }
 
     /// <summary>
+    /// <para>Specifies the path used to store pending messages when sending fails. Defaults to the system temporary directory.</para>
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
+    [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
+    [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
+    [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
+    public string? PendingMessagesPath { get; set; }
+
+    /// <summary>
     /// <para>Enables logging of communication with the server to the console.</para>
     /// </summary>
     [Parameter(Mandatory = false)]

@@ -8,9 +8,8 @@ public static class SmtpPendingMessageExample {
     /// <summary>Runs the example.</summary>
     public static async Task RunAsync() {
         var path = Path.Combine(Path.GetTempPath(), "pending.log");
-        var repository = new FilePendingMessageRepository(path);
 
-        var smtp = new Smtp { PendingMessageRepository = repository };
+        var smtp = new Smtp { PendingMessagesPath = path };
         smtp.From = "sender@example.com";
         smtp.To = new[] { "recipient@example.com" };
         smtp.Subject = "Pending";

@@ -397,6 +397,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             sentLogPath = providedSentLogPath;
         }
         smtpClient.SentMessageRepository = new FileSentMessageRepository(sentLogPath);
+        smtpClient.PendingMessagesPath = PendingMessagesPath;
         smtpClient.From = Helpers.GetFromObject(fromEmail, fromName);
         smtpClient.ReplyTo = ReplyTo;
         smtpClient.Cc = Cc;

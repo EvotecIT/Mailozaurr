@@ -40,4 +40,22 @@ public sealed class FilePendingMessageRepositoryTests {
             }
         }
     }
+
+    [Fact]
+    public async Task UsesOptions() {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var opts = new PendingMessageRepositoryOptions {
+            DirectoryPath = dir,
+            FileNameFactory = _ => "custom.log"
+        };
+        var repo = new FilePendingMessageRepository(opts);
+        var record = new PendingMessageRecord {
+            MessageId = "1",
+            MimeMessage = string.Empty,
+            Timestamp = DateTimeOffset.UtcNow
+        };
+        await repo.SaveAsync(record);
+        Assert.True(File.Exists(Path.Combine(dir, "custom.log")));
+        File.Delete(Path.Combine(dir, "custom.log"));
+    }
 }

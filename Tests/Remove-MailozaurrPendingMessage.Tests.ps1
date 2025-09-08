@@ -16,7 +16,7 @@ Describe 'Remove-MailozaurrPendingMessage' {
         $record.NextAttemptAt = [DateTimeOffset]::UtcNow
         $repo.SaveAsync($record).GetAwaiter().GetResult()
 
-        Remove-MailozaurrPendingMessage -PendingPath $path -MessageId $record.MessageId -Confirm:$false
-        (Get-MailozaurrPendingMessage -PendingPath $path | Measure-Object).Count | Should -Be 0
+        Remove-MailozaurrPendingMessage -PendingMessagesPath $path -MessageId $record.MessageId -Confirm:$false
+        (Get-MailozaurrPendingMessage -PendingMessagesPath $path | Measure-Object).Count | Should -Be 0
     }
 }

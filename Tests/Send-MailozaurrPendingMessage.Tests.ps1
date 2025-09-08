@@ -39,9 +39,9 @@ public class FakeSendClient : ClientSmtp {
 "@
         $fake = [FakeSendClient]::new()
         [Mailozaurr.Smtp]::ClientFactory = { $fake }
-        Send-MailozaurrPendingMessage -PendingPath $path
+        Send-MailozaurrPendingMessage -PendingMessagesPath $path
         [Mailozaurr.Smtp]::ClientFactory = { [Mailozaurr.ClientSmtp]::new() }
 
-        (Get-MailozaurrPendingMessage -PendingPath $path | Measure-Object).Count | Should -Be 0
+        (Get-MailozaurrPendingMessage -PendingMessagesPath $path | Measure-Object).Count | Should -Be 0
     }
 }

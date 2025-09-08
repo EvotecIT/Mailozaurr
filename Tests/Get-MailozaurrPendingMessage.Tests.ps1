@@ -16,7 +16,7 @@ Describe 'Get-MailozaurrPendingMessage' {
         $record.NextAttemptAt = [DateTimeOffset]::UtcNow
         $repo.SaveAsync($record).GetAwaiter().GetResult()
 
-        $result = Get-MailozaurrPendingMessage -PendingPath $path
+        $result = Get-MailozaurrPendingMessage -PendingMessagesPath $path
         $result.MessageId | Should -Be $msg.MessageId
     }
 }
