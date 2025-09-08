@@ -11,6 +11,11 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
     private readonly Dictionary<string, long> index = new(StringComparer.OrdinalIgnoreCase);
     private readonly byte[] newlineBytes = Encoding.UTF8.GetBytes(Environment.NewLine);
 
+    /// <summary>Creates a new repository using the specified options.</summary>
+    /// <param name="options">Configuration for directory and file naming.</param>
+    public FilePendingMessageRepository(PendingMessageRepositoryOptions? options = null)
+        : this(GetFilePath(options)) { }
+
     /// <summary>
     /// Creates a new repository using the specified file path.
     /// </summary>
@@ -20,6 +25,18 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
         if (File.Exists(filePath)) {
             BuildIndex();
         }
+    }
+
+    private static string GetFilePath(PendingMessageRepositoryOptions? options) {
+        options ??= new PendingMessageRepositoryOptions();
+        var directory = string.IsNullOrWhiteSpace(options.DirectoryPath) ? Path.GetTempPath() : options.DirectoryPath;
+        string name;
+        try {
+            name = options.FileNamingScheme?.Invoke() ?? "pending.log";
+        } catch (Exception ex) {
+            throw new InvalidOperationException("FileNamingScheme failed to provide a file name", ex);
+        }
+        return Path.Combine(directory, name);
     }
 
     private void BuildIndex() {

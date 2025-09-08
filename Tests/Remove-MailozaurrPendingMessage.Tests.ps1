@@ -1,7 +1,9 @@
 Describe 'Remove-MailozaurrPendingMessage' {
     It 'Deletes message from repository' {
-        $path = Join-Path $TestDrive 'pending.log'
-        $repo = [Mailozaurr.FilePendingMessageRepository]::new($path)
+        $path = Join-Path $TestDrive 'pending'
+        $options = [Mailozaurr.PendingMessageRepositoryOptions]::new()
+        $options.DirectoryPath = $path
+        $repo = [Mailozaurr.FilePendingMessageRepository]::new($options)
         $msg = [MimeKit.MimeMessage]::new()
         $msg.From.Add([MimeKit.MailboxAddress]::Parse('a@example.com'))
         $msg.To.Add([MimeKit.MailboxAddress]::Parse('b@example.com'))
@@ -16,7 +18,7 @@ Describe 'Remove-MailozaurrPendingMessage' {
         $record.NextAttemptAt = [DateTimeOffset]::UtcNow
         $repo.SaveAsync($record).GetAwaiter().GetResult()
 
-        Remove-MailozaurrPendingMessage -PendingPath $path -MessageId $record.MessageId -Confirm:$false
-        (Get-MailozaurrPendingMessage -PendingPath $path | Measure-Object).Count | Should -Be 0
+        Remove-MailozaurrPendingMessage -PendingMessagesPath $path -MessageId $record.MessageId -Confirm:$false
+        (Get-MailozaurrPendingMessage -PendingMessagesPath $path | Measure-Object).Count | Should -Be 0
     }
 }

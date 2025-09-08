@@ -9,8 +9,9 @@ using Mailozaurr;
 public static class PendingMessageRepositoryExample {
     /// <summary>Runs the example.</summary>
     public static async Task RunAsync() {
-        var path = Path.Combine(Path.GetTempPath(), "pending.log");
-        var repository = new FilePendingMessageRepository(path);
+        var dir = Path.Combine(Path.GetTempPath(), "pending");
+        var options = new PendingMessageRepositoryOptions { DirectoryPath = dir };
+        var repository = new FilePendingMessageRepository(options);
 
         var message = new MimeMessage();
         message.From.Add(MailboxAddress.Parse("sender@example.com"));

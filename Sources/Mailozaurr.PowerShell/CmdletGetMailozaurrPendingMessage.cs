@@ -9,13 +9,15 @@ namespace Mailozaurr.PowerShell;
 [Cmdlet(VerbsCommon.Get, "MailozaurrPendingMessage")]
 [OutputType(typeof(PendingMessageRecord))]
 public sealed class CmdletGetMailozaurrPendingMessage : AsyncPSCmdlet {
-    /// <summary>Path to the pending message log file.</summary>
+    /// <summary>Directory containing pending message log file.</summary>
     [Parameter(Mandatory = true)]
-    public string? PendingPath { get; set; }
+    [Alias("PendingPath")]
+    public string? PendingMessagesPath { get; set; }
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        var repo = new FilePendingMessageRepository(PendingPath!);
+        var options = new PendingMessageRepositoryOptions { DirectoryPath = PendingMessagesPath! };
+        var repo = new FilePendingMessageRepository(options);
         await foreach (var record in repo.GetAllAsync(CancelToken)) {
             WriteObject(record);
         }
