@@ -30,7 +30,12 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
     private static string GetFilePath(PendingMessageRepositoryOptions? options) {
         options ??= new PendingMessageRepositoryOptions();
         var directory = string.IsNullOrWhiteSpace(options.DirectoryPath) ? Path.GetTempPath() : options.DirectoryPath;
-        var name = options.FileNamingScheme?.Invoke() ?? "pending.log";
+        string name;
+        try {
+            name = options.FileNamingScheme?.Invoke() ?? "pending.log";
+        } catch (Exception ex) {
+            throw new InvalidOperationException("FileNamingScheme failed to provide a file name", ex);
+        }
         return Path.Combine(directory, name);
     }
 

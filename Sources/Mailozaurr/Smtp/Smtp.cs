@@ -25,7 +25,7 @@ namespace Mailozaurr;
 public class Smtp {
 
     /// <summary>Factory used to create <see cref="ClientSmtp"/> instances.</summary>
-    internal static Func<ProtocolLogger?, ClientSmtp> ClientFactory { get; set; } = logger => logger == null ? new ClientSmtp() : new ClientSmtp(logger);
+    public static Func<ProtocolLogger?, ClientSmtp> ClientFactory { get; set; } = logger => logger == null ? new ClientSmtp() : new ClientSmtp(logger);
     /// <summary>Configuration used for protocol logging.</summary>
     public LoggingConfigurator? Logging;
 
@@ -42,11 +42,15 @@ public class Smtp {
     public string? PendingMessagesPath {
         get => _pendingMessagesPath;
         set {
-            _pendingMessagesPath = value;
-            if (!string.IsNullOrWhiteSpace(value)) {
+            if (string.IsNullOrWhiteSpace(value)) {
+                _pendingMessagesPath = value;
+                return;
+            }
+            if (!string.Equals(_pendingMessagesPath, value, StringComparison.OrdinalIgnoreCase)) {
                 var options = new PendingMessageRepositoryOptions { DirectoryPath = value };
                 PendingMessageRepository = new FilePendingMessageRepository(options);
             }
+            _pendingMessagesPath = value;
         }
     }
 

@@ -4,7 +4,7 @@ Describe 'Connect-POP3 SSL Options' {
             [MailKit.Net.Pop3.Pop3Client].Assembly.Location,
             [MailKit.Security.SecureSocketOptions].Assembly.Location
         )
-        Add-Type -ReferencedAssemblies $refs -TypeDefinition @"
+        Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
 using MailKit.Net.Pop3;
 using MailKit.Security;
 using System.Threading;
@@ -37,7 +37,7 @@ public class FakePop3Client : Pop3Client {
             [MailKit.Net.Pop3.Pop3Client].Assembly.Location,
             [MailKit.Security.SecureSocketOptions].Assembly.Location
         )
-        Add-Type -ReferencedAssemblies $refs -TypeDefinition @"
+        Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
 using MailKit.Net.Pop3;
 using MailKit.Security;
 using System.Threading;

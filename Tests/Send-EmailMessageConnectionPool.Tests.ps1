@@ -4,7 +4,7 @@ Describe 'Send-EmailMessage connection pool' {
             [Mailozaurr.ClientSmtp].Assembly.Location,
             [MailKit.Security.SecureSocketOptions].Assembly.Location
         )
-        Add-Type -ReferencedAssemblies $refs -TypeDefinition @"
+        Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
 using Mailozaurr;
 using MailKit.Security;
 using System.Threading;

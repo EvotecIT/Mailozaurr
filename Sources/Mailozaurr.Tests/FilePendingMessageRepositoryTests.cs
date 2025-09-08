@@ -54,4 +54,21 @@ public sealed class FilePendingMessageRepositoryTests {
         var path = (string)field.GetValue(repo)!;
         Assert.StartsWith(Path.GetTempPath(), path, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void DirectoryPath_MustNotBeNullOrEmpty() {
+        var options = new PendingMessageRepositoryOptions();
+        Assert.Throws<ArgumentException>(() => options.DirectoryPath = null!);
+        Assert.Throws<ArgumentException>(() => options.DirectoryPath = "");
+    }
+
+    [Fact]
+    public void FileNamingScheme_ExceptionWrapped() {
+        var options = new PendingMessageRepositoryOptions {
+            FileNamingScheme = () => throw new InvalidOperationException("boom")
+        };
+        var ex = Assert.Throws<InvalidOperationException>(() => new FilePendingMessageRepository(options));
+        Assert.Contains("FileNamingScheme", ex.Message);
+        Assert.IsType<InvalidOperationException>(ex.InnerException);
+    }
 }

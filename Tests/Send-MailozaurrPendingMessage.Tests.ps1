@@ -25,7 +25,7 @@ Describe 'Send-MailozaurrPendingMessage' {
             [MimeKit.MimeMessage].Assembly.Location,
             [MailKit.Net.Smtp.SmtpClient].Assembly.Location
         )
-        Add-Type -ReferencedAssemblies $refs -TypeDefinition @"
+        Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
 using Mailozaurr;
 using MimeKit;
 using MailKit.Net.Smtp;
@@ -34,7 +34,7 @@ using System.Threading;
 using System.Threading.Tasks;
 public class FakeSendClient : ClientSmtp {
     public override void Connect(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default) {}
-    public new Task SendAsync(MimeMessage message, CancellationToken cancellationToken = default) {
+    public override Task SendAsync(MimeMessage message, CancellationToken cancellationToken = default) {
         return Task.CompletedTask;
     }
 }

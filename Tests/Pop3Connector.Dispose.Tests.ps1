@@ -7,7 +7,7 @@ Describe 'Pop3Connector disposal' {
     }
 
     It 'Disposes client after failed connect' {
-        Add-Type -ReferencedAssemblies $refs -TypeDefinition @"
+        Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
 using MailKit.Net.Pop3;
 using MailKit.Security;
 using System.Threading;
@@ -40,7 +40,7 @@ public class FailingPop3Client : Pop3Client {
     }
 
     It 'Disposes client even when DisconnectAsync throws' {
-        Add-Type -ReferencedAssemblies $refs -TypeDefinition @"
+        Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
 using MailKit.Net.Pop3;
 using MailKit.Security;
 using System.Threading;
