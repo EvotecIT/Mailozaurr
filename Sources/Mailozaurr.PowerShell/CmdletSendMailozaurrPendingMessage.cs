@@ -8,13 +8,15 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommunications.Send, "MailozaurrPendingMessage")]
 public sealed class CmdletSendMailozaurrPendingMessage : AsyncPSCmdlet {
-    /// <summary>Path to the pending message log file.</summary>
+    /// <summary>Directory containing pending message log file.</summary>
     [Parameter(Mandatory = true)]
-    public string? PendingPath { get; set; }
+    [Alias("PendingPath")]
+    public string? PendingMessagesPath { get; set; }
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        var smtp = new Smtp { PendingMessageRepository = new FilePendingMessageRepository(PendingPath!) };
+        var options = new PendingMessageRepositoryOptions { DirectoryPath = PendingMessagesPath! };
+        var smtp = new Smtp { PendingMessageRepository = new FilePendingMessageRepository(options) };
         await smtp.ProcessPendingMessagesAsync(CancelToken);
     }
 }

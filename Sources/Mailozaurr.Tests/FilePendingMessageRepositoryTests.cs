@@ -1,4 +1,5 @@
 using System.IO;
+using System.Reflection;
 using System.Threading.Tasks;
 using MimeKit;
 
@@ -7,9 +8,11 @@ namespace Mailozaurr.Tests;
 public sealed class FilePendingMessageRepositoryTests {
     [Fact]
     public async Task SaveRetrieveAndRemove() {
-        var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var options = new PendingMessageRepositoryOptions { DirectoryPath = dir, FileNamingScheme = () => "pending.log" };
+        var filePath = Path.Combine(dir, "pending.log");
         try {
-            var repo = new FilePendingMessageRepository(path);
+            var repo = new FilePendingMessageRepository(options);
             var message = new MimeMessage();
             message.From.Add(MailboxAddress.Parse("sender@example.com"));
             message.To.Add(MailboxAddress.Parse("recipient@example.com"));
@@ -35,9 +38,20 @@ public sealed class FilePendingMessageRepositoryTests {
             var removed = await repo.GetByMessageIdAsync(record.MessageId);
             Assert.Null(removed);
         } finally {
-            if (File.Exists(path)) {
-                File.Delete(path);
+            if (File.Exists(filePath)) {
+                File.Delete(filePath);
+            }
+            if (Directory.Exists(dir)) {
+                Directory.Delete(dir, true);
             }
         }
+    }
+
+    [Fact]
+    public void DefaultsToTempPath() {
+        var repo = new FilePendingMessageRepository();
+        var field = typeof(FilePendingMessageRepository).GetField("filePath", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var path = (string)field.GetValue(repo)!;
+        Assert.StartsWith(Path.GetTempPath(), path, StringComparison.OrdinalIgnoreCase);
     }
 }

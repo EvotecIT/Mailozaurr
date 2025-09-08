@@ -12,16 +12,18 @@ public sealed class CmdletRemoveMailozaurrPendingMessage : AsyncPSCmdlet {
     [Parameter(Mandatory = true)]
     public string? MessageId { get; set; }
 
-    /// <summary>Path to the pending message log file.</summary>
+    /// <summary>Directory containing pending message log file.</summary>
     [Parameter(Mandatory = true)]
-    public string? PendingPath { get; set; }
+    [Alias("PendingPath")]
+    public string? PendingMessagesPath { get; set; }
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         if (!ShouldProcess(MessageId ?? string.Empty, "Removing pending message")) {
             return;
         }
-        var repo = new FilePendingMessageRepository(PendingPath!);
+        var options = new PendingMessageRepositoryOptions { DirectoryPath = PendingMessagesPath! };
+        var repo = new FilePendingMessageRepository(options);
         await repo.RemoveAsync(MessageId!, CancelToken);
     }
 }

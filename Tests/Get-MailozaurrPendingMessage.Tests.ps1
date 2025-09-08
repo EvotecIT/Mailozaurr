@@ -1,7 +1,9 @@
 Describe 'Get-MailozaurrPendingMessage' {
     It 'Lists messages from repository' {
-        $path = Join-Path $TestDrive 'pending.log'
-        $repo = [Mailozaurr.FilePendingMessageRepository]::new($path)
+        $path = Join-Path $TestDrive 'pending'
+        $options = [Mailozaurr.PendingMessageRepositoryOptions]::new()
+        $options.DirectoryPath = $path
+        $repo = [Mailozaurr.FilePendingMessageRepository]::new($options)
         $msg = [MimeKit.MimeMessage]::new()
         $msg.From.Add([MimeKit.MailboxAddress]::Parse('a@example.com'))
         $msg.To.Add([MimeKit.MailboxAddress]::Parse('b@example.com'))
@@ -16,7 +18,7 @@ Describe 'Get-MailozaurrPendingMessage' {
         $record.NextAttemptAt = [DateTimeOffset]::UtcNow
         $repo.SaveAsync($record).GetAwaiter().GetResult()
 
-        $result = Get-MailozaurrPendingMessage -PendingPath $path
+        $result = Get-MailozaurrPendingMessage -PendingMessagesPath $path
         $result.MessageId | Should -Be $msg.MessageId
     }
 }

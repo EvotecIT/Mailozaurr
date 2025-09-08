@@ -1,3 +1,4 @@
+using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -69,6 +70,17 @@ public sealed class SmtpPendingMessageTests {
     private static void SetClient(Smtp smtp, ClientSmtp client) {
         var field = typeof(Smtp).GetField("<Client>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!;
         field.SetValue(smtp, client);
+    }
+
+    [Fact]
+    public void PendingMessagesPathCreatesRepository() {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var smtp = new Smtp { PendingMessagesPath = dir };
+        Assert.NotNull(smtp.PendingMessageRepository);
+        var repo = Assert.IsType<FilePendingMessageRepository>(smtp.PendingMessageRepository);
+        var field = typeof(FilePendingMessageRepository).GetField("filePath", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var expected = Path.Combine(dir, "pending.log");
+        Assert.Equal(expected, (string)field.GetValue(repo)!);
     }
 
     [Fact]

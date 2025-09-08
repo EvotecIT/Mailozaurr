@@ -37,6 +37,19 @@ public class Smtp {
     /// <summary>Repository used to persist pending messages for later retry.</summary>
     public IPendingMessageRepository? PendingMessageRepository { get; set; }
 
+    private string? _pendingMessagesPath;
+    /// <summary>Directory path for storing pending messages.</summary>
+    public string? PendingMessagesPath {
+        get => _pendingMessagesPath;
+        set {
+            _pendingMessagesPath = value;
+            if (!string.IsNullOrWhiteSpace(value)) {
+                var options = new PendingMessageRepositoryOptions { DirectoryPath = value };
+                PendingMessageRepository = new FilePendingMessageRepository(options);
+            }
+        }
+    }
+
     /// <summary>Underlying SMTP client used to send messages.</summary>
     public ClientSmtp Client { get; private set; }
 

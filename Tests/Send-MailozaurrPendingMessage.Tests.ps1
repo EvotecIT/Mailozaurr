@@ -1,7 +1,9 @@
 Describe 'Send-MailozaurrPendingMessage' {
     It 'Sends and clears pending messages' {
-        $path = Join-Path $TestDrive 'pending.log'
-        $repo = [Mailozaurr.FilePendingMessageRepository]::new($path)
+        $path = Join-Path $TestDrive 'pending'
+        $options = [Mailozaurr.PendingMessageRepositoryOptions]::new()
+        $options.DirectoryPath = $path
+        $repo = [Mailozaurr.FilePendingMessageRepository]::new($options)
         $msg = [MimeKit.MimeMessage]::new()
         $msg.From.Add([MimeKit.MailboxAddress]::Parse('a@example.com'))
         $msg.To.Add([MimeKit.MailboxAddress]::Parse('b@example.com'))
@@ -39,9 +41,9 @@ public class FakeSendClient : ClientSmtp {
 "@
         $fake = [FakeSendClient]::new()
         [Mailozaurr.Smtp]::ClientFactory = { $fake }
-        Send-MailozaurrPendingMessage -PendingPath $path
+        Send-MailozaurrPendingMessage -PendingMessagesPath $path
         [Mailozaurr.Smtp]::ClientFactory = { [Mailozaurr.ClientSmtp]::new() }
 
-        (Get-MailozaurrPendingMessage -PendingPath $path | Measure-Object).Count | Should -Be 0
+        (Get-MailozaurrPendingMessage -PendingMessagesPath $path | Measure-Object).Count | Should -Be 0
     }
 }
