@@ -70,8 +70,7 @@ public static class HtmlUtils {
         var images = new List<RemoteImage>();
         if (string.IsNullOrWhiteSpace(html)) return (html, images);
 
-        string pattern = "(?<=<img[^>]+src=['\"])([^'\"]+)(?=['\"])";
-        var matches = Regex.Matches(html, pattern, RegexOptions.IgnoreCase);
+        var matches = ImageSrcRegex.Matches(html);
         var replacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (Match match in matches) {
@@ -97,7 +96,7 @@ public static class HtmlUtils {
             }
         }
 
-        html = Regex.Replace(html, pattern, m => replacements.TryGetValue(m.Value, out var value) ? value : m.Value, RegexOptions.IgnoreCase);
+        html = ImageSrcRegex.Replace(html, m => replacements.TryGetValue(m.Value, out var value) ? value : m.Value);
 
         return (html, images);
     }
