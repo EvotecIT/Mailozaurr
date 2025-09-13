@@ -98,13 +98,15 @@ public static class Helpers {
     }
 
     /// <summary>
-    /// Enumerates unique address objects based on email value using the provided hash set to track seen addresses.
+    /// Enumerates unique address objects based on email value using a hash set to track already yielded addresses.
     /// </summary>
     /// <param name="addresses">Collection of address objects.</param>
-    /// <param name="seen">Hash set tracking emails that were already yielded.</param>
+    /// <param name="seen">Optional hash set tracking emails that were already yielded. If <see langword="null"/> a new set is created.</param>
     /// <returns>Unique address objects.</returns>
-    public static IEnumerable<object> UniqueAddresses(IEnumerable<object>? addresses, HashSet<string> seen) {
+    public static IEnumerable<object> UniqueAddresses(IEnumerable<object>? addresses, HashSet<string>? seen) {
         if (addresses == null) yield break;
+
+        seen ??= new HashSet<string>();
 
         foreach (var address in addresses) {
             var email = GetEmailAddress(address);

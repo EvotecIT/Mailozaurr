@@ -149,6 +149,36 @@ public class HelpersTests {
         Assert.Same(first, result[0]);
     }
 
+    [Fact]
+    public void UniqueAddresses_DefaultsToNewSet_WhenSeenIsNull() {
+        var addresses = new object[] { "a@example.com", "a@example.com", "b@example.com" };
+
+        var result = Mailozaurr.Helpers
+            .UniqueAddresses(addresses, null)
+            .Select(Mailozaurr.Helpers.GetEmailAddress)
+            .ToArray();
+
+        Assert.Equal(new[] { "a@example.com", "b@example.com" }, result);
+    }
+
+    [Fact]
+    public void UniqueAddresses_UsesProvidedSetAcrossCalls() {
+        var seen = new HashSet<string>();
+        var first = new object[] { "a@example.com" };
+        var second = new object[] { "a@example.com", "b@example.com" };
+
+        Mailozaurr.Helpers
+            .UniqueAddresses(first, seen)
+            .ToArray();
+
+        var result = Mailozaurr.Helpers
+            .UniqueAddresses(second, seen)
+            .Select(Mailozaurr.Helpers.GetEmailAddress)
+            .ToArray();
+
+        Assert.Equal(new[] { "b@example.com" }, result);
+    }
+
     private class CancelHandler : HttpMessageHandler {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             => Task.FromCanceled<HttpResponseMessage>(cancellationToken);
