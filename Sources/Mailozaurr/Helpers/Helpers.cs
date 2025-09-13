@@ -16,8 +16,17 @@ public static class Helpers {
     private static HttpClient s_sharedHttpClient = new HttpClient();
 
     internal static HttpClient SharedHttpClient {
-        get => s_sharedHttpClient;
-        set => s_sharedHttpClient = value ?? throw new ArgumentNullException(nameof(value));
+        get => Volatile.Read(ref s_sharedHttpClient);
+        set {
+            if (value is null) {
+                throw new ArgumentNullException(nameof(value));
+            }
+
+            var old = Interlocked.Exchange(ref s_sharedHttpClient, value);
+            if (!ReferenceEquals(old, value)) {
+                old.Dispose();
+            }
+        }
     }
     /// <summary>Converts a credential into an OAuth token tuple.</summary>
     /// <param name="credential">The credential containing the token.</param>
