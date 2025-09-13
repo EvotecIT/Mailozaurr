@@ -305,4 +305,24 @@ public class GmailApiClientTests {
         client.Dispose();
         Assert.True(handler.Disposed);
     }
+
+    public static IEnumerable<object[]> DisposedMethods() {
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.SendAsync("u", new MimeKit.MimeMessage())) };
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.ListAsync("u")) };
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.GetAsync("u", "id")) };
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.GetMimeMessageAsync("u", "id")) };
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.DeleteAsync("u", "id")) };
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.ListThreadsAsync("u")) };
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.GetThreadAsync("u", "id")) };
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.ListAttachmentsAsync("u", "id")) };
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.DownloadAttachmentAsync("u", "mid", "aid")) };
+    }
+
+    [Theory]
+    [MemberData(nameof(DisposedMethods))]
+    public async Task Methods_AfterDispose_ThrowObjectDisposedException(Func<GmailApiClient, Task> action) {
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        client.Dispose();
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => action(client));
+    }
 }

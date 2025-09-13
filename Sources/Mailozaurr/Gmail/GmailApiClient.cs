@@ -21,6 +21,12 @@ public sealed class GmailApiClient : IDisposable {
     private readonly Func<CancellationToken, Task<string>>? _refreshToken;
     private bool _disposed;
 
+    private void ThrowIfDisposed() {
+        if (_disposed) {
+            throw new ObjectDisposedException(nameof(GmailApiClient));
+        }
+    }
+
     /// <summary>
     /// Initializes the client using the provided OAuth credential.
     /// </summary>
@@ -68,6 +74,7 @@ public sealed class GmailApiClient : IDisposable {
     /// Sends the specified MIME message via Gmail API.
     /// </summary>
     public async Task<GmailMessage> SendAsync(string userId, MimeMessage message, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
         using var ms = new MemoryStream();
         await message.WriteToAsync(ms, cancellationToken).ConfigureAwait(false);
         var raw = Convert.ToBase64String(ms.ToArray())
@@ -95,6 +102,7 @@ public sealed class GmailApiClient : IDisposable {
     /// Lists messages matching the supplied query.
     /// </summary>
     public async Task<IList<GmailMessage>> ListAsync(string userId, string? query = null, int? maxResults = null, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
         var messages = new List<GmailMessage>();
         string? pageToken = null;
         int? remaining = maxResults;
@@ -138,6 +146,7 @@ public sealed class GmailApiClient : IDisposable {
     /// Retrieves a single message by id.
     /// </summary>
     public async Task<GmailMessage> GetAsync(string userId, string id, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
         using var response = await _client.GetAsync($"users/{userId}/messages/{id}", cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
@@ -157,6 +166,7 @@ public sealed class GmailApiClient : IDisposable {
     /// Retrieves a MIME message by id.
     /// </summary>
     public async Task<MimeMessage> GetMimeMessageAsync(string userId, string id, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
         using var response = await _client.GetAsync($"users/{userId}/messages/{id}?format=raw", cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
@@ -181,6 +191,7 @@ public sealed class GmailApiClient : IDisposable {
     /// Deletes a message by id.
     /// </summary>
     public async Task DeleteAsync(string userId, string id, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
         using var response = await _client.DeleteAsync($"users/{userId}/messages/{id}", cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
@@ -190,6 +201,7 @@ public sealed class GmailApiClient : IDisposable {
     /// Lists threads matching the supplied query.
     /// </summary>
     public async Task<IList<GmailThreadInfo>> ListThreadsAsync(string userId, string? query = null, int? maxResults = null, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
         var threads = new List<GmailThreadInfo>();
         string? pageToken = null;
         do {
@@ -223,6 +235,7 @@ public sealed class GmailApiClient : IDisposable {
     /// Retrieves a single thread by id.
     /// </summary>
     public async Task<GmailThread> GetThreadAsync(string userId, string id, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
         using var response = await _client.GetAsync($"users/{userId}/threads/{id}", cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
@@ -242,6 +255,7 @@ public sealed class GmailApiClient : IDisposable {
     /// Lists attachment metadata for a message.
     /// </summary>
     public async Task<IList<GmailAttachmentInfo>> ListAttachmentsAsync(string userId, string id, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
         using var response = await _client.GetAsync($"users/{userId}/messages/{id}?format=full", cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
@@ -262,6 +276,7 @@ public sealed class GmailApiClient : IDisposable {
     /// Downloads a single attachment by id.
     /// </summary>
     public async Task<byte[]> DownloadAttachmentAsync(string userId, string messageId, string attachmentId, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
         using var response = await _client.GetAsync($"users/{userId}/messages/{messageId}/attachments/{attachmentId}", cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
