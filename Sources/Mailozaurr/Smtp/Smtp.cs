@@ -293,7 +293,7 @@ public class Smtp {
     public static SmtpConnectionInfo TestConnection(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false)
     {
         var logging = new LoggingConfigurator();
-        logging.ConfigureLogging(null!, false, true, false, false);
+        logging.ConfigureLogging(null, false, true, false, false);
 
         var smtp = new Smtp(logging);
         _ = smtp.Connect(server, port, secureSocketOptions, useSsl);
