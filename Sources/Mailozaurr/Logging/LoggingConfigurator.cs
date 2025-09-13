@@ -28,14 +28,14 @@ public class LoggingConfigurator {
     public string? LogClientPrefix { get; private set; }
     /// <summary>Indicates whether existing log files should be overwritten.</summary>
     public bool LogOverwrite { get; private set; }
-    /// <summary>The path of the log file.</summary>
+    /// <summary>The path of the log file or <see langword="null"/> when not logging to a file.</summary>
     public string? LogPath { get; private set; }
     internal ProtocolLogger? ProtocolLogger { get; set; }
 
     /// <summary>
     /// Configures protocol logging.
     /// </summary>
-    /// <param name="logPath">Path to the log file or <c>null</c> to disable file logging.</param>
+    /// <param name="logPath">Path to the log file or <see langword="null"/> to disable file logging.</param>
     /// <param name="logConsole">Enable console logging.</param>
     /// <param name="logObject">Capture log entries in memory for later use.</param>
     /// <param name="logTimestamps">Include timestamps in the log.</param>
@@ -44,7 +44,7 @@ public class LoggingConfigurator {
     /// <param name="logServerPrefix">Optional prefix for server messages.</param>
     /// <param name="logClientPrefix">Optional prefix for client messages.</param>
     /// <param name="logOverwrite">Overwrite existing log file if it exists.</param>
-    public void ConfigureLogging(string logPath, bool logConsole, bool logObject, bool logTimestamps, bool logSecrets, string? logTimestampsFormat = null, string? logServerPrefix = null, string? logClientPrefix = null, bool logOverwrite = false) {
+    public void ConfigureLogging(string? logPath, bool logConsole, bool logObject, bool logTimestamps, bool logSecrets, string? logTimestampsFormat = null, string? logServerPrefix = null, string? logClientPrefix = null, bool logOverwrite = false) {
         LogTimestamps = logTimestamps;
         LogSecrets = logSecrets;
         LogTimestampsFormat = logTimestampsFormat;
