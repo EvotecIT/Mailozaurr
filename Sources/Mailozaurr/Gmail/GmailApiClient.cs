@@ -84,7 +84,12 @@ public sealed class GmailApiClient : IDisposable {
 #else
         var resultJson = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
-        var result = JsonSerializer.Deserialize<GmailMessage>(resultJson, s_jsonOptions);
+        GmailMessage? result;
+        try {
+            result = JsonSerializer.Deserialize<GmailMessage>(resultJson, s_jsonOptions);
+        } catch (JsonException ex) {
+            throw new GmailApiException("Failed to parse Gmail API send response.", resultJson, ex);
+        }
         if (result is null) {
             throw new InvalidDataException("Gmail API returned an invalid send response.");
         }
@@ -115,7 +120,12 @@ public sealed class GmailApiClient : IDisposable {
 #else
             var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
-            var list = JsonSerializer.Deserialize<GmailListResponse>(json, s_jsonOptions);
+            GmailListResponse? list;
+            try {
+                list = JsonSerializer.Deserialize<GmailListResponse>(json, s_jsonOptions);
+            } catch (JsonException ex) {
+                throw new GmailApiException("Failed to parse Gmail API list response.", json, ex);
+            }
             if (list?.Messages != null) {
                 messages.AddRange(list.Messages);
             }
@@ -146,7 +156,12 @@ public sealed class GmailApiClient : IDisposable {
 #else
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
-        var message = JsonSerializer.Deserialize<GmailMessage>(json, s_jsonOptions);
+        GmailMessage? message;
+        try {
+            message = JsonSerializer.Deserialize<GmailMessage>(json, s_jsonOptions);
+        } catch (JsonException ex) {
+            throw new GmailApiException("Failed to parse Gmail API message response.", json, ex);
+        }
         if (message is null) {
             throw new InvalidDataException("Gmail API returned an invalid message response.");
         }
@@ -165,7 +180,12 @@ public sealed class GmailApiClient : IDisposable {
 #else
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
-        var msg = JsonSerializer.Deserialize<GmailMessage>(json, s_jsonOptions);
+        GmailMessage? msg;
+        try {
+            msg = JsonSerializer.Deserialize<GmailMessage>(json, s_jsonOptions);
+        } catch (JsonException ex) {
+            throw new GmailApiException("Failed to parse Gmail API message response.", json, ex);
+        }
         if (string.IsNullOrEmpty(msg?.Raw)) {
             throw new InvalidDataException("Gmail API returned an invalid message response.");
         }
@@ -209,7 +229,12 @@ public sealed class GmailApiClient : IDisposable {
 #else
             var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
-            var list = JsonSerializer.Deserialize<GmailThreadListResponse>(json, s_jsonOptions);
+            GmailThreadListResponse? list;
+            try {
+                list = JsonSerializer.Deserialize<GmailThreadListResponse>(json, s_jsonOptions);
+            } catch (JsonException ex) {
+                throw new GmailApiException("Failed to parse Gmail API thread list response.", json, ex);
+            }
             if (list?.Threads != null) {
                 threads.AddRange(list.Threads);
             }
@@ -231,7 +256,12 @@ public sealed class GmailApiClient : IDisposable {
 #else
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
-        var thread = JsonSerializer.Deserialize<GmailThread>(json, s_jsonOptions);
+        GmailThread? thread;
+        try {
+            thread = JsonSerializer.Deserialize<GmailThread>(json, s_jsonOptions);
+        } catch (JsonException ex) {
+            throw new GmailApiException("Failed to parse Gmail API thread response.", json, ex);
+        }
         if (thread is null) {
             throw new InvalidDataException("Gmail API returned an invalid thread response.");
         }
@@ -270,7 +300,12 @@ public sealed class GmailApiClient : IDisposable {
 #else
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
-        var result = JsonSerializer.Deserialize<AttachmentResponse>(json, s_jsonOptions);
+        AttachmentResponse? result;
+        try {
+            result = JsonSerializer.Deserialize<AttachmentResponse>(json, s_jsonOptions);
+        } catch (JsonException ex) {
+            throw new GmailApiException("Failed to parse Gmail API attachment response.", json, ex);
+        }
         if (string.IsNullOrEmpty(result?.Data)) {
             return Array.Empty<byte>();
         }

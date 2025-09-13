@@ -232,6 +232,27 @@ public class GmailApiClientTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task SendAsync_InvalidJson_ThrowsGmailApiException() {
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent("not json") });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+        var message = new MimeKit.MimeMessage();
+        var ex = await Assert.ThrowsAsync<GmailApiException>(() => client.SendAsync("me", message));
+        Assert.Equal("not json", ex.ResponseContent);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetAsync_InvalidJson_ThrowsGmailApiException() {
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent("not json") });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+        var ex = await Assert.ThrowsAsync<GmailApiException>(() => client.GetAsync("me", "id"));
+        Assert.Equal("not json", ex.ResponseContent);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task ListThreadsAsync_PaginatesUntilTokenNull() {
         var page1 = "{\"threads\":[{\"id\":\"1\"}],\"nextPageToken\":\"tok\"}";
         var page2 = "{\"threads\":[{\"id\":\"2\"}]}";
