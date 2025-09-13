@@ -214,7 +214,6 @@ public class HelpersTests {
 
     [Fact]
     public async Task PostWebhookAsync_UsesSharedClient_WhenClientNotProvided() {
-        var original = Mailozaurr.Helpers.SharedHttpClient;
         var handler = new CountingHandler();
         var client = new HttpClient(handler);
         Mailozaurr.Helpers.SharedHttpClient = client;
@@ -225,8 +224,41 @@ public class HelpersTests {
             await Mailozaurr.Helpers.PostWebhookAsync("http://localhost", result);
             Assert.Equal(2, handler.Calls);
         } finally {
-            Mailozaurr.Helpers.SharedHttpClient = original;
-            client.Dispose();
+            Mailozaurr.Helpers.SharedHttpClient = new HttpClient();
         }
+    }
+
+    private class DisposeTrackingHandler : HttpMessageHandler {
+        public bool Disposed;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+
+        protected override void Dispose(bool disposing) {
+            if (disposing) {
+                Disposed = true;
+            }
+
+            base.Dispose(disposing);
+        }
+    }
+
+    [Fact]
+    public async Task SharedHttpClient_ReplacesAndDisposesPreviousClient() {
+        var handler1 = new DisposeTrackingHandler();
+        var client1 = new HttpClient(handler1);
+        Mailozaurr.Helpers.SharedHttpClient = client1;
+
+        var handler2 = new CountingHandler();
+        var client2 = new HttpClient(handler2);
+        Mailozaurr.Helpers.SharedHttpClient = client2;
+
+        Assert.True(handler1.Disposed);
+
+        using var response = await Mailozaurr.Helpers.SharedHttpClient.GetAsync("http://localhost");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1, handler2.Calls);
+
+        Mailozaurr.Helpers.SharedHttpClient = new HttpClient();
     }
 }
