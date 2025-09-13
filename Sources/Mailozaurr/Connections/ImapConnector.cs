@@ -1,6 +1,7 @@
 using MailKit.Net.Imap;
 using MailKit.Security;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Mailozaurr;
@@ -17,7 +18,7 @@ public static class ImapConnector {
     /// <summary>
     /// Delegate used to introduce a delay between connection retries.
     /// </summary>
-    public static Func<int, Task>? DelayAsync { get; set; }
+    public static Func<int, CancellationToken, Task>? DelayAsync { get; set; }
 
     /// <summary>
     /// Connects and authenticates to an IMAP server with retry support.
@@ -40,10 +41,11 @@ public static class ImapConnector {
         int timeout,
         bool skipCertificateRevocation,
         bool skipCertificateValidation,
-        Func<ImapClient, Task> authenticateAsync,
+        Func<ImapClient, CancellationToken, Task> authenticateAsync,
         int retryCount,
         int retryDelayMilliseconds,
-        double retryDelayBackoff) =>
+        double retryDelayBackoff,
+        CancellationToken cancellationToken = default) =>
         ConnectionRetrier.ConnectAsync(
             ClientFactory,
             "IMAP",
@@ -57,5 +59,6 @@ public static class ImapConnector {
             retryCount,
             retryDelayMilliseconds,
             retryDelayBackoff,
-            DelayAsync);
+            DelayAsync,
+            cancellationToken);
 }

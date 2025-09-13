@@ -96,10 +96,10 @@ public class ConnectorTests
         var fake = new FakeImapClient { FailuresBeforeSuccess = 2 };
         var delays = new List<int>();
         ImapConnector.ClientFactory = () => fake;
-        ImapConnector.DelayAsync = d => { delays.Add(d); return Task.CompletedTask; };
+        ImapConnector.DelayAsync = (d, ct) => { delays.Add(d); return Task.CompletedTask; };
         var client = await ImapConnector.ConnectAsync(
             "s", 1, SecureSocketOptions.Auto, 0, false, false,
-            c => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; },
+            (c, ct) => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; },
             3, 10, 2);
         ImapConnector.ClientFactory = () => new ImapClient();
         ImapConnector.DelayAsync = null;
@@ -114,10 +114,10 @@ public class ConnectorTests
         var fake = new FakeImapClient { FailuresBeforeSuccess = 5 };
         var delays = new List<int>();
         ImapConnector.ClientFactory = () => fake;
-        ImapConnector.DelayAsync = d => { delays.Add(d); return Task.CompletedTask; };
+        ImapConnector.DelayAsync = (d, ct) => { delays.Add(d); return Task.CompletedTask; };
         await Assert.ThrowsAsync<HttpRequestException>(() => ImapConnector.ConnectAsync(
             "s", 1, SecureSocketOptions.Auto, 0, false, false,
-            c => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; },
+            (c, ct) => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; },
             2, 10, 2));
         ImapConnector.ClientFactory = () => new ImapClient();
         ImapConnector.DelayAsync = null;
@@ -131,10 +131,10 @@ public class ConnectorTests
         var fake = new FakePop3Client { FailuresBeforeSuccess = 1 };
         var delays = new List<int>();
         Pop3Connector.ClientFactory = () => fake;
-        Pop3Connector.DelayAsync = d => { delays.Add(d); return Task.CompletedTask; };
+        Pop3Connector.DelayAsync = (d, ct) => { delays.Add(d); return Task.CompletedTask; };
         var client = await Pop3Connector.ConnectAsync(
             "s", 1, SecureSocketOptions.Auto, 0, false, false,
-            c => { ((FakePop3Client)c).Authenticated = true; return Task.CompletedTask; },
+            (c, ct) => { ((FakePop3Client)c).Authenticated = true; return Task.CompletedTask; },
             2, 10, 2);
         Pop3Connector.ClientFactory = () => new Pop3Client();
         Pop3Connector.DelayAsync = null;
@@ -149,10 +149,10 @@ public class ConnectorTests
         var fake = new FakePop3Client { FailuresBeforeSuccess = 4 };
         var delays = new List<int>();
         Pop3Connector.ClientFactory = () => fake;
-        Pop3Connector.DelayAsync = d => { delays.Add(d); return Task.CompletedTask; };
+        Pop3Connector.DelayAsync = (d, ct) => { delays.Add(d); return Task.CompletedTask; };
         await Assert.ThrowsAsync<HttpRequestException>(() => Pop3Connector.ConnectAsync(
             "s", 1, SecureSocketOptions.Auto, 0, false, false,
-            c => { ((FakePop3Client)c).Authenticated = true; return Task.CompletedTask; },
+            (c, ct) => { ((FakePop3Client)c).Authenticated = true; return Task.CompletedTask; },
             2, 10, 2));
         Pop3Connector.ClientFactory = () => new Pop3Client();
         Pop3Connector.DelayAsync = null;
@@ -167,7 +167,7 @@ public class ConnectorTests
         ImapConnector.ClientFactory = () => fake;
         await Assert.ThrowsAsync<HttpRequestException>(() => ImapConnector.ConnectAsync(
             "s", 1, SecureSocketOptions.Auto, 0, false, false,
-            c => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; },
+            (c, ct) => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; },
             0, 10, 2));
         ImapConnector.ClientFactory = () => new ImapClient();
         Assert.Equal(1, fake.ConnectCalls);
@@ -180,9 +180,41 @@ public class ConnectorTests
         Pop3Connector.ClientFactory = () => fake;
         await Assert.ThrowsAsync<HttpRequestException>(() => Pop3Connector.ConnectAsync(
             "s", 1, SecureSocketOptions.Auto, 0, false, false,
-            c => { ((FakePop3Client)c).Authenticated = true; return Task.CompletedTask; },
+            (c, ct) => { ((FakePop3Client)c).Authenticated = true; return Task.CompletedTask; },
             0, 10, 2));
         Pop3Connector.ClientFactory = () => new Pop3Client();
+        Assert.Equal(1, fake.ConnectCalls);
+    }
+
+    [Fact]
+    public async Task ImapConnector_CancellationStopsRetries()
+    {
+        var fake = new FakeImapClient { FailuresBeforeSuccess = 5 };
+        var cts = new CancellationTokenSource();
+        ImapConnector.ClientFactory = () => fake;
+        ImapConnector.DelayAsync = (d, ct) => { cts.Cancel(); return Task.Delay(d, ct); };
+        await Assert.ThrowsAsync<TaskCanceledException>(() => ImapConnector.ConnectAsync(
+            "s", 1, SecureSocketOptions.Auto, 0, false, false,
+            (c, ct) => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; },
+            3, 10, 2, cts.Token));
+        ImapConnector.ClientFactory = () => new ImapClient();
+        ImapConnector.DelayAsync = null;
+        Assert.Equal(1, fake.ConnectCalls);
+    }
+
+    [Fact]
+    public async Task Pop3Connector_CancellationStopsRetries()
+    {
+        var fake = new FakePop3Client { FailuresBeforeSuccess = 5 };
+        var cts = new CancellationTokenSource();
+        Pop3Connector.ClientFactory = () => fake;
+        Pop3Connector.DelayAsync = (d, ct) => { cts.Cancel(); return Task.Delay(d, ct); };
+        await Assert.ThrowsAsync<TaskCanceledException>(() => Pop3Connector.ConnectAsync(
+            "s", 1, SecureSocketOptions.Auto, 0, false, false,
+            (c, ct) => { ((FakePop3Client)c).Authenticated = true; return Task.CompletedTask; },
+            3, 10, 2, cts.Token));
+        Pop3Connector.ClientFactory = () => new Pop3Client();
+        Pop3Connector.DelayAsync = null;
         Assert.Equal(1, fake.ConnectCalls);
     }
 
@@ -197,7 +229,7 @@ public class ConnectorTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => ImapConnector.ConnectAsync(
             "s", 1, SecureSocketOptions.Auto, 0, false, false,
-            _ => throw new InvalidOperationException("auth"),
+            (_, _) => throw new InvalidOperationException("auth"),
             0, 0, 1));
 
         LoggingMessages.Logger.OnWarningMessage -= Handler;
@@ -223,7 +255,7 @@ public class ConnectorTests
         };
         var client = await ImapConnector.ConnectAsync(
             "s", 1, SecureSocketOptions.Auto, 0, false, false,
-            c => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; },
+            (c, ct) => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; },
             1, 0, 1);
         ImapConnector.ClientFactory = () => new ImapClient();
         Assert.Same(second, client);
@@ -236,7 +268,7 @@ public class ConnectorTests
         ImapConnector.ClientFactory = () => fake;
         await Assert.ThrowsAsync<HttpRequestException>(() => ImapConnector.ConnectAsync(
             "s", 1, SecureSocketOptions.Auto, 0, false, false,
-            c => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; },
+            (c, ct) => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; },
             0, 0, 1));
         ImapConnector.ClientFactory = () => new ImapClient();
         Assert.True(fake.Disposed);
@@ -253,7 +285,7 @@ public class ConnectorTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => Pop3Connector.ConnectAsync(
             "s", 1, SecureSocketOptions.Auto, 0, false, false,
-            _ => throw new InvalidOperationException("auth"),
+            (_, _) => throw new InvalidOperationException("auth"),
             0, 0, 1));
 
         LoggingMessages.Logger.OnWarningMessage -= Handler;
@@ -279,7 +311,7 @@ public class ConnectorTests
         };
         var client = await Pop3Connector.ConnectAsync(
             "s", 1, SecureSocketOptions.Auto, 0, false, false,
-            c => { ((FakePop3Client)c).Authenticated = true; return Task.CompletedTask; },
+            (c, ct) => { ((FakePop3Client)c).Authenticated = true; return Task.CompletedTask; },
             1, 0, 1);
         Pop3Connector.ClientFactory = () => new Pop3Client();
         Assert.Same(second, client);
@@ -292,7 +324,7 @@ public class ConnectorTests
         Pop3Connector.ClientFactory = () => fake;
         await Assert.ThrowsAsync<HttpRequestException>(() => Pop3Connector.ConnectAsync(
             "s", 1, SecureSocketOptions.Auto, 0, false, false,
-            c => { ((FakePop3Client)c).Authenticated = true; return Task.CompletedTask; },
+            (c, ct) => { ((FakePop3Client)c).Authenticated = true; return Task.CompletedTask; },
             0, 0, 1));
         Pop3Connector.ClientFactory = () => new Pop3Client();
         Assert.True(fake.Disposed);

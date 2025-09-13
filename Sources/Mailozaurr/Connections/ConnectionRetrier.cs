@@ -1,6 +1,7 @@
 using MailKit;
 using MailKit.Security;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Mailozaurr;
@@ -26,6 +27,7 @@ internal static class ConnectionRetrier {
     /// <param name="retryDelayMilliseconds">Initial delay between retries.</param>
     /// <param name="retryDelayBackoff">Multiplier for delay backoff.</param>
     /// <param name="delayAsync">Delegate used to introduce delay between retries.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
     /// <returns>Authenticated client instance.</returns>
     internal static async Task<TClient> ConnectAsync<TClient>(
         Func<TClient> clientFactory,
@@ -36,18 +38,19 @@ internal static class ConnectionRetrier {
         int timeout,
         bool skipCertificateRevocation,
         bool skipCertificateValidation,
-        Func<TClient, Task> authenticateAsync,
+        Func<TClient, CancellationToken, Task> authenticateAsync,
         int retryCount,
         int retryDelayMilliseconds,
         double retryDelayBackoff,
-        Func<int, Task>? delayAsync)
+        Func<int, CancellationToken, Task>? delayAsync,
+        CancellationToken cancellationToken = default)
         where TClient : MailService {
         int attempts = 0;
         Exception? lastException = null;
         do {
             var client = clientFactory();
             try {
-                await client.ConnectAsync(server, port, options).ConfigureAwait(false);
+                await client.ConnectAsync(server, port, options, cancellationToken).ConfigureAwait(false);
                 if (skipCertificateRevocation) {
                     client.CheckCertificateRevocation = false;
                 }
@@ -57,7 +60,7 @@ internal static class ConnectionRetrier {
                 if (client.Timeout != timeout) {
                     client.Timeout = timeout;
                 }
-                await authenticateAsync(client).ConfigureAwait(false);
+                await authenticateAsync(client, cancellationToken).ConfigureAwait(false);
                 if (!client.IsAuthenticated) {
                     throw new InvalidOperationException("Authentication failed.");
                 }
@@ -67,7 +70,7 @@ internal static class ConnectionRetrier {
                 LoggingMessages.Logger.WriteWarning($"Connect-{protocolName} - {ex.Message}");
                 try {
                     if (client.IsConnected) {
-                        await client.DisconnectAsync(true).ConfigureAwait(false);
+                        await client.DisconnectAsync(true, cancellationToken).ConfigureAwait(false);
                     }
                 } catch (Exception ex2) {
                     LoggingMessages.Logger.WriteWarning($"Connect-{protocolName} - {ex2.Message}");
@@ -80,9 +83,9 @@ internal static class ConnectionRetrier {
                 var delay = (int)Math.Round(retryDelayMilliseconds * Math.Pow(retryDelayBackoff, attempts));
                 if (delay > 0) {
                     if (delayAsync != null) {
-                        await delayAsync(delay).ConfigureAwait(false);
+                        await delayAsync(delay, cancellationToken).ConfigureAwait(false);
                     } else {
-                        await Task.Delay(delay).ConfigureAwait(false);
+                        await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                     }
                 }
             }
