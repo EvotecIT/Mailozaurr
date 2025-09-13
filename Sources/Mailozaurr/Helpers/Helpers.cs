@@ -33,7 +33,29 @@ public static class Helpers {
     /// <param name="userName">The user name.</param>
     /// <param name="password">The password.</param>
     /// <returns>The resulting credential.</returns>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when <paramref name="userName"/> or <paramref name="password"/> is <see langword="null"/>.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="userName"/> or <paramref name="password"/> is empty.
+    /// </exception>
     public static NetworkCredential ConvertFromPlainText(string userName, string password) {
+        if (userName is null) {
+            throw new ArgumentNullException(nameof(userName));
+        }
+
+        if (userName.Length == 0) {
+            throw new ArgumentException("Value cannot be empty.", nameof(userName));
+        }
+
+        if (password is null) {
+            throw new ArgumentNullException(nameof(password));
+        }
+
+        if (password.Length == 0) {
+            throw new ArgumentException("Value cannot be empty.", nameof(password));
+        }
+
         var secStringPassword = new SecureString();
         foreach (char c in password) {
             secStringPassword.AppendChar(c);
