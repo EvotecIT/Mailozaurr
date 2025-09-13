@@ -60,6 +60,26 @@ public class HelpersTests {
     }
 
     [Fact]
+    public void ConvertFromPlainText_ThrowsArgumentNullException_WhenUserNameIsNull() {
+        Assert.Throws<ArgumentNullException>(() => Mailozaurr.Helpers.ConvertFromPlainText(null!, "secret"));
+    }
+
+    [Fact]
+    public void ConvertFromPlainText_ThrowsArgumentNullException_WhenPasswordIsNull() {
+        Assert.Throws<ArgumentNullException>(() => Mailozaurr.Helpers.ConvertFromPlainText("user", null!));
+    }
+
+    [Fact]
+    public void ConvertFromPlainText_ThrowsArgumentException_WhenUserNameIsEmpty() {
+        Assert.Throws<ArgumentException>(() => Mailozaurr.Helpers.ConvertFromPlainText(string.Empty, "secret"));
+    }
+
+    [Fact]
+    public void ConvertFromPlainText_ThrowsArgumentException_WhenPasswordIsEmpty() {
+        Assert.Throws<ArgumentException>(() => Mailozaurr.Helpers.ConvertFromPlainText("user", string.Empty));
+    }
+
+    [Fact]
     public void CredentialToApiKey_ReturnsPassword_WhenNetworkCredential() {
         var cred = new NetworkCredential("apikey", "theKey");
 
