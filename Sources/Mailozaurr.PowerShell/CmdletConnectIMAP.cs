@@ -3,6 +3,7 @@ using MailKit.Security;
 using Mailozaurr;
 using System.Security;
 using System.Security.Authentication;
+using System.Threading;
 
 namespace Mailozaurr.PowerShell;
 
@@ -141,7 +142,7 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
     /// Use the returned object with <c>Disconnect-IMAP</c>, <c>Get-IMAPFolder</c>, or <c>Get-IMAPMessage</c> for further operations.
     /// </remarks>
     protected override async Task ProcessRecordAsync() {
-        async Task Authenticate(ImapClient c) {
+        async Task Authenticate(ImapClient c, CancellationToken ct) {
             if (ParameterSetName == "OAuth2" && OAuth2.IsPresent) {
                 if (Credential == null) {
                     throw new System.Security.Authentication.AuthenticationException("Credential is required for OAuth2 authentication.");
@@ -149,13 +150,13 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
                 var username = Credential.UserName;
                 var token = new System.Net.NetworkCredential(string.Empty, Credential.Password).Password;
                 var sasl = new MailKit.Security.SaslMechanismOAuth2(username, token);
-                await c.AuthenticateAsync(sasl);
+                await c.AuthenticateAsync(sasl, ct);
             } else if (ParameterSetName == "ClearText" && !string.IsNullOrWhiteSpace(UserName) && !string.IsNullOrWhiteSpace(Password)) {
-                await c.AuthenticateAsync(UserName, Password);
+                await c.AuthenticateAsync(UserName, Password, ct);
             } else if (Credential != null) {
                 var username = Credential.UserName;
                 var password = Credential.Password is SecureString ss ? new System.Net.NetworkCredential(string.Empty, ss).Password : Credential.GetNetworkCredential().Password;
-                await c.AuthenticateAsync(username, password);
+                await c.AuthenticateAsync(username, password, ct);
             } else {
                 throw new System.Security.Authentication.AuthenticationException("No valid authentication method provided.");
             }
@@ -173,7 +174,8 @@ public sealed class CmdletConnectIMAP : AsyncPSCmdlet {
                 Authenticate,
                 RetryCount,
                 RetryDelayMilliseconds,
-                RetryDelayBackoff);
+                RetryDelayBackoff,
+                CancelToken);
         } catch (Exception ex) {
             WriteWarning($"Connect-IMAP - {ex.Message}");
             return;

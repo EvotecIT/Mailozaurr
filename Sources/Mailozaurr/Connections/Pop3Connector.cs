@@ -1,6 +1,7 @@
 using MailKit.Net.Pop3;
 using MailKit.Security;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Mailozaurr;
@@ -17,7 +18,7 @@ public static class Pop3Connector {
     /// <summary>
     /// Delegate used to delay between connection retries.
     /// </summary>
-    public static Func<int, Task>? DelayAsync { get; set; }
+    public static Func<int, CancellationToken, Task>? DelayAsync { get; set; }
     /// <summary>
     /// Connects and authenticates to a POP3 server with retry support.
     /// </summary>
@@ -39,10 +40,11 @@ public static class Pop3Connector {
         int timeout,
         bool skipCertificateRevocation,
         bool skipCertificateValidation,
-        Func<Pop3Client, Task> authenticateAsync,
+        Func<Pop3Client, CancellationToken, Task> authenticateAsync,
         int retryCount,
         int retryDelayMilliseconds,
-        double retryDelayBackoff) =>
+        double retryDelayBackoff,
+        CancellationToken cancellationToken = default) =>
         ConnectionRetrier.ConnectAsync(
             ClientFactory,
             "POP3",
@@ -56,5 +58,6 @@ public static class Pop3Connector {
             retryCount,
             retryDelayMilliseconds,
             retryDelayBackoff,
-            DelayAsync);
+            DelayAsync,
+            cancellationToken);
 }
