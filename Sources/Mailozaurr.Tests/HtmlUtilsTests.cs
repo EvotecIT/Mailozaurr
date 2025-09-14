@@ -127,5 +127,49 @@ public class HtmlUtilsTests
             handlerField.SetValue(client, original);
         }
     }
+
+    [Fact]
+    public async Task DownloadRemoteImagesAsync_DetectsMultipleImagesRegardlessOfCaseAsync()
+    {
+        const string url1 = "https://example.com/img.png";
+        const string url2 = "HTTPS://example.com/photo.jpg";
+        var html = $"<IMG SRC=\"{url1}\"><img SRC=\"{url2}\"><p>{url1}</p>";
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(new byte[] { 1 })
+                {
+                    Headers = { ContentType = new MediaTypeHeaderValue("image/png") }
+                }
+            },
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(new byte[] { 2 })
+                {
+                    Headers = { ContentType = new MediaTypeHeaderValue("image/jpeg") }
+                }
+            });
+        var client = HtmlUtils.HttpClient;
+        var handlerField = typeof(HttpMessageInvoker).GetField("_handler", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? typeof(HttpMessageInvoker).GetField("handler", BindingFlags.Instance | BindingFlags.NonPublic);
+        var original = (HttpMessageHandler)handlerField!.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        try
+        {
+            var (result, images) = await HtmlUtils.DownloadRemoteImagesAsync(html);
+
+            Assert.Contains("cid:img.png", result);
+            Assert.Contains("cid:photo.jpg", result);
+            Assert.Contains($"<p>{url1}</p>", result);
+            Assert.Equal(2, images.Count);
+            Assert.Contains(images, i => i.MediaType == "image/png");
+            Assert.Contains(images, i => i.MediaType == "image/jpeg");
+            Assert.Equal(2, handler.Requests.Count);
+        }
+        finally
+        {
+            handlerField.SetValue(client, original);
+        }
+    }
 }
 
