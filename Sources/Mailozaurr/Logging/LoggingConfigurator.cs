@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 
 namespace Mailozaurr;
@@ -9,7 +10,7 @@ namespace Mailozaurr;
 /// Enables capturing protocol transcripts either in memory or on
 /// disk so that troubleshooting information can be reviewed.
 /// </remarks>
-public class LoggingConfigurator {
+public class LoggingConfigurator : IDisposable {
     /// <summary>Gets the in-memory log stream when logging to an object.</summary>
     public MemoryStream? LogStream { get; private set; }
     /// <summary>True when logging to the console is enabled.</summary>
@@ -31,6 +32,7 @@ public class LoggingConfigurator {
     /// <summary>The path of the log file or <see langword="null"/> when not logging to a file.</summary>
     public string? LogPath { get; private set; }
     internal ProtocolLogger? ProtocolLogger { get; set; }
+    private bool _disposed;
 
     /// <summary>
     /// Configures protocol logging.
@@ -87,5 +89,27 @@ public class LoggingConfigurator {
             }
         }
         ProtocolLogger = protocolLogger;
+    }
+
+    ~LoggingConfigurator() => Dispose(false);
+
+    protected virtual void Dispose(bool disposing) {
+        if (_disposed) {
+            return;
+        }
+
+        if (disposing) {
+            ProtocolLogger?.Dispose();
+            ProtocolLogger = null;
+            LogStream?.Dispose();
+            LogStream = null;
+        }
+
+        _disposed = true;
+    }
+
+    public void Dispose() {
+        Dispose(true);
+        GC.SuppressFinalize(this);
     }
 }
