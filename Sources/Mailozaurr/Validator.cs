@@ -36,8 +36,12 @@ public static class Validator {
         return set;
     }
     private static bool IsDisposableEmail(string email) {
-        var domain = email.Split('@').Last();
-        return IsDisposableDomain(domain);
+        var atIndex = email.IndexOf('@');
+        if (atIndex < 0 || atIndex == email.Length - 1) {
+            return false;
+        }
+        var domain = email.AsSpan(atIndex + 1);
+        return IsDisposableDomain(domain.ToString());
     }
 
     /// <summary>
