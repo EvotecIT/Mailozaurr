@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 
 namespace Mailozaurr;
 
@@ -10,6 +11,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly Dictionary<string, long> index = new(StringComparer.OrdinalIgnoreCase);
     private readonly byte[] newlineBytes = Encoding.UTF8.GetBytes(Environment.NewLine);
+    private static readonly JsonSerializerOptions SerializerOptions = new() { PropertyNameCaseInsensitive = true };
 
     /// <summary>Creates a new repository using the specified options.</summary>
     /// <param name="options">Configuration for directory and file naming.</param>
@@ -25,6 +27,17 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
         if (File.Exists(filePath)) {
             BuildIndex();
         }
+    }
+
+    private static PendingMessageRecord? DeserializeRecord(string json) {
+        if (string.IsNullOrWhiteSpace(json)) {
+            return null;
+        }
+        var record = JsonSerializer.Deserialize<PendingMessageRecord>(json, SerializerOptions);
+        if (record != null) {
+            _ = record.ProviderData;
+        }
+        return record;
     }
 
     private static string GetFilePath(PendingMessageRepositoryOptions? options) {
@@ -46,7 +59,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
                 position += newlineBytes.Length;
                 continue;
             }
-            var record = JsonSerializer.Deserialize<PendingMessageRecord>(line);
+            var record = DeserializeRecord(line);
             if (record != null && !string.IsNullOrEmpty(record.MessageId)) {
                 index[record.MessageId] = position;
             }
@@ -67,7 +80,8 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
             }
             using var write = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read);
             var offset = write.Position;
-            await JsonSerializer.SerializeAsync(write, record, cancellationToken: cancellationToken);
+            _ = record.ProviderData;
+            await JsonSerializer.SerializeAsync(write, record, SerializerOptions, cancellationToken);
             await write.WriteAsync(newlineBytes, 0, newlineBytes.Length, cancellationToken);
             index[record.MessageId] = offset;
         } finally {
@@ -92,7 +106,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
             if (string.IsNullOrWhiteSpace(line)) {
                 return null;
             }
-            var record = JsonSerializer.Deserialize<PendingMessageRecord>(line);
+            var record = DeserializeRecord(line);
             if (record != null && string.Equals(record.MessageId, messageId, StringComparison.OrdinalIgnoreCase)) {
                 return record;
             }
@@ -117,7 +131,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
                 if (string.IsNullOrWhiteSpace(line)) {
                     continue;
                 }
-                var record = JsonSerializer.Deserialize<PendingMessageRecord>(line);
+                var record = DeserializeRecord(line);
                 if (record != null) {
                     yield return record;
                 }
@@ -150,7 +164,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
                         position += newlineBytes.Length;
                         continue;
                     }
-                    var record = JsonSerializer.Deserialize<PendingMessageRecord>(line);
+                    var record = DeserializeRecord(line);
                     if (record == null || string.Equals(record.MessageId, messageId, StringComparison.OrdinalIgnoreCase)) {
                         continue;
                     }
