@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Mailozaurr;
 
 /// <summary>
@@ -29,4 +31,19 @@ public sealed class PendingMessageRecord {
     /// DPAPI protected password encoded as Base64.
     /// </summary>
     public string? Password { get; set; }
+
+    /// <summary>
+    /// Provider that should handle the queued message.
+    /// </summary>
+    public EmailProvider Provider { get; set; } = EmailProvider.None;
+
+    private Dictionary<string, string>? providerData;
+
+    /// <summary>
+    /// Arbitrary provider-specific fields required to resume delivery.
+    /// </summary>
+    public Dictionary<string, string> ProviderData {
+        get => providerData ??= new Dictionary<string, string>();
+        set => providerData = value ?? new Dictionary<string, string>();
+    }
 }

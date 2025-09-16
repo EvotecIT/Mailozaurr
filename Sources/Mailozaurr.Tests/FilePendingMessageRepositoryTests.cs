@@ -23,13 +23,17 @@ public sealed class FilePendingMessageRepositoryTests {
             var record = new PendingMessageRecord {
                 MessageId = message.MessageId ?? MimeKit.Utils.MimeUtils.GenerateMessageId(),
                 MimeMessage = Convert.ToBase64String(ms.ToArray()),
-                Timestamp = DateTimeOffset.UtcNow
+                Timestamp = DateTimeOffset.UtcNow,
+                Provider = EmailProvider.SendGrid
             };
+            record.ProviderData["ApiKeyId"] = "sendgrid-key";
             await repo.SaveAsync(record);
 
             var loaded = await repo.GetByMessageIdAsync(record.MessageId);
             Assert.NotNull(loaded);
             Assert.True(loaded!.NextAttemptAt <= DateTimeOffset.UtcNow);
+            Assert.Equal(EmailProvider.SendGrid, loaded.Provider);
+            Assert.Equal("sendgrid-key", loaded.ProviderData["ApiKeyId"]);
             using var ms2 = new MemoryStream(Convert.FromBase64String(loaded!.MimeMessage));
             var restored = await MimeMessage.LoadAsync(ms2);
             Assert.Equal("Pending", restored.Subject);
