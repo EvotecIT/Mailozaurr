@@ -152,6 +152,14 @@ public sealed class PendingMessageProcessorTests {
         }
     }
 
+    private static readonly EmailProvider[] ProvidersUnderTest = new[] {
+        EmailProvider.None,
+        EmailProvider.SendGrid,
+        EmailProvider.Mailgun,
+        EmailProvider.SES,
+        EmailProvider.Gmail
+    };
+
     private static PendingMessageRecord CreateRecord(DateTimeOffset nextAttempt, string? messageId = null) => new() {
         MessageId = messageId ?? Guid.NewGuid().ToString("N"),
         Timestamp = nextAttempt,
@@ -476,5 +484,112 @@ public sealed class PendingMessageProcessorTests {
         var failure = Assert.Single(observer.Failed);
         Assert.True(failure.RetryDelay.HasValue);
         Assert.Equal(TimeSpan.Zero, failure.RetryDelay.Value);
+    }
+
+    public static IEnumerable<object[]> ProviderDispatchData() {
+        foreach (var provider in ProvidersUnderTest) {
+            yield return new object[] { provider };
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(ProviderDispatchData))]
+    public async Task ProcessAsync_DispatchesToRegisteredProviderSender(EmailProvider provider) {
+        var currentTime = DateTimeOffset.Parse("2024-06-11T08:00:00Z");
+        var repository = new InMemoryPendingMessageRepository();
+        var record = CreateRecord(currentTime.AddMinutes(-1));
+        record.Provider = provider;
+        repository.Add(record);
+        var senders = new Dictionary<EmailProvider, RecordingPendingMessageSender>();
+        var entries = new List<KeyValuePair<EmailProvider, IPendingMessageSender>>();
+        foreach (var providerUnderTest in ProvidersUnderTest) {
+            var stub = new RecordingPendingMessageSender();
+            senders[providerUnderTest] = stub;
+            entries.Add(new KeyValuePair<EmailProvider, IPendingMessageSender>(providerUnderTest, stub));
+        }
+
+        var factory = new PendingMessageSenderFactory(entries);
+        var processor = new PendingMessageProcessor(
+            repository,
+            factory,
+            clock: () => currentTime,
+            processingLeaseDuration: TimeSpan.Zero);
+
+        await processor.ProcessAsync();
+
+        Assert.False(repository.Contains(record.MessageId));
+        Assert.Single(senders[provider].SentRecords);
+        Assert.Equal(provider, senders[provider].SentRecords[0].Provider);
+        foreach (var pair in senders) {
+            if (pair.Key == provider) {
+                continue;
+            }
+
+            Assert.Empty(pair.Value.SentRecords);
+        }
+    }
+
+    [Fact]
+    public async Task ProcessAsync_RetriesUsingDelaySelectorPerAttempt() {
+        var currentTime = DateTimeOffset.Parse("2024-06-12T07:30:00Z");
+        var repository = new InMemoryPendingMessageRepository();
+        var record = CreateRecord(currentTime.AddMinutes(-2));
+        record.Provider = EmailProvider.Mailgun;
+        repository.Add(record);
+        var sender = new RecordingPendingMessageSender {
+            ShouldThrow = true,
+            ExceptionToThrow = new Exception("Transient provider failure")
+        };
+        var attempts = new List<int>();
+        var delays = new Dictionary<int, TimeSpan> {
+            { 1, TimeSpan.FromMinutes(5) },
+            { 2, TimeSpan.FromMinutes(10) }
+        };
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            { EmailProvider.Mailgun, sender }
+        });
+        var processor = new PendingMessageProcessor(
+            repository,
+            factory,
+            retryDelaySelector: attempt => {
+                attempts.Add(attempt);
+                if (delays.TryGetValue(attempt, out var delay)) {
+                    return delay;
+                }
+
+                return TimeSpan.FromMinutes(15);
+            },
+            clock: () => currentTime,
+            maxRetryAttempts: 4);
+
+        await processor.ProcessAsync();
+
+        var storedAfterFirstAttempt = await repository.GetByMessageIdAsync(record.MessageId);
+        Assert.NotNull(storedAfterFirstAttempt);
+        Assert.Equal(1, storedAfterFirstAttempt!.AttemptCount);
+        Assert.Equal(currentTime + delays[1], storedAfterFirstAttempt.NextAttemptAt);
+        Assert.Equal(new[] { 1 }, attempts);
+
+        currentTime = storedAfterFirstAttempt.NextAttemptAt.AddMinutes(1);
+
+        await processor.ProcessAsync();
+
+        var storedAfterSecondAttempt = await repository.GetByMessageIdAsync(record.MessageId);
+        Assert.NotNull(storedAfterSecondAttempt);
+        Assert.Equal(2, storedAfterSecondAttempt!.AttemptCount);
+        Assert.Equal(currentTime + delays[2], storedAfterSecondAttempt.NextAttemptAt);
+        Assert.Equal(new[] { 1, 2 }, attempts);
+
+        currentTime = storedAfterSecondAttempt.NextAttemptAt.AddMinutes(1);
+        sender.ShouldThrow = false;
+
+        await processor.ProcessAsync();
+
+        Assert.False(repository.Contains(record.MessageId));
+        Assert.Equal(3, sender.SentRecords.Count);
+        var lastRecord = sender.SentRecords[sender.SentRecords.Count - 1];
+        Assert.Equal(3, lastRecord.AttemptCount);
+        Assert.Equal(EmailProvider.Mailgun, lastRecord.Provider);
+        Assert.Equal(new[] { 1, 2 }, attempts);
     }
 }
