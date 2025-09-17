@@ -63,7 +63,9 @@ public sealed class AesCredentialProtectorTests {
     }
 
     private sealed class KeyDirectoryScope : IDisposable {
-        private static readonly string[] VariableNames = new[] {
+        private const string OverrideVariable = "MAILOZAURR_KEY_DIRECTORY";
+
+        private static readonly string[] BasePathVariables = new[] {
             "LOCALAPPDATA",
             "APPDATA",
             "HOME",
@@ -78,9 +80,10 @@ public sealed class AesCredentialProtectorTests {
             root = Path.Combine(Path.GetTempPath(), "Mailozaurr", "KeyTests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(root);
 
-            foreach (var variable in VariableNames) {
-                previousValues[variable] = Environment.GetEnvironmentVariable(variable);
-                Environment.SetEnvironmentVariable(variable, root);
+            SetVariable(OverrideVariable, Path.Combine(root, "keys"));
+
+            foreach (var variable in BasePathVariables) {
+                SetVariable(variable, root);
             }
         }
 
@@ -96,6 +99,11 @@ public sealed class AesCredentialProtectorTests {
             } catch {
                 // Best-effort cleanup.
             }
+        }
+
+        private void SetVariable(string name, string value) {
+            previousValues[name] = Environment.GetEnvironmentVariable(name);
+            Environment.SetEnvironmentVariable(name, value);
         }
     }
 }

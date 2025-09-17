@@ -208,17 +208,22 @@ internal sealed class AesCredentialProtector : ICredentialProtector {
     }
 
     private static bool IsSharingViolation(Exception ex) {
-        const int ERROR_SHARING_VIOLATION = unchecked((int)0x80070020);
-        const int ERROR_LOCK_VIOLATION = unchecked((int)0x80070021);
-        const int ERROR_FILE_EXISTS = unchecked((int)0x80070050);
-        const int ERROR_ALREADY_EXISTS = unchecked((int)0x800700B7);
-        const int ERROR_ACCESS_DENIED = unchecked((int)0x80070005);
+        const int ERROR_SHARING_VIOLATION = 32;
+        const int ERROR_LOCK_VIOLATION = 33;
+        const int ERROR_FILE_EXISTS = 80;
+        const int ERROR_ALREADY_EXISTS = 183;
+        const int ERROR_ACCESS_DENIED = 5;
+        const int EACCES = 13;
+        const int EAGAIN = 11;
 
-        var hresult = ex.HResult;
-        return hresult == ERROR_SHARING_VIOLATION
-            || hresult == ERROR_LOCK_VIOLATION
-            || hresult == ERROR_FILE_EXISTS
-            || hresult == ERROR_ALREADY_EXISTS
-            || hresult == ERROR_ACCESS_DENIED;
+        var code = (int)((uint)ex.HResult & 0xFFFF);
+
+        return code == ERROR_SHARING_VIOLATION
+            || code == ERROR_LOCK_VIOLATION
+            || code == ERROR_FILE_EXISTS
+            || code == ERROR_ALREADY_EXISTS
+            || code == ERROR_ACCESS_DENIED
+            || code == EACCES
+            || code == EAGAIN;
     }
 }

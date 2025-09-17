@@ -6,8 +6,14 @@ namespace Mailozaurr;
 internal static class CredentialProtectionPaths {
     private const string RootDirectoryName = "Mailozaurr";
     private const string SubDirectoryName = "DataProtection";
+    private const string OverrideDirectoryVariable = "MAILOZAURR_KEY_DIRECTORY";
 
     public static string ResolveKeyDirectory() {
+        var overrideDirectory = Environment.GetEnvironmentVariable(OverrideDirectoryVariable);
+        if (!string.IsNullOrWhiteSpace(overrideDirectory)) {
+            return Path.GetFullPath(overrideDirectory);
+        }
+
         var baseDirectory = GetBaseDirectory();
         return Path.Combine(baseDirectory, RootDirectoryName, SubDirectoryName);
     }
