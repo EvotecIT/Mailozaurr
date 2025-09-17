@@ -83,6 +83,9 @@ public class MailgunClient : IDisposable {
     /// <summary>URL of the webhook called after sending.</summary>
     public string? WebhookUrl { get; set; }
 
+    /// <summary>Repository used to persist messages that need retrying.</summary>
+    public IPendingMessageRepository? PendingMessageRepository { get; set; }
+
     /// <summary>The normalized sender email address.</summary>
     public string SentFrom => Helpers.GetEmailAddress(From);
     /// <summary>Comma separated list of recipients.</summary>
@@ -182,6 +185,80 @@ public class MailgunClient : IDisposable {
         return content;
     }
 
+    private MimeMessage BuildMimeMessage() {
+        var smtp = new Smtp {
+            From = From,
+            To = To,
+            Cc = Cc,
+            Bcc = Bcc,
+            ReplyTo = ReplyTo,
+            Subject = Subject ?? string.Empty,
+            TextBody = Text,
+            HtmlBody = Html,
+            Headers = Headers
+        };
+        if (Attachment != null) {
+            smtp.Attachments = Attachment.Cast<object>().ToList();
+        }
+        if (InlineAttachment != null) {
+            smtp.InlineAttachments = InlineAttachment.Cast<object>().ToList();
+        }
+        smtp.CreateMessage();
+        return smtp.Message;
+    }
+
+    private async Task QueuePendingMessageAsync(CancellationToken cancellationToken) {
+        if (PendingMessageRepository == null) {
+            return;
+        }
+
+        string apiKey;
+        string domain;
+        try {
+            apiKey = ApiKey;
+            domain = EmailDomain;
+        } catch (Exception ex) {
+            LogCollector.LogWarning($"Send-EmailMessage - Failed to capture Mailgun credentials for retry: {ex.Message}");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(apiKey)) {
+            return;
+        }
+
+        MimeMessage message;
+        try {
+            message = BuildMimeMessage();
+        } catch (Exception ex) {
+            LogCollector.LogWarning($"Send-EmailMessage - Failed to serialize Mailgun message for retry: {ex.Message}");
+            return;
+        }
+
+        var messageId = string.IsNullOrEmpty(message.MessageId)
+            ? MimeKit.Utils.MimeUtils.GenerateMessageId(domain)
+            : message.MessageId;
+
+        using var stream = new MemoryStream();
+        await message.WriteToAsync(stream, cancellationToken).ConfigureAwait(false);
+
+        var now = DateTimeOffset.UtcNow;
+        var record = new PendingMessageRecord {
+            MessageId = messageId,
+            MimeMessage = Convert.ToBase64String(stream.ToArray()),
+            Timestamp = now,
+            NextAttemptAt = now,
+            Provider = EmailProvider.Mailgun
+        };
+        record.ProviderData[MailgunPendingMessageSender.DomainKey] = domain;
+        record.ProviderData[MailgunPendingMessageSender.ApiKeyBase64Key] = Convert.ToBase64String(Encoding.UTF8.GetBytes(apiKey));
+
+        try {
+            await PendingMessageRepository.SaveAsync(record, cancellationToken).ConfigureAwait(false);
+        } catch (Exception ex) {
+            LogCollector.LogWarning($"Send-EmailMessage - Failed to persist Mailgun pending message: {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// Sends the email using the Mailgun REST API.
     /// </summary>
@@ -226,6 +303,7 @@ public class MailgunClient : IDisposable {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Mailgun: {ex.Message}");
                 if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
+                    await QueuePendingMessageAsync(cancellationToken).ConfigureAwait(false);
                     if (ErrorAction == ActionPreference.Stop) throw;
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", ex.Message);
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
@@ -236,6 +314,7 @@ public class MailgunClient : IDisposable {
             }
             attempts++;
         } while (attempts <= RetryCount);
+        await QueuePendingMessageAsync(cancellationToken).ConfigureAwait(false);
         var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", lastException?.Message);
         await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken).ConfigureAwait(false);
         return finalResult;

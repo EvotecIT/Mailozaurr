@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -19,6 +20,7 @@ public sealed class GmailApiClient : IDisposable {
     private static readonly JsonSerializerOptions s_jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _client;
     private readonly Func<CancellationToken, Task<string>>? _refreshToken;
+    private readonly OAuthCredential? _credential;
     private bool _disposed;
 
     private void ThrowIfDisposed() {
@@ -31,6 +33,11 @@ public sealed class GmailApiClient : IDisposable {
     /// Initializes the client using the provided OAuth credential.
     /// </summary>
     public GmailApiClient(OAuthCredential credential, Func<CancellationToken, Task<string>>? refreshToken = null) {
+        if (credential == null) {
+            throw new ArgumentNullException(nameof(credential));
+        }
+
+        _credential = credential;
         _client = new HttpClient {
             BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/")
         };
@@ -38,10 +45,19 @@ public sealed class GmailApiClient : IDisposable {
         _refreshToken = refreshToken;
     }
 
-    internal GmailApiClient(HttpClient client, Func<CancellationToken, Task<string>>? refreshToken = null) {
-        _client = client;
+    internal GmailApiClient(HttpClient client, Func<CancellationToken, Task<string>>? refreshToken = null, OAuthCredential? credential = null) {
+        _client = client ?? throw new ArgumentNullException(nameof(client));
         _refreshToken = refreshToken;
+        _credential = credential;
+        if (credential != null && !string.IsNullOrEmpty(credential.AccessToken) && _client.DefaultRequestHeaders.Authorization == null) {
+            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credential.AccessToken);
+        }
     }
+
+    /// <summary>
+    /// Repository used to persist messages that require retrying.
+    /// </summary>
+    public IPendingMessageRepository? PendingMessageRepository { get; set; }
 
     /// <inheritdoc />
     public void Dispose() {
@@ -60,6 +76,9 @@ public sealed class GmailApiClient : IDisposable {
             if (_refreshToken != null) {
                 string token = await _refreshToken(cancellationToken).ConfigureAwait(false);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                if (_credential != null) {
+                    _credential.AccessToken = token;
+                }
             }
 #if NET5_0_OR_GREATER
             string content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -70,11 +89,71 @@ public sealed class GmailApiClient : IDisposable {
         }
     }
 
+    private string? ResolveAccessToken() {
+        if (!string.IsNullOrEmpty(_credential?.AccessToken)) {
+            return _credential.AccessToken;
+        }
+
+        var authorization = _client.DefaultRequestHeaders.Authorization;
+        if (authorization != null && authorization.Scheme.Equals("Bearer", StringComparison.OrdinalIgnoreCase)) {
+            return authorization.Parameter;
+        }
+
+        return null;
+    }
+
+    private async Task QueuePendingMessageAsync(string userId, MimeMessage message, CancellationToken cancellationToken) {
+        if (PendingMessageRepository == null) {
+            return;
+        }
+
+        var accessToken = ResolveAccessToken();
+        if (string.IsNullOrEmpty(accessToken)) {
+            return;
+        }
+
+        if (string.IsNullOrEmpty(message.MessageId)) {
+            message.MessageId = MimeKit.Utils.MimeUtils.GenerateMessageId();
+        }
+
+        using var stream = new MemoryStream();
+        await message.WriteToAsync(stream, cancellationToken).ConfigureAwait(false);
+
+        var now = DateTimeOffset.UtcNow;
+        var record = new PendingMessageRecord {
+            MessageId = message.MessageId,
+            MimeMessage = Convert.ToBase64String(stream.ToArray()),
+            Timestamp = now,
+            NextAttemptAt = now,
+            Provider = EmailProvider.Gmail
+        };
+
+        var credential = _credential;
+        var userName = !string.IsNullOrWhiteSpace(credential?.UserName) ? credential!.UserName : userId;
+        var expiresOn = credential?.ExpiresOn ?? DateTimeOffset.MaxValue;
+        record.ProviderData[GmailPendingMessageSender.UserIdKey] = userId;
+        record.ProviderData[GmailPendingMessageSender.UserNameKey] = userName;
+        record.ProviderData[GmailPendingMessageSender.ExpiresOnKey] = expiresOn.ToString("o", CultureInfo.InvariantCulture);
+        record.ProviderData[GmailPendingMessageSender.AccessTokenBase64Key] = Convert.ToBase64String(Encoding.UTF8.GetBytes(accessToken));
+        if (!string.IsNullOrEmpty(credential?.RefreshToken)) {
+            record.ProviderData[GmailPendingMessageSender.RefreshTokenBase64Key] = Convert.ToBase64String(Encoding.UTF8.GetBytes(credential.RefreshToken));
+        }
+
+        try {
+            await PendingMessageRepository.SaveAsync(record, cancellationToken).ConfigureAwait(false);
+        } catch (Exception ex) {
+            LoggingMessages.Logger.WriteWarning($"Failed to persist Gmail pending message: {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// Sends the specified MIME message via Gmail API.
     /// </summary>
     public async Task<GmailMessage> SendAsync(string userId, MimeMessage message, CancellationToken cancellationToken = default) {
         ThrowIfDisposed();
+        if (message == null) {
+            throw new ArgumentNullException(nameof(message));
+        }
         using var ms = new MemoryStream();
         await message.WriteToAsync(ms, cancellationToken).ConfigureAwait(false);
         var raw = Convert.ToBase64String(ms.ToArray())
@@ -84,8 +163,38 @@ public sealed class GmailApiClient : IDisposable {
         var json = JsonSerializer.Serialize(new { raw }, s_jsonOptions);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
         using var response = await _client.PostAsync($"users/{userId}/messages/send", content, cancellationToken).ConfigureAwait(false);
-        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        var queued = false;
+        try {
+            await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode) {
+#if NET5_0_OR_GREATER
+                var error = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+                var error = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+                await QueuePendingMessageAsync(userId, message, cancellationToken).ConfigureAwait(false);
+                queued = true;
+                throw new HttpRequestException($"Gmail returned {(int)response.StatusCode} ({response.StatusCode}): {error}");
+            }
+        } catch (GmailAuthenticationException) {
+            if (!queued) {
+                await QueuePendingMessageAsync(userId, message, cancellationToken).ConfigureAwait(false);
+                queued = true;
+            }
+            throw;
+        } catch (HttpRequestException) {
+            if (!queued) {
+                await QueuePendingMessageAsync(userId, message, cancellationToken).ConfigureAwait(false);
+                queued = true;
+            }
+            throw;
+        } catch (TaskCanceledException) {
+            if (!queued) {
+                await QueuePendingMessageAsync(userId, message, cancellationToken).ConfigureAwait(false);
+                queued = true;
+            }
+            throw;
+        }
 #if NET5_0_OR_GREATER
         var resultJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 #else

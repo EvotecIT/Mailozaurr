@@ -69,6 +69,9 @@ public class SesClient : IDisposable {
     /// <summary>Collector used to store log entries.</summary>
     public LogCollector LogCollector { get; set; } = new();
 
+    /// <summary>Repository used to persist messages that require retrying.</summary>
+    public IPendingMessageRepository? PendingMessageRepository { get; set; }
+
     /// <summary>
     /// Gets the normalized sender email address.
     /// </summary>
@@ -168,7 +171,81 @@ public class SesClient : IDisposable {
         return request;
     }
 
-    private async Task<SmtpResult> SendSesRequestAsync(string body, CancellationToken cancellationToken)
+    private async Task QueuePendingMessageAsync(MimeMessage? message, string? mimeMessageBase64, CancellationToken cancellationToken)
+    {
+        if (PendingMessageRepository == null)
+        {
+            return;
+        }
+
+        if (Credentials is not NetworkCredential net)
+        {
+            LogCollector.LogWarning("Send-EmailMessage - Unable to queue SES message because credentials are not network credentials.");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(net.UserName) || string.IsNullOrEmpty(net.Password))
+        {
+            return;
+        }
+
+        var base64 = mimeMessageBase64;
+        string messageId;
+        if (message != null)
+        {
+            if (string.IsNullOrEmpty(message.MessageId))
+            {
+                message.MessageId = MimeKit.Utils.MimeUtils.GenerateMessageId();
+            }
+
+            if (string.IsNullOrEmpty(base64))
+            {
+                using var stream = new MemoryStream();
+                await message.WriteToAsync(stream, cancellationToken).ConfigureAwait(false);
+                base64 = Convert.ToBase64String(stream.ToArray());
+            }
+
+            messageId = message.MessageId;
+        }
+        else
+        {
+            if (string.IsNullOrEmpty(base64))
+            {
+                return;
+            }
+
+            messageId = Guid.NewGuid().ToString("N");
+        }
+
+        if (string.IsNullOrEmpty(base64))
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var record = new PendingMessageRecord
+        {
+            MessageId = messageId,
+            MimeMessage = base64,
+            Timestamp = now,
+            NextAttemptAt = now,
+            Provider = EmailProvider.SES
+        };
+        record.ProviderData[SesPendingMessageSender.AccessKeyIdBase64Key] = Convert.ToBase64String(Encoding.UTF8.GetBytes(net.UserName));
+        record.ProviderData[SesPendingMessageSender.SecretAccessKeyBase64Key] = Convert.ToBase64String(Encoding.UTF8.GetBytes(net.Password));
+        record.ProviderData[SesPendingMessageSender.RegionKey] = Region;
+
+        try
+        {
+            await PendingMessageRepository.SaveAsync(record, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            LogCollector.LogWarning($"Send-EmailMessage - Failed to persist SES pending message: {ex.Message}");
+        }
+    }
+
+    private async Task<SmtpResult> SendSesRequestAsync(string body, CancellationToken cancellationToken, MimeMessage? message = null, string? mimeMessageBase64 = null)
     {
         int attempts = 0;
         Exception? lastException = null;
@@ -201,6 +278,7 @@ public class SesClient : IDisposable {
 
             if ((!Helpers.IsTransient(lastException) && !RetryAlways) || attempts >= RetryCount)
             {
+                await QueuePendingMessageAsync(message, mimeMessageBase64, cancellationToken).ConfigureAwait(false);
                 if (ErrorAction == ActionPreference.Stop && lastException != null)
                 {
                     throw lastException;
@@ -219,6 +297,7 @@ public class SesClient : IDisposable {
         }
         while (attempts <= RetryCount);
 
+        await QueuePendingMessageAsync(message, mimeMessageBase64, cancellationToken).ConfigureAwait(false);
         SmtpResult final = new(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, lastException?.Message);
         await Helpers.PostWebhookAsync(WebhookUrl, final, cancellationToken, _client);
         return final;
@@ -239,7 +318,7 @@ public class SesClient : IDisposable {
         await message.WriteToAsync(stream, cancellationToken);
         string raw = Convert.ToBase64String(stream.ToArray());
         string body = $"Action=SendRawEmail&RawMessage.Data={Uri.EscapeDataString(raw)}&Version=2010-12-01";
-        return await SendSesRequestAsync(body, cancellationToken);
+        return await SendSesRequestAsync(body, cancellationToken, message, raw);
     }
 
     /// <summary>
@@ -270,7 +349,11 @@ public class SesClient : IDisposable {
         if (ReplyTo != null) sb.Append("&ReplyToAddresses.member.1=").Append(Uri.EscapeDataString(Helpers.GetEmailAddress(ReplyTo)));
         string json = TemplateData != null ? JsonSerializer.Serialize(TemplateData) : "{}";
         sb.Append("&TemplateData=").Append(Uri.EscapeDataString(json));
-        return await SendSesRequestAsync(sb.ToString(), cancellationToken);
+        MimeMessage message = BuildMessage();
+        using MemoryStream stream = new();
+        await message.WriteToAsync(stream, cancellationToken);
+        var raw = Convert.ToBase64String(stream.ToArray());
+        return await SendSesRequestAsync(sb.ToString(), cancellationToken, message, raw);
     }
 
     /// <summary>

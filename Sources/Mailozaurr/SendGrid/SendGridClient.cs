@@ -95,6 +95,11 @@ public sealed class SendGridClient : IDisposable {
     public ActionPreference? ErrorAction { get; set; }
 
     /// <summary>
+    /// Repository used to persist messages that require retrying.
+    /// </summary>
+    public IPendingMessageRepository? PendingMessageRepository { get; set; }
+
+    /// <summary>
     /// Number of times to retry sending the message when an error occurs.
     /// </summary>
     public int RetryCount { get; set; } = 0;
@@ -361,6 +366,7 @@ public sealed class SendGridClient : IDisposable {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - HTTP error during sending using SendGrid: {ex.Message}");
                 if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
+                    await QueuePendingMessageAsync(apiKey, cancellationToken).ConfigureAwait(false);
                     if (ErrorAction == ActionPreference.Stop && lastException != null) {
                         throw lastException;
                     }
@@ -377,6 +383,7 @@ public sealed class SendGridClient : IDisposable {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Request canceled: {ex.Message}");
                 if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
+                    await QueuePendingMessageAsync(apiKey, cancellationToken).ConfigureAwait(false);
                     if (ErrorAction == ActionPreference.Stop && lastException != null) {
                         throw lastException;
                     }
@@ -392,9 +399,40 @@ public sealed class SendGridClient : IDisposable {
             attempts++;
         } while (attempts <= RetryCount);
 
+        await QueuePendingMessageAsync(apiKey, cancellationToken).ConfigureAwait(false);
         var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
         await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken).ConfigureAwait(false);
         return finalResult;
+    }
+
+    private async Task QueuePendingMessageAsync(string apiKey, CancellationToken cancellationToken) {
+        if (PendingMessageRepository == null) {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(MessageJson)) {
+            return;
+        }
+
+        if (string.IsNullOrEmpty(apiKey)) {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var record = new PendingMessageRecord {
+            MessageId = Guid.NewGuid().ToString("N"),
+            Timestamp = now,
+            NextAttemptAt = now,
+            Provider = EmailProvider.SendGrid
+        };
+        record.ProviderData[SendGridPendingMessageSender.MessageJsonKey] = MessageJson;
+        record.ProviderData[SendGridPendingMessageSender.ApiKeyBase64Key] = Convert.ToBase64String(Encoding.UTF8.GetBytes(apiKey));
+
+        try {
+            await PendingMessageRepository.SaveAsync(record, cancellationToken).ConfigureAwait(false);
+        } catch (Exception ex) {
+            LogCollector.LogWarning($"Send-EmailMessage - Failed to persist SendGrid pending message: {ex.Message}");
+        }
     }
 
     private void ThrowIfDisposed() {

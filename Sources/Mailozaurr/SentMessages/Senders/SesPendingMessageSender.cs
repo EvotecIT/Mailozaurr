@@ -10,6 +10,8 @@ namespace Mailozaurr;
 public sealed class SesPendingMessageSender : IPendingMessageSender {
     internal const string AccessKeyIdKey = "AccessKeyId";
     internal const string SecretAccessKeyKey = "SecretAccessKey";
+    internal const string AccessKeyIdBase64Key = "AccessKeyIdBase64";
+    internal const string SecretAccessKeyBase64Key = "SecretAccessKeyBase64";
     internal const string RegionKey = "Region";
 
     private readonly HttpClient httpClient;
@@ -33,12 +35,8 @@ public sealed class SesPendingMessageSender : IPendingMessageSender {
         if (string.IsNullOrWhiteSpace(record.MimeMessage)) {
             throw new InvalidOperationException("Pending SES message does not contain MIME content.");
         }
-        if (!record.ProviderData.TryGetValue(AccessKeyIdKey, out var accessKey) || string.IsNullOrWhiteSpace(accessKey)) {
-            throw new InvalidOperationException("Pending SES message is missing the AWS access key identifier.");
-        }
-        if (!record.ProviderData.TryGetValue(SecretAccessKeyKey, out var secretKey) || string.IsNullOrWhiteSpace(secretKey)) {
-            throw new InvalidOperationException("Pending SES message is missing the AWS secret access key.");
-        }
+        var accessKey = ResolveAccessKey(record.ProviderData);
+        var secretKey = ResolveSecretKey(record.ProviderData);
         var region = record.ProviderData.TryGetValue(RegionKey, out var regionValue) && !string.IsNullOrWhiteSpace(regionValue)
             ? regionValue
             : "us-east-1";
@@ -62,6 +60,32 @@ public sealed class SesPendingMessageSender : IPendingMessageSender {
 
     private static string BuildRequestBody(string mimeMessageBase64) {
         return $"Action=SendRawEmail&RawMessage.Data={Uri.EscapeDataString(mimeMessageBase64)}&Version=2010-12-01";
+    }
+
+    private static string ResolveAccessKey(Dictionary<string, string> providerData) {
+        if (providerData.TryGetValue(AccessKeyIdBase64Key, out var encoded) && !string.IsNullOrWhiteSpace(encoded)) {
+            var bytes = Convert.FromBase64String(encoded);
+            return Encoding.UTF8.GetString(bytes);
+        }
+
+        if (providerData.TryGetValue(AccessKeyIdKey, out var accessKey) && !string.IsNullOrWhiteSpace(accessKey)) {
+            return accessKey;
+        }
+
+        throw new InvalidOperationException("Pending SES message is missing the AWS access key identifier.");
+    }
+
+    private static string ResolveSecretKey(Dictionary<string, string> providerData) {
+        if (providerData.TryGetValue(SecretAccessKeyBase64Key, out var encoded) && !string.IsNullOrWhiteSpace(encoded)) {
+            var bytes = Convert.FromBase64String(encoded);
+            return Encoding.UTF8.GetString(bytes);
+        }
+
+        if (providerData.TryGetValue(SecretAccessKeyKey, out var secretKey) && !string.IsNullOrWhiteSpace(secretKey)) {
+            return secretKey;
+        }
+
+        throw new InvalidOperationException("Pending SES message is missing the AWS secret access key.");
     }
 
     private static HttpRequestMessage CreateRequest(string accessKey, string secretKey, string region, string content, DateTime nowUtc) {
