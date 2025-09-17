@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Security;
 using System.Runtime.InteropServices;
@@ -37,6 +38,12 @@ public class Smtp {
     /// <summary>Repository used to persist pending messages for later retry.</summary>
     public IPendingMessageRepository? PendingMessageRepository { get; set; }
 
+    private const string ProviderDataSecureSocketOptionsKey = "SecureSocketOptions";
+    private const string ProviderDataUseSslKey = "UseSsl";
+    private const string ProviderDataSkipCertificateValidationKey = "SkipCertificateValidation";
+    private const string ProviderDataCheckCertificateRevocationKey = "CheckCertificateRevocation";
+    private const string ProviderDataTimeoutKey = "TimeoutMilliseconds";
+
     private string? _pendingMessagesPath;
     /// <summary>Directory path for storing pending messages.</summary>
     public string? PendingMessagesPath {
@@ -56,6 +63,9 @@ public class Smtp {
 
     /// <summary>Underlying SMTP client used to send messages.</summary>
     public ClientSmtp Client { get; private set; }
+
+    private SecureSocketOptions _activeSecureSocketOptions = SecureSocketOptions.Auto;
+    private bool _activeUseSsl;
 
     /// <summary>Credentials used during authentication.</summary>
     public NetworkCredential? Credential { get; private set; }
@@ -403,22 +413,25 @@ public class Smtp {
         {
             Client = pooled;
         }
+        var effectiveOptions = secureSocketOptions;
+        if (useSsl && effectiveOptions == SecureSocketOptions.Auto) {
+            // Maintain backwards compatibility with Send-MailMessage by
+            // defaulting to StartTls when the UseSsl flag is supplied and
+            // no explicit option was provided.
+            effectiveOptions = SecureSocketOptions.StartTls;
+        }
+        _activeUseSsl = useSsl;
+        _activeSecureSocketOptions = effectiveOptions;
         try {
             if (!Client.IsConnected)
             {
-                if (useSsl && secureSocketOptions == SecureSocketOptions.Auto) {
-                    // Maintain backwards compatibility with Send-MailMessage by
-                    // defaulting to StartTls when the UseSsl flag is supplied and
-                    // no explicit option was provided.
-                    secureSocketOptions = SecureSocketOptions.StartTls;
-                }
-                Client.Connect(server, port, secureSocketOptions);
+                Client.Connect(server, port, effectiveOptions);
             }
-            LogVerbose($"Connected to {server} on {port} port using SSL: {secureSocketOptions}");
+            LogVerbose($"Connected to {server} on {port} port using SSL: {effectiveOptions}");
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "");
         } catch (Exception ex) {
             LogWarning($"Send-EmailMessage - Error during connect: {ex.Message}");
-            LogWarning($"Send-EmailMessage - Possible issue: Port? ({port} was used), Using SSL? ({secureSocketOptions}, was used). You can also try 'SkipCertificateValidation' or 'SkipCertificateRevocation'.");
+            LogWarning($"Send-EmailMessage - Possible issue: Port? ({port} was used), Using SSL? ({effectiveOptions}, was used). You can also try 'SkipCertificateValidation' or 'SkipCertificateRevocation'.");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
@@ -461,22 +474,25 @@ public class Smtp {
         {
             Client = pooled;
         }
+        var effectiveOptions = secureSocketOptions;
+        if (useSsl && effectiveOptions == SecureSocketOptions.Auto) {
+            // Maintain backwards compatibility with Send-MailMessage by
+            // defaulting to StartTls when the UseSsl flag is supplied and
+            // no explicit option was provided.
+            effectiveOptions = SecureSocketOptions.StartTls;
+        }
+        _activeUseSsl = useSsl;
+        _activeSecureSocketOptions = effectiveOptions;
         try {
             if (!Client.IsConnected)
             {
-                if (useSsl && secureSocketOptions == SecureSocketOptions.Auto) {
-                    // Maintain backwards compatibility with Send-MailMessage by
-                    // defaulting to StartTls when the UseSsl flag is supplied and
-                    // no explicit option was provided.
-                    secureSocketOptions = SecureSocketOptions.StartTls;
-                }
-                await Client.ConnectAsync(server, port, secureSocketOptions);
+                await Client.ConnectAsync(server, port, effectiveOptions);
             }
-            LogVerbose($"Connected to {server} on {port} port using SSL: {secureSocketOptions}");
+            LogVerbose($"Connected to {server} on {port} port using SSL: {effectiveOptions}");
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "");
         } catch (Exception ex) {
             LogWarning($"Send-EmailMessage - Error during connect: {ex.Message}");
-            LogWarning($"Send-EmailMessage - Possible issue: Port? ({port} was used), Using SSL? ({secureSocketOptions}, was used). You can also try 'SkipCertificateValidation' or 'SkipCertificateRevocation'.");
+            LogWarning($"Send-EmailMessage - Possible issue: Port? ({port} was used), Using SSL? ({effectiveOptions}, was used). You can also try 'SkipCertificateValidation' or 'SkipCertificateRevocation'.");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
@@ -761,6 +777,18 @@ public class Smtp {
         }
     }
 
+    private Dictionary<string, string> CreateProviderDataSnapshot() {
+        var data = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+            [ProviderDataSecureSocketOptionsKey] = _activeSecureSocketOptions.ToString(),
+            [ProviderDataUseSslKey] = _activeUseSsl.ToString(CultureInfo.InvariantCulture),
+            [ProviderDataSkipCertificateValidationKey] = _skipCertificateValidation.ToString(CultureInfo.InvariantCulture),
+            [ProviderDataCheckCertificateRevocationKey] = Client.CheckCertificateRevocation.ToString(CultureInfo.InvariantCulture),
+            [ProviderDataTimeoutKey] = Client.Timeout.ToString(CultureInfo.InvariantCulture)
+        };
+
+        return data;
+    }
+
     private async Task<SmtpResult> SendCoreAsync(CancellationToken cancellationToken = default) {
         int attempts = 0;
         Exception? lastException = null;
@@ -812,7 +840,8 @@ public class Smtp {
                             UserName = Credential?.UserName,
                             Password = string.IsNullOrEmpty(Credential?.Password)
                                 ? null
-                                : credentialProtector.Protect(Credential!.Password)
+                                : credentialProtector.Protect(Credential!.Password),
+                            ProviderData = CreateProviderDataSnapshot()
                         };
                         await PendingMessageRepository.SaveAsync(record, cancellationToken);
                     }
@@ -849,7 +878,8 @@ public class Smtp {
                 UserName = Credential?.UserName,
                 Password = string.IsNullOrEmpty(Credential?.Password)
                     ? null
-                    : credentialProtector.Protect(Credential!.Password)
+                    : credentialProtector.Protect(Credential!.Password),
+                ProviderData = CreateProviderDataSnapshot()
             };
             await PendingMessageRepository.SaveAsync(record, cancellationToken);
         }
