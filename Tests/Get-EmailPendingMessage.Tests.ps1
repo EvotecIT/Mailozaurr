@@ -1,5 +1,5 @@
-Describe 'Remove-MailozaurrPendingMessage' {
-    It 'Deletes message from repository' {
+Describe 'Get-EmailPendingMessage' {
+    It 'Lists messages from repository' {
         $path = Join-Path $TestDrive 'pending'
         $options = [Mailozaurr.PendingMessageRepositoryOptions]::new()
         $options.DirectoryPath = $path
@@ -18,7 +18,7 @@ Describe 'Remove-MailozaurrPendingMessage' {
         $record.NextAttemptAt = [DateTimeOffset]::UtcNow
         $repo.SaveAsync($record).GetAwaiter().GetResult()
 
-        Remove-MailozaurrPendingMessage -PendingMessagesPath $path -MessageId $record.MessageId -Confirm:$false
-        (Get-MailozaurrPendingMessage -PendingMessagesPath $path | Measure-Object).Count | Should -Be 0
+        $result = Get-EmailPendingMessage -PendingMessagesPath $path
+        $result.MessageId | Should -Be $msg.MessageId
     }
 }
