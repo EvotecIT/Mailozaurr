@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 
 namespace Mailozaurr;
 
@@ -62,23 +63,162 @@ internal sealed class AesCredentialProtector : ICredentialProtector {
         return Encoding.UTF8.GetString(plaintextBytes);
     }
 
+    private static readonly TimeSpan[] RetryDelays = new[] {
+        TimeSpan.Zero,
+        TimeSpan.FromMilliseconds(20),
+        TimeSpan.FromMilliseconds(50),
+        TimeSpan.FromMilliseconds(100),
+        TimeSpan.FromMilliseconds(200),
+        TimeSpan.FromMilliseconds(400)
+    };
+
     private static byte[] LoadOrCreateKey() {
         var directory = CredentialProtectionPaths.ResolveKeyDirectory();
         Directory.CreateDirectory(directory);
         var keyPath = Path.Combine(directory, KeyFileName);
 
-        if (File.Exists(keyPath)) {
-            var existingKey = File.ReadAllBytes(keyPath);
-            if (existingKey.Length == KeySizeBytes) {
+        var requiresCleanup = false;
+
+        for (var attempt = 0; attempt < RetryDelays.Length; attempt++) {
+            var delay = RetryDelays[attempt];
+            if (delay > TimeSpan.Zero) {
+                Thread.Sleep(delay);
+            }
+
+            if (requiresCleanup) {
+                if (!TryDeleteInvalidKeyFile(keyPath)) {
+                    continue;
+                }
+
+                requiresCleanup = false;
+            }
+
+            if (TryReadExistingKey(keyPath, out var existingKey, out var invalidLength)) {
                 return existingKey;
+            }
+
+            if (invalidLength) {
+                requiresCleanup = true;
+                continue;
+            }
+
+            if (TryCreateKeyFile(keyPath, out var newKey)) {
+                return newKey;
             }
         }
 
-        var newKey = new byte[KeySizeBytes];
-        using (var rng = RandomNumberGenerator.Create()) {
-            rng.GetBytes(newKey);
+        if (TryReadExistingKey(keyPath, out var fallbackKey, out _)) {
+            return fallbackKey;
         }
-        File.WriteAllBytes(keyPath, newKey);
-        return newKey;
+
+        throw new IOException($"Failed to create or load credential key at '{keyPath}'.");
+    }
+
+    private static bool TryReadExistingKey(string keyPath, out byte[] key, out bool invalidLength) {
+        key = Array.Empty<byte>();
+        invalidLength = false;
+
+        if (!File.Exists(keyPath)) {
+            return false;
+        }
+
+        try {
+            using var stream = new FileStream(keyPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (stream.Length != KeySizeBytes) {
+                invalidLength = true;
+                return false;
+            }
+
+            var buffer = new byte[KeySizeBytes];
+            var offset = 0;
+            while (offset < buffer.Length) {
+                var bytesRead = stream.Read(buffer, offset, buffer.Length - offset);
+                if (bytesRead == 0) {
+                    invalidLength = true;
+                    return false;
+                }
+
+                offset += bytesRead;
+            }
+
+            key = buffer;
+            return true;
+        } catch (IOException ex) {
+            if (IsSharingViolation(ex)) {
+                return false;
+            }
+
+            throw;
+        } catch (UnauthorizedAccessException ex) {
+            if (IsSharingViolation(ex)) {
+                return false;
+            }
+
+            throw;
+        }
+    }
+
+    private static bool TryCreateKeyFile(string keyPath, out byte[] key) {
+        key = new byte[KeySizeBytes];
+        using (var rng = RandomNumberGenerator.Create()) {
+            rng.GetBytes(key);
+        }
+
+        try {
+            using var stream = new FileStream(keyPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            stream.Write(key, 0, key.Length);
+            stream.Flush(true);
+            return true;
+        } catch (IOException ex) {
+            if (IsSharingViolation(ex) || File.Exists(keyPath)) {
+                return false;
+            }
+
+            throw;
+        } catch (UnauthorizedAccessException ex) {
+            if (IsSharingViolation(ex)) {
+                return false;
+            }
+
+            throw;
+        }
+    }
+
+    private static bool TryDeleteInvalidKeyFile(string keyPath) {
+        try {
+            if (!File.Exists(keyPath)) {
+                return true;
+            }
+
+            File.Delete(keyPath);
+            return true;
+        } catch (IOException ex) {
+            if (IsSharingViolation(ex)) {
+                return false;
+            }
+
+            throw;
+        } catch (UnauthorizedAccessException ex) {
+            if (IsSharingViolation(ex)) {
+                return false;
+            }
+
+            throw;
+        }
+    }
+
+    private static bool IsSharingViolation(Exception ex) {
+        const int ERROR_SHARING_VIOLATION = unchecked((int)0x80070020);
+        const int ERROR_LOCK_VIOLATION = unchecked((int)0x80070021);
+        const int ERROR_FILE_EXISTS = unchecked((int)0x80070050);
+        const int ERROR_ALREADY_EXISTS = unchecked((int)0x800700B7);
+        const int ERROR_ACCESS_DENIED = unchecked((int)0x80070005);
+
+        var hresult = ex.HResult;
+        return hresult == ERROR_SHARING_VIOLATION
+            || hresult == ERROR_LOCK_VIOLATION
+            || hresult == ERROR_FILE_EXISTS
+            || hresult == ERROR_ALREADY_EXISTS
+            || hresult == ERROR_ACCESS_DENIED;
     }
 }
