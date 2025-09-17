@@ -82,14 +82,75 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
 
             _ = record.ProviderData;
             var payload = JsonSerializer.SerializeToUtf8Bytes(record, SerializerOptions);
+            var hasExistingRecord = File.Exists(filePath) && index.ContainsKey(record.MessageId);
 
-            using var write = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read);
-            var offset = write.Position;
-            await write.WriteAsync(payload, 0, payload.Length, cancellationToken).ConfigureAwait(false);
-            await write.WriteAsync(newlineBytes, 0, newlineBytes.Length, cancellationToken).ConfigureAwait(false);
-            await write.FlushAsync(cancellationToken).ConfigureAwait(false);
+            if (!hasExistingRecord) {
+                using var write = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read);
+                var offset = write.Position;
+                await write.WriteAsync(payload, 0, payload.Length, cancellationToken).ConfigureAwait(false);
+                await write.WriteAsync(newlineBytes, 0, newlineBytes.Length, cancellationToken).ConfigureAwait(false);
+                await write.FlushAsync(cancellationToken).ConfigureAwait(false);
 
-            index[record.MessageId] = offset;
+                index[record.MessageId] = offset;
+                return;
+            }
+
+            var temp = filePath + ".tmp";
+            if (File.Exists(temp)) {
+                File.Delete(temp);
+            }
+
+            var newIndex = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+            try {
+                using (var read = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.None))
+                using (var write = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None)) {
+                    using var reader = new StreamReader(read, Encoding.UTF8, false, 1024, leaveOpen: true);
+                    long position = 0;
+                    string? line;
+                    while ((line = await reader.ReadLineAsync().ConfigureAwait(false)) != null) {
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        if (string.IsNullOrWhiteSpace(line)) {
+                            continue;
+                        }
+
+                        var existingRecord = DeserializeRecord(line);
+                        if (existingRecord == null || string.IsNullOrWhiteSpace(existingRecord.MessageId)) {
+                            continue;
+                        }
+
+                        if (string.Equals(existingRecord.MessageId, record.MessageId, StringComparison.OrdinalIgnoreCase)) {
+                            continue;
+                        }
+
+                        var bytes = Encoding.UTF8.GetBytes(line);
+                        await write.WriteAsync(bytes, 0, bytes.Length, cancellationToken).ConfigureAwait(false);
+                        await write.WriteAsync(newlineBytes, 0, newlineBytes.Length, cancellationToken).ConfigureAwait(false);
+                        newIndex[existingRecord.MessageId] = position;
+                        position += bytes.Length + newlineBytes.Length;
+                    }
+
+                    newIndex[record.MessageId] = position;
+                    await write.WriteAsync(payload, 0, payload.Length, cancellationToken).ConfigureAwait(false);
+                    await write.WriteAsync(newlineBytes, 0, newlineBytes.Length, cancellationToken).ConfigureAwait(false);
+                    await write.FlushAsync(cancellationToken).ConfigureAwait(false);
+                }
+
+                if (File.Exists(filePath)) {
+                    File.Delete(filePath);
+                }
+                File.Move(temp, filePath);
+
+                index.Clear();
+                foreach (var pair in newIndex) {
+                    index[pair.Key] = pair.Value;
+                }
+            } finally {
+                if (File.Exists(temp)) {
+                    File.Delete(temp);
+                }
+            }
         } finally {
             gate.Release();
         }
@@ -131,6 +192,8 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
 
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
+            var orderedIds = new List<string>();
+            var recordsById = new Dictionary<string, PendingMessageRecord>(StringComparer.OrdinalIgnoreCase);
             using var read = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             using var reader = new StreamReader(read, Encoding.UTF8, false, 1024, leaveOpen: true);
             string? line;
@@ -141,7 +204,19 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
                 }
 
                 var record = DeserializeRecord(line);
-                if (record != null) {
+                if (record == null || string.IsNullOrWhiteSpace(record.MessageId)) {
+                    continue;
+                }
+
+                if (!recordsById.ContainsKey(record.MessageId)) {
+                    orderedIds.Add(record.MessageId);
+                }
+
+                recordsById[record.MessageId] = record;
+            }
+
+            foreach (var id in orderedIds) {
+                if (recordsById.TryGetValue(id, out var record)) {
                     snapshot.Add(record);
                 }
             }
