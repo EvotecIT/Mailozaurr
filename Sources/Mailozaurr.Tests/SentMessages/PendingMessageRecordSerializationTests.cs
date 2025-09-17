@@ -51,6 +51,7 @@ public sealed class PendingMessageRecordSerializationTests {
             MessageId = $"message-{provider}",
             Timestamp = DateTimeOffset.Parse("2024-01-01T00:00:00Z"),
             NextAttemptAt = DateTimeOffset.Parse("2024-01-01T01:00:00Z"),
+            AttemptCount = 3,
             MimeMessage = Convert.ToBase64String(Encoding.UTF8.GetBytes($"Message body for {provider}")),
             Provider = provider
         };
@@ -65,6 +66,7 @@ public sealed class PendingMessageRecordSerializationTests {
         Assert.Equal(provider, restored!.Provider);
         Assert.Equal(record.ProviderData, restored.ProviderData);
         Assert.Equal(record.MessageId, restored.MessageId);
+        Assert.Equal(record.AttemptCount, restored.AttemptCount);
     }
 
     [Fact]
@@ -76,6 +78,7 @@ public sealed class PendingMessageRecordSerializationTests {
         Assert.NotNull(record);
         Assert.Equal(EmailProvider.None, record!.Provider);
         Assert.Empty(record.ProviderData);
+        Assert.Equal(0, record.AttemptCount);
     }
 
     [Fact]
@@ -87,5 +90,6 @@ public sealed class PendingMessageRecordSerializationTests {
         Assert.NotNull(record);
         Assert.Equal(EmailProvider.SES, record!.Provider);
         Assert.Empty(record.ProviderData);
+        Assert.Equal(0, record.AttemptCount);
     }
 }

@@ -15,6 +15,9 @@ public sealed class PendingMessageRecord {
     /// <summary>Time when the next send attempt should occur.</summary>
     public DateTimeOffset NextAttemptAt { get; set; }
 
+    /// <summary>Number of times delivery has been attempted.</summary>
+    public int AttemptCount { get; set; }
+
     /// <summary>Base64-encoded MIME message.</summary>
     public string MimeMessage { get; set; } = string.Empty;
 
