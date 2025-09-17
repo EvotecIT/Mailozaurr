@@ -151,5 +151,36 @@ public static class FakePendingMessageSenderFactory {
         [FakePendingMessageSender]::SendCount | Should -Be 1
         (Get-EmailPendingMessage -PendingMessagesPath $path | Measure-Object).Count | Should -Be 0
     }
+
+    It 'Processes due messages without hanging when using the file repository' {
+        $path = Join-Path $TestDrive 'pending-hang-check'
+        $options = [Mailozaurr.PendingMessageRepositoryOptions]::new()
+        $options.DirectoryPath = $path
+        $repo = [Mailozaurr.FilePendingMessageRepository]::new($options)
+
+        $message = [MimeKit.MimeMessage]::new()
+        $message.From.Add([MimeKit.MailboxAddress]::Parse('a@example.com'))
+        $message.To.Add([MimeKit.MailboxAddress]::Parse('b@example.com'))
+        $message.Subject = 'Immediate delivery'
+        $message.Body = [MimeKit.TextPart]::new('plain')
+        $data = [System.IO.MemoryStream]::new()
+        $message.WriteTo($data)
+
+        $record = [Mailozaurr.PendingMessageRecord]::new()
+        $record.MessageId = $message.MessageId
+        $record.MimeMessage = [Convert]::ToBase64String($data.ToArray())
+        $record.Timestamp = [DateTimeOffset]::UtcNow
+        $record.NextAttemptAt = [DateTimeOffset]::UtcNow.AddMinutes(-1)
+        $record.Provider = [Mailozaurr.EmailProvider]::None
+        $repo.SaveAsync($record).GetAwaiter().GetResult()
+
+        $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+        Send-EmailPendingMessage -PendingMessagesPath $path
+        $stopwatch.Stop()
+
+        [FakePendingMessageSender]::SendCount | Should -Be 1
+        (Get-EmailPendingMessage -PendingMessagesPath $path | Measure-Object).Count | Should -Be 0
+        $stopwatch.Elapsed.TotalSeconds | Should -BeLessThan 5
+    }
 }
 
