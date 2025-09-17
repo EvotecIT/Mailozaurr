@@ -4,10 +4,11 @@ using System.Threading.Tasks;
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
-/// Sends pending messages stored in a file based repository.
+/// Retrieves pending email messages from a file based repository.
 /// </summary>
-[Cmdlet(VerbsCommunications.Send, "MailozaurrPendingMessage")]
-public sealed class CmdletSendMailozaurrPendingMessage : AsyncPSCmdlet {
+[Cmdlet(VerbsCommon.Get, "EmailPendingMessage")]
+[OutputType(typeof(PendingMessageRecord))]
+public sealed class CmdletGetEmailPendingMessage : AsyncPSCmdlet {
     /// <summary>Directory containing pending message log file.</summary>
     [Parameter(Mandatory = true)]
     [Alias("PendingPath")]
@@ -16,7 +17,9 @@ public sealed class CmdletSendMailozaurrPendingMessage : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         var options = new PendingMessageRepositoryOptions { DirectoryPath = PendingMessagesPath! };
-        var smtp = new Smtp { PendingMessageRepository = new FilePendingMessageRepository(options) };
-        await smtp.ProcessPendingMessagesAsync(CancelToken);
+        var repo = new FilePendingMessageRepository(options);
+        await foreach (var record in repo.GetAllAsync(CancelToken)) {
+            WriteObject(record);
+        }
     }
 }

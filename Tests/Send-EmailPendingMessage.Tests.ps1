@@ -1,0 +1,155 @@
+Describe 'Send-EmailPendingMessage' {
+    BeforeAll {
+        if (-not ('Mailozaurr.PendingMessageRecord' -as [type])) {
+            $modulePath = Join-Path $PSScriptRoot '..' 'Mailozaurr.psd1'
+            Import-Module $modulePath -Force
+        }
+        if (-not ('FakePendingMessageSender' -as [type])) {
+            $assemblies = @(
+                [Mailozaurr.PendingMessageRecord].Assembly.Location
+            )
+            Add-Type -ReferencedAssemblies $assemblies -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+using Mailozaurr;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+
+public sealed class FakePendingMessageSender : IPendingMessageSender {
+    private static int sendCount;
+
+    public static void Reset() => sendCount = 0;
+
+    public static int SendCount => sendCount;
+
+    public Task SendAsync(PendingMessageRecord record, CancellationToken ct) {
+        sendCount++;
+        return Task.CompletedTask;
+    }
+}
+
+public static class FakePendingMessageSenderFactory {
+    public static PendingMessageSenderFactory Create() {
+        var pair = new KeyValuePair<EmailProvider, IPendingMessageSender>(EmailProvider.None, new FakePendingMessageSender());
+        return new PendingMessageSenderFactory(new[] { pair });
+    }
+}
+"@
+        }
+    }
+
+    BeforeEach {
+        [FakePendingMessageSender]::Reset()
+        $delegate = [System.Delegate]::CreateDelegate([System.Func[Mailozaurr.PendingMessageSenderFactory]], [FakePendingMessageSenderFactory], 'Create')
+        [Mailozaurr.PowerShell.CmdletSendEmailPendingMessage]::SenderFactoryProvider = $delegate
+    }
+
+    AfterEach {
+        [Mailozaurr.PowerShell.CmdletSendEmailPendingMessage]::SenderFactoryProvider = $null
+    }
+
+    It 'Resends selected messages by id regardless of schedule' {
+        $path = Join-Path $TestDrive 'pending-targeted'
+        $options = [Mailozaurr.PendingMessageRepositoryOptions]::new()
+        $options.DirectoryPath = $path
+        $repo = [Mailozaurr.FilePendingMessageRepository]::new($options)
+
+        $msg = [MimeKit.MimeMessage]::new()
+        $msg.From.Add([MimeKit.MailboxAddress]::Parse('a@example.com'))
+        $msg.To.Add([MimeKit.MailboxAddress]::Parse('b@example.com'))
+        $msg.Subject = 'Pending'
+        $msg.Body = [MimeKit.TextPart]::new('plain')
+        $stream = [System.IO.MemoryStream]::new()
+        $msg.WriteTo($stream)
+
+        $record = [Mailozaurr.PendingMessageRecord]::new()
+        $record.MessageId = $msg.MessageId
+        $record.MimeMessage = [Convert]::ToBase64String($stream.ToArray())
+        $record.Timestamp = [DateTimeOffset]::UtcNow
+        $record.NextAttemptAt = [DateTimeOffset]::UtcNow.AddHours(2)
+        $record.Server = 'smtp.server'
+        $record.Port = 25
+        $repo.SaveAsync($record).GetAwaiter().GetResult()
+
+        Send-EmailPendingMessage -PendingMessagesPath $path -MessageId $record.MessageId
+
+        [FakePendingMessageSender]::SendCount | Should -Be 1
+        (Get-EmailPendingMessage -PendingMessagesPath $path | Measure-Object).Count | Should -Be 0
+    }
+
+    It 'Processes only the requested provider' {
+        $path = Join-Path $TestDrive 'pending-provider'
+        $options = [Mailozaurr.PendingMessageRepositoryOptions]::new()
+        $options.DirectoryPath = $path
+        $repo = [Mailozaurr.FilePendingMessageRepository]::new($options)
+
+        $message = [MimeKit.MimeMessage]::new()
+        $message.From.Add([MimeKit.MailboxAddress]::Parse('a@example.com'))
+        $message.To.Add([MimeKit.MailboxAddress]::Parse('b@example.com'))
+        $message.Subject = 'Provider filter'
+        $message.Body = [MimeKit.TextPart]::new('plain')
+        $buffer = [System.IO.MemoryStream]::new()
+        $message.WriteTo($buffer)
+        $payload = [Convert]::ToBase64String($buffer.ToArray())
+
+        $smtpRecord = [Mailozaurr.PendingMessageRecord]::new()
+        $smtpRecord.MessageId = [Guid]::NewGuid().ToString()
+        $smtpRecord.MimeMessage = $payload
+        $smtpRecord.Timestamp = [DateTimeOffset]::UtcNow
+        $smtpRecord.NextAttemptAt = [DateTimeOffset]::UtcNow
+        $smtpRecord.Server = 'smtp.server'
+        $smtpRecord.Port = 25
+        $smtpRecord.Provider = [Mailozaurr.EmailProvider]::None
+        $repo.SaveAsync($smtpRecord).GetAwaiter().GetResult()
+
+        $apiRecord = [Mailozaurr.PendingMessageRecord]::new()
+        $apiRecord.MessageId = [Guid]::NewGuid().ToString()
+        $apiRecord.MimeMessage = $payload
+        $apiRecord.Timestamp = [DateTimeOffset]::UtcNow
+        $apiRecord.NextAttemptAt = [DateTimeOffset]::UtcNow
+        $apiRecord.Provider = [Mailozaurr.EmailProvider]::Gmail
+        $repo.SaveAsync($apiRecord).GetAwaiter().GetResult()
+
+        Send-EmailPendingMessage -PendingMessagesPath $path -Provider ([Mailozaurr.EmailProvider]::None)
+
+        [FakePendingMessageSender]::SendCount | Should -Be 1
+        $remaining = @(Get-EmailPendingMessage -PendingMessagesPath $path)
+        $remaining.Count | Should -Be 1
+        $remaining[0].Provider | Should -Be ([Mailozaurr.EmailProvider]::Gmail)
+    }
+
+    It 'Honors schedule unless ProcessAll is specified' {
+        $path = Join-Path $TestDrive 'pending-schedule'
+        $options = [Mailozaurr.PendingMessageRepositoryOptions]::new()
+        $options.DirectoryPath = $path
+        $repo = [Mailozaurr.FilePendingMessageRepository]::new($options)
+
+        $message = [MimeKit.MimeMessage]::new()
+        $message.From.Add([MimeKit.MailboxAddress]::Parse('a@example.com'))
+        $message.To.Add([MimeKit.MailboxAddress]::Parse('b@example.com'))
+        $message.Subject = 'Future delivery'
+        $message.Body = [MimeKit.TextPart]::new('plain')
+        $dataStream = [System.IO.MemoryStream]::new()
+        $message.WriteTo($dataStream)
+
+        $scheduled = [Mailozaurr.PendingMessageRecord]::new()
+        $scheduled.MessageId = $message.MessageId
+        $scheduled.MimeMessage = [Convert]::ToBase64String($dataStream.ToArray())
+        $scheduled.Timestamp = [DateTimeOffset]::UtcNow
+        $scheduled.NextAttemptAt = [DateTimeOffset]::UtcNow.AddHours(4)
+        $scheduled.Server = 'smtp.server'
+        $scheduled.Port = 25
+        $repo.SaveAsync($scheduled).GetAwaiter().GetResult()
+
+        Send-EmailPendingMessage -PendingMessagesPath $path
+
+        [FakePendingMessageSender]::SendCount | Should -Be 0
+        (Get-EmailPendingMessage -PendingMessagesPath $path | Measure-Object).Count | Should -Be 1
+
+        [FakePendingMessageSender]::Reset()
+        Send-EmailPendingMessage -PendingMessagesPath $path -ProcessAll
+
+        [FakePendingMessageSender]::SendCount | Should -Be 1
+        (Get-EmailPendingMessage -PendingMessagesPath $path | Measure-Object).Count | Should -Be 0
+    }
+}
+
