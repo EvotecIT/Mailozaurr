@@ -75,4 +75,72 @@ public sealed class FilePendingMessageRepositoryTests {
         Assert.Contains("FileNamingScheme", ex.Message);
         Assert.IsType<InvalidOperationException>(ex.InnerException);
     }
+
+    [Fact]
+    public async Task SaveAsync_ReplacesExistingMessageWithSameId() {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var options = new PendingMessageRepositoryOptions { DirectoryPath = dir, FileNamingScheme = () => "pending.log" };
+        var filePath = Path.Combine(dir, "pending.log");
+        Directory.CreateDirectory(dir);
+
+        try {
+            var repo = new FilePendingMessageRepository(options);
+            var messageId = Guid.NewGuid().ToString("N");
+            var initial = new PendingMessageRecord {
+                MessageId = messageId,
+                Timestamp = DateTimeOffset.UtcNow,
+                NextAttemptAt = DateTimeOffset.UtcNow.AddMinutes(-1),
+                Provider = EmailProvider.SendGrid,
+                AttemptCount = 1
+            };
+
+            await repo.SaveAsync(initial);
+
+            var updated = new PendingMessageRecord {
+                MessageId = messageId,
+                Timestamp = initial.Timestamp.AddMinutes(1),
+                NextAttemptAt = DateTimeOffset.UtcNow.AddMinutes(10),
+                Provider = EmailProvider.Mailgun,
+                AttemptCount = 3
+            };
+
+            await repo.SaveAsync(updated);
+
+            var loaded = await repo.GetByMessageIdAsync(messageId);
+            Assert.NotNull(loaded);
+            Assert.Equal(updated.AttemptCount, loaded!.AttemptCount);
+            Assert.Equal(updated.Provider, loaded.Provider);
+            Assert.Equal(updated.NextAttemptAt, loaded.NextAttemptAt);
+
+            var nonEmptyLines = 0;
+            foreach (var line in File.ReadAllLines(filePath)) {
+                if (!string.IsNullOrWhiteSpace(line)) {
+                    nonEmptyLines++;
+                }
+            }
+
+            Assert.Equal(1, nonEmptyLines);
+
+            var records = await ReadAllAsync(repo);
+            Assert.Single(records);
+            Assert.Equal(messageId, records[0].MessageId);
+            Assert.Equal(updated.AttemptCount, records[0].AttemptCount);
+        } finally {
+            if (File.Exists(filePath)) {
+                File.Delete(filePath);
+            }
+            if (Directory.Exists(dir)) {
+                Directory.Delete(dir, true);
+            }
+        }
+    }
+
+    private static async Task<List<PendingMessageRecord>> ReadAllAsync(IPendingMessageRepository repository) {
+        var records = new List<PendingMessageRecord>();
+        await foreach (var record in repository.GetAllAsync()) {
+            records.Add(record);
+        }
+
+        return records;
+    }
 }
