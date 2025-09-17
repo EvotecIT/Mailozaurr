@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 
 namespace Mailozaurr;
 
@@ -6,6 +7,8 @@ namespace Mailozaurr;
 /// Represents a message pending to be sent.
 /// </summary>
 public sealed class PendingMessageRecord {
+    private int attemptCount;
+
     /// <summary>Identifier of the message.</summary>
     public string MessageId { get; set; } = string.Empty;
 
@@ -14,6 +17,12 @@ public sealed class PendingMessageRecord {
 
     /// <summary>Time when the next send attempt should occur.</summary>
     public DateTimeOffset NextAttemptAt { get; set; }
+
+    /// <summary>Number of times delivery has been attempted.</summary>
+    public int AttemptCount {
+        get => Volatile.Read(ref attemptCount);
+        set => Volatile.Write(ref attemptCount, value);
+    }
 
     /// <summary>Base64-encoded MIME message.</summary>
     public string MimeMessage { get; set; } = string.Empty;
@@ -46,4 +55,16 @@ public sealed class PendingMessageRecord {
         get => providerData ??= new Dictionary<string, string>();
         set => providerData = value ?? new Dictionary<string, string>();
     }
+
+    /// <summary>
+    /// Atomically increments <see cref="AttemptCount"/> and returns the updated value.
+    /// </summary>
+    public int IncrementAttemptCount() => Interlocked.Increment(ref attemptCount);
+
+    /// <summary>
+    /// Atomically sets <see cref="AttemptCount"/> to the specified value.
+    /// </summary>
+    /// <param name="value">Value assigned to the attempt counter.</param>
+    /// <returns>The previous value stored in the attempt counter.</returns>
+    public int ExchangeAttemptCount(int value) => Interlocked.Exchange(ref attemptCount, value);
 }
