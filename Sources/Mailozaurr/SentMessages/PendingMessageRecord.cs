@@ -60,4 +60,11 @@ public sealed class PendingMessageRecord {
     /// Atomically increments <see cref="AttemptCount"/> and returns the updated value.
     /// </summary>
     public int IncrementAttemptCount() => Interlocked.Increment(ref attemptCount);
+
+    /// <summary>
+    /// Atomically sets <see cref="AttemptCount"/> to the specified value.
+    /// </summary>
+    /// <param name="value">Value assigned to the attempt counter.</param>
+    /// <returns>The previous value stored in the attempt counter.</returns>
+    public int ExchangeAttemptCount(int value) => Interlocked.Exchange(ref attemptCount, value);
 }

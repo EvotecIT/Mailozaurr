@@ -94,6 +94,7 @@ public sealed class PendingMessageProcessor {
 
             await AcquireProcessingLeaseAsync(record, now, cancellationToken).ConfigureAwait(false);
 
+            var originalAttemptCount = record.AttemptCount;
             var attempt = record.IncrementAttemptCount();
             observer.MessageAttemptStarted(record, attempt);
             var stopwatch = Stopwatch.StartNew();
@@ -106,9 +107,9 @@ public sealed class PendingMessageProcessor {
                 await repository.RemoveAsync(record.MessageId, cancellationToken).ConfigureAwait(false);
             } catch (OperationCanceledException ex) {
                 stopwatch.Stop();
-                observer.MessageFailed(record, attempt, ex, stopwatch.Elapsed, willRetry: false, retryDelay: null);
-                record.AttemptCount = attempt - 1;
+                record.ExchangeAttemptCount(originalAttemptCount);
                 record.NextAttemptAt = ApplyDelay(clock(), TimeSpan.Zero);
+                observer.MessageFailed(record, attempt, ex, stopwatch.Elapsed, willRetry: false, retryDelay: null);
                 try {
                     await repository.SaveAsync(record, CancellationToken.None).ConfigureAwait(false);
                 } catch (Exception saveEx) {
