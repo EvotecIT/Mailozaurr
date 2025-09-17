@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -57,6 +58,86 @@ public sealed class PendingMessageProcessorTests {
         }
     }
 
+    private sealed class RecordingObserver : IPendingMessageProcessorObserver {
+        public List<(PendingMessageRecord Record, PendingMessageSkipReason Reason)> Skipped { get; } = new();
+        public List<(PendingMessageRecord Record, int Attempt)> Started { get; } = new();
+        public List<(PendingMessageRecord Record, int Attempt, TimeSpan Duration)> Sent { get; } = new();
+        public List<MessageFailureEvent> Failed { get; } = new();
+        public List<MessageDropEvent> Dropped { get; } = new();
+
+        public void MessageSkipped(PendingMessageRecord record, PendingMessageSkipReason reason) {
+            Skipped.Add((record, reason));
+        }
+
+        public void MessageAttemptStarted(PendingMessageRecord record, int attempt) {
+            Started.Add((record, attempt));
+        }
+
+        public void MessageSent(PendingMessageRecord record, int attempt, TimeSpan duration) {
+            Sent.Add((record, attempt, duration));
+        }
+
+        public void MessageFailed(
+            PendingMessageRecord record,
+            int attempt,
+            Exception exception,
+            TimeSpan duration,
+            bool willRetry,
+            TimeSpan? retryDelay) {
+            Failed.Add(new MessageFailureEvent(record, attempt, exception, duration, willRetry, retryDelay));
+        }
+
+        public void MessageDropped(
+            PendingMessageRecord record,
+            int attempt,
+            PendingMessageDropReason reason,
+            Exception? exception) {
+            Dropped.Add(new MessageDropEvent(record, attempt, reason, exception));
+        }
+
+        public sealed class MessageFailureEvent {
+            public MessageFailureEvent(
+                PendingMessageRecord record,
+                int attempt,
+                Exception exception,
+                TimeSpan duration,
+                bool willRetry,
+                TimeSpan? retryDelay) {
+                Record = record;
+                Attempt = attempt;
+                Exception = exception;
+                Duration = duration;
+                WillRetry = willRetry;
+                RetryDelay = retryDelay;
+            }
+
+            public PendingMessageRecord Record { get; }
+            public int Attempt { get; }
+            public Exception Exception { get; }
+            public TimeSpan Duration { get; }
+            public bool WillRetry { get; }
+            public TimeSpan? RetryDelay { get; }
+        }
+
+        public sealed class MessageDropEvent {
+            public MessageDropEvent(
+                PendingMessageRecord record,
+                int attempt,
+                PendingMessageDropReason reason,
+                Exception? exception) {
+                Record = record;
+                Attempt = attempt;
+                Reason = reason;
+                Exception = exception;
+            }
+
+            public PendingMessageRecord Record { get; }
+            public int Attempt { get; }
+            public PendingMessageDropReason Reason { get; }
+            public Exception? Exception { get; }
+        }
+    }
+
     private static PendingMessageRecord CreateRecord(DateTimeOffset nextAttempt, string? messageId = null) => new() {
         MessageId = messageId ?? Guid.NewGuid().ToString("N"),
         Timestamp = nextAttempt,
@@ -71,6 +152,7 @@ public sealed class PendingMessageProcessorTests {
         var record = CreateRecord(currentTime.AddMinutes(-5));
         repository.Add(record);
         var sender = new RecordingPendingMessageSender();
+        var observer = new RecordingObserver();
         var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
             { EmailProvider.None, sender }
         });
@@ -78,13 +160,19 @@ public sealed class PendingMessageProcessorTests {
             repository,
             factory,
             retryDelaySelector: _ => TimeSpan.FromMinutes(1),
-            clock: () => currentTime);
+            clock: () => currentTime,
+            observer: observer);
 
         await processor.ProcessAsync();
 
         Assert.False(repository.Contains(record.MessageId));
         Assert.Single(sender.SentRecords);
         Assert.Equal(1, sender.SentRecords[0].AttemptCount);
+        Assert.Single(observer.Started);
+        Assert.Single(observer.Sent);
+        Assert.Empty(observer.Failed);
+        Assert.Equal(1, observer.Started[0].Attempt);
+        Assert.True(observer.Sent[0].Duration >= TimeSpan.Zero);
     }
 
     [Fact]
@@ -98,6 +186,7 @@ public sealed class PendingMessageProcessorTests {
             ExceptionToThrow = new Exception("Send failure")
         };
         var delay = TimeSpan.FromMinutes(15);
+        var observer = new RecordingObserver();
         var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
             { EmailProvider.None, sender }
         });
@@ -105,7 +194,8 @@ public sealed class PendingMessageProcessorTests {
             repository,
             factory,
             retryDelaySelector: _ => delay,
-            clock: () => currentTime);
+            clock: () => currentTime,
+            observer: observer);
 
         await processor.ProcessAsync();
 
@@ -114,6 +204,10 @@ public sealed class PendingMessageProcessorTests {
         Assert.True(repository.Contains(record.MessageId));
         Assert.Equal(1, stored!.AttemptCount);
         Assert.Equal(currentTime + delay, stored.NextAttemptAt);
+        var failure = Assert.Single(observer.Failed);
+        Assert.True(failure.WillRetry);
+        Assert.True(failure.RetryDelay.HasValue);
+        Assert.Equal(delay, failure.RetryDelay.Value);
     }
 
     [Fact]
@@ -123,6 +217,7 @@ public sealed class PendingMessageProcessorTests {
         var record = CreateRecord(currentTime.AddMinutes(10));
         repository.Add(record);
         var sender = new RecordingPendingMessageSender();
+        var observer = new RecordingObserver();
         var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
             { EmailProvider.None, sender }
         });
@@ -130,7 +225,8 @@ public sealed class PendingMessageProcessorTests {
             repository,
             factory,
             retryDelaySelector: _ => TimeSpan.FromMinutes(5),
-            clock: () => currentTime);
+            clock: () => currentTime,
+            observer: observer);
 
         await processor.ProcessAsync();
 
@@ -140,6 +236,8 @@ public sealed class PendingMessageProcessorTests {
         Assert.Equal(0, stored!.AttemptCount);
         Assert.Empty(sender.SentRecords);
         Assert.Equal(record.NextAttemptAt, stored.NextAttemptAt);
+        Assert.Single(observer.Skipped);
+        Assert.Equal(PendingMessageSkipReason.NotDue, observer.Skipped[0].Reason);
     }
 
     [Fact]
@@ -151,10 +249,11 @@ public sealed class PendingMessageProcessorTests {
         repository.Add(invalid);
         repository.Add(valid);
         var sender = new RecordingPendingMessageSender();
+        var observer = new RecordingObserver();
         var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
             { EmailProvider.None, sender }
         });
-        var processor = new PendingMessageProcessor(repository, factory, clock: () => currentTime);
+        var processor = new PendingMessageProcessor(repository, factory, clock: () => currentTime, observer: observer);
 
         await processor.ProcessAsync();
 
@@ -162,6 +261,8 @@ public sealed class PendingMessageProcessorTests {
         Assert.False(repository.Contains(valid.MessageId));
         Assert.Single(sender.SentRecords);
         Assert.Equal(valid.MessageId, sender.SentRecords[0].MessageId);
+        Assert.Single(observer.Skipped);
+        Assert.Equal(PendingMessageSkipReason.MissingMessageId, observer.Skipped[0].Reason);
     }
 
     [Fact]
@@ -174,15 +275,21 @@ public sealed class PendingMessageProcessorTests {
             ShouldThrow = true,
             ExceptionToThrow = new InvalidOperationException("Permanent failure")
         };
+        var observer = new RecordingObserver();
         var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
             { EmailProvider.None, sender }
         });
-        var processor = new PendingMessageProcessor(repository, factory, clock: () => currentTime);
+        var processor = new PendingMessageProcessor(repository, factory, clock: () => currentTime, observer: observer);
 
         await processor.ProcessAsync();
 
         Assert.False(repository.Contains(record.MessageId));
         Assert.Single(sender.SentRecords);
+        var failure = Assert.Single(observer.Failed);
+        Assert.False(failure.WillRetry);
+        Assert.Null(failure.RetryDelay);
+        var drop = Assert.Single(observer.Dropped);
+        Assert.Equal(PendingMessageDropReason.PermanentFailure, drop.Reason);
     }
 
     [Fact]
@@ -218,16 +325,20 @@ public sealed class PendingMessageProcessorTests {
         record.AttemptCount = 5;
         repository.Add(record);
         var sender = new RecordingPendingMessageSender();
+        var observer = new RecordingObserver();
         var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
             { EmailProvider.None, sender }
         });
-        var processor = new PendingMessageProcessor(repository, factory, clock: () => currentTime, maxRetryAttempts: 5);
+        var processor = new PendingMessageProcessor(repository, factory, clock: () => currentTime, maxRetryAttempts: 5, observer: observer);
 
         await processor.ProcessAsync();
 
         Assert.False(repository.Contains(record.MessageId));
         Assert.Empty(sender.SentRecords);
         Assert.Equal(5, record.AttemptCount);
+        Assert.Single(observer.Dropped);
+        Assert.Equal(PendingMessageDropReason.RetryLimitReached, observer.Dropped[0].Reason);
+        Assert.Equal(5, observer.Dropped[0].Attempt);
     }
 
     [Fact]
@@ -241,6 +352,7 @@ public sealed class PendingMessageProcessorTests {
             ShouldThrow = true,
             ExceptionToThrow = new Exception("Transient failure")
         };
+        var observer = new RecordingObserver();
         var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
             { EmailProvider.None, sender }
         });
@@ -249,12 +361,82 @@ public sealed class PendingMessageProcessorTests {
             factory,
             retryDelaySelector: _ => TimeSpan.FromMinutes(5),
             clock: () => currentTime,
-            maxRetryAttempts: 5);
+            maxRetryAttempts: 5,
+            observer: observer);
 
         await processor.ProcessAsync();
 
         Assert.False(repository.Contains(record.MessageId));
         Assert.Single(sender.SentRecords);
         Assert.Equal(5, record.AttemptCount);
+        var failure = Assert.Single(observer.Failed);
+        Assert.False(failure.WillRetry);
+        Assert.Null(failure.RetryDelay);
+        var drop = Assert.Single(observer.Dropped);
+        Assert.Equal(PendingMessageDropReason.RetryLimitReached, drop.Reason);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_UsesCustomPermanentFailureDetector() {
+        var currentTime = DateTimeOffset.Parse("2024-06-09T12:00:00Z");
+        var repository = new InMemoryPendingMessageRepository();
+        var record = CreateRecord(currentTime.AddMinutes(-1));
+        repository.Add(record);
+        var sender = new RecordingPendingMessageSender {
+            ShouldThrow = true,
+            ExceptionToThrow = new HttpRequestException("Unrecoverable remote error")
+        };
+        var observer = new RecordingObserver();
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            { EmailProvider.None, sender }
+        });
+        var processor = new PendingMessageProcessor(
+            repository,
+            factory,
+            clock: () => currentTime,
+            observer: observer,
+            permanentFailureDetector: ex => ex is HttpRequestException);
+
+        await processor.ProcessAsync();
+
+        Assert.False(repository.Contains(record.MessageId));
+        var failure = Assert.Single(observer.Failed);
+        Assert.False(failure.WillRetry);
+        Assert.Null(failure.RetryDelay);
+        var drop = Assert.Single(observer.Dropped);
+        Assert.Equal(PendingMessageDropReason.PermanentFailure, drop.Reason);
+        Assert.IsType<HttpRequestException>(drop.Exception);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_NormalizesNegativeRetryDelayToZero() {
+        var currentTime = DateTimeOffset.Parse("2024-06-10T10:15:00Z");
+        var repository = new InMemoryPendingMessageRepository();
+        var record = CreateRecord(currentTime.AddMinutes(-1));
+        repository.Add(record);
+        var sender = new RecordingPendingMessageSender {
+            ShouldThrow = true,
+            ExceptionToThrow = new Exception("Transient")
+        };
+        var observer = new RecordingObserver();
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            { EmailProvider.None, sender }
+        });
+        var processor = new PendingMessageProcessor(
+            repository,
+            factory,
+            retryDelaySelector: _ => TimeSpan.FromMinutes(-5),
+            clock: () => currentTime,
+            observer: observer,
+            maxRetryAttempts: 3);
+
+        await processor.ProcessAsync();
+
+        var stored = await repository.GetByMessageIdAsync(record.MessageId);
+        Assert.NotNull(stored);
+        Assert.Equal(currentTime, stored!.NextAttemptAt);
+        var failure = Assert.Single(observer.Failed);
+        Assert.True(failure.RetryDelay.HasValue);
+        Assert.Equal(TimeSpan.Zero, failure.RetryDelay.Value);
     }
 }
