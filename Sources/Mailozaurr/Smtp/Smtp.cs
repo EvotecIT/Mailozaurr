@@ -711,18 +711,7 @@ public class Smtp {
                 if (!string.IsNullOrWhiteSpace(server)) {
                     Connect(server, port);
                     if (!string.IsNullOrEmpty(record.UserName)) {
-                        var pwd = string.Empty;
-                        if (!string.IsNullOrEmpty(record.Password)) {
-                            try {
-                                var data = Convert.FromBase64String(record.Password);
-                                var unprotected = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                                    ? ProtectedData.Unprotect(data, null, DataProtectionScope.CurrentUser)
-                                    : data;
-                                pwd = Encoding.UTF8.GetString(unprotected);
-                            } catch {
-                                pwd = string.Empty;
-                            }
-                        }
+                        var pwd = CredentialProtection.UnprotectWithFallback(record.Password);
                         var cred = Helpers.ConvertFromPlainText(record.UserName, pwd);
                         Authenticate(cred);
                     }
@@ -775,6 +764,8 @@ public class Smtp {
     private async Task<SmtpResult> SendCoreAsync(CancellationToken cancellationToken = default) {
         int attempts = 0;
         Exception? lastException = null;
+        var credentialProtector = CredentialProtection.Default;
+
         do {
             try {
                 await Client.SendAsync(Message, cancellationToken);
@@ -821,10 +812,7 @@ public class Smtp {
                             UserName = Credential?.UserName,
                             Password = string.IsNullOrEmpty(Credential?.Password)
                                 ? null
-                                : Convert.ToBase64String(
-                                    RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                                        ? ProtectedData.Protect(Encoding.UTF8.GetBytes(Credential!.Password), null, DataProtectionScope.CurrentUser)
-                                        : Encoding.UTF8.GetBytes(Credential!.Password))
+                                : credentialProtector.Protect(Credential!.Password)
                         };
                         await PendingMessageRepository.SaveAsync(record, cancellationToken);
                     }
@@ -861,10 +849,7 @@ public class Smtp {
                 UserName = Credential?.UserName,
                 Password = string.IsNullOrEmpty(Credential?.Password)
                     ? null
-                    : Convert.ToBase64String(
-                        RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                            ? ProtectedData.Protect(Encoding.UTF8.GetBytes(Credential!.Password), null, DataProtectionScope.CurrentUser)
-                            : Encoding.UTF8.GetBytes(Credential!.Password))
+                    : credentialProtector.Protect(Credential!.Password)
             };
             await PendingMessageRepository.SaveAsync(record, cancellationToken);
         }
