@@ -58,6 +58,20 @@ public sealed class PendingMessageProcessorTests {
         }
     }
 
+    private sealed class CancellingPendingMessageSender : IPendingMessageSender {
+        private readonly CancellationTokenSource cts;
+
+        public CancellingPendingMessageSender(CancellationTokenSource cts) {
+            this.cts = cts;
+        }
+
+        public Task SendAsync(PendingMessageRecord record, CancellationToken ct) {
+            cts.Cancel();
+            ct.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class RecordingObserver : IPendingMessageProcessorObserver {
         public List<(PendingMessageRecord Record, PendingMessageSkipReason Reason)> Skipped { get; } = new();
         public List<(PendingMessageRecord Record, int Attempt)> Started { get; } = new();
@@ -156,18 +170,21 @@ public sealed class PendingMessageProcessorTests {
         var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
             { EmailProvider.None, sender }
         });
+        var lease = TimeSpan.FromMinutes(2);
         var processor = new PendingMessageProcessor(
             repository,
             factory,
             retryDelaySelector: _ => TimeSpan.FromMinutes(1),
             clock: () => currentTime,
-            observer: observer);
+            observer: observer,
+            processingLeaseDuration: lease);
 
         await processor.ProcessAsync();
 
         Assert.False(repository.Contains(record.MessageId));
         Assert.Single(sender.SentRecords);
         Assert.Equal(1, sender.SentRecords[0].AttemptCount);
+        Assert.Equal(currentTime + lease, sender.SentRecords[0].NextAttemptAt);
         Assert.Single(observer.Started);
         Assert.Single(observer.Sent);
         Assert.Empty(observer.Failed);
@@ -208,6 +225,27 @@ public sealed class PendingMessageProcessorTests {
         Assert.True(failure.WillRetry);
         Assert.True(failure.RetryDelay.HasValue);
         Assert.Equal(delay, failure.RetryDelay.Value);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_ReleasesLeaseWhenCancelled() {
+        var currentTime = DateTimeOffset.Parse("2024-07-01T09:00:00Z");
+        var repository = new InMemoryPendingMessageRepository();
+        var record = CreateRecord(currentTime.AddMinutes(-1));
+        repository.Add(record);
+        using var cts = new CancellationTokenSource();
+        var sender = new CancellingPendingMessageSender(cts);
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            { EmailProvider.None, sender }
+        });
+        var processor = new PendingMessageProcessor(repository, factory, clock: () => currentTime);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => processor.ProcessAsync(cts.Token));
+
+        var stored = await repository.GetByMessageIdAsync(record.MessageId);
+        Assert.NotNull(stored);
+        Assert.Equal(0, stored!.AttemptCount);
+        Assert.Equal(currentTime, stored.NextAttemptAt);
     }
 
     [Fact]

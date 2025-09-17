@@ -17,6 +17,7 @@ public sealed class PendingMessageProcessor {
     private readonly InternalLogger? logger;
     private readonly IPendingMessageProcessorObserver observer;
     private readonly Func<Exception, bool> permanentFailureDetector;
+    private readonly TimeSpan processingLeaseDuration;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PendingMessageProcessor"/> class.
@@ -29,6 +30,7 @@ public sealed class PendingMessageProcessor {
     /// <param name="logger">Optional logger used to record processing diagnostics.</param>
     /// <param name="observer">Optional observer used to emit telemetry about processing outcomes.</param>
     /// <param name="permanentFailureDetector">Optional delegate that classifies whether a failure should skip retries.</param>
+    /// <param name="processingLeaseDuration">Optional duration used to lease records while they are being processed to avoid concurrent handling.</param>
     public PendingMessageProcessor(
         IPendingMessageRepository repository,
         PendingMessageSenderFactory? senderFactory = null,
@@ -37,7 +39,8 @@ public sealed class PendingMessageProcessor {
         int maxRetryAttempts = 5,
         InternalLogger? logger = null,
         IPendingMessageProcessorObserver? observer = null,
-        Func<Exception, bool>? permanentFailureDetector = null) {
+        Func<Exception, bool>? permanentFailureDetector = null,
+        TimeSpan? processingLeaseDuration = null) {
         this.repository = repository ?? throw new ArgumentNullException(nameof(repository));
         this.senderFactory = senderFactory ?? new PendingMessageSenderFactory();
         this.retryDelaySelector = retryDelaySelector ?? DefaultRetryDelaySelector;
@@ -50,6 +53,12 @@ public sealed class PendingMessageProcessor {
         this.logger = logger;
         this.observer = observer ?? NullPendingMessageProcessorObserver.Instance;
         this.permanentFailureDetector = permanentFailureDetector ?? DefaultPermanentFailureDetector;
+        processingLeaseDuration ??= TimeSpan.FromMinutes(1);
+        if (processingLeaseDuration < TimeSpan.Zero) {
+            throw new ArgumentOutOfRangeException(nameof(processingLeaseDuration), "Processing lease duration cannot be negative.");
+        }
+
+        this.processingLeaseDuration = processingLeaseDuration.Value;
     }
 
     /// <summary>
@@ -83,12 +92,14 @@ public sealed class PendingMessageProcessor {
                 continue;
             }
 
-            var sender = senderFactory.GetSender(record);
+            await AcquireProcessingLeaseAsync(record, now, cancellationToken).ConfigureAwait(false);
+
             var attempt = record.IncrementAttemptCount();
             observer.MessageAttemptStarted(record, attempt);
             var stopwatch = Stopwatch.StartNew();
 
             try {
+                var sender = senderFactory.GetSender(record);
                 await sender.SendAsync(record, cancellationToken).ConfigureAwait(false);
                 stopwatch.Stop();
                 observer.MessageSent(record, attempt, stopwatch.Elapsed);
@@ -97,6 +108,12 @@ public sealed class PendingMessageProcessor {
                 stopwatch.Stop();
                 observer.MessageFailed(record, attempt, ex, stopwatch.Elapsed, willRetry: false, retryDelay: null);
                 record.AttemptCount = attempt - 1;
+                record.NextAttemptAt = ApplyDelay(clock(), TimeSpan.Zero);
+                try {
+                    await repository.SaveAsync(record, CancellationToken.None).ConfigureAwait(false);
+                } catch (Exception saveEx) {
+                    logger?.WriteWarning($"Failed to release processing lease for message {record.MessageId} after cancellation: {saveEx.Message}");
+                }
                 throw;
             } catch (Exception ex) {
                 stopwatch.Stop();
@@ -105,7 +122,8 @@ public sealed class PendingMessageProcessor {
                 TimeSpan? delay = null;
                 if (willRetry) {
                     delay = NormalizeDelay(retryDelaySelector(attempt));
-                    record.NextAttemptAt = now + delay.Value;
+                    var failureTime = clock();
+                    record.NextAttemptAt = ApplyDelay(failureTime, delay.Value);
                 }
 
                 observer.MessageFailed(record, attempt, ex, stopwatch.Elapsed, willRetry, delay);
@@ -121,6 +139,15 @@ public sealed class PendingMessageProcessor {
                 await repository.SaveAsync(record, cancellationToken).ConfigureAwait(false);
             }
         }
+    }
+
+    private async Task AcquireProcessingLeaseAsync(PendingMessageRecord record, DateTimeOffset now, CancellationToken cancellationToken) {
+        if (processingLeaseDuration == TimeSpan.Zero) {
+            return;
+        }
+
+        record.NextAttemptAt = ApplyDelay(now, processingLeaseDuration);
+        await repository.SaveAsync(record, cancellationToken).ConfigureAwait(false);
     }
 
     private static TimeSpan DefaultRetryDelaySelector(int attempt) {
@@ -140,6 +167,19 @@ public sealed class PendingMessageProcessor {
 
     private static bool DefaultPermanentFailureDetector(Exception exception) =>
         exception is InvalidOperationException or ArgumentException;
+
+    private static DateTimeOffset ApplyDelay(DateTimeOffset reference, TimeSpan delay) {
+        if (delay <= TimeSpan.Zero) {
+            return reference;
+        }
+
+        var maxIncrement = DateTimeOffset.MaxValue - reference;
+        if (delay > maxIncrement) {
+            return DateTimeOffset.MaxValue;
+        }
+
+        return reference + delay;
+    }
 
     private sealed class NullPendingMessageProcessorObserver : IPendingMessageProcessorObserver {
         internal static NullPendingMessageProcessorObserver Instance { get; } = new();
