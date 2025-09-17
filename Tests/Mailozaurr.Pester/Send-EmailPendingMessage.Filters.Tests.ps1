@@ -1,3 +1,26 @@
+$script:FilterSenderReferencedAssemblies = $null
+
+function Get-FilterSenderReferencedAssemblies {
+    if ($null -eq $script:FilterSenderReferencedAssemblies) {
+        $sharedRoot = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.dotnet/shared/Microsoft.NETCore.App'
+        $runtimeVersion = Get-ChildItem -Path $sharedRoot -Directory | Sort-Object Name -Descending | Select-Object -First 1
+        if (-not $runtimeVersion) {
+            throw 'Unable to locate .NET runtime assemblies required for Add-Type.'
+        }
+
+        $runtimePath = $runtimeVersion.FullName
+        $script:FilterSenderReferencedAssemblies = @(
+            [Mailozaurr.PendingMessageRecord].Assembly.Location,
+            (Join-Path $runtimePath 'System.Private.CoreLib.dll'),
+            (Join-Path $runtimePath 'System.Runtime.dll'),
+            (Join-Path $runtimePath 'System.Collections.dll'),
+            (Join-Path $runtimePath 'System.Collections.Concurrent.dll')
+        )
+    }
+
+    return $script:FilterSenderReferencedAssemblies
+}
+
 function global:New-PendingRecord {
     param(
         [Mailozaurr.EmailProvider]$Provider,
@@ -36,31 +59,19 @@ Describe 'Send-EmailPendingMessage provider and message filters' {
         }
 
         if (-not ('FilterRecordingPendingMessageSender' -as [type])) {
-            $sharedRoot = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.dotnet/shared/Microsoft.NETCore.App'
-            $runtimeVersion = Get-ChildItem -Path $sharedRoot -Directory | Sort-Object Name -Descending | Select-Object -First 1
-            if (-not $runtimeVersion) {
-                throw 'Unable to locate .NET runtime assemblies required for Add-Type.'
-            }
-
-            $runtimePath = $runtimeVersion.FullName
-            $assemblies = @(
-                [Mailozaurr.PendingMessageRecord].Assembly.Location,
-                (Join-Path $runtimePath 'System.Private.CoreLib.dll'),
-                (Join-Path $runtimePath 'System.Runtime.dll'),
-                (Join-Path $runtimePath 'System.Collections.dll')
-            )
+            $assemblies = Get-FilterSenderReferencedAssemblies
 
             Add-Type -ReferencedAssemblies $assemblies -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
 using System;
-using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using Mailozaurr;
 
 public sealed class FilterRecordingPendingMessageSender : IPendingMessageSender {
     private readonly EmailProvider provider;
-    private static readonly Hashtable Processed = new();
+    private static readonly ConcurrentDictionary<EmailProvider, ConcurrentBag<string>> Processed = new();
 
     public FilterRecordingPendingMessageSender(EmailProvider provider) {
         this.provider = provider;
@@ -69,22 +80,16 @@ public sealed class FilterRecordingPendingMessageSender : IPendingMessageSender 
     public static void Reset() => Processed.Clear();
 
     public static string[] GetProcessedMessageIds(EmailProvider provider) {
-        if (Processed[provider] is ArrayList list) {
-            var result = new string[list.Count];
-            list.CopyTo(result, 0);
-            return result;
+        if (Processed.TryGetValue(provider, out var records)) {
+            return records.ToArray();
         }
 
         return Array.Empty<string>();
     }
 
     public Task SendAsync(PendingMessageRecord record, CancellationToken ct) {
-        if (Processed[provider] is not ArrayList list) {
-            list = new ArrayList();
-            Processed[provider] = list;
-        }
-
-        list.Add(record.MessageId ?? string.Empty);
+        var messages = Processed.GetOrAdd(provider, _ => new ConcurrentBag<string>());
+        messages.Add(record.MessageId ?? string.Empty);
 
         return Task.CompletedTask;
     }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
@@ -9,7 +10,7 @@ namespace Mailozaurr.Tests;
 
 public sealed class PendingMessageProcessorTests {
     private sealed class InMemoryPendingMessageRepository : IPendingMessageRepository {
-        private readonly Dictionary<string, PendingMessageRecord> records = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, PendingMessageRecord> records = new(StringComparer.OrdinalIgnoreCase);
 
         public void Add(PendingMessageRecord record) {
             records[record.MessageId] = record;
@@ -22,13 +23,12 @@ public sealed class PendingMessageProcessorTests {
 
         public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) {
             records.TryGetValue(messageId, out var record);
-            PendingMessageRecord? result = record;
-            return Task.FromResult<PendingMessageRecord?>(result);
+            return Task.FromResult(record);
         }
 
         public async IAsyncEnumerable<PendingMessageRecord> GetAllAsync(
             [EnumeratorCancellation] CancellationToken cancellationToken = default) {
-            foreach (var record in records.Values.ToList()) {
+            foreach (var record in records.Values) {
                 cancellationToken.ThrowIfCancellationRequested();
                 yield return record;
                 await Task.Yield();
@@ -36,7 +36,7 @@ public sealed class PendingMessageProcessorTests {
         }
 
         public Task RemoveAsync(string messageId, CancellationToken cancellationToken = default) {
-            records.Remove(messageId);
+            records.TryRemove(messageId, out _);
             return Task.CompletedTask;
         }
 

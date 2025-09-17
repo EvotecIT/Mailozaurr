@@ -4,8 +4,15 @@ $notificationSender = 'mailer@example.com'
 $smtpServer = 'smtp.office365.com'
 $notificationSubject = 'Mailozaurr pending message queue failure'
 
+if ($NotificationCredential -and $NotificationCredential -isnot [pscredential]) {
+    throw 'NotificationCredential must be a PSCredential instance.'
+}
+
 if (-not $NotificationCredential) {
     $NotificationCredential = Get-Credential -Message 'Provide SMTP credentials used for failure notifications'
+    if (-not $NotificationCredential) {
+        throw 'SMTP credentials are required for failure notifications'
+    }
 }
 
 $notificationParameters = @{
@@ -22,10 +29,12 @@ try {
     Send-EmailPendingMessage -PendingMessagesPath $pending -ProcessAll
 } catch {
     $timestamp = Get-Date -Format o
+    $rawMessage = if ($_.Exception) { $_.Exception.ToString() } else { $_ | Out-String }
+    $sanitizedMessage = $rawMessage -replace '(?i)(password|token|key|secret)=\S+', '$1=***'
     $body = @"
 Processing of the pending message queue failed at $timestamp.
 
-$($_.Exception.Message)
+$sanitizedMessage
 "@
     Send-EmailMessage @notificationParameters -Body $body
     throw
