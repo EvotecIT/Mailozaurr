@@ -1,4 +1,3 @@
-#if !WINDOWS
 using System;
 using System.IO;
 using System.Security.Cryptography;
@@ -83,4 +82,3 @@ internal sealed class AesCredentialProtector : ICredentialProtector {
         return newKey;
     }
 }
-#endif

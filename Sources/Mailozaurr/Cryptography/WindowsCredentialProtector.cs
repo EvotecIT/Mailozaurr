@@ -1,4 +1,3 @@
-#if WINDOWS
 using System;
 using System.Security.Cryptography;
 using System.Text;
@@ -26,4 +25,3 @@ internal sealed class WindowsCredentialProtector : ICredentialProtector {
         return Encoding.UTF8.GetString(plaintextBytes);
     }
 }
-#endif

@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -88,10 +89,10 @@ public static class CredentialProtection {
     }
 
     private static ICredentialProtector CreateDefaultProtector() {
-#if WINDOWS
-        return new WindowsCredentialProtector();
-#else
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
+            return new WindowsCredentialProtector();
+        }
+
         return new AesCredentialProtector();
-#endif
     }
 }
