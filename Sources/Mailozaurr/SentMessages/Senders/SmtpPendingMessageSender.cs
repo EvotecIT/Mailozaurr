@@ -1,7 +1,4 @@
 using System.Globalization;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace Mailozaurr;
 
@@ -21,6 +18,7 @@ public sealed class SmtpPendingMessageSender : IPendingMessageSender {
     private readonly bool defaultSkipCertificateValidation;
     private readonly bool defaultCheckCertificateRevocation;
     private readonly int? defaultTimeout;
+    private readonly ICredentialProtector credentialProtector;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SmtpPendingMessageSender"/> class.
@@ -37,13 +35,15 @@ public sealed class SmtpPendingMessageSender : IPendingMessageSender {
         bool useSsl = false,
         bool skipCertificateValidation = false,
         bool checkCertificateRevocation = true,
-        int? timeout = null) {
+        int? timeout = null,
+        ICredentialProtector? credentialProtector = null) {
         this.clientFactory = clientFactory ?? (() => Smtp.ClientFactory(null));
         defaultSecureSocketOptions = secureSocketOptions;
         defaultUseSsl = useSsl;
         defaultSkipCertificateValidation = skipCertificateValidation;
         defaultCheckCertificateRevocation = checkCertificateRevocation;
         defaultTimeout = timeout;
+        this.credentialProtector = credentialProtector ?? CredentialProtection.Default;
     }
 
     /// <inheritdoc />
@@ -138,14 +138,5 @@ public sealed class SmtpPendingMessageSender : IPendingMessageSender {
         return defaultValue;
     }
 
-    private static string DecodePassword(string? password) {
-        if (string.IsNullOrEmpty(password)) {
-            return string.Empty;
-        }
-        byte[] data = Convert.FromBase64String(password);
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
-            data = ProtectedData.Unprotect(data, null, DataProtectionScope.CurrentUser);
-        }
-        return Encoding.UTF8.GetString(data);
-    }
+    internal string DecodePassword(string? password) => CredentialProtection.UnprotectWithFallback(credentialProtector, password);
 }
