@@ -29,8 +29,14 @@ public sealed class FakePendingMessageSender : IPendingMessageSender {
 
 public static class FakePendingMessageSenderFactory {
     public static PendingMessageSenderFactory Create() {
-        var pair = new KeyValuePair<EmailProvider, IPendingMessageSender>(EmailProvider.None, new FakePendingMessageSender());
-        return new PendingMessageSenderFactory(new[] { pair });
+        var entries = new [] {
+            new KeyValuePair<EmailProvider, IPendingMessageSender>(EmailProvider.None, new FakePendingMessageSender()),
+            new KeyValuePair<EmailProvider, IPendingMessageSender>(EmailProvider.SendGrid, new FakePendingMessageSender()),
+            new KeyValuePair<EmailProvider, IPendingMessageSender>(EmailProvider.Mailgun, new FakePendingMessageSender()),
+            new KeyValuePair<EmailProvider, IPendingMessageSender>(EmailProvider.SES, new FakePendingMessageSender()),
+            new KeyValuePair<EmailProvider, IPendingMessageSender>(EmailProvider.Gmail, new FakePendingMessageSender()),
+        };
+        return new PendingMessageSenderFactory(entries);
     }
 }
 "@
@@ -115,6 +121,45 @@ public static class FakePendingMessageSenderFactory {
         $remaining = @(Get-EmailPendingMessage -PendingMessagesPath $path)
         $remaining.Count | Should -Be 1
         $remaining[0].Provider | Should -Be ([Mailozaurr.EmailProvider]::Gmail)
+    }
+
+    It 'Replays non-SMTP messages when filtered by provider' {
+        $path = Join-Path $TestDrive 'pending-api'
+        $options = [Mailozaurr.PendingMessageRepositoryOptions]::new()
+        $options.DirectoryPath = $path
+        $repo = [Mailozaurr.FilePendingMessageRepository]::new($options)
+
+        $message = [MimeKit.MimeMessage]::new()
+        $message.From.Add([MimeKit.MailboxAddress]::Parse('sender@example.com'))
+        $message.To.Add([MimeKit.MailboxAddress]::Parse('recipient@example.com'))
+        $message.Subject = 'queued'
+        $message.Body = [MimeKit.TextPart]::new('plain')
+        $buffer = [System.IO.MemoryStream]::new()
+        $message.WriteTo($buffer)
+        $payload = [Convert]::ToBase64String($buffer.ToArray())
+
+        $gmailRecord = [Mailozaurr.PendingMessageRecord]::new()
+        $gmailRecord.MessageId = [Guid]::NewGuid().ToString()
+        $gmailRecord.MimeMessage = $payload
+        $gmailRecord.Timestamp = [DateTimeOffset]::UtcNow
+        $gmailRecord.NextAttemptAt = [DateTimeOffset]::UtcNow
+        $gmailRecord.Provider = [Mailozaurr.EmailProvider]::Gmail
+        $repo.SaveAsync($gmailRecord).GetAwaiter().GetResult()
+
+        $sendGridRecord = [Mailozaurr.PendingMessageRecord]::new()
+        $sendGridRecord.MessageId = [Guid]::NewGuid().ToString()
+        $sendGridRecord.MimeMessage = $payload
+        $sendGridRecord.Timestamp = [DateTimeOffset]::UtcNow
+        $sendGridRecord.NextAttemptAt = [DateTimeOffset]::UtcNow
+        $sendGridRecord.Provider = [Mailozaurr.EmailProvider]::SendGrid
+        $repo.SaveAsync($sendGridRecord).GetAwaiter().GetResult()
+
+        Send-EmailPendingMessage -PendingMessagesPath $path -Provider ([Mailozaurr.EmailProvider]::Gmail)
+
+        [FakePendingMessageSender]::SendCount | Should -Be 1
+        $remaining = @(Get-EmailPendingMessage -PendingMessagesPath $path)
+        $remaining.Count | Should -Be 1
+        $remaining[0].Provider | Should -Be ([Mailozaurr.EmailProvider]::SendGrid)
     }
 
     It 'Honors schedule unless ProcessAll is specified' {

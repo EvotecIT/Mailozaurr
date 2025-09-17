@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 
 namespace Mailozaurr;
 
@@ -8,9 +9,11 @@ namespace Mailozaurr;
 public sealed class GmailPendingMessageSender : IPendingMessageSender {
     internal const string UserIdKey = "UserId";
     internal const string AccessTokenKey = "AccessToken";
+    internal const string AccessTokenBase64Key = "AccessTokenBase64";
     internal const string UserNameKey = "UserName";
     internal const string ExpiresOnKey = "ExpiresOn";
     internal const string RefreshTokenKey = "RefreshToken";
+    internal const string RefreshTokenBase64Key = "RefreshTokenBase64";
 
     private readonly Func<OAuthCredential, GmailApiClient> clientFactory;
 
@@ -30,11 +33,8 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
         if (!record.ProviderData.TryGetValue(UserIdKey, out var userId) || string.IsNullOrWhiteSpace(userId)) {
             throw new InvalidOperationException("Pending Gmail message is missing the user identifier.");
         }
-        if (!record.ProviderData.TryGetValue(AccessTokenKey, out var accessToken) || string.IsNullOrWhiteSpace(accessToken)) {
-            throw new InvalidOperationException("Pending Gmail message is missing an access token.");
-        }
-
         var message = await LoadMessageAsync(record, ct).ConfigureAwait(false);
+        var accessToken = ResolveAccessToken(record.ProviderData);
         var credential = BuildCredential(record.ProviderData, accessToken, userId);
         using var client = clientFactory(credential);
         _ = await client.SendAsync(userId, message, ct).ConfigureAwait(false);
@@ -57,10 +57,37 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
                 : userId,
             ExpiresOn = ResolveExpiration(providerData),
         };
-        if (providerData.TryGetValue(RefreshTokenKey, out var refreshToken) && !string.IsNullOrWhiteSpace(refreshToken)) {
+        var refreshToken = ResolveRefreshToken(providerData);
+        if (!string.IsNullOrEmpty(refreshToken)) {
             credential.RefreshToken = refreshToken;
         }
         return credential;
+    }
+
+    private static string ResolveAccessToken(Dictionary<string, string> providerData) {
+        if (providerData.TryGetValue(AccessTokenBase64Key, out var encoded) && !string.IsNullOrWhiteSpace(encoded)) {
+            var bytes = Convert.FromBase64String(encoded);
+            return Encoding.UTF8.GetString(bytes);
+        }
+
+        if (providerData.TryGetValue(AccessTokenKey, out var token) && !string.IsNullOrWhiteSpace(token)) {
+            return token;
+        }
+
+        throw new InvalidOperationException("Pending Gmail message is missing an access token.");
+    }
+
+    private static string? ResolveRefreshToken(Dictionary<string, string> providerData) {
+        if (providerData.TryGetValue(RefreshTokenBase64Key, out var encoded) && !string.IsNullOrWhiteSpace(encoded)) {
+            var bytes = Convert.FromBase64String(encoded);
+            return Encoding.UTF8.GetString(bytes);
+        }
+
+        if (providerData.TryGetValue(RefreshTokenKey, out var token) && !string.IsNullOrWhiteSpace(token)) {
+            return token;
+        }
+
+        return null;
     }
 
     private static DateTimeOffset ResolveExpiration(Dictionary<string, string> providerData) {
