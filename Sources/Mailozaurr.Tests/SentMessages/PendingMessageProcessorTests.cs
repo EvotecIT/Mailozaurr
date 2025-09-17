@@ -22,7 +22,7 @@ public sealed class PendingMessageProcessorTests {
         public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) {
             records.TryGetValue(messageId, out var record);
             PendingMessageRecord? result = record;
-            return Task.FromResult(result);
+            return Task.FromResult<PendingMessageRecord?>(result);
         }
 
         public async IAsyncEnumerable<PendingMessageRecord> GetAllAsync(
@@ -57,8 +57,8 @@ public sealed class PendingMessageProcessorTests {
         }
     }
 
-    private static PendingMessageRecord CreateRecord(DateTimeOffset nextAttempt) => new() {
-        MessageId = Guid.NewGuid().ToString("N"),
+    private static PendingMessageRecord CreateRecord(DateTimeOffset nextAttempt, string? messageId = null) => new() {
+        MessageId = messageId ?? Guid.NewGuid().ToString("N"),
         Timestamp = nextAttempt,
         NextAttemptAt = nextAttempt,
         Provider = EmailProvider.None
@@ -93,7 +93,10 @@ public sealed class PendingMessageProcessorTests {
         var repository = new InMemoryPendingMessageRepository();
         var record = CreateRecord(currentTime);
         repository.Add(record);
-        var sender = new RecordingPendingMessageSender { ShouldThrow = true };
+        var sender = new RecordingPendingMessageSender {
+            ShouldThrow = true,
+            ExceptionToThrow = new Exception("Send failure")
+        };
         var delay = TimeSpan.FromMinutes(15);
         var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
             { EmailProvider.None, sender }
@@ -137,5 +140,121 @@ public sealed class PendingMessageProcessorTests {
         Assert.Equal(0, stored!.AttemptCount);
         Assert.Empty(sender.SentRecords);
         Assert.Equal(record.NextAttemptAt, stored.NextAttemptAt);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_SkipsRecordsWithMissingMessageId() {
+        var currentTime = DateTimeOffset.Parse("2024-06-04T10:00:00Z");
+        var repository = new InMemoryPendingMessageRepository();
+        var invalid = CreateRecord(currentTime.AddMinutes(-2), string.Empty);
+        var valid = CreateRecord(currentTime.AddMinutes(-2));
+        repository.Add(invalid);
+        repository.Add(valid);
+        var sender = new RecordingPendingMessageSender();
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            { EmailProvider.None, sender }
+        });
+        var processor = new PendingMessageProcessor(repository, factory, clock: () => currentTime);
+
+        await processor.ProcessAsync();
+
+        Assert.True(repository.Contains(string.Empty));
+        Assert.False(repository.Contains(valid.MessageId));
+        Assert.Single(sender.SentRecords);
+        Assert.Equal(valid.MessageId, sender.SentRecords[0].MessageId);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_RemovesRecordWhenPermanentFailureOccurs() {
+        var currentTime = DateTimeOffset.Parse("2024-06-05T09:30:00Z");
+        var repository = new InMemoryPendingMessageRepository();
+        var record = CreateRecord(currentTime.AddMinutes(-1));
+        repository.Add(record);
+        var sender = new RecordingPendingMessageSender {
+            ShouldThrow = true,
+            ExceptionToThrow = new InvalidOperationException("Permanent failure")
+        };
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            { EmailProvider.None, sender }
+        });
+        var processor = new PendingMessageProcessor(repository, factory, clock: () => currentTime);
+
+        await processor.ProcessAsync();
+
+        Assert.False(repository.Contains(record.MessageId));
+        Assert.Single(sender.SentRecords);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_StopsAfterCancellation() {
+        var currentTime = DateTimeOffset.Parse("2024-06-06T07:15:00Z");
+        var repository = new InMemoryPendingMessageRepository();
+        var first = CreateRecord(currentTime.AddMinutes(-1));
+        var second = CreateRecord(currentTime.AddMinutes(-1));
+        repository.Add(first);
+        repository.Add(second);
+        var sender = new RecordingPendingMessageSender();
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            { EmailProvider.None, sender }
+        });
+        var processor = new PendingMessageProcessor(repository, factory, clock: () => currentTime);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => processor.ProcessAsync(cts.Token));
+
+        Assert.Empty(sender.SentRecords);
+        Assert.True(repository.Contains(first.MessageId));
+        Assert.True(repository.Contains(second.MessageId));
+        Assert.Equal(0, first.AttemptCount);
+        Assert.Equal(0, second.AttemptCount);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_RemovesRecordsThatExceededRetryLimit() {
+        var currentTime = DateTimeOffset.Parse("2024-06-07T11:00:00Z");
+        var repository = new InMemoryPendingMessageRepository();
+        var record = CreateRecord(currentTime.AddMinutes(-1));
+        record.AttemptCount = 5;
+        repository.Add(record);
+        var sender = new RecordingPendingMessageSender();
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            { EmailProvider.None, sender }
+        });
+        var processor = new PendingMessageProcessor(repository, factory, clock: () => currentTime, maxRetryAttempts: 5);
+
+        await processor.ProcessAsync();
+
+        Assert.False(repository.Contains(record.MessageId));
+        Assert.Empty(sender.SentRecords);
+        Assert.Equal(5, record.AttemptCount);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_RemovesRecordAfterFinalFailedAttempt() {
+        var currentTime = DateTimeOffset.Parse("2024-06-08T14:45:00Z");
+        var repository = new InMemoryPendingMessageRepository();
+        var record = CreateRecord(currentTime.AddMinutes(-1));
+        record.AttemptCount = 4;
+        repository.Add(record);
+        var sender = new RecordingPendingMessageSender {
+            ShouldThrow = true,
+            ExceptionToThrow = new Exception("Transient failure")
+        };
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            { EmailProvider.None, sender }
+        });
+        var processor = new PendingMessageProcessor(
+            repository,
+            factory,
+            retryDelaySelector: _ => TimeSpan.FromMinutes(5),
+            clock: () => currentTime,
+            maxRetryAttempts: 5);
+
+        await processor.ProcessAsync();
+
+        Assert.False(repository.Contains(record.MessageId));
+        Assert.Single(sender.SentRecords);
+        Assert.Equal(5, record.AttemptCount);
     }
 }
