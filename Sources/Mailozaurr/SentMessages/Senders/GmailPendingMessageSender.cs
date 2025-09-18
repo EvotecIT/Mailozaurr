@@ -1,12 +1,20 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using MimeKit;
+using Org.BouncyCastle.Asn1.Pkcs;
+using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.OpenSsl;
+using Org.BouncyCastle.Pkcs;
+using Org.BouncyCastle.Security;
 
 namespace Mailozaurr;
 
@@ -29,6 +37,7 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
     internal const string ServiceAccountSubjectKey = "ServiceAccountSubject";
 
     private const string TokenEndpoint = "https://oauth2.googleapis.com/token";
+    private const string GmailSendScope = "https://www.googleapis.com/auth/gmail.send";
 
     private readonly Func<OAuthCredential, Func<CancellationToken, Task<string>>?, GmailApiClient> clientFactory;
     private readonly ICredentialProtector credentialProtector;
@@ -193,17 +202,20 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
     }
 
     private GmailRefreshContext? BuildRefreshContext(Dictionary<string, string> providerData, OAuthCredential credential) {
-        var refreshToken = credential.RefreshToken;
-        if (string.IsNullOrEmpty(refreshToken)) {
-            return null;
-        }
-
         credential.ClientId ??= ResolveClientId(providerData);
         credential.ClientSecret ??= ResolveProtectedString(providerData, ClientSecretProtectedKey);
         credential.ServiceAccountJson ??= ResolveProtectedString(providerData, ServiceAccountJsonProtectedKey);
         credential.ServiceAccountSubject ??= ResolveServiceAccountSubject(providerData);
 
-        if (string.IsNullOrEmpty(credential.ClientId) && string.IsNullOrEmpty(credential.ServiceAccountJson)) {
+        var refreshToken = credential.RefreshToken;
+        var hasRefreshToken = !string.IsNullOrEmpty(refreshToken);
+        var hasServiceAccount = !string.IsNullOrEmpty(credential.ServiceAccountJson);
+
+        if (!hasRefreshToken && !hasServiceAccount) {
+            return null;
+        }
+
+        if (!hasServiceAccount && string.IsNullOrEmpty(credential.ClientId)) {
             return null;
         }
 
@@ -242,8 +254,9 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
     private static bool ShouldRefreshToken(DateTimeOffset expiresOn) => expiresOn <= DateTimeOffset.UtcNow.AddMinutes(1);
 
     private async Task<string> RefreshAccessTokenAsync(OAuthCredential credential, GmailRefreshContext context, CancellationToken cancellationToken) {
-        if (context.HasClientSecret) {
-            var refreshed = await ExchangeRefreshTokenAsync(context.ClientId!, context.ClientSecret!, context.RefreshToken, cancellationToken)
+        if (context.HasClientSecret && context.HasRefreshToken) {
+            var refreshToken = context.RefreshToken!;
+            var refreshed = await ExchangeRefreshTokenAsync(context.ClientId!, context.ClientSecret!, refreshToken, cancellationToken)
                 .ConfigureAwait(false);
             credential.AccessToken = refreshed.AccessToken;
             if (!string.IsNullOrEmpty(refreshed.RefreshToken)) {
@@ -261,7 +274,12 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
         }
 
         if (context.HasServiceAccount) {
-            throw new InvalidOperationException("Service account refresh is not supported for pending Gmail messages.");
+            var refreshed = await ExchangeServiceAccountTokenAsync(context, cancellationToken).ConfigureAwait(false);
+            credential.AccessToken = refreshed.AccessToken;
+            credential.RefreshToken = null;
+            credential.ExpiresOn = refreshed.ExpiresOn ?? DateTimeOffset.UtcNow.AddHours(1);
+            context.UpdateStoredCredential(credential);
+            return credential.AccessToken;
         }
 
         throw new InvalidOperationException("Pending Gmail message is missing OAuth client context required to refresh the access token.");
@@ -313,20 +331,156 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
         return (accessToken, newRefresh, expiresOn);
     }
 
+    private async Task<(string AccessToken, DateTimeOffset? ExpiresOn)> ExchangeServiceAccountTokenAsync(
+        GmailRefreshContext context,
+        CancellationToken cancellationToken) {
+        var serviceAccountJson = context.ServiceAccountJson;
+        if (string.IsNullOrEmpty(serviceAccountJson)) {
+            throw new InvalidOperationException("Pending Gmail message is missing service account credentials required to mint a new access token.");
+        }
+
+        using var document = JsonDocument.Parse(serviceAccountJson);
+        var root = document.RootElement;
+        if (!root.TryGetProperty("client_email", out var emailProperty)) {
+            throw new InvalidOperationException("Service account JSON does not contain the client_email field.");
+        }
+
+        var clientEmail = emailProperty.GetString();
+        if (string.IsNullOrWhiteSpace(clientEmail)) {
+            throw new InvalidOperationException("Service account client_email value is empty.");
+        }
+        var clientEmailValue = clientEmail!;
+
+        if (!root.TryGetProperty("private_key", out var keyProperty)) {
+            throw new InvalidOperationException("Service account JSON does not contain the private_key field.");
+        }
+
+        var privateKey = keyProperty.GetString();
+        if (string.IsNullOrWhiteSpace(privateKey)) {
+            throw new InvalidOperationException("Service account private key is empty.");
+        }
+
+        privateKey = privateKey.Replace("\\n", "\n").Trim();
+        var assertion = CreateServiceAccountAssertion(clientEmailValue, privateKey, context.ServiceAccountSubject);
+
+        using var content = new FormUrlEncodedContent(new Dictionary<string, string> {
+            { "grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer" },
+            { "assertion", assertion }
+        });
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, TokenEndpoint) { Content = content };
+        using var response = await Helpers.SharedHttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+#if NET5_0_OR_GREATER
+        var payload = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var payload = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        if (!response.IsSuccessStatusCode) {
+            throw new InvalidOperationException($"Failed to mint Gmail service account access token: {payload}");
+        }
+
+        using var tokenDocument = JsonDocument.Parse(payload);
+        if (!tokenDocument.RootElement.TryGetProperty("access_token", out var tokenProperty)) {
+            throw new InvalidOperationException("Gmail service account response did not include an access token.");
+        }
+
+        var accessToken = tokenProperty.GetString();
+        if (string.IsNullOrEmpty(accessToken)) {
+            throw new InvalidOperationException("Gmail service account response contained an empty access token.");
+        }
+        var accessTokenValue = accessToken!;
+
+        DateTimeOffset? expiresOn = null;
+        if (tokenDocument.RootElement.TryGetProperty("expires_in", out var expiresProperty) &&
+            expiresProperty.TryGetInt64(out var seconds) && seconds > 0) {
+            expiresOn = DateTimeOffset.UtcNow.AddSeconds(seconds);
+        }
+
+        return (accessTokenValue, expiresOn);
+    }
+
+    private static string CreateServiceAccountAssertion(string clientEmail, string privateKeyPem, string? subject) {
+        var now = DateTimeOffset.UtcNow;
+        var headerJson = JsonSerializer.Serialize(new Dictionary<string, object> {
+            { "alg", "RS256" },
+            { "typ", "JWT" }
+        });
+
+        var payload = new Dictionary<string, object> {
+            { "iss", clientEmail },
+            { "scope", GmailSendScope },
+            { "aud", TokenEndpoint },
+            { "iat", now.ToUnixTimeSeconds() },
+            { "exp", now.AddHours(1).ToUnixTimeSeconds() }
+        };
+
+        if (!string.IsNullOrEmpty(subject)) {
+            payload["sub"] = subject;
+        }
+
+        var payloadJson = JsonSerializer.Serialize(payload);
+        var header = Base64UrlEncode(Encoding.UTF8.GetBytes(headerJson));
+        var body = Base64UrlEncode(Encoding.UTF8.GetBytes(payloadJson));
+        var unsignedToken = string.Concat(header, '.', body);
+
+        using var rsa = CreateRsaFromPrivateKey(privateKeyPem);
+        var signature = rsa.SignData(Encoding.UTF8.GetBytes(unsignedToken), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        var signatureSegment = Base64UrlEncode(signature);
+        return string.Concat(unsignedToken, '.', signatureSegment);
+    }
+
+    private static RSA CreateRsaFromPrivateKey(string privateKeyPem) {
+        using var reader = new StringReader(privateKeyPem);
+        var pemReader = new PemReader(reader);
+        object? keyObject = pemReader.ReadObject();
+        if (keyObject == null) {
+            throw new InvalidOperationException("Service account private key is invalid.");
+        }
+
+        RsaPrivateCrtKeyParameters? rsaParameters = null;
+        switch (keyObject) {
+            case AsymmetricCipherKeyPair pair:
+                rsaParameters = pair.Private as RsaPrivateCrtKeyParameters;
+                break;
+            case RsaPrivateCrtKeyParameters parameters:
+                rsaParameters = parameters;
+                break;
+            case PrivateKeyInfo privateKeyInfo:
+                rsaParameters = PrivateKeyFactory.CreateKey(privateKeyInfo) as RsaPrivateCrtKeyParameters;
+                break;
+            case AsymmetricKeyParameter keyParameter when keyParameter.IsPrivate:
+                rsaParameters = keyParameter as RsaPrivateCrtKeyParameters;
+                break;
+        }
+
+        if (rsaParameters == null) {
+            throw new InvalidOperationException("Service account private key format is not supported.");
+        }
+
+        var rsa = RSA.Create();
+        rsa.ImportParameters(DotNetUtilities.ToRSAParameters(rsaParameters));
+        return rsa;
+    }
+
+    private static string Base64UrlEncode(byte[] data) {
+        var base64 = Convert.ToBase64String(data);
+        return base64.TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+
     private sealed class GmailRefreshContext {
         private readonly Dictionary<string, string> providerData;
         private readonly ICredentialProtector protector;
 
         internal GmailRefreshContext(
             Dictionary<string, string> providerData,
-            string refreshToken,
+            string? refreshToken,
             string? clientId,
             string? clientSecret,
             string? serviceAccountJson,
             string? serviceAccountSubject,
             ICredentialProtector protector) {
             this.providerData = providerData ?? throw new ArgumentNullException(nameof(providerData));
-            RefreshToken = refreshToken ?? throw new ArgumentNullException(nameof(refreshToken));
+            RefreshToken = refreshToken;
             ClientId = clientId;
             ClientSecret = clientSecret;
             ServiceAccountJson = serviceAccountJson;
@@ -334,7 +488,7 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
             this.protector = protector ?? throw new ArgumentNullException(nameof(protector));
         }
 
-        internal string RefreshToken { get; private set; }
+        internal string? RefreshToken { get; private set; }
         internal string? ClientId { get; }
         internal string? ClientSecret { get; }
         internal string? ServiceAccountJson { get; }
@@ -342,6 +496,7 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
 
         internal bool HasClientSecret => !string.IsNullOrEmpty(ClientId) && !string.IsNullOrEmpty(ClientSecret);
         internal bool HasServiceAccount => !string.IsNullOrEmpty(ServiceAccountJson);
+        internal bool HasRefreshToken => !string.IsNullOrEmpty(RefreshToken);
 
         internal void UpdateStoredCredential(OAuthCredential credential) {
             providerData[GmailPendingMessageSender.AccessTokenProtectedKey] = protector.Protect(credential.AccessToken);
@@ -353,6 +508,11 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
                 providerData.Remove(GmailPendingMessageSender.RefreshTokenBase64Key);
                 providerData.Remove(GmailPendingMessageSender.RefreshTokenKey);
                 RefreshToken = credential.RefreshToken!;
+            } else {
+                providerData.Remove(GmailPendingMessageSender.RefreshTokenProtectedKey);
+                providerData.Remove(GmailPendingMessageSender.RefreshTokenBase64Key);
+                providerData.Remove(GmailPendingMessageSender.RefreshTokenKey);
+                RefreshToken = null;
             }
 
             providerData[GmailPendingMessageSender.ExpiresOnKey] = credential.ExpiresOn.ToString("o", CultureInfo.InvariantCulture);
