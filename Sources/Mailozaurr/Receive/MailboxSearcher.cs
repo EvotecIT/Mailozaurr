@@ -318,41 +318,72 @@ public static class MailboxSearcher {
             new[] { "id" },
             filter,
             maxResults > 0 ? maxResults : (int?)null).ConfigureAwait(false);
-        var mimeMessages = new List<MimeMessage>(msgs.Count);
+        var results = new List<NonDeliveryReport>();
         if (parallelDownloadLimit <= 1) {
             foreach (var m in msgs) {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (maxResults > 0 && results.Count >= maxResults) break;
                 if (m.TryGetValue("id", out var idObj) && idObj is string id) {
                     var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
-                    mimeMessages.Add(mime);
+                    var reports = FilterNonDeliveryReports(new[] { mime }, since, before, recipientContains, messageId);
+                    if (reports.Count > 0) {
+                        foreach (var r in reports) {
+                            if (maxResults > 0 && results.Count >= maxResults) break;
+                            results.Add(r);
+                        }
+                        if (maxResults > 0 && results.Count >= maxResults) break;
+                    }
                 }
             }
         } else {
-            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
-            var tasks = new List<Task>();
-
-            async Task DownloadMessageAsync(string id) {
-                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                try {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
-                    lock (mimeMessages) mimeMessages.Add(mime);
-                } finally {
-                    semaphore.Release();
-                }
+            var msgArray = msgs.ToArray();
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var workers = new Task[Math.Min(parallelDownloadLimit, msgArray.Length)];
+            int next = 0;
+            int resultCount = 0;
+            var gate = new object();
+            for (int i = 0; i < workers.Length; i++) {
+                workers[i] = Task.Run(async () => {
+                    while (true) {
+                        Dictionary<string, object>? current;
+                        lock (gate) {
+                            if (cts.IsCancellationRequested || next >= msgArray.Length || (maxResults > 0 && resultCount >= maxResults)) return;
+                            current = msgArray[next++];
+                        }
+                        if (!current.TryGetValue("id", out var idObj) || idObj is not string id) continue;
+                        MimeMessage mime;
+                        try {
+                            cts.Token.ThrowIfCancellationRequested();
+                            mime = await MicrosoftGraphUtils.GetMailMessageMimeAsync(credential, userPrincipalName, id).ConfigureAwait(false);
+                        } catch (OperationCanceledException) {
+                            return;
+                        }
+                        var reports = FilterNonDeliveryReports(new[] { mime }, since, before, recipientContains, messageId);
+                        if (reports.Count == 0) continue;
+                        lock (gate) {
+                            foreach (var r in reports) {
+                                if (maxResults > 0 && resultCount >= maxResults) {
+                                    cts.Cancel();
+                                    break;
+                                }
+                                results.Add(r);
+                                resultCount++;
+                                if (maxResults > 0 && resultCount >= maxResults) {
+                                    cts.Cancel();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }, CancellationToken.None);
             }
-
-            foreach (var m in msgs) {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (m.TryGetValue("id", out var idObj) && idObj is string id) {
-                    tasks.Add(DownloadMessageAsync(id));
-                }
+            try {
+                await Task.WhenAll(workers).ConfigureAwait(false);
+            } catch (OperationCanceledException) {
             }
-
-            await Task.WhenAll(tasks).ConfigureAwait(false);
         }
 
-        return FilterNonDeliveryReports(mimeMessages, since, before, recipientContains, messageId);
+        return maxResults > 0 && results.Count > maxResults ? results.GetRange(0, maxResults) : results;
     }
 
     /// <summary>
@@ -372,43 +403,71 @@ public static class MailboxSearcher {
         CancellationToken cancellationToken = default) {
         string query = BuildGmailNonDeliveryReportQuery(since, before);
         var msgs = await client.ListAsync(userId, query, maxResults > 0 ? maxResults : (int?)null, cancellationToken).ConfigureAwait(false);
-        var mimeMessages = new List<MimeMessage>(msgs.Count);
+        var results = new List<NonDeliveryReport>();
         if (parallelDownloadLimit <= 1) {
             foreach (var m in msgs) {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (maxResults > 0 && results.Count >= maxResults) break;
                 if (!string.IsNullOrEmpty(m.Id)) {
                     var mime = await client.GetMimeMessageAsync(userId, m.Id, cancellationToken).ConfigureAwait(false);
-                    mimeMessages.Add(mime);
-                    if (maxResults > 0 && mimeMessages.Count >= maxResults) break;
+                    var reports = FilterNonDeliveryReports(new[] { mime }, since, before, recipientContains, messageId);
+                    if (reports.Count > 0) {
+                        foreach (var r in reports) {
+                            if (maxResults > 0 && results.Count >= maxResults) break;
+                            results.Add(r);
+                        }
+                        if (maxResults > 0 && results.Count >= maxResults) break;
+                    }
                 }
             }
         } else {
-            using var semaphore = new SemaphoreSlim(parallelDownloadLimit);
-            var tasks = new List<Task>();
-
-            async Task DownloadMessageAsync(string id) {
-                await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                try {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var mime = await client.GetMimeMessageAsync(userId, id, cancellationToken).ConfigureAwait(false);
-                    lock (mimeMessages) mimeMessages.Add(mime);
-                } finally {
-                    semaphore.Release();
-                }
+            var msgArray = msgs.ToArray();
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var workers = new Task[Math.Min(parallelDownloadLimit, msgArray.Length)];
+            int next = 0;
+            int resultCount = 0;
+            var gate = new object();
+            for (int i = 0; i < workers.Length; i++) {
+                workers[i] = Task.Run(async () => {
+                    while (true) {
+                        GmailMessage? current;
+                        lock (gate) {
+                            if (cts.IsCancellationRequested || next >= msgArray.Length || (maxResults > 0 && resultCount >= maxResults)) return;
+                            current = msgArray[next++];
+                        }
+                        if (string.IsNullOrEmpty(current.Id)) continue;
+                        MimeMessage mime;
+                        try {
+                            mime = await client.GetMimeMessageAsync(userId, current.Id, cts.Token).ConfigureAwait(false);
+                        } catch (OperationCanceledException) {
+                            return;
+                        }
+                        var reports = FilterNonDeliveryReports(new[] { mime }, since, before, recipientContains, messageId);
+                        if (reports.Count == 0) continue;
+                        lock (gate) {
+                            foreach (var r in reports) {
+                                if (maxResults > 0 && resultCount >= maxResults) {
+                                    cts.Cancel();
+                                    break;
+                                }
+                                results.Add(r);
+                                resultCount++;
+                                if (maxResults > 0 && resultCount >= maxResults) {
+                                    cts.Cancel();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }, CancellationToken.None);
             }
-
-            foreach (var m in msgs) {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!string.IsNullOrEmpty(m.Id)) {
-                    tasks.Add(DownloadMessageAsync(m.Id));
-                }
-                if (maxResults > 0 && tasks.Count >= maxResults) break;
+            try {
+                await Task.WhenAll(workers).ConfigureAwait(false);
+            } catch (OperationCanceledException) {
             }
-
-            await Task.WhenAll(tasks).ConfigureAwait(false);
         }
 
-        return FilterNonDeliveryReports(mimeMessages, since, before, recipientContains, messageId);
+        return maxResults > 0 && results.Count > maxResults ? results.GetRange(0, maxResults) : results;
     }
 
     // DMARC report helpers

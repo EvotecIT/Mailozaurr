@@ -31,6 +31,31 @@ public class SearchNonDeliveryReportsTests {
         return MimeMessage.Load(stream);
     }
 
+    private static MimeMessage CreateMultiRecipientNdr(string messageId, DateTimeOffset date, params string[] recipients) {
+        if (recipients == null || recipients.Length == 0) {
+            throw new ArgumentException("At least one recipient is required.", nameof(recipients));
+        }
+
+        string arrival = date.ToString("ddd, dd MMM yyyy HH:mm:ss K", CultureInfo.InvariantCulture);
+        var sb = new StringBuilder();
+        sb.Append($"Date: {arrival}\r\n");
+        sb.Append("Content-Type: multipart/report; report-type=delivery-status; boundary=\"XXX\"\r\n\r\n");
+        sb.Append("--XXX\r\nContent-Type: text/plain; charset=utf-8\r\n\r\ntext\r\n\r\n");
+        sb.Append("--XXX\r\nContent-Type: message/delivery-status\r\n\r\n");
+        foreach (var recipient in recipients) {
+            sb.Append($"Original-Recipient: rfc822; {recipient}\r\n");
+            sb.Append($"Final-Recipient: rfc822; {recipient}\r\n");
+            sb.Append($"Original-Message-ID: {messageId}\r\n");
+            sb.Append("Reporting-MTA: dns; mx.example.com\r\n");
+            sb.Append("Diagnostic-Code: smtp; 550 5.1.1 User unknown\r\n");
+            sb.Append("Status: 5.1.1\r\n");
+            sb.Append($"Arrival-Date: {arrival}\r\n\r\n");
+        }
+        sb.Append("--XXX--");
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(sb.ToString()));
+        return MimeMessage.Load(stream);
+    }
+
     [Fact]
     public void FilterNonDeliveryReports_FiltersByRecipientAndMessageId() {
         var now = DateTimeOffset.UtcNow;
@@ -304,6 +329,51 @@ public class SearchNonDeliveryReportsTests {
         }
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task SearchNonDeliveryReportsAsync_Graph_RespectsMaxResultsWithinSingleMime(int parallelDownloadLimit) {
+        var handler = new MultiRecipientGraphHandler();
+        var field = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var client = (HttpClient)field.GetValue(null)!;
+        var handlerField = GetHandlerField();
+        var original = (HttpMessageHandler)handlerField.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        try {
+            var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", ClientSecret = "secret" };
+            var reports = await MailboxSearcher.SearchNonDeliveryReportsAsync(
+                cred,
+                "user@example.com",
+                maxResults: 1,
+                parallelDownloadLimit: parallelDownloadLimit,
+                cancellationToken: CancellationToken.None);
+            Assert.Single(reports);
+            Assert.Equal("multi", reports[0].OriginalMessageId);
+            Assert.Equal(1, handler.MimeFetches);
+        } finally {
+            handlerField.SetValue(client, original);
+        }
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task SearchNonDeliveryReportsAsync_Gmail_RespectsMaxResultsWithinSingleMime(int parallelDownloadLimit) {
+        var handler = new MultiRecipientGmailHandler();
+        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/") };
+        using var client = new GmailApiClient(httpClient);
+        var reports = await MailboxSearcher.SearchNonDeliveryReportsAsync(
+            client,
+            "me",
+            maxResults: 1,
+            parallelDownloadLimit: parallelDownloadLimit,
+            cancellationToken: CancellationToken.None);
+        Assert.Single(reports);
+        Assert.Equal("multi", reports[0].OriginalMessageId);
+        Assert.Equal(1, handler.MimeFetches);
+        Assert.Equal(1, handler.ListRequests);
+    }
+
     private static FieldInfo GetHandlerField() =>
         typeof(HttpMessageInvoker).GetField("_handler", BindingFlags.NonPublic | BindingFlags.Instance)
         ?? typeof(HttpMessageInvoker).GetField("handler", BindingFlags.NonPublic | BindingFlags.Instance)
@@ -334,6 +404,70 @@ public class SearchNonDeliveryReportsTests {
                 MimeFetches++;
                 const string raw = "Date: Mon, 1 Jan 2024 00:00:00 +0000\r\nSubject: Undeliverable: Delivery has failed\r\n\r\nbody";
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(raw) });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
+    }
+
+    private sealed class MultiRecipientGraphHandler : HttpMessageHandler {
+        private readonly string _raw;
+        public int MimeFetches { get; private set; }
+
+        public MultiRecipientGraphHandler() {
+            var message = CreateMultiRecipientNdr("<multi>", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero), "user1@example.com", "user2@example.com");
+            using var stream = new MemoryStream();
+            message.WriteTo(stream);
+            _raw = Encoding.UTF8.GetString(stream.ToArray());
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            var uri = request.RequestUri!;
+            if (uri.AbsoluteUri.Contains("oauth2")) {
+                var json = "{\"access_token\":\"token\",\"token_type\":\"Bearer\"}";
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
+            }
+
+            if (uri.AbsolutePath.EndsWith("/messages")) {
+                var json = "{\"value\":[{\"id\":\"1\"}]}";
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
+            }
+
+            if (uri.AbsolutePath.Contains("/messages/") && uri.AbsolutePath.EndsWith("/$value")) {
+                MimeFetches++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(_raw) });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
+    }
+
+    private sealed class MultiRecipientGmailHandler : HttpMessageHandler {
+        private readonly string _raw;
+        public int MimeFetches { get; private set; }
+        public int ListRequests { get; private set; }
+
+        public MultiRecipientGmailHandler() {
+            var message = CreateMultiRecipientNdr("<multi>", new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero), "user1@example.com", "user2@example.com");
+            using var stream = new MemoryStream();
+            message.WriteTo(stream);
+            var bytes = stream.ToArray();
+            var base64 = Convert.ToBase64String(bytes).Replace('+', '-').Replace('/', '_').TrimEnd('=');
+            _raw = base64;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            var uri = request.RequestUri!;
+            if (uri.AbsolutePath.EndsWith("/messages")) {
+                ListRequests++;
+                var json = "{\"messages\":[{\"id\":\"1\"}]}";
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
+            }
+
+            if (uri.AbsolutePath.Contains("/messages/") && uri.Query.Contains("format=raw")) {
+                MimeFetches++;
+                var json = $"{{\"id\":\"1\",\"raw\":\"{_raw}\"}}";
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
             }
 
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
