@@ -26,4 +26,24 @@ public class OAuthCredential {
     /// The refresh token, if available.
     /// </summary>
     public string? RefreshToken { get; set; }
+
+    /// <summary>
+    /// Identifier of the OAuth client used to acquire the token.
+    /// </summary>
+    public string? ClientId { get; set; }
+
+    /// <summary>
+    /// Secret associated with the OAuth client used to acquire the token.
+    /// </summary>
+    public string? ClientSecret { get; set; }
+
+    /// <summary>
+    /// Raw JSON payload containing service account credentials used for delegated access.
+    /// </summary>
+    public string? ServiceAccountJson { get; set; }
+
+    /// <summary>
+    /// Optional subject impersonated when using service account credentials.
+    /// </summary>
+    public string? ServiceAccountSubject { get; set; }
 }
