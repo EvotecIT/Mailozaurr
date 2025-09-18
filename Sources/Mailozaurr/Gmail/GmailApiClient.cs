@@ -134,9 +134,9 @@ public sealed class GmailApiClient : IDisposable {
         record.ProviderData[GmailPendingMessageSender.UserIdKey] = userId;
         record.ProviderData[GmailPendingMessageSender.UserNameKey] = userName;
         record.ProviderData[GmailPendingMessageSender.ExpiresOnKey] = expiresOn.ToString("o", CultureInfo.InvariantCulture);
-        record.ProviderData[GmailPendingMessageSender.AccessTokenBase64Key] = Convert.ToBase64String(Encoding.UTF8.GetBytes(accessToken));
+        record.ProviderData[GmailPendingMessageSender.AccessTokenBase64Key] = CredentialProtection.Default.Protect(accessToken);
         if (!string.IsNullOrEmpty(credential?.RefreshToken)) {
-            record.ProviderData[GmailPendingMessageSender.RefreshTokenBase64Key] = Convert.ToBase64String(Encoding.UTF8.GetBytes(credential.RefreshToken));
+            record.ProviderData[GmailPendingMessageSender.RefreshTokenBase64Key] = CredentialProtection.Default.Protect(credential.RefreshToken);
         }
 
         try {

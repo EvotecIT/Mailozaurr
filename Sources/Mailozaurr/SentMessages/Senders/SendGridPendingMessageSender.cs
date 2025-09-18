@@ -59,8 +59,10 @@ public sealed class SendGridPendingMessageSender : IPendingMessageSender {
 
     private static string ResolveApiKey(Dictionary<string, string> providerData) {
         if (providerData.TryGetValue(ApiKeyBase64Key, out var encoded) && !string.IsNullOrWhiteSpace(encoded)) {
-            var bytes = Convert.FromBase64String(encoded);
-            return Encoding.UTF8.GetString(bytes);
+            var decoded = CredentialProtection.UnprotectWithFallback(encoded);
+            if (!string.IsNullOrEmpty(decoded)) {
+                return decoded;
+            }
         }
         if (providerData.TryGetValue(ApiKeyKey, out var value) && !string.IsNullOrWhiteSpace(value)) {
             return value;

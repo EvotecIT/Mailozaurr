@@ -13,6 +13,10 @@ public static class PendingMessageRepositoryExample {
         var options = new PendingMessageRepositoryOptions { DirectoryPath = dir };
         var repository = new FilePendingMessageRepository(options);
 
+        // Pending message providers such as SendGrid, Mailgun, Gmail API, and SES automatically
+        // upgrade legacy Base64 secrets to the new CredentialProtection format the next time a
+        // record is saved, so existing queue directories can be reused without manual migration.
+
         var message = new MimeMessage();
         message.From.Add(MailboxAddress.Parse("sender@example.com"));
         message.To.Add(MailboxAddress.Parse("recipient@example.com"));

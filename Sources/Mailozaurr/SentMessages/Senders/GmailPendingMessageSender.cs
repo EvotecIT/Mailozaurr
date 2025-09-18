@@ -66,12 +66,14 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
 
     private static string ResolveAccessToken(Dictionary<string, string> providerData) {
         if (providerData.TryGetValue(AccessTokenBase64Key, out var encoded) && !string.IsNullOrWhiteSpace(encoded)) {
-            var bytes = Convert.FromBase64String(encoded);
-            return Encoding.UTF8.GetString(bytes);
+            var unprotectedToken = CredentialProtection.UnprotectWithFallback(encoded);
+            if (!string.IsNullOrEmpty(unprotectedToken)) {
+                return unprotectedToken;
+            }
         }
 
-        if (providerData.TryGetValue(AccessTokenKey, out var token) && !string.IsNullOrWhiteSpace(token)) {
-            return token;
+        if (providerData.TryGetValue(AccessTokenKey, out var tokenValue) && !string.IsNullOrWhiteSpace(tokenValue)) {
+            return tokenValue;
         }
 
         throw new InvalidOperationException("Pending Gmail message is missing an access token.");
@@ -79,12 +81,14 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
 
     private static string? ResolveRefreshToken(Dictionary<string, string> providerData) {
         if (providerData.TryGetValue(RefreshTokenBase64Key, out var encoded) && !string.IsNullOrWhiteSpace(encoded)) {
-            var bytes = Convert.FromBase64String(encoded);
-            return Encoding.UTF8.GetString(bytes);
+            var unprotectedToken = CredentialProtection.UnprotectWithFallback(encoded);
+            if (!string.IsNullOrEmpty(unprotectedToken)) {
+                return unprotectedToken;
+            }
         }
 
-        if (providerData.TryGetValue(RefreshTokenKey, out var token) && !string.IsNullOrWhiteSpace(token)) {
-            return token;
+        if (providerData.TryGetValue(RefreshTokenKey, out var tokenValue) && !string.IsNullOrWhiteSpace(tokenValue)) {
+            return tokenValue;
         }
 
         return null;

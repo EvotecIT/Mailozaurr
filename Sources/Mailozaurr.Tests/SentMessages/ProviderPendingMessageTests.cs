@@ -102,7 +102,10 @@ public sealed class ProviderPendingMessageTests {
         Assert.True(record.ProviderData.TryGetValue(SendGridPendingMessageSender.MessageJsonKey, out var json));
         Assert.False(string.IsNullOrWhiteSpace(json));
         Assert.True(record.ProviderData.TryGetValue(SendGridPendingMessageSender.ApiKeyBase64Key, out var apiKeyBase64));
-        var decodedApiKey = Encoding.UTF8.GetString(Convert.FromBase64String(apiKeyBase64!));
+        Assert.False(string.IsNullOrWhiteSpace(apiKeyBase64));
+        Assert.NotEqual("SG.API", apiKeyBase64);
+        Assert.NotEqual(Convert.ToBase64String(Encoding.UTF8.GetBytes("SG.API")), apiKeyBase64);
+        var decodedApiKey = CredentialProtection.UnprotectWithFallback(apiKeyBase64!);
         Assert.Equal("SG.API", decodedApiKey);
 
         var successHandler = new TestHandler((request, _) => {
@@ -147,7 +150,10 @@ public sealed class ProviderPendingMessageTests {
         Assert.NotNull(record);
         Assert.Equal(EmailProvider.Mailgun, record.Provider);
         Assert.Equal("example.com", record.ProviderData[MailgunPendingMessageSender.DomainKey]);
-        var apiKey = Encoding.UTF8.GetString(Convert.FromBase64String(record.ProviderData[MailgunPendingMessageSender.ApiKeyBase64Key]!));
+        var storedApiKey = record.ProviderData[MailgunPendingMessageSender.ApiKeyBase64Key]!;
+        Assert.NotEqual("mailgun-api-key", storedApiKey);
+        Assert.NotEqual(Convert.ToBase64String(Encoding.UTF8.GetBytes("mailgun-api-key")), storedApiKey);
+        var apiKey = CredentialProtection.UnprotectWithFallback(storedApiKey);
         Assert.Equal("mailgun-api-key", apiKey);
         var mime = await MimeMessage.LoadAsync(new MemoryStream(Convert.FromBase64String(record.MimeMessage)));
         Assert.Equal("mailgun", mime.Subject);
@@ -202,9 +208,15 @@ public sealed class ProviderPendingMessageTests {
         Assert.Equal(EmailProvider.Gmail, record.Provider);
         Assert.Equal("me", record.ProviderData[GmailPendingMessageSender.UserIdKey]);
         Assert.Equal("user@example.com", record.ProviderData[GmailPendingMessageSender.UserNameKey]);
-        var storedAccess = Encoding.UTF8.GetString(Convert.FromBase64String(record.ProviderData[GmailPendingMessageSender.AccessTokenBase64Key]!));
+        var storedAccessRaw = record.ProviderData[GmailPendingMessageSender.AccessTokenBase64Key]!;
+        Assert.NotEqual("access-token", storedAccessRaw);
+        Assert.NotEqual(Convert.ToBase64String(Encoding.UTF8.GetBytes("access-token")), storedAccessRaw);
+        var storedAccess = CredentialProtection.UnprotectWithFallback(storedAccessRaw);
         Assert.Equal("access-token", storedAccess);
-        var storedRefresh = Encoding.UTF8.GetString(Convert.FromBase64String(record.ProviderData[GmailPendingMessageSender.RefreshTokenBase64Key]!));
+        var storedRefreshRaw = record.ProviderData[GmailPendingMessageSender.RefreshTokenBase64Key]!;
+        Assert.NotEqual("refresh-token", storedRefreshRaw);
+        Assert.NotEqual(Convert.ToBase64String(Encoding.UTF8.GetBytes("refresh-token")), storedRefreshRaw);
+        var storedRefresh = CredentialProtection.UnprotectWithFallback(storedRefreshRaw);
         Assert.Equal("refresh-token", storedRefresh);
         var queuedMessage = await MimeMessage.LoadAsync(new MemoryStream(Convert.FromBase64String(record.MimeMessage)));
         Assert.Equal("gmail", queuedMessage.Subject);
@@ -257,8 +269,14 @@ public sealed class ProviderPendingMessageTests {
         var record = repository.LastSaved;
         Assert.NotNull(record);
         Assert.Equal(EmailProvider.SES, record.Provider);
-        var accessKey = Encoding.UTF8.GetString(Convert.FromBase64String(record.ProviderData[SesPendingMessageSender.AccessKeyIdBase64Key]!));
-        var secretKey = Encoding.UTF8.GetString(Convert.FromBase64String(record.ProviderData[SesPendingMessageSender.SecretAccessKeyBase64Key]!));
+        var storedAccessKey = record.ProviderData[SesPendingMessageSender.AccessKeyIdBase64Key]!;
+        var storedSecretKey = record.ProviderData[SesPendingMessageSender.SecretAccessKeyBase64Key]!;
+        Assert.NotEqual("AKIA123", storedAccessKey);
+        Assert.NotEqual("secret-key", storedSecretKey);
+        Assert.NotEqual(Convert.ToBase64String(Encoding.UTF8.GetBytes("AKIA123")), storedAccessKey);
+        Assert.NotEqual(Convert.ToBase64String(Encoding.UTF8.GetBytes("secret-key")), storedSecretKey);
+        var accessKey = CredentialProtection.UnprotectWithFallback(storedAccessKey);
+        var secretKey = CredentialProtection.UnprotectWithFallback(storedSecretKey);
         Assert.Equal("AKIA123", accessKey);
         Assert.Equal("secret-key", secretKey);
         Assert.Equal("us-east-1", record.ProviderData[SesPendingMessageSender.RegionKey]);

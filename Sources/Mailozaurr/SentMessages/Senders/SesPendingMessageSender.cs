@@ -64,8 +64,10 @@ public sealed class SesPendingMessageSender : IPendingMessageSender {
 
     private static string ResolveAccessKey(Dictionary<string, string> providerData) {
         if (providerData.TryGetValue(AccessKeyIdBase64Key, out var encoded) && !string.IsNullOrWhiteSpace(encoded)) {
-            var bytes = Convert.FromBase64String(encoded);
-            return Encoding.UTF8.GetString(bytes);
+            var decoded = CredentialProtection.UnprotectWithFallback(encoded);
+            if (!string.IsNullOrEmpty(decoded)) {
+                return decoded;
+            }
         }
 
         if (providerData.TryGetValue(AccessKeyIdKey, out var accessKey) && !string.IsNullOrWhiteSpace(accessKey)) {
@@ -77,8 +79,10 @@ public sealed class SesPendingMessageSender : IPendingMessageSender {
 
     private static string ResolveSecretKey(Dictionary<string, string> providerData) {
         if (providerData.TryGetValue(SecretAccessKeyBase64Key, out var encoded) && !string.IsNullOrWhiteSpace(encoded)) {
-            var bytes = Convert.FromBase64String(encoded);
-            return Encoding.UTF8.GetString(bytes);
+            var decoded = CredentialProtection.UnprotectWithFallback(encoded);
+            if (!string.IsNullOrEmpty(decoded)) {
+                return decoded;
+            }
         }
 
         if (providerData.TryGetValue(SecretAccessKeyKey, out var secretKey) && !string.IsNullOrWhiteSpace(secretKey)) {
