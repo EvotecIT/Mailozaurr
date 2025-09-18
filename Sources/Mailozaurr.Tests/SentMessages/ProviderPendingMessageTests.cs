@@ -176,7 +176,9 @@ public sealed class ProviderPendingMessageTests {
             UserName = "user@example.com",
             AccessToken = "access-token",
             RefreshToken = "refresh-token",
-            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
+            ClientId = "client-123",
+            ClientSecret = "client-secret"
         };
         var repository = new InMemoryPendingMessageRepository();
         var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError) {
@@ -202,10 +204,13 @@ public sealed class ProviderPendingMessageTests {
         Assert.Equal(EmailProvider.Gmail, record.Provider);
         Assert.Equal("me", record.ProviderData[GmailPendingMessageSender.UserIdKey]);
         Assert.Equal("user@example.com", record.ProviderData[GmailPendingMessageSender.UserNameKey]);
-        var storedAccess = Encoding.UTF8.GetString(Convert.FromBase64String(record.ProviderData[GmailPendingMessageSender.AccessTokenBase64Key]!));
+        var storedAccess = CredentialProtection.UnprotectWithFallback(record.ProviderData[GmailPendingMessageSender.AccessTokenProtectedKey]);
         Assert.Equal("access-token", storedAccess);
-        var storedRefresh = Encoding.UTF8.GetString(Convert.FromBase64String(record.ProviderData[GmailPendingMessageSender.RefreshTokenBase64Key]!));
+        var storedRefresh = CredentialProtection.UnprotectWithFallback(record.ProviderData[GmailPendingMessageSender.RefreshTokenProtectedKey]);
         Assert.Equal("refresh-token", storedRefresh);
+        Assert.Equal("client-123", record.ProviderData[GmailPendingMessageSender.ClientIdKey]);
+        var storedSecret = CredentialProtection.UnprotectWithFallback(record.ProviderData[GmailPendingMessageSender.ClientSecretProtectedKey]);
+        Assert.Equal("client-secret", storedSecret);
         var queuedMessage = await MimeMessage.LoadAsync(new MemoryStream(Convert.FromBase64String(record.MimeMessage)));
         Assert.Equal("gmail", queuedMessage.Subject);
 
@@ -220,7 +225,7 @@ public sealed class ProviderPendingMessageTests {
         var successClient = new HttpClient(successHandler) {
             BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/")
         };
-        var sender = new GmailPendingMessageSender(c => new GmailApiClient(successClient, credential: c));
+        var sender = new GmailPendingMessageSender((c, refresher) => new GmailApiClient(successClient, refresher, credential: c));
         var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
             { EmailProvider.Gmail, sender }
         });

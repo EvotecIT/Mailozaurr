@@ -137,7 +137,9 @@ public static class OAuthHelpers {
             UserName = credential.UserId,
             AccessToken = credential.Token.AccessToken,
             RefreshToken = credential.Token.RefreshToken,
-            ExpiresOn = credential.Token.IssuedUtc + TimeSpan.FromSeconds(credential.Token.ExpiresInSeconds ?? 0)
+            ExpiresOn = credential.Token.IssuedUtc + TimeSpan.FromSeconds(credential.Token.ExpiresInSeconds ?? 0),
+            ClientId = clientId,
+            ClientSecret = clientSecret
         };
         await OAuthTokenCache.SetAsync($"google:{cred.UserName}", cred);
         return cred;
@@ -184,6 +186,10 @@ public static class OAuthHelpers {
         IEnumerable<string> scopes) {
         var cacheKey = $"google:{gmailAccount}";
         var cached = await OAuthTokenCache.GetAsync(cacheKey);
+        if (cached != null) {
+            cached.ClientId ??= clientId;
+            cached.ClientSecret ??= clientSecret;
+        }
         if (cached != null && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
             return cached;
         }
@@ -203,7 +209,9 @@ public static class OAuthHelpers {
                     UserName = gmailAccount,
                     AccessToken = userCred.Token.AccessToken,
                     RefreshToken = userCred.Token.RefreshToken,
-                    ExpiresOn = userCred.Token.IssuedUtc + TimeSpan.FromSeconds(userCred.Token.ExpiresInSeconds ?? 0)
+                    ExpiresOn = userCred.Token.IssuedUtc + TimeSpan.FromSeconds(userCred.Token.ExpiresInSeconds ?? 0),
+                    ClientId = clientId,
+                    ClientSecret = clientSecret
                 };
                 await OAuthTokenCache.SetAsync(cacheKey, newCred);
                 return newCred;

@@ -134,9 +134,31 @@ public sealed class GmailApiClient : IDisposable {
         record.ProviderData[GmailPendingMessageSender.UserIdKey] = userId;
         record.ProviderData[GmailPendingMessageSender.UserNameKey] = userName;
         record.ProviderData[GmailPendingMessageSender.ExpiresOnKey] = expiresOn.ToString("o", CultureInfo.InvariantCulture);
-        record.ProviderData[GmailPendingMessageSender.AccessTokenBase64Key] = Convert.ToBase64String(Encoding.UTF8.GetBytes(accessToken));
+
+        var protector = CredentialProtection.Default;
+        record.ProviderData[GmailPendingMessageSender.AccessTokenProtectedKey] = protector.Protect(accessToken);
+        record.ProviderData.Remove(GmailPendingMessageSender.AccessTokenKey);
+        record.ProviderData.Remove(GmailPendingMessageSender.AccessTokenBase64Key);
         if (!string.IsNullOrEmpty(credential?.RefreshToken)) {
-            record.ProviderData[GmailPendingMessageSender.RefreshTokenBase64Key] = Convert.ToBase64String(Encoding.UTF8.GetBytes(credential.RefreshToken));
+            record.ProviderData[GmailPendingMessageSender.RefreshTokenProtectedKey] = protector.Protect(credential.RefreshToken);
+        }
+        record.ProviderData.Remove(GmailPendingMessageSender.RefreshTokenKey);
+        record.ProviderData.Remove(GmailPendingMessageSender.RefreshTokenBase64Key);
+
+        if (!string.IsNullOrEmpty(credential?.ClientId)) {
+            record.ProviderData[GmailPendingMessageSender.ClientIdKey] = credential.ClientId;
+        }
+
+        if (!string.IsNullOrEmpty(credential?.ClientSecret)) {
+            record.ProviderData[GmailPendingMessageSender.ClientSecretProtectedKey] = protector.Protect(credential.ClientSecret);
+        }
+
+        if (!string.IsNullOrEmpty(credential?.ServiceAccountJson)) {
+            record.ProviderData[GmailPendingMessageSender.ServiceAccountJsonProtectedKey] = protector.Protect(credential.ServiceAccountJson);
+        }
+
+        if (!string.IsNullOrEmpty(credential?.ServiceAccountSubject)) {
+            record.ProviderData[GmailPendingMessageSender.ServiceAccountSubjectKey] = credential.ServiceAccountSubject;
         }
 
         try {
