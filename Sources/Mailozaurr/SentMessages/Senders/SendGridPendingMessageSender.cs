@@ -10,6 +10,7 @@ public sealed class SendGridPendingMessageSender : IPendingMessageSender {
     internal const string MessageJsonKey = "MessageJson";
     internal const string ApiKeyKey = "ApiKey";
     internal const string ApiKeyBase64Key = "ApiKeyBase64";
+    internal const string ApiKeyProtectedKey = "ApiKeyProtected";
     internal const string EndpointKey = "Endpoint";
 
     private static readonly Uri DefaultEndpoint = new("https://api.sendgrid.com/v3/mail/send");
@@ -58,6 +59,13 @@ public sealed class SendGridPendingMessageSender : IPendingMessageSender {
     }
 
     private static string ResolveApiKey(Dictionary<string, string> providerData) {
+        if (providerData.TryGetValue(ApiKeyProtectedKey, out var protectedValue) && !string.IsNullOrWhiteSpace(protectedValue)) {
+            var decrypted = CredentialProtection.UnprotectWithFallback(protectedValue);
+            if (!string.IsNullOrEmpty(decrypted)) {
+                return decrypted;
+            }
+        }
+
         if (providerData.TryGetValue(ApiKeyBase64Key, out var encoded) && !string.IsNullOrWhiteSpace(encoded)) {
             var bytes = Convert.FromBase64String(encoded);
             return Encoding.UTF8.GetString(bytes);

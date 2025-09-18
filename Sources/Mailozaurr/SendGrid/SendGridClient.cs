@@ -426,7 +426,10 @@ public sealed class SendGridClient : IDisposable {
             Provider = EmailProvider.SendGrid
         };
         record.ProviderData[SendGridPendingMessageSender.MessageJsonKey] = MessageJson;
-        record.ProviderData[SendGridPendingMessageSender.ApiKeyBase64Key] = Convert.ToBase64String(Encoding.UTF8.GetBytes(apiKey));
+        var protector = CredentialProtection.Default;
+        record.ProviderData[SendGridPendingMessageSender.ApiKeyProtectedKey] = protector.Protect(apiKey);
+        record.ProviderData.Remove(SendGridPendingMessageSender.ApiKeyKey);
+        record.ProviderData.Remove(SendGridPendingMessageSender.ApiKeyBase64Key);
 
         try {
             await PendingMessageRepository.SaveAsync(record, cancellationToken).ConfigureAwait(false);

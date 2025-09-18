@@ -12,6 +12,8 @@ public sealed class SesPendingMessageSender : IPendingMessageSender {
     internal const string SecretAccessKeyKey = "SecretAccessKey";
     internal const string AccessKeyIdBase64Key = "AccessKeyIdBase64";
     internal const string SecretAccessKeyBase64Key = "SecretAccessKeyBase64";
+    internal const string AccessKeyIdProtectedKey = "AccessKeyIdProtected";
+    internal const string SecretAccessKeyProtectedKey = "SecretAccessKeyProtected";
     internal const string RegionKey = "Region";
 
     private readonly HttpClient httpClient;
@@ -63,6 +65,13 @@ public sealed class SesPendingMessageSender : IPendingMessageSender {
     }
 
     private static string ResolveAccessKey(Dictionary<string, string> providerData) {
+        if (providerData.TryGetValue(AccessKeyIdProtectedKey, out var protectedValue) && !string.IsNullOrWhiteSpace(protectedValue)) {
+            var decrypted = CredentialProtection.UnprotectWithFallback(protectedValue);
+            if (!string.IsNullOrEmpty(decrypted)) {
+                return decrypted;
+            }
+        }
+
         if (providerData.TryGetValue(AccessKeyIdBase64Key, out var encoded) && !string.IsNullOrWhiteSpace(encoded)) {
             var bytes = Convert.FromBase64String(encoded);
             return Encoding.UTF8.GetString(bytes);
@@ -76,6 +85,13 @@ public sealed class SesPendingMessageSender : IPendingMessageSender {
     }
 
     private static string ResolveSecretKey(Dictionary<string, string> providerData) {
+        if (providerData.TryGetValue(SecretAccessKeyProtectedKey, out var protectedValue) && !string.IsNullOrWhiteSpace(protectedValue)) {
+            var decrypted = CredentialProtection.UnprotectWithFallback(protectedValue);
+            if (!string.IsNullOrEmpty(decrypted)) {
+                return decrypted;
+            }
+        }
+
         if (providerData.TryGetValue(SecretAccessKeyBase64Key, out var encoded) && !string.IsNullOrWhiteSpace(encoded)) {
             var bytes = Convert.FromBase64String(encoded);
             return Encoding.UTF8.GetString(bytes);
