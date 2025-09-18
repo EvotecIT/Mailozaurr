@@ -218,12 +218,26 @@ internal sealed class AesCredentialProtector : ICredentialProtector {
 
         var code = (int)((uint)ex.HResult & 0xFFFF);
 
-        return code == ERROR_SHARING_VIOLATION
+        if (code == ERROR_SHARING_VIOLATION
             || code == ERROR_LOCK_VIOLATION
             || code == ERROR_FILE_EXISTS
             || code == ERROR_ALREADY_EXISTS
             || code == ERROR_ACCESS_DENIED
             || code == EACCES
-            || code == EAGAIN;
+            || code == EAGAIN) {
+            return true;
+        }
+
+        if (ex is IOException ioEx) {
+            var message = ioEx.Message;
+            if (!string.IsNullOrEmpty(message)) {
+                if (message.IndexOf("sharing violation", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("used by another process", StringComparison.OrdinalIgnoreCase) >= 0) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }
