@@ -1,5 +1,9 @@
 $pending = Join-Path $PSScriptRoot 'pending'
 
+# Existing pending queues created prior to credential protection will still replay,
+# and the entries will be re-encrypted with the new protector the next time they are
+# saved by the module (for example, after another delivery attempt).
+
 # Review queued messages
 Get-EmailPendingMessage -PendingMessagesPath $pending
 

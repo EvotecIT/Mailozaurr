@@ -101,9 +101,10 @@ public sealed class ProviderPendingMessageTests {
         Assert.False(string.IsNullOrWhiteSpace(record.MessageId));
         Assert.True(record.ProviderData.TryGetValue(SendGridPendingMessageSender.MessageJsonKey, out var json));
         Assert.False(string.IsNullOrWhiteSpace(json));
-        Assert.True(record.ProviderData.TryGetValue(SendGridPendingMessageSender.ApiKeyBase64Key, out var apiKeyBase64));
-        var decodedApiKey = Encoding.UTF8.GetString(Convert.FromBase64String(apiKeyBase64!));
-        Assert.Equal("SG.API", decodedApiKey);
+        Assert.True(record.ProviderData.TryGetValue(SendGridPendingMessageSender.ApiKeyProtectedKey, out var apiKeyProtected));
+        Assert.False(string.IsNullOrWhiteSpace(apiKeyProtected));
+        Assert.Equal("SG.API", CredentialProtection.UnprotectWithFallback(apiKeyProtected));
+        Assert.DoesNotContain(SendGridPendingMessageSender.ApiKeyBase64Key, record.ProviderData.Keys);
 
         var successHandler = new TestHandler((request, _) => {
             Assert.Equal(HttpMethod.Post, request.Method);
@@ -147,8 +148,10 @@ public sealed class ProviderPendingMessageTests {
         Assert.NotNull(record);
         Assert.Equal(EmailProvider.Mailgun, record.Provider);
         Assert.Equal("example.com", record.ProviderData[MailgunPendingMessageSender.DomainKey]);
-        var apiKey = Encoding.UTF8.GetString(Convert.FromBase64String(record.ProviderData[MailgunPendingMessageSender.ApiKeyBase64Key]!));
-        Assert.Equal("mailgun-api-key", apiKey);
+        Assert.True(record.ProviderData.TryGetValue(MailgunPendingMessageSender.ApiKeyProtectedKey, out var mailgunProtected));
+        Assert.False(string.IsNullOrWhiteSpace(mailgunProtected));
+        Assert.Equal("mailgun-api-key", CredentialProtection.UnprotectWithFallback(mailgunProtected));
+        Assert.DoesNotContain(MailgunPendingMessageSender.ApiKeyBase64Key, record.ProviderData.Keys);
         var mime = await MimeMessage.LoadAsync(new MemoryStream(Convert.FromBase64String(record.MimeMessage)));
         Assert.Equal("mailgun", mime.Subject);
 
@@ -262,10 +265,12 @@ public sealed class ProviderPendingMessageTests {
         var record = repository.LastSaved;
         Assert.NotNull(record);
         Assert.Equal(EmailProvider.SES, record.Provider);
-        var accessKey = Encoding.UTF8.GetString(Convert.FromBase64String(record.ProviderData[SesPendingMessageSender.AccessKeyIdBase64Key]!));
-        var secretKey = Encoding.UTF8.GetString(Convert.FromBase64String(record.ProviderData[SesPendingMessageSender.SecretAccessKeyBase64Key]!));
-        Assert.Equal("AKIA123", accessKey);
-        Assert.Equal("secret-key", secretKey);
+        Assert.True(record.ProviderData.TryGetValue(SesPendingMessageSender.AccessKeyIdProtectedKey, out var sesAccessProtected));
+        Assert.True(record.ProviderData.TryGetValue(SesPendingMessageSender.SecretAccessKeyProtectedKey, out var sesSecretProtected));
+        Assert.Equal("AKIA123", CredentialProtection.UnprotectWithFallback(sesAccessProtected));
+        Assert.Equal("secret-key", CredentialProtection.UnprotectWithFallback(sesSecretProtected));
+        Assert.DoesNotContain(SesPendingMessageSender.AccessKeyIdBase64Key, record.ProviderData.Keys);
+        Assert.DoesNotContain(SesPendingMessageSender.SecretAccessKeyBase64Key, record.ProviderData.Keys);
         Assert.Equal("us-east-1", record.ProviderData[SesPendingMessageSender.RegionKey]);
 
         var successHandler = new TestHandler((request, _) => {

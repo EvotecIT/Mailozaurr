@@ -250,7 +250,10 @@ public class MailgunClient : IDisposable {
             Provider = EmailProvider.Mailgun
         };
         record.ProviderData[MailgunPendingMessageSender.DomainKey] = domain;
-        record.ProviderData[MailgunPendingMessageSender.ApiKeyBase64Key] = Convert.ToBase64String(Encoding.UTF8.GetBytes(apiKey));
+        var protector = CredentialProtection.Default;
+        record.ProviderData[MailgunPendingMessageSender.ApiKeyProtectedKey] = protector.Protect(apiKey);
+        record.ProviderData.Remove(MailgunPendingMessageSender.ApiKeyKey);
+        record.ProviderData.Remove(MailgunPendingMessageSender.ApiKeyBase64Key);
 
         try {
             await PendingMessageRepository.SaveAsync(record, cancellationToken).ConfigureAwait(false);

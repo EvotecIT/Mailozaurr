@@ -231,8 +231,13 @@ public class SesClient : IDisposable {
             NextAttemptAt = now,
             Provider = EmailProvider.SES
         };
-        record.ProviderData[SesPendingMessageSender.AccessKeyIdBase64Key] = Convert.ToBase64String(Encoding.UTF8.GetBytes(net.UserName));
-        record.ProviderData[SesPendingMessageSender.SecretAccessKeyBase64Key] = Convert.ToBase64String(Encoding.UTF8.GetBytes(net.Password));
+        var protector = CredentialProtection.Default;
+        record.ProviderData[SesPendingMessageSender.AccessKeyIdProtectedKey] = protector.Protect(net.UserName);
+        record.ProviderData[SesPendingMessageSender.SecretAccessKeyProtectedKey] = protector.Protect(net.Password);
+        record.ProviderData.Remove(SesPendingMessageSender.AccessKeyIdKey);
+        record.ProviderData.Remove(SesPendingMessageSender.AccessKeyIdBase64Key);
+        record.ProviderData.Remove(SesPendingMessageSender.SecretAccessKeyKey);
+        record.ProviderData.Remove(SesPendingMessageSender.SecretAccessKeyBase64Key);
         record.ProviderData[SesPendingMessageSender.RegionKey] = Region;
 
         try
