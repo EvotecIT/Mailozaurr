@@ -29,6 +29,7 @@ public class GmailNonDeliveryReportsTests {
     public async Task SearchNonDeliveryReportsAsync_GmailApi_ReturnsReports() {
         var now = DateTimeOffset.UtcNow;
         var ndr = CreateNdr("user@example.com", "<id1>", now);
+        ndr.Subject = "Undeliverable: Delivery has failed";
         var normal = new MimeMessage();
         normal.Subject = "hello";
         var listJson = "{\"messages\":[{\"id\":\"1\"},{\"id\":\"2\"}]}";
@@ -42,6 +43,20 @@ public class GmailNonDeliveryReportsTests {
         var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
         field.SetValue(client, new HttpClient(handler) { BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/") });
         var reports = await MailboxSearcher.SearchNonDeliveryReportsAsync(client, "me", parallelDownloadLimit: 1, cancellationToken: CancellationToken.None);
+        Assert.NotEmpty(handler.Requests);
+        var listRequest = handler.Requests[0];
+        var uri = listRequest.RequestUri!;
+        string? queryParam = null;
+        var query = uri.Query.TrimStart('?').Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var part in query) {
+            var kvp = part.Split(new[] { '=' }, 2);
+            if (kvp.Length == 2 && kvp[0] == "q") {
+                queryParam = Uri.UnescapeDataString(kvp[1]);
+                break;
+            }
+        }
+        Assert.NotNull(queryParam);
+        Assert.Contains("subject:\"Undeliverable:\"", queryParam, StringComparison.Ordinal);
         Assert.Single(reports);
         Assert.Equal("id1", reports[0].OriginalMessageId);
     }

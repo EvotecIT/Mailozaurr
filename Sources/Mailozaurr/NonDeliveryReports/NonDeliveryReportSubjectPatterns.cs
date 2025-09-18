@@ -8,6 +8,11 @@ internal static class NonDeliveryReportSubjectPatterns {
         "Mail Delivery Subsystem",
         "Failure Notice",
         "Delivery failure",
+        "Undeliverable:",
+        "Delivery has failed to these recipients or groups",
+        "Undeliverable message",
+        "Undeliverable mail",
+        "Your message couldn't be delivered",
     };
 }
 

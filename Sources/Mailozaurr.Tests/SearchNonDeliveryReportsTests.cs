@@ -295,8 +295,10 @@ public class SearchNonDeliveryReportsTests {
             Assert.Equal(1, handler.MimeFetches);
             Assert.NotNull(handler.Filter);
             foreach (var pattern in NonDeliveryReportSubjectPatterns.Values) {
-                Assert.Contains(pattern, handler.Filter!);
+                var expectedPattern = pattern.Replace("'", "''");
+                Assert.Contains(expectedPattern, handler.Filter!, StringComparison.Ordinal);
             }
+            Assert.Contains("contains(subject,'Undeliverable:')", handler.Filter!, StringComparison.Ordinal);
         } finally {
             handlerField.SetValue(client, original);
         }
@@ -330,7 +332,7 @@ public class SearchNonDeliveryReportsTests {
 
             if (uri.AbsolutePath.Contains("/messages/") && uri.AbsolutePath.EndsWith("/$value")) {
                 MimeFetches++;
-                const string raw = "Date: Mon, 1 Jan 2024 00:00:00 +0000\r\nSubject: Mail Delivery Subsystem\r\n\r\nbody";
+                const string raw = "Date: Mon, 1 Jan 2024 00:00:00 +0000\r\nSubject: Undeliverable: Delivery has failed\r\n\r\nbody";
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(raw) });
             }
 
