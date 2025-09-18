@@ -711,6 +711,10 @@ public class Smtp {
                 continue;
             }
 
+            if (record.Provider != EmailProvider.None) {
+                continue;
+            }
+
             MimeMessage message;
             try {
                 var bytes = Convert.FromBase64String(record.MimeMessage);

@@ -72,6 +72,26 @@ public sealed class SmtpPendingMessageTests {
         field.SetValue(smtp, client);
     }
 
+    private static PendingMessageRecord CreatePendingRecord(string messageId, EmailProvider provider) {
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse("a@b.com"));
+        message.To.Add(MailboxAddress.Parse("b@c.com"));
+        message.Subject = $"queued-{messageId}";
+        message.Body = new TextPart("plain") { Text = "body" };
+        message.MessageId = messageId;
+
+        using var ms = new MemoryStream();
+        message.WriteTo(ms);
+
+        return new PendingMessageRecord {
+            MessageId = messageId,
+            MimeMessage = Convert.ToBase64String(ms.ToArray()),
+            Timestamp = DateTimeOffset.UtcNow,
+            NextAttemptAt = DateTimeOffset.UtcNow,
+            Provider = provider
+        };
+    }
+
     [Fact]
     public void PendingMessagesPathCreatesRepository() {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
@@ -274,6 +294,31 @@ public sealed class SmtpPendingMessageTests {
         Assert.Equal("msg-4", sent.Saved[0].MessageId);
         Assert.Single(pending.Removed);
         Assert.Equal("msg-4", pending.Removed[0]);
+    }
+
+    [Fact]
+    public async Task ProcessPendingMessages_SkipsRecordsForOtherProviders() {
+        var pending = new InMemoryPendingRepository();
+        var sent = new InMemorySentRepository();
+        var smtp = new Smtp { PendingMessageRepository = pending, SentMessageRepository = sent };
+        SetClient(smtp, new SuccessClient());
+
+        var smtpRecord = CreatePendingRecord("msg-smtp", EmailProvider.None);
+        var gmailRecord = CreatePendingRecord("msg-gmail", EmailProvider.Gmail);
+
+        await pending.SaveAsync(smtpRecord);
+        await pending.SaveAsync(gmailRecord);
+
+        var expectedNextAttempt = gmailRecord.NextAttemptAt;
+
+        await smtp.ProcessPendingMessagesAsync();
+
+        Assert.Single(pending.Removed);
+        Assert.Equal("msg-smtp", pending.Removed[0]);
+        Assert.DoesNotContain("msg-gmail", pending.Removed);
+        Assert.Equal(expectedNextAttempt, gmailRecord.NextAttemptAt);
+        var sentRecord = Assert.Single(sent.Saved);
+        Assert.Equal("msg-smtp", sentRecord.MessageId);
     }
 }
 
