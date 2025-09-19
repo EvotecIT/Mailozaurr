@@ -16,7 +16,7 @@ namespace Mailozaurr;
 /// </remarks>
 public class Pop3PollListener : IDisposable {
     private readonly Pop3Client _client;
-    private int _seenCount;
+    private readonly HashSet<string> _knownUids = new HashSet<string>(StringComparer.Ordinal);
     private CancellationTokenSource? _cancel;
     private readonly TimeSpan _interval;
 
@@ -43,15 +43,21 @@ public class Pop3PollListener : IDisposable {
     /// <summary>
     /// Starts listening for new messages.
     /// </summary>
-    public Task StartAsync(CancellationToken cancellationToken = default) {
+    public async Task StartAsync(CancellationToken cancellationToken = default) {
         if (_cancel != null) {
             throw new InvalidOperationException("Listener already started.");
         }
 
         _cancel = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _seenCount = _client.Count;
+        _knownUids.Clear();
+        var count = GetMessageCount();
+        for (var i = 0; i < count; i++) {
+            var uid = await GetMessageUidAsync(i, _cancel.Token).ConfigureAwait(false);
+            if (!string.IsNullOrEmpty(uid)) {
+                _knownUids.Add(uid);
+            }
+        }
         _ = PollLoopAsync();
-        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -62,24 +68,77 @@ public class Pop3PollListener : IDisposable {
     private async Task PollLoopAsync() {
         while (!_cancel!.IsCancellationRequested) {
             try {
-                await Task.Delay(_interval, _cancel.Token).ConfigureAwait(false);
-                await _client.NoOpAsync(_cancel.Token).ConfigureAwait(false);
-                var count = _client.Count;
-                if (count > _seenCount) {
-                    for (var i = _seenCount; i < count; i++) {
-                        var message = await _client.GetMessageAsync(i, _cancel.Token).ConfigureAwait(false);
-                        MessageArrived?.Invoke(this, new Pop3EmailMessage(i, message));
+                await DelayAsync(_interval, _cancel.Token).ConfigureAwait(false);
+                await NoOpAsync(_cancel.Token).ConfigureAwait(false);
+                var count = GetMessageCount();
+                var currentUids = new HashSet<string>(StringComparer.Ordinal);
+                for (var i = 0; i < count; i++) {
+                    var uid = await GetMessageUidAsync(i, _cancel.Token).ConfigureAwait(false);
+                    if (string.IsNullOrEmpty(uid)) {
+                        continue;
                     }
-                    _seenCount = count;
+
+                    currentUids.Add(uid);
+
+                    if (_knownUids.Contains(uid)) {
+                        continue;
+                    }
+
+                    var message = await GetMessageAsync(i, _cancel.Token).ConfigureAwait(false);
+                    MessageArrived?.Invoke(this, new Pop3EmailMessage(i, message));
+                    _knownUids.Add(uid);
                 }
+
+                _knownUids.IntersectWith(currentUids);
             } catch (OperationCanceledException) when (_cancel.IsCancellationRequested) {
                 break;
             } catch (Exception ex) {
                 PollError?.Invoke(this, ex);
-                await Task.Delay(TimeSpan.FromSeconds(5), _cancel.Token).ConfigureAwait(false);
+                await DelayAsync(TimeSpan.FromSeconds(5), _cancel.Token).ConfigureAwait(false);
             }
         }
     }
+
+    /// <summary>
+    /// Retrieves the total number of messages in the current mailbox.
+    /// </summary>
+    /// <returns>The number of messages available.</returns>
+    protected virtual int GetMessageCount() => _client.Count;
+
+    /// <summary>
+    /// Retrieves a message UID by index.
+    /// </summary>
+    /// <param name="index">Message index.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The message UID.</returns>
+    protected virtual Task<string> GetMessageUidAsync(int index, CancellationToken cancellationToken) =>
+        _client.GetMessageUidAsync(index, cancellationToken);
+
+    /// <summary>
+    /// Retrieves a message by index.
+    /// </summary>
+    /// <param name="index">Message index.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The message.</returns>
+    protected virtual Task<MimeMessage> GetMessageAsync(int index, CancellationToken cancellationToken) =>
+        _client.GetMessageAsync(index, cancellationToken);
+
+    /// <summary>
+    /// Sends a NOOP command to keep the POP3 connection alive.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    protected virtual Task NoOpAsync(CancellationToken cancellationToken) =>
+        _client.NoOpAsync(cancellationToken);
+
+    /// <summary>
+    /// Delays the polling loop execution.
+    /// </summary>
+    /// <param name="interval">Delay interval.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    protected virtual Task DelayAsync(TimeSpan interval, CancellationToken cancellationToken) =>
+        Task.Delay(interval, cancellationToken);
 
     /// <inheritdoc />
     public void Dispose() {
