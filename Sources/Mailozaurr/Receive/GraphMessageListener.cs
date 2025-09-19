@@ -12,7 +12,7 @@ namespace Mailozaurr;
 /// The listener keeps track of message IDs to avoid raising duplicate
 /// notifications during polling.
 /// </remarks>
-public class GraphMessageListener : IDisposable {
+public class GraphMessageListener : IDisposable, IAsyncDisposable {
     private readonly GraphCredential _credential;
     private readonly string _userPrincipalName;
     private readonly HashSet<string> _seenIds = new();
@@ -66,20 +66,35 @@ public class GraphMessageListener : IDisposable {
     /// Stops listening for new messages.
     /// </summary>
     public void Stop() {
-        if (_cancel == null) {
+        StopAsync(CancellationToken.None).GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Stops listening for new messages.
+    /// </summary>
+    /// <param name="cancellationToken">Token used to cancel waiting for the polling loop to complete.</param>
+    public async Task StopAsync(CancellationToken cancellationToken) {
+        var cancel = _cancel;
+        if (cancel == null) {
             return;
         }
 
-        _cancel.Cancel();
-        try {
-            _pollTask?.GetAwaiter().GetResult();
-        } catch (OperationCanceledException) {
-            // ignored
-        }
+        Task? pollTask = _pollTask;
+        cancel.Cancel();
 
-        _cancel.Dispose();
-        _cancel = null;
-        _pollTask = null;
+        try {
+            if (pollTask != null) {
+                try {
+                    await WaitWithCancellationAsync(pollTask, cancellationToken).ConfigureAwait(false);
+                } catch (OperationCanceledException) when (cancel.IsCancellationRequested && !cancellationToken.IsCancellationRequested) {
+                    // Expected cancellation from the listener itself.
+                }
+            }
+        } finally {
+            cancel.Dispose();
+            _cancel = null;
+            _pollTask = null;
+        }
     }
 
     private async Task PollLoopAsync() {
@@ -104,8 +119,33 @@ public class GraphMessageListener : IDisposable {
 
     /// <inheritdoc />
     public void Dispose() {
-        Stop();
-        _cancel?.Dispose();
-        _cancel = null;
+        DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync() {
+        await StopAsync(CancellationToken.None).ConfigureAwait(false);
+        GC.SuppressFinalize(this);
+    }
+
+    private static async Task WaitWithCancellationAsync(Task task, CancellationToken cancellationToken) {
+        if (!cancellationToken.CanBeCanceled) {
+            await task.ConfigureAwait(false);
+            return;
+        }
+
+        if (task.IsCompleted) {
+            await task.ConfigureAwait(false);
+            return;
+        }
+
+        var tcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using (cancellationToken.Register(static state => ((TaskCompletionSource<object?>)state!).TrySetResult(null), tcs)) {
+            if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false)) {
+                throw new OperationCanceledException(cancellationToken);
+            }
+        }
+
+        await task.ConfigureAwait(false);
     }
 }

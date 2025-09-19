@@ -66,7 +66,7 @@ public class GraphMessageListenerTests {
             var first = cancelField.GetValue(listener);
             var firstPoll = pollField.GetValue(listener);
             await Task.Delay(20);
-            listener.Dispose();
+            await listener.StopAsync(CancellationToken.None);
             Assert.Null(cancelField.GetValue(listener));
             Assert.Null(pollField.GetValue(listener));
 
@@ -87,4 +87,23 @@ public class GraphMessageListenerTests {
         } finally {
             handlerField.SetValue(client, original);
         }
-    }}
+    }
+
+    [Fact]
+    public async Task StopAsync_WhenPollingTaskFaults_PropagatesException() {
+        var cred = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
+        var listener = new GraphMessageListener(cred, "user", TimeSpan.FromSeconds(1));
+
+        var cancelField = typeof(GraphMessageListener).GetField("_cancel", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var pollField = typeof(GraphMessageListener).GetField("_pollTask", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        var cts = new CancellationTokenSource();
+        cancelField.SetValue(listener, cts);
+        var exception = new InvalidOperationException("boom");
+        pollField.SetValue(listener, Task.FromException(exception));
+
+        var thrown = await Assert.ThrowsAsync<InvalidOperationException>(() => listener.StopAsync(CancellationToken.None));
+        Assert.Same(exception, thrown);
+    }
+}
+}
