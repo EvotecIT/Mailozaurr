@@ -1,4 +1,8 @@
+using System;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
+using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Search;
 using Xunit;
@@ -18,4 +22,49 @@ public class ImapIdleListenerTests {
 
         Assert.Equal(query, field);
     }
+
+    [Fact]
+    public async Task StopAsync_CancelsIdleLoopGracefully() {
+        var listener = new ImapIdleListener(new ImapClient());
+        var cancellation = new CancellationTokenSource();
+        var idleCompletion = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        SetPrivateField(listener, "_cancel", cancellation);
+        SetPrivateField(listener, "_idleTask", idleCompletion.Task);
+
+        var stopTask = listener.StopAsync();
+
+        Assert.True(cancellation.IsCancellationRequested);
+        Assert.False(stopTask.IsCompleted, "StopAsync completed before the idle loop finished.");
+
+        idleCompletion.SetResult(null);
+
+        await stopTask;
+
+        Assert.Null(GetPrivateField<CancellationTokenSource?>(listener, "_cancel"));
+        Assert.Null(GetPrivateField<Task?>(listener, "_idleTask"));
+    }
+
+    [Fact]
+    public async Task StopAsync_PropagatesExceptionsFromIdleLoop() {
+        var listener = new ImapIdleListener(new ImapClient());
+        var cancellation = new CancellationTokenSource();
+        var idleFailure = new InvalidOperationException("Idle loop faulted");
+
+        SetPrivateField(listener, "_cancel", cancellation);
+        SetPrivateField(listener, "_idleTask", Task.FromException(idleFailure));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => listener.StopAsync());
+
+        Assert.Same(idleFailure, exception);
+        Assert.True(cancellation.IsCancellationRequested);
+        Assert.Null(GetPrivateField<Task?>(listener, "_idleTask"));
+        Assert.Null(GetPrivateField<CancellationTokenSource?>(listener, "_cancel"));
+    }
+
+    private static void SetPrivateField<T>(ImapIdleListener listener, string name, T value) =>
+        typeof(ImapIdleListener).GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(listener, value);
+
+    private static T? GetPrivateField<T>(ImapIdleListener listener, string name) =>
+        (T?)typeof(ImapIdleListener).GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(listener);
 }
