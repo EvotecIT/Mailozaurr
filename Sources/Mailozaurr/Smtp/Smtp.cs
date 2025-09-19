@@ -379,6 +379,19 @@ public class Smtp {
     }
 
     /// <summary>
+    /// Asynchronously saves the constructed message to the specified path.
+    /// </summary>
+    /// <param name="path">Destination file path.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    public Task SaveMessageAsync(string path, CancellationToken cancellationToken = default) {
+        if (string.IsNullOrWhiteSpace(path)) {
+            return Task.CompletedTask;
+        }
+
+        return Client.SaveMessageAsync(path, cancellationToken);
+    }
+
+    /// <summary>
     /// Connect to the SMTP server using the provided server and port.
     /// </summary>
     /// <param name="server"></param>

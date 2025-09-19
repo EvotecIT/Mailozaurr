@@ -1,4 +1,5 @@
 using System.Threading;
+using System.Threading.Tasks;
 using MimeKit.Utils;
 
 namespace Mailozaurr;
@@ -267,6 +268,22 @@ public partial class ClientSmtp : SmtpClient {
             Directory.CreateDirectory(directory);
         }
         Message.WriteTo(path);
+    }
+
+    /// <summary>
+    /// Asynchronously saves the constructed message to the specified file path.
+    /// </summary>
+    /// <param name="path">Destination file path.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    public async Task SaveMessageAsync(string path, CancellationToken cancellationToken = default) {
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory)) {
+            Directory.CreateDirectory(directory);
+        }
+
+        using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 4096, useAsync: true);
+        await Message.WriteToAsync(stream, cancellationToken).ConfigureAwait(false);
+        await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private IEnumerable<MailboxAddress> ConvertToMailboxAddressesUnique(IEnumerable<object>? inputs, HashSet<string> seen) {
