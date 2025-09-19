@@ -1,11 +1,11 @@
-using MailKit;
-using MailKit.Net.Imap;
-using MailKit.Search;
-using MimeKit;
 using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using MailKit;
+using MailKit.Net.Imap;
+using MailKit.Search;
+using MimeKit;
 
 namespace Mailozaurr;
 
@@ -16,7 +16,7 @@ namespace Mailozaurr;
 /// An internal cache of <see cref="IMessageSummary"/> objects is maintained
 /// to ensure each message is reported only once per session.
 /// </remarks>
-public class ImapIdleListener : IDisposable {
+public class ImapIdleListener : IDisposable, IAsyncDisposable {
     private readonly ImapClient _client;
     private readonly string? _folderName;
     private readonly List<IMessageSummary> _summaries = new();
@@ -27,6 +27,8 @@ public class ImapIdleListener : IDisposable {
     private CancellationTokenSource? _cancel;
     private CancellationTokenSource? _done;
     private bool _messagesArrived;
+    private Task? _idleTask;
+    private bool _disposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ImapIdleListener"/> class.
@@ -54,6 +56,10 @@ public class ImapIdleListener : IDisposable {
     /// Starts listening for new messages.
     /// </summary>
     public async Task StartAsync(CancellationToken cancellationToken = default) {
+        if (_disposed) {
+            throw new ObjectDisposedException(nameof(ImapIdleListener));
+        }
+
         if (_cancel != null) {
             throw new InvalidOperationException("Listener already started.");
         }
@@ -74,7 +80,7 @@ public class ImapIdleListener : IDisposable {
         _folder.CountChanged += OnCountChanged;
         _folder.MessageExpunged += OnMessageExpunged;
 
-        _ = IdleLoopAsync();
+        _idleTask = IdleLoopAsync();
     }
 
     /// <summary>
@@ -82,21 +88,48 @@ public class ImapIdleListener : IDisposable {
     /// </summary>
     public void Stop() => _cancel?.Cancel();
 
-    private async Task IdleLoopAsync() {
-        while (!_cancel!.IsCancellationRequested) {
-            try {
-                await WaitForNewMessagesAsync().ConfigureAwait(false);
+    /// <summary>
+    /// Stops listening for new messages and waits for the listener loop to finish.
+    /// </summary>
+    public async Task StopAsync() {
+        var idleTask = _idleTask;
 
-                if (_messagesArrived) {
-                    await FetchNewMessagesAsync().ConfigureAwait(false);
-                    _messagesArrived = false;
-                }
-            } catch (OperationCanceledException) when (_cancel.IsCancellationRequested) {
-                break;
-            } catch (Exception ex) {
-                IdleError?.Invoke(this, ex);
-                await Task.Delay(TimeSpan.FromSeconds(5), _cancel.Token).ConfigureAwait(false);
+        Stop();
+
+        if (idleTask == null) {
+            Cleanup();
+            return;
+        }
+
+        try {
+            await idleTask.ConfigureAwait(false);
+        } finally {
+            Cleanup();
+            if (ReferenceEquals(_idleTask, idleTask)) {
+                _idleTask = null;
             }
+        }
+    }
+
+    private async Task IdleLoopAsync() {
+        try {
+            while (!_cancel!.IsCancellationRequested) {
+                try {
+                    await WaitForNewMessagesAsync().ConfigureAwait(false);
+
+                    if (_messagesArrived) {
+                        await FetchNewMessagesAsync().ConfigureAwait(false);
+                        _messagesArrived = false;
+                    }
+                } catch (OperationCanceledException) when (_cancel.IsCancellationRequested) {
+                    break;
+                } catch (Exception ex) {
+                    IdleError?.Invoke(this, ex);
+                    await Task.Delay(TimeSpan.FromSeconds(5), _cancel.Token).ConfigureAwait(false);
+                }
+            }
+        } finally {
+            Cleanup();
         }
     }
 
@@ -153,10 +186,55 @@ public class ImapIdleListener : IDisposable {
 
     /// <inheritdoc />
     public void Dispose() {
-        Stop();
+        if (_disposed) {
+            return;
+        }
+
+        _disposed = true;
+
+        try {
+            Stop();
+
+            var idleTask = _idleTask;
+            if (idleTask != null) {
+                idleTask.GetAwaiter().GetResult();
+            }
+        } finally {
+            Cleanup();
+            _idleTask = null;
+            GC.SuppressFinalize(this);
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync() {
+        if (_disposed) {
+            return;
+        }
+
+        _disposed = true;
+
+        try {
+            await StopAsync().ConfigureAwait(false);
+        } finally {
+            _idleTask = null;
+            GC.SuppressFinalize(this);
+        }
+    }
+
+    private void Cleanup() {
         if (_folder != null) {
             _folder.CountChanged -= OnCountChanged;
             _folder.MessageExpunged -= OnMessageExpunged;
+            _folder = null;
         }
+
+        _done?.Dispose();
+        _done = null;
+
+        _cancel?.Dispose();
+        _cancel = null;
+
+        _messagesArrived = false;
     }
 }
