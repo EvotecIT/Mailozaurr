@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using MailKit;
 using MimeKit;
 
@@ -319,6 +320,66 @@ public sealed class SmtpPendingMessageTests {
         Assert.Equal(expectedNextAttempt, gmailRecord.NextAttemptAt);
         var sentRecord = Assert.Single(sent.Saved);
         Assert.Equal("msg-smtp", sentRecord.MessageId);
+    }
+
+    [Fact]
+    public async Task SaveMessageAsync_WritesMessageToFile() {
+        var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var path = Path.Combine(tempDir, "message.eml");
+        var smtp = new Smtp();
+
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse("async@from.com"));
+        message.To.Add(MailboxAddress.Parse("async@to.com"));
+        message.Subject = "async-save";
+        message.Body = new TextPart("plain") { Text = "body" };
+        message.MessageId = $"async-{Guid.NewGuid():N}";
+        smtp.Message = message;
+
+        try {
+            await smtp.SaveMessageAsync(path);
+
+            Assert.True(File.Exists(path));
+            using var stream = File.OpenRead(path);
+            var loaded = await MimeMessage.LoadAsync(stream);
+            Assert.Equal(message.MessageId, loaded.MessageId);
+            var body = Assert.IsType<TextPart>(loaded.Body);
+            Assert.Equal("body", body.Text.TrimEnd('\r', '\n'));
+        } finally {
+            if (Directory.Exists(tempDir)) {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task SaveMessageAsync_RespectsCancellation() {
+        var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var path = Path.Combine(tempDir, "message.eml");
+        var smtp = new Smtp();
+
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse("async@from.com"));
+        message.To.Add(MailboxAddress.Parse("async@to.com"));
+        message.Subject = "async-cancel";
+        message.Body = new TextPart("plain") { Text = "body" };
+        smtp.Message = message;
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        try {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => smtp.SaveMessageAsync(path, cts.Token));
+
+            if (File.Exists(path)) {
+                var info = new FileInfo(path);
+                Assert.Equal(0, info.Length);
+            }
+        } finally {
+            if (Directory.Exists(tempDir)) {
+                Directory.Delete(tempDir, true);
+            }
+        }
     }
 }
 
