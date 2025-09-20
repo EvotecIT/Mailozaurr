@@ -353,19 +353,17 @@ public class Smtp {
     /// Creates the MIME message using the current property values.
     /// </summary>
     public void CreateMessage(CancellationToken cancellationToken = default) {
-        if (AutoEmbedImages) {
-            var (html, paths) = HtmlUtils.ExtractLocalImagePaths(HtmlBody);
-            HtmlBody = html;
-            if (paths.Count > 0) {
-                InlineAttachments ??= new List<object>();
-                foreach (var p in paths) {
-                    if (!InlineAttachments.Contains(p)) {
-                        InlineAttachments.Add(p);
-                    }
-                }
-            }
-        }
+        PrepareInlineAttachments();
         Client.CreateMessage(cancellationToken);
+    }
+
+    /// <summary>
+    /// Asynchronously creates the MIME message using the current property values.
+    /// </summary>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    public async Task CreateMessageAsync(CancellationToken cancellationToken = default) {
+        PrepareInlineAttachments();
+        await Client.CreateMessageAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -389,6 +387,25 @@ public class Smtp {
         }
 
         return Client.SaveMessageAsync(path, cancellationToken);
+    }
+
+    private void PrepareInlineAttachments() {
+        if (!AutoEmbedImages) {
+            return;
+        }
+
+        var (html, paths) = HtmlUtils.ExtractLocalImagePaths(HtmlBody);
+        HtmlBody = html;
+        if (paths.Count <= 0) {
+            return;
+        }
+
+        InlineAttachments ??= new List<object>();
+        foreach (var path in paths) {
+            if (!InlineAttachments.Contains(path)) {
+                InlineAttachments.Add(path);
+            }
+        }
     }
 
     /// <summary>

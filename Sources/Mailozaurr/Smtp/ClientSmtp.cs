@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using MimeKit.Utils;
@@ -113,11 +114,27 @@ public partial class ClientSmtp : SmtpClient {
     /// </summary>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     public void CreateMessage(CancellationToken cancellationToken = default) {
+        var task = Task.Run(
+            async () => await CreateMessageAsync(cancellationToken).ConfigureAwait(false),
+            cancellationToken);
+        try {
+            task.Wait(cancellationToken);
+        } catch (AggregateException ex) when (ex.InnerExceptions.Count == 1) {
+            ExceptionDispatchInfo.Capture(ex.InnerExceptions[0]).Throw();
+        }
+    }
+
+    /// <summary>
+    /// Asynchronously builds the <see cref="MimeMessage"/> based on the configured properties.
+    /// </summary>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    public async Task CreateMessageAsync(CancellationToken cancellationToken = default) {
+        cancellationToken.ThrowIfCancellationRequested();
         InlineAttachments ??= new List<object>();
         var message = new MimeMessage();
         AddAddressesToMessage(message);
         SetMessagePriority(message);
-        BuildMessageBody(message, cancellationToken);
+        await BuildMessageBodyAsync(message, cancellationToken).ConfigureAwait(false);
         message.Subject = Subject;
         AddHeaders(message);
         Message = message;
@@ -167,7 +184,8 @@ public partial class ClientSmtp : SmtpClient {
         }
     }
 
-    private void BuildMessageBody(MimeMessage message, CancellationToken cancellationToken) {
+    private async Task BuildMessageBodyAsync(MimeMessage message, CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
         var bodyBuilder = new BodyBuilder();
         if (!string.IsNullOrWhiteSpace(HtmlBody)) {
             bodyBuilder.HtmlBody = HtmlBody;
@@ -234,7 +252,8 @@ public partial class ClientSmtp : SmtpClient {
             }
         }
         if (AutoEmbedRemoteImages && !string.IsNullOrWhiteSpace(bodyBuilder.HtmlBody)) {
-            var (html, images) = HtmlUtils.DownloadRemoteImagesAsync(bodyBuilder.HtmlBody, cancellationToken).GetAwaiter().GetResult();
+            var (html, images) = await HtmlUtils.DownloadRemoteImagesAsync(bodyBuilder.HtmlBody, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             bodyBuilder.HtmlBody = html;
             HtmlBody = html;
             foreach (var img in images) {
@@ -248,6 +267,7 @@ public partial class ClientSmtp : SmtpClient {
                 bodyBuilder.LinkedResources.Add(part);
             }
         }
+        cancellationToken.ThrowIfCancellationRequested();
         message.Body = bodyBuilder.ToMessageBody();
     }
 
