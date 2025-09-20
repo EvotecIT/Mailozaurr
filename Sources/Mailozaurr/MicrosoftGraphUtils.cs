@@ -466,9 +466,10 @@ namespace Mailozaurr {
         /// <summary>
         /// Retrieves mail messages for the specified user.
         /// </summary>
-        public static async Task<List<Dictionary<string, object>>> GetMailMessagesAsync(GraphCredential credential, string userPrincipalName, IEnumerable<string>? properties = null, string? filter = null, int? limit = null) {
+        public static async Task<List<Dictionary<string, object>>> GetMailMessagesAsync(GraphCredential credential, string userPrincipalName, IEnumerable<string>? properties = null, string? filter = null, int? limit = null, CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
             var headers = new Dictionary<string, string>();
-            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com", cancellationToken).ConfigureAwait(false);
             headers["Authorization"] = token ?? string.Empty;
             var queryParams = new Dictionary<string, object>();
             if (!string.IsNullOrWhiteSpace(filter)) queryParams["$filter"] = filter!;
@@ -476,9 +477,11 @@ namespace Mailozaurr {
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages", queryParams);
             var messages = new List<Dictionary<string, object>>();
             while (!string.IsNullOrEmpty(uri)) {
-                var doc = await InvokeGraphApiAsync("GET", uri, headers).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                var doc = await InvokeGraphApiAsync("GET", uri, headers, cancellationToken: cancellationToken).ConfigureAwait(false);
                 if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
                     foreach (var item in valueElement.EnumerateArray()) {
+                        cancellationToken.ThrowIfCancellationRequested();
                         var native = ConvertJsonElementToNativeObject(item) as Dictionary<string, object>;
                         if (native != null) {
                             messages.Add(native);
@@ -503,17 +506,19 @@ namespace Mailozaurr {
         /// <summary>
         /// Retrieves attachments for a specific message.
         /// </summary>
-        public static async Task<List<Attachment>> GetMailMessageAttachmentsAsync(GraphCredential credential, string userPrincipalName, string messageId, IEnumerable<string>? properties = null) {
+        public static async Task<List<Attachment>> GetMailMessageAttachmentsAsync(GraphCredential credential, string userPrincipalName, string messageId, IEnumerable<string>? properties = null, CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
             var headers = new Dictionary<string, string>();
-            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com", cancellationToken).ConfigureAwait(false);
             headers["Authorization"] = token;
             var queryParams = new Dictionary<string, object>();
             if (properties != null && properties.Any()) queryParams["$select"] = string.Join(",", properties);
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages/{messageId}/attachments", queryParams);
-            var doc = await InvokeGraphApiAsync("GET", uri, headers).ConfigureAwait(false);
+            var doc = await InvokeGraphApiAsync("GET", uri, headers, cancellationToken: cancellationToken).ConfigureAwait(false);
             var attachments = new List<Attachment>();
             if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
                 foreach (var item in valueElement.EnumerateArray()) {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var att = JsonSerializer.Deserialize<Attachment>(item.GetRawText());
                     if (att != null) {
                         attachments.Add(att);
@@ -526,15 +531,17 @@ namespace Mailozaurr {
         /// <summary>
         /// Lists mail folders for the specified user.
         /// </summary>
-        public static async Task<List<JsonElement>> GetMailFoldersAsync(GraphCredential credential, string userPrincipalName) {
+        public static async Task<List<JsonElement>> GetMailFoldersAsync(GraphCredential credential, string userPrincipalName, CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
             var headers = new Dictionary<string, string>();
-            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com", cancellationToken).ConfigureAwait(false);
             headers["Authorization"] = token;
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/mailFolders");
-            var doc = await InvokeGraphApiAsync("GET", uri, headers).ConfigureAwait(false);
+            var doc = await InvokeGraphApiAsync("GET", uri, headers, cancellationToken: cancellationToken).ConfigureAwait(false);
             var folders = new List<JsonElement>();
             if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
                 foreach (var item in valueElement.EnumerateArray()) {
+                    cancellationToken.ThrowIfCancellationRequested();
                     folders.Add(item);
                 }
             }
