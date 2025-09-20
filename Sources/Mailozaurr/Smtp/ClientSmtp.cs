@@ -210,6 +210,9 @@ public partial class ClientSmtp : SmtpClient {
                     case MimeEntity entity:
                         bodyBuilder.Attachments.Add(entity);
                         break;
+                    case SmtpAttachmentDescriptor descriptor:
+                        bodyBuilder.Attachments.Add(descriptor.CreateMimeEntity(inline: false));
+                        break;
                 }
             }
         }
@@ -244,6 +247,10 @@ public partial class ClientSmtp : SmtpClient {
                     case MimeEntity mime:
                         bodyBuilder.LinkedResources.Add(mime);
                         entity = mime;
+                        break;
+                    case SmtpAttachmentDescriptor descriptor:
+                        entity = descriptor.CreateMimeEntity(inline: true);
+                        bodyBuilder.LinkedResources.Add(entity);
                         break;
                 }
                 if (entity is MimePart inlinePart && string.IsNullOrWhiteSpace(inlinePart.ContentId)) {
