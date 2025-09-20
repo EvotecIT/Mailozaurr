@@ -1,7 +1,9 @@
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using MimeKit;
+using System.Text.Json;
 
 namespace Mailozaurr.Tests;
 
@@ -112,19 +114,104 @@ public sealed class FilePendingMessageRepositoryTests {
             Assert.Equal(updated.Provider, loaded.Provider);
             Assert.Equal(updated.NextAttemptAt, loaded.NextAttemptAt);
 
-            var nonEmptyLines = 0;
-            foreach (var line in File.ReadAllLines(filePath)) {
-                if (!string.IsNullOrWhiteSpace(line)) {
-                    nonEmptyLines++;
-                }
-            }
+            var lines = File.ReadAllLines(filePath).Where(line => !string.IsNullOrWhiteSpace(line)).ToList();
 
-            Assert.Equal(1, nonEmptyLines);
+            Assert.Equal(2, lines.Count);
+
+            using (var json = JsonDocument.Parse(lines[1])) {
+                Assert.True(TryGetProperty(json.RootElement, "EntryType", out var entryTypeElement));
+                Assert.Equal("upsert", entryTypeElement.GetString(), StringComparer.OrdinalIgnoreCase);
+            }
 
             var records = await ReadAllAsync(repo);
             Assert.Single(records);
             Assert.Equal(messageId, records[0].MessageId);
             Assert.Equal(updated.AttemptCount, records[0].AttemptCount);
+        } finally {
+            if (File.Exists(filePath)) {
+                File.Delete(filePath);
+            }
+            if (Directory.Exists(dir)) {
+                Directory.Delete(dir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task SaveAsync_PerformsCompactionWhenThresholdReached() {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var options = new PendingMessageRepositoryOptions { DirectoryPath = dir, FileNamingScheme = () => "pending.log" };
+        var filePath = Path.Combine(dir, "pending.log");
+        Directory.CreateDirectory(dir);
+
+        try {
+            var repo = new FilePendingMessageRepository(options);
+            var thresholdField = typeof(FilePendingMessageRepository).GetField("DefaultCompactionThreshold", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.NotNull(thresholdField);
+            var threshold = (int)thresholdField!.GetValue(null)!;
+            var totalOperations = threshold + 5;
+
+            var record = new PendingMessageRecord {
+                MessageId = Guid.NewGuid().ToString("N"),
+                Timestamp = DateTimeOffset.UtcNow,
+                Provider = EmailProvider.SendGrid
+            };
+
+            for (var i = 0; i < totalOperations; i++) {
+                record.AttemptCount = i;
+                record.NextAttemptAt = DateTimeOffset.UtcNow.AddMinutes(i);
+                await repo.SaveAsync(record);
+            }
+
+            var lines = File.ReadAllLines(filePath).Where(line => !string.IsNullOrWhiteSpace(line)).ToList();
+            Assert.True(lines.Count < totalOperations, $"Expected compaction to reduce log size. Entries: {lines.Count}, operations: {totalOperations}");
+
+            var loaded = await repo.GetByMessageIdAsync(record.MessageId);
+            Assert.NotNull(loaded);
+            Assert.Equal(record.AttemptCount, loaded!.AttemptCount);
+        } finally {
+            if (File.Exists(filePath)) {
+                File.Delete(filePath);
+            }
+            if (Directory.Exists(dir)) {
+                Directory.Delete(dir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task RemoveAsync_AppendsTombstoneEntry() {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var options = new PendingMessageRepositoryOptions { DirectoryPath = dir, FileNamingScheme = () => "pending.log" };
+        var filePath = Path.Combine(dir, "pending.log");
+        Directory.CreateDirectory(dir);
+
+        try {
+            var repo = new FilePendingMessageRepository(options);
+            var record = new PendingMessageRecord {
+                MessageId = Guid.NewGuid().ToString("N"),
+                Timestamp = DateTimeOffset.UtcNow,
+                Provider = EmailProvider.Mailgun
+            };
+
+            await repo.SaveAsync(record);
+
+            await repo.RemoveAsync(record.MessageId);
+
+            var lines = File.ReadAllLines(filePath).Where(line => !string.IsNullOrWhiteSpace(line)).ToList();
+            Assert.Equal(2, lines.Count);
+
+            var lastLine = lines[lines.Count - 1];
+
+            using (var json = JsonDocument.Parse(lastLine)) {
+                Assert.True(TryGetProperty(json.RootElement, "EntryType", out var entryTypeElement));
+                Assert.Equal("tombstone", entryTypeElement.GetString(), StringComparer.OrdinalIgnoreCase);
+                Assert.True(TryGetProperty(json.RootElement, "MessageId", out var messageIdElement));
+                Assert.Equal(record.MessageId, messageIdElement.GetString());
+            }
+
+            var loaded = await repo.GetByMessageIdAsync(record.MessageId);
+            Assert.Null(loaded);
         } finally {
             if (File.Exists(filePath)) {
                 File.Delete(filePath);
@@ -142,5 +229,17 @@ public sealed class FilePendingMessageRepositoryTests {
         }
 
         return records;
+    }
+
+    private static bool TryGetProperty(JsonElement element, string propertyName, out JsonElement value) {
+        foreach (var property in element.EnumerateObject()) {
+            if (string.Equals(property.Name, propertyName, StringComparison.OrdinalIgnoreCase)) {
+                value = property.Value;
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
     }
 }
