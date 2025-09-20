@@ -14,12 +14,31 @@ public class Pop3PollListenerTests {
     public void Dispose_DisposesCancellationTokenSourceAndNullsField() {
         var listener = new Pop3PollListener(new Pop3Client());
         var field = typeof(Pop3PollListener).GetField("_cancel", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var pollingTaskField = typeof(Pop3PollListener).GetField("_pollingTask", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var cts = new CancellationTokenSource();
         field.SetValue(listener, cts);
+        pollingTaskField.SetValue(listener, Task.CompletedTask);
 
         listener.Dispose();
 
         Assert.Null(field.GetValue(listener));
+        Assert.Null(pollingTaskField.GetValue(listener));
+        Assert.Throws<ObjectDisposedException>(() => _ = cts.Token.WaitHandle);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_DisposesCancellationTokenSourceAndNullsField() {
+        var listener = new Pop3PollListener(new Pop3Client());
+        var field = typeof(Pop3PollListener).GetField("_cancel", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var pollingTaskField = typeof(Pop3PollListener).GetField("_pollingTask", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var cts = new CancellationTokenSource();
+        field.SetValue(listener, cts);
+        pollingTaskField.SetValue(listener, Task.CompletedTask);
+
+        await listener.DisposeAsync();
+
+        Assert.Null(field.GetValue(listener));
+        Assert.Null(pollingTaskField.GetValue(listener));
         Assert.Throws<ObjectDisposedException>(() => _ = cts.Token.WaitHandle);
     }
 
@@ -41,7 +60,7 @@ public class Pop3PollListenerTests {
 
         await listener.WaitForDelayAsync();
 
-        listener.Stop();
+        await listener.StopAsync();
 
         Assert.Single(receivedSubjects);
         Assert.Equal("New", receivedSubjects[0]);
@@ -70,10 +89,70 @@ public class Pop3PollListenerTests {
 
         await listener.WaitForDelayAsync();
 
-        listener.Stop();
+        await listener.StopAsync();
 
         Assert.Single(receivedSubjects);
         Assert.Equal("Third", receivedSubjects[0]);
+    }
+
+    [Fact]
+    public async Task StopAsync_WaitsForPollingLoopToComplete() {
+        var listener = new TestPop3PollListener { DelayIgnoresCancellation = true };
+
+        await listener.StartAsync();
+        await listener.WaitForDelayAsync();
+
+        var stopTask = listener.StopAsync();
+
+        var completed = await Task.WhenAny(stopTask, Task.Delay(100));
+        Assert.NotSame(stopTask, completed);
+
+        listener.ReleaseNextDelay();
+
+        await stopTask;
+
+        var cancelField = typeof(Pop3PollListener).GetField("_cancel", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var pollingTaskField = typeof(Pop3PollListener).GetField("_pollingTask", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        Assert.Null(cancelField.GetValue(listener));
+        Assert.Null(pollingTaskField.GetValue(listener));
+    }
+
+    [Fact]
+    public async Task PollLoop_RaisesPollErrorAndRecoversAfterException() {
+        var listener = new TestPop3PollListener();
+        listener.SetMessages(new TestPop3PollListener.TestMessage("uid1", CreateMessage("Initial")));
+        var receivedSubjects = new List<string>();
+        var errors = new List<Exception>();
+        listener.MessageArrived += (_, message) => receivedSubjects.Add(message.Message.Subject ?? string.Empty);
+        listener.PollError += (_, exception) => errors.Add(exception);
+
+        await listener.StartAsync();
+        await listener.WaitForDelayAsync();
+
+        listener.SetMessages(
+            new TestPop3PollListener.TestMessage("uid1", CreateMessage("Initial")),
+            new TestPop3PollListener.TestMessage("uid2", CreateMessage("New")));
+        listener.ThrowOnNextFetch(new InvalidOperationException("Boom"));
+        listener.ReleaseNextDelay();
+
+        await listener.WaitForDelayAsync();
+        listener.ReleaseNextDelay();
+
+        await listener.WaitForDelayAsync();
+        listener.SetMessages(
+            new TestPop3PollListener.TestMessage("uid1", CreateMessage("Initial")),
+            new TestPop3PollListener.TestMessage("uid2", CreateMessage("New")));
+        listener.ReleaseNextDelay();
+
+        await listener.WaitForDelayAsync();
+
+        await listener.StopAsync();
+
+        Assert.Single(errors);
+        Assert.IsType<InvalidOperationException>(errors[0]);
+        Assert.Single(receivedSubjects);
+        Assert.Equal("New", receivedSubjects[0]);
     }
 
     private static MimeMessage CreateMessage(string subject) {
@@ -87,10 +166,13 @@ public class Pop3PollListenerTests {
         private readonly List<TestMessage> _messages = new List<TestMessage>();
         private readonly Queue<TaskCompletionSource<bool>> _pendingDelays = new Queue<TaskCompletionSource<bool>>();
         private readonly SemaphoreSlim _delayScheduled = new SemaphoreSlim(0);
+        private Exception? _nextFetchException;
 
         public TestPop3PollListener()
             : base(new Pop3Client(), TimeSpan.Zero) {
         }
+
+        public bool DelayIgnoresCancellation { get; set; }
 
         public void SetMessages(params TestMessage[] messages) {
             lock (_syncRoot) {
@@ -114,6 +196,16 @@ public class Pop3PollListenerTests {
             pending?.TrySetResult(true);
         }
 
+        public void ThrowOnNextFetch(Exception exception) {
+            if (exception == null) {
+                throw new ArgumentNullException(nameof(exception));
+            }
+
+            lock (_syncRoot) {
+                _nextFetchException = exception;
+            }
+        }
+
         protected override int GetMessageCount() {
             lock (_syncRoot) {
                 return _messages.Count;
@@ -128,6 +220,12 @@ public class Pop3PollListenerTests {
 
         protected override Task<MimeMessage> GetMessageAsync(int index, CancellationToken cancellationToken) {
             lock (_syncRoot) {
+                if (_nextFetchException != null) {
+                    var exception = _nextFetchException;
+                    _nextFetchException = null;
+                    throw exception;
+                }
+
                 return Task.FromResult(_messages[index].Message);
             }
         }
@@ -136,7 +234,7 @@ public class Pop3PollListenerTests {
 
         protected override Task DelayAsync(TimeSpan interval, CancellationToken cancellationToken) {
             var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            if (cancellationToken.CanBeCanceled) {
+            if (!DelayIgnoresCancellation && cancellationToken.CanBeCanceled) {
                 cancellationToken.Register(() => tcs.TrySetCanceled(cancellationToken));
             }
 
