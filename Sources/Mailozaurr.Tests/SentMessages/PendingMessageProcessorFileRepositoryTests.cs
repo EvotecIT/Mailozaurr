@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -95,7 +97,13 @@ public sealed class PendingMessageProcessorFileRepositoryTests {
             Assert.NotNull(pending);
             Assert.Equal(1, pending!.AttemptCount);
             Assert.Equal(baseTime + retryDelay, pending.NextAttemptAt);
-            Assert.Equal(1, CountNonEmptyLines(filePath));
+            var entriesAfterFirstAttempt = ReadLogEntries(filePath);
+            Assert.NotEmpty(entriesAfterFirstAttempt);
+            var lastUpsertAfterFirstAttempt = entriesAfterFirstAttempt.Last(e => string.Equals(e.EntryType, "upsert", StringComparison.OrdinalIgnoreCase));
+            Assert.NotNull(lastUpsertAfterFirstAttempt.Record);
+            Assert.Equal(1, lastUpsertAfterFirstAttempt.Record!.AttemptCount);
+            Assert.Equal(baseTime + retryDelay, lastUpsertAfterFirstAttempt.Record.NextAttemptAt);
+            var entryCountAfterFirstAttempt = entriesAfterFirstAttempt.Count;
 
             currentTime = baseTime.AddMinutes(5);
             await processor.ProcessAsync();
@@ -104,6 +112,7 @@ public sealed class PendingMessageProcessorFileRepositoryTests {
             Assert.Equal(1, pending!.AttemptCount);
             Assert.Equal(baseTime + retryDelay, pending.NextAttemptAt);
             Assert.Equal(1, sender.Attempts);
+            Assert.Equal(entryCountAfterFirstAttempt, ReadLogEntries(filePath).Count);
 
             currentTime = baseTime + retryDelay + TimeSpan.FromMinutes(1);
             await processor.ProcessAsync();
@@ -113,7 +122,12 @@ public sealed class PendingMessageProcessorFileRepositoryTests {
             var expectedNextAttempt = currentTime + retryDelay;
             Assert.Equal(expectedNextAttempt, pending.NextAttemptAt);
             Assert.Equal(2, sender.Attempts);
-            Assert.Equal(1, CountNonEmptyLines(filePath));
+            var entriesAfterSecondAttempt = ReadLogEntries(filePath);
+            var lastUpsertAfterSecondAttempt = entriesAfterSecondAttempt.Last(e => string.Equals(e.EntryType, "upsert", StringComparison.OrdinalIgnoreCase));
+            Assert.NotNull(lastUpsertAfterSecondAttempt.Record);
+            Assert.Equal(2, lastUpsertAfterSecondAttempt.Record!.AttemptCount);
+            Assert.Equal(expectedNextAttempt, lastUpsertAfterSecondAttempt.Record.NextAttemptAt);
+            var entryCountAfterSecondAttempt = entriesAfterSecondAttempt.Count;
 
             currentTime = expectedNextAttempt.AddMinutes(-2);
             await processor.ProcessAsync();
@@ -122,13 +136,18 @@ public sealed class PendingMessageProcessorFileRepositoryTests {
             Assert.Equal(2, pending!.AttemptCount);
             Assert.Equal(expectedNextAttempt, pending.NextAttemptAt);
             Assert.Equal(2, sender.Attempts);
+            Assert.Equal(entryCountAfterSecondAttempt, ReadLogEntries(filePath).Count);
 
             currentTime = expectedNextAttempt.AddMinutes(1);
             await processor.ProcessAsync();
             pending = await repository.GetByMessageIdAsync(record.MessageId);
             Assert.Null(pending);
             Assert.Equal(maxAttempts, sender.Attempts);
-            Assert.Equal(0, CountNonEmptyLines(filePath));
+            var finalEntries = ReadLogEntries(filePath);
+            Assert.NotEmpty(finalEntries);
+            var lastEntry = finalEntries[finalEntries.Count - 1];
+            Assert.Equal("tombstone", lastEntry.EntryType, StringComparer.OrdinalIgnoreCase);
+            Assert.Equal(record.MessageId, lastEntry.MessageId);
         } finally {
             if (File.Exists(filePath)) {
                 File.Delete(filePath);
@@ -139,19 +158,27 @@ public sealed class PendingMessageProcessorFileRepositoryTests {
         }
     }
 
-    private static int CountNonEmptyLines(string path) {
+    private static List<PendingLogEntry> ReadLogEntries(string path) {
+        var entries = new List<PendingLogEntry>();
+
         if (!File.Exists(path)) {
-            return 0;
+            return entries;
         }
 
-        var count = 0;
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
         foreach (var line in File.ReadAllLines(path)) {
-            if (!string.IsNullOrWhiteSpace(line)) {
-                count++;
+            if (string.IsNullOrWhiteSpace(line)) {
+                continue;
+            }
+
+            var entry = JsonSerializer.Deserialize<PendingLogEntry>(line, options);
+            if (entry != null) {
+                entries.Add(entry);
             }
         }
 
-        return count;
+        return entries;
     }
 
     private sealed class FailingPendingMessageSender : IPendingMessageSender {
@@ -170,5 +197,13 @@ public sealed class PendingMessageProcessorFileRepositoryTests {
             SentRecords.Add(record);
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class PendingLogEntry {
+        public string? EntryType { get; set; }
+
+        public string? MessageId { get; set; }
+
+        public PendingMessageRecord? Record { get; set; }
     }
 }
