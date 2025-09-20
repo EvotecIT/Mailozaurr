@@ -14,10 +14,11 @@ namespace Mailozaurr;
 /// Uses basic polling rather than the IMAP IDLE approach and is
 /// therefore best suited for servers without IDLE support.
 /// </remarks>
-public class Pop3PollListener : IDisposable {
+public class Pop3PollListener : IDisposable, IAsyncDisposable {
     private readonly Pop3Client _client;
     private readonly HashSet<string> _knownUids = new HashSet<string>(StringComparer.Ordinal);
     private CancellationTokenSource? _cancel;
+    private Task? _pollingTask;
     private readonly TimeSpan _interval;
 
     /// <summary>
@@ -57,13 +58,47 @@ public class Pop3PollListener : IDisposable {
                 _knownUids.Add(uid);
             }
         }
-        _ = PollLoopAsync();
+        _pollingTask = PollLoopAsync();
     }
 
     /// <summary>
     /// Stops listening for new messages.
     /// </summary>
-    public void Stop() => _cancel?.Cancel();
+    public void Stop() => StopAsync().GetAwaiter().GetResult();
+
+    /// <summary>
+    /// Stops listening for new messages and waits for the polling loop to finish.
+    /// </summary>
+    public async Task StopAsync() {
+        var cancel = _cancel;
+        var pollingTask = _pollingTask;
+
+        if (cancel == null) {
+            if (pollingTask != null) {
+                try {
+                    await pollingTask.ConfigureAwait(false);
+                } finally {
+                    _pollingTask = null;
+                }
+            }
+
+            return;
+        }
+
+        try {
+            cancel.Cancel();
+            if (pollingTask != null) {
+                try {
+                    await pollingTask.ConfigureAwait(false);
+                } catch (OperationCanceledException) when (cancel.IsCancellationRequested) {
+                }
+            }
+        } finally {
+            cancel.Dispose();
+            _cancel = null;
+            _pollingTask = null;
+        }
+    }
 
     private async Task PollLoopAsync() {
         while (!_cancel!.IsCancellationRequested) {
@@ -143,7 +178,12 @@ public class Pop3PollListener : IDisposable {
     /// <inheritdoc />
     public void Dispose() {
         Stop();
-        _cancel?.Dispose();
-        _cancel = null;
+        GC.SuppressFinalize(this);
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync() {
+        await StopAsync().ConfigureAwait(false);
+        GC.SuppressFinalize(this);
     }
 }
