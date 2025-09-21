@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using System.IO;
+using Mailozaurr.Definitions;
 
 namespace Mailozaurr;
 
@@ -198,10 +199,10 @@ public class MailgunClient : IDisposable {
             Headers = Headers
         };
         if (Attachment != null) {
-            smtp.Attachments = Attachment.Cast<object>().ToList();
+            smtp.Attachments = Attachment.Select(path => new FileAttachmentDescriptor(path)).Cast<AttachmentDescriptor>().ToList();
         }
         if (InlineAttachment != null) {
-            smtp.InlineAttachments = InlineAttachment.Cast<object>().ToList();
+            smtp.InlineAttachments = InlineAttachment.Select(path => new FileAttachmentDescriptor(path)).Cast<AttachmentDescriptor>().ToList();
         }
         smtp.CreateMessage();
         return smtp.Message;

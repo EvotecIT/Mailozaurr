@@ -4,6 +4,7 @@ using System.IO;
 using System.Net;
 using System.Reflection;
 using Xunit;
+using Mailozaurr.Definitions;
 
 namespace Mailozaurr.Tests;
 
@@ -75,7 +76,11 @@ public class SendGridCreateMessageTests
             Subject = "subject",
             Text = "text",
             Credentials = new NetworkCredential("apikey", "test"),
-            Attachment = new object[] { tmp, tmp }
+            Attachments = new List<AttachmentDescriptor>
+            {
+                new FileAttachmentDescriptor(tmp),
+                new FileAttachmentDescriptor(tmp)
+            }
         };
         client.CreateMessage();
         PropertyInfo? prop = typeof(SendGridClient).GetProperty("MessageJson", BindingFlags.NonPublic | BindingFlags.Instance);

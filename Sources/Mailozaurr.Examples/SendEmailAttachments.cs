@@ -1,10 +1,7 @@
 using Mailozaurr;
 
 using MimeKit;
-
-using System.Collections.Generic;
-
-
+using Mailozaurr.Definitions;
 
 public static class SendEmailAttachments
 
@@ -24,7 +21,7 @@ public static class SendEmailAttachments
 
         smtp.TextBody = "Check attachments";
 
-        smtp.Attachments = new List<object> { "C:\\Temp\\report.pdf" };
+        smtp.Attachments = new List<AttachmentDescriptor> { new FileAttachmentDescriptor("C:\\Temp\\report.pdf") };
 
         var part = new MimePart("text/plain")
 
@@ -36,9 +33,9 @@ public static class SendEmailAttachments
 
         };
 
-        smtp.Attachments.Add(part);
+        smtp.Attachments.Add(new MimeEntityAttachmentDescriptor(part));
 
-        smtp.InlineAttachments = new List<object> { "C:\\Temp\\logo.png" };
+        smtp.InlineAttachments = new List<AttachmentDescriptor> { new FileAttachmentDescriptor("C:\\Temp\\logo.png") };
 
         smtp.Connect("smtp.example.com", 25);
 

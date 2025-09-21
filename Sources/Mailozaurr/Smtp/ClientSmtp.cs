@@ -1,6 +1,7 @@
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Mailozaurr.Definitions;
 using MimeKit.Utils;
 
 namespace Mailozaurr;
@@ -16,9 +17,9 @@ public partial class ClientSmtp : SmtpClient {
     /// <summary>Plain text body of the message.</summary>
     public string TextBody { get; set; } = string.Empty;
     /// <summary>Attachments to include with the message.</summary>
-    public List<object>? Attachments { get; set; } = new List<object>();
+    public List<AttachmentDescriptor>? Attachments { get; set; } = new List<AttachmentDescriptor>();
     /// <summary>Inline attachments to embed in the message.</summary>
-    public List<object>? InlineAttachments { get; set; } = new List<object>();
+    public List<AttachmentDescriptor>? InlineAttachments { get; set; } = new List<AttachmentDescriptor>();
     /// <summary>The sender address.</summary>
     public object? From { get; set; }
     /// <summary>Primary recipients.</summary>
@@ -130,7 +131,7 @@ public partial class ClientSmtp : SmtpClient {
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     public async Task CreateMessageAsync(CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
-        InlineAttachments ??= new List<object>();
+        InlineAttachments ??= new List<AttachmentDescriptor>();
         var message = new MimeMessage();
         AddAddressesToMessage(message);
         SetMessagePriority(message);
@@ -195,64 +196,46 @@ public partial class ClientSmtp : SmtpClient {
         }
         if (Attachments != null) {
             var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var attachment in Attachments) {
-                switch (attachment) {
-                    case string path when seenPaths.Add(path):
-                        if (File.Exists(path)) {
-                            bodyBuilder.Attachments.Add(path);
-                        } else {
-                            LoggingMessages.Logger.WriteWarning(
-                                $"Send-EmailMessage - File not found: {path}. Skipping attachment.");
-                        }
-                        break;
-                    case string:
-                        break;
-                    case MimeEntity entity:
-                        bodyBuilder.Attachments.Add(entity);
-                        break;
-                    case SmtpAttachmentDescriptor descriptor:
-                        bodyBuilder.Attachments.Add(descriptor.CreateMimeEntity(inline: false));
-                        break;
+            foreach (var descriptor in Attachments) {
+                if (descriptor == null) {
+                    continue;
                 }
+
+                var path = descriptor.SourcePath;
+                if (!string.IsNullOrWhiteSpace(path) && !seenPaths.Add(path)) {
+                    continue;
+                }
+
+                if (descriptor is FileAttachmentDescriptor fileDescriptor && !File.Exists(fileDescriptor.FilePath)) {
+                    LoggingMessages.Logger.WriteWarning(
+                        $"Send-EmailMessage - File not found: {fileDescriptor.FilePath}. Skipping attachment.");
+                    continue;
+                }
+
+                bodyBuilder.Attachments.Add(descriptor.CreateMimeEntity(inline: false));
             }
         }
         if (InlineAttachments != null) {
             var seenInline = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var inline in InlineAttachments) {
-                MimeEntity? entity = null;
-                switch (inline) {
-                    case string path when seenInline.Add(path):
-                    {
-                        if (File.Exists(path)) {
-                            // Read the file into memory so it can be removed immediately
-                            var bytes = File.ReadAllBytes(path);
-                            using var ms = new MemoryStream(bytes);
-                            var part = new MimePart(MimeTypes.GetMimeType(path))
-                            {
-                                Content = new MimeContent(ms),
-                                FileName = Path.GetFileName(path),
-                                ContentId = Path.GetFileName(path),
-                                ContentDisposition = new ContentDisposition(ContentDisposition.Inline)
-                            };
-                            bodyBuilder.LinkedResources.Add(part);
-                            entity = part;
-                        } else {
-                            LoggingMessages.Logger.WriteWarning(
-                                $"Send-EmailMessage - File not found: {path}. Skipping inline attachment.");
-                        }
-                        break;
-                    }
-                    case string:
-                        break;
-                    case MimeEntity mime:
-                        bodyBuilder.LinkedResources.Add(mime);
-                        entity = mime;
-                        break;
-                    case SmtpAttachmentDescriptor descriptor:
-                        entity = descriptor.CreateMimeEntity(inline: true);
-                        bodyBuilder.LinkedResources.Add(entity);
-                        break;
+            foreach (var descriptor in InlineAttachments) {
+                if (descriptor == null) {
+                    continue;
                 }
+
+                var path = descriptor.SourcePath;
+                if (!string.IsNullOrWhiteSpace(path) && !seenInline.Add(path)) {
+                    continue;
+                }
+
+                if (descriptor is FileAttachmentDescriptor fileDescriptor && !File.Exists(fileDescriptor.FilePath)) {
+                    LoggingMessages.Logger.WriteWarning(
+                        $"Send-EmailMessage - File not found: {fileDescriptor.FilePath}. Skipping inline attachment.");
+                    continue;
+                }
+
+                var entity = descriptor.CreateMimeEntity(inline: true);
+                bodyBuilder.LinkedResources.Add(entity);
+
                 if (entity is MimePart inlinePart && string.IsNullOrWhiteSpace(inlinePart.ContentId)) {
                     inlinePart.ContentId = MimeUtils.GenerateMessageId();
                 }

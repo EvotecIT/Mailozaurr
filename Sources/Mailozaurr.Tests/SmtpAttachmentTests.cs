@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using MimeKit;
 using Xunit;
+using Mailozaurr.Definitions;
 
 namespace Mailozaurr.Tests;
 
@@ -19,7 +20,7 @@ public class SmtpAttachmentTests
             To = new object[] { "c@d.com" },
             Subject = "test",
             TextBody = "body",
-            Attachments = new List<object> { path }
+            Attachments = new List<AttachmentDescriptor> { new FileAttachmentDescriptor(path) }
         };
 
         smtp.CreateMessage();
@@ -32,7 +33,7 @@ public class SmtpAttachmentTests
     {
         var data = Encoding.UTF8.GetBytes("hello world");
         using var source = new MemoryStream(data);
-        var descriptor = new SmtpAttachmentStreamDescriptor(source, "greeting.txt")
+        var descriptor = new StreamAttachmentDescriptor(source, "greeting.txt")
         {
             ContentType = "text/plain",
             Headers = new Dictionary<string, string> { { "X-Test", "Stream" } },
@@ -44,7 +45,7 @@ public class SmtpAttachmentTests
             To = new object[] { "c@d.com" },
             Subject = "test",
             TextBody = "body",
-            Attachments = new List<object> { descriptor },
+            Attachments = new List<AttachmentDescriptor> { descriptor },
         };
 
         smtp.CreateMessage();
@@ -67,7 +68,7 @@ public class SmtpAttachmentTests
     public void CreateMessage_ByteArrayAttachmentDescriptor_AddsAttachment()
     {
         var data = new byte[] { 1, 2, 3, 4, 5 };
-        var descriptor = new SmtpAttachmentByteArrayDescriptor(data, "data.bin")
+        var descriptor = new ByteArrayAttachmentDescriptor(data, "data.bin")
         {
             ContentType = "application/octet-stream",
         };
@@ -78,7 +79,7 @@ public class SmtpAttachmentTests
             To = new object[] { "c@d.com" },
             Subject = "test",
             TextBody = "body",
-            Attachments = new List<object> { descriptor },
+            Attachments = new List<AttachmentDescriptor> { descriptor },
         };
 
         smtp.CreateMessage();

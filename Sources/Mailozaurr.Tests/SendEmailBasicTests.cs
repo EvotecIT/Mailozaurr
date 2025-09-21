@@ -1,4 +1,5 @@
 using Xunit;
+using Mailozaurr.Definitions;
 using Mailozaurr;
 using System.Net;
 using System.Net.Http;
@@ -181,7 +182,7 @@ namespace Mailozaurr.Tests {
             smtp.From = "a@b.com";
             smtp.To = new object[] { "c@d.com" };
             smtp.Subject = "test";
-            smtp.Attachments = new System.Collections.Generic.List<object> { tmp };
+            smtp.Attachments = new System.Collections.Generic.List<AttachmentDescriptor> { new FileAttachmentDescriptor(tmp) };
             smtp.CreateMessage();
 
             // Act
@@ -202,7 +203,11 @@ namespace Mailozaurr.Tests {
             smtp.From = "a@b.com";
             smtp.To = new object[] { "c@d.com" };
             smtp.Subject = "test";
-            smtp.Attachments = new System.Collections.Generic.List<object> { tmp, tmp };
+            smtp.Attachments = new System.Collections.Generic.List<AttachmentDescriptor>
+            {
+                new FileAttachmentDescriptor(tmp),
+                new FileAttachmentDescriptor(tmp)
+            };
             smtp.CreateMessage();
 
             var attachCount = smtp.Message.BodyParts

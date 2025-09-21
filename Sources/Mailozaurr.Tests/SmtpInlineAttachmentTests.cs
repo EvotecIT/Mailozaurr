@@ -3,6 +3,7 @@ using System.Linq;
 using System.Collections.Generic;
 using MimeKit;
 using Xunit;
+using Mailozaurr.Definitions;
 
 namespace Mailozaurr.Tests;
 
@@ -21,7 +22,7 @@ public class SmtpInlineAttachmentTests
         smtp.To = new object[] { "c@d.com" };
         smtp.Subject = "test";
         smtp.HtmlBody = "<img src=\"cid:test\">";
-        smtp.InlineAttachments = new List<object> { tmp };
+        smtp.InlineAttachments = new List<AttachmentDescriptor> { new FileAttachmentDescriptor(tmp) };
         smtp.CreateMessage();
         var body = (MultipartRelated)smtp.Message.Body;
         var inlineCount = body.OfType<MimePart>().Count(p => p.ContentDisposition?.Disposition == ContentDisposition.Inline);
@@ -57,7 +58,7 @@ public class SmtpInlineAttachmentTests
             To = new object[] { "c@d.com" },
             Subject = "test",
             HtmlBody = "<img src=\"cid:test\">",
-            InlineAttachments = new List<object> { path }
+            InlineAttachments = new List<AttachmentDescriptor> { new FileAttachmentDescriptor(path) }
         };
 
         smtp.CreateMessage();

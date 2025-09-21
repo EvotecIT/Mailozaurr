@@ -5,6 +5,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using System.Threading;
 using Mailozaurr;
+using Mailozaurr.Definitions;
 
 namespace Mailozaurr.PowerShell;
 
@@ -102,8 +103,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         if (Text != null) sendGrid.Text = string.Join("", Text);
         if (HTML != null) sendGrid.Html = string.Join("", HTML);
         sendGrid.Priority = Priority;
-        if (Attachment != null) {
-            sendGrid.Attachment = Attachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
+        var sendGridAttachments = ConvertToAttachmentDescriptors(Attachment);
+        if (sendGridAttachments != null) {
+            sendGrid.Attachments = sendGridAttachments;
         }
         if (Headers != null) sendGrid.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         sendGrid.SeparateTo = SeparateTo;
@@ -220,8 +222,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         smtp.Subject = Subject ?? string.Empty;
         if (Text != null) smtp.TextBody = string.Join("", Text);
         if (HTML != null) smtp.HtmlBody = string.Join("", HTML);
-        smtp.Attachments = Attachment?.ToList();
-        smtp.InlineAttachments = InlineAttachment?.ToList();
+        smtp.Attachments = ConvertToAttachmentDescriptors(Attachment);
+        smtp.InlineAttachments = ConvertToAttachmentDescriptors(InlineAttachment);
         smtp.Priority = Priority;
         if (Headers != null) smtp.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         smtp.CreateMessage(CancellationToken.None);
@@ -413,8 +415,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         if (HTML != null) smtpClient.HtmlBody = string.Join("", HTML);
         if (Text != null) smtpClient.TextBody = string.Join("", Text);
 
-        smtpClient.Attachments = Attachment?.ToList();
-        smtpClient.InlineAttachments = InlineAttachment?.ToList();
+        smtpClient.Attachments = ConvertToAttachmentDescriptors(Attachment);
+        smtpClient.InlineAttachments = ConvertToAttachmentDescriptors(InlineAttachment);
         if (Headers != null) smtpClient.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         smtpClient.Timeout = Timeout;
 
@@ -689,6 +691,35 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             }
         }
         return size;
+    }
+
+    private static List<AttachmentDescriptor>? ConvertToAttachmentDescriptors(object[]? attachments) {
+        if (attachments == null) {
+            return null;
+        }
+
+        var result = new List<AttachmentDescriptor>();
+        foreach (var entry in attachments) {
+            if (entry == null) {
+                continue;
+            }
+
+            switch (entry) {
+                case AttachmentDescriptor descriptor:
+                    result.Add(descriptor);
+                    break;
+                case string path:
+                    result.Add(new FileAttachmentDescriptor(path));
+                    break;
+                case FileInfo fileInfo:
+                    result.Add(new FileAttachmentDescriptor(fileInfo.FullName));
+                    break;
+                default:
+                    throw new ArgumentException($"Unsupported attachment type: {entry.GetType().Name}");
+            }
+        }
+
+        return result;
     }
 
     private object[]? FilterExistingPaths(object[]? paths, string parameterName) {

@@ -1,5 +1,5 @@
 using Mailozaurr;
-using System.Collections.Generic;
+using Mailozaurr.Definitions;
 
 public static class SendEmailVerifyAttachments
 {
@@ -11,7 +11,7 @@ public static class SendEmailVerifyAttachments
             To = new[] { "recipient@example.com" },
             Subject = "Verify attachments demo",
             TextBody = "body",
-            Attachments = new List<object> { "missing-file.txt" }
+            Attachments = new List<AttachmentDescriptor> { new FileAttachmentDescriptor("missing-file.txt") }
         };
 
         smtp.Connect("smtp.example.com", 25);
