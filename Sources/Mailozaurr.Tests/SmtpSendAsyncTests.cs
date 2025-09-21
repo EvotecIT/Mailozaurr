@@ -31,7 +31,7 @@ public class SmtpSendAsyncTests
         smtp.Subject = "test";
         smtp.TextBody = "body";
         smtp.WebhookUrl = null;
-        smtp.CreateMessage();
+        await smtp.CreateMessageAsync();
 
         var result = await smtp.SendAsync();
 
