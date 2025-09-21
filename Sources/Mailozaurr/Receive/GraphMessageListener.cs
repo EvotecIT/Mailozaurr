@@ -15,10 +15,13 @@ namespace Mailozaurr;
 public class GraphMessageListener : IDisposable {
     private readonly GraphCredential _credential;
     private readonly string _userPrincipalName;
-    private readonly HashSet<string> _seenIds = new();
+    private readonly Dictionary<string, DateTimeOffset> _seenIds = new();
+    private readonly Queue<(string Id, DateTimeOffset Timestamp)> _seenQueue = new();
+    private readonly object _seenLock = new();
     private CancellationTokenSource? _cancel;
     private Task? _pollTask;
     private readonly TimeSpan _interval;
+    private readonly GraphMessageListenerRetentionOptions _retentionOptions;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="GraphMessageListener"/> class.
@@ -26,10 +29,15 @@ public class GraphMessageListener : IDisposable {
     /// <param name="credential">Graph credential to use.</param>
     /// <param name="userPrincipalName">User principal name to monitor.</param>
     /// <param name="interval">Polling interval.</param>
-    public GraphMessageListener(GraphCredential credential, string userPrincipalName, TimeSpan? interval = null) {
+    public GraphMessageListener(
+        GraphCredential credential,
+        string userPrincipalName,
+        TimeSpan? interval = null,
+        GraphMessageListenerRetentionOptions? retentionOptions = null) {
         _credential = credential ?? throw new ArgumentNullException(nameof(credential));
         _userPrincipalName = userPrincipalName ?? throw new ArgumentNullException(nameof(userPrincipalName));
         _interval = interval ?? TimeSpan.FromMinutes(1);
+        _retentionOptions = (retentionOptions ?? new GraphMessageListenerRetentionOptions()).Clone();
     }
 
     /// <summary>
@@ -55,7 +63,7 @@ public class GraphMessageListener : IDisposable {
         var initial = await MicrosoftGraphUtils.GetMailMessagesAsync(_credential, _userPrincipalName).ConfigureAwait(false);
         foreach (var msg in initial) {
             if (msg.TryGetValue("id", out var idObj) && idObj is string id) {
-                _seenIds.Add(id);
+                TrackSeenMessage(id);
             }
         }
 
@@ -88,8 +96,7 @@ public class GraphMessageListener : IDisposable {
                 await Task.Delay(_interval, _cancel.Token).ConfigureAwait(false);
                 var messages = await MicrosoftGraphUtils.GetMailMessagesAsync(_credential, _userPrincipalName).ConfigureAwait(false);
                 foreach (var msg in messages) {
-                    if (msg.TryGetValue("id", out var idObj) && idObj is string id && !_seenIds.Contains(id)) {
-                        _seenIds.Add(id);
+                    if (msg.TryGetValue("id", out var idObj) && idObj is string id && TryRegisterMessage(id)) {
                         MessageArrived?.Invoke(this, msg);
                     }
                 }
@@ -98,6 +105,67 @@ public class GraphMessageListener : IDisposable {
             } catch (Exception ex) {
                 PollError?.Invoke(this, ex);
                 await Task.Delay(TimeSpan.FromSeconds(5), _cancel.Token).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private bool TryRegisterMessage(string id) {
+        var now = _retentionOptions.Clock();
+        lock (_seenLock) {
+            PruneSeenIds(now);
+            if (_seenIds.ContainsKey(id)) {
+                _seenIds[id] = now;
+                _seenQueue.Enqueue((id, now));
+                PruneSeenIds(now);
+                return false;
+            }
+
+            AddSeenIdInternal(id, now);
+            return true;
+        }
+    }
+
+    private void TrackSeenMessage(string id) {
+        var now = _retentionOptions.Clock();
+        lock (_seenLock) {
+            PruneSeenIds(now);
+            AddSeenIdInternal(id, now);
+        }
+    }
+
+    private void AddSeenIdInternal(string id, DateTimeOffset timestamp) {
+        _seenIds[id] = timestamp;
+        _seenQueue.Enqueue((id, timestamp));
+        PruneSeenIds(timestamp);
+    }
+
+    private void PruneSeenIds(DateTimeOffset now) {
+        if (_retentionOptions.SlidingExpiration.HasValue) {
+            var expirationThreshold = now - _retentionOptions.SlidingExpiration.Value;
+            while (_seenQueue.Count > 0) {
+                var (seenId, timestamp) = _seenQueue.Peek();
+                if (_seenIds.TryGetValue(seenId, out var recordedTimestamp) && recordedTimestamp > timestamp) {
+                    _seenQueue.Dequeue();
+                    continue;
+                }
+
+                if (timestamp < expirationThreshold) {
+                    _seenQueue.Dequeue();
+                    if (_seenIds.TryGetValue(seenId, out recordedTimestamp) && recordedTimestamp <= timestamp) {
+                        _seenIds.Remove(seenId);
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+
+        if (_retentionOptions.MaxSeenIds.HasValue) {
+            while (_seenIds.Count > _retentionOptions.MaxSeenIds.Value && _seenQueue.Count > 0) {
+                var (seenId, timestamp) = _seenQueue.Dequeue();
+                if (_seenIds.TryGetValue(seenId, out var recordedTimestamp) && recordedTimestamp <= timestamp) {
+                    _seenIds.Remove(seenId);
+                }
             }
         }
     }
