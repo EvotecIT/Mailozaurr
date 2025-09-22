@@ -2,6 +2,7 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Mailozaurr.Definitions;
 
 namespace Mailozaurr;
 
@@ -121,8 +122,8 @@ public class SesClient : IDisposable {
         smtp.Subject = Subject ?? string.Empty;
         smtp.TextBody = Text;
         smtp.HtmlBody = Html;
-        if (Attachment != null) smtp.Attachments = Attachment.ToList<object>();
-        if (InlineAttachment != null) smtp.InlineAttachments = InlineAttachment.ToList<object>();
+        if (Attachment != null) smtp.Attachments = Attachment.Select(path => (AttachmentDescriptor)new FileAttachmentDescriptor(path)).ToList();
+        if (InlineAttachment != null) smtp.InlineAttachments = InlineAttachment.Select(path => (AttachmentDescriptor)new FileAttachmentDescriptor(path)).ToList();
         if (Headers != null) smtp.Headers = Headers;
         smtp.CreateMessage();
         return smtp.Message;

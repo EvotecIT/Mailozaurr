@@ -10,6 +10,7 @@ using System.Text;
 using Org.BouncyCastle.Bcpg.OpenPgp;
 using System.Threading.Tasks;
 using System.Threading;
+using Mailozaurr.Definitions;
 
 namespace Mailozaurr;
 
@@ -89,13 +90,13 @@ public class Smtp {
     }
 
     /// <summary>Attachments to include with the message.</summary>
-    public List<object>? Attachments {
+    public List<AttachmentDescriptor>? Attachments {
         get => Client.Attachments;
         set => Client.Attachments = value;
     }
 
     /// <summary>Inline attachments to embed in the message.</summary>
-    public List<object>? InlineAttachments {
+    public List<AttachmentDescriptor>? InlineAttachments {
         get => Client.InlineAttachments;
         set => Client.InlineAttachments = value;
     }
@@ -402,11 +403,13 @@ public class Smtp {
             return;
         }
 
-        InlineAttachments ??= new List<object>();
+        InlineAttachments ??= new List<AttachmentDescriptor>();
         foreach (var path in paths) {
-            if (!InlineAttachments.Contains(path)) {
-                InlineAttachments.Add(path);
+            if (InlineAttachments.Any(d => string.Equals(d.SourcePath, path, StringComparison.OrdinalIgnoreCase))) {
+                continue;
             }
+
+            InlineAttachments.Add(new FileAttachmentDescriptor(path));
         }
     }
 
