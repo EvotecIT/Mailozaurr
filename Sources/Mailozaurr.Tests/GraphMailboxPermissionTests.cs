@@ -74,6 +74,28 @@ public class GraphMailboxPermissionTests {
     }
 
     [Fact]
+    public async Task GetMailboxPermissionsAsync_UsesProvidedCancellationToken() {
+        var handler = new RecordingHandler();
+        var clientField = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var client = (HttpClient)clientField.GetValue(null)!;
+        var handlerField = GetHandlerField();
+        var original = (HttpMessageHandler)handlerField.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        try {
+            var cred = new GraphCredential { ClientId = Guid.NewGuid().ToString("N"), DirectoryId = "tenant", ClientSecret = "secret" };
+            using var cts = new CancellationTokenSource();
+            var permissionsTask = MicrosoftGraphUtils.GetMailboxPermissionsAsync(cred, "user@example.com", cts.Token);
+            var started = await Task.WhenAny(handler.GraphRequestStarted.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+            Assert.Same(handler.GraphRequestStarted.Task, started);
+            cts.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await permissionsTask);
+            Assert.True(handler.GraphRequestCancelled);
+        } finally {
+            handlerField.SetValue(client, original);
+        }
+    }
+
+    [Fact]
     public async Task ClearJunkMailAsync_Cancelled_ThrowsOperationCanceledException() {
         using var cts = new CancellationTokenSource();
         cts.Cancel();

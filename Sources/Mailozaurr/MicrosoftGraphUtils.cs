@@ -1026,15 +1026,20 @@ namespace Mailozaurr {
         /// <summary>
         /// Retrieves mailbox permissions for a user.
         /// </summary>
-        public static async Task<List<GraphMailboxPermission>> GetMailboxPermissionsAsync(GraphCredential credential, string userPrincipalName) {
+        public static async Task<List<GraphMailboxPermission>> GetMailboxPermissionsAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
             var headers = new Dictionary<string, string>();
-            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com", cancellationToken).ConfigureAwait(false);
             headers["Authorization"] = token;
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/permissions");
-            var doc = await InvokeGraphApiAsync("GET", uri, headers).ConfigureAwait(false);
+            var doc = await InvokeGraphApiAsync("GET", uri, headers, cancellationToken: cancellationToken).ConfigureAwait(false);
             var result = new List<GraphMailboxPermission>();
             if (doc.RootElement.TryGetProperty("value", out var val) && val.ValueKind == JsonValueKind.Array) {
                 foreach (var item in val.EnumerateArray()) {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var dict = ConvertJsonElementToNativeObject(item) as Dictionary<string, object>;
                     if (dict != null) result.Add(new GraphMailboxPermission(dict, userPrincipalName));
                 }
@@ -1175,17 +1180,20 @@ namespace Mailozaurr {
         public static async Task<List<GraphInboxRule>> GetRulesAsync(
             GraphCredential credential,
             string userPrincipalName,
-            string? filter = null) {
+            string? filter = null,
+            CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
             var headers = new Dictionary<string, string>();
-            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com", cancellationToken).ConfigureAwait(false);
             headers["Authorization"] = token;
             Dictionary<string, object>? qp = null;
             if (!string.IsNullOrWhiteSpace(filter)) qp = new Dictionary<string, object> { ["$filter"] = filter! };
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/mailFolders/inbox/messageRules", qp);
-            var doc = await InvokeGraphApiAsync("GET", uri, headers).ConfigureAwait(false);
+            var doc = await InvokeGraphApiAsync("GET", uri, headers, cancellationToken: cancellationToken).ConfigureAwait(false);
             var rules = new List<GraphInboxRule>();
             if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
                 foreach (var item in valueElement.EnumerateArray()) {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var rule = JsonSerializer.Deserialize<GraphInboxRule>(item.GetRawText());
                     if (rule != null) rules.Add(rule);
                 }
@@ -1270,18 +1278,21 @@ namespace Mailozaurr {
             string userPrincipalName,
             IEnumerable<string>? properties = null,
             string? filter = null,
-            int? limit = null) {
+            int? limit = null,
+            CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
             var headers = new Dictionary<string, string>();
-            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com", cancellationToken).ConfigureAwait(false);
             headers["Authorization"] = token;
             var qp = new Dictionary<string, object>();
             if (!string.IsNullOrWhiteSpace(filter)) qp["$filter"] = filter!;
             if (properties != null && properties.Any()) qp["$select"] = string.Join(",", properties);
             var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/events", qp);
-            var doc = await InvokeGraphApiAsync("GET", uri, headers).ConfigureAwait(false);
+            var doc = await InvokeGraphApiAsync("GET", uri, headers, cancellationToken: cancellationToken).ConfigureAwait(false);
             var events = new List<Dictionary<string, object>>();
             if (doc.RootElement.TryGetProperty("value", out var val) && val.ValueKind == JsonValueKind.Array) {
                 foreach (var item in val.EnumerateArray()) {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (limit.HasValue && events.Count >= limit.Value) break;
                     var dict = ConvertJsonElementToNativeObject(item) as Dictionary<string, object>;
                     if (dict != null) events.Add(dict);
