@@ -105,6 +105,25 @@ namespace Mailozaurr.Tests
         }
 
         [Fact]
+        public async Task StopAsync_WhenWaitIsCancelled_ThrowsOperationCanceledException() {
+            var cred = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
+            var listener = new GraphMessageListener(cred, "user", TimeSpan.FromSeconds(1));
+
+            var cancelField = typeof(GraphMessageListener).GetField("_cancel", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            var pollField = typeof(GraphMessageListener).GetField("_pollTask", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+            var listenerCts = new CancellationTokenSource();
+            cancelField.SetValue(listener, listenerCts);
+            var pollTcs = new TaskCompletionSource<object?>();
+            pollField.SetValue(listener, pollTcs.Task);
+
+            using var externalCts = new CancellationTokenSource();
+            externalCts.Cancel();
+
+            await Assert.ThrowsAsync<OperationCanceledException>(() => listener.StopAsync(externalCts.Token));
+        }
+
+        [Fact]
         public async Task StopAsync_AfterDispose_ThrowsObjectDisposedException() {
             var cred = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
             var listener = new GraphMessageListener(cred, "user", TimeSpan.FromSeconds(1));
@@ -112,6 +131,23 @@ namespace Mailozaurr.Tests
             await listener.DisposeAsync();
 
             await Assert.ThrowsAsync<ObjectDisposedException>(() => listener.StopAsync(CancellationToken.None));
+        }
+
+        [Fact]
+        public void GetNextErrorDelay_ResetsAndCapsAsExpected() {
+            var type = typeof(GraphMessageListener);
+            var initial = (TimeSpan)type.GetField("ErrorDelayInitial", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
+            var maximum = (TimeSpan)type.GetField("ErrorDelayMaximum", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
+            var method = type.GetMethod("GetNextErrorDelay", BindingFlags.NonPublic | BindingFlags.Static)!;
+
+            var doubled = (TimeSpan)method.Invoke(null, new object[] { initial })!;
+            Assert.Equal(initial + initial, doubled);
+
+            var capped = (TimeSpan)method.Invoke(null, new object[] { maximum })!;
+            Assert.Equal(maximum, capped);
+
+            var reset = (TimeSpan)method.Invoke(null, new object[] { TimeSpan.Zero })!;
+            Assert.Equal(initial, reset);
         }
     }
 }

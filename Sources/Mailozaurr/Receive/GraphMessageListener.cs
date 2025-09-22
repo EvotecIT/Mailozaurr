@@ -21,6 +21,8 @@ public class GraphMessageListener : IDisposable, IAsyncDisposable {
     private readonly TimeSpan _interval;
     private Task? _disposeTask;
     private int _disposeState;
+    private static readonly TimeSpan ErrorDelayInitial = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan ErrorDelayMaximum = TimeSpan.FromMinutes(2);
 
     private const int DisposeStateActive = 0;
     private const int DisposeStateDisposing = 1;
@@ -95,6 +97,8 @@ public class GraphMessageListener : IDisposable, IAsyncDisposable {
     }
 
     private async Task PollLoopAsync() {
+        var currentErrorDelay = ErrorDelayInitial;
+
         while (!_cancel!.IsCancellationRequested) {
             try {
                 await Task.Delay(_interval, _cancel.Token).ConfigureAwait(false);
@@ -105,11 +109,14 @@ public class GraphMessageListener : IDisposable, IAsyncDisposable {
                         MessageArrived?.Invoke(this, msg);
                     }
                 }
+                currentErrorDelay = ErrorDelayInitial;
             } catch (OperationCanceledException) when (_cancel.IsCancellationRequested) {
                 break;
             } catch (Exception ex) {
                 PollError?.Invoke(this, ex);
-                await Task.Delay(TimeSpan.FromSeconds(5), _cancel.Token).ConfigureAwait(false);
+                var delay = currentErrorDelay;
+                currentErrorDelay = GetNextErrorDelay(currentErrorDelay);
+                await Task.Delay(delay, _cancel.Token).ConfigureAwait(false);
             }
         }
     }
@@ -198,5 +205,25 @@ public class GraphMessageListener : IDisposable, IAsyncDisposable {
         }
 
         await task.ConfigureAwait(false);
+    }
+
+    private static TimeSpan GetNextErrorDelay(TimeSpan current)
+    {
+        if (current <= TimeSpan.Zero) {
+            return ErrorDelayInitial;
+        }
+
+        long doubledTicks;
+        try {
+            doubledTicks = checked(current.Ticks * 2);
+        } catch (OverflowException) {
+            return ErrorDelayMaximum;
+        }
+
+        if (doubledTicks > ErrorDelayMaximum.Ticks) {
+            return ErrorDelayMaximum;
+        }
+
+        return TimeSpan.FromTicks(doubledTicks);
     }
 }
