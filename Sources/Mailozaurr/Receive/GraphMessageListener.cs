@@ -117,10 +117,11 @@ public class GraphMessageListener : IDisposable {
     private bool TryRegisterMessage(string id) {
         var now = _retentionOptions.Clock();
         lock (_seenLock) {
+            PruneExpiredEntries(now);
             var alreadySeen = _seenIds.ContainsKey(id);
             _seenIds[id] = now;
             _seenQueue.Enqueue((id, now));
-            PruneSeenIds(now);
+            TrimCapacity();
             return !alreadySeen;
         }
     }
@@ -128,39 +129,46 @@ public class GraphMessageListener : IDisposable {
     private void TrackSeenMessage(string id) {
         var now = _retentionOptions.Clock();
         lock (_seenLock) {
+            PruneExpiredEntries(now);
             _seenIds[id] = now;
             _seenQueue.Enqueue((id, now));
-            PruneSeenIds(now);
+            TrimCapacity();
         }
     }
 
-    private void PruneSeenIds(DateTimeOffset now) {
-        if (_retentionOptions.SlidingExpiration.HasValue) {
-            var expirationThreshold = now - _retentionOptions.SlidingExpiration.Value;
-            while (_seenQueue.Count > 0) {
-                var (seenId, timestamp) = _seenQueue.Peek();
-                if (!_seenIds.TryGetValue(seenId, out var recordedTimestamp) || recordedTimestamp > timestamp) {
-                    _seenQueue.Dequeue();
-                    continue;
-                }
-
-                if (timestamp < expirationThreshold) {
-                    _seenQueue.Dequeue();
-                    if (recordedTimestamp <= timestamp) {
-                        _seenIds.Remove(seenId);
-                    }
-                } else {
-                    break;
-                }
-            }
+    private void PruneExpiredEntries(DateTimeOffset now) {
+        if (!_retentionOptions.SlidingExpiration.HasValue) {
+            return;
         }
 
-        if (_retentionOptions.MaxSeenIds.HasValue) {
-            while (_seenIds.Count > _retentionOptions.MaxSeenIds.Value && _seenQueue.Count > 0) {
-                var (seenId, timestamp) = _seenQueue.Dequeue();
-                if (_seenIds.TryGetValue(seenId, out var recordedTimestamp) && recordedTimestamp <= timestamp) {
+        var expirationThreshold = now - _retentionOptions.SlidingExpiration.Value;
+        while (_seenQueue.Count > 0) {
+            var (seenId, timestamp) = _seenQueue.Peek();
+            if (!_seenIds.TryGetValue(seenId, out var recordedTimestamp) || recordedTimestamp > timestamp) {
+                _seenQueue.Dequeue();
+                continue;
+            }
+
+            if (timestamp < expirationThreshold) {
+                _seenQueue.Dequeue();
+                if (recordedTimestamp <= timestamp) {
                     _seenIds.Remove(seenId);
                 }
+            } else {
+                break;
+            }
+        }
+    }
+
+    private void TrimCapacity() {
+        if (!_retentionOptions.MaxSeenIds.HasValue) {
+            return;
+        }
+
+        while (_seenIds.Count > _retentionOptions.MaxSeenIds.Value && _seenQueue.Count > 0) {
+            var (seenId, timestamp) = _seenQueue.Dequeue();
+            if (_seenIds.TryGetValue(seenId, out var recordedTimestamp) && recordedTimestamp <= timestamp) {
+                _seenIds.Remove(seenId);
             }
         }
     }

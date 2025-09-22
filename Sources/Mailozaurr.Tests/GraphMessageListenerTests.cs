@@ -218,6 +218,57 @@ public class GraphMessageListenerTests {
     }
 
     [Fact]
+    public async Task Listener_RaisesExpiredId_WhenItReturnsWithoutOtherTraffic() {
+        var baseTime = DateTimeOffset.UtcNow;
+        var currentTime = baseTime;
+        var responses = new[] {
+            (CreateTokenResponse(), (Action<HttpRequestMessage>?)null),
+            (CreateMessagesResponse("old1"), (Action<HttpRequestMessage>?)(_ => currentTime = baseTime)),
+            (CreateTokenResponse(), (Action<HttpRequestMessage>?)(_ => currentTime = baseTime.AddMilliseconds(10))),
+            (CreateMessagesResponse(), (Action<HttpRequestMessage>?)(_ => currentTime = baseTime.AddMilliseconds(10))),
+            (CreateTokenResponse(), (Action<HttpRequestMessage>?)(_ => currentTime = baseTime.AddMilliseconds(75))),
+            (CreateMessagesResponse("old1"), (Action<HttpRequestMessage>?)(_ => currentTime = baseTime.AddMilliseconds(75)))
+        };
+
+        var handler = new QueueHandler(responses);
+        var overrideInfo = OverrideHttpClient(handler);
+        ResetGraphCaches();
+
+        GraphMessageListener? listener = null;
+        try {
+            var cred = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
+            var options = new GraphMessageListenerRetentionOptions {
+                MaxSeenIds = null,
+                SlidingExpiration = TimeSpan.FromMilliseconds(50)
+            };
+            options.Clock = () => currentTime;
+            listener = new GraphMessageListener(cred, "user", TimeSpan.FromMilliseconds(20), options);
+            var ids = new List<string>();
+            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            listener.MessageArrived += (_, msg) => {
+                if (msg.TryGetValue("id", out var idObj) && idObj is string id) {
+                    lock (ids) {
+                        ids.Add(id);
+                        if (ids.Count >= 1) {
+                            tcs.TrySetResult(true);
+                        }
+                    }
+                }
+            };
+
+            await listener.StartAsync();
+            var completed = await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+            listener.Dispose();
+
+            Assert.Same(tcs.Task, completed);
+            Assert.Equal(new[] { "old1" }, ids);
+        } finally {
+            listener?.Dispose();
+            overrideInfo.HandlerField.SetValue(overrideInfo.Client, overrideInfo.OriginalHandler);
+        }
+    }
+
+    [Fact]
     public void Listener_Throws_WhenRetentionHasNoLimits() {
         var cred = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
         var options = new GraphMessageListenerRetentionOptions {
