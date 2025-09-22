@@ -353,6 +353,7 @@ public class Smtp {
     /// Creates the MIME message using the current property values.
     /// </summary>
     public void CreateMessage(CancellationToken cancellationToken = default) {
+        cancellationToken.ThrowIfCancellationRequested();
         PrepareInlineAttachments();
         Client.CreateMessage(cancellationToken);
     }
@@ -362,6 +363,7 @@ public class Smtp {
     /// </summary>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     public async Task CreateMessageAsync(CancellationToken cancellationToken = default) {
+        cancellationToken.ThrowIfCancellationRequested();
         PrepareInlineAttachments();
         await Client.CreateMessageAsync(cancellationToken).ConfigureAwait(false);
     }
