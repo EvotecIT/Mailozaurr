@@ -216,5 +216,17 @@ public class GraphMessageListenerTests {
             overrideInfo.HandlerField.SetValue(overrideInfo.Client, overrideInfo.OriginalHandler);
         }
     }
+
+    [Fact]
+    public void Listener_Throws_WhenRetentionHasNoLimits() {
+        var cred = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
+        var options = new GraphMessageListenerRetentionOptions {
+            MaxSeenIds = null,
+            SlidingExpiration = null
+        };
+
+        var ex = Assert.Throws<ArgumentException>(() => new GraphMessageListener(cred, "user", TimeSpan.FromSeconds(1), options));
+        Assert.Equal("retentionOptions", ex.ParamName);
+    }
 }
 }

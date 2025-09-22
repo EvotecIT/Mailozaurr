@@ -38,6 +38,11 @@ public class GraphMessageListener : IDisposable {
         _userPrincipalName = userPrincipalName ?? throw new ArgumentNullException(nameof(userPrincipalName));
         _interval = interval ?? TimeSpan.FromMinutes(1);
         _retentionOptions = (retentionOptions ?? new GraphMessageListenerRetentionOptions()).Clone();
+        if (!_retentionOptions.MaxSeenIds.HasValue && !_retentionOptions.SlidingExpiration.HasValue) {
+            throw new ArgumentException(
+                "Retention options must configure either MaxSeenIds or SlidingExpiration.",
+                nameof(retentionOptions));
+        }
     }
 
     /// <summary>
@@ -112,31 +117,21 @@ public class GraphMessageListener : IDisposable {
     private bool TryRegisterMessage(string id) {
         var now = _retentionOptions.Clock();
         lock (_seenLock) {
+            var alreadySeen = _seenIds.ContainsKey(id);
+            _seenIds[id] = now;
+            _seenQueue.Enqueue((id, now));
             PruneSeenIds(now);
-            if (_seenIds.ContainsKey(id)) {
-                _seenIds[id] = now;
-                _seenQueue.Enqueue((id, now));
-                PruneSeenIds(now);
-                return false;
-            }
-
-            AddSeenIdInternal(id, now);
-            return true;
+            return !alreadySeen;
         }
     }
 
     private void TrackSeenMessage(string id) {
         var now = _retentionOptions.Clock();
         lock (_seenLock) {
+            _seenIds[id] = now;
+            _seenQueue.Enqueue((id, now));
             PruneSeenIds(now);
-            AddSeenIdInternal(id, now);
         }
-    }
-
-    private void AddSeenIdInternal(string id, DateTimeOffset timestamp) {
-        _seenIds[id] = timestamp;
-        _seenQueue.Enqueue((id, timestamp));
-        PruneSeenIds(timestamp);
     }
 
     private void PruneSeenIds(DateTimeOffset now) {
@@ -144,14 +139,14 @@ public class GraphMessageListener : IDisposable {
             var expirationThreshold = now - _retentionOptions.SlidingExpiration.Value;
             while (_seenQueue.Count > 0) {
                 var (seenId, timestamp) = _seenQueue.Peek();
-                if (_seenIds.TryGetValue(seenId, out var recordedTimestamp) && recordedTimestamp > timestamp) {
+                if (!_seenIds.TryGetValue(seenId, out var recordedTimestamp) || recordedTimestamp > timestamp) {
                     _seenQueue.Dequeue();
                     continue;
                 }
 
                 if (timestamp < expirationThreshold) {
                     _seenQueue.Dequeue();
-                    if (_seenIds.TryGetValue(seenId, out recordedTimestamp) && recordedTimestamp <= timestamp) {
+                    if (recordedTimestamp <= timestamp) {
                         _seenIds.Remove(seenId);
                     }
                 } else {

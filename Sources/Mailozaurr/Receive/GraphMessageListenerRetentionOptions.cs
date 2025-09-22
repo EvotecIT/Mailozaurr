@@ -6,8 +6,13 @@ namespace Mailozaurr;
 /// Configures how <see cref="GraphMessageListener"/> retains identifiers of processed messages.
 /// </summary>
 public class GraphMessageListenerRetentionOptions {
+    /// <summary>
+    /// Default capacity used when <see cref="MaxSeenIds"/> is not specified.
+    /// </summary>
+    public const int DefaultMaxSeenIds = 1024;
+
     private static readonly Func<DateTimeOffset> DefaultClock = () => DateTimeOffset.UtcNow;
-    private int? _maxSeenIds = 1024;
+    private int? _maxSeenIds = DefaultMaxSeenIds;
     private TimeSpan? _slidingExpiration;
     private Func<DateTimeOffset>? _clock;
 
@@ -55,7 +60,7 @@ public class GraphMessageListenerRetentionOptions {
     /// </remarks>
     public Func<DateTimeOffset> Clock {
         get => _clock ?? DefaultClock;
-        set => _clock = value ?? throw new ArgumentNullException(nameof(value));
+        internal set => _clock = value ?? throw new ArgumentNullException(nameof(value));
     }
 
     internal GraphMessageListenerRetentionOptions Clone() => new() {
