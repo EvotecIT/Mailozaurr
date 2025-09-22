@@ -29,6 +29,7 @@ public class GraphMessageListener : IDisposable {
     /// <param name="credential">Graph credential to use.</param>
     /// <param name="userPrincipalName">User principal name to monitor.</param>
     /// <param name="interval">Polling interval.</param>
+    /// <param name="retentionOptions">Policy controlling how seen message identifiers are retained.</param>
     public GraphMessageListener(
         GraphCredential credential,
         string userPrincipalName,
@@ -118,9 +119,7 @@ public class GraphMessageListener : IDisposable {
         var now = _retentionOptions.Clock();
         lock (_seenLock) {
             PruneExpiredEntries(now);
-            var alreadySeen = _seenIds.ContainsKey(id);
-            _seenIds[id] = now;
-            _seenQueue.Enqueue((id, now));
+            var alreadySeen = RecordSeenMessage(id, now);
             TrimCapacity();
             return !alreadySeen;
         }
@@ -130,10 +129,16 @@ public class GraphMessageListener : IDisposable {
         var now = _retentionOptions.Clock();
         lock (_seenLock) {
             PruneExpiredEntries(now);
-            _seenIds[id] = now;
-            _seenQueue.Enqueue((id, now));
+            RecordSeenMessage(id, now);
             TrimCapacity();
         }
+    }
+
+    private bool RecordSeenMessage(string id, DateTimeOffset timestamp) {
+        var alreadySeen = _seenIds.TryGetValue(id, out _);
+        _seenIds[id] = timestamp;
+        _seenQueue.Enqueue((id, timestamp));
+        return alreadySeen;
     }
 
     private void PruneExpiredEntries(DateTimeOffset now) {
