@@ -74,14 +74,14 @@ public class GraphMessageListener : IDisposable, IAsyncDisposable {
     /// Stops listening for new messages.
     /// </summary>
     public void Stop() {
-        StopAsync(CancellationToken.None).GetAwaiter().GetResult();
+        StopAsync().GetAwaiter().GetResult();
     }
 
     /// <summary>
     /// Stops listening for new messages.
     /// </summary>
     /// <param name="cancellationToken">Token used to cancel waiting for the polling loop to complete.</param>
-    public async Task StopAsync(CancellationToken cancellationToken) {
+    public async Task StopAsync(CancellationToken cancellationToken = default) {
         var disposeTask = Volatile.Read(ref _disposeTask);
         if (disposeTask != null) {
             await WaitWithCancellationAsync(disposeTask, cancellationToken).ConfigureAwait(false);
