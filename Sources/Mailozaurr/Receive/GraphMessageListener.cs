@@ -19,6 +19,12 @@ public class GraphMessageListener : IDisposable, IAsyncDisposable {
     private CancellationTokenSource? _cancel;
     private Task? _pollTask;
     private readonly TimeSpan _interval;
+    private Task? _disposeTask;
+    private int _disposeState;
+
+    private const int DisposeStateActive = 0;
+    private const int DisposeStateDisposing = 1;
+    private const int DisposeStateDisposed = 2;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="GraphMessageListener"/> class.
@@ -46,6 +52,8 @@ public class GraphMessageListener : IDisposable, IAsyncDisposable {
     /// Starts listening for new messages.
     /// </summary>
     public async Task StartAsync(CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+
         if (_cancel != null) {
             throw new InvalidOperationException("Listener already started.");
         }
@@ -74,27 +82,16 @@ public class GraphMessageListener : IDisposable, IAsyncDisposable {
     /// </summary>
     /// <param name="cancellationToken">Token used to cancel waiting for the polling loop to complete.</param>
     public async Task StopAsync(CancellationToken cancellationToken) {
-        var cancel = _cancel;
-        if (cancel == null) {
+        var disposeTask = Volatile.Read(ref _disposeTask);
+        if (disposeTask != null) {
+            await WaitWithCancellationAsync(disposeTask, cancellationToken).ConfigureAwait(false);
+            ThrowIfDisposed();
             return;
         }
 
-        Task? pollTask = _pollTask;
-        cancel.Cancel();
+        ThrowIfDisposed();
 
-        try {
-            if (pollTask != null) {
-                try {
-                    await WaitWithCancellationAsync(pollTask, cancellationToken).ConfigureAwait(false);
-                } catch (OperationCanceledException) when (cancel.IsCancellationRequested && !cancellationToken.IsCancellationRequested) {
-                    // Expected cancellation from the listener itself.
-                }
-            }
-        } finally {
-            cancel.Dispose();
-            _cancel = null;
-            _pollTask = null;
-        }
+        await StopAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
     private async Task PollLoopAsync() {
@@ -123,9 +120,63 @@ public class GraphMessageListener : IDisposable, IAsyncDisposable {
     }
 
     /// <inheritdoc />
-    public async ValueTask DisposeAsync() {
-        await StopAsync(CancellationToken.None).ConfigureAwait(false);
-        GC.SuppressFinalize(this);
+    public ValueTask DisposeAsync() => new ValueTask(EnsureDisposeTask());
+
+    private Task EnsureDisposeTask() {
+        while (true) {
+            var existing = Volatile.Read(ref _disposeTask);
+            if (existing != null) {
+                return existing;
+            }
+
+            var created = DisposeAsyncCore();
+            if (Interlocked.CompareExchange(ref _disposeTask, created, null) == null) {
+                return created;
+            }
+        }
+    }
+
+    private async Task DisposeAsyncCore() {
+        if (Interlocked.CompareExchange(ref _disposeState, DisposeStateDisposing, DisposeStateActive) != DisposeStateActive) {
+            return;
+        }
+
+        try {
+            await StopAsyncCore(CancellationToken.None).ConfigureAwait(false);
+        } finally {
+            Volatile.Write(ref _disposeState, DisposeStateDisposed);
+            GC.SuppressFinalize(this);
+        }
+    }
+
+    private async Task StopAsyncCore(CancellationToken cancellationToken) {
+        var cancel = _cancel;
+        if (cancel == null) {
+            return;
+        }
+
+        Task? pollTask = _pollTask;
+        cancel.Cancel();
+
+        try {
+            if (pollTask != null) {
+                try {
+                    await WaitWithCancellationAsync(pollTask, cancellationToken).ConfigureAwait(false);
+                } catch (OperationCanceledException) when (cancel.IsCancellationRequested && !cancellationToken.IsCancellationRequested) {
+                    // Expected cancellation from the listener itself.
+                }
+            }
+        } finally {
+            cancel.Dispose();
+            _cancel = null;
+            _pollTask = null;
+        }
+    }
+
+    private void ThrowIfDisposed() {
+        if (Volatile.Read(ref _disposeState) == DisposeStateDisposed) {
+            throw new ObjectDisposedException(nameof(GraphMessageListener));
+        }
     }
 
     private static async Task WaitWithCancellationAsync(Task task, CancellationToken cancellationToken) {

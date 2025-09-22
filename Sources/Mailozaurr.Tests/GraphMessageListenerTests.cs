@@ -65,7 +65,6 @@ public class GraphMessageListenerTests {
             await listener.StartAsync();
             var first = cancelField.GetValue(listener);
             var firstPoll = pollField.GetValue(listener);
-            await Task.Delay(20);
             await listener.StopAsync(CancellationToken.None);
             Assert.Null(cancelField.GetValue(listener));
             Assert.Null(pollField.GetValue(listener));
@@ -73,7 +72,6 @@ public class GraphMessageListenerTests {
             await listener.StartAsync();
             var second = cancelField.GetValue(listener);
             var secondPoll = pollField.GetValue(listener);
-            await Task.Delay(20);
             listener.Dispose();
             Assert.Null(cancelField.GetValue(listener));
             Assert.Null(pollField.GetValue(listener));
@@ -104,6 +102,16 @@ public class GraphMessageListenerTests {
 
         var thrown = await Assert.ThrowsAsync<InvalidOperationException>(() => listener.StopAsync(CancellationToken.None));
         Assert.Same(exception, thrown);
+    }
+
+    [Fact]
+    public async Task StopAsync_AfterDispose_ThrowsObjectDisposedException() {
+        var cred = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
+        var listener = new GraphMessageListener(cred, "user", TimeSpan.FromSeconds(1));
+
+        await listener.DisposeAsync();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => listener.StopAsync(CancellationToken.None));
     }
 }
 }
