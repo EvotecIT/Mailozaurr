@@ -21,6 +21,7 @@ namespace Mailozaurr {
     public static class MicrosoftGraphUtils {
         private static readonly HttpClient HttpClient;
         private static readonly ConcurrentDictionary<string, GraphAuthorization> TokenCache = new();
+        private static readonly object ConcurrencySemaphoreLock = new();
         private static SemaphoreSlim _concurrencySemaphore = new(5, 5);
         private static int _maxConcurrentRequests = 5;
 
@@ -33,10 +34,32 @@ namespace Mailozaurr {
                 if (value <= 0) {
                     throw new ArgumentOutOfRangeException(nameof(MaxConcurrentRequests));
                 }
-                var newSem = new SemaphoreSlim(value, value);
-                var old = Interlocked.Exchange(ref _concurrencySemaphore, newSem);
-                old.Dispose();
-                _maxConcurrentRequests = value;
+
+                lock (ConcurrencySemaphoreLock) {
+                    if (value == _maxConcurrentRequests) {
+                        return;
+                    }
+
+                    var previousSemaphore = _concurrencySemaphore;
+                    var previousMax = _maxConcurrentRequests;
+                    var newSem = new SemaphoreSlim(value, value);
+                    _concurrencySemaphore = newSem;
+                    _maxConcurrentRequests = value;
+
+                    if (previousSemaphore != null) {
+                        _ = Task.Run(async () => {
+                            try {
+                                for (var i = 0; i < previousMax; i++) {
+                                    await previousSemaphore.WaitAsync().ConfigureAwait(false);
+                                }
+                            } catch (ObjectDisposedException) {
+                                // Ignore disposal race if another thread finished cleanup sooner.
+                            } finally {
+                                previousSemaphore.Dispose();
+                            }
+                        });
+                    }
+                }
             }
         }
 
@@ -603,13 +626,16 @@ namespace Mailozaurr {
             IEnumerable<string> userPrincipalNames,
             string queryString,
             int from = 0,
-            int size = 25) {
+            int size = 25,
+            CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
             var headers = new Dictionary<string, string>();
-            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com", cancellationToken).ConfigureAwait(false);
             headers["Authorization"] = token;
 
             var requests = new List<object>();
             foreach (var upn in userPrincipalNames) {
+                cancellationToken.ThrowIfCancellationRequested();
                 requests.Add(new {
                     entityTypes = new[] { "message" },
                     from,
@@ -621,17 +647,20 @@ namespace Mailozaurr {
 
             var body = JsonSerializer.Serialize(new { requests });
             var searchUri = BuildGraphUri(GraphEndpoint.V1, "/search/query");
-            var doc = await InvokeGraphApiAsync("POST", searchUri, headers, body).ConfigureAwait(false);
+            var doc = await InvokeGraphApiAsync("POST", searchUri, headers, body, cancellationToken).ConfigureAwait(false);
 
             var results = new List<GraphMessageInfo>();
             int index = 0;
             if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
                 foreach (var item in valueElement.EnumerateArray()) {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var upn = userPrincipalNames.ElementAt(index++);
                     if (item.TryGetProperty("hitsContainers", out var containers) && containers.ValueKind == JsonValueKind.Array) {
                         foreach (var container in containers.EnumerateArray()) {
+                            cancellationToken.ThrowIfCancellationRequested();
                             if (container.TryGetProperty("hits", out var hits) && hits.ValueKind == JsonValueKind.Array) {
                                 foreach (var hit in hits.EnumerateArray()) {
+                                    cancellationToken.ThrowIfCancellationRequested();
                                     string? summary = null;
                                     if (hit.TryGetProperty("summary", out var sumEl)) summary = sumEl.GetString();
                                     if (hit.TryGetProperty("resource", out var res) && res.ValueKind == JsonValueKind.Object) {
@@ -730,16 +759,22 @@ namespace Mailozaurr {
         /// <summary>
         /// Retrieves the raw MIME content of a mail message.
         /// </summary>
-        public static async Task<MimeMessage> GetMailMessageMimeAsync(GraphCredential credential, string userPrincipalName, string messageId) {
-            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
+        public static async Task<MimeMessage> GetMailMessageMimeAsync(GraphCredential credential, string userPrincipalName, string messageId, CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com", cancellationToken).ConfigureAwait(false);
             var request = new HttpRequestMessage(HttpMethod.Get, $"https://graph.microsoft.com/v1.0/users/{userPrincipalName}/messages/{messageId}/$value");
             request.Headers.TryAddWithoutValidation("Authorization", token);
-            await ConcurrencySemaphore.WaitAsync().ConfigureAwait(false);
+            await ConcurrencySemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
             try {
-                using var response = await HttpClient.SendAsync(request).ConfigureAwait(false);
+                using var response = await HttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
-                using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-                return await MimeMessage.LoadAsync(stream).ConfigureAwait(false);
+                using var stream =
+#if NET5_0_OR_GREATER
+                    await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+#else
+                    await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+#endif
+                return await MimeMessage.LoadAsync(stream, cancellationToken).ConfigureAwait(false);
             } finally {
                 ConcurrencySemaphore.Release();
             }
@@ -1036,9 +1071,11 @@ namespace Mailozaurr {
         /// </summary>
         public static async Task<GraphMailboxStatistics> GetMailboxStatisticsAsync(
             GraphCredential credential,
-            string userPrincipalName) {
+            string userPrincipalName,
+            CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
             var headers = new Dictionary<string, string>();
-            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com", cancellationToken).ConfigureAwait(false);
             headers["Authorization"] = token;
 
             var folderQuery = new Dictionary<string, object> {
@@ -1050,9 +1087,11 @@ namespace Mailozaurr {
             int folderCount = 0;
             var foldersStats = new List<GraphMailboxFolderStatistics>();
             while (!string.IsNullOrWhiteSpace(folderUri)) {
-                var doc = await InvokeGraphApiAsync("GET", folderUri!, headers).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                var doc = await InvokeGraphApiAsync("GET", folderUri!, headers, cancellationToken: cancellationToken).ConfigureAwait(false);
                 if (doc.RootElement.TryGetProperty("value", out var folders) && folders.ValueKind == JsonValueKind.Array) {
                     foreach (var item in folders.EnumerateArray()) {
+                        cancellationToken.ThrowIfCancellationRequested();
                         var stat = new GraphMailboxFolderStatistics {
                             Id = item.GetProperty("id").GetString() ?? string.Empty,
                             DisplayName = item.GetProperty("displayName").GetString() ?? string.Empty,
@@ -1080,9 +1119,11 @@ namespace Mailozaurr {
             };
             var msgUri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages", msgQuery);
             while (!string.IsNullOrWhiteSpace(msgUri)) {
-                var doc = await InvokeGraphApiAsync("GET", msgUri!, headers).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                var doc = await InvokeGraphApiAsync("GET", msgUri!, headers, cancellationToken: cancellationToken).ConfigureAwait(false);
                 if (doc.RootElement.TryGetProperty("value", out var msgs) && msgs.ValueKind == JsonValueKind.Array) {
                     foreach (var msg in msgs.EnumerateArray()) {
+                        cancellationToken.ThrowIfCancellationRequested();
                         if (!msg.TryGetProperty("id", out var idEl) || idEl.ValueKind != JsonValueKind.String) {
                             continue;
                         }
@@ -1099,8 +1140,10 @@ namespace Mailozaurr {
                             credential,
                             userPrincipalName,
                             id!,
-                            new[] { "size" }).ConfigureAwait(false);
+                            new[] { "size" },
+                            cancellationToken).ConfigureAwait(false);
                         foreach (var att in atts) {
+                            cancellationToken.ThrowIfCancellationRequested();
                             attachmentSize += att.Size;
                         }
                     }
