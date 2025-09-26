@@ -1,9 +1,12 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using MailKit.Security;
+using Mailozaurr.Definitions;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -59,7 +62,8 @@ public class SmtpAsyncWrappersTests
 
             await smtp.CreateMessageAsync();
 
-            Assert.Contains(tempFile, smtp.InlineAttachments ?? new List<object>());
+            var inlineAttachments = smtp.InlineAttachments ?? new List<AttachmentDescriptor>();
+            Assert.Contains(inlineAttachments.OfType<FileAttachmentDescriptor>(), a => string.Equals(a.FilePath, tempFile, StringComparison.OrdinalIgnoreCase));
             Assert.Contains($"cid:{Path.GetFileName(tempFile)}", smtp.HtmlBody);
             Assert.Contains($"cid:{Path.GetFileName(tempFile)}", smtp.Message.HtmlBody);
         }
@@ -94,7 +98,8 @@ public class SmtpAsyncWrappersTests
             await Assert.ThrowsAsync<OperationCanceledException>(async () => await smtp.CreateMessageAsync(cts.Token));
 
             Assert.Equal(originalHtml, smtp.HtmlBody);
-            Assert.DoesNotContain(tempFile, smtp.InlineAttachments ?? new List<object>());
+            var inlineAttachments = smtp.InlineAttachments ?? new List<AttachmentDescriptor>();
+            Assert.DoesNotContain(inlineAttachments.OfType<FileAttachmentDescriptor>(), a => string.Equals(a.FilePath, tempFile, StringComparison.OrdinalIgnoreCase));
         }
         finally
         {
