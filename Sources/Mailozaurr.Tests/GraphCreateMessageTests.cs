@@ -42,13 +42,15 @@ public class GraphCreateMessageTests
     }
 
     [Fact]
-    public void CreateAttachments_WithMissingFile_ThrowsFileNotFoundException()
+    public void CreateAttachments_WithMissingFile_SkipsAttachment()
     {
         using var graph = new Graph
         {
             Attachments = new object[] { "missing.file" }
         };
-        Assert.Throws<FileNotFoundException>(() => graph.CreateAttachments());
+        graph.CreateAttachments();
+
+        Assert.Empty(graph.ConvertedAttachments);
     }
 
     [Fact]
