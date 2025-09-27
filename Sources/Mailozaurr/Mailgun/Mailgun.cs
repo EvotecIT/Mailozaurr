@@ -119,16 +119,18 @@ public class MailgunClient : IDisposable {
         return string.IsNullOrWhiteSpace(name) ? email : $"{name} <{email}>";
     }
 
-    private static async Task<byte[]> ReadFileBytesAsync(string path, CancellationToken cancellationToken) {
-        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
-        var bytes = new byte[fs.Length];
-        var read = 0;
-        while (read < bytes.Length) {
-            var r = await fs.ReadAsync(bytes, read, bytes.Length - read, cancellationToken).ConfigureAwait(false);
-            if (r == 0) break;
-            read += r;
-        }
-        return bytes;
+    private static StreamContent CreateStreamContent(string path) {
+        var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 8192,
+            options: FileOptions.Asynchronous | FileOptions.SequentialScan);
+
+        var streamContent = new StreamContent(stream);
+        streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        return streamContent;
     }
 
     /// <summary>
@@ -157,9 +159,7 @@ public class MailgunClient : IDisposable {
                     continue;
                 }
 
-                var bytes = await ReadFileBytesAsync(path, cancellationToken).ConfigureAwait(false);
-                var fileContent = new ByteArrayContent(bytes);
-                fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                var fileContent = CreateStreamContent(path);
                 content.Add(fileContent, "attachment", Path.GetFileName(path));
             }
         }
@@ -172,9 +172,7 @@ public class MailgunClient : IDisposable {
                     continue;
                 }
 
-                var bytes = await ReadFileBytesAsync(path, cancellationToken).ConfigureAwait(false);
-                var fileContent = new ByteArrayContent(bytes);
-                fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                var fileContent = CreateStreamContent(path);
                 content.Add(fileContent, "inline", Path.GetFileName(path));
             }
         }
