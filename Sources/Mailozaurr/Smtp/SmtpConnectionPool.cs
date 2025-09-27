@@ -25,11 +25,21 @@ public static class SmtpConnectionPool {
     /// <summary>Enables or disables connection pooling.</summary>
     public static bool PoolingEnabled => Volatile.Read(ref _poolingEnabled) == 1;
 
-    public static void SetMaxPoolSize(int value) => Interlocked.Exchange(ref _maxPoolSize, value);
+    public static void SetMaxPoolSize(int value) {
+        if (value < 1) {
+            throw new ArgumentOutOfRangeException(nameof(value), value, "Max pool size must be at least 1.");
+        }
+
+        Interlocked.Exchange(ref _maxPoolSize, value);
+    }
 
     public static void SetPoolingEnabled(bool enabled) => Interlocked.Exchange(ref _poolingEnabled, enabled ? 1 : 0);
 
     public static void Configure(bool poolingEnabled, int maxPoolSize) {
+        if (maxPoolSize < 1) {
+            throw new ArgumentOutOfRangeException(nameof(maxPoolSize), maxPoolSize, "Max pool size must be at least 1.");
+        }
+
         SetPoolingEnabled(poolingEnabled);
         SetMaxPoolSize(maxPoolSize);
     }
