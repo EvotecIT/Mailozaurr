@@ -1,5 +1,6 @@
 using System;
-﻿using System.Net.Http.Headers;
+using System.Diagnostics;
+using System.Net.Http.Headers;
 using System.Threading;
 
 namespace Mailozaurr;
@@ -378,6 +379,7 @@ namespace Mailozaurr;
     /// </summary>
     /// <returns>The result of the connection attempt.</returns>
     public async Task<SmtpResult> ConnectO365GraphAsync(CancellationToken cancellationToken = default) {
+        Stopwatch.Restart();
         string resource = "https://graph.microsoft.com";
         var body = new Dictionary<string, string> {
             { "grant_type", "client_credentials" },
@@ -426,6 +428,7 @@ namespace Mailozaurr;
     /// </summary>
     /// <returns>The result of the send operation.</returns>
     public async Task<SmtpResult> SendMessageAsync(CancellationToken cancellationToken = default) {
+        Stopwatch.Restart();
         // create message
         CreateMessage();
         LogCollector.LogVerbose("Send-EmailMessage - Sending email via Graph API");
@@ -501,6 +504,7 @@ namespace Mailozaurr;
     /// </summary>
     /// <returns>The result of the send operation.</returns>
     public async Task<SmtpResult> SendMessageDraftAsync(CancellationToken cancellationToken = default) {
+        Stopwatch.Restart();
         // Create the draft message using the new method
         var draftMessage = await CreateDraftMessageAsync(cancellationToken);
 
@@ -555,6 +559,7 @@ namespace Mailozaurr;
         /// <param name="cancellationToken">Token used to cancel the operation.</param>
         /// <returns>The result of the send operation.</returns>
         public async Task<SmtpResult> SendDraftMessage(GraphMessage draftMessage, CancellationToken cancellationToken = default) {
+        Stopwatch.Restart();
         // Send the draft message
         var sendRequestUri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
@@ -597,6 +602,7 @@ namespace Mailozaurr;
     /// Sends the current message using Microsoft Graph batch requests.
     /// </summary>
     public async Task<SmtpResult> SendMessageBatchAsync(CancellationToken cancellationToken = default) {
+        Stopwatch.Restart();
         CreateMessage();
         var credential = new GraphCredential {
             ClientId = ApplicationID,
