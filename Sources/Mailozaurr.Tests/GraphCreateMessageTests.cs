@@ -42,6 +42,30 @@ public class GraphCreateMessageTests
     }
 
     [Fact]
+    public void CreateMessage_WithoutExplicitContentType_DefaultsToHtml()
+    {
+        using var graph = new Graph
+        {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "subject",
+            HTML = "body"
+        };
+
+        graph.CreateMessage();
+
+        Assert.Equal("HTML", graph.MessageContainer.Message.Body?.Type);
+    }
+
+    [Fact]
+    public void ContentType_SetToInvalidValue_ThrowsArgumentException()
+    {
+        using var graph = new Graph();
+
+        Assert.Throws<ArgumentException>(() => graph.ContentType = "Markdown");
+    }
+
+    [Fact]
     public void CreateAttachments_WithMissingFile_SkipsAttachment()
     {
         using var graph = new Graph

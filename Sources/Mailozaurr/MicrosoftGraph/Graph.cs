@@ -90,10 +90,31 @@ namespace Mailozaurr;
     /// </summary>
     public string HTML { get; set; } = string.Empty;
 
+    private string _contentType = "HTML";
+
     /// <summary>
     /// Content type of the email.
     /// </summary>
-    public string ContentType { get; set; } = string.Empty;
+    public string ContentType {
+        get => _contentType;
+        set {
+            if (value is null) {
+                throw new ArgumentNullException(nameof(value));
+            }
+
+            if (string.Equals(value, "HTML", StringComparison.OrdinalIgnoreCase)) {
+                _contentType = "HTML";
+                return;
+            }
+
+            if (string.Equals(value, "Text", StringComparison.OrdinalIgnoreCase)) {
+                _contentType = "Text";
+                return;
+            }
+
+            throw new ArgumentException("ContentType must be either \"Text\" or \"HTML\".", nameof(value));
+        }
+    }
 
     /// <summary>
     /// Value indicating whether the message should not be saved to the Sent Items folder.
