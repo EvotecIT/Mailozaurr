@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 ﻿using System.Net.Http.Headers;
 using System.Threading;
 
@@ -330,19 +331,32 @@ namespace Mailozaurr;
     /// </summary>
     /// <param name="Credentials">The credentials to parse.</param>
     public void Authenticate(ICredentials Credentials) {
-        var networkCredential = Credentials as NetworkCredential;
-        if (networkCredential != null) {
-            var userSplit = networkCredential.UserName.Split('@');
-            if (userSplit.Length != 2) {
-                throw new ArgumentException(
-                    "Credential.UserName must be in the format 'clientid@directoryid'",
-                    nameof(Credentials));
-            }
-
-            ApplicationID = userSplit[0];
-            ApplicationKey = networkCredential.Password;
-            TenantDomain = userSplit[1];
+        if (Credentials == null) {
+            throw new ArgumentNullException(nameof(Credentials));
         }
+
+        if (Credentials is not NetworkCredential networkCredential) {
+            throw new ArgumentException(
+                "Credentials must be provided as a NetworkCredential with a UserName in the format 'clientid@directoryid'",
+                nameof(Credentials));
+        }
+
+        if (string.IsNullOrWhiteSpace(networkCredential.UserName)) {
+            throw new ArgumentException(
+                "Credential.UserName must be in the format 'clientid@directoryid'",
+                nameof(Credentials));
+        }
+
+        var userSplit = networkCredential.UserName.Split('@');
+        if (userSplit.Length != 2 || string.IsNullOrWhiteSpace(userSplit[0]) || string.IsNullOrWhiteSpace(userSplit[1])) {
+            throw new ArgumentException(
+                "Credential.UserName must be in the format 'clientid@directoryid'",
+                nameof(Credentials));
+        }
+
+        ApplicationID = userSplit[0];
+        ApplicationKey = networkCredential.Password;
+        TenantDomain = userSplit[1];
     }
 
     private GraphEmailAddress? ConvertToGraphEmailAddress(object? email) {
