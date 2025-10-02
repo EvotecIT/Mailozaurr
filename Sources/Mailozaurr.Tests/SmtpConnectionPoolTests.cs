@@ -1,3 +1,4 @@
+using System;
 using MailKit.Security;
 using System.Threading;
 using Xunit;
@@ -53,5 +54,57 @@ public class SmtpConnectionPoolTests {
 
         SmtpConnectionPool.ClearConnectionPool();
         SmtpConnectionPool.SetPoolingEnabled(false);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void SetMaxPoolSize_InvalidValue_Throws(int value) {
+        var original = SmtpConnectionPool.MaxPoolSize;
+
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => SmtpConnectionPool.SetMaxPoolSize(value));
+        Assert.Equal("value", ex.ParamName);
+        Assert.Equal(original, SmtpConnectionPool.MaxPoolSize);
+    }
+
+    [Fact]
+    public void SetMaxPoolSize_ValidValue_UpdatesProperty() {
+        var original = SmtpConnectionPool.MaxPoolSize;
+        var expected = original + 1;
+
+        try {
+            SmtpConnectionPool.SetMaxPoolSize(expected);
+            Assert.Equal(expected, SmtpConnectionPool.MaxPoolSize);
+        } finally {
+            SmtpConnectionPool.SetMaxPoolSize(original);
+        }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public void Configure_InvalidMaxPoolSize_Throws(int value) {
+        var originalEnabled = SmtpConnectionPool.PoolingEnabled;
+        var originalMax = SmtpConnectionPool.MaxPoolSize;
+
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => SmtpConnectionPool.Configure(true, value));
+        Assert.Equal("maxPoolSize", ex.ParamName);
+        Assert.Equal(originalEnabled, SmtpConnectionPool.PoolingEnabled);
+        Assert.Equal(originalMax, SmtpConnectionPool.MaxPoolSize);
+    }
+
+    [Fact]
+    public void Configure_ValidMaxPoolSize_UpdatesProperty() {
+        var originalEnabled = SmtpConnectionPool.PoolingEnabled;
+        var originalMax = SmtpConnectionPool.MaxPoolSize;
+        var expected = originalMax + 1;
+
+        try {
+            SmtpConnectionPool.Configure(true, expected);
+            Assert.True(SmtpConnectionPool.PoolingEnabled);
+            Assert.Equal(expected, SmtpConnectionPool.MaxPoolSize);
+        } finally {
+            SmtpConnectionPool.Configure(originalEnabled, originalMax);
+        }
     }
 }
