@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -44,5 +45,32 @@ public class GraphDraftTests
         Assert.True(graph.IsLargerAttachment);
         Assert.Equal(2, graph.AttachmentsPlaceHolders.Count);
         Assert.All(graph.AttachmentsPlaceHolders, p => Assert.False(string.IsNullOrWhiteSpace(p.FileName)));
+    }
+
+    [Fact]
+    public async Task CreateGraphAttachment_MissingFile_ThrowsAndLogsWarning()
+    {
+        string missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
+        using var graph = new Graph();
+
+        var exception = await Assert.ThrowsAsync<FileNotFoundException>(() => graph.CreateGraphAttachment(missing));
+        Assert.Contains("Attachment file not found", exception.Message);
+        Assert.Equal(missing, exception.FileName);
+
+        var warnings = graph.LogCollector.Logs.ToArray();
+        Assert.Contains(warnings, entry => entry.Type == LogType.Warning && entry.Message.IndexOf(missing, StringComparison.OrdinalIgnoreCase) >= 0);
+    }
+
+    [Fact]
+    public async Task PrepareAttachments_MissingFile_SkipsPlaceholderAndLogs()
+    {
+        string missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
+        using var graph = new Graph { Attachments = new object[] { missing } };
+
+        await graph.PrepareAttachments();
+
+        Assert.Empty(graph.AttachmentsPlaceHolders);
+        var warnings = graph.LogCollector.Logs.ToArray();
+        Assert.True(warnings.Count(entry => entry.Type == LogType.Warning && entry.Message.IndexOf(missing, StringComparison.OrdinalIgnoreCase) >= 0) >= 1);
     }
 }

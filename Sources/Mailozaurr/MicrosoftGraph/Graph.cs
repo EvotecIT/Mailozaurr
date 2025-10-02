@@ -229,6 +229,14 @@ namespace Mailozaurr;
         if (LogCollector == null) LogCollector = new();
     }
 
+    private void LogMissingAttachmentWarning(string attachmentPath) {
+        var pathForMessage = string.IsNullOrWhiteSpace(attachmentPath)
+            ? "(empty path)"
+            : attachmentPath;
+        LogCollector.LogWarning($"Send-EmailMessage - Attachment file not found: {pathForMessage}");
+        LogCollector.LogWarning($"Send-EmailMessage - Possible issue: Path '{pathForMessage}' is invalid. Verify the file exists and the path is correct.");
+    }
+
     /// <summary>
     /// Converts the <see cref="Attachments"/> collection into <see cref="GraphAttachment"/> instances.
     /// </summary>
@@ -239,8 +247,7 @@ namespace Mailozaurr;
             foreach (var item in Attachments) {
                 if (item is string path) {
                     if (!File.Exists(path)) {
-                        LogCollector.LogWarning($"Send-EmailMessage - Attachment file not found: {path}");
-                        LogCollector.LogWarning($"Send-EmailMessage - Possible issue: Path '{path}' is invalid. Verify the file exists and the path is correct.");
+                        LogMissingAttachmentWarning(path);
                         continue;
                     }
                     ConvertedAttachments.Add(GraphAttachment.FromFile(path));
@@ -720,6 +727,10 @@ namespace Mailozaurr;
         /// <param name="cancellationToken">Token used to cancel the operation.</param>
         /// <returns>The placeholder representing the attachment.</returns>
         public Task<GraphAttachmentPlaceHolder> CreateGraphAttachment(string attachmentPath, CancellationToken cancellationToken = default) {
+        if (!File.Exists(attachmentPath)) {
+            LogMissingAttachmentWarning(attachmentPath);
+            throw new FileNotFoundException($"Send-EmailMessage - Attachment file not found: {attachmentPath}", attachmentPath);
+        }
         var fileName = Path.GetFileName(attachmentPath);
         var fileSize = new FileInfo(attachmentPath).Length;
 
@@ -829,9 +840,13 @@ namespace Mailozaurr;
         if (Attachments != null && Attachments.Length > 0) {
             foreach (var attachmentPath in Attachments) {
                 if (attachmentPath is string path) {
-                    var attachmentItemJson = await CreateGraphAttachment(path, cancellationToken);
-                    var uploadUrl = await CreateUploadSession(draftMessage, attachmentItemJson.Json, cancellationToken);
-                    await SendFileChunks(uploadUrl, attachmentItemJson.Content, cancellationToken);
+                    try {
+                        var attachmentItemJson = await CreateGraphAttachment(path, cancellationToken);
+                        var uploadUrl = await CreateUploadSession(draftMessage, attachmentItemJson.Json, cancellationToken);
+                        await SendFileChunks(uploadUrl, attachmentItemJson.Content, cancellationToken);
+                    } catch (FileNotFoundException) {
+                        // Already logged by CreateGraphAttachment.
+                    }
                 }
             }
         }
@@ -845,8 +860,12 @@ namespace Mailozaurr;
         if (Attachments != null && Attachments.Length > 0) {
             foreach (var attachmentPath in Attachments) {
                 if (attachmentPath is string path) {
-                    var attachmentItemJson = await CreateGraphAttachment(path, cancellationToken);
-                    AttachmentsPlaceHolders.Add(attachmentItemJson);
+                    try {
+                        var attachmentItemJson = await CreateGraphAttachment(path, cancellationToken);
+                        AttachmentsPlaceHolders.Add(attachmentItemJson);
+                    } catch (FileNotFoundException) {
+                        // Already logged by CreateGraphAttachment.
+                    }
                 }
             }
         }
