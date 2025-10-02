@@ -190,6 +190,54 @@ public class MailgunClientTests
     }
 
     [Fact]
+    public async Task CreateContentAsync_UsesStreamContentForFiles()
+    {
+        var attachment = Path.GetTempFileName();
+        var inline = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllBytes(attachment, new byte[1024]);
+            File.WriteAllBytes(inline, new byte[1024]);
+
+            using var client = new MailgunClient
+            {
+                From = "sender@example.com",
+                To = new List<object> { "to@example.com" },
+                Attachment = new[] { attachment },
+                InlineAttachment = new[] { inline }
+            };
+
+            MethodInfo? method = typeof(MailgunClient).GetMethod("CreateContentAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+            var task = (Task<MultipartFormDataContent>)method!.Invoke(client, new object[] { default(CancellationToken) })!;
+            using var content = await task;
+
+            var attachmentContent = content.Single(c => c.Headers.ContentDisposition?.Name?.Trim('"') == "attachment");
+            var inlineContent = content.Single(c => c.Headers.ContentDisposition?.Name?.Trim('"') == "inline");
+
+            Assert.IsType<StreamContent>(attachmentContent);
+            Assert.IsType<StreamContent>(inlineContent);
+
+            var streamField = typeof(StreamContent)
+                .GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                .FirstOrDefault(f => typeof(Stream).IsAssignableFrom(f.FieldType));
+            Assert.NotNull(streamField);
+
+            var attachmentStream = (Stream)streamField!.GetValue(attachmentContent)!;
+            var inlineStream = (Stream)streamField.GetValue(inlineContent)!;
+
+            Assert.IsType<FileStream>(attachmentStream);
+            Assert.IsType<FileStream>(inlineStream);
+            Assert.Equal(new FileInfo(attachment).Length, attachmentContent.Headers.ContentLength);
+            Assert.Equal(new FileInfo(inline).Length, inlineContent.Headers.ContentLength);
+        }
+        finally
+        {
+            File.Delete(attachment);
+            File.Delete(inline);
+        }
+    }
+
+    [Fact]
     public async Task SendEmailAsync_InvalidCredentials_ThrowsInvalidOperationException()
     {
         using var client = new MailgunClient
