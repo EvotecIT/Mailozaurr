@@ -17,6 +17,23 @@ public class SmtpConnectionPoolTests {
         }
     }
 
+    private sealed class TrackingClient : ClientSmtp {
+        private bool _connected = true;
+        private bool _disposed;
+
+        public bool Disposed => _disposed;
+
+        public override bool IsConnected => _connected;
+
+        public void SetConnected(bool value) => _connected = value;
+
+        protected override void Dispose(bool disposing) {
+            _disposed = true;
+            _connected = false;
+            base.Dispose(disposing);
+        }
+    }
+
     [Fact]
     public void Disconnect_ReturnsClientToPool() {
         SmtpConnectionPool.SetPoolingEnabled(true);
@@ -104,6 +121,32 @@ public class SmtpConnectionPoolTests {
             Assert.True(SmtpConnectionPool.PoolingEnabled);
             Assert.Equal(expected, SmtpConnectionPool.MaxPoolSize);
         } finally {
+            SmtpConnectionPool.Configure(originalEnabled, originalMax);
+        }
+    }
+
+    [Fact]
+    public void Configure_DisablingPooling_ClearsCachedClients() {
+        var originalEnabled = SmtpConnectionPool.PoolingEnabled;
+        var originalMax = SmtpConnectionPool.MaxPoolSize;
+
+        var client = new TrackingClient();
+        client.SetConnected(true);
+
+        try {
+            SmtpConnectionPool.Configure(true, Math.Max(2, originalMax));
+            SmtpConnectionPool.ClearConnectionPool();
+
+            SmtpConnectionPool.ReturnClient("h", 25, client);
+            Assert.Equal(1, SmtpConnectionPool.CurrentPoolSize);
+
+            SmtpConnectionPool.Configure(false, originalMax);
+
+            Assert.True(client.Disposed);
+            Assert.Equal(0, SmtpConnectionPool.CurrentPoolSize);
+            Assert.False(SmtpConnectionPool.PoolingEnabled);
+        } finally {
+            SmtpConnectionPool.ClearConnectionPool();
             SmtpConnectionPool.Configure(originalEnabled, originalMax);
         }
     }

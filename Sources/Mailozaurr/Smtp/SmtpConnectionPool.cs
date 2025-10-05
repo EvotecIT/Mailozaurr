@@ -33,7 +33,13 @@ public static class SmtpConnectionPool {
         Interlocked.Exchange(ref _maxPoolSize, value);
     }
 
-    public static void SetPoolingEnabled(bool enabled) => Interlocked.Exchange(ref _poolingEnabled, enabled ? 1 : 0);
+    public static void SetPoolingEnabled(bool enabled) {
+        var newValue = enabled ? 1 : 0;
+        var previous = Interlocked.Exchange(ref _poolingEnabled, newValue);
+        if (previous == 1 && newValue == 0) {
+            ClearConnectionPool();
+        }
+    }
 
     public static void Configure(bool poolingEnabled, int maxPoolSize) {
         if (maxPoolSize < 1) {
