@@ -21,6 +21,9 @@ namespace Mailozaurr {
     public static class MicrosoftGraphUtils {
         private static readonly HttpClient HttpClient;
         private static readonly ConcurrentDictionary<string, GraphAuthorization> TokenCache = new();
+        internal static Func<string, string, string, string, IEnumerable<string>?, Task<GraphAuthorization>> AcquireGraphCertificateTokenAsyncFunc { get; set; } = AcquireGraphCertificateTokenAsyncDefault;
+        internal static Func<string, string, byte[], string, IEnumerable<string>?, Task<GraphAuthorization>> AcquireGraphCertificateBytesTokenAsyncFunc { get; set; } = AcquireGraphCertificateBytesTokenAsyncDefault;
+        internal static Func<string, string, string, IEnumerable<string>?, Task<GraphAuthorization>> AcquireGraphCertificatePemTokenAsyncFunc { get; set; } = AcquireGraphCertificatePemTokenAsyncDefault;
         private static SemaphoreSlim _concurrencySemaphore = new(5, 5);
         private static int _maxConcurrentRequests = 5;
 
@@ -76,6 +79,30 @@ namespace Mailozaurr {
             HttpClient.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
             AppDomain.CurrentDomain.ProcessExit += (_, _) => HttpClient.Dispose();
         }
+
+        internal static void ResetOAuthHelperOverrides() {
+            AcquireGraphCertificateTokenAsyncFunc = AcquireGraphCertificateTokenAsyncDefault;
+            AcquireGraphCertificateBytesTokenAsyncFunc = AcquireGraphCertificateBytesTokenAsyncDefault;
+            AcquireGraphCertificatePemTokenAsyncFunc = AcquireGraphCertificatePemTokenAsyncDefault;
+        }
+
+        private static Task<GraphAuthorization> AcquireGraphCertificateTokenAsyncDefault(string clientId, string tenantDomain, string certificatePath, string certificatePassword, IEnumerable<string>? scopes) =>
+            OAuthHelpers.AcquireGraphCertificateTokenAsync(clientId, tenantDomain, certificatePath, certificatePassword, scopes);
+
+        private static Task<GraphAuthorization> AcquireGraphCertificateBytesTokenAsyncDefault(string clientId, string tenantDomain, byte[] certificateBytes, string certificatePassword, IEnumerable<string>? scopes) =>
+            OAuthHelpers.AcquireGraphCertificateTokenAsync(clientId, tenantDomain, certificateBytes, certificatePassword, scopes);
+
+        private static Task<GraphAuthorization> AcquireGraphCertificatePemTokenAsyncDefault(string clientId, string tenantDomain, string pemPath, IEnumerable<string>? scopes) =>
+            OAuthHelpers.AcquireGraphCertificatePemTokenAsync(clientId, tenantDomain, pemPath, scopes);
+
+        private static async Task CacheGraphAuthorizationAsync(string key, string clientId, GraphAuthorization authorization) {
+            TokenCache[key] = authorization;
+            await OAuthTokenCache.SetAsync($"graph:{key}", new OAuthCredential {
+                UserName = clientId,
+                AccessToken = authorization.AccessToken,
+                ExpiresOn = authorization.ExpiresOn
+            }).ConfigureAwait(false);
+        }
         /// <summary>
         /// Converts a credential string (username@directory) and secret to a GraphCredential object.
         /// </summary>
@@ -124,32 +151,34 @@ namespace Mailozaurr {
             }
             if (!string.IsNullOrWhiteSpace(credential.CertificatePath)) {
                 var scopes = new[] { $"{resource}/.default" };
-                var auth = await OAuthHelpers.AcquireGraphCertificateTokenAsync(
+                var auth = await AcquireGraphCertificateTokenAsyncFunc(
                     credential.ClientId,
                     tenantDomain,
                     credential.CertificatePath!,
                     credential.CertificatePassword ?? string.Empty,
                     scopes).ConfigureAwait(false);
-                TokenCache[key] = auth;
+                await CacheGraphAuthorizationAsync(key, credential.ClientId, auth).ConfigureAwait(false);
                 return $"{auth.TokenType} {auth.AccessToken}";
             }
             if (credential.CertificateBytes != null) {
                 var scopes = new[] { $"{resource}/.default" };
-                var auth = await OAuthHelpers.AcquireGraphCertificateTokenAsync(
+                var auth = await AcquireGraphCertificateBytesTokenAsyncFunc(
                     credential.ClientId,
                     tenantDomain,
                     credential.CertificateBytes,
                     credential.CertificatePassword ?? string.Empty,
                     scopes).ConfigureAwait(false);
+                await CacheGraphAuthorizationAsync(key, credential.ClientId, auth).ConfigureAwait(false);
                 return $"{auth.TokenType} {auth.AccessToken}";
             }
             if (!string.IsNullOrWhiteSpace(credential.CertificatePemPath)) {
                 var scopes = new[] { $"{resource}/.default" };
-                var auth = await OAuthHelpers.AcquireGraphCertificatePemTokenAsync(
+                var auth = await AcquireGraphCertificatePemTokenAsyncFunc(
                     credential.ClientId,
                     tenantDomain,
                     credential.CertificatePemPath!,
                     scopes).ConfigureAwait(false);
+                await CacheGraphAuthorizationAsync(key, credential.ClientId, auth).ConfigureAwait(false);
                 return $"{auth.TokenType} {auth.AccessToken}";
             }
 
