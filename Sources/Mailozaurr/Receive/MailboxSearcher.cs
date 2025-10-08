@@ -66,16 +66,20 @@ public static class MailboxSearcher {
             }
         }
           if (!string.IsNullOrWhiteSpace(queryString)) {
-              var parsed = ParseQuery(queryString);
-            if (!string.IsNullOrWhiteSpace(parsed.Subject)) search = search.And(SearchQuery.SubjectContains(parsed.Subject));
-            if (!string.IsNullOrWhiteSpace(parsed.FromContains)) search = search.And(SearchQuery.FromContains(parsed.FromContains));
-            if (!string.IsNullOrWhiteSpace(parsed.ToContains)) search = search.And(SearchQuery.ToContains(parsed.ToContains));
-            if (!string.IsNullOrWhiteSpace(parsed.BodyContains)) search = search.And(SearchQuery.BodyContains(parsed.BodyContains));
-            if (parsed.Since.HasValue) search = search.And(SearchQuery.DeliveredAfter(parsed.Since.Value.ToUniversalTime()));
-            if (parsed.Before.HasValue) search = search.And(SearchQuery.DeliveredBefore(parsed.Before.Value.ToUniversalTime()));
-            foreach (var q in parsed.AdditionalQueries) search = search.And(q);
-            hasAttachment |= parsed.HasAttachment;
-            if (!priority.HasValue) priority = parsed.Priority;
+              try {
+                  var parsed = ParseQuery(queryString);
+                  if (!string.IsNullOrWhiteSpace(parsed.Subject)) search = search.And(SearchQuery.SubjectContains(parsed.Subject));
+                  if (!string.IsNullOrWhiteSpace(parsed.FromContains)) search = search.And(SearchQuery.FromContains(parsed.FromContains));
+                  if (!string.IsNullOrWhiteSpace(parsed.ToContains)) search = search.And(SearchQuery.ToContains(parsed.ToContains));
+                  if (!string.IsNullOrWhiteSpace(parsed.BodyContains)) search = search.And(SearchQuery.BodyContains(parsed.BodyContains));
+                  if (parsed.Since.HasValue) search = search.And(SearchQuery.DeliveredAfter(parsed.Since.Value.ToUniversalTime()));
+                  if (parsed.Before.HasValue) search = search.And(SearchQuery.DeliveredBefore(parsed.Before.Value.ToUniversalTime()));
+                  foreach (var q in parsed.AdditionalQueries) search = search.And(q);
+                  hasAttachment |= parsed.HasAttachment;
+                  if (!priority.HasValue) priority = parsed.Priority;
+              } catch (Exception ex) {
+                  LoggingMessages.Logger.WriteWarning("Failed to parse IMAP query string: {0}", ex.Message);
+              }
         }
         var uids = await mailFolder.SearchAsync(search, cancellationToken).ConfigureAwait(false);
         var result = new List<ImapEmailMessage>(uids.Count);
@@ -118,15 +122,19 @@ public static class MailboxSearcher {
         CancellationToken cancellationToken = default,
         string? queryString = null) {
           if (!string.IsNullOrWhiteSpace(queryString)) {
-              var parsed = ParseQuery(queryString);
-            if (string.IsNullOrWhiteSpace(subject)) subject = parsed.Subject;
-            if (string.IsNullOrWhiteSpace(fromContains)) fromContains = parsed.FromContains;
-            if (string.IsNullOrWhiteSpace(toContains)) toContains = parsed.ToContains;
-            if (string.IsNullOrWhiteSpace(bodyContains)) bodyContains = parsed.BodyContains;
-            if (!since.HasValue) since = parsed.Since;
-            if (!before.HasValue) before = parsed.Before;
-            if (!priority.HasValue) priority = parsed.Priority;
-            hasAttachment |= parsed.HasAttachment;
+              try {
+                  var parsed = ParseQuery(queryString);
+                  if (string.IsNullOrWhiteSpace(subject)) subject = parsed.Subject;
+                  if (string.IsNullOrWhiteSpace(fromContains)) fromContains = parsed.FromContains;
+                  if (string.IsNullOrWhiteSpace(toContains)) toContains = parsed.ToContains;
+                  if (string.IsNullOrWhiteSpace(bodyContains)) bodyContains = parsed.BodyContains;
+                  if (!since.HasValue) since = parsed.Since;
+                  if (!before.HasValue) before = parsed.Before;
+                  if (!priority.HasValue) priority = parsed.Priority;
+                  hasAttachment |= parsed.HasAttachment;
+              } catch (Exception ex) {
+                  LoggingMessages.Logger.WriteWarning("Failed to parse POP3 query string: {0}", ex.Message);
+              }
         }
         var results = new List<Pop3EmailMessage>();
         var sinceUtc = since?.ToUniversalTime();

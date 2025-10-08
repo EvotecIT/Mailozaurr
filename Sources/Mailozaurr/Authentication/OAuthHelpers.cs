@@ -184,15 +184,41 @@ public static class OAuthHelpers {
         string clientId,
         string clientSecret,
         IEnumerable<string> scopes) {
-        var cacheKey = $"google:{gmailAccount}";
-        var cached = await OAuthTokenCache.GetAsync(cacheKey);
-        if (cached != null) {
-            cached.ClientId ??= clientId;
-            cached.ClientSecret ??= clientSecret;
+        // Prefer a cache key that includes client id to avoid token confusion across apps.
+        var compositeKey = $"google:{clientId}:{gmailAccount}";
+        var legacyKey = $"google:{gmailAccount}";
+
+        bool loadedFromLegacy = false;
+        var cached = await OAuthTokenCache.GetAsync(compositeKey).ConfigureAwait(false);
+        if (cached is null) {
+            cached = await OAuthTokenCache.GetAsync(legacyKey).ConfigureAwait(false);
+            loadedFromLegacy = cached != null;
         }
+
+        if (cached != null) {
+            // Validate that cached token belongs to the same app/client.
+            if (!string.IsNullOrEmpty(cached.ClientId) && !string.Equals(cached.ClientId, clientId, StringComparison.Ordinal)) {
+                LoggingMessages.Logger.WriteWarning("OAuth cache entry for {0} was created with a different ClientId. Ignoring cached token.", gmailAccount);
+                cached = null;
+            } else {
+                // Fill blanks, but do not override mismatched values.
+                cached.ClientId ??= clientId;
+                if (string.IsNullOrEmpty(cached.ClientSecret)) {
+                    cached.ClientSecret = clientSecret;
+                } else if (!string.Equals(cached.ClientSecret, clientSecret, StringComparison.Ordinal)) {
+                    LoggingMessages.Logger.WriteWarning("OAuth cache entry for {0} contains a different ClientSecret than provided. Proceeding to refresh with provided secret.", gmailAccount);
+                }
+            }
+        }
+
         if (cached != null && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
+            // Migrate legacy entries to composite key to prevent cross-app confusion.
+            if (loadedFromLegacy) {
+                await OAuthTokenCache.SetAsync(compositeKey, cached).ConfigureAwait(false);
+            }
             return cached;
         }
+
         if (cached != null && !string.IsNullOrWhiteSpace(cached.RefreshToken)) {
             var clientSecrets = new ClientSecrets { ClientId = clientId, ClientSecret = clientSecret };
             var initializer = new GoogleAuthorizationCodeFlow.Initializer {
@@ -213,13 +239,13 @@ public static class OAuthHelpers {
                     ClientId = clientId,
                     ClientSecret = clientSecret
                 };
-                await OAuthTokenCache.SetAsync(cacheKey, newCred);
+                await OAuthTokenCache.SetAsync(compositeKey, newCred).ConfigureAwait(false);
                 return newCred;
             }
         }
 
-        var cred = await AcquireGoogleTokenInteractiveAsync(gmailAccount, clientId, clientSecret, scopes);
-        await OAuthTokenCache.SetAsync(cacheKey, cred);
+        var cred = await AcquireGoogleTokenInteractiveAsync(gmailAccount, clientId, clientSecret, scopes).ConfigureAwait(false);
+        await OAuthTokenCache.SetAsync(compositeKey, cred).ConfigureAwait(false);
         return cred;
     }
 
