@@ -125,7 +125,7 @@ public sealed class SmtpPendingMessageProcessorIntegrationTests {
 
         public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) {
             var record = records.FirstOrDefault(r => string.Equals(r.MessageId, messageId, StringComparison.Ordinal));
-            return Task.FromResult(record);
+            return Task.FromResult<PendingMessageRecord?>(record);
         }
 
         public async IAsyncEnumerable<PendingMessageRecord> GetAllAsync([EnumeratorCancellation] CancellationToken cancellationToken = default) {

@@ -12,7 +12,7 @@ public class GraphMessageContainer {
     /// Gets or sets the message payload.
     /// </summary>
     [JsonPropertyName("message")]
-    public GraphMessage Message { get; set; }
+    public GraphMessage Message { get; set; } = new GraphMessage();
 
     /// <summary>
     /// Gets or sets a value indicating whether the message should be saved to the Sent Items folder.

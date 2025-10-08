@@ -14,6 +14,6 @@ public class GraphUploadSessionResult {
     /// Gets or sets the URL that should be used to upload the attachment bytes.
     /// </summary>
     [JsonPropertyName("uploadUrl")]
-    public string UploadUrl { get; set; }
+    public string UploadUrl { get; set; } = string.Empty;
 }
 

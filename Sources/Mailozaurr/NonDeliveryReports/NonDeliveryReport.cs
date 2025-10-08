@@ -92,7 +92,7 @@ public sealed class NonDeliveryReport {
         if (string.IsNullOrWhiteSpace(value)) {
             return null;
         }
-        var trimmed = value.Trim();
+        var trimmed = value!.Trim();
         if (trimmed.Length > 1 && trimmed[0] == '<' && trimmed[trimmed.Length - 1] == '>') {
             trimmed = trimmed.Substring(1, trimmed.Length - 2);
         }

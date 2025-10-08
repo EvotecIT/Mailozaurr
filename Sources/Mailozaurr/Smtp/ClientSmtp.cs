@@ -202,7 +202,7 @@ public partial class ClientSmtp : SmtpClient {
                 }
 
                 var path = descriptor.SourcePath;
-                if (!string.IsNullOrWhiteSpace(path) && !seenPaths.Add(path)) {
+                if (!string.IsNullOrWhiteSpace(path) && !seenPaths.Add(path!)) {
                     continue;
                 }
 
@@ -223,7 +223,7 @@ public partial class ClientSmtp : SmtpClient {
                 }
 
                 var path = descriptor.SourcePath;
-                if (!string.IsNullOrWhiteSpace(path) && !seenInline.Add(path)) {
+                if (!string.IsNullOrWhiteSpace(path) && !seenInline.Add(path!)) {
                     continue;
                 }
 

@@ -12,11 +12,11 @@ namespace Mailozaurr;
 public class GraphAuthorization {
     /// <summary>The type of token issued.</summary>
     [JsonPropertyName("token_type")]
-    public string TokenType { get; set; }
+    public string TokenType { get; set; } = string.Empty;
 
     /// <summary>The access token value.</summary>
     [JsonPropertyName("access_token")]
-    public string AccessToken { get; set; }
+    public string AccessToken { get; set; } = string.Empty;
 
     /// <summary>Time when the access token expires.</summary>
     [JsonPropertyName("expires_on")]

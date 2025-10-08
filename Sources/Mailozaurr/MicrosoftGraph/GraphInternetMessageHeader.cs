@@ -11,10 +11,10 @@ namespace Mailozaurr;
 public class GraphInternetMessageHeader {
     /// <summary>Header name.</summary>
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
 
     /// <summary>Header value.</summary>
     [JsonPropertyName("value")]
-    public string Value { get; set; }
+    public string Value { get; set; } = string.Empty;
 }
 

@@ -228,7 +228,7 @@ public sealed class SendGridClient : IDisposable {
 
             var path = descriptor.SourcePath;
             if (!string.IsNullOrWhiteSpace(path)) {
-                if (!seen.Add(path)) {
+                if (!seen.Add(path!)) {
                     continue;
                 }
 

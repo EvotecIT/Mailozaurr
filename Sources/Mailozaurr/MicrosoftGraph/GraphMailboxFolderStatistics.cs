@@ -9,10 +9,10 @@ namespace Mailozaurr;
 /// </remarks>
 public class GraphMailboxFolderStatistics {
     /// <summary>Folder identifier.</summary>
-    public string Id { get; set; }
+    public string Id { get; set; } = string.Empty;
 
     /// <summary>Display name of the folder.</summary>
-    public string DisplayName { get; set; }
+    public string DisplayName { get; set; } = string.Empty;
 
     /// <summary>Optional well-known name such as 'inbox' or 'sentitems'.</summary>
     public string? WellKnownName { get; set; }

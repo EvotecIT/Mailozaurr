@@ -33,6 +33,7 @@ public static class ImapConnector {
     /// <param name="retryCount">Number of retry attempts.</param>
     /// <param name="retryDelayMilliseconds">Initial delay between retries.</param>
     /// <param name="retryDelayBackoff">Multiplier for delay backoff.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
     /// <returns>Authenticated <see cref="ImapClient"/> instance.</returns>
     public static Task<ImapClient> ConnectAsync(
         string server,

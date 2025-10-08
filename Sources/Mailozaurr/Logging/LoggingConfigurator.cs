@@ -49,7 +49,26 @@ public class LoggingConfigurator : IDisposable {
     public void ConfigureLogging(string? logPath, bool logConsole, bool logObject, bool logTimestamps, bool logSecrets, string? logTimestampsFormat = null, string? logServerPrefix = null, string? logClientPrefix = null, bool logOverwrite = false) {
         LogTimestamps = logTimestamps;
         LogSecrets = logSecrets;
-        LogTimestampsFormat = logTimestampsFormat;
+        // Validate formats and prefixes
+        if (!string.IsNullOrWhiteSpace(logTimestampsFormat)) {
+            try {
+                _ = DateTimeOffset.UtcNow.ToString(logTimestampsFormat);
+                LogTimestampsFormat = logTimestampsFormat;
+            } catch (FormatException) {
+                LoggingMessages.Logger.WriteWarning("Invalid log timestamp format '{0}'. Falling back to default.", logTimestampsFormat!);
+                LogTimestampsFormat = null;
+            }
+        } else {
+            LogTimestampsFormat = null;
+        }
+        if (!string.IsNullOrEmpty(logServerPrefix) && (logServerPrefix.Contains('\n') || logServerPrefix.Contains('\r'))) {
+            LoggingMessages.Logger.WriteWarning("Server log prefix contains new lines. Stripping them for safety.");
+            logServerPrefix = logServerPrefix!.Replace("\r", string.Empty).Replace("\n", string.Empty);
+        }
+        if (!string.IsNullOrEmpty(logClientPrefix) && (logClientPrefix.Contains('\n') || logClientPrefix.Contains('\r'))) {
+            LoggingMessages.Logger.WriteWarning("Client log prefix contains new lines. Stripping them for safety.");
+            logClientPrefix = logClientPrefix!.Replace("\r", string.Empty).Replace("\n", string.Empty);
+        }
         LogServerPrefix = logServerPrefix;
         LogClientPrefix = logClientPrefix;
         LogOverwrite = logOverwrite;
@@ -60,6 +79,15 @@ public class LoggingConfigurator : IDisposable {
         ProtocolLogger? protocolLogger = null;
         if (!string.IsNullOrWhiteSpace(logPath) || logConsole || logObject) {
             if (!string.IsNullOrWhiteSpace(logPath)) {
+                try {
+                    var directory = Path.GetDirectoryName(logPath);
+                    if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory)) {
+                        Directory.CreateDirectory(directory);
+                    }
+                } catch (Exception ex) {
+                    LoggingMessages.Logger.WriteWarning("Couldn't create directory for protocol logs at '{0}': {1}. Using console output instead.", logPath!, ex.Message);
+                    logPath = null;
+                }
                 try {
                     protocolLogger = new ProtocolLogger(logPath, logOverwrite);
                 } catch (IOException ex) {
@@ -91,8 +119,11 @@ public class LoggingConfigurator : IDisposable {
         ProtocolLogger = protocolLogger;
     }
 
+    /// <summary>Finalizer that ensures unmanaged resources are released.</summary>
     ~LoggingConfigurator() => Dispose(false);
 
+    /// <summary>Releases resources used by the logger.</summary>
+    /// <param name="disposing">When true, disposes managed resources as well.</param>
     protected virtual void Dispose(bool disposing) {
         if (_disposed) {
             return;
@@ -108,6 +139,7 @@ public class LoggingConfigurator : IDisposable {
         _disposed = true;
     }
 
+    /// <summary>Disposes the configurator and suppresses finalization.</summary>
     public void Dispose() {
         Dispose(true);
         GC.SuppressFinalize(this);

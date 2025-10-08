@@ -269,7 +269,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
                     }
 
                     if (!string.IsNullOrWhiteSpace(messageId) && record != null) {
-                        entry = new LogEntry(LogEntryKind.Upsert, messageId, record);
+                        entry = new LogEntry(LogEntryKind.Upsert, messageId!, record);
                         return true;
                     }
 

@@ -328,7 +328,7 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
             expiresOn = DateTimeOffset.UtcNow.AddSeconds(seconds);
         }
 
-        return (accessToken, newRefresh, expiresOn);
+        return (accessToken!, newRefresh, expiresOn);
     }
 
     private async Task<(string AccessToken, DateTimeOffset? ExpiresOn)> ExchangeServiceAccountTokenAsync(
@@ -339,7 +339,7 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
             throw new InvalidOperationException("Pending Gmail message is missing service account credentials required to mint a new access token.");
         }
 
-        using var document = JsonDocument.Parse(serviceAccountJson);
+        using var document = JsonDocument.Parse(serviceAccountJson!);
         var root = document.RootElement;
         if (!root.TryGetProperty("client_email", out var emailProperty)) {
             throw new InvalidOperationException("Service account JSON does not contain the client_email field.");
@@ -360,7 +360,7 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
             throw new InvalidOperationException("Service account private key is empty.");
         }
 
-        privateKey = privateKey.Replace("\\n", "\n").Trim();
+        privateKey = privateKey!.Replace("\\n", "\n").Trim();
         var assertion = CreateServiceAccountAssertion(clientEmailValue, privateKey, context.ServiceAccountSubject);
 
         using var content = new FormUrlEncodedContent(new Dictionary<string, string> {
@@ -415,7 +415,7 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
         };
 
         if (!string.IsNullOrEmpty(subject)) {
-            payload["sub"] = subject;
+            payload["sub"] = subject!;
         }
 
         var payloadJson = JsonSerializer.Serialize(payload);
@@ -504,7 +504,7 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
             providerData.Remove(GmailPendingMessageSender.AccessTokenKey);
 
             if (!string.IsNullOrEmpty(credential.RefreshToken)) {
-                providerData[GmailPendingMessageSender.RefreshTokenProtectedKey] = protector.Protect(credential.RefreshToken);
+                providerData[GmailPendingMessageSender.RefreshTokenProtectedKey] = protector.Protect(credential.RefreshToken!);
                 providerData.Remove(GmailPendingMessageSender.RefreshTokenBase64Key);
                 providerData.Remove(GmailPendingMessageSender.RefreshTokenKey);
                 RefreshToken = credential.RefreshToken!;

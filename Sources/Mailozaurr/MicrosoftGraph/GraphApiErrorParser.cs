@@ -21,10 +21,10 @@ public static class GraphApiErrorParser {
             return null;
         }
 
-        var response = new GraphApiErrorResponse { Raw = message };
+        var response = new GraphApiErrorResponse { Raw = message! };
 
         try {
-            var lines = message.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var lines = message!.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             if (lines.Length == 0) {
                 return response;
             }

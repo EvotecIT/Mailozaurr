@@ -130,7 +130,7 @@ public static class OAuthHelpers {
         var codeReceiver = new LocalServerCodeReceiver();
         var authCode = new AuthorizationCodeInstalledApp(codeFlow, codeReceiver);
         var credential = await authCode.AuthorizeAsync(gmailAccount, System.Threading.CancellationToken.None);
-        if (credential.Token.IsExpired(Google.Apis.Util.SystemClock.Default)) {
+        if (credential.Token.IsStale) {
             await credential.RefreshTokenAsync(System.Threading.CancellationToken.None);
         }
         var cred = new OAuthCredential {
@@ -184,15 +184,41 @@ public static class OAuthHelpers {
         string clientId,
         string clientSecret,
         IEnumerable<string> scopes) {
-        var cacheKey = $"google:{gmailAccount}";
-        var cached = await OAuthTokenCache.GetAsync(cacheKey);
-        if (cached != null) {
-            cached.ClientId ??= clientId;
-            cached.ClientSecret ??= clientSecret;
+        // Prefer a cache key that includes client id to avoid token confusion across apps.
+        var compositeKey = $"google:{clientId}:{gmailAccount}";
+        var legacyKey = $"google:{gmailAccount}";
+
+        bool loadedFromLegacy = false;
+        var cached = await OAuthTokenCache.GetAsync(compositeKey).ConfigureAwait(false);
+        if (cached is null) {
+            cached = await OAuthTokenCache.GetAsync(legacyKey).ConfigureAwait(false);
+            loadedFromLegacy = cached != null;
         }
+
+        if (cached != null) {
+            // Validate that cached token belongs to the same app/client.
+            if (!string.IsNullOrEmpty(cached.ClientId) && !string.Equals(cached.ClientId, clientId, StringComparison.Ordinal)) {
+                LoggingMessages.Logger.WriteWarning("OAuth cache entry for {0} was created with a different ClientId. Ignoring cached token.", gmailAccount);
+                cached = null;
+            } else {
+                // Fill blanks, but do not override mismatched values.
+                cached.ClientId ??= clientId;
+                if (string.IsNullOrEmpty(cached.ClientSecret)) {
+                    cached.ClientSecret = clientSecret;
+                } else if (!string.Equals(cached.ClientSecret, clientSecret, StringComparison.Ordinal)) {
+                    LoggingMessages.Logger.WriteWarning("OAuth cache entry for {0} contains a different ClientSecret than provided. Proceeding to refresh with provided secret.", gmailAccount);
+                }
+            }
+        }
+
         if (cached != null && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
+            // Migrate legacy entries to composite key to prevent cross-app confusion.
+            if (loadedFromLegacy) {
+                await OAuthTokenCache.SetAsync(compositeKey, cached).ConfigureAwait(false);
+            }
             return cached;
         }
+
         if (cached != null && !string.IsNullOrWhiteSpace(cached.RefreshToken)) {
             var clientSecrets = new ClientSecrets { ClientId = clientId, ClientSecret = clientSecret };
             var initializer = new GoogleAuthorizationCodeFlow.Initializer {
@@ -213,13 +239,13 @@ public static class OAuthHelpers {
                     ClientId = clientId,
                     ClientSecret = clientSecret
                 };
-                await OAuthTokenCache.SetAsync(cacheKey, newCred);
+                await OAuthTokenCache.SetAsync(compositeKey, newCred).ConfigureAwait(false);
                 return newCred;
             }
         }
 
-        var cred = await AcquireGoogleTokenInteractiveAsync(gmailAccount, clientId, clientSecret, scopes);
-        await OAuthTokenCache.SetAsync(cacheKey, cred);
+        var cred = await AcquireGoogleTokenInteractiveAsync(gmailAccount, clientId, clientSecret, scopes).ConfigureAwait(false);
+        await OAuthTokenCache.SetAsync(compositeKey, cred).ConfigureAwait(false);
         return cred;
     }
 
@@ -331,16 +357,16 @@ public static class OAuthHelpers {
     /// <param name="pemPath">Path to the PEM certificate file.</param>
     /// <param name="scopes">Optional scopes to request.</param>
     /// <returns>The authorization information including access token.</returns>
-    public static async Task<GraphAuthorization> AcquireGraphCertificatePemTokenAsync(
+    public static Task<GraphAuthorization> AcquireGraphCertificatePemTokenAsync(
         string clientId,
         string tenantId,
         string pemPath,
         IEnumerable<string>? scopes = null) {
 #if NET5_0_OR_GREATER
         var certificate = X509Certificate2.CreateFromPemFile(pemPath);
-        return await AcquireGraphCertificateTokenInternal(clientId, tenantId, certificate, scopes);
+        return AcquireGraphCertificateTokenInternal(clientId, tenantId, certificate, scopes);
 #else
-        throw new NotSupportedException("PEM certificates are not supported on this framework.");
+        return Task.FromException<GraphAuthorization>(new NotSupportedException("PEM certificates are not supported on this framework."));
 #endif
     }
 

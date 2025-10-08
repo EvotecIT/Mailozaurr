@@ -25,6 +25,8 @@ public static class SmtpConnectionPool {
     /// <summary>Enables or disables connection pooling.</summary>
     public static bool PoolingEnabled => Volatile.Read(ref _poolingEnabled) == 1;
 
+    /// <summary>Sets the maximum number of pooled connections per server/port.</summary>
+    /// <param name="value">Maximum number of pooled connections. Must be at least 1.</param>
     public static void SetMaxPoolSize(int value) {
         if (value < 1) {
             throw new ArgumentOutOfRangeException(nameof(value), value, "Max pool size must be at least 1.");
@@ -33,6 +35,8 @@ public static class SmtpConnectionPool {
         Interlocked.Exchange(ref _maxPoolSize, value);
     }
 
+    /// <summary>Enables or disables connection pooling.</summary>
+    /// <param name="enabled">If true, reuses SMTP connections where possible.</param>
     public static void SetPoolingEnabled(bool enabled) {
         var newValue = enabled ? 1 : 0;
         var previous = Interlocked.Exchange(ref _poolingEnabled, newValue);
@@ -41,6 +45,9 @@ public static class SmtpConnectionPool {
         }
     }
 
+    /// <summary>Configures pooling settings in a single call.</summary>
+    /// <param name="poolingEnabled">Whether pooling should be enabled.</param>
+    /// <param name="maxPoolSize">Maximum number of pooled connections per endpoint.</param>
     public static void Configure(bool poolingEnabled, int maxPoolSize) {
         if (maxPoolSize < 1) {
             throw new ArgumentOutOfRangeException(nameof(maxPoolSize), maxPoolSize, "Max pool size must be at least 1.");

@@ -29,6 +29,7 @@ public sealed class SmtpPendingMessageSender : IPendingMessageSender {
     /// <param name="skipCertificateValidation">Whether certificate validation should be skipped.</param>
     /// <param name="checkCertificateRevocation">Whether certificate revocation should be checked.</param>
     /// <param name="timeout">Optional operation timeout in milliseconds.</param>
+    /// <param name="credentialProtector">Optional credential protector used to decrypt queued passwords.</param>
     public SmtpPendingMessageSender(
         Func<ClientSmtp>? clientFactory = null,
         SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto,

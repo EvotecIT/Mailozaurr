@@ -11,11 +11,11 @@ public class OAuthCredential {
     /// <summary>
     /// The username associated with the OAuth credential.
     /// </summary>
-    public string UserName { get; set; }
+    public string UserName { get; set; } = string.Empty;
     /// <summary>
     /// The access token for the OAuth credential.
     /// </summary>
-    public string AccessToken { get; set; }
+    public string AccessToken { get; set; } = string.Empty;
 
     /// <summary>
     /// Time when the access token expires.

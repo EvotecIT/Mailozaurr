@@ -71,7 +71,7 @@ public static class CredentialProtection {
         }
 
         try {
-            return protector.Unprotect(protectedData);
+            return protector.Unprotect(protectedData!);
         } catch (FormatException) {
             // Fall back to legacy behaviour below.
         } catch (CryptographicException) {

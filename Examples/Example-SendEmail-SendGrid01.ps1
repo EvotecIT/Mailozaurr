@@ -9,4 +9,4 @@ Send-EmailMessage -From 'przemyslaw.klys@evo.cool' -To 'przemyslaw.klys@evotec.p
     -Server 'smtp.sendgrid.net' `
     -Password $Key `
     -Body 'test me 🤣😍😒💖✨🎁 Przemysław Kłys' -DeliveryNotificationOption OnSuccess `
-    -Priority High -Subject '😒💖 This is another test email 我' -UseSsl -Port 587 -Verbose -WhatIf
+    -Priority High -Subject '😒💖 This is another test email 我' -UseSsl -Port 587 -Verbose #-WhatIf

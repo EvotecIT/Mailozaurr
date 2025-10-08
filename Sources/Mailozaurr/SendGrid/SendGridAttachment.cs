@@ -17,10 +17,10 @@ public class SendGridAttachment {
     public string Content { get; set; }
 
     /// <summary>Gets or sets the MIME type of the attachment.</summary>
-    public string Type { get; set; }
+    public string Type { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the disposition of the attachment.</summary>
-    public string Disposition { get; set; }
+    public string Disposition { get; set; } = "attachment";
 
     /// <summary>Gets or sets the optional content identifier of the attachment.</summary>
     public string? ContentId { get; set; }
@@ -42,8 +42,8 @@ public class SendGridAttachment {
 
         Filename = fileName;
         Content = Convert.ToBase64String(content);
-        Type = !string.IsNullOrWhiteSpace(contentType) ? contentType : MimeTypes.GetMimeType(fileName);
-        Disposition = string.IsNullOrWhiteSpace(disposition) ? "attachment" : disposition;
+        Type = !string.IsNullOrWhiteSpace(contentType) ? contentType! : (MimeTypes.GetMimeType(fileName) ?? "application/octet-stream");
+        Disposition = string.IsNullOrWhiteSpace(disposition) ? "attachment" : disposition!;
         ContentId = contentId;
     }
 
