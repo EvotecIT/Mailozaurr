@@ -507,7 +507,7 @@ namespace Mailozaurr {
             var messages = new List<Dictionary<string, object>>();
             while (!string.IsNullOrEmpty(uri)) {
                 cancellationToken.ThrowIfCancellationRequested();
-                var doc = await InvokeGraphApiAsync("GET", uri, headers, cancellationToken: cancellationToken).ConfigureAwait(false);
+                var doc = await InvokeGraphApiAsync("GET", uri!, headers, cancellationToken: cancellationToken).ConfigureAwait(false);
                 if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
                     foreach (var item in valueElement.EnumerateArray()) {
                         cancellationToken.ThrowIfCancellationRequested();

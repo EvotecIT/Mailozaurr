@@ -8,7 +8,7 @@ namespace Mailozaurr;
 /// </remarks>
 public class GraphMailboxStatistics {
     /// <summary>User principal name of the mailbox.</summary>
-    public string UserPrincipalName { get; set; }
+    public string UserPrincipalName { get; set; } = string.Empty;
 
     /// <summary>Total number of messages across all folders.</summary>
     public int MessageCount { get; set; }

@@ -14,7 +14,7 @@ namespace Mailozaurr {
     /// <inheritdoc cref="SaslMechanism"/>
     public class SaslMechanismNtlmIntegrated : SaslMechanism {
         LoginState state;
-        ClientContext sspiContext;
+        ClientContext sspiContext = null!;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SaslMechanismNtlmIntegrated"/> class.

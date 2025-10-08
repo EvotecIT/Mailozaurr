@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using MailKit;
+using System.Runtime.CompilerServices;
 using MimeKit;
 
 namespace Mailozaurr.Tests;
@@ -40,9 +41,9 @@ public sealed class SmtpPendingMessageTests {
         }
 
         public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Saved.FirstOrDefault(r => r.MessageId == messageId));
+            Task.FromResult<PendingMessageRecord?>(Saved.FirstOrDefault(r => r.MessageId == messageId));
 
-        public async IAsyncEnumerable<PendingMessageRecord> GetAllAsync(CancellationToken cancellationToken = default) {
+        public async IAsyncEnumerable<PendingMessageRecord> GetAllAsync([EnumeratorCancellation] CancellationToken cancellationToken = default) {
             var snapshot = Saved.ToList();
             foreach (var r in snapshot) {
                 yield return r;
@@ -65,7 +66,7 @@ public sealed class SmtpPendingMessageTests {
         }
 
         public Task<SentMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Saved.FirstOrDefault(r => r.MessageId == messageId));
+            Task.FromResult<SentMessageRecord?>(Saved.FirstOrDefault(r => r.MessageId == messageId));
     }
 
     private static void SetClient(Smtp smtp, ClientSmtp client) {

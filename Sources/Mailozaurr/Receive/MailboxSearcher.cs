@@ -23,8 +23,20 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches an IMAP mailbox and returns matching messages.
     /// </summary>
+    /// <param name="client">Connected IMAP client.</param>
+    /// <param name="folder">Optional folder to search. Defaults to the inbox.</param>
+    /// <param name="subject">Optional "subject contains" filter.</param>
+    /// <param name="fromContains">Optional "from contains" filter.</param>
+    /// <param name="toContains">Optional "to contains" filter.</param>
+    /// <param name="bodyContains">Optional "body contains" filter.</param>
+    /// <param name="priority">Optional message priority to match.</param>
     /// <param name="since">Optional UTC lower bound for message delivery dates.</param>
     /// <param name="before">Optional UTC upper bound for message delivery dates.</param>
+    /// <param name="hasAttachment">If true, only messages with attachments are returned.</param>
+    /// <param name="additionalQueries">Additional IMAP search queries to combine.</param>
+    /// <param name="maxResults">Maximum number of results to return. Use 0 for unlimited.</param>
+    /// <param name="cancellationToken">Token used to observe cancellation requests.</param>
+    /// <param name="queryString">Optional free-form query string parsed into filters.</param>
     public static async Task<IList<ImapEmailMessage>> SearchImapAsync(
         ImapClient client,
         string? folder = null,
@@ -80,8 +92,18 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches a POP3 mailbox and returns matching messages.
     /// </summary>
+    /// <param name="client">Connected POP3 client.</param>
+    /// <param name="subject">Optional "subject contains" filter.</param>
+    /// <param name="fromContains">Optional "from contains" filter.</param>
+    /// <param name="toContains">Optional "to contains" filter.</param>
+    /// <param name="bodyContains">Optional "body contains" filter.</param>
+    /// <param name="priority">Optional message priority to match.</param>
     /// <param name="since">Optional UTC lower bound for message delivery dates.</param>
     /// <param name="before">Optional UTC upper bound for message delivery dates.</param>
+    /// <param name="hasAttachment">If true, only messages with attachments are returned.</param>
+    /// <param name="maxResults">Maximum number of results to return. Use 0 for unlimited.</param>
+    /// <param name="cancellationToken">Token used to observe cancellation requests.</param>
+    /// <param name="queryString">Optional free-form query string parsed into filters.</param>
     public static async Task<IList<Pop3EmailMessage>> SearchPop3Async(
         Pop3Client client,
         string? subject = null,
@@ -134,8 +156,15 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches for Non-Delivery Reports in an IMAP mailbox.
     /// </summary>
+    /// <param name="client">Connected IMAP client.</param>
+    /// <param name="folder">Optional folder to search. Defaults to the inbox.</param>
     /// <param name="since">Optional UTC lower bound for report timestamps.</param>
     /// <param name="before">Optional UTC upper bound for report timestamps.</param>
+    /// <param name="recipientContains">Optional string that the recipient should contain.</param>
+    /// <param name="messageId">Optional original message id to match.</param>
+    /// <param name="maxResults">Optional limit for the number of reports returned. Use 0 for unlimited.</param>
+    /// <param name="parallelDownloadLimit">Maximum number of concurrent message downloads.</param>
+    /// <param name="cancellationToken">Token used to observe cancellation requests.</param>
     public static async Task<IList<NonDeliveryReport>> SearchNonDeliveryReportsAsync(
         ImapClient client,
         string? folder = null,
@@ -215,8 +244,14 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches for Non-Delivery Reports in a POP3 mailbox.
     /// </summary>
+    /// <param name="client">Connected POP3 client.</param>
     /// <param name="since">Optional UTC lower bound for report timestamps.</param>
     /// <param name="before">Optional UTC upper bound for report timestamps.</param>
+    /// <param name="recipientContains">Optional string that the recipient should contain.</param>
+    /// <param name="messageId">Optional original message id to match.</param>
+    /// <param name="maxResults">Optional limit for the number of reports returned. Use 0 for unlimited.</param>
+    /// <param name="parallelDownloadLimit">Maximum number of concurrent message downloads.</param>
+    /// <param name="cancellationToken">Token used to observe cancellation requests.</param>
     public static async Task<IList<NonDeliveryReport>> SearchNonDeliveryReportsAsync(
         Pop3Client client,
         DateTime? since = null,
@@ -291,8 +326,15 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches for Non-Delivery Reports using Microsoft Graph.
     /// </summary>
+    /// <param name="credential">Graph credential used to access the mailbox.</param>
+    /// <param name="userPrincipalName">UPN of the mailbox to search.</param>
     /// <param name="since">Optional UTC lower bound for report timestamps.</param>
     /// <param name="before">Optional UTC upper bound for report timestamps.</param>
+    /// <param name="recipientContains">Optional string that the recipient should contain.</param>
+    /// <param name="messageId">Optional original message id to match.</param>
+    /// <param name="maxResults">Optional limit for the number of reports returned. Use 0 for unlimited.</param>
+    /// <param name="parallelDownloadLimit">Maximum number of concurrent message downloads.</param>
+    /// <param name="cancellationToken">Token used to observe cancellation requests.</param>
     public static async Task<IList<NonDeliveryReport>> SearchNonDeliveryReportsAsync(
         GraphCredential credential,
         string userPrincipalName,
@@ -389,8 +431,15 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches for Non-Delivery Reports using the Gmail API.
     /// </summary>
+    /// <param name="client">Initialized Gmail API client.</param>
+    /// <param name="userId">User mailbox identifier (e.g. "me").</param>
     /// <param name="since">Optional UTC lower bound for report timestamps.</param>
     /// <param name="before">Optional UTC upper bound for report timestamps.</param>
+    /// <param name="recipientContains">Optional string that the recipient should contain.</param>
+    /// <param name="messageId">Optional original message id to match.</param>
+    /// <param name="maxResults">Optional limit for the number of reports returned. Use 0 for unlimited.</param>
+    /// <param name="parallelDownloadLimit">Maximum number of concurrent message downloads.</param>
+    /// <param name="cancellationToken">Token used to observe cancellation requests.</param>
     public static async Task<IList<NonDeliveryReport>> SearchNonDeliveryReportsAsync(
         GmailApiClient client,
         string userId,
@@ -409,7 +458,7 @@ public static class MailboxSearcher {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (maxResults > 0 && results.Count >= maxResults) break;
                 if (!string.IsNullOrEmpty(m.Id)) {
-                    var mime = await client.GetMimeMessageAsync(userId, m.Id, cancellationToken).ConfigureAwait(false);
+                    var mime = await client.GetMimeMessageAsync(userId, m.Id!, cancellationToken).ConfigureAwait(false);
                     var reports = FilterNonDeliveryReports(new[] { mime }, since, before, recipientContains, messageId);
                     if (reports.Count > 0) {
                         foreach (var r in reports) {
@@ -438,7 +487,7 @@ public static class MailboxSearcher {
                         if (string.IsNullOrEmpty(current.Id)) continue;
                         MimeMessage mime;
                         try {
-                            mime = await client.GetMimeMessageAsync(userId, current.Id, cts.Token).ConfigureAwait(false);
+                            mime = await client.GetMimeMessageAsync(userId, current.Id!, cts.Token).ConfigureAwait(false);
                         } catch (OperationCanceledException) {
                             return;
                         }
@@ -475,8 +524,15 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches for DMARC aggregate reports in an IMAP mailbox.
     /// </summary>
+    /// <param name="client">Connected IMAP client.</param>
+    /// <param name="folder">Optional folder to search. Defaults to the inbox.</param>
     /// <param name="since">Optional UTC lower bound for message dates.</param>
     /// <param name="before">Optional UTC upper bound for message dates.</param>
+    /// <param name="domain">Optional domain that report subjects should contain.</param>
+    /// <param name="maxResults">Optional limit for the number of reports returned. Use 0 for unlimited.</param>
+    /// <param name="parallelDownloadLimit">Maximum number of concurrent message downloads.</param>
+    /// <param name="maxUncompressedSize">Maximum uncompressed attachment size to inspect, in bytes.</param>
+    /// <param name="cancellationToken">Token used to observe cancellation requests.</param>
     public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
         ImapClient client,
         string? folder = null,
@@ -556,8 +612,14 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches for DMARC aggregate reports in a POP3 mailbox.
     /// </summary>
+    /// <param name="client">Connected POP3 client.</param>
     /// <param name="since">Optional UTC lower bound for message dates.</param>
     /// <param name="before">Optional UTC upper bound for message dates.</param>
+    /// <param name="domain">Optional domain that report subjects should contain.</param>
+    /// <param name="maxResults">Optional limit for the number of reports returned. Use 0 for unlimited.</param>
+    /// <param name="parallelDownloadLimit">Maximum number of concurrent message downloads.</param>
+    /// <param name="maxUncompressedSize">Maximum uncompressed attachment size to inspect, in bytes.</param>
+    /// <param name="cancellationToken">Token used to observe cancellation requests.</param>
     public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
         Pop3Client client,
         DateTime? since = null,
@@ -632,8 +694,15 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches for DMARC aggregate reports using Microsoft Graph.
     /// </summary>
+    /// <param name="credential">Graph credential used to access the mailbox.</param>
+    /// <param name="userPrincipalName">UPN of the mailbox to search.</param>
     /// <param name="since">Optional UTC lower bound for message dates.</param>
     /// <param name="before">Optional UTC upper bound for message dates.</param>
+    /// <param name="domain">Optional domain that report subjects should contain.</param>
+    /// <param name="maxResults">Optional limit for the number of reports returned. Use 0 for unlimited.</param>
+    /// <param name="parallelDownloadLimit">Maximum number of concurrent message downloads.</param>
+    /// <param name="maxUncompressedSize">Maximum uncompressed attachment size to inspect, in bytes.</param>
+    /// <param name="cancellationToken">Token used to observe cancellation requests.</param>
     public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
         GraphCredential credential,
         string userPrincipalName,
@@ -647,7 +716,7 @@ public static class MailboxSearcher {
         var filters = new List<string> { "hasAttachments eq true", "contains(subject,'report domain')" };
         if (since.HasValue) filters.Add($"receivedDateTime ge {since.Value.ToUniversalTime():o}");
         if (before.HasValue) filters.Add($"receivedDateTime le {before.Value.ToUniversalTime():o}");
-        if (!string.IsNullOrWhiteSpace(domain)) filters.Add($"contains(subject,'{domain.Replace("'", "''")}')");
+        if (!string.IsNullOrWhiteSpace(domain)) filters.Add($"contains(subject,'{domain!.Replace("'", "''")}')");
         var filter = string.Join(" and ", filters);
         var msgs = await MicrosoftGraphUtils.GetMailMessagesAsync(
             credential,
@@ -695,8 +764,15 @@ public static class MailboxSearcher {
     /// <summary>
     /// Searches for DMARC aggregate reports using the Gmail API.
     /// </summary>
+    /// <param name="client">Initialized Gmail API client.</param>
+    /// <param name="userId">User mailbox identifier (e.g. "me").</param>
     /// <param name="since">Optional UTC lower bound for message dates.</param>
     /// <param name="before">Optional UTC upper bound for message dates.</param>
+    /// <param name="domain">Optional domain that report subjects should contain.</param>
+    /// <param name="maxResults">Optional limit for the number of reports returned. Use 0 for unlimited.</param>
+    /// <param name="parallelDownloadLimit">Maximum number of concurrent message downloads.</param>
+    /// <param name="maxUncompressedSize">Maximum uncompressed attachment size to inspect, in bytes.</param>
+    /// <param name="cancellationToken">Token used to observe cancellation requests.</param>
     public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
         GmailApiClient client,
         string userId,
@@ -714,7 +790,7 @@ public static class MailboxSearcher {
             foreach (var m in msgs) {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!string.IsNullOrEmpty(m.Id)) {
-                    var mime = await client.GetMimeMessageAsync(userId, m.Id, cancellationToken).ConfigureAwait(false);
+                    var mime = await client.GetMimeMessageAsync(userId, m.Id!, cancellationToken).ConfigureAwait(false);
                     mimeMessages.Add(mime);
                     if (maxResults > 0 && mimeMessages.Count >= maxResults) break;
                 }
@@ -737,7 +813,7 @@ public static class MailboxSearcher {
             foreach (var m in msgs) {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (!string.IsNullOrEmpty(m.Id)) {
-                    tasks.Add(DownloadMessageAsync(m.Id));
+                    tasks.Add(DownloadMessageAsync(m.Id!));
                 }
                 if (maxResults > 0 && tasks.Count >= maxResults) break;
             }
@@ -751,8 +827,11 @@ public static class MailboxSearcher {
     /// <summary>
     /// Filters DMARC reports by date and domain.
     /// </summary>
+    /// <param name="messages">Collection of MIME messages to inspect.</param>
     /// <param name="since">Optional UTC lower bound for the message date.</param>
     /// <param name="before">Optional UTC upper bound for the message date.</param>
+    /// <param name="domain">Optional domain that report attachments should match.</param>
+    /// <param name="maxUncompressedSize">Maximum uncompressed attachment size to inspect, in bytes.</param>
     internal static IList<DmarcReport> FilterDmarcReports(
         IEnumerable<MimeMessage> messages,
         DateTime? since,
@@ -845,7 +924,7 @@ public static class MailboxSearcher {
 
     internal static string BuildGmailDmarcReportQuery(DateTime? since, DateTime? before, string? domain) {
         var sb = new StringBuilder("subject:\"report domain\" has:attachment");
-        if (!string.IsNullOrWhiteSpace(domain)) sb.Append(' ').Append("subject:\"").Append(EscapeGmailQueryValue(domain)).Append("\"");
+        if (!string.IsNullOrWhiteSpace(domain)) sb.Append(' ').Append("subject:\"").Append(EscapeGmailQueryValue(domain!)).Append("\"");
         if (since.HasValue) sb.Append(' ').Append("after:").Append(since.Value.ToUniversalTime().ToString("yyyy/MM/dd"));
         if (before.HasValue) sb.Append(' ').Append("before:").Append(before.Value.ToUniversalTime().ToString("yyyy/MM/dd"));
         return sb.ToString().Trim();
@@ -871,8 +950,11 @@ public static class MailboxSearcher {
     /// <summary>
     /// Filters Non-Delivery Reports by date, recipient and message id.
     /// </summary>
+    /// <param name="messages">Collection of MIME messages to inspect.</param>
     /// <param name="since">Optional UTC lower bound for the report timestamp.</param>
     /// <param name="before">Optional UTC upper bound for the report timestamp.</param>
+    /// <param name="recipientContains">Optional string that the recipient should contain.</param>
+    /// <param name="messageId">Optional original message id to match.</param>
     internal static IList<NonDeliveryReport> FilterNonDeliveryReports(
         IEnumerable<MimeMessage> messages,
         DateTime? since,

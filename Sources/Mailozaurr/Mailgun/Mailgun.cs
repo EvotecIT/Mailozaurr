@@ -116,7 +116,8 @@ public class MailgunClient : IDisposable {
     /// <returns>The formatted address string.</returns>
     private static string ConvertAddress(object address) {
         var (email, name) = Helpers.GetEmailAndName(address);
-        return string.IsNullOrWhiteSpace(name) ? email : $"{name} <{email}>";
+        var emailSafe = email ?? string.Empty;
+        return string.IsNullOrWhiteSpace(name) ? emailSafe : $"{name} <{emailSafe}>";
     }
 
     private static StreamContent CreateStreamContent(string path) {
@@ -138,7 +139,7 @@ public class MailgunClient : IDisposable {
     /// </summary>
     /// <param name="cancellationToken">Token to cancel asynchronous operations.</param>
     /// <returns>The constructed multipart content.</returns>
-    private async Task<MultipartFormDataContent> CreateContentAsync(CancellationToken cancellationToken) {
+    private Task<MultipartFormDataContent> CreateContentAsync(CancellationToken cancellationToken) {
         var content = new MultipartFormDataContent();
         content.Add(new StringContent(ConvertAddress(From)), "from");
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -181,7 +182,7 @@ public class MailgunClient : IDisposable {
                 content.Add(new StringContent(kvp.Value), $"h:{kvp.Key}");
             }
         }
-        return content;
+        return Task.FromResult(content);
     }
 
     private MimeMessage BuildMimeMessage() {
@@ -331,6 +332,8 @@ public class MailgunClient : IDisposable {
         }
     }
 
+    /// <summary>Releases resources used by the client.</summary>
+    /// <param name="disposing">When true, disposes managed resources as well.</param>
     protected virtual void Dispose(bool disposing) {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         if (disposing) {
@@ -338,8 +341,10 @@ public class MailgunClient : IDisposable {
         }
     }
 
+    /// <summary>Finalizer that ensures unmanaged resources are released.</summary>
     ~MailgunClient() => Dispose(false);
 
+    /// <summary>Disposes the client and suppresses finalization.</summary>
     public void Dispose() {
         Dispose(true);
         GC.SuppressFinalize(this);

@@ -58,5 +58,5 @@ public class Pop3MessageInfo {
     public EmailEncryption Encryption => Raw.Encryption;
 
     /// <inheritdoc />
-    public override string ToString() => Subject ?? base.ToString();
+    public override string ToString() => Subject ?? string.Empty;
 }

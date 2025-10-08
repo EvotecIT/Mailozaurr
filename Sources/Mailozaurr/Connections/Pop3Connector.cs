@@ -32,6 +32,7 @@ public static class Pop3Connector {
     /// <param name="retryCount">Number of retry attempts.</param>
     /// <param name="retryDelayMilliseconds">Initial delay between retries.</param>
     /// <param name="retryDelayBackoff">Multiplier for delay backoff.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
     /// <returns>Authenticated <see cref="Pop3Client"/> instance.</returns>
     public static Task<Pop3Client> ConnectAsync(
         string server,

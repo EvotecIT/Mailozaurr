@@ -28,12 +28,13 @@ public class GraphMailboxPermission {
     /// <param name="raw">Dictionary with Graph permission fields.</param>
     /// <param name="userPrincipalName">Mailbox owner.</param>
     public GraphMailboxPermission(Dictionary<string, object> raw, string? userPrincipalName = null) {
-        Raw = raw ?? new Dictionary<string, object>();
+        var source = raw ?? new Dictionary<string, object>();
+        Raw = source;
         UserPrincipalName = userPrincipalName;
-        if (raw.TryGetValue("id", out var idObj)) Id = idObj as string;
-        if (raw.TryGetValue("roles", out var rolesObj) && rolesObj is object[] arr)
+        if (source.TryGetValue("id", out var idObj)) Id = idObj as string;
+        if (source.TryGetValue("roles", out var rolesObj) && rolesObj is object[] arr)
             Roles = arr.Select(r => Enum.TryParse<GraphMailboxRole>(r?.ToString(), ignoreCase: true, out var role) ? role : GraphMailboxRole.Custom).ToArray();
-        if (raw.TryGetValue("grantedTo", out var granted) && granted is Dictionary<string, object> gdict)
+        if (source.TryGetValue("grantedTo", out var granted) && granted is Dictionary<string, object> gdict)
             GrantedTo = GraphMailboxGrantee.FromDictionary(gdict);
     }
 
@@ -59,9 +60,11 @@ public class GraphMailboxPermission {
     /// <param name="userPrincipalName">Mailbox owner.</param>
     /// <returns>Created permission object.</returns>
     public static GraphMailboxPermission FromHashtable(Hashtable table, string? userPrincipalName = null) {
-        var dict = table.Cast<DictionaryEntry>().ToDictionary(e => (string)e.Key, e => e.Value);
+        var dict = table.Cast<DictionaryEntry>().ToDictionary(e => (string)e.Key, e => (object)(e.Value ?? string.Empty));
         return new GraphMailboxPermission(dict, userPrincipalName);
     }
+
+    // Intentionally no overload with nullable dictionary to avoid nullability warnings in callers.
 
     /// <summary>
     /// Converts the permission to a dictionary suitable for Graph requests.
@@ -97,5 +100,5 @@ public class GraphMailboxPermission {
     }
 
     /// <inheritdoc />
-    public override string ToString() => Id ?? base.ToString();
+    public override string ToString() => Id ?? string.Empty;
 }

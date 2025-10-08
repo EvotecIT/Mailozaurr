@@ -336,6 +336,9 @@ public sealed class MimeEntityAttachmentDescriptor : AttachmentDescriptor
         return _entity;
     }
 
+    /// <summary>
+    /// Throwing override — a <see cref="MimeEntityAttachmentDescriptor"/> does not expose a raw content stream.
+    /// </summary>
     protected override Stream CreateContentStream() => throw new NotSupportedException("MimeEntity attachments do not expose a content stream.");
 
     internal override byte[] GetContentBytes() => throw new NotSupportedException("MimeEntity attachments cannot be converted to raw bytes.");

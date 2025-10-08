@@ -24,6 +24,7 @@ public static class TemporarySmimeCertificate {
     /// </summary>
     /// <param name="subjectName">Subject name of the certificate.</param>
     /// <param name="validDays">Number of days the certificate is valid.</param>
+    /// <param name="outputPath">Optional path to save the PFX file.</param>
     /// <returns>A new <see cref="X509Certificate2"/> instance.</returns>
     public static X509Certificate2 CreateSelfSigned(string subjectName = "CN=Mailozaurr Test", int validDays = 1, string? outputPath = null) {
 #if NETSTANDARD2_0

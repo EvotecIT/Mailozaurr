@@ -130,7 +130,7 @@ public static class OAuthHelpers {
         var codeReceiver = new LocalServerCodeReceiver();
         var authCode = new AuthorizationCodeInstalledApp(codeFlow, codeReceiver);
         var credential = await authCode.AuthorizeAsync(gmailAccount, System.Threading.CancellationToken.None);
-        if (credential.Token.IsExpired(Google.Apis.Util.SystemClock.Default)) {
+        if (credential.Token.IsStale) {
             await credential.RefreshTokenAsync(System.Threading.CancellationToken.None);
         }
         var cred = new OAuthCredential {
@@ -331,16 +331,16 @@ public static class OAuthHelpers {
     /// <param name="pemPath">Path to the PEM certificate file.</param>
     /// <param name="scopes">Optional scopes to request.</param>
     /// <returns>The authorization information including access token.</returns>
-    public static async Task<GraphAuthorization> AcquireGraphCertificatePemTokenAsync(
+    public static Task<GraphAuthorization> AcquireGraphCertificatePemTokenAsync(
         string clientId,
         string tenantId,
         string pemPath,
         IEnumerable<string>? scopes = null) {
 #if NET5_0_OR_GREATER
         var certificate = X509Certificate2.CreateFromPemFile(pemPath);
-        return await AcquireGraphCertificateTokenInternal(clientId, tenantId, certificate, scopes);
+        return AcquireGraphCertificateTokenInternal(clientId, tenantId, certificate, scopes);
 #else
-        throw new NotSupportedException("PEM certificates are not supported on this framework.");
+        return Task.FromException<GraphAuthorization>(new NotSupportedException("PEM certificates are not supported on this framework."));
 #endif
     }
 

@@ -227,7 +227,7 @@ public class SesClient : IDisposable {
         var record = new PendingMessageRecord
         {
             MessageId = messageId,
-            MimeMessage = base64,
+            MimeMessage = base64!,
             Timestamp = now,
             NextAttemptAt = now,
             Provider = EmailProvider.SES

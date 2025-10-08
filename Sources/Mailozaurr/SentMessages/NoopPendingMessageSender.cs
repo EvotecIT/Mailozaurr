@@ -8,11 +8,7 @@ namespace Mailozaurr;
 
 
 
-/// <summary>
-
-/// Provides a no-operation implementation for queued messages without a provider.
-
-/// </summary>
+/// <summary>Provides a no-operation implementation for queued messages without a provider.</summary>
 
 internal sealed class NoopPendingMessageSender : IPendingMessageSender {
 

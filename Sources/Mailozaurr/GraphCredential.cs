@@ -11,12 +11,12 @@ public class GraphCredential {
     /// <summary>
     /// Gets or sets the application (client) identifier.
     /// </summary>
-    public string ClientId { get; set; }
+    public string ClientId { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the directory (tenant) identifier.
     /// </summary>
-    public string DirectoryId { get; set; }
+    public string DirectoryId { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the client secret if using secret-based auth.

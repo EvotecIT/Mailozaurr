@@ -55,7 +55,7 @@ public class Smtp {
                 return;
             }
             if (!string.Equals(_pendingMessagesPath, value, StringComparison.OrdinalIgnoreCase)) {
-                var options = new PendingMessageRepositoryOptions { DirectoryPath = value };
+                var options = new PendingMessageRepositoryOptions { DirectoryPath = value! };
                 PendingMessageRepository = new FilePendingMessageRepository(options);
             }
             _pendingMessagesPath = value;
@@ -108,7 +108,7 @@ public class Smtp {
     }
 
     /// <summary>The sender address.</summary>
-    public object From {
+    public object? From {
         get => Client.From;
         set => Client.From = value;
     }
@@ -255,7 +255,7 @@ public class Smtp {
     /// <summary>Comma separated list of all recipients.</summary>
     public string SentTo => Client.SentTo;
     /// <summary>Normalized address the message is sent from.</summary>
-    public string SentFrom => Helpers.GetEmailAddress(From);
+    public string SentFrom => Helpers.GetEmailAddress(From ?? string.Empty);
 
     /// <summary>Stopwatch measuring the time of operations.</summary>
     public readonly Stopwatch Stopwatch;
@@ -633,7 +633,7 @@ public class Smtp {
             IntPtr unmanagedString = IntPtr.Zero;
             try {
                 unmanagedString = Marshal.SecureStringToGlobalAllocUnicode(securePassword);
-                return Marshal.PtrToStringUni(unmanagedString);
+                return Marshal.PtrToStringUni(unmanagedString) ?? string.Empty;
             } finally {
                 Marshal.ZeroFreeGlobalAllocUnicode(unmanagedString);
             }
@@ -767,7 +767,7 @@ public class Smtp {
                     Connect(server, port);
                     if (!string.IsNullOrEmpty(record.UserName)) {
                         var pwd = CredentialProtection.UnprotectWithFallback(record.Password);
-                        var cred = Helpers.ConvertFromPlainText(record.UserName, pwd);
+                        var cred = Helpers.ConvertFromPlainText(record.UserName!, pwd);
                         Authenticate(cred);
                     }
                 }
@@ -783,7 +783,7 @@ public class Smtp {
                     };
                     await SentMessageRepository.SaveAsync(sentRecord, cancellationToken);
                 }
-                await PendingMessageRepository.RemoveAsync(record.MessageId, cancellationToken);
+                await PendingMessageRepository.RemoveAsync(record.MessageId!, cancellationToken);
             } catch (Exception ex) {
                 LogWarning($"ProcessPendingMessages - Error sending {record.MessageId}: {ex.Message}");
                 record.NextAttemptAt = DateTimeOffset.UtcNow;
@@ -847,7 +847,7 @@ public class Smtp {
                     await SentMessageRepository.SaveAsync(record, cancellationToken);
                 }
                 if (PendingMessageRepository != null && !string.IsNullOrEmpty(Message.MessageId)) {
-                    await PendingMessageRepository.RemoveAsync(Message.MessageId, cancellationToken);
+                    await PendingMessageRepository.RemoveAsync(Message.MessageId!, cancellationToken);
                 }
                 var result = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging) {
                     MessageId = Message.MessageId

@@ -48,6 +48,7 @@ internal static class OAuthTokenCache {
     /// Retrieves a credential from the cache.
     /// </summary>
     /// <param name="key">Unique cache key.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
     /// <returns>The cached credential or <c>null</c> if not found.</returns>
     public static async Task<OAuthCredential?> GetAsync(string key, CancellationToken cancellationToken = default) {
         var cache = await LoadCacheAsync(cancellationToken).ConfigureAwait(false);
@@ -63,6 +64,7 @@ internal static class OAuthTokenCache {
     /// </summary>
     /// <param name="key">Unique cache key.</param>
     /// <param name="credential">Credential to cache.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
     public static async Task SetAsync(string key, OAuthCredential credential, CancellationToken cancellationToken = default) {
         var cache = await LoadCacheAsync(cancellationToken).ConfigureAwait(false);
         string? dir;

@@ -24,9 +24,10 @@ public class GraphMailboxGrantee {
         return g;
     }
 
+
     /// <summary>Creates an instance from a PowerShell hashtable.</summary>
     public static GraphMailboxGrantee FromHashtable(Hashtable table) {
-        var dict = table.Cast<DictionaryEntry>().ToDictionary(e => (string)e.Key, e => e.Value);
+        var dict = table.Cast<DictionaryEntry>().ToDictionary(e => (string)e.Key, e => (object)(e.Value ?? string.Empty));
         return FromDictionary(dict);
     }
 
@@ -38,5 +39,5 @@ public class GraphMailboxGrantee {
     }
 
     /// <inheritdoc />
-    public override string ToString() => User ?? base.ToString();
+    public override string ToString() => User ?? string.Empty;
 }

@@ -91,8 +91,11 @@ public class LoggingConfigurator : IDisposable {
         ProtocolLogger = protocolLogger;
     }
 
+    /// <summary>Finalizer that ensures unmanaged resources are released.</summary>
     ~LoggingConfigurator() => Dispose(false);
 
+    /// <summary>Releases resources used by the logger.</summary>
+    /// <param name="disposing">When true, disposes managed resources as well.</param>
     protected virtual void Dispose(bool disposing) {
         if (_disposed) {
             return;
@@ -108,6 +111,7 @@ public class LoggingConfigurator : IDisposable {
         _disposed = true;
     }
 
+    /// <summary>Disposes the configurator and suppresses finalization.</summary>
     public void Dispose() {
         Dispose(true);
         GC.SuppressFinalize(this);

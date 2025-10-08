@@ -90,8 +90,9 @@ public sealed class GmailApiClient : IDisposable {
     }
 
     private string? ResolveAccessToken() {
-        if (!string.IsNullOrEmpty(_credential?.AccessToken)) {
-            return _credential.AccessToken;
+        var token = _credential?.AccessToken;
+        if (!string.IsNullOrEmpty(token)) {
+            return token;
         }
 
         var authorization = _client.DefaultRequestHeaders.Authorization;
@@ -136,29 +137,34 @@ public sealed class GmailApiClient : IDisposable {
         record.ProviderData[GmailPendingMessageSender.ExpiresOnKey] = expiresOn.ToString("o", CultureInfo.InvariantCulture);
 
         var protector = CredentialProtection.Default;
-        record.ProviderData[GmailPendingMessageSender.AccessTokenProtectedKey] = protector.Protect(accessToken);
+        record.ProviderData[GmailPendingMessageSender.AccessTokenProtectedKey] = protector.Protect(accessToken!);
         record.ProviderData.Remove(GmailPendingMessageSender.AccessTokenKey);
         record.ProviderData.Remove(GmailPendingMessageSender.AccessTokenBase64Key);
-        if (!string.IsNullOrEmpty(credential?.RefreshToken)) {
-            record.ProviderData[GmailPendingMessageSender.RefreshTokenProtectedKey] = protector.Protect(credential.RefreshToken);
+        var refresh = credential?.RefreshToken;
+        if (!string.IsNullOrEmpty(refresh)) {
+            record.ProviderData[GmailPendingMessageSender.RefreshTokenProtectedKey] = protector.Protect(refresh!);
         }
         record.ProviderData.Remove(GmailPendingMessageSender.RefreshTokenKey);
         record.ProviderData.Remove(GmailPendingMessageSender.RefreshTokenBase64Key);
 
-        if (!string.IsNullOrEmpty(credential?.ClientId)) {
-            record.ProviderData[GmailPendingMessageSender.ClientIdKey] = credential.ClientId;
+        var clientId = credential?.ClientId;
+        if (!string.IsNullOrEmpty(clientId)) {
+            record.ProviderData[GmailPendingMessageSender.ClientIdKey] = clientId!;
         }
 
-        if (!string.IsNullOrEmpty(credential?.ClientSecret)) {
-            record.ProviderData[GmailPendingMessageSender.ClientSecretProtectedKey] = protector.Protect(credential.ClientSecret);
+        var clientSecret = credential?.ClientSecret;
+        if (!string.IsNullOrEmpty(clientSecret)) {
+            record.ProviderData[GmailPendingMessageSender.ClientSecretProtectedKey] = protector.Protect(clientSecret!);
         }
 
-        if (!string.IsNullOrEmpty(credential?.ServiceAccountJson)) {
-            record.ProviderData[GmailPendingMessageSender.ServiceAccountJsonProtectedKey] = protector.Protect(credential.ServiceAccountJson);
+        var serviceJson = credential?.ServiceAccountJson;
+        if (!string.IsNullOrEmpty(serviceJson)) {
+            record.ProviderData[GmailPendingMessageSender.ServiceAccountJsonProtectedKey] = protector.Protect(serviceJson!);
         }
 
-        if (!string.IsNullOrEmpty(credential?.ServiceAccountSubject)) {
-            record.ProviderData[GmailPendingMessageSender.ServiceAccountSubjectKey] = credential.ServiceAccountSubject;
+        var serviceSubject = credential?.ServiceAccountSubject;
+        if (!string.IsNullOrEmpty(serviceSubject)) {
+            record.ProviderData[GmailPendingMessageSender.ServiceAccountSubjectKey] = serviceSubject!;
         }
 
         try {
@@ -330,7 +336,8 @@ public sealed class GmailApiClient : IDisposable {
         if (string.IsNullOrEmpty(msg?.Raw)) {
             throw new InvalidDataException("Gmail API returned an invalid message response.");
         }
-        var data = msg.Raw.Replace('-', '+').Replace('_', '/');
+        var raw = msg!.Raw!;
+        var data = raw.Replace('-', '+').Replace('_', '/');
         int padding = (4 - data.Length % 4) % 4;
         if (padding > 0) data = data.PadRight(data.Length + padding, '=');
         var bytes = Convert.FromBase64String(data);
@@ -456,7 +463,8 @@ public sealed class GmailApiClient : IDisposable {
             return Array.Empty<byte>();
         }
 
-        var data = result.Data.Replace('-', '+').Replace('_', '/');
+        var dataProp = result!.Data!;
+        var data = dataProp.Replace('-', '+').Replace('_', '/');
 
         if (data.Length % 4 == 1) {
             throw new InvalidDataException("Attachment data is not a valid Base64 string.");

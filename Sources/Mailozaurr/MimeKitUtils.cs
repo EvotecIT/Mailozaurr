@@ -90,7 +90,7 @@ public static class MimeKitUtils {
             return false;
         }
         foreach (var p in NonDeliveryReportSubjectPatterns.Values) {
-            if (subject.IndexOf(p, System.StringComparison.OrdinalIgnoreCase) >= 0) {
+            if (subject!.IndexOf(p, System.StringComparison.OrdinalIgnoreCase) >= 0) {
                 return true;
             }
         }

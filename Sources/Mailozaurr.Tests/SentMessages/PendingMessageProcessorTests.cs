@@ -23,7 +23,7 @@ public sealed class PendingMessageProcessorTests {
 
         public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) {
             records.TryGetValue(messageId, out var record);
-            return Task.FromResult(record);
+            return Task.FromResult<PendingMessageRecord?>(record);
         }
 
         public async IAsyncEnumerable<PendingMessageRecord> GetAllAsync(
