@@ -106,8 +106,10 @@ internal static class GraphRetryHelper
 
 internal static class GraphRetryHelperRandom
 {
+#if !NET5_0_OR_GREATER
     [ThreadStatic]
     private static Random? s_random;
+#endif
 
     internal static int NextInt(int maxExclusive)
     {
