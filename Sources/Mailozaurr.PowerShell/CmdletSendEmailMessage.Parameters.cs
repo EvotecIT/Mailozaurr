@@ -308,6 +308,18 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
     public double RetryDelayBackoff { get; set; } = 1.0;
 
     /// <summary>
+    /// <para>Maximum delay in milliseconds between retries. 0 disables capping. Applies to all providers.</para>
+    /// </summary>
+    [Parameter(Mandatory = false)]
+    public int MaxDelayMilliseconds { get; set; } = 0;
+
+    /// <summary>
+    /// <para>Jitter window in milliseconds added to each retry delay. 0 disables jitter. Applies to all providers.</para>
+    /// </summary>
+    [Parameter(Mandatory = false)]
+    public int JitterMilliseconds { get; set; } = 0;
+
+    /// <summary>
     /// <para>When specified, retries are attempted regardless of the error
     /// type. Without this switch, only transient errors are retried.</para>
     /// </summary>
@@ -338,6 +350,19 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
     [Parameter(Mandatory = false)]
     [ValidateRange(1, int.MaxValue)]
     public int ConnectionPoolSize { get; set; } = 2;
+
+    /// <summary>
+    /// <para>Overrides Graph concurrency for this invocation. When set, caps parallel Graph HTTP requests.</para>
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "Graph")]
+    [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
+    public int GraphMaxConcurrency { get; set; } = 0;
+
+    /// <summary>
+    /// <para>Enables SMTP fallback when Graph ultimately fails. Requires a configured factory via [Mailozaurr.MailozaurrOptions]::SmtpFallbackFactory.</para>
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "Graph")]
+    public SwitchParameter EnableSmtpFallback { get; set; }
 
 
     /// <summary>

@@ -174,6 +174,12 @@ public class Smtp {
     /// <summary>Exponential backoff multiplier for retries.</summary>
     public double RetryDelayBackoff { get; set; } = 1.0;
 
+    /// <summary>Maximum delay in milliseconds between retries. 0 disables capping.</summary>
+    public int MaxDelayMilliseconds { get; set; } = 0;
+
+    /// <summary>Jitter window in milliseconds added to retry delay. 0 disables jitter.</summary>
+    public int JitterMilliseconds { get; set; } = 0;
+
     /// <summary>
     /// When set to <see langword="true"/>, replaces local image references in
     /// <see cref="HtmlBody"/> with inline attachments.
@@ -892,6 +898,12 @@ public class Smtp {
                 }
 
                 var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+                if (MaxDelayMilliseconds > 0 && delayMilliseconds > MaxDelayMilliseconds) {
+                    delayMilliseconds = MaxDelayMilliseconds;
+                }
+                if (JitterMilliseconds > 0 && delayMilliseconds > 0) {
+                    delayMilliseconds += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
+                }
                 if (delayMilliseconds > 0) {
                     await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken);
                 }

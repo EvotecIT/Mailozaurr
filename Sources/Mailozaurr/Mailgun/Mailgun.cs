@@ -74,6 +74,10 @@ public class MailgunClient : IDisposable {
     public int RetryDelayMilliseconds { get; set; } = 0;
     /// <summary>Exponential backoff multiplier for retries.</summary>
     public double RetryDelayBackoff { get; set; } = 1.0;
+    /// <summary>Maximum delay in milliseconds between retries. 0 disables capping.</summary>
+    public int MaxDelayMilliseconds { get; set; } = 0;
+    /// <summary>Jitter window in milliseconds added to retry delay. 0 disables jitter.</summary>
+    public int JitterMilliseconds { get; set; } = 0;
 
     /// <summary>
     /// When set to <c>true</c> the client retries sending even if the
@@ -313,6 +317,12 @@ public class MailgunClient : IDisposable {
                     return failResult;
                 }
                 var delay = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+                if (MaxDelayMilliseconds > 0 && delay > MaxDelayMilliseconds) {
+                    delay = MaxDelayMilliseconds;
+                }
+                if (JitterMilliseconds > 0 && delay > 0) {
+                    delay += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
+                }
                 if (delay > 0) await Task.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken).ConfigureAwait(false);
             }
             attempts++;

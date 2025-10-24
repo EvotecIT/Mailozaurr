@@ -61,6 +61,10 @@ public class SesClient : IDisposable {
     public double RetryDelayBackoff { get; set; } = 1.0;
     /// <summary>Retry even on non-transient errors.</summary>
     public bool RetryAlways { get; set; } = false;
+    /// <summary>Maximum delay in milliseconds between retries. 0 disables capping.</summary>
+    public int MaxDelayMilliseconds { get; set; } = 0;
+    /// <summary>Jitter window in milliseconds added to retry delay. 0 disables jitter.</summary>
+    public int JitterMilliseconds { get; set; } = 0;
 
     /// <summary>AWS region to use.</summary>
     public string Region { get; set; } = "us-east-1";
@@ -295,6 +299,12 @@ public class SesClient : IDisposable {
             }
 
             int delay = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+            if (MaxDelayMilliseconds > 0 && delay > MaxDelayMilliseconds) {
+                delay = MaxDelayMilliseconds;
+            }
+            if (JitterMilliseconds > 0 && delay > 0) {
+                delay += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
+            }
             if (delay > 0)
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken);

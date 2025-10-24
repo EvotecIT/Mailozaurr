@@ -183,6 +183,13 @@ namespace Mailozaurr;
     /// </summary>
     public bool RetryAlways { get; set; } = false;
 
+    /// <summary>
+    /// Optional policy controlling throttling/backoff and fallback behavior for Graph sends.
+    /// </summary>
+    public GraphSendPolicy? SendPolicy { get; private set; }
+
+    private Func<Smtp>? _smtpFallbackFactory;
+
     /// <summary>Webhook invoked after sending.</summary>
     public string? WebhookUrl { get; set; }
 
@@ -249,6 +256,30 @@ namespace Mailozaurr;
         _client = new HttpClient();
         _client.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
         if (LogCollector == null) LogCollector = new();
+    }
+
+    /// <summary>
+    /// Apply a send policy to this instance. Also updates the global Graph concurrency limit.
+    /// </summary>
+    /// <remarks>
+    /// The concurrency limit is process-wide and affects all Graph operations within the AppDomain.
+    /// The update is performed using a thread-safe semaphore swap, but callers should be aware of
+    /// the global nature of this setting when running multiple independent pipelines in parallel.
+    /// </remarks>
+    public Graph WithSendPolicy(GraphSendPolicy policy) {
+        SendPolicy = policy ?? throw new ArgumentNullException(nameof(policy));
+        if (policy.MaxConcurrency > 0) {
+            MicrosoftGraphUtils.MaxConcurrentRequests = policy.MaxConcurrency;
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Provide an SMTP factory used for fallback when the active policy enables SMTP fallback.
+    /// </summary>
+    public Graph WithSmtpFallback(Func<Smtp> factory) {
+        _smtpFallbackFactory = factory ?? throw new ArgumentNullException(nameof(factory));
+        return this;
     }
 
     private void LogMissingAttachmentWarning(string attachmentPath) {
@@ -478,6 +509,16 @@ namespace Mailozaurr;
             GraphEndpoint.V1,
             $"/users/{MessageContainer.Message.From!.Email.Address}/sendMail");
 
+        var policy = SendPolicy ?? MailozaurrOptions.DefaultGraphPolicy;
+        if (policy != null && policy.MaxConcurrency > 0) {
+            MicrosoftGraphUtils.MaxConcurrentRequests = policy.MaxConcurrency;
+        }
+
+        var policyDraft = SendPolicy ?? MailozaurrOptions.DefaultGraphPolicy;
+        if (policyDraft != null && policyDraft.MaxConcurrency > 0) {
+            MicrosoftGraphUtils.MaxConcurrentRequests = policyDraft.MaxConcurrency;
+        }
+
         int attempts = 0;
         Exception? lastException = null;
         do {
@@ -500,44 +541,44 @@ namespace Mailozaurr;
                     var errorMessage = (error == null || error.Error == null || error.Error.InnerError == null)
                         ? $"Unknown error: {content}"
                         : $"Error code: {error.Error.Code}, message: {error.Error.Message}, request ID: {error.Error.InnerError.RequestId}, date: {error.Error.InnerError.Date}";
-                    throw new GraphApiException(response.StatusCode, errorMessage, content);
+                    var retryAfter = ParseRetryAfter(response);
+                    throw new GraphApiException(response.StatusCode, errorMessage, content, retryAfter);
                 } finally {
                     MicrosoftGraphUtils.ConcurrencySemaphore.Release();
                 }
             } catch (TaskCanceledException ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Sending via Graph API cancelled: {ex.Message}");
-                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
+                var maxRetries = policy?.MaxRetries ?? RetryCount;
+                var shouldRetry = (policy?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
+                if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, ex.Message);
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
-                    return failResult;
+                    return await TrySmtpFallbackAsync(policy, failResult, ex, cancellationToken);
                 }
-                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
-                if (delayMilliseconds > 0) {
-                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken);
-                }
+                await DelayWithBackoffAsync(policy, attempts, null, ex, cancellationToken);
             } catch (Exception ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
-                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
+                var maxRetries = policy?.MaxRetries ?? RetryCount;
+                var shouldRetry = (policy?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
+                if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", ex.Message);
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
-                    return failResult;
+                    return await TrySmtpFallbackAsync(policy, failResult, ex, cancellationToken);
                 }
-                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
-                if (delayMilliseconds > 0) {
-                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken);
-                }
+                var retryAfter = (ex as GraphApiException)?.RetryAfter;
+                await DelayWithBackoffAsync(policy, attempts, retryAfter, ex, cancellationToken);
             }
             attempts++;
-        } while (attempts <= RetryCount);
+        } while (attempts <= (policy?.MaxRetries ?? RetryCount));
 
         var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", lastException?.Message);
         await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken);
-        return finalResult;
+        return await TrySmtpFallbackAsync(policy, finalResult, lastException, cancellationToken);
     }
 
     /// <summary>
@@ -552,6 +593,11 @@ namespace Mailozaurr;
         // Upload attachments to the draft message
         await UploadAttachmentsAsync(draftMessage, cancellationToken);
 
+        var policyDraft = SendPolicy ?? MailozaurrOptions.DefaultGraphPolicy;
+        if (policyDraft != null && policyDraft.MaxConcurrency > 0) {
+            MicrosoftGraphUtils.MaxConcurrentRequests = policyDraft.MaxConcurrency;
+        }
+
         int attempts = 0;
         Exception? lastException = null;
         do {
@@ -560,37 +606,36 @@ namespace Mailozaurr;
             } catch (TaskCanceledException ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Sending draft via Graph API cancelled: {ex.Message}");
-                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
+                var maxRetries = policyDraft?.MaxRetries ?? RetryCount;
+                var shouldRetry = (policyDraft?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
+                if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, ex.Message);
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
-                    return failResult;
+                    return await TrySmtpFallbackAsync(policyDraft, failResult, ex, cancellationToken);
                 }
-                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
-                if (delayMilliseconds > 0) {
-                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken);
-                }
+                await DelayWithBackoffAsync(policyDraft, attempts, null, ex, cancellationToken);
             } catch (Exception ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
-                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
+                var maxRetries = policyDraft?.MaxRetries ?? RetryCount;
+                var shouldRetry = (policyDraft?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
+                if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", ex.Message);
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
-                    return failResult;
+                    return await TrySmtpFallbackAsync(policyDraft, failResult, ex, cancellationToken);
                 }
-                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
-                if (delayMilliseconds > 0) {
-                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken);
-                }
+                var ra = (ex as GraphApiException)?.RetryAfter;
+                await DelayWithBackoffAsync(policyDraft, attempts, ra, ex, cancellationToken);
             }
             attempts++;
-        } while (attempts <= RetryCount);
+        } while (attempts <= (policyDraft?.MaxRetries ?? RetryCount));
 
         var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", lastException?.Message);
         await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken);
-        return finalResult;
+        return await TrySmtpFallbackAsync(policyDraft, finalResult, lastException, cancellationToken);
     }
 
         /// <summary>
@@ -628,7 +673,8 @@ namespace Mailozaurr;
             var sendErrorMessage = (sendError == null || sendError.Error == null || sendError.Error.InnerError == null)
                 ? $"Unknown error: {sendContent}"
                 : $"Error code: {sendError.Error.Code}, message: {sendError.Error.Message}, request ID: {sendError.Error.InnerError.RequestId}, date: {sendError.Error.InnerError.Date}";
-            throw new GraphApiException(sendResponse.StatusCode, sendErrorMessage, sendContent);
+            var retryAfter = ParseRetryAfter(sendResponse);
+            throw new GraphApiException(sendResponse.StatusCode, sendErrorMessage, sendContent, retryAfter);
         } catch (GraphApiException ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
             var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, ex.ResponseContent, ex.Message);
@@ -718,7 +764,8 @@ namespace Mailozaurr;
                 var errorMessage = (error == null || error.Error == null)
                     ? $"Unknown error: {draftContent}"
                     : $"Error code: {error.Error.Code}, message: {error.Error.Message}";
-                throw new GraphApiException(draftResponse.StatusCode, errorMessage, draftContent);
+                var retryAfter = ParseRetryAfter(draftResponse);
+                throw new GraphApiException(draftResponse.StatusCode, errorMessage, draftContent, retryAfter);
             }
 
             // Deserialize the draft message
@@ -946,6 +993,101 @@ namespace Mailozaurr;
             }
         } finally {
             MicrosoftGraphUtils.ConcurrencySemaphore.Release();
+        }
+    }
+
+    private static TimeSpan? ParseRetryAfter(HttpResponseMessage response) {
+        if (response.Headers.TryGetValues("Retry-After", out var values)) {
+            var first = values.FirstOrDefault();
+            if (int.TryParse(first, out var seconds)) {
+                return TimeSpan.FromSeconds(Math.Max(0, seconds));
+            }
+            if (DateTimeOffset.TryParse(first, out var ts)) {
+                var delta = ts - DateTimeOffset.UtcNow;
+                return delta > TimeSpan.Zero ? delta : TimeSpan.Zero;
+            }
+        }
+        return null;
+    }
+
+    private async Task DelayWithBackoffAsync(GraphSendPolicy? policy, int attempts, TimeSpan? retryAfter, Exception ex, CancellationToken cancellationToken) {
+        TimeSpan delay = TimeSpan.Zero;
+        if (policy != null) {
+            delay = GraphRetryHelper.CalculateDelay(policy, attempts);
+            if (GraphRetryHelper.IsThrottled(ex) && retryAfter.HasValue && retryAfter.Value > delay) {
+                delay = retryAfter.Value;
+            }
+            if (policy.MaxDelayMs > 0 && delay > TimeSpan.FromMilliseconds(policy.MaxDelayMs)) {
+                delay = TimeSpan.FromMilliseconds(policy.MaxDelayMs);
+            }
+        } else {
+            var delayMs = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+            if (delayMs > 0) delay = TimeSpan.FromMilliseconds(delayMs);
+        }
+
+        if (delay > TimeSpan.Zero) {
+            var reason = GraphRetryHelper.IsThrottled(ex) ? "throttling" : "transient";
+            LogCollector.LogVerbose($"Send-EmailMessage - Retry attempt {attempts + 1}, delaying {delay.TotalMilliseconds:N0} ms due to {reason}.");
+            await Task.Delay(delay, cancellationToken);
+        }
+    }
+
+    private const string DefaultAttachmentName = "attachment.bin";
+
+    private async Task<SmtpResult> TrySmtpFallbackAsync(GraphSendPolicy? policy, SmtpResult current, Exception? lastException, CancellationToken cancellationToken) {
+        if (policy == null || !policy.EnableSmtpFallback) {
+            return current;
+        }
+
+        var smtp = _smtpFallbackFactory?.Invoke() ?? MailozaurrOptions.SmtpFallbackFactory?.Invoke(this);
+        if (smtp == null) {
+            LogCollector.LogVerbose("Send-EmailMessage - SMTP fallback requested but no SMTP factory configured.");
+            return current;
+        }
+
+        try {
+            smtp.From = this.From;
+            smtp.To = this.To;
+            smtp.Cc = this.Cc;
+            smtp.Bcc = this.Bcc;
+            smtp.ReplyTo = string.IsNullOrWhiteSpace(this.ReplyTo) ? null : this.ReplyTo;
+            smtp.Subject = this.Subject;
+            smtp.HtmlBody = this.HTML;
+            smtp.Headers = this.Headers;
+            smtp.WebhookUrl = this.WebhookUrl;
+
+            if (this.ConvertedAttachments != null && this.ConvertedAttachments.Count > 0) {
+                var attachments = new List<Definitions.AttachmentDescriptor>();
+                var inline = new List<Definitions.AttachmentDescriptor>();
+                foreach (var a in this.ConvertedAttachments) {
+                    if (string.IsNullOrWhiteSpace(a.ContentBytes)) continue;
+                    try {
+                        var bytes = Convert.FromBase64String(a.ContentBytes);
+                        var d = new Definitions.ByteArrayAttachmentDescriptor(bytes, string.IsNullOrWhiteSpace(a.Name) ? DefaultAttachmentName : a.Name);
+                        if (!string.IsNullOrWhiteSpace(a.ContentId)) d.ContentId = a.ContentId;
+                        if (a.IsInline) inline.Add(d); else attachments.Add(d);
+                    } catch (FormatException fex) {
+                        LogCollector.LogWarning($"Send-EmailMessage - SMTP fallback skipped invalid base64 attachment '{(a?.Name ?? "(unnamed)")}' : {fex.Message}");
+                    }
+                }
+                if (attachments.Count > 0) smtp.Attachments = attachments;
+                if (inline.Count > 0) smtp.InlineAttachments = inline;
+            }
+
+            await smtp.CreateMessageAsync(cancellationToken).ConfigureAwait(false);
+            LogCollector.LogVerbose("Send-EmailMessage - Sending via SMTP fallback after Graph failure.");
+            return await smtp.SendAsync(cancellationToken).ConfigureAwait(false);
+        } catch (Exception ex) {
+            LogCollector.LogWarning($"Send-EmailMessage - SMTP fallback failed: {ex.Message}");
+            // Preserve original Graph failure, but add fallback context to Error for diagnostics
+            var mergedError = string.IsNullOrWhiteSpace(current.Error)
+                ? $"Graph failed; SMTP fallback error: {ex.Message}"
+                : $"{current.Error} | SMTP fallback error: {ex.Message}";
+            return new SmtpResult(current.Status, current.EmailAction, current.SentTo, current.SentFrom, current.Server, current.Port, current.TimeToExecute, current.Message, mergedError)
+            {
+                GraphError = current.GraphError,
+                MessageId = current.MessageId
+            };
         }
     }
 

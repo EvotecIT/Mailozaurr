@@ -22,14 +22,30 @@ public class GraphApiException : Exception {
     public string ResponseContent { get; }
 
     /// <summary>
+    /// Optional server-provided retry-after delay when throttled.
+    /// </summary>
+    public TimeSpan? RetryAfter { get; }
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="GraphApiException"/> class.
     /// </summary>
     /// <param name="statusCode">The HTTP status code.</param>
     /// <param name="message">The error message.</param>
     /// <param name="responseContent">Raw response content from the server.</param>
     public GraphApiException(HttpStatusCode statusCode, string message, string responseContent)
+        : this(statusCode, message, responseContent, null) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GraphApiException"/> class.
+    /// </summary>
+    /// <param name="statusCode">The HTTP status code.</param>
+    /// <param name="message">The error message.</param>
+    /// <param name="responseContent">Raw response content from the server.</param>
+    /// <param name="retryAfter">Optional server-provided retry-after hint.</param>
+    public GraphApiException(HttpStatusCode statusCode, string message, string responseContent, TimeSpan? retryAfter)
         : base(message) {
         StatusCode = statusCode;
         ResponseContent = responseContent;
+        RetryAfter = retryAfter;
     }
 }
