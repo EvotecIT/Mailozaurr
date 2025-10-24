@@ -114,6 +114,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         sendGrid.RetryDelayMilliseconds = RetryDelayMilliseconds;
         sendGrid.RetryDelayBackoff = RetryDelayBackoff;
         sendGrid.RetryAlways = RetryAlways.IsPresent;
+        sendGrid.MaxDelayMilliseconds = MaxDelayMilliseconds;
+        sendGrid.JitterMilliseconds = JitterMilliseconds;
         NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
         sendGrid.Credentials = networkCredential;
         sendGrid.CreateMessage();
@@ -155,6 +157,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         mailgun.RetryDelayMilliseconds = RetryDelayMilliseconds;
         mailgun.RetryDelayBackoff = RetryDelayBackoff;
         mailgun.RetryAlways = RetryAlways.IsPresent;
+        mailgun.MaxDelayMilliseconds = MaxDelayMilliseconds;
+        mailgun.JitterMilliseconds = JitterMilliseconds;
         NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
         mailgun.Credentials = networkCredential;
         if (ShouldProcess(mailgun.SentTo, "Sending email message via Mailgun")) {
@@ -195,6 +199,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         ses.RetryDelayMilliseconds = RetryDelayMilliseconds;
         ses.RetryDelayBackoff = RetryDelayBackoff;
         ses.RetryAlways = RetryAlways.IsPresent;
+        ses.MaxDelayMilliseconds = MaxDelayMilliseconds;
+        ses.JitterMilliseconds = JitterMilliseconds;
         var region = Region;
         if (region != null && region.Length > 0) {
             ses.Region = region;
@@ -282,6 +288,36 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         graph.ContentType = "HTML";
         graph.Attachments = Attachment;
         if (Headers != null) graph.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
+        // Apply optional Graph policy without introducing new cmdlets
+        var applyPolicy = MailozaurrOptions.DefaultGraphPolicy != null
+            || GraphMaxConcurrency > 0
+            || MaxDelayMilliseconds > 0
+            || JitterMilliseconds > 0
+            || EnableSmtpFallback.IsPresent
+            || (RetryCount > 0 && this.MyInvocation.BoundParameters.ContainsKey(nameof(RetryCount)))
+            || (RetryDelayMilliseconds > 0 && this.MyInvocation.BoundParameters.ContainsKey(nameof(RetryDelayMilliseconds)));
+
+        if (applyPolicy) {
+            var p = MailozaurrOptions.DefaultGraphPolicy != null
+                ? new GraphSendPolicy {
+                    MaxConcurrency = MailozaurrOptions.DefaultGraphPolicy.MaxConcurrency,
+                    MaxRetries = MailozaurrOptions.DefaultGraphPolicy.MaxRetries,
+                    BaseDelayMs = MailozaurrOptions.DefaultGraphPolicy.BaseDelayMs,
+                    MaxDelayMs = MailozaurrOptions.DefaultGraphPolicy.MaxDelayMs,
+                    JitterMs = MailozaurrOptions.DefaultGraphPolicy.JitterMs,
+                    RetryOnTransient = MailozaurrOptions.DefaultGraphPolicy.RetryOnTransient,
+                    EnableSmtpFallback = MailozaurrOptions.DefaultGraphPolicy.EnableSmtpFallback
+                }
+                : new GraphSendPolicy();
+            if (RetryCount > 0 && this.MyInvocation.BoundParameters.ContainsKey(nameof(RetryCount))) p.MaxRetries = RetryCount;
+            if (RetryDelayMilliseconds > 0 && this.MyInvocation.BoundParameters.ContainsKey(nameof(RetryDelayMilliseconds))) p.BaseDelayMs = RetryDelayMilliseconds;
+            if (MaxDelayMilliseconds > 0) p.MaxDelayMs = MaxDelayMilliseconds;
+            if (JitterMilliseconds > 0) p.JitterMs = JitterMilliseconds;
+            if (GraphMaxConcurrency > 0) p.MaxConcurrency = GraphMaxConcurrency;
+            if (EnableSmtpFallback.IsPresent) p.EnableSmtpFallback = true;
+
+            graph.WithSendPolicy(p);
+        }
         graph.CreateAttachments();
         long graphSize = GetTotalAttachmentSize(graph.ConvertedAttachments);
         if (graphSize > GraphAttachmentLimitBytes) {
@@ -328,6 +364,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
     }
 
     private async Task ProcessMgGraphRequest(string fromEmail, string fromName) {
+        if (GraphMaxConcurrency > 0) {
+            MicrosoftGraphUtils.MaxConcurrentRequests = GraphMaxConcurrency;
+        }
         using Graph graph = new Graph();
         graph.ChunkSize = ChunkSize;
         graph.From = Helpers.GetFromObject(fromEmail, fromName);
@@ -425,6 +464,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         smtpClient.RetryDelayMilliseconds = RetryDelayMilliseconds;
         smtpClient.RetryDelayBackoff = RetryDelayBackoff;
         smtpClient.RetryAlways = RetryAlways.IsPresent;
+        smtpClient.MaxDelayMilliseconds = MaxDelayMilliseconds;
+        smtpClient.JitterMilliseconds = JitterMilliseconds;
 
         if (!ShouldProcess(smtpClient.SentTo, "Sending email message")) {
             logCollector.LogVerbose("Send-EmailMessage - Skipping authentication");

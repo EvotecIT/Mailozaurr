@@ -115,6 +115,10 @@ public sealed class SendGridClient : IDisposable {
     /// 1 disables backoff.
     /// </summary>
     public double RetryDelayBackoff { get; set; } = 1.0;
+    /// <summary>Maximum delay in milliseconds between retries. 0 disables capping.</summary>
+    public int MaxDelayMilliseconds { get; set; } = 0;
+    /// <summary>Jitter window in milliseconds added to retry delay. 0 disables jitter.</summary>
+    public int JitterMilliseconds { get; set; } = 0;
 
     /// <summary>
     /// If set to <c>true</c>, retries will occur even on non-transient
@@ -393,6 +397,12 @@ public sealed class SendGridClient : IDisposable {
                 }
 
                 var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+                if (MaxDelayMilliseconds > 0 && delayMilliseconds > MaxDelayMilliseconds) {
+                    delayMilliseconds = MaxDelayMilliseconds;
+                }
+                if (JitterMilliseconds > 0 && delayMilliseconds > 0) {
+                    delayMilliseconds += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
+                }
                 if (delayMilliseconds > 0) {
                     await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken).ConfigureAwait(false);
                 }
@@ -409,6 +419,12 @@ public sealed class SendGridClient : IDisposable {
                     return failResult;
                 }
                 var delayMs = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
+                if (MaxDelayMilliseconds > 0 && delayMs > MaxDelayMilliseconds) {
+                    delayMs = MaxDelayMilliseconds;
+                }
+                if (JitterMilliseconds > 0 && delayMs > 0) {
+                    delayMs += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
+                }
                 if (delayMs > 0) {
                     await Task.Delay(TimeSpan.FromMilliseconds(delayMs), cancellationToken).ConfigureAwait(false);
                 }

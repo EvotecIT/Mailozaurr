@@ -236,6 +236,81 @@ Wait-GraphMessage -Connection $graph -UserPrincipalName 'user@example.com' -Unti
 }
 ```
 
+### Throttling‑safe sending (Graph) and retry/backoff knobs
+
+Mailozaurr v2 includes a built‑in policy for Microsoft Graph sends that handles throttling and transient errors:
+
+- Concurrency limiting to avoid request bursts
+- Exponential backoff with jitter and a max cap
+- Honors Retry-After header on 429
+- Optional SMTP fallback when Graph ultimately fails
+
+PowerShell
+
+```powershell
+# Graph send with conservative retry/backoff and concurrency
+$cred = ConvertTo-GraphCredential -ClientId $ClientId -ClientSecret $ClientSecret -DirectoryId $TenantId
+
+Send-EmailMessage -Graph -From 'sender@example.com' -To 'user@example.com' `
+  -Credential $cred -HTML '<b>Hello</b>' -Subject 'Graph policy demo' `
+  -RetryCount 4 -RetryDelayMilliseconds 1000 `
+  -JitterMilliseconds 500 -MaxDelayMilliseconds 30000 `
+  -GraphMaxConcurrency 2 -Verbose
+
+# Optional: SMTP fallback when Graph keeps failing (configure once)
+[Mailozaurr.MailozaurrOptions]::SmtpFallbackFactory = {
+  param($graph)
+  $s = [Mailozaurr.Smtp]::new()
+  $s.Connect('smtp.office365.com', 587)
+  $s.Authenticate([System.Net.NetworkCredential]::new('user','pass'))
+  $s
+}
+Send-EmailMessage -Graph -EnableSmtpFallback -From 'sender@example.com' -To 'user@example.com' `
+  -Credential $cred -HTML '<b>Hello via fallback</b>' -Subject 'Graph+SMTP fallback'
+
+# Same jitter/max-delay knobs also apply to SMTP/SendGrid/Mailgun/SES
+Send-EmailMessage -Server 'smtp.office365.com' -Port 587 -UseSsl `
+  -From 'sender@example.com' -To 'user@example.com' -Credential (Get-Credential) `
+  -RetryCount 4 -RetryDelayMilliseconds 2000 -JitterMilliseconds 400 -MaxDelayMilliseconds 30000
+```
+
+C# (Graph)
+
+```csharp
+using Mailozaurr;
+var policy = new GraphSendPolicy {
+    MaxConcurrency = 2,
+    MaxRetries = 4,
+    BaseDelayMs = 1000,
+    MaxDelayMs = 30000,
+    JitterMs = 500,
+    RetryOnTransient = true,
+    EnableSmtpFallback = true
+};
+
+var graph = new Graph()
+    .WithSendPolicy(policy)
+    .WithSmtpFallback(() => {
+        var s = new Smtp();
+        s.Connect("smtp.office365.com", 587);
+        s.Authenticate("user@example.com", "password");
+        return s;
+    });
+
+graph.From = "sender@example.com";
+graph.To = new object[] { "user@example.com" };
+graph.Subject = "Graph policy demo";
+graph.HTML = "<b>Hello</b>";
+graph.Authenticate(new System.Net.NetworkCredential("clientid@tenant.onmicrosoft.com", "client-secret"));
+await graph.ConnectO365GraphAsync();
+await graph.SendMessageAsync();
+```
+
+Notes
+
+- Defaults are conservative. Override per‑invocation in PowerShell or set `MailozaurrOptions.DefaultGraphPolicy` in code.
+- For raw `Invoke‑MgGraphRequest` scenarios, use `-GraphMaxConcurrency` to keep batch operations within Graph tenancy limits.
+
 ```powershell
 $cred = Get-Credential
 $client = Connect-POP3 -Server 'pop.example.com' -Credential $cred
