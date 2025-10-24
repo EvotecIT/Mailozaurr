@@ -30,6 +30,11 @@ namespace Mailozaurr {
         /// <summary>
         /// Gets or sets the maximum number of concurrent HTTP requests allowed.
         /// </summary>
+        /// <remarks>
+        /// This is a process-wide limit. Setting this property affects all Graph operations in the
+        /// current AppDomain. The underlying semaphore is swapped using a thread-safe exchange to
+        /// ensure safe updates under concurrency.
+        /// </remarks>
         public static int MaxConcurrentRequests {
             get => _maxConcurrentRequests;
             set {

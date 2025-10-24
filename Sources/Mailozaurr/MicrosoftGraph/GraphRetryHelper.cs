@@ -8,6 +8,10 @@ namespace Mailozaurr;
 /// </summary>
 internal static class GraphRetryHelper
 {
+    private const int StatusRequestTimeout = 408;
+    private const int StatusTooManyRequests = 429;
+    private const int StatusServerErrorMin = 500;
+    private const int StatusServerErrorMax = 599;
     private static readonly string[] ThrottleMarkers = new[]
     {
         "ApplicationThrottled",
@@ -20,7 +24,7 @@ internal static class GraphRetryHelper
     {
         if (ex is GraphApiException gex)
         {
-            if ((int)gex.StatusCode == 429)
+            if ((int)gex.StatusCode == StatusTooManyRequests)
             {
                 return true;
             }
@@ -44,7 +48,7 @@ internal static class GraphRetryHelper
         if (ex is HttpRequestException httpEx)
         {
 #if NET5_0_OR_GREATER
-            if (httpEx.StatusCode.HasValue && (int)httpEx.StatusCode.Value == 429)
+            if (httpEx.StatusCode.HasValue && (int)httpEx.StatusCode.Value == StatusTooManyRequests)
                 return true;
 #endif
         }
@@ -62,9 +66,9 @@ internal static class GraphRetryHelper
         if (ex is GraphApiException gex)
         {
             var code = (int)gex.StatusCode;
-            if (code == 408 || code == 429)
+            if (code == StatusRequestTimeout || code == StatusTooManyRequests)
                 return true;
-            if (code >= 500 && code <= 599)
+            if (code >= StatusServerErrorMin && code <= StatusServerErrorMax)
                 return true;
 
             var parsed = GraphApiErrorParser.Parse(gex.ResponseContent);

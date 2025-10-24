@@ -261,6 +261,11 @@ namespace Mailozaurr;
     /// <summary>
     /// Apply a send policy to this instance. Also updates the global Graph concurrency limit.
     /// </summary>
+    /// <remarks>
+    /// The concurrency limit is process-wide and affects all Graph operations within the AppDomain.
+    /// The update is performed using a thread-safe semaphore swap, but callers should be aware of
+    /// the global nature of this setting when running multiple independent pipelines in parallel.
+    /// </remarks>
     public Graph WithSendPolicy(GraphSendPolicy policy) {
         SendPolicy = policy ?? throw new ArgumentNullException(nameof(policy));
         if (policy.MaxConcurrency > 0) {
@@ -1027,6 +1032,8 @@ namespace Mailozaurr;
         }
     }
 
+    private const string DefaultAttachmentName = "attachment.bin";
+
     private async Task<SmtpResult> TrySmtpFallbackAsync(GraphSendPolicy? policy, SmtpResult current, Exception? lastException, CancellationToken cancellationToken) {
         if (policy == null || !policy.EnableSmtpFallback) {
             return current;
@@ -1056,10 +1063,12 @@ namespace Mailozaurr;
                     if (string.IsNullOrWhiteSpace(a.ContentBytes)) continue;
                     try {
                         var bytes = Convert.FromBase64String(a.ContentBytes);
-                        var d = new Definitions.ByteArrayAttachmentDescriptor(bytes, string.IsNullOrWhiteSpace(a.Name) ? "attachment.bin" : a.Name);
+                        var d = new Definitions.ByteArrayAttachmentDescriptor(bytes, string.IsNullOrWhiteSpace(a.Name) ? DefaultAttachmentName : a.Name);
                         if (!string.IsNullOrWhiteSpace(a.ContentId)) d.ContentId = a.ContentId;
                         if (a.IsInline) inline.Add(d); else attachments.Add(d);
-                    } catch { /* ignore invalid base64 */ }
+                    } catch (FormatException fex) {
+                        LogCollector.LogWarning($"Send-EmailMessage - SMTP fallback skipped invalid base64 attachment '{(a?.Name ?? "(unnamed)")}' : {fex.Message}");
+                    }
                 }
                 if (attachments.Count > 0) smtp.Attachments = attachments;
                 if (inline.Count > 0) smtp.InlineAttachments = inline;
@@ -1070,7 +1079,15 @@ namespace Mailozaurr;
             return await smtp.SendAsync(cancellationToken).ConfigureAwait(false);
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - SMTP fallback failed: {ex.Message}");
-            return current;
+            // Preserve original Graph failure, but add fallback context to Error for diagnostics
+            var mergedError = string.IsNullOrWhiteSpace(current.Error)
+                ? $"Graph failed; SMTP fallback error: {ex.Message}"
+                : $"{current.Error} | SMTP fallback error: {ex.Message}";
+            return new SmtpResult(current.Status, current.EmailAction, current.SentTo, current.SentFrom, current.Server, current.Port, current.TimeToExecute, current.Message, mergedError)
+            {
+                GraphError = current.GraphError,
+                MessageId = current.MessageId
+            };
         }
     }
 
