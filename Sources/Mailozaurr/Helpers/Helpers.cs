@@ -196,7 +196,7 @@ public static class Helpers {
         client ??= SharedHttpClient;
 
         try {
-            var json = JsonSerializer.Serialize(result);
+            var json = JsonSerializer.Serialize(result, MailozaurrJsonContext.Default.SmtpResult);
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
             using var response = await client.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode) {

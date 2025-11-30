@@ -185,7 +185,7 @@ public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
             obj = RuleObject;
         } else {
             var dict = Rule!.Cast<DictionaryEntry>().ToDictionary(d => (string)d.Key, d => d.Value!);
-            var json = JsonSerializer.Serialize(dict);
+            var json = JsonSerializer.Serialize(dict, MailozaurrJsonContext.Default.DictionaryStringObject);
             obj = JsonSerializer.Deserialize<GraphInboxRule>(json)!;
         }
         do {
@@ -217,10 +217,16 @@ public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
         var uri = MicrosoftGraphUtils.JoinUriQuery(
             GraphEndpoint.V1,
             $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules");
+        var rulePayload = Rule ?? throw new PSArgumentNullException(nameof(Rule), "Rule has to be provided or built.");
         var bodyObj = RuleBuilder != null
             ? RuleBuilder.Build()
-            : RuleObject ?? JsonSerializer.Deserialize<GraphInboxRule>(JsonSerializer.Serialize(Rule));
-        var body = JsonSerializer.Serialize(bodyObj, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+            : RuleObject ?? JsonSerializer.Deserialize(JsonSerializer.Serialize(rulePayload, MailozaurrJsonContext.Default.Object), MailozaurrJsonContext.Default.GraphInboxRule);
+
+        if (bodyObj is null) {
+            throw new PSArgumentException("Graph inbox rule definition cannot be null.");
+        }
+
+        var body = JsonSerializer.Serialize(bodyObj, MailozaurrJsonContext.Default.GraphInboxRule);
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "POST")

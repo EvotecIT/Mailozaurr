@@ -104,7 +104,11 @@ public sealed class CmdletSetGraphInboxRule : AsyncPSCmdlet
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         int attempts = 0;
         Exception? lastException = null;
-        GraphInboxRule obj = RuleObject ?? JsonSerializer.Deserialize<GraphInboxRule>(JsonSerializer.Serialize(Rule))!;
+        var rulePayload = Rule ?? throw new PSArgumentNullException(nameof(Rule), "Rule has to be provided or built.");
+        var obj = RuleObject ?? JsonSerializer.Deserialize(JsonSerializer.Serialize(rulePayload, MailozaurrJsonContext.Default.Object), MailozaurrJsonContext.Default.GraphInboxRule);
+        if (obj is null) {
+            throw new PSArgumentException("Graph inbox rule definition cannot be null.");
+        }
         do
         {
             try
@@ -148,8 +152,15 @@ public sealed class CmdletSetGraphInboxRule : AsyncPSCmdlet
         var uri = MicrosoftGraphUtils.JoinUriQuery(
             GraphEndpoint.V1,
             $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules/{RuleId}");
-        var bodyObj = RuleObject ?? JsonSerializer.Deserialize<GraphInboxRule>(JsonSerializer.Serialize(Rule));
-        var body = JsonSerializer.Serialize(bodyObj, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+        var rulePayload = Rule ?? throw new PSArgumentNullException(nameof(Rule), "Rule has to be provided or built.");
+        var bodyObj = RuleObject ?? JsonSerializer.Deserialize(JsonSerializer.Serialize(rulePayload, MailozaurrJsonContext.Default.Object), MailozaurrJsonContext.Default.GraphInboxRule);
+        if (bodyObj is null) {
+            throw new PSArgumentException("Graph inbox rule definition cannot be null.");
+        }
+        if (bodyObj is null) {
+            throw new PSArgumentException("Graph inbox rule definition cannot be null.");
+        }
+        var body = JsonSerializer.Serialize(bodyObj, MailozaurrJsonContext.Default.GraphInboxRule);
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "PATCH")

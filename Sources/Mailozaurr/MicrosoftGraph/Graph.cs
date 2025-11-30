@@ -377,11 +377,7 @@ namespace Mailozaurr;
             MessageContainer.Message.InternetMessageHeaders = Headers.Select(kvp => new GraphInternetMessageHeader { Name = kvp.Key, Value = kvp.Value }).ToList();
         }
 
-        var options = new JsonSerializerOptions() {
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            //WriteIndented = true
-        };
-        MessageJson = JsonSerializer.Serialize(MessageContainer, options);
+        MessageJson = JsonSerializer.Serialize(MessageContainer, MailozaurrJsonContext.Default.GraphMessageContainer);
         //LoggingMessages.Logger.WriteVerbose(MessageJson);
     }
 
@@ -476,7 +472,7 @@ namespace Mailozaurr;
                     return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, content, content);
                 }
 
-                var authorization = JsonSerializer.Deserialize<GraphAuthorization>(content);
+                var authorization = JsonSerializer.Deserialize(content, MailozaurrJsonContext.Default.GraphAuthorization);
                 AccessToken = authorization?.AccessToken ?? string.Empty;
                 TokenType = authorization?.TokenType ?? string.Empty;
                 return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", "");
@@ -537,7 +533,7 @@ namespace Mailozaurr;
                         await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken);
                         return okResult;
                     }
-                    var error = JsonSerializer.Deserialize<GraphApiError>(content);
+                    var error = JsonSerializer.Deserialize(content, MailozaurrJsonContext.Default.GraphApiError);
                     var errorMessage = (error == null || error.Error == null || error.Error.InnerError == null)
                         ? $"Unknown error: {content}"
                         : $"Error code: {error.Error.Code}, message: {error.Error.Message}, request ID: {error.Error.InnerError.RequestId}, date: {error.Error.InnerError.Date}";
@@ -669,7 +665,7 @@ namespace Mailozaurr;
 
             // If the status code indicates an error, throw an exception with the content
             var sendContent = await sendResponse.Content.ReadAsStringAsync();
-            var sendError = JsonSerializer.Deserialize<GraphApiError>(sendContent);
+            var sendError = JsonSerializer.Deserialize(sendContent, MailozaurrJsonContext.Default.GraphApiError);
             var sendErrorMessage = (sendError == null || sendError.Error == null || sendError.Error.InnerError == null)
                 ? $"Unknown error: {sendContent}"
                 : $"Error code: {sendError.Error.Code}, message: {sendError.Error.Message}, request ID: {sendError.Error.InnerError.RequestId}, date: {sendError.Error.InnerError.Date}";
@@ -696,7 +692,7 @@ namespace Mailozaurr;
             ClientSecret = ApplicationKey,
             DirectoryId = TenantDomain
         };
-        var bodyObj = JsonSerializer.Deserialize<object>(MessageJson);
+        var bodyObj = JsonSerializer.Deserialize(MessageJson, MailozaurrJsonContext.Default.JsonElement);
         var request = new GraphBatchRequest {
             Id = "1",
             Method = GraphHttpMethod.POST,
@@ -760,7 +756,7 @@ namespace Mailozaurr;
             var draftContent = await draftResponse.Content.ReadAsStringAsync();
 
             if (!draftResponse.IsSuccessStatusCode) {
-                var error = JsonSerializer.Deserialize<GraphApiError>(draftContent);
+                var error = JsonSerializer.Deserialize(draftContent, MailozaurrJsonContext.Default.GraphApiError);
                 var errorMessage = (error == null || error.Error == null)
                     ? $"Unknown error: {draftContent}"
                     : $"Error code: {error.Error.Code}, message: {error.Error.Message}";
@@ -769,7 +765,7 @@ namespace Mailozaurr;
             }
 
             // Deserialize the draft message
-            var draftMessage = JsonSerializer.Deserialize<GraphMessage>(draftContent);
+            var draftMessage = JsonSerializer.Deserialize(draftContent, MailozaurrJsonContext.Default.GraphMessage);
 
             if (draftMessage == null) {
                 throw new InvalidOperationException("Failed to create draft message.");
@@ -797,12 +793,8 @@ namespace Mailozaurr;
     public string CreateDraft() {
         CreateMessage();
 
-        var options = new JsonSerializerOptions() {
-            WriteIndented = true
-        };
-
         // Serialize only the GraphMessage to a JSON string, excluding the SaveToSentItems property
-        var messageJson = JsonSerializer.Serialize(MessageContainer.Message, options);
+        var messageJson = JsonSerializer.Serialize(MessageContainer.Message, MailozaurrJsonContext.Default.GraphMessage);
         return messageJson;
     }
 
@@ -824,7 +816,7 @@ namespace Mailozaurr;
         var attachmentItem = new GraphAttachmentItem("file", fileName, fileSize);
 
         var attachmentItemWrapper = new GraphAttachmentItemWrapper(attachmentItem);
-        var attachmentItemJson = JsonSerializer.Serialize(attachmentItemWrapper);
+        var attachmentItemJson = JsonSerializer.Serialize(attachmentItemWrapper, MailozaurrJsonContext.Default.GraphAttachmentItemWrapper);
 
         List<StreamContent> content = PrepareByteArrayContentForUpload(attachmentPath, ChunkSize, cancellationToken);
 
@@ -874,7 +866,7 @@ namespace Mailozaurr;
     }
 
     private static string ParseUploadSessionResult(string uploadSessionContent) {
-        var uploadSessionResult = JsonSerializer.Deserialize<GraphUploadSessionResult>(uploadSessionContent)
+        var uploadSessionResult = JsonSerializer.Deserialize(uploadSessionContent, MailozaurrJsonContext.Default.GraphUploadSessionResult)
             ?? throw new InvalidOperationException("Failed to deserialize the upload session response.");
 
         if (string.IsNullOrEmpty(uploadSessionResult.UploadUrl)) {

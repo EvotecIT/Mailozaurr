@@ -85,7 +85,7 @@ public class GraphMailboxPermission {
     /// <param name="credential">Graph credential.</param>
     public async Task AddAsync(GraphCredential credential) {
         if (UserPrincipalName is null) throw new InvalidOperationException("UserPrincipalName not set.");
-        var body = JsonSerializer.Serialize(ToDictionary());
+        var body = JsonSerializer.Serialize(ToDictionary(), MailozaurrJsonContext.Default.DictionaryStringObject);
         await MicrosoftGraphUtils.AddMailboxPermissionAsync(credential, UserPrincipalName, body).ConfigureAwait(false);
     }
 

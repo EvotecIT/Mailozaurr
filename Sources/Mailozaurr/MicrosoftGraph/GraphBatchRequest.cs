@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json;
 namespace Mailozaurr;
 
 /// <summary>
@@ -14,5 +15,5 @@ public class GraphBatchRequest {
     /// <summary>Optional headers to include with the request.</summary>
     public IDictionary<string, string>? Headers { get; set; }
     /// <summary>Optional JSON body for POST/PUT/PATCH requests.</summary>
-    public object? Body { get; set; }
+    public JsonElement? Body { get; set; }
 }

@@ -362,8 +362,16 @@ namespace Mailozaurr {
         public static async Task<IReadOnlyList<GraphBatchResult>> SendBatchAsync(GraphCredential credential, IEnumerable<GraphBatchRequest> requests, CancellationToken cancellationToken = default) {
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com", cancellationToken).ConfigureAwait(false);
             var headers = new Dictionary<string, string> { { "Authorization", token } };
-            var batchPayload = new { requests = requests.Select(r => new { id = r.Id, method = r.Method.ToString(), url = r.Url.TrimStart('/') , headers = r.Headers, body = r.Body }) };
-            var jsonBody = JsonSerializer.Serialize(batchPayload);
+            var batchPayload = new GraphBatchPayload {
+                Requests = requests.Select(r => new GraphBatchRequestPayload {
+                    Id = r.Id,
+                    Method = r.Method.ToString(),
+                    Url = r.Url.TrimStart('/'),
+                    Headers = r.Headers,
+                    Body = r.Body
+                }).ToList()
+            };
+            var jsonBody = JsonSerializer.Serialize(batchPayload, MailozaurrJsonContext.Default.GraphBatchPayload);
             var batchUri = BuildGraphUri(GraphEndpoint.V1, "/$batch");
             var doc = await InvokeGraphApiAsync("POST", batchUri, headers, jsonBody, cancellationToken).ConfigureAwait(false);
             var results = new List<GraphBatchResult>();
@@ -553,7 +561,7 @@ namespace Mailozaurr {
             if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
                 foreach (var item in valueElement.EnumerateArray()) {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var att = JsonSerializer.Deserialize<Attachment>(item.GetRawText());
+                    var att = JsonSerializer.Deserialize(item.GetRawText(), MailozaurrJsonContext.Default.Attachment);
                     if (att != null) {
                         attachments.Add(att);
                     }
@@ -642,18 +650,18 @@ namespace Mailozaurr {
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
 
-            var requests = new List<object>();
+            var searchPayload = new GraphSearchPayload();
             foreach (var upn in userPrincipalNames) {
-                requests.Add(new {
-                    entityTypes = new[] { "message" },
-                    from,
-                    size,
-                    query = new { queryString },
-                    userScopes = new[] { upn }
+                searchPayload.Requests.Add(new GraphSearchRequest {
+                    EntityTypes = new[] { "message" },
+                    From = from,
+                    Size = size,
+                    Query = new GraphSearchQuery { QueryString = queryString },
+                    UserScopes = new[] { upn }
                 });
             }
 
-            var body = JsonSerializer.Serialize(new { requests });
+            var body = JsonSerializer.Serialize(searchPayload, MailozaurrJsonContext.Default.GraphSearchPayload);
             var searchUri = BuildGraphUri(GraphEndpoint.V1, "/search/query");
             var doc = await InvokeGraphApiAsync("POST", searchUri, headers, body).ConfigureAwait(false);
 
@@ -701,13 +709,13 @@ namespace Mailozaurr {
                     if (string.IsNullOrWhiteSpace(destinationFolderId)) throw new ArgumentNullException(nameof(destinationFolderId));
                     method = "POST";
                     uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages/{messageId}/move");
-                    body = JsonSerializer.Serialize(new { destinationId = destinationFolderId });
+                    body = JsonSerializer.Serialize(new GraphDestinationRequest { DestinationId = destinationFolderId }, MailozaurrJsonContext.Default.GraphDestinationRequest);
                     break;
                 case GraphMessageAction.Copy:
                     if (string.IsNullOrWhiteSpace(destinationFolderId)) throw new ArgumentNullException(nameof(destinationFolderId));
                     method = "POST";
                     uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages/{messageId}/copy");
-                    body = JsonSerializer.Serialize(new { destinationId = destinationFolderId });
+                    body = JsonSerializer.Serialize(new GraphDestinationRequest { DestinationId = destinationFolderId }, MailozaurrJsonContext.Default.GraphDestinationRequest);
                     break;
                 case GraphMessageAction.Delete:
                     method = "DELETE";
@@ -742,7 +750,7 @@ namespace Mailozaurr {
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages/{messageId}");
-            var body = JsonSerializer.Serialize(new { isRead });
+            var body = JsonSerializer.Serialize(new GraphMarkReadRequest { IsRead = isRead }, MailozaurrJsonContext.Default.GraphMarkReadRequest);
             await InvokeGraphApiAsync("PATCH", uri, headers, body).ConfigureAwait(false);
         }
 
@@ -955,7 +963,7 @@ namespace Mailozaurr {
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/mailFolders/{folderId}/move");
-            var body = JsonSerializer.Serialize(new { destinationId = destinationFolderId });
+            var body = JsonSerializer.Serialize(new GraphDestinationRequest { DestinationId = destinationFolderId }, MailozaurrJsonContext.Default.GraphDestinationRequest);
             await InvokeGraphApiAsync("POST", uri, headers, body).ConfigureAwait(false);
         }
 
@@ -976,7 +984,7 @@ namespace Mailozaurr {
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/mailFolders/{folderId}");
-            var body = JsonSerializer.Serialize(new { displayName = newDisplayName });
+            var body = JsonSerializer.Serialize(new GraphFolderRenameRequest { DisplayName = newDisplayName }, MailozaurrJsonContext.Default.GraphFolderRenameRequest);
             await InvokeGraphApiAsync("PATCH", uri, headers, body).ConfigureAwait(false);
         }
 
@@ -1150,7 +1158,7 @@ namespace Mailozaurr {
             var rules = new List<GraphInboxRule>();
             if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
                 foreach (var item in valueElement.EnumerateArray()) {
-                    var rule = JsonSerializer.Deserialize<GraphInboxRule>(item.GetRawText());
+                    var rule = JsonSerializer.Deserialize(item.GetRawText(), MailozaurrJsonContext.Default.GraphInboxRule);
                     if (rule != null) rules.Add(rule);
                 }
             }
@@ -1171,10 +1179,10 @@ namespace Mailozaurr {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
-            var body = JsonSerializer.Serialize(rule, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+            var body = JsonSerializer.Serialize(rule, MailozaurrJsonContext.Default.GraphInboxRule);
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/mailFolders/inbox/messageRules");
             var doc = await InvokeGraphApiAsync("POST", uri, headers, body).ConfigureAwait(false);
-            var created = JsonSerializer.Deserialize<GraphInboxRule>(doc.RootElement.GetRawText());
+            var created = JsonSerializer.Deserialize(doc.RootElement.GetRawText(), MailozaurrJsonContext.Default.GraphInboxRule);
             if (created is null) {
                 throw new InvalidDataException("Microsoft Graph returned an invalid inbox rule response.");
             }
@@ -1192,10 +1200,10 @@ namespace Mailozaurr {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
-            var body = JsonSerializer.Serialize(rule, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+            var body = JsonSerializer.Serialize(rule, MailozaurrJsonContext.Default.GraphInboxRule);
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/mailFolders/inbox/messageRules/{ruleId}");
             var doc = await InvokeGraphApiAsync("PATCH", uri, headers, body).ConfigureAwait(false);
-            var updated = JsonSerializer.Deserialize<GraphInboxRule>(doc.RootElement.GetRawText());
+            var updated = JsonSerializer.Deserialize(doc.RootElement.GetRawText(), MailozaurrJsonContext.Default.GraphInboxRule);
             if (updated is null) {
                 throw new InvalidDataException("Microsoft Graph returned an invalid inbox rule response.");
             }
@@ -1258,10 +1266,10 @@ namespace Mailozaurr {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
-            var body = JsonSerializer.Serialize(ev, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+            var body = JsonSerializer.Serialize(ev, MailozaurrJsonContext.Default.GraphEvent);
             var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/events");
             var doc = await InvokeGraphApiAsync("POST", uri, headers, body).ConfigureAwait(false);
-            var created = JsonSerializer.Deserialize<GraphEvent>(doc.RootElement.GetRawText());
+            var created = JsonSerializer.Deserialize(doc.RootElement.GetRawText(), MailozaurrJsonContext.Default.GraphEvent);
             if (created is null) {
                 throw new InvalidDataException("Microsoft Graph returned an invalid event response.");
             }
@@ -1279,10 +1287,10 @@ namespace Mailozaurr {
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
-            var body = JsonSerializer.Serialize(ev, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+            var body = JsonSerializer.Serialize(ev, MailozaurrJsonContext.Default.GraphEvent);
             var uri = JoinUriQuery("https://graph.microsoft.com/v1.0", $"/users/{userPrincipalName}/events/{eventId}");
             var doc = await InvokeGraphApiAsync("PATCH", uri, headers, body).ConfigureAwait(false);
-            var updated = JsonSerializer.Deserialize<GraphEvent>(doc.RootElement.GetRawText());
+            var updated = JsonSerializer.Deserialize(doc.RootElement.GetRawText(), MailozaurrJsonContext.Default.GraphEvent);
             if (updated is null) {
                 throw new InvalidDataException("Microsoft Graph returned an invalid event response.");
             }

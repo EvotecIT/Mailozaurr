@@ -115,7 +115,9 @@ public class CmdletRenameGraphFolder : AsyncPSCmdlet {
         var uri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
             $"/users/{UserPrincipalName}/mailFolders/{FolderId}");
-        var body = JsonSerializer.Serialize(new { displayName = NewName });
+        var body = JsonSerializer.Serialize(
+            new GraphFolderRenameRequest { DisplayName = NewName },
+            MailozaurrJsonContext.Default.GraphFolderRenameRequest);
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "PATCH")
