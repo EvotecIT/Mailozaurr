@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace Mailozaurr;
 
+/// <summary>Source-generated metadata used by Mailozaurr for AOT-safe JSON serialization.</summary>
 [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(SmtpResult))]
 [JsonSerializable(typeof(PendingMessageRecord))]
@@ -67,5 +68,4 @@ namespace Mailozaurr;
 [JsonSerializable(typeof(PendingMessageRepositoryOptions))]
 [JsonSerializable(typeof(Dictionary<string, string[]>))]
 [JsonSerializable(typeof(Dictionary<string, IList<string>>))]
-/// <summary>Source-generated metadata used by Mailozaurr for AOT-safe JSON serialization.</summary>
 public partial class MailozaurrJsonContext : JsonSerializerContext;

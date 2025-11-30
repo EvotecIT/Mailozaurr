@@ -496,11 +496,13 @@ public sealed class GmailApiClient : IDisposable {
         }
     }
 
+    /// <summary>Attachment metadata returned by Gmail API.</summary>
     public sealed class AttachmentResponse {
         /// <summary>Base64 encoded attachment data.</summary>
         public string? Data { get; set; }
     }
 
+    /// <summary>Response envelope for Gmail list messages API.</summary>
     public sealed class GmailListResponse {
         /// <summary>Messages returned by the API.</summary>
         public List<GmailMessage>? Messages { get; set; }
@@ -508,6 +510,7 @@ public sealed class GmailApiClient : IDisposable {
         public string? NextPageToken { get; set; }
     }
 
+    /// <summary>Response envelope for Gmail thread listing.</summary>
     public sealed class GmailThreadListResponse {
         /// <summary>Threads returned by the API.</summary>
         public List<GmailThreadInfo>? Threads { get; set; }

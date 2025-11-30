@@ -9,95 +9,96 @@ public sealed class GmailRawRequest {
     /// <summary>Initializes the request with base64-url encoded MIME content.</summary>
     public GmailRawRequest(string raw) => Raw = raw;
 
-    [JsonPropertyName("raw")]
     /// <summary>Base64-url encoded MIME message.</summary>
+    [JsonPropertyName("raw")]
     public string Raw { get; }
 }
 
 /// <summary>Batch envelope for Microsoft Graph batch API.</summary>
 public sealed class GraphBatchPayload {
-    [JsonPropertyName("requests")]
     /// <summary>Individual batch requests.</summary>
+    [JsonPropertyName("requests")]
     public List<GraphBatchRequestPayload> Requests { get; set; } = new();
 }
 
 /// <summary>Single request entry inside a Graph batch.</summary>
 public sealed class GraphBatchRequestPayload {
-    [JsonPropertyName("id")]
     /// <summary>Client-supplied identifier for correlating responses.</summary>
+    [JsonPropertyName("id")]
     public string Id { get; set; } = string.Empty;
 
-    [JsonPropertyName("method")]
     /// <summary>HTTP method name.</summary>
+    [JsonPropertyName("method")]
     public string Method { get; set; } = string.Empty;
 
-    [JsonPropertyName("url")]
     /// <summary>Relative URL within Graph.</summary>
+    [JsonPropertyName("url")]
     public string Url { get; set; } = string.Empty;
 
-    [JsonPropertyName("headers")]
     /// <summary>Optional per-request headers.</summary>
+    [JsonPropertyName("headers")]
     public IDictionary<string, string>? Headers { get; set; }
-    [JsonPropertyName("body")]
+
     /// <summary>Optional JSON payload.</summary>
+    [JsonPropertyName("body")]
     public JsonElement? Body { get; set; }
 }
 
 /// <summary>Batch search request payload for Graph search API.</summary>
 public sealed class GraphSearchPayload {
-    [JsonPropertyName("requests")]
     /// <summary>Search requests to execute.</summary>
+    [JsonPropertyName("requests")]
     public List<GraphSearchRequest> Requests { get; set; } = new();
 }
 
 /// <summary>Represents a single Graph search request.</summary>
 public sealed class GraphSearchRequest {
-    [JsonPropertyName("entityTypes")]
     /// <summary>Entity types to search (e.g., message).</summary>
+    [JsonPropertyName("entityTypes")]
     public string[] EntityTypes { get; set; } = Array.Empty<string>();
 
-    [JsonPropertyName("from")]
     /// <summary>Zero-based result offset.</summary>
+    [JsonPropertyName("from")]
     public int From { get; set; }
 
-    [JsonPropertyName("size")]
     /// <summary>Maximum number of hits to return.</summary>
+    [JsonPropertyName("size")]
     public int Size { get; set; }
 
-    [JsonPropertyName("query")]
     /// <summary>Query text definition.</summary>
+    [JsonPropertyName("query")]
     public GraphSearchQuery Query { get; set; } = new();
 
-    [JsonPropertyName("userScopes")]
     /// <summary>User principals to scope the search to.</summary>
+    [JsonPropertyName("userScopes")]
     public string[] UserScopes { get; set; } = Array.Empty<string>();
 }
 
 /// <summary>Holds the query text for Graph search.</summary>
 public sealed class GraphSearchQuery {
-    [JsonPropertyName("queryString")]
     /// <summary>Raw KQL-like query string.</summary>
+    [JsonPropertyName("queryString")]
     public string QueryString { get; set; } = string.Empty;
 }
 
 /// <summary>Payload for move/copy operations in Graph.</summary>
 public sealed class GraphDestinationRequest {
-    [JsonPropertyName("destinationId")]
     /// <summary>Target folder id.</summary>
+    [JsonPropertyName("destinationId")]
     public string? DestinationId { get; set; }
 }
 
 /// <summary>Payload to mark messages read/unread.</summary>
 public sealed class GraphMarkReadRequest {
-    [JsonPropertyName("isRead")]
     /// <summary>True to mark read; false to mark unread.</summary>
+    [JsonPropertyName("isRead")]
     public bool IsRead { get; set; }
 }
 
 /// <summary>Payload to rename a Graph mail folder.</summary>
 public sealed class GraphFolderRenameRequest {
-    [JsonPropertyName("displayName")]
     /// <summary>New display name.</summary>
+    [JsonPropertyName("displayName")]
     public string? DisplayName { get; set; }
 }
 
@@ -105,8 +106,10 @@ public sealed class GraphFolderRenameRequest {
 public sealed class PendingMessageLogEnvelope {
     /// <summary>Entry type (upsert or tombstone).</summary>
     public string EntryType { get; set; } = string.Empty;
+
     /// <summary>Message id affected by this entry.</summary>
     public string? MessageId { get; set; }
+
     /// <summary>Full pending message record, when applicable.</summary>
     public PendingMessageRecord? Record { get; set; }
 }
