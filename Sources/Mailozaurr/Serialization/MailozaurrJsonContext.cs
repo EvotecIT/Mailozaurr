@@ -20,6 +20,7 @@ namespace Mailozaurr;
 [JsonSerializable(typeof(Dictionary<string, object>))]
 [JsonSerializable(typeof(Dictionary<string, JsonElement>))]
 [JsonSerializable(typeof(Dictionary<string, object?>), TypeInfoPropertyName = "DictionaryStringObjectNullable")]
+[JsonSerializable(typeof(Dictionary<string, object>), TypeInfoPropertyName = "DictionaryStringObject")]
 [JsonSerializable(typeof(Dictionary<string, JsonElement?>))]
 [JsonSerializable(typeof(object), TypeInfoPropertyName = "Object")]
 [JsonSerializable(typeof(JsonElement))]

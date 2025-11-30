@@ -112,7 +112,7 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
         ps.AddCommand("Import-Csv").AddParameter("Path", CsvPath);
         var rows = ps.Invoke();
         foreach (var row in rows.OfType<PSObject>()) {
-            var dict = row.Properties.ToDictionary(p => p.Name, p => p.Value);
+            var dict = row.Properties.ToDictionary(p => p.Name, p => (object?)p.Value!);
             await ProcessGraphAsync(cred, new Hashtable(dict));
         }
     }
@@ -123,7 +123,7 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
         int attempts = 0;
         Exception? lastException = null;
         string body = permission switch {
-            Hashtable ht => JsonSerializer.Serialize(ht.Cast<DictionaryEntry>().ToDictionary(e => (string)e.Key, e => e.Value), MailozaurrJsonContext.Default.DictionaryStringObject),
+            Hashtable ht => JsonSerializer.Serialize(ht.Cast<DictionaryEntry>().ToDictionary(e => (string)e.Key, e => (object?)e.Value!), MailozaurrJsonContext.Default.DictionaryStringObject),
             GraphMailboxPermission p => JsonSerializer.Serialize(p.ToDictionary(), MailozaurrJsonContext.Default.DictionaryStringObject),
             _ => JsonSerializer.Serialize(permission, MailozaurrJsonContext.Default.Object)
         };
@@ -157,7 +157,7 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
             psCsv.AddCommand("Import-Csv").AddParameter("Path", CsvPath);
             var rows = psCsv.Invoke();
             foreach (var row in rows.OfType<PSObject>()) {
-                var dict = row.Properties.ToDictionary(p => p.Name, p => p.Value);
+                var dict = row.Properties.ToDictionary(p => p.Name, p => (object?)p.Value!);
                 body = JsonSerializer.Serialize(dict, MailozaurrJsonContext.Default.DictionaryStringObject);
                 InvokeMgGraph(body);
             }
@@ -168,7 +168,7 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
             }
         } else if (Permission != null) {
             foreach (var ht in Permission) {
-                var conv = ht.Cast<DictionaryEntry>().ToDictionary(e => (string)e.Key, e => e.Value);
+                var conv = ht.Cast<DictionaryEntry>().ToDictionary(e => (string)e.Key, e => (object?)e.Value!);
                 body = JsonSerializer.Serialize(conv, MailozaurrJsonContext.Default.DictionaryStringObject);
                 InvokeMgGraph(body);
             }

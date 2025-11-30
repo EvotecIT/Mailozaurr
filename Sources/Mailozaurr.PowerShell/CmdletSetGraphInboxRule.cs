@@ -104,7 +104,11 @@ public sealed class CmdletSetGraphInboxRule : AsyncPSCmdlet
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         int attempts = 0;
         Exception? lastException = null;
-        GraphInboxRule obj = RuleObject ?? JsonSerializer.Deserialize(JsonSerializer.Serialize(Rule, MailozaurrJsonContext.Default.Object), MailozaurrJsonContext.Default.GraphInboxRule)!;
+        var rulePayload = Rule ?? throw new PSArgumentNullException(nameof(Rule), "Rule has to be provided or built.");
+        var obj = RuleObject ?? JsonSerializer.Deserialize(JsonSerializer.Serialize(rulePayload, MailozaurrJsonContext.Default.Object), MailozaurrJsonContext.Default.GraphInboxRule);
+        if (obj is null) {
+            throw new PSArgumentException("Graph inbox rule definition cannot be null.");
+        }
         do
         {
             try
@@ -150,6 +154,9 @@ public sealed class CmdletSetGraphInboxRule : AsyncPSCmdlet
             $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules/{RuleId}");
         var rulePayload = Rule ?? throw new PSArgumentNullException(nameof(Rule), "Rule has to be provided or built.");
         var bodyObj = RuleObject ?? JsonSerializer.Deserialize(JsonSerializer.Serialize(rulePayload, MailozaurrJsonContext.Default.Object), MailozaurrJsonContext.Default.GraphInboxRule);
+        if (bodyObj is null) {
+            throw new PSArgumentException("Graph inbox rule definition cannot be null.");
+        }
         if (bodyObj is null) {
             throw new PSArgumentException("Graph inbox rule definition cannot be null.");
         }
