@@ -139,7 +139,7 @@ public class CmdletMoveGraphMessage : AsyncPSCmdlet {
         var uri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
             $"/users/{UserPrincipalName}/messages/{MessageId}/move");
-        var body = System.Text.Json.JsonSerializer.Serialize(new { destinationId = DestinationFolderId });
+        var body = JsonSerializer.Serialize(new GraphDestinationRequest { DestinationId = DestinationFolderId }, MailozaurrJsonContext.Default.GraphDestinationRequest);
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "POST")
