@@ -16,7 +16,6 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
     private readonly Dictionary<string, long> index = new(StringComparer.OrdinalIgnoreCase);
     private readonly byte[] newlineBytes = Encoding.UTF8.GetBytes(Environment.NewLine);
     private int dirtyEntryCount;
-    private static readonly JsonSerializerOptions SerializerOptions = new() { PropertyNameCaseInsensitive = true };
 
     /// <summary>Creates a new repository using the specified options.</summary>
     /// <param name="options">Configuration for directory and file naming.</param>
@@ -103,14 +102,6 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
         public PendingMessageRecord? Record { get; }
     }
 
-    private sealed class PendingMessageLogEnvelope {
-        public string EntryType { get; set; } = string.Empty;
-
-        public string? MessageId { get; set; }
-
-        public PendingMessageRecord? Record { get; set; }
-    }
-
     private static PendingMessageLogEnvelope CreateUpsertEnvelope(PendingMessageRecord record) => new() {
         EntryType = UpsertEntryType,
         MessageId = record.MessageId,
@@ -122,7 +113,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
         MessageId = messageId
     };
 
-    private static byte[] SerializeEnvelope(PendingMessageLogEnvelope envelope) => JsonSerializer.SerializeToUtf8Bytes(envelope, SerializerOptions);
+    private static byte[] SerializeEnvelope(PendingMessageLogEnvelope envelope) => JsonSerializer.SerializeToUtf8Bytes(envelope, MailozaurrJsonContext.Default.PendingMessageLogEnvelope);
 
     private async Task<long> AppendEnvelopeAsync(PendingMessageLogEnvelope envelope, CancellationToken cancellationToken) {
         var payload = SerializeEnvelope(envelope);
@@ -253,7 +244,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
                 if (string.Equals(entryType, UpsertEntryType, StringComparison.OrdinalIgnoreCase)) {
                     PendingMessageRecord? record = null;
                     if (TryGetPropertyCaseInsensitive(root, "record", out var recordElement) && recordElement.ValueKind == JsonValueKind.Object) {
-                        record = recordElement.Deserialize<PendingMessageRecord>(SerializerOptions);
+                        record = recordElement.Deserialize(MailozaurrJsonContext.Default.PendingMessageRecord);
                         if (record != null) {
                             _ = record.ProviderData;
                         }
@@ -279,7 +270,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
                 return false;
             }
 
-            var legacyRecord = JsonSerializer.Deserialize<PendingMessageRecord>(json, SerializerOptions);
+            var legacyRecord = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.PendingMessageRecord);
             if (legacyRecord != null && !string.IsNullOrWhiteSpace(legacyRecord.MessageId)) {
                 _ = legacyRecord.ProviderData;
                 entry = new LogEntry(LogEntryKind.Upsert, legacyRecord.MessageId, legacyRecord);

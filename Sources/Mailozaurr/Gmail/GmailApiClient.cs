@@ -17,7 +17,6 @@ namespace Mailozaurr;
 /// Lightweight client for sending and retrieving messages using Gmail REST API.
 /// </summary>
 public sealed class GmailApiClient : IDisposable {
-    private static readonly JsonSerializerOptions s_jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _client;
     private readonly Func<CancellationToken, Task<string>>? _refreshToken;
     private readonly OAuthCredential? _credential;
@@ -188,7 +187,7 @@ public sealed class GmailApiClient : IDisposable {
             .Replace('+', '-')
             .Replace('/', '_')
             .Replace("=", string.Empty);
-        var json = JsonSerializer.Serialize(new { raw }, s_jsonOptions);
+        var json = JsonSerializer.Serialize(new GmailRawRequest(raw), MailozaurrJsonContext.Default.GmailRawRequest);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
         using var response = await _client.PostAsync($"users/{userId}/messages/send", content, cancellationToken).ConfigureAwait(false);
         var queued = false;
@@ -230,7 +229,7 @@ public sealed class GmailApiClient : IDisposable {
 #endif
         GmailMessage? result;
         try {
-            result = JsonSerializer.Deserialize<GmailMessage>(resultJson, s_jsonOptions);
+            result = JsonSerializer.Deserialize(resultJson, MailozaurrJsonContext.Default.GmailMessage);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API send response.", resultJson, ex);
         }
@@ -267,7 +266,7 @@ public sealed class GmailApiClient : IDisposable {
 #endif
             GmailListResponse? list;
             try {
-                list = JsonSerializer.Deserialize<GmailListResponse>(json, s_jsonOptions);
+                list = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailListResponse);
             } catch (JsonException ex) {
                 throw new GmailApiException("Failed to parse Gmail API list response.", json, ex);
             }
@@ -304,7 +303,7 @@ public sealed class GmailApiClient : IDisposable {
 #endif
         GmailMessage? message;
         try {
-            message = JsonSerializer.Deserialize<GmailMessage>(json, s_jsonOptions);
+            message = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailMessage);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API message response.", json, ex);
         }
@@ -329,7 +328,7 @@ public sealed class GmailApiClient : IDisposable {
 #endif
         GmailMessage? msg;
         try {
-            msg = JsonSerializer.Deserialize<GmailMessage>(json, s_jsonOptions);
+            msg = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailMessage);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API message response.", json, ex);
         }
@@ -381,7 +380,7 @@ public sealed class GmailApiClient : IDisposable {
 #endif
             GmailThreadListResponse? list;
             try {
-                list = JsonSerializer.Deserialize<GmailThreadListResponse>(json, s_jsonOptions);
+                list = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailThreadListResponse);
             } catch (JsonException ex) {
                 throw new GmailApiException("Failed to parse Gmail API thread list response.", json, ex);
             }
@@ -409,7 +408,7 @@ public sealed class GmailApiClient : IDisposable {
 #endif
         GmailThread? thread;
         try {
-            thread = JsonSerializer.Deserialize<GmailThread>(json, s_jsonOptions);
+            thread = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailThread);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API thread response.", json, ex);
         }
@@ -455,7 +454,7 @@ public sealed class GmailApiClient : IDisposable {
 #endif
         AttachmentResponse? result;
         try {
-            result = JsonSerializer.Deserialize<AttachmentResponse>(json, s_jsonOptions);
+            result = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.AttachmentResponse);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API attachment response.", json, ex);
         }
@@ -497,19 +496,19 @@ public sealed class GmailApiClient : IDisposable {
         }
     }
 
-    private sealed class AttachmentResponse {
+    public sealed class AttachmentResponse {
         /// <summary>Base64 encoded attachment data.</summary>
         public string? Data { get; set; }
     }
 
-    private sealed class GmailListResponse {
+    public sealed class GmailListResponse {
         /// <summary>Messages returned by the API.</summary>
         public List<GmailMessage>? Messages { get; set; }
         /// <summary>Token for the next page of results.</summary>
         public string? NextPageToken { get; set; }
     }
 
-    private sealed class GmailThreadListResponse {
+    public sealed class GmailThreadListResponse {
         /// <summary>Threads returned by the API.</summary>
         public List<GmailThreadInfo>? Threads { get; set; }
         /// <summary>Token for the next page of results.</summary>

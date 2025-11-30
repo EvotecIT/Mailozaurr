@@ -363,7 +363,9 @@ public class SesClient : IDisposable {
             for (int i = 0; i < Bcc.Count; i++) sb.Append("&Destination.BccAddresses.member.").Append(i + 1).Append("=").Append(Uri.EscapeDataString(Helpers.GetEmailAddress(Bcc[i])));
         }
         if (ReplyTo != null) sb.Append("&ReplyToAddresses.member.1=").Append(Uri.EscapeDataString(Helpers.GetEmailAddress(ReplyTo)));
-        string json = TemplateData != null ? JsonSerializer.Serialize(TemplateData) : "{}";
+        string json = TemplateData != null
+            ? JsonSerializer.Serialize(TemplateData, MailozaurrJsonContext.Default.DictionaryStringString)
+            : "{}";
         sb.Append("&TemplateData=").Append(Uri.EscapeDataString(json));
         MimeMessage message = BuildMessage();
         using MemoryStream stream = new();

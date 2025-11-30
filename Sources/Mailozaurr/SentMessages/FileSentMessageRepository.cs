@@ -27,7 +27,7 @@ public sealed class FileSentMessageRepository : ISentMessageRepository {
                 position += newlineBytes.Length;
                 continue;
             }
-            var record = JsonSerializer.Deserialize<SentMessageRecord>(line);
+            var record = JsonSerializer.Deserialize(line, MailozaurrJsonContext.Default.SentMessageRecord);
             if (record != null && !string.IsNullOrEmpty(record.MessageId)) {
                 index[record.MessageId] = position;
             }
@@ -45,7 +45,7 @@ public sealed class FileSentMessageRepository : ISentMessageRepository {
             }
             using var write = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read);
             var offset = write.Position;
-            await JsonSerializer.SerializeAsync(write, record, cancellationToken: cancellationToken);
+            await JsonSerializer.SerializeAsync(write, record, MailozaurrJsonContext.Default.SentMessageRecord, cancellationToken);
             await write.WriteAsync(newlineBytes, 0, newlineBytes.Length, cancellationToken);
             index[record.MessageId] = offset;
         } finally {
@@ -70,7 +70,7 @@ public sealed class FileSentMessageRepository : ISentMessageRepository {
             if (string.IsNullOrWhiteSpace(line)) {
                 return null;
             }
-            var record = JsonSerializer.Deserialize<SentMessageRecord>(line);
+            var record = JsonSerializer.Deserialize(line, MailozaurrJsonContext.Default.SentMessageRecord);
             if (record != null && string.Equals(record.MessageId, messageId, StringComparison.OrdinalIgnoreCase)) {
                 return record;
             }

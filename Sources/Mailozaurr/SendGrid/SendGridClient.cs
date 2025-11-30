@@ -322,11 +322,7 @@ public sealed class SendGridClient : IDisposable {
             Headers = Headers
         };
 
-        var options = new JsonSerializerOptions() {
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            WriteIndented = true
-        };
-        MessageJson = JsonSerializer.Serialize(message, options);
+        MessageJson = JsonSerializer.Serialize(message, MailozaurrJsonContext.Default.SendGridMessage);
         //Console.WriteLine(MessageJson);
     }
 

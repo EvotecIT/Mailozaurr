@@ -33,7 +33,7 @@ internal static class OAuthTokenCache {
 #else
             var json = await File.ReadAllTextAsync(CacheFilePath, cancellationToken).ConfigureAwait(false);
 #endif
-            cache = JsonSerializer.Deserialize<Dictionary<string, OAuthCredential>>(json) ?? new();
+            cache = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.DictionaryStringOAuthCredential) ?? new();
         } else {
             cache = new Dictionary<string, OAuthCredential>();
         }
@@ -76,7 +76,7 @@ internal static class OAuthTokenCache {
             if (!Directory.Exists(dir)) {
                 Directory.CreateDirectory(dir!);
             }
-            json = JsonSerializer.Serialize(cache);
+            json = JsonSerializer.Serialize(cache, MailozaurrJsonContext.Default.DictionaryStringOAuthCredential);
         }
         cancellationToken.ThrowIfCancellationRequested();
 #if NETFRAMEWORK || NETSTANDARD2_0

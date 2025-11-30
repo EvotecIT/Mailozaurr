@@ -404,7 +404,7 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
         var headerJson = JsonSerializer.Serialize(new Dictionary<string, object> {
             { "alg", "RS256" },
             { "typ", "JWT" }
-        });
+        }, MailozaurrJsonContext.Default.DictionaryStringObject);
 
         var payload = new Dictionary<string, object> {
             { "iss", clientEmail },
@@ -418,7 +418,7 @@ public sealed class GmailPendingMessageSender : IPendingMessageSender {
             payload["sub"] = subject!;
         }
 
-        var payloadJson = JsonSerializer.Serialize(payload);
+        var payloadJson = JsonSerializer.Serialize(payload, MailozaurrJsonContext.Default.DictionaryStringObject);
         var header = Base64UrlEncode(Encoding.UTF8.GetBytes(headerJson));
         var body = Base64UrlEncode(Encoding.UTF8.GetBytes(payloadJson));
         var unsignedToken = string.Concat(header, '.', body);
