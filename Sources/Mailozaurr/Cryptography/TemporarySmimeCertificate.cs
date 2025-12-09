@@ -100,7 +100,7 @@ public static class TemporarySmimeCertificate {
         certGen.SetPublicKey(keyPair.Public);
         certGen.AddExtension(X509Extensions.BasicConstraints, true, new BasicConstraints(false));
         certGen.AddExtension(X509Extensions.KeyUsage, true, new KeyUsage(KeyUsage.DigitalSignature | KeyUsage.KeyEncipherment));
-        certGen.AddExtension(X509Extensions.SubjectKeyIdentifier, false, new SubjectKeyIdentifierStructure(keyPair.Public));
+        certGen.AddExtension(X509Extensions.SubjectKeyIdentifier, false, X509ExtensionUtilities.CreateSubjectKeyIdentifier(keyPair.Public));
 
         var signatureFactory = new Asn1SignatureFactory("SHA256WithRSA", keyPair.Private);
         Org.BouncyCastle.X509.X509Certificate bouncyCert = certGen.Generate(signatureFactory);
