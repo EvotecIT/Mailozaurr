@@ -9,10 +9,11 @@
         <Nullable>enable</Nullable>
         <Copyright>(c) 2011 - 2024 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
         <LangVersion>latest</LangVersion>
+        <PackageIcon>Mailozaurr.png</PackageIcon>
+        <PackageReadmeFile>README.MD</PackageReadmeFile>
         <RepositoryUrl>https://github.com/EvotecIT/Mailozaurr</RepositoryUrl>
         <PackageTags>
             Windows;MacOS;Linux;Mail;Email;MX;SPF;DMARC;DKIM;GraphApi;SendGrid;Graph;IMAP;POP3</PackageTags>
-        <PackageIconUrl>https://evotec.xyz/wp-content/uploads/2020/07/MailoZaurr.png</PackageIconUrl>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     </PropertyGroup>
 
@@ -55,6 +56,11 @@
         <!-- This is needed for XmlDoc2CmdletDoc to generate a PowerShell documentation file. -->
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\..\Mailozaurr.png" Pack="true" PackagePath="\" />
+        <None Include="..\..\README.MD" Pack="true" PackagePath="\" />
+    </ItemGroup>
 
     <ItemGroup>
         <!-- This is needed for XmlDoc2CmdletDoc to generate a PowerShell documentation file. -->

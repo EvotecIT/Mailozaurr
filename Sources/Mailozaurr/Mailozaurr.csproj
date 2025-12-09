@@ -8,6 +8,8 @@
         <AssemblyName>Mailozaurr</AssemblyName>
         <Copyright>(c) 2011 - 2024 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
         <LangVersion>latest</LangVersion>
+        <PackageIcon>Mailozaurr.png</PackageIcon>
+        <PackageReadmeFile>README.MD</PackageReadmeFile>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -16,7 +18,6 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <RepositoryUrl>https://github.com/EvotecIT/Mailozaurr</RepositoryUrl>
         <PackageTags>Windows;MacOS;Linux;Mail;Email;MX;SPF;DMARC;DKIM;GraphApi;SendGrid;Graph;IMAP;POP3</PackageTags>
-        <PackageIconUrl>https://evotec.xyz/wp-content/uploads/2020/07/MailoZaurr.png</PackageIconUrl>
   </PropertyGroup>
 
   <!-- Include referenced assemblies alongside output -->
@@ -50,6 +51,11 @@
 
     <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
         <Reference Include="System.IO.Compression" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\..\Mailozaurr.png" Pack="true" PackagePath="\" />
+        <None Include="..\..\README.MD" Pack="true" PackagePath="\" />
     </ItemGroup>
 
 
