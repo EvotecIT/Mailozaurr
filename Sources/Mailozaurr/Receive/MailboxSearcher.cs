@@ -4,6 +4,7 @@ using MailKit.Net.Pop3;
 using MailKit.Search;
 using MimeKit;
 using System.Text;
+using System.Globalization;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -54,12 +55,14 @@ public static class MailboxSearcher {
         string? queryString = null) {
         var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadOnly);
         SearchQuery search = SearchQuery.All;
+        var sinceUtc = NormalizeToUtc(since);
+        var beforeUtc = NormalizeToUtc(before);
         if (!string.IsNullOrWhiteSpace(subject)) search = search.And(SearchQuery.SubjectContains(subject));
         if (!string.IsNullOrWhiteSpace(fromContains)) search = search.And(SearchQuery.FromContains(fromContains));
         if (!string.IsNullOrWhiteSpace(toContains)) search = search.And(SearchQuery.ToContains(toContains));
         if (!string.IsNullOrWhiteSpace(bodyContains)) search = search.And(SearchQuery.BodyContains(bodyContains));
-        if (since.HasValue) search = search.And(SearchQuery.DeliveredAfter(since.Value.ToUniversalTime()));
-        if (before.HasValue) search = search.And(SearchQuery.DeliveredBefore(before.Value.ToUniversalTime()));
+        if (sinceUtc.HasValue) search = search.And(SearchQuery.DeliveredAfter(sinceUtc.Value));
+        if (beforeUtc.HasValue) search = search.And(SearchQuery.DeliveredBefore(beforeUtc.Value));
         if (additionalQueries != null) {
             foreach (var q in additionalQueries) {
                 if (q != null) search = search.And(q);
@@ -72,8 +75,10 @@ public static class MailboxSearcher {
                   if (!string.IsNullOrWhiteSpace(parsed.FromContains)) search = search.And(SearchQuery.FromContains(parsed.FromContains));
                   if (!string.IsNullOrWhiteSpace(parsed.ToContains)) search = search.And(SearchQuery.ToContains(parsed.ToContains));
                   if (!string.IsNullOrWhiteSpace(parsed.BodyContains)) search = search.And(SearchQuery.BodyContains(parsed.BodyContains));
-                  if (parsed.Since.HasValue) search = search.And(SearchQuery.DeliveredAfter(parsed.Since.Value.ToUniversalTime()));
-                  if (parsed.Before.HasValue) search = search.And(SearchQuery.DeliveredBefore(parsed.Before.Value.ToUniversalTime()));
+                  var parsedSince = NormalizeToUtc(parsed.Since);
+                  var parsedBefore = NormalizeToUtc(parsed.Before);
+                  if (parsedSince.HasValue) search = search.And(SearchQuery.DeliveredAfter(parsedSince.Value));
+                  if (parsedBefore.HasValue) search = search.And(SearchQuery.DeliveredBefore(parsedBefore.Value));
                   foreach (var q in parsed.AdditionalQueries) search = search.And(q);
                   hasAttachment |= parsed.HasAttachment;
                   if (!priority.HasValue) priority = parsed.Priority;
@@ -121,7 +126,7 @@ public static class MailboxSearcher {
         int maxResults = 0,
         CancellationToken cancellationToken = default,
         string? queryString = null) {
-          if (!string.IsNullOrWhiteSpace(queryString)) {
+        if (!string.IsNullOrWhiteSpace(queryString)) {
               try {
                   var parsed = ParseQuery(queryString);
                   if (string.IsNullOrWhiteSpace(subject)) subject = parsed.Subject;
@@ -137,8 +142,8 @@ public static class MailboxSearcher {
               }
         }
         var results = new List<Pop3EmailMessage>();
-        var sinceUtc = since?.ToUniversalTime();
-        var beforeUtc = before?.ToUniversalTime();
+        var sinceUtc = NormalizeToUtc(since);
+        var beforeUtc = NormalizeToUtc(before);
         for (int i = 0; i < client.Count; i++) {
             var message = await client.GetMessageAsync(i, cancellationToken).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(subject) && (message.Subject == null || message.Subject.IndexOf(subject, StringComparison.OrdinalIgnoreCase) < 0)) continue;
@@ -354,13 +359,15 @@ public static class MailboxSearcher {
         int parallelDownloadLimit = 4,
         CancellationToken cancellationToken = default) {
         var filters = new List<string>();
+        var sinceUtc = NormalizeToUtc(since);
+        var beforeUtc = NormalizeToUtc(before);
         var subjectFilters = new List<string>();
         foreach (var pattern in NonDeliveryReportSubjectPatterns.Values) {
             subjectFilters.Add($"contains(subject,'{pattern.Replace("'", "''")}')");
         }
         if (subjectFilters.Count > 0) filters.Add($"({string.Join(" or ", subjectFilters)})");
-        if (since.HasValue) filters.Add($"receivedDateTime ge {since.Value.ToUniversalTime():o}");
-        if (before.HasValue) filters.Add($"receivedDateTime le {before.Value.ToUniversalTime():o}");
+        if (sinceUtc.HasValue) filters.Add($"receivedDateTime ge {sinceUtc.Value:o}");
+        if (beforeUtc.HasValue) filters.Add($"receivedDateTime le {beforeUtc.Value:o}");
         var filter = filters.Count > 0 ? string.Join(" and ", filters) : null;
         var msgs = await MicrosoftGraphUtils.GetMailMessagesAsync(
             credential,
@@ -722,8 +729,10 @@ public static class MailboxSearcher {
         long maxUncompressedSize = 10 * 1024 * 1024,
         CancellationToken cancellationToken = default) {
         var filters = new List<string> { "hasAttachments eq true", "contains(subject,'report domain')" };
-        if (since.HasValue) filters.Add($"receivedDateTime ge {since.Value.ToUniversalTime():o}");
-        if (before.HasValue) filters.Add($"receivedDateTime le {before.Value.ToUniversalTime():o}");
+        var sinceUtc = NormalizeToUtc(since);
+        var beforeUtc = NormalizeToUtc(before);
+        if (sinceUtc.HasValue) filters.Add($"receivedDateTime ge {sinceUtc.Value:o}");
+        if (beforeUtc.HasValue) filters.Add($"receivedDateTime le {beforeUtc.Value:o}");
         if (!string.IsNullOrWhiteSpace(domain)) filters.Add($"contains(subject,'{domain!.Replace("'", "''")}')");
         var filter = string.Join(" and ", filters);
         var msgs = await MicrosoftGraphUtils.GetMailMessagesAsync(
@@ -847,8 +856,8 @@ public static class MailboxSearcher {
         string? domain,
         long maxUncompressedSize = 10 * 1024 * 1024) {
         var results = new List<DmarcReport>();
-        var sinceUtc = since?.ToUniversalTime();
-        var beforeUtc = before?.ToUniversalTime();
+        var sinceUtc = NormalizeToUtc(since);
+        var beforeUtc = NormalizeToUtc(before);
         foreach (var message in messages) {
             var msgDate = message.Date.UtcDateTime;
             if (sinceUtc.HasValue && msgDate < sinceUtc.Value) continue;
@@ -916,8 +925,10 @@ public static class MailboxSearcher {
         var hasAtt = typeof(SearchQuery).GetProperty("HasAttachment", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)?.GetValue(null) as SearchQuery;
         search = search.And(hasAtt ?? SearchQuery.HeaderContains("Content-Disposition", "attachment"));
         if (!string.IsNullOrWhiteSpace(domain)) search = search.And(SearchQuery.SubjectContains(domain));
-        if (since.HasValue) search = search.And(SearchQuery.DeliveredAfter(since.Value.ToUniversalTime()));
-        if (before.HasValue) search = search.And(SearchQuery.DeliveredBefore(before.Value.ToUniversalTime()));
+        var sinceUtc = NormalizeToUtc(since);
+        var beforeUtc = NormalizeToUtc(before);
+        if (sinceUtc.HasValue) search = search.And(SearchQuery.DeliveredAfter(sinceUtc.Value));
+        if (beforeUtc.HasValue) search = search.And(SearchQuery.DeliveredBefore(beforeUtc.Value));
         return search;
     }
 
@@ -933,8 +944,10 @@ public static class MailboxSearcher {
     internal static string BuildGmailDmarcReportQuery(DateTime? since, DateTime? before, string? domain) {
         var sb = new StringBuilder("subject:\"report domain\" has:attachment");
         if (!string.IsNullOrWhiteSpace(domain)) sb.Append(' ').Append("subject:\"").Append(EscapeGmailQueryValue(domain!)).Append("\"");
-        if (since.HasValue) sb.Append(' ').Append("after:").Append(since.Value.ToUniversalTime().ToString("yyyy/MM/dd"));
-        if (before.HasValue) sb.Append(' ').Append("before:").Append(before.Value.ToUniversalTime().ToString("yyyy/MM/dd"));
+        var sinceUtc = NormalizeToUtc(since);
+        var beforeUtc = NormalizeToUtc(before);
+        if (sinceUtc.HasValue) sb.Append(' ').Append("after:").Append(sinceUtc.Value.ToString("yyyy'/'MM'/'dd", CultureInfo.InvariantCulture));
+        if (beforeUtc.HasValue) sb.Append(' ').Append("before:").Append(beforeUtc.Value.ToString("yyyy'/'MM'/'dd", CultureInfo.InvariantCulture));
         return sb.ToString().Trim();
     }
 
@@ -971,8 +984,8 @@ public static class MailboxSearcher {
         string? messageId) {
         messageId = NonDeliveryReport.NormalizeMessageId(messageId);
         var results = new List<NonDeliveryReport>();
-        var sinceUtc = since?.ToUniversalTime();
-        var beforeUtc = before?.ToUniversalTime();
+        var sinceUtc = NormalizeToUtc(since);
+        var beforeUtc = NormalizeToUtc(before);
         foreach (var message in messages) {
             foreach (var report in MimeKitUtils.GetNonDeliveryReports(message)) {
                 var reportDate = (report.LastAttemptDate ?? report.Timestamp).UtcDateTime;
@@ -998,8 +1011,10 @@ public static class MailboxSearcher {
             sb.Insert(0, "(");
             sb.Append(')');
         }
-        if (since.HasValue) sb.Append(' ').Append("after:").Append(since.Value.ToUniversalTime().ToString("yyyy/MM/dd"));
-        if (before.HasValue) sb.Append(' ').Append("before:").Append(before.Value.ToUniversalTime().ToString("yyyy/MM/dd"));
+        var sinceUtc = NormalizeToUtc(since);
+        var beforeUtc = NormalizeToUtc(before);
+        if (sinceUtc.HasValue) sb.Append(' ').Append("after:").Append(sinceUtc.Value.ToString("yyyy'/'MM'/'dd", CultureInfo.InvariantCulture));
+        if (beforeUtc.HasValue) sb.Append(' ').Append("before:").Append(beforeUtc.Value.ToString("yyyy'/'MM'/'dd", CultureInfo.InvariantCulture));
         return sb.ToString().Trim();
     }
 
@@ -1036,8 +1051,10 @@ public static class MailboxSearcher {
             subjectQuery = subjectQuery == null ? q : subjectQuery.Or(q);
         }
         if (subjectQuery != null) search = search.Or(subjectQuery);
-        if (since.HasValue) search = search.And(SearchQuery.DeliveredAfter(since.Value.ToUniversalTime()));
-        if (before.HasValue) search = search.And(SearchQuery.DeliveredBefore(before.Value.ToUniversalTime()));
+        var sinceUtc = NormalizeToUtc(since);
+        var beforeUtc = NormalizeToUtc(before);
+        if (sinceUtc.HasValue) search = search.And(SearchQuery.DeliveredAfter(sinceUtc.Value));
+        if (beforeUtc.HasValue) search = search.And(SearchQuery.DeliveredBefore(beforeUtc.Value));
         return search;
     }
 
@@ -1086,6 +1103,19 @@ public static class MailboxSearcher {
             }
         }
         return result;
+    }
+
+    private static DateTime? NormalizeToUtc(DateTime? value) {
+        if (!value.HasValue) {
+            return null;
+        }
+
+        var dt = value.Value;
+        if (dt.Kind == DateTimeKind.Unspecified) {
+            return DateTime.SpecifyKind(dt, DateTimeKind.Utc);
+        }
+
+        return dt.ToUniversalTime();
     }
 
     private static IEnumerable<string> SplitTokens(string input) {

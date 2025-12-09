@@ -51,7 +51,7 @@ public class SmtpAttachmentTests
         smtp.CreateMessage();
 
         var multipart = Assert.IsType<Multipart>(smtp.Message.Body);
-        var part = Assert.IsType<MimePart>(Assert.Single(multipart.OfType<MimePart>().Where(p => p.IsAttachment)));
+        var part = Assert.Single(multipart.OfType<MimePart>(), p => p.IsAttachment);
 
         Assert.Equal("greeting.txt", part.FileName);
         Assert.Equal("text/plain", part.ContentType.MimeType);
@@ -85,7 +85,7 @@ public class SmtpAttachmentTests
         smtp.CreateMessage();
 
         var multipart = Assert.IsType<Multipart>(smtp.Message.Body);
-        var part = Assert.IsType<MimePart>(Assert.Single(multipart.OfType<MimePart>().Where(p => p.IsAttachment)));
+        var part = Assert.Single(multipart.OfType<MimePart>(), p => p.IsAttachment);
 
         Assert.Equal("data.bin", part.FileName);
         Assert.Equal("application/octet-stream", part.ContentType.MimeType);
