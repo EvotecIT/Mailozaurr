@@ -39,9 +39,6 @@ public sealed class CmdletSetPOP3Message : AsyncPSCmdlet {
         }
         var actionText = Read.IsPresent ? "Marking POP3 message as read" : "Marking POP3 message as unread";
         var dryRun = !ShouldProcess(Index.ToString(), actionText);
-        if (dryRun) {
-            return Task.CompletedTask;
-        }
         var conn = Client ?? DefaultSessions.Pop3Session;
         if (conn != null && conn.Data != null) {
             if (Read) {

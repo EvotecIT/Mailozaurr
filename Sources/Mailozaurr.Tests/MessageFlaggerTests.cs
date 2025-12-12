@@ -38,7 +38,7 @@ public class MessageFlaggerTests {
 
     [Fact]
     public async Task SetPop3Flags_StoresState() {
-        var client = new Pop3Client();
+        using var client = new Pop3Client();
         await MessageFlagSetter.SetReadAsync(client, 2, true);
         Assert.True(MessageFlagSetter.TryGetPop3Read(client, 2, out var read) && read);
         await MessageFlagSetter.SetReadAsync(client, 2, false);
@@ -47,7 +47,7 @@ public class MessageFlaggerTests {
 
     [Fact]
     public async Task SetPop3Flags_DryRun_DoesNotStoreState() {
-        var client = new Pop3Client();
+        using var client = new Pop3Client();
         await MessageFlagSetter.SetReadAsync(client, 2, true, dryRun: true);
         Assert.False(MessageFlagSetter.TryGetPop3Read(client, 2, out _));
     }

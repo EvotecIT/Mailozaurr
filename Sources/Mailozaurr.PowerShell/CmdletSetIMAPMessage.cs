@@ -44,9 +44,6 @@ public sealed class CmdletSetIMAPMessage : AsyncPSCmdlet {
         }
         var actionText = Read.IsPresent ? "Marking IMAP message as read" : "Marking IMAP message as unread";
         var dryRun = !ShouldProcess(Uid.ToString(), actionText);
-        if (dryRun) {
-            return;
-        }
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
             var uid = new UniqueId(Uid);

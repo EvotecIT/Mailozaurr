@@ -465,11 +465,13 @@ namespace Mailozaurr;
             { "client_secret", ApplicationKey }
         };
 
-        //LoggingMessages.Logger.WriteVerbose($"Application ID: {ApplicationID}");
-        //LoggingMessages.Logger.WriteVerbose($"Tenant Domain: {TenantDomain}");
-        //LoggingMessages.Logger.WriteVerbose($"Application Key {ApplicationKey}");
         try {
-            await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
+            Stopwatch.Stop();
+            try {
+                await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
+            } finally {
+                Stopwatch.Start();
+            }
             try {
                 using var response = await _client.PostAsync($"https://login.microsoftonline.com/{TenantDomain}/oauth2/token", new FormUrlEncodedContent(body), cancellationToken);
                 var content = await response.Content.ReadAsStringAsync();
@@ -537,7 +539,12 @@ namespace Mailozaurr;
                 };
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
 
-                await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
+                Stopwatch.Stop();
+                try {
+                    await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
+                } finally {
+                    Stopwatch.Start();
+                }
                 try {
                     using var response = await _client.SendAsync(request, cancellationToken);
                     var content = await response.Content.ReadAsStringAsync();
@@ -674,7 +681,12 @@ namespace Mailozaurr;
         sendRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
 
         // Send the HTTP request for sending the draft message
-        await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
+        Stopwatch.Stop();
+        try {
+            await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
+        } finally {
+            Stopwatch.Start();
+        }
         try {
             using var sendResponse = await _client.SendAsync(sendRequest, cancellationToken);
 

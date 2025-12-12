@@ -129,7 +129,7 @@ public static class FolderOperations {
         try {
             if (recursive) {
                 foreach (var sub in await src.GetSubfoldersAsync(false, cancellationToken).ConfigureAwait(false))
-                    await RemoveFolderAsync(client, sub.FullName, true, dryRun: false, cancellationToken).ConfigureAwait(false);
+                    await RemoveFolderAsync(client, sub.FullName, true, dryRun, cancellationToken).ConfigureAwait(false);
 
                 if (src.IsOpen)
                     await src.CloseAsync(false, cancellationToken).ConfigureAwait(false);

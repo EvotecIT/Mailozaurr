@@ -84,9 +84,18 @@ public class GraphMailboxPermission {
     /// </summary>
     /// <param name="credential">Graph credential.</param>
     public async Task AddAsync(GraphCredential credential) {
+        await AddAsync(credential, dryRun: false).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Adds this permission to the associated mailbox, optionally simulating the change.
+    /// </summary>
+    /// <param name="credential">Graph credential.</param>
+    /// <param name="dryRun">When set, no Graph request is issued.</param>
+    public async Task AddAsync(GraphCredential credential, bool dryRun) {
         if (UserPrincipalName is null) throw new InvalidOperationException("UserPrincipalName not set.");
         var body = JsonSerializer.Serialize(ToDictionary(), MailozaurrJsonContext.Default.DictionaryStringObject);
-        await MicrosoftGraphUtils.AddMailboxPermissionAsync(credential, UserPrincipalName, body).ConfigureAwait(false);
+        await MicrosoftGraphUtils.AddMailboxPermissionAsync(credential, UserPrincipalName, body, dryRun).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -94,9 +103,18 @@ public class GraphMailboxPermission {
     /// </summary>
     /// <param name="credential">Graph credential.</param>
     public async Task RemoveAsync(GraphCredential credential) {
+        await RemoveAsync(credential, dryRun: false).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Removes this permission from the associated mailbox, optionally simulating the change.
+    /// </summary>
+    /// <param name="credential">Graph credential.</param>
+    /// <param name="dryRun">When set, no Graph request is issued.</param>
+    public async Task RemoveAsync(GraphCredential credential, bool dryRun) {
         if (UserPrincipalName is null) throw new InvalidOperationException("UserPrincipalName not set.");
         if (Id is null) throw new InvalidOperationException("Id not set.");
-        await MicrosoftGraphUtils.RemoveMailboxPermissionAsync(credential, UserPrincipalName, Id).ConfigureAwait(false);
+        await MicrosoftGraphUtils.RemoveMailboxPermissionAsync(credential, UserPrincipalName, Id, dryRun).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
