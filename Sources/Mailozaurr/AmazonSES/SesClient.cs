@@ -74,6 +74,11 @@ public class SesClient : IDisposable {
     /// <summary>Collector used to store log entries.</summary>
     public LogCollector LogCollector { get; set; } = new();
 
+    /// <summary>
+    /// When set, sending is simulated and no SES request is issued.
+    /// </summary>
+    public bool DryRun { get; set; }
+
     /// <summary>Repository used to persist messages that require retrying.</summary>
     public IPendingMessageRepository? PendingMessageRepository { get; set; }
 
@@ -257,6 +262,10 @@ public class SesClient : IDisposable {
 
     private async Task<SmtpResult> SendSesRequestAsync(string body, CancellationToken cancellationToken, MimeMessage? message = null, string? mimeMessageBase64 = null)
     {
+        if (DryRun) {
+            LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping SES send.");
+            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
+        }
         int attempts = 0;
         Exception? lastException = null;
         do

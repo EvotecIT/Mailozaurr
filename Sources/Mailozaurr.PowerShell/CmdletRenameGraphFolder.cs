@@ -75,16 +75,18 @@ public class CmdletRenameGraphFolder : AsyncPSCmdlet {
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        if (!ShouldProcess(FolderId!, "Renaming Graph folder")) {
-            return;
-        }
+        var dryRun = !ShouldProcess(FolderId!, "Renaming Graph folder");
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         MicrosoftGraphUtils.MaxConcurrentRequests = MaxConcurrentRequests;
+        if (dryRun) {
+            await MicrosoftGraphUtils.RenameFolderAsync(cred, UserPrincipalName!, FolderId!, NewName!, dryRun: true);
+            return;
+        }
         int attempts = 0;
         Exception? lastException = null;
         do {
             try {
-                await MicrosoftGraphUtils.RenameFolderAsync(cred, UserPrincipalName!, FolderId!, NewName!);
+                await MicrosoftGraphUtils.RenameFolderAsync(cred, UserPrincipalName!, FolderId!, NewName!, dryRun: false);
                 return;
             } catch (Exception ex) {
                 lastException = ex;

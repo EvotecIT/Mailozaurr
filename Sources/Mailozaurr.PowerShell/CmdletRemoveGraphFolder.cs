@@ -73,16 +73,18 @@ public class CmdletRemoveGraphFolder : AsyncPSCmdlet {
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        if (!ShouldProcess(FolderId!, "Removing Graph folder")) {
-            return;
-        }
+        var dryRun = !ShouldProcess(FolderId!, "Removing Graph folder");
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         MicrosoftGraphUtils.MaxConcurrentRequests = MaxConcurrentRequests;
+        if (dryRun) {
+            await MicrosoftGraphUtils.RemoveFolderAsync(cred, UserPrincipalName!, FolderId!, dryRun: true);
+            return;
+        }
         int attempts = 0;
         Exception? lastException = null;
         do {
             try {
-                await MicrosoftGraphUtils.RemoveFolderAsync(cred, UserPrincipalName!, FolderId!);
+                await MicrosoftGraphUtils.RemoveFolderAsync(cred, UserPrincipalName!, FolderId!, dryRun: false);
                 return;
             } catch (Exception ex) {
                 lastException = ex;

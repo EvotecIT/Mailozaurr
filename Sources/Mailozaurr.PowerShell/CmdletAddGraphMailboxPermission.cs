@@ -118,7 +118,7 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred, object permission) {
-        if (!ShouldProcess(UserPrincipalName!, "Adding mailbox permission")) return;
+        var dryRun = !ShouldProcess(UserPrincipalName!, "Adding mailbox permission");
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         int attempts = 0;
         Exception? lastException = null;
@@ -127,9 +127,13 @@ public class CmdletAddGraphMailboxPermission : AsyncPSCmdlet {
             GraphMailboxPermission p => JsonSerializer.Serialize(p.ToDictionary(), MailozaurrJsonContext.Default.DictionaryStringObject),
             _ => JsonSerializer.Serialize(permission, MailozaurrJsonContext.Default.Object)
         };
+        if (dryRun) {
+            await MicrosoftGraphUtils.AddMailboxPermissionAsync(cred, UserPrincipalName!, body, dryRun: true);
+            return;
+        }
         do {
             try {
-                await MicrosoftGraphUtils.AddMailboxPermissionAsync(cred, UserPrincipalName!, body);
+                await MicrosoftGraphUtils.AddMailboxPermissionAsync(cred, UserPrincipalName!, body, dryRun: false);
                 return;
             } catch (Exception ex) {
                 lastException = ex;

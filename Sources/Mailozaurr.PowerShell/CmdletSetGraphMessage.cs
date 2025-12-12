@@ -9,7 +9,7 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// Updates properties of an existing Microsoft Graph message.
 /// </summary>
-[Cmdlet(VerbsCommon.Set, "GraphMessage")]
+[Cmdlet(VerbsCommon.Set, "GraphMessage", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 public class CmdletSetGraphMessage : AsyncPSCmdlet {
     /// <summary>
     /// UPN of the mailbox owner containing the message.
@@ -95,13 +95,18 @@ public class CmdletSetGraphMessage : AsyncPSCmdlet {
     /// </summary>
     /// <param name="cred">Credential used to access Graph.</param>
     private async Task ProcessGraphAsync(GraphCredential cred) {
+        var dryRun = !ShouldProcess(MessageId!, "Updating message via Graph");
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         MicrosoftGraphUtils.MaxConcurrentRequests = MaxConcurrentRequests;
+        if (dryRun) {
+            await MicrosoftGraphUtils.SetMailMessageAsync(cred, UserPrincipalName!, MessageId!, Read.IsPresent, dryRun: true);
+            return;
+        }
         int attempts = 0;
         Exception? lastException = null;
         do {
             try {
-                await MicrosoftGraphUtils.SetMailMessageAsync(cred, UserPrincipalName!, MessageId!, Read.IsPresent);
+                await MicrosoftGraphUtils.SetMailMessageAsync(cred, UserPrincipalName!, MessageId!, Read.IsPresent, dryRun: false);
                 return;
             } catch (Exception ex) {
                 lastException = ex;
@@ -129,6 +134,9 @@ public class CmdletSetGraphMessage : AsyncPSCmdlet {
     /// Executes the update operation using the <c>Invoke-MgGraphRequest</c> cmdlet.
     /// </summary>
     private void ProcessMgGraph() {
+        if (!ShouldProcess(MessageId!, "Updating message via Graph")) {
+            return;
+        }
         var uri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
             $"/users/{UserPrincipalName}/messages/{MessageId}");

@@ -28,6 +28,11 @@ public sealed class SendGridClient : IDisposable {
     public readonly Stopwatch Stopwatch;
 
     /// <summary>
+    /// When set, sending is simulated and no SendGrid request is issued.
+    /// </summary>
+    public bool DryRun { get; set; }
+
+    /// <summary>
     /// Gets or sets the sender of the email.
     /// </summary>
     public object? From { get; set; }
@@ -338,6 +343,10 @@ public sealed class SendGridClient : IDisposable {
     /// <returns>A Task that represents the asynchronous operation. The task result contains the result of the email sending operation.</returns>
     public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken) {
         ThrowIfDisposed();
+        if (DryRun) {
+            LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping SendGrid send.");
+            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
+        }
         string apiKey;
         if (Credentials is NetworkCredential networkCredential) {
             apiKey = networkCredential.Password;

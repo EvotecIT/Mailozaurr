@@ -6,7 +6,7 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// Removes attachments from a POP3 <see cref="MimeMessage"/> instance.
 /// </summary>
-[Cmdlet(VerbsCommon.Remove, "POP3MessageAttachment")]
+[Cmdlet(VerbsCommon.Remove, "POP3MessageAttachment", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Low)]
 [OutputType(typeof(MimeMessage))]
 public sealed class CmdletRemovePOP3MessageAttachment : PSCmdlet {
     /// <summary>
@@ -18,10 +18,15 @@ public sealed class CmdletRemovePOP3MessageAttachment : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        if (Message != null) {
-            RemoveMimeAttachments(Message.Body);
-            WriteObject(Message);
+        if (Message == null) {
+            return;
         }
+        if (!ShouldProcess("MimeMessage", "Removing attachments")) {
+            WriteObject(Message);
+            return;
+        }
+        RemoveMimeAttachments(Message.Body);
+        WriteObject(Message);
     }
 
     private static void RemoveMimeAttachments(MimeEntity? entity) {

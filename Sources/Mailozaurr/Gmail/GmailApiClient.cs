@@ -58,6 +58,11 @@ public sealed class GmailApiClient : IDisposable {
     /// </summary>
     public IPendingMessageRepository? PendingMessageRepository { get; set; }
 
+    /// <summary>
+    /// When set, sending is simulated and no Gmail request is issued.
+    /// </summary>
+    public bool DryRun { get; set; }
+
     /// <inheritdoc />
     public void Dispose() {
         if (_disposed) {
@@ -180,6 +185,9 @@ public sealed class GmailApiClient : IDisposable {
         ThrowIfDisposed();
         if (message == null) {
             throw new ArgumentNullException(nameof(message));
+        }
+        if (DryRun) {
+            return new GmailMessage { Id = string.Empty, ThreadId = string.Empty };
         }
         using var ms = new MemoryStream();
         await message.WriteToAsync(ms, cancellationToken).ConfigureAwait(false);
@@ -349,6 +357,9 @@ public sealed class GmailApiClient : IDisposable {
     /// </summary>
     public async Task DeleteAsync(string userId, string id, CancellationToken cancellationToken = default) {
         ThrowIfDisposed();
+        if (DryRun) {
+            return;
+        }
         using var response = await _client.DeleteAsync($"users/{userId}/messages/{id}", cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();

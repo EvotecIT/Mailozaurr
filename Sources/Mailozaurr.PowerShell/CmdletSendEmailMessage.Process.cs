@@ -119,14 +119,11 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
         sendGrid.Credentials = networkCredential;
         sendGrid.CreateMessage();
-        if (ShouldProcess(sendGrid.SentTo, "Sending email message via SendGrid")) {
-            var result = sendGrid.SendEmailAsync().GetAwaiter().GetResult();
-            LogEmitter.EmitLogs(logCollector, this);
-            if (!Suppress) {
-                WriteObject(result);
-            }
-        } else if (!Suppress) {
-            WriteObject(new SmtpResult(false, EmailAction.Send, sendGrid.SentTo, sendGrid.SentFrom, "SendGridApi", 0, sendGrid.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
+        sendGrid.DryRun = !ShouldProcess(sendGrid.SentTo, "Sending email message via SendGrid");
+        var result = sendGrid.SendEmailAsync().GetAwaiter().GetResult();
+        LogEmitter.EmitLogs(logCollector, this);
+        if (!Suppress) {
+            WriteObject(result);
         }
     }
 
@@ -161,14 +158,11 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         mailgun.JitterMilliseconds = JitterMilliseconds;
         NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
         mailgun.Credentials = networkCredential;
-        if (ShouldProcess(mailgun.SentTo, "Sending email message via Mailgun")) {
-            var result = mailgun.SendEmailAsync().GetAwaiter().GetResult();
-            LogEmitter.EmitLogs(logCollector, this);
-            if (!Suppress) {
-                WriteObject(result);
-            }
-        } else if (!Suppress) {
-            WriteObject(new SmtpResult(false, EmailAction.Send, mailgun.SentTo, mailgun.SentFrom, "MailgunApi", 0, mailgun.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
+        mailgun.DryRun = !ShouldProcess(mailgun.SentTo, "Sending email message via Mailgun");
+        var result = mailgun.SendEmailAsync().GetAwaiter().GetResult();
+        LogEmitter.EmitLogs(logCollector, this);
+        if (!Suppress) {
+            WriteObject(result);
         }
     }
 
@@ -207,14 +201,11 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         }
         NetworkCredential networkCredential = new NetworkCredential(Credential.UserName, Credential.Password);
         ses.Credentials = networkCredential;
-        if (ShouldProcess(ses.SentTo, "Sending email message via SES")) {
-            var result = ses.SendEmailAsync().GetAwaiter().GetResult();
-            LogEmitter.EmitLogs(logCollector, this);
-            if (!Suppress) {
-                WriteObject(result);
-            }
-        } else if (!Suppress) {
-            WriteObject(new SmtpResult(false, EmailAction.Send, ses.SentTo, ses.SentFrom, "SESApi", 0, ses.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
+        ses.DryRun = !ShouldProcess(ses.SentTo, "Sending email message via SES");
+        var result = ses.SendEmailAsync().GetAwaiter().GetResult();
+        LogEmitter.EmitLogs(logCollector, this);
+        if (!Suppress) {
+            WriteObject(result);
         }
     }
 
@@ -330,10 +321,14 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             return;
         }
 
-        if (!ShouldProcess(graph.SentTo, "Sending email message via Graph")) {
+        graph.DryRun = !ShouldProcess(graph.SentTo, "Sending email message via Graph");
+        if (graph.DryRun) {
             LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
+            var status = graph.IsLargerAttachment
+                ? graph.SendMessageDraftAsync().GetAwaiter().GetResult()
+                : graph.SendMessageAsync().GetAwaiter().GetResult();
             if (!Suppress) {
-                WriteObject(new SmtpResult(false, EmailAction.Send, graph.SentTo, graph.SentFrom, "GraphAPI", 0, graph.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
+                WriteObject(status);
             }
             LogEmitter.EmitLogs(graph.LogCollector, this);
             return;
@@ -394,6 +389,14 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
                 "GraphAttachmentLimitExceeded",
                 ErrorCategory.InvalidData,
                 null));
+            LogEmitter.EmitLogs(graph.LogCollector, this);
+            return;
+        }
+        if (!ShouldProcess(graph.SentTo, "Sending email message via Graph (MgGraphRequest)")) {
+            LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
+            if (!Suppress) {
+                WriteObject(new SmtpResult(false, EmailAction.Send, graph.SentTo, graph.SentFrom, "GraphAPI", 0, graph.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
+            }
             LogEmitter.EmitLogs(graph.LogCollector, this);
             return;
         }
@@ -466,13 +469,18 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         smtpClient.RetryAlways = RetryAlways.IsPresent;
         smtpClient.MaxDelayMilliseconds = MaxDelayMilliseconds;
         smtpClient.JitterMilliseconds = JitterMilliseconds;
-
-        if (!ShouldProcess(smtpClient.SentTo, "Sending email message")) {
+        smtpClient.DryRun = !ShouldProcess(smtpClient.SentTo, "Sending email message");
+        if (smtpClient.DryRun) {
             logCollector.LogVerbose("Send-EmailMessage - Skipping authentication");
+            var useSslFlagDryRun = UseSsl.IsPresent && !this.MyInvocation.BoundParameters.ContainsKey(nameof(SecureSocketOptions));
+            smtpClient.Connect(Server ?? string.Empty, Port, SecureSocketOptions, useSslFlagDryRun);
+            smtpClient.CreateMessage(CancellationToken.None);
+            var dryRunStatus = smtpClient.Send();
             LogEmitter.EmitLogs(logCollector, this);
             if (!Suppress) {
-                WriteObject(new SmtpResult(false, EmailAction.Send, smtpClient.SentTo, smtpClient.SentFrom, Server ?? string.Empty, Port, TimeSpan.Zero, string.Empty, "Email not sent (WhatIf)"));
+                WriteObject(dryRunStatus);
             }
+            smtpClient.Dispose();
             return;
         }
 

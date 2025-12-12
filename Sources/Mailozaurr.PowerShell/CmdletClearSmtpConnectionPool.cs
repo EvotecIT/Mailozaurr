@@ -14,10 +14,13 @@ namespace Mailozaurr.PowerShell;
 ///   <code>Clear-SmtpConnectionPool</code>
 /// </example>
 /// </summary>
-[Cmdlet(VerbsCommon.Clear, "SmtpConnectionPool")]
+[Cmdlet(VerbsCommon.Clear, "SmtpConnectionPool", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Low)]
 public sealed class CmdletClearSmtpConnectionPool : AsyncPSCmdlet {
     /// <summary>Clears all connections from the pool.</summary>
     protected override Task ProcessRecordAsync() {
+        if (!ShouldProcess("SmtpConnectionPool", "Clearing SMTP connection pool")) {
+            return Task.CompletedTask;
+        }
         SmtpConnectionPool.ClearConnectionPool();
         return Task.CompletedTask;
     }

@@ -90,7 +90,7 @@ public sealed class CmdletClearIMAPJunk : AsyncPSCmdlet {
                 }
                 return;
             }
-            if (!ShouldProcess(folder, "Clearing IMAP junk")) return;
+            var dryRun = !ShouldProcess(folder, "Clearing IMAP junk");
             await JunkCleaner.ClearImapJunkAsync(
                 conn.Data,
                 folder,
@@ -101,6 +101,7 @@ public sealed class CmdletClearIMAPJunk : AsyncPSCmdlet {
                 SkipUid,
                 SkipHasAttachment.IsPresent,
                 SkipAttachmentExtension,
+                dryRun,
                 CancelToken);
         } else {
             ThrowTerminatingError(new ErrorRecord(

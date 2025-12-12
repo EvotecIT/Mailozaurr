@@ -97,10 +97,7 @@ public sealed class CmdletSetGraphInboxRule : AsyncPSCmdlet
 
     private async Task ProcessGraphAsync(GraphCredential cred)
     {
-        if (!ShouldProcess(RuleId!, "Updating inbox rule"))
-        {
-            return;
-        }
+        var dryRun = !ShouldProcess(RuleId!, "Updating inbox rule");
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         int attempts = 0;
         Exception? lastException = null;
@@ -109,11 +106,15 @@ public sealed class CmdletSetGraphInboxRule : AsyncPSCmdlet
         if (obj is null) {
             throw new PSArgumentException("Graph inbox rule definition cannot be null.");
         }
+        if (dryRun) {
+            await MicrosoftGraphUtils.UpdateRuleAsync(cred, UserPrincipalName!, RuleId!, obj, dryRun: true);
+            return;
+        }
         do
         {
             try
             {
-                var res = await MicrosoftGraphUtils.UpdateRuleAsync(cred, UserPrincipalName!, RuleId!, obj);
+                var res = await MicrosoftGraphUtils.UpdateRuleAsync(cred, UserPrincipalName!, RuleId!, obj, dryRun: false);
                 WriteObject(res);
                 return;
             }

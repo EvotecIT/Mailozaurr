@@ -32,16 +32,14 @@ public sealed class CmdletRemoveGmailMessage : AsyncPSCmdlet {
     /// </summary>
     /// <returns>A task representing the asynchronous operation.</returns>
     protected override async Task ProcessRecordAsync() {
-        if (!ShouldProcess(Id!, "Deleting Gmail message")) {
-            return;
-        }
+        var dryRun = !ShouldProcess(Id!, "Deleting Gmail message");
         var net = Credential!.GetNetworkCredential();
         var oauth = new OAuthCredential {
             UserName = net.UserName,
             AccessToken = net.Password,
             ExpiresOn = System.DateTimeOffset.MaxValue
         };
-        var client = new GmailApiClient(oauth);
+        var client = new GmailApiClient(oauth) { DryRun = dryRun };
         await client.DeleteAsync(GmailAccount!, Id!, CancelToken);
     }
 }

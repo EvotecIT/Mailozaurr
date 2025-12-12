@@ -60,15 +60,17 @@ public sealed class CmdletRemoveGraphEvent : AsyncPSCmdlet {
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        if (!ShouldProcess(EventId!, "Removing event")) {
+        var dryRun = !ShouldProcess(EventId!, "Removing event");
+        MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
+        if (dryRun) {
+            await MicrosoftGraphUtils.RemoveEventAsync(cred, UserPrincipalName!, EventId!, dryRun: true);
             return;
         }
-        MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         int attempts = 0;
         Exception? last = null;
         do {
             try {
-                await MicrosoftGraphUtils.RemoveEventAsync(cred, UserPrincipalName!, EventId!);
+                await MicrosoftGraphUtils.RemoveEventAsync(cred, UserPrincipalName!, EventId!, dryRun: false);
                 return;
             } catch (Exception ex) {
                 last = ex;

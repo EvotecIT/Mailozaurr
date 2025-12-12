@@ -8,7 +8,7 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// Sets the working IMAP folder for subsequent operations.
 /// </summary>
-[Cmdlet(VerbsCommon.Set, "IMAPFolder")]
+[Cmdlet(VerbsCommon.Set, "IMAPFolder", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Low)]
 public sealed class CmdletSetIMAPFolder : AsyncPSCmdlet {
     /// <summary>Active IMAP connection.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]
@@ -29,6 +29,9 @@ public sealed class CmdletSetIMAPFolder : AsyncPSCmdlet {
     protected override Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
+            if (!ShouldProcess(Path!, "Setting IMAP folder")) {
+                return Task.CompletedTask;
+            }
             var folder = (ImapFolder)conn.Data.GetCachedFolder(Path!, FolderAccess);
             conn.Messages = folder;
             conn.Count = folder.Count;

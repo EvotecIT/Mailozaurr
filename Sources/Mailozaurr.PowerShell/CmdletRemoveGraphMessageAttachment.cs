@@ -5,7 +5,7 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// Removes attachments from a <see cref="GraphMessage"/> instance.
 /// </summary>
-[Cmdlet(VerbsCommon.Remove, "GraphMessageAttachment")]
+[Cmdlet(VerbsCommon.Remove, "GraphMessageAttachment", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Low)]
 [OutputType(typeof(GraphMessage))]
 public sealed class CmdletRemoveGraphMessageAttachment : PSCmdlet {
     /// <summary>
@@ -17,9 +17,14 @@ public sealed class CmdletRemoveGraphMessageAttachment : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        if (Message != null) {
-            Message.Attachments = null;
-            WriteObject(Message);
+        if (Message == null) {
+            return;
         }
+        if (!ShouldProcess("GraphMessage", "Removing attachments")) {
+            WriteObject(Message);
+            return;
+        }
+        Message.Attachments = null;
+        WriteObject(Message);
     }
 }

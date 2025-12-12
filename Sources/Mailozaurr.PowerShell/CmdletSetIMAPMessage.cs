@@ -8,7 +8,7 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// Updates flags on an IMAP message.
 /// </summary>
-[Cmdlet(VerbsCommon.Set, "IMAPMessage")]
+[Cmdlet(VerbsCommon.Set, "IMAPMessage", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 public sealed class CmdletSetIMAPMessage : AsyncPSCmdlet {
     /// <summary>Active IMAP connection.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]
@@ -39,13 +39,18 @@ public sealed class CmdletSetIMAPMessage : AsyncPSCmdlet {
             ThrowTerminatingError(new ErrorRecord(new PSArgumentException("Specify only -Read or -Unread."), "InvalidFlags", ErrorCategory.InvalidArgument, null));
             return;
         }
+        if (!(Read.IsPresent || Unread.IsPresent)) {
+            return;
+        }
+        var actionText = Read.IsPresent ? "Marking IMAP message as read" : "Marking IMAP message as unread";
+        var dryRun = !ShouldProcess(Uid.ToString(), actionText);
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
             var uid = new UniqueId(Uid);
             if (Read) {
-                await MessageFlagSetter.SetFlagsAsync(conn.Data, uid, MessageFlags.Seen, true, Folder ?? conn.Folder?.FullName, CancelToken);
+                await MessageFlagSetter.SetFlagsAsync(conn.Data, uid, MessageFlags.Seen, true, dryRun, Folder ?? conn.Folder?.FullName, CancelToken);
             } else if (Unread) {
-                await MessageFlagSetter.SetFlagsAsync(conn.Data, uid, MessageFlags.Seen, false, Folder ?? conn.Folder?.FullName, CancelToken);
+                await MessageFlagSetter.SetFlagsAsync(conn.Data, uid, MessageFlags.Seen, false, dryRun, Folder ?? conn.Folder?.FullName, CancelToken);
             }
         } else {
             ThrowTerminatingError(new ErrorRecord(

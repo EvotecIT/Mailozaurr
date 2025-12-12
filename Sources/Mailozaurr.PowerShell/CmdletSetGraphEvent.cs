@@ -68,15 +68,17 @@ public sealed class CmdletSetGraphEvent : AsyncPSCmdlet {
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        if (!ShouldProcess(EventId!, "Updating event")) {
+        var dryRun = !ShouldProcess(EventId!, "Updating event");
+        MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
+        if (dryRun) {
+            await MicrosoftGraphUtils.UpdateEventAsync(cred, UserPrincipalName!, EventId!, Event!, dryRun: true);
             return;
         }
-        MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         int attempts = 0;
         Exception? last = null;
         do {
             try {
-                var result = await MicrosoftGraphUtils.UpdateEventAsync(cred, UserPrincipalName!, EventId!, Event!);
+                var result = await MicrosoftGraphUtils.UpdateEventAsync(cred, UserPrincipalName!, EventId!, Event!, dryRun: false);
                 WriteObject(result);
                 return;
             } catch (Exception ex) {

@@ -13,7 +13,7 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// Creates a new inbox rule via Microsoft Graph.
 /// </summary>
-[Cmdlet(VerbsCommon.New, "GraphInboxRule")]
+[Cmdlet(VerbsCommon.New, "GraphInboxRule", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 [OutputType(typeof(GraphInboxRule))]
 public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
     /// <summary>
@@ -173,6 +173,7 @@ public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
+        var dryRun = !ShouldProcess(UserPrincipalName!, "Creating inbox rule via Graph");
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         int attempts = 0;
         Exception? lastException = null;
@@ -188,9 +189,13 @@ public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
             var json = JsonSerializer.Serialize(dict, MailozaurrJsonContext.Default.DictionaryStringObject);
             obj = JsonSerializer.Deserialize<GraphInboxRule>(json)!;
         }
+        if (dryRun) {
+            await MicrosoftGraphUtils.NewRuleAsync(cred, UserPrincipalName!, obj, dryRun: true);
+            return;
+        }
         do {
             try {
-                var res = await MicrosoftGraphUtils.NewRuleAsync(cred, UserPrincipalName!, obj);
+                var res = await MicrosoftGraphUtils.NewRuleAsync(cred, UserPrincipalName!, obj, dryRun: false);
                 WriteObject(res);
                 return;
             } catch (Exception ex) {
@@ -214,6 +219,9 @@ public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
     }
 
     private void ProcessMgGraph() {
+        if (!ShouldProcess(UserPrincipalName!, "Creating inbox rule via Graph")) {
+            return;
+        }
         var uri = MicrosoftGraphUtils.JoinUriQuery(
             GraphEndpoint.V1,
             $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules");

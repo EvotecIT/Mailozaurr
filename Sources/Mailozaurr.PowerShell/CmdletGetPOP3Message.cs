@@ -21,7 +21,7 @@ namespace Mailozaurr.PowerShell;
 /// <seealso cref="CmdletConnectPOP3"/>
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
-[Cmdlet(VerbsCommon.Get, "POP3Message")]
+[Cmdlet(VerbsCommon.Get, "POP3Message", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
 [OutputType(typeof(Pop3MessageInfo))]
 public sealed class CmdletGetPOP3Message : AsyncPSCmdlet {
     /// <summary>
@@ -108,6 +108,11 @@ public sealed class CmdletGetPOP3Message : AsyncPSCmdlet {
                 return;
             }
 
+            var delete = Delete.IsPresent;
+            if (delete && !ShouldProcess(string.IsNullOrWhiteSpace(conn.Uri) ? "POP3 mailbox" : conn.Uri, "Deleting POP3 messages")) {
+                delete = false;
+            }
+
             await foreach (var message in MessageFetcher.Fetch(
                 conn.Data,
                 Subject,
@@ -117,7 +122,7 @@ public sealed class CmdletGetPOP3Message : AsyncPSCmdlet {
                 Since,
                 Before,
                 All.IsPresent,
-                Delete.IsPresent,
+                delete,
                 HasAttachment.IsPresent,
                 CancelToken)) {
                 WriteObject(new Pop3MessageInfo(message));

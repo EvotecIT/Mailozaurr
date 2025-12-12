@@ -158,13 +158,17 @@ public class CmdletRemoveGraphMailboxPermission : AsyncPSCmdlet {
             _ => null
         };
         if (id is null) return;
-        if (!ShouldProcess(id, "Removing mailbox permission")) return;
+        var dryRun = !ShouldProcess(id, "Removing mailbox permission");
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
+        if (dryRun) {
+            await MicrosoftGraphUtils.RemoveMailboxPermissionAsync(cred, UserPrincipalName!, id, dryRun: true);
+            return;
+        }
         int attempts = 0;
         Exception? lastException = null;
         do {
             try {
-                await MicrosoftGraphUtils.RemoveMailboxPermissionAsync(cred, UserPrincipalName!, id);
+                await MicrosoftGraphUtils.RemoveMailboxPermissionAsync(cred, UserPrincipalName!, id, dryRun: false);
                 return;
             } catch (Exception ex) {
                 lastException = ex;

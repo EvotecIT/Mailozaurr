@@ -2,6 +2,7 @@ using System.Management.Automation;
 using MailKit;
 using MailKit.Net.Imap;
 using Mailozaurr;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
@@ -29,12 +30,9 @@ public sealed class CmdletRemoveIMAPMessage : AsyncPSCmdlet {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
             var folder = Folder ?? conn.Folder?.FullName;
-            if (!ShouldProcess(string.Join(",", Uid ?? System.Array.Empty<uint>()), "Deleting IMAP message")) {
-                return;
-            }
-            foreach (var u in Uid!) {
-                await MessageRemover.DeleteAsync(conn.Data, new UniqueId(u), folder, CancelToken);
-            }
+            var dryRun = !ShouldProcess(string.Join(",", Uid ?? System.Array.Empty<uint>()), "Deleting IMAP message");
+            var uniqueIds = (Uid ?? System.Array.Empty<uint>()).Select(u => new UniqueId(u));
+            await MessageRemover.DeleteAsync(conn.Data, uniqueIds, dryRun, folder, CancelToken);
         } else {
             ThrowTerminatingError(new ErrorRecord(
                 new InvalidOperationException("Remove-IMAPMessage - IMAP client not provided or not connected."),

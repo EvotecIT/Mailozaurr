@@ -32,10 +32,8 @@ public sealed class CmdletRenameIMAPFolder : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
-            if (!ShouldProcess(Folder!, "Renaming IMAP folder")) {
-                return;
-            }
-            await FolderOperations.RenameFolderAsync(conn.Data, Folder!, NewName!, CancelToken);
+            var dryRun = !ShouldProcess(Folder!, "Renaming IMAP folder");
+            await FolderOperations.RenameFolderAsync(conn.Data, Folder!, NewName!, dryRun, CancelToken);
         } else {
             ThrowTerminatingError(new ErrorRecord(
                 new InvalidOperationException("Rename-IMAPFolder - IMAP client not provided or not connected."),
