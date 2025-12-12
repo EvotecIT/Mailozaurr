@@ -21,3 +21,4 @@ dotnet-install.sh
 packages-microsoft-prod.deb
 
 Sources/*/TestResults/
+.nuget

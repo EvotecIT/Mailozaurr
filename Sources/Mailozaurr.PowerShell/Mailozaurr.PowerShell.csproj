@@ -36,6 +36,20 @@
         <Delete Files="$(OutDir)System.Management.dll" />
     </Target>
 
+    <!-- Do not ship framework assemblies for PowerShell 7+ (net8.0) to avoid version conflicts with
+    the host -->
+    <Target Name="RemoveFilesAfterPublish" AfterTargets="Publish"
+        Condition=" '$(TargetFramework)' == 'net8.0' ">
+        <ItemGroup>
+            <FilesToDelete Include="$(PublishDir)System.Formats.Asn1.dll" />
+            <FilesToDelete Include="$(PublishDir)System.Security.Cryptography.Pkcs.dll" />
+            <FilesToDelete Include="$(PublishDir)System.Security.Cryptography.ProtectedData.dll" />
+            <FilesToDelete Include="$(PublishDir)System.Management.Automation.dll" />
+            <FilesToDelete Include="$(PublishDir)System.Management.dll" />
+        </ItemGroup>
+        <Delete Files="@(FilesToDelete)" TreatErrorsAsWarnings="true" />
+    </Target>
+
     <ItemGroup>
         <Using Include="Mailozaurr" />
         <Using Include="System.Collections" />
