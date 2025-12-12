@@ -7,7 +7,7 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// Creates a new calendar event via Microsoft Graph.
 /// </summary>
-[Cmdlet(VerbsCommon.New, "GraphEvent")]
+[Cmdlet(VerbsCommon.New, "GraphEvent", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 [OutputType(typeof(GraphEvent))]
 public sealed class CmdletNewGraphEvent : AsyncPSCmdlet
 {
@@ -70,6 +70,9 @@ public sealed class CmdletNewGraphEvent : AsyncPSCmdlet
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
+        if (!ShouldProcess(UserPrincipalName!, "Creating Graph event")) {
+            return;
+        }
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         int attempts = 0;
         Exception? last = null;

@@ -11,7 +11,7 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// Sends pending messages stored in a file-based repository.
 /// </summary>
-[Cmdlet(VerbsCommunications.Send, "EmailPendingMessage")]
+[Cmdlet(VerbsCommunications.Send, "EmailPendingMessage", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
     /// <summary>
     /// Allows tests to override the sender factory used for processing.
@@ -43,6 +43,9 @@ public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        if (!ShouldProcess(PendingMessagesPath!, "Sending pending email messages")) {
+            return;
+        }
         var options = new PendingMessageRepositoryOptions { DirectoryPath = PendingMessagesPath! };
         var repository = new FilePendingMessageRepository(options);
         var logger = new InternalLogger();
@@ -206,4 +209,3 @@ public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
         }
     }
 }
-

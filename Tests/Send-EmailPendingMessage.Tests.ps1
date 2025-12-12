@@ -53,6 +53,36 @@ public static class FakePendingMessageSenderFactory {
         [Mailozaurr.PowerShell.CmdletSendEmailPendingMessage]::SenderFactoryProvider = $null
     }
 
+    It 'WhatIf skips sending pending messages' {
+        $path = Join-Path $TestDrive 'pending-whatif'
+        $options = [Mailozaurr.PendingMessageRepositoryOptions]::new()
+        $options.DirectoryPath = $path
+        $repo = [Mailozaurr.FilePendingMessageRepository]::new($options)
+
+        $msg = [MimeKit.MimeMessage]::new()
+        $msg.From.Add([MimeKit.MailboxAddress]::Parse('a@example.com'))
+        $msg.To.Add([MimeKit.MailboxAddress]::Parse('b@example.com'))
+        $msg.Subject = 'Pending'
+        $msg.Body = [MimeKit.TextPart]::new('plain')
+        $stream = [System.IO.MemoryStream]::new()
+        $msg.WriteTo($stream)
+
+        $record = [Mailozaurr.PendingMessageRecord]::new()
+        $record.MessageId = $msg.MessageId
+        $record.MimeMessage = [Convert]::ToBase64String($stream.ToArray())
+        $record.Timestamp = [DateTimeOffset]::UtcNow
+        $record.NextAttemptAt = [DateTimeOffset]::UtcNow
+        $record.Server = 'smtp.server'
+        $record.Port = 25
+        $record.Provider = [Mailozaurr.EmailProvider]::None
+        $repo.SaveAsync($record).GetAwaiter().GetResult()
+
+        Send-EmailPendingMessage -PendingMessagesPath $path -WhatIf
+
+        [FakePendingMessageSender]::SendCount | Should -Be 0
+        (Get-EmailPendingMessage -PendingMessagesPath $path | Measure-Object).Count | Should -Be 1
+    }
+
     It 'Resends selected messages by id regardless of schedule' {
         $path = Join-Path $TestDrive 'pending-targeted'
         $options = [Mailozaurr.PendingMessageRepositoryOptions]::new()
@@ -228,4 +258,3 @@ public static class FakePendingMessageSenderFactory {
         $stopwatch.Elapsed.TotalSeconds | Should -BeLessThan 5
     }
 }
-

@@ -64,6 +64,19 @@
         $Output.Port | Should -Be 25
         $Output.Status | Should -Be $false
     }
+    It 'Send email using given parameters (MgGraphRequest WhatIf)' {
+        $params = @{
+            From           = 'from@example.com'
+            To             = 'to@example.com'
+            Subject        = 'Test'
+            Body           = $Body
+            MgGraphRequest = $true
+            WhatIf         = $true
+        }
+        $result = Send-EmailMessage @params
+        $result.Error | Should -Be 'Email not sent (WhatIf)'
+        $result.Status | Should -Be $false
+    }
 
     It 'Accepts RetryAlways switch' {
         $params = @{ From = 'a@b.com'; To = 'c@d.com'; Server = 'smtp.example.com'; Subject = 't'; Text = 'b'; RetryAlways = $true; RetryCount = 1; WhatIf = $true }

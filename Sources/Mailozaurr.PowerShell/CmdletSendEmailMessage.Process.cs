@@ -397,6 +397,14 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             LogEmitter.EmitLogs(graph.LogCollector, this);
             return;
         }
+        if (!ShouldProcess(graph.SentTo, "Sending email message via Graph (MgGraphRequest)")) {
+            LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
+            if (!Suppress) {
+                WriteObject(new SmtpResult(false, EmailAction.Send, graph.SentTo, graph.SentFrom, "GraphAPI", 0, graph.Stopwatch.Elapsed, "", "Email not sent (WhatIf)"));
+            }
+            LogEmitter.EmitLogs(graph.LogCollector, this);
+            return;
+        }
         if (graph.IsLargerAttachment) {
             var json = graph.CreateDraftForMg();
             var draftMessageId = InvokeMgGraphRequestPOST1($"v1.0/users/{graph.From}/mailfolders/drafts/messages", EmailAction.SendDraftMessage, json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);

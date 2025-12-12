@@ -8,7 +8,7 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// Updates flags on an IMAP message.
 /// </summary>
-[Cmdlet(VerbsCommon.Set, "IMAPMessage")]
+[Cmdlet(VerbsCommon.Set, "IMAPMessage", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 public sealed class CmdletSetIMAPMessage : AsyncPSCmdlet {
     /// <summary>Active IMAP connection.</summary>
     [Parameter(Position = 0, ValueFromPipeline = true)]
@@ -37,6 +37,13 @@ public sealed class CmdletSetIMAPMessage : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         if (Read.IsPresent && Unread.IsPresent) {
             ThrowTerminatingError(new ErrorRecord(new PSArgumentException("Specify only -Read or -Unread."), "InvalidFlags", ErrorCategory.InvalidArgument, null));
+            return;
+        }
+        if (!(Read.IsPresent || Unread.IsPresent)) {
+            return;
+        }
+        var actionText = Read.IsPresent ? "Marking IMAP message as read" : "Marking IMAP message as unread";
+        if (!ShouldProcess(Uid.ToString(), actionText)) {
             return;
         }
         var conn = Client ?? DefaultSessions.ImapSession;
