@@ -731,7 +731,16 @@ namespace Mailozaurr {
         /// <summary>
         /// Moves a mail message to another folder.
         /// </summary>
-        public static async Task MoveMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId, string destinationFolderId) {
+        public static Task MoveMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId, string destinationFolderId) =>
+            MoveMailMessageAsync(credential, userPrincipalName, messageId, destinationFolderId, dryRun: false);
+
+        /// <summary>
+        /// Moves a mail message to another folder, optionally simulating the change.
+        /// </summary>
+        public static async Task MoveMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId, string destinationFolderId, bool dryRun) {
+            if (dryRun) {
+                return;
+            }
             await ExecuteMailMessageActionAsync(credential, userPrincipalName, messageId, GraphMessageAction.Move, destinationFolderId).ConfigureAwait(false);
         }
 
@@ -745,7 +754,16 @@ namespace Mailozaurr {
         /// <summary>
         /// Sets the read state for a mail message.
         /// </summary>
-        public static async Task SetMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId, bool isRead) {
+        public static Task SetMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId, bool isRead) =>
+            SetMailMessageAsync(credential, userPrincipalName, messageId, isRead, dryRun: false);
+
+        /// <summary>
+        /// Sets the read state for a mail message, optionally simulating the change.
+        /// </summary>
+        public static async Task SetMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId, bool isRead, bool dryRun) {
+            if (dryRun) {
+                return;
+            }
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
@@ -757,7 +775,16 @@ namespace Mailozaurr {
         /// <summary>
         /// Deletes a mail message.
         /// </summary>
-        public static async Task DeleteMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId) {
+        public static Task DeleteMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId) =>
+            DeleteMailMessageAsync(credential, userPrincipalName, messageId, dryRun: false);
+
+        /// <summary>
+        /// Deletes a mail message, optionally simulating the change.
+        /// </summary>
+        public static async Task DeleteMailMessageAsync(GraphCredential credential, string userPrincipalName, string messageId, bool dryRun) {
+            if (dryRun) {
+                return;
+            }
             await ExecuteMailMessageActionAsync(credential, userPrincipalName, messageId, GraphMessageAction.Delete).ConfigureAwait(false);
         }
 
@@ -782,7 +809,7 @@ namespace Mailozaurr {
         /// <summary>
         /// Deletes all messages from the Junk Email folder.
         /// </summary>
-        public static async Task ClearJunkMailAsync(
+        public static Task ClearJunkMailAsync(
             GraphCredential credential,
             string userPrincipalName,
             IEnumerable<string>? skipIds = null,
@@ -790,7 +817,25 @@ namespace Mailozaurr {
             IEnumerable<string>? skipTo = null,
             IEnumerable<string>? skipSubjectContains = null,
             bool skipHasAttachment = false,
+            IEnumerable<string>? skipAttachmentExtension = null) =>
+            ClearJunkMailAsync(credential, userPrincipalName, dryRun: false, skipIds, skipFrom, skipTo, skipSubjectContains, skipHasAttachment, skipAttachmentExtension);
+
+        /// <summary>
+        /// Deletes all messages from the Junk Email folder, optionally simulating the change.
+        /// </summary>
+        public static async Task ClearJunkMailAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            bool dryRun,
+            IEnumerable<string>? skipIds = null,
+            IEnumerable<string>? skipFrom = null,
+            IEnumerable<string>? skipTo = null,
+            IEnumerable<string>? skipSubjectContains = null,
+            bool skipHasAttachment = false,
             IEnumerable<string>? skipAttachmentExtension = null) {
+            if (dryRun) {
+                return;
+            }
             var properties = new List<string> { "id" };
             if (skipFrom != null) properties.Add("from");
             if (skipTo != null) properties.Add("toRecipients");
@@ -954,11 +999,25 @@ namespace Mailozaurr {
         /// <param name="folderId">Identifier of the folder to move.</param>
         /// <param name="destinationFolderId">Identifier of the new parent folder.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
+        public static Task MoveFolderAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            string folderId,
+            string destinationFolderId) =>
+            MoveFolderAsync(credential, userPrincipalName, folderId, destinationFolderId, dryRun: false);
+
+        /// <summary>
+        /// Moves a mail folder to another location, optionally simulating the change.
+        /// </summary>
         public static async Task MoveFolderAsync(
             GraphCredential credential,
             string userPrincipalName,
             string folderId,
-            string destinationFolderId) {
+            string destinationFolderId,
+            bool dryRun) {
+            if (dryRun) {
+                return;
+            }
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
@@ -975,11 +1034,25 @@ namespace Mailozaurr {
         /// <param name="folderId">Identifier of the folder to rename.</param>
         /// <param name="newDisplayName">New display name for the folder.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
+        public static Task RenameFolderAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            string folderId,
+            string newDisplayName) =>
+            RenameFolderAsync(credential, userPrincipalName, folderId, newDisplayName, dryRun: false);
+
+        /// <summary>
+        /// Renames a mail folder, optionally simulating the change.
+        /// </summary>
         public static async Task RenameFolderAsync(
             GraphCredential credential,
             string userPrincipalName,
             string folderId,
-            string newDisplayName) {
+            string newDisplayName,
+            bool dryRun) {
+            if (dryRun) {
+                return;
+            }
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
@@ -995,10 +1068,23 @@ namespace Mailozaurr {
         /// <param name="userPrincipalName">User principal name owning the mail folder.</param>
         /// <param name="folderId">Identifier of the folder to remove.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
+        public static Task RemoveFolderAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            string folderId) =>
+            RemoveFolderAsync(credential, userPrincipalName, folderId, dryRun: false);
+
+        /// <summary>
+        /// Removes a mail folder, optionally simulating the change.
+        /// </summary>
         public static async Task RemoveFolderAsync(
             GraphCredential credential,
             string userPrincipalName,
-            string folderId) {
+            string folderId,
+            bool dryRun) {
+            if (dryRun) {
+                return;
+            }
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
@@ -1028,7 +1114,16 @@ namespace Mailozaurr {
         /// <summary>
         /// Adds a mailbox permission.
         /// </summary>
-        public static async Task AddMailboxPermissionAsync(GraphCredential credential, string userPrincipalName, string body) {
+        public static Task AddMailboxPermissionAsync(GraphCredential credential, string userPrincipalName, string body) =>
+            AddMailboxPermissionAsync(credential, userPrincipalName, body, dryRun: false);
+
+        /// <summary>
+        /// Adds a mailbox permission, optionally simulating the change.
+        /// </summary>
+        public static async Task AddMailboxPermissionAsync(GraphCredential credential, string userPrincipalName, string body, bool dryRun) {
+            if (dryRun) {
+                return;
+            }
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
@@ -1039,11 +1134,21 @@ namespace Mailozaurr {
         /// <summary>
         /// Removes a mailbox permission.
         /// </summary>
-        public static async Task RemoveMailboxPermissionAsync(GraphCredential credential, string userPrincipalName, string permissionId) {
+        public static Task RemoveMailboxPermissionAsync(GraphCredential credential, string userPrincipalName, string permissionId) =>
+            RemoveMailboxPermissionAsync(credential, userPrincipalName, permissionId, dryRun: false);
+
+        /// <summary>
+        /// Removes a mailbox permission, optionally simulating the change.
+        /// </summary>
+        public static async Task RemoveMailboxPermissionAsync(GraphCredential credential, string userPrincipalName, string permissionId, bool dryRun) {
+            if (dryRun) {
+                return;
+            }
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/permissions/{permissionId}");
+            await InvokeGraphApiAsync("DELETE", uri, headers).ConfigureAwait(false);
         }
       
         /// <summary>     
@@ -1172,10 +1277,23 @@ namespace Mailozaurr {
         /// <param name="userPrincipalName">User principal name owning the mailbox.</param>
         /// <param name="rule">Dictionary describing the rule to create.</param>
         /// <returns>The created rule as a dictionary.</returns>
+        public static Task<GraphInboxRule> NewRuleAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            GraphInboxRule rule) =>
+            NewRuleAsync(credential, userPrincipalName, rule, dryRun: false);
+
+        /// <summary>
+        /// Creates a new inbox rule, optionally simulating the change.
+        /// </summary>
         public static async Task<GraphInboxRule> NewRuleAsync(
             GraphCredential credential,
             string userPrincipalName,
-            GraphInboxRule rule) {
+            GraphInboxRule rule,
+            bool dryRun) {
+            if (dryRun) {
+                return rule;
+            }
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
@@ -1192,11 +1310,25 @@ namespace Mailozaurr {
         /// <summary>
         /// Updates an existing inbox rule.
         /// </summary>
+        public static Task<GraphInboxRule> UpdateRuleAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            string ruleId,
+            GraphInboxRule rule) =>
+            UpdateRuleAsync(credential, userPrincipalName, ruleId, rule, dryRun: false);
+
+        /// <summary>
+        /// Updates an existing inbox rule, optionally simulating the change.
+        /// </summary>
         public static async Task<GraphInboxRule> UpdateRuleAsync(
             GraphCredential credential,
             string userPrincipalName,
             string ruleId,
-            GraphInboxRule rule) {
+            GraphInboxRule rule,
+            bool dryRun) {
+            if (dryRun) {
+                return rule;
+            }
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
@@ -1217,10 +1349,23 @@ namespace Mailozaurr {
         /// <param name="userPrincipalName">User principal name owning the mailbox.</param>
         /// <param name="ruleId">Identifier of the rule to remove.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
+        public static Task RemoveRuleAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            string ruleId) =>
+            RemoveRuleAsync(credential, userPrincipalName, ruleId, dryRun: false);
+
+        /// <summary>
+        /// Removes the specified inbox rule, optionally simulating the change.
+        /// </summary>
         public static async Task RemoveRuleAsync(
             GraphCredential credential,
             string userPrincipalName,
-            string ruleId) {
+            string ruleId,
+            bool dryRun) {
+            if (dryRun) {
+                return;
+            }
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
@@ -1259,10 +1404,23 @@ namespace Mailozaurr {
         /// <summary>
         /// Creates a new calendar event.
         /// </summary>
+        public static Task<GraphEvent> NewEventAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            GraphEvent ev) =>
+            NewEventAsync(credential, userPrincipalName, ev, dryRun: false);
+
+        /// <summary>
+        /// Creates a new calendar event, optionally simulating the change.
+        /// </summary>
         public static async Task<GraphEvent> NewEventAsync(
             GraphCredential credential,
             string userPrincipalName,
-            GraphEvent ev) {
+            GraphEvent ev,
+            bool dryRun) {
+            if (dryRun) {
+                return ev;
+            }
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
@@ -1279,11 +1437,25 @@ namespace Mailozaurr {
         /// <summary>
         /// Updates an existing calendar event.
         /// </summary>
+        public static Task<GraphEvent> UpdateEventAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            string eventId,
+            GraphEvent ev) =>
+            UpdateEventAsync(credential, userPrincipalName, eventId, ev, dryRun: false);
+
+        /// <summary>
+        /// Updates an existing calendar event, optionally simulating the change.
+        /// </summary>
         public static async Task<GraphEvent> UpdateEventAsync(
             GraphCredential credential,
             string userPrincipalName,
             string eventId,
-            GraphEvent ev) {
+            GraphEvent ev,
+            bool dryRun) {
+            if (dryRun) {
+                return ev;
+            }
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
@@ -1300,10 +1472,23 @@ namespace Mailozaurr {
         /// <summary>
         /// Removes the specified calendar event.
         /// </summary>
+        public static Task RemoveEventAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            string eventId) =>
+            RemoveEventAsync(credential, userPrincipalName, eventId, dryRun: false);
+
+        /// <summary>
+        /// Removes the specified calendar event, optionally simulating the change.
+        /// </summary>
         public static async Task RemoveEventAsync(
             GraphCredential credential,
             string userPrincipalName,
-            string eventId) {
+            string eventId,
+            bool dryRun) {
+            if (dryRun) {
+                return;
+            }
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;

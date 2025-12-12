@@ -249,6 +249,11 @@ namespace Mailozaurr;
     public LogCollector LogCollector { get; set; } = new();
 
     /// <summary>
+    /// When set, sending is simulated and no Graph requests are issued.
+    /// </summary>
+    public bool DryRun { get; set; }
+
+    /// <summary>
     /// Initializes a new instance of the Graph class.
     /// </summary>
     public Graph() {
@@ -499,6 +504,10 @@ namespace Mailozaurr;
         Stopwatch.Restart();
         // create message
         CreateMessage();
+        if (DryRun) {
+            LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph send.");
+            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
+        }
         LogCollector.LogVerbose("Send-EmailMessage - Sending email via Graph API");
         // Create the request URI outside the loop.
         var requestUri = MicrosoftGraphUtils.BuildGraphUri(
@@ -583,6 +592,11 @@ namespace Mailozaurr;
     /// <returns>The result of the send operation.</returns>
     public async Task<SmtpResult> SendMessageDraftAsync(CancellationToken cancellationToken = default) {
         Stopwatch.Restart();
+        if (DryRun) {
+            CreateMessage();
+            LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph draft send.");
+            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
+        }
         // Create the draft message using the new method
         var draftMessage = await CreateDraftMessageAsync(cancellationToken);
 
@@ -642,6 +656,10 @@ namespace Mailozaurr;
         /// <returns>The result of the send operation.</returns>
         public async Task<SmtpResult> SendDraftMessage(GraphMessage draftMessage, CancellationToken cancellationToken = default) {
         Stopwatch.Restart();
+        if (DryRun) {
+            LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph draft send.");
+            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
+        }
         // Send the draft message
         var sendRequestUri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
@@ -687,6 +705,10 @@ namespace Mailozaurr;
     public async Task<SmtpResult> SendMessageBatchAsync(CancellationToken cancellationToken = default) {
         Stopwatch.Restart();
         CreateMessage();
+        if (DryRun) {
+            LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph batch send.");
+            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
+        }
         var credential = new GraphCredential {
             ClientId = ApplicationID,
             ClientSecret = ApplicationKey,

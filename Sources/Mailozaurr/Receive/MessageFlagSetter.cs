@@ -43,7 +43,16 @@ public static class MessageFlagSetter {
     /// <summary>
     /// Sets or clears message flags in an IMAP folder.
     /// </summary>
-    public static Task SetFlagsAsync(ImapClient client, UniqueId uid, MessageFlags flags, bool add, string? folder = null, CancellationToken cancellationToken = default) {
+    public static Task SetFlagsAsync(ImapClient client, UniqueId uid, MessageFlags flags, bool add, string? folder = null, CancellationToken cancellationToken = default) =>
+        SetFlagsAsync(client, uid, flags, add, dryRun: false, folder, cancellationToken);
+
+    /// <summary>
+    /// Sets or clears message flags in an IMAP folder, optionally simulating the change.
+    /// </summary>
+    public static Task SetFlagsAsync(ImapClient client, UniqueId uid, MessageFlags flags, bool add, bool dryRun, string? folder = null, CancellationToken cancellationToken = default) {
+        if (dryRun) {
+            return Task.CompletedTask;
+        }
         var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadWrite);
         return SetFlagsAsync(new FolderWrapper(mailFolder), uid, flags, add, cancellationToken);
     }
@@ -52,15 +61,34 @@ public static class MessageFlagSetter {
     /// Sets or clears message flags using an abstract folder.
     /// </summary>
     public static Task SetFlagsAsync(IImapFolder folder, UniqueId uid, MessageFlags flags, bool add, CancellationToken cancellationToken = default) =>
-        add ? folder.AddFlagsAsync(uid, flags, true, cancellationToken)
+        SetFlagsAsync(folder, uid, flags, add, dryRun: false, cancellationToken);
+
+    /// <summary>
+    /// Sets or clears message flags using an abstract folder, optionally simulating the change.
+    /// </summary>
+    public static Task SetFlagsAsync(IImapFolder folder, UniqueId uid, MessageFlags flags, bool add, bool dryRun, CancellationToken cancellationToken = default) {
+        if (dryRun) {
+            return Task.CompletedTask;
+        }
+        return add ? folder.AddFlagsAsync(uid, flags, true, cancellationToken)
             : folder.RemoveFlagsAsync(uid, flags, true, cancellationToken);
+    }
 
     private static readonly ConditionalWeakTable<Pop3Client, ConcurrentDictionary<int, bool>> Pop3Flags = new();
 
     /// <summary>
     /// Sets or clears the local read flag for a POP3 message.
     /// </summary>
-    public static Task SetReadAsync(Pop3Client client, int index, bool read, CancellationToken cancellationToken = default) {
+    public static Task SetReadAsync(Pop3Client client, int index, bool read, CancellationToken cancellationToken = default) =>
+        SetReadAsync(client, index, read, dryRun: false, cancellationToken);
+
+    /// <summary>
+    /// Sets or clears the local read flag for a POP3 message, optionally simulating the change.
+    /// </summary>
+    public static Task SetReadAsync(Pop3Client client, int index, bool read, bool dryRun, CancellationToken cancellationToken = default) {
+        if (dryRun) {
+            return Task.CompletedTask;
+        }
         var state = Pop3Flags.GetOrCreateValue(client);
         state[index] = read;
         return Task.CompletedTask;

@@ -34,6 +34,11 @@ public class Smtp {
     /// <summary>LogCollector for capturing logs from async operations.</summary>
     public LogCollector? LogCollector { get; set; }
 
+    /// <summary>
+    /// When set, sending is simulated and no network or repository side-effects are performed.
+    /// </summary>
+    public bool DryRun { get; set; }
+
     /// <summary>Repository used to persist sent message metadata.</summary>
     public ISentMessageRepository? SentMessageRepository { get; set; }
     /// <summary>Repository used to persist pending messages for later retry.</summary>
@@ -835,6 +840,12 @@ public class Smtp {
     }
 
     private async Task<SmtpResult> SendCoreAsync(CancellationToken cancellationToken = default) {
+        if (DryRun) {
+            LogVerbose("Send-EmailMessage - DryRun enabled, skipping send.");
+            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)") {
+                MessageId = Message?.MessageId
+            };
+        }
         int attempts = 0;
         Exception? lastException = null;
         var credentialProtector = CredentialProtection.Default;

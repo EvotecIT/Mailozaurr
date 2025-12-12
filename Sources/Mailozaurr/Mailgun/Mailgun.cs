@@ -68,6 +68,11 @@ public class MailgunClient : IDisposable {
 
     /// <summary>Collector used to store log entries.</summary>
     public LogCollector LogCollector { get; set; } = new();
+
+    /// <summary>
+    /// When set, sending is simulated and no Mailgun request is issued.
+    /// </summary>
+    public bool DryRun { get; set; }
     /// <summary>Number of retry attempts on failure.</summary>
     public int RetryCount { get; set; } = 0;
     /// <summary>Base delay in milliseconds between retries.</summary>
@@ -281,6 +286,10 @@ public class MailgunClient : IDisposable {
     /// <returns>The result of the send operation.</returns>
     public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken) {
         ThrowIfDisposed();
+        if (DryRun) {
+            LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Mailgun send.");
+            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
+        }
         var url = $"https://api.mailgun.net/v3/{EmailDomain}/messages";
         var auth = Convert.ToBase64String(Encoding.ASCII.GetBytes($"api:{ApiKey}"));
 
