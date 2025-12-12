@@ -13,7 +13,7 @@
     PrivateData          = @{
         PSData = @{
             IconUri                  = 'https://evotec.xyz/wp-content/uploads/2020/07/MailoZaurr.png'
-            Prerelease               = 'Preview10'
+            Prerelease               = 'Preview11'
             ProjectUri               = 'https://github.com/EvotecIT/MailoZaurr'
             RequireLicenseAcceptance = $false
             Tags                     = @('Windows', 'MacOS', 'Linux', 'Mail', 'Email', 'MX', 'SPF', 'DMARC', 'DKIM', 'GraphApi', 'SendGrid', 'Graph', 'IMAP', 'POP3')
