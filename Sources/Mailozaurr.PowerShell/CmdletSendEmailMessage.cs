@@ -34,7 +34,7 @@ namespace Mailozaurr.PowerShell;
 /// Send-EmailMessage -From @{ Name = 'John Doe'; Email = 'john.doe@example.com' } -To 'recipient@example.com' -Credential $cred -HTML '<b>Hello</b>' -Subject 'Graph API Email' -Graph</code>
 /// </example>
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
-[Cmdlet(VerbsCommunications.Send, "EmailMessage", DefaultParameterSetName = "Compatibility", SupportsShouldProcess = true)]
+[Cmdlet(VerbsCommunications.Send, "EmailMessage", DefaultParameterSetName = "Compatibility", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 [CmdletBinding()]
 public sealed partial class CmdletSendEmailMessage : PSCmdlet {
     private const long GraphAttachmentLimitBytes = 150000000;
