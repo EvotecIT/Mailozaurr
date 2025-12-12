@@ -133,9 +133,22 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        if (!ShouldProcess(UserPrincipalName!, "Clearing Graph junk")) return;
+        var dryRun = !ShouldProcess(UserPrincipalName!, "Clearing Graph junk");
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         MicrosoftGraphUtils.MaxConcurrentRequests = MaxConcurrentRequests;
+        if (dryRun) {
+            await MicrosoftGraphUtils.ClearJunkMailAsync(
+                cred,
+                UserPrincipalName!,
+                true,
+                SkipId,
+                SkipFrom,
+                SkipTo,
+                SkipSubjectContains,
+                SkipHasAttachment.IsPresent,
+                SkipAttachmentExtension);
+            return;
+        }
         int attempts = 0;
         Exception? lastException = null;
         do {
@@ -143,6 +156,7 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
                 await MicrosoftGraphUtils.ClearJunkMailAsync(
                     cred,
                     UserPrincipalName!,
+                    false,
                     SkipId,
                     SkipFrom,
                     SkipTo,

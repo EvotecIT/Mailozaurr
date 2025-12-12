@@ -38,16 +38,17 @@ public sealed class CmdletSetPOP3Message : AsyncPSCmdlet {
             return Task.CompletedTask;
         }
         var actionText = Read.IsPresent ? "Marking POP3 message as read" : "Marking POP3 message as unread";
-        if (!ShouldProcess(Index.ToString(), actionText)) {
+        var dryRun = !ShouldProcess(Index.ToString(), actionText);
+        if (dryRun) {
             return Task.CompletedTask;
         }
         var conn = Client ?? DefaultSessions.Pop3Session;
         if (conn != null && conn.Data != null) {
             if (Read) {
-                return MessageFlagSetter.SetReadAsync(conn.Data, Index, true, CancelToken);
+                return MessageFlagSetter.SetReadAsync(conn.Data, Index, true, dryRun, CancelToken);
             }
             if (Unread) {
-                return MessageFlagSetter.SetReadAsync(conn.Data, Index, false, CancelToken);
+                return MessageFlagSetter.SetReadAsync(conn.Data, Index, false, dryRun, CancelToken);
             }
         } else {
             ThrowTerminatingError(new ErrorRecord(

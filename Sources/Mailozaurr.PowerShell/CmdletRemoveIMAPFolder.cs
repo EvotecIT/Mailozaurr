@@ -30,10 +30,8 @@ public sealed class CmdletRemoveIMAPFolder : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
-            if (!ShouldProcess(Folder!, "Removing IMAP folder")) {
-                return;
-            }
-            await FolderOperations.RemoveFolderAsync(conn.Data, Folder!, Recursive, CancelToken);
+            var dryRun = !ShouldProcess(Folder!, "Removing IMAP folder");
+            await FolderOperations.RemoveFolderAsync(conn.Data, Folder!, Recursive.IsPresent, dryRun, CancelToken);
         } else {
             ThrowTerminatingError(new ErrorRecord(
                 new InvalidOperationException("Remove-IMAPFolder - IMAP client not provided or not connected."),

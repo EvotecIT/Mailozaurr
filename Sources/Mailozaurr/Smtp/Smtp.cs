@@ -441,6 +441,19 @@ public class Smtp {
         var oldPort = Port;
         Server = server;
         Port = port;
+        var effectiveOptions = secureSocketOptions;
+        if (useSsl && effectiveOptions == SecureSocketOptions.Auto) {
+            // Maintain backwards compatibility with Send-MailMessage by
+            // defaulting to StartTls when the UseSsl flag is supplied and
+            // no explicit option was provided.
+            effectiveOptions = SecureSocketOptions.StartTls;
+        }
+        _activeUseSsl = useSsl;
+        _activeSecureSocketOptions = effectiveOptions;
+        if (DryRun) {
+            LogVerbose($"Send-EmailMessage - DryRun enabled, skipping connect to {server} on port {port} using SSL: {effectiveOptions}");
+            return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "Connection skipped (WhatIf)");
+        }
         if (Client.IsConnected)
         {
             if (SmtpConnectionPool.PoolingEnabled)
@@ -459,15 +472,6 @@ public class Smtp {
         {
             Client = pooled;
         }
-        var effectiveOptions = secureSocketOptions;
-        if (useSsl && effectiveOptions == SecureSocketOptions.Auto) {
-            // Maintain backwards compatibility with Send-MailMessage by
-            // defaulting to StartTls when the UseSsl flag is supplied and
-            // no explicit option was provided.
-            effectiveOptions = SecureSocketOptions.StartTls;
-        }
-        _activeUseSsl = useSsl;
-        _activeSecureSocketOptions = effectiveOptions;
         try {
             if (!Client.IsConnected)
             {
@@ -502,6 +506,19 @@ public class Smtp {
         var oldPort = Port;
         Server = server;
         Port = port;
+        var effectiveOptions = secureSocketOptions;
+        if (useSsl && effectiveOptions == SecureSocketOptions.Auto) {
+            // Maintain backwards compatibility with Send-MailMessage by
+            // defaulting to StartTls when the UseSsl flag is supplied and
+            // no explicit option was provided.
+            effectiveOptions = SecureSocketOptions.StartTls;
+        }
+        _activeUseSsl = useSsl;
+        _activeSecureSocketOptions = effectiveOptions;
+        if (DryRun) {
+            LogVerbose($"Send-EmailMessage - DryRun enabled, skipping connect to {server} on port {port} using SSL: {effectiveOptions}");
+            return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "Connection skipped (WhatIf)");
+        }
         if (Client.IsConnected)
         {
             if (SmtpConnectionPool.PoolingEnabled)
@@ -520,15 +537,6 @@ public class Smtp {
         {
             Client = pooled;
         }
-        var effectiveOptions = secureSocketOptions;
-        if (useSsl && effectiveOptions == SecureSocketOptions.Auto) {
-            // Maintain backwards compatibility with Send-MailMessage by
-            // defaulting to StartTls when the UseSsl flag is supplied and
-            // no explicit option was provided.
-            effectiveOptions = SecureSocketOptions.StartTls;
-        }
-        _activeUseSsl = useSsl;
-        _activeSecureSocketOptions = effectiveOptions;
         try {
             if (!Client.IsConnected)
             {
@@ -553,6 +561,10 @@ public class Smtp {
     /// <param name="isOAuth"></param>
     /// <returns></returns>
     public SmtpResult Authenticate(ICredentials Credentials, bool isOAuth = false) {
+        if (DryRun) {
+            LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
+            return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "Authentication skipped (WhatIf)");
+        }
         try {
             if (isOAuth) {
                 var networkCredential = Credentials as NetworkCredential;
@@ -585,6 +597,10 @@ public class Smtp {
     /// <param name="isOAuth"></param>
     /// <returns></returns>
     public async Task<SmtpResult> AuthenticateAsync(ICredentials Credentials, bool isOAuth = false) {
+        if (DryRun) {
+            LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
+            return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "Authentication skipped (WhatIf)");
+        }
         try {
             if (isOAuth) {
                 var networkCredential = Credentials as NetworkCredential;
@@ -615,6 +631,10 @@ public class Smtp {
     /// </summary>
     /// <returns></returns>
     public SmtpResult AuthenticateDefaultCredentials() {
+        if (DryRun) {
+            LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
+            return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "Authentication skipped (WhatIf)");
+        }
         try {
             var mechanism = new SaslMechanismNtlmIntegrated();
             Client.Authenticate(mechanism);
@@ -668,6 +688,10 @@ public class Smtp {
     /// <param name="mechanism">Authentication mechanism to use.</param>
     /// <returns>An <see cref="SmtpResult"/> representing the outcome.</returns>
     public SmtpResult Authenticate(string username, string password, bool isSecureString, AuthenticationMechanism mechanism = AuthenticationMechanism.Plain) {
+        if (DryRun) {
+            LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
+            return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "Authentication skipped (WhatIf)");
+        }
         password = ConvertSecureStringToPlainString(password, isSecureString);
         Credential = new NetworkCredential(username, password);
         try {
@@ -750,6 +774,10 @@ public class Smtp {
 
         await foreach (var record in PendingMessageRepository.GetAllAsync(cancellationToken)) {
             cancellationToken.ThrowIfCancellationRequested();
+            if (DryRun) {
+                LogVerbose($"ProcessPendingMessages - DryRun enabled, skipping {record.MessageId}");
+                continue;
+            }
             if (string.IsNullOrWhiteSpace(record.MimeMessage) || string.IsNullOrEmpty(record.MessageId)) {
                 continue;
             }

@@ -22,6 +22,21 @@ public static class FolderOperations {
         string sourceFolder,
         string? destinationFolder,
         CancellationToken cancellationToken = default) {
+        await MoveFolderAsync(client, sourceFolder, destinationFolder, dryRun: false, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Moves an IMAP folder to a different parent folder, optionally simulating the change.
+    /// </summary>
+    public static async Task MoveFolderAsync(
+        ImapClient client,
+        string sourceFolder,
+        string? destinationFolder,
+        bool dryRun,
+        CancellationToken cancellationToken = default) {
+        if (dryRun) {
+            return;
+        }
         var source = client.GetCachedFolder(sourceFolder, FolderAccess.ReadWrite);
         IMailFolder destParent;
         if (string.IsNullOrWhiteSpace(destinationFolder)) {
@@ -57,6 +72,21 @@ public static class FolderOperations {
         string folder,
         string newName,
         CancellationToken cancellationToken = default) {
+        await RenameFolderAsync(client, folder, newName, dryRun: false, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Renames an existing IMAP folder, optionally simulating the change.
+    /// </summary>
+    public static async Task RenameFolderAsync(
+        ImapClient client,
+        string folder,
+        string newName,
+        bool dryRun,
+        CancellationToken cancellationToken = default) {
+        if (dryRun) {
+            return;
+        }
         var src = client.GetCachedFolder(folder, FolderAccess.ReadWrite);
         try {
             await src.RenameAsync(src.ParentFolder, newName, cancellationToken).ConfigureAwait(false);
@@ -80,11 +110,26 @@ public static class FolderOperations {
         string folder,
         bool recursive = false,
         CancellationToken cancellationToken = default) {
+        await RemoveFolderAsync(client, folder, recursive, dryRun: false, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Permanently deletes a folder, optionally simulating the change.
+    /// </summary>
+    public static async Task RemoveFolderAsync(
+        ImapClient client,
+        string folder,
+        bool recursive,
+        bool dryRun,
+        CancellationToken cancellationToken = default) {
+        if (dryRun) {
+            return;
+        }
         var src = client.GetCachedFolder(folder, FolderAccess.ReadWrite);
         try {
             if (recursive) {
                 foreach (var sub in await src.GetSubfoldersAsync(false, cancellationToken).ConfigureAwait(false))
-                    await RemoveFolderAsync(client, sub.FullName, true, cancellationToken).ConfigureAwait(false);
+                    await RemoveFolderAsync(client, sub.FullName, true, dryRun: false, cancellationToken).ConfigureAwait(false);
 
                 if (src.IsOpen)
                     await src.CloseAsync(false, cancellationToken).ConfigureAwait(false);

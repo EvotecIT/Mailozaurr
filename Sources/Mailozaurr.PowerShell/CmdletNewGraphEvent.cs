@@ -70,16 +70,18 @@ public sealed class CmdletNewGraphEvent : AsyncPSCmdlet
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        if (!ShouldProcess(UserPrincipalName!, "Creating Graph event")) {
-            return;
-        }
+        var dryRun = !ShouldProcess(UserPrincipalName!, "Creating Graph event");
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         int attempts = 0;
         Exception? last = null;
         GraphEvent toCreate = ParameterSetName == "Builder" ? EventBuilder! : Event!;
+        if (dryRun) {
+            await MicrosoftGraphUtils.NewEventAsync(cred, UserPrincipalName!, toCreate, dryRun: true);
+            return;
+        }
         do {
             try {
-                var result = await MicrosoftGraphUtils.NewEventAsync(cred, UserPrincipalName!, toCreate);
+                var result = await MicrosoftGraphUtils.NewEventAsync(cred, UserPrincipalName!, toCreate, dryRun: false);
                 WriteObject(result);
                 return;
             } catch (Exception ex) {

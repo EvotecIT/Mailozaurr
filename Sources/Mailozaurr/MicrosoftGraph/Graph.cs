@@ -453,6 +453,10 @@ namespace Mailozaurr;
     /// <returns>The result of the connection attempt.</returns>
     public async Task<SmtpResult> ConnectO365GraphAsync(CancellationToken cancellationToken = default) {
         Stopwatch.Restart();
+        if (DryRun) {
+            LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph authentication.");
+            return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "Connection skipped (WhatIf)");
+        }
         string resource = "https://graph.microsoft.com";
         var body = new Dictionary<string, string> {
             { "grant_type", "client_credentials" },

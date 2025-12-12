@@ -96,16 +96,18 @@ public class CmdletMoveGraphMessage : AsyncPSCmdlet {
     /// </summary>
     /// <param name="cred">Credential used to access Graph.</param>
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        if (!ShouldProcess(MessageId!, "Moving Graph message")) {
-            return;
-        }
+        var dryRun = !ShouldProcess(MessageId!, "Moving Graph message");
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         MicrosoftGraphUtils.MaxConcurrentRequests = MaxConcurrentRequests;
+        if (dryRun) {
+            await MicrosoftGraphUtils.MoveMailMessageAsync(cred, UserPrincipalName!, MessageId!, DestinationFolderId!, dryRun: true);
+            return;
+        }
         int attempts = 0;
         Exception? lastException = null;
         do {
             try {
-                await MicrosoftGraphUtils.MoveMailMessageAsync(cred, UserPrincipalName!, MessageId!, DestinationFolderId!);
+                await MicrosoftGraphUtils.MoveMailMessageAsync(cred, UserPrincipalName!, MessageId!, DestinationFolderId!, dryRun: false);
                 return;
             } catch (Exception ex) {
                 lastException = ex;

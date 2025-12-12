@@ -77,15 +77,17 @@ public sealed class CmdletRemoveGraphInboxRule : AsyncPSCmdlet {
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        if (!ShouldProcess(RuleId!, "Removing inbox rule")) {
+        var dryRun = !ShouldProcess(RuleId!, "Removing inbox rule");
+        MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
+        if (dryRun) {
+            await MicrosoftGraphUtils.RemoveRuleAsync(cred, UserPrincipalName!, RuleId!, dryRun: true);
             return;
         }
-        MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         int attempts = 0;
         Exception? lastException = null;
         do {
             try {
-                await MicrosoftGraphUtils.RemoveRuleAsync(cred, UserPrincipalName!, RuleId!);
+                await MicrosoftGraphUtils.RemoveRuleAsync(cred, UserPrincipalName!, RuleId!, dryRun: false);
                 return;
             } catch (Exception ex) {
                 lastException = ex;

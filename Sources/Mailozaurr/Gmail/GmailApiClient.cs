@@ -357,6 +357,9 @@ public sealed class GmailApiClient : IDisposable {
     /// </summary>
     public async Task DeleteAsync(string userId, string id, CancellationToken cancellationToken = default) {
         ThrowIfDisposed();
+        if (DryRun) {
+            return;
+        }
         using var response = await _client.DeleteAsync($"users/{userId}/messages/{id}", cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();

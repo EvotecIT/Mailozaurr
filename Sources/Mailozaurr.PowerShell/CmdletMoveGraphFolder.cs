@@ -82,17 +82,19 @@ public class CmdletMoveGraphFolder : AsyncPSCmdlet {
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        if (!ShouldProcess(FolderId!, "Moving Graph folder")) {
-            return;
-        }
+        var dryRun = !ShouldProcess(FolderId!, "Moving Graph folder");
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         MicrosoftGraphUtils.MaxConcurrentRequests = MaxConcurrentRequests;
+        var dest = ParameterSetName == RootParameterSet ? "msgfolderroot" : DestinationFolderId!;
+        if (dryRun) {
+            await MicrosoftGraphUtils.MoveFolderAsync(cred, UserPrincipalName!, FolderId!, dest, dryRun: true);
+            return;
+        }
         int attempts = 0;
         Exception? lastException = null;
         do {
             try {
-                var dest = ParameterSetName == RootParameterSet ? "msgfolderroot" : DestinationFolderId!;
-                await MicrosoftGraphUtils.MoveFolderAsync(cred, UserPrincipalName!, FolderId!, dest);
+                await MicrosoftGraphUtils.MoveFolderAsync(cred, UserPrincipalName!, FolderId!, dest, dryRun: false);
                 return;
             } catch (Exception ex) {
                 lastException = ex;

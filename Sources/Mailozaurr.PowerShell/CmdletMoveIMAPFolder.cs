@@ -38,11 +38,9 @@ public sealed class CmdletMoveIMAPFolder : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
-            if (!ShouldProcess(Folder!, "Moving IMAP folder")) {
-                return;
-            }
+            var dryRun = !ShouldProcess(Folder!, "Moving IMAP folder");
             var dest = ParameterSetName == RootParameterSet ? null : DestinationFolder;
-            await FolderOperations.MoveFolderAsync(conn.Data, Folder!, dest, CancelToken);
+            await FolderOperations.MoveFolderAsync(conn.Data, Folder!, dest, dryRun, CancelToken);
         } else {
             ThrowTerminatingError(new ErrorRecord(
                 new InvalidOperationException("Move-IMAPFolder - IMAP client not provided or not connected."),

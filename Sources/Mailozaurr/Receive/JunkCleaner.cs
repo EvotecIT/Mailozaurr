@@ -36,6 +36,38 @@ public static class JunkCleaner {
         bool skipHasAttachment = false,
         IEnumerable<string>? skipAttachmentExtension = null,
         CancellationToken cancellationToken = default) {
+        await ClearImapJunkAsync(
+            client,
+            folder,
+            skipFrom,
+            skipTo,
+            skipSubjectContains,
+            skipMessageId,
+            skipUid,
+            skipHasAttachment,
+            skipAttachmentExtension,
+            dryRun: false,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Deletes all messages from the specified junk folder, optionally simulating the change.
+    /// </summary>
+    public static async Task ClearImapJunkAsync(
+        ImapClient client,
+        string? folder,
+        IEnumerable<string>? skipFrom,
+        IEnumerable<string>? skipTo,
+        IEnumerable<string>? skipSubjectContains,
+        IEnumerable<string>? skipMessageId,
+        IEnumerable<uint>? skipUid,
+        bool skipHasAttachment,
+        IEnumerable<string>? skipAttachmentExtension,
+        bool dryRun,
+        CancellationToken cancellationToken = default) {
+        if (dryRun) {
+            return;
+        }
         var junk = client.GetCachedFolder(folder ?? "Junk", FolderAccess.ReadWrite);
         var uids = await junk.SearchAsync(SearchQuery.All, cancellationToken).ConfigureAwait(false);
         if (uids.Count == 0) {

@@ -95,16 +95,18 @@ public class CmdletSetGraphMessage : AsyncPSCmdlet {
     /// </summary>
     /// <param name="cred">Credential used to access Graph.</param>
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        if (!ShouldProcess(MessageId!, "Updating message via Graph")) {
-            return;
-        }
+        var dryRun = !ShouldProcess(MessageId!, "Updating message via Graph");
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         MicrosoftGraphUtils.MaxConcurrentRequests = MaxConcurrentRequests;
+        if (dryRun) {
+            await MicrosoftGraphUtils.SetMailMessageAsync(cred, UserPrincipalName!, MessageId!, Read.IsPresent, dryRun: true);
+            return;
+        }
         int attempts = 0;
         Exception? lastException = null;
         do {
             try {
-                await MicrosoftGraphUtils.SetMailMessageAsync(cred, UserPrincipalName!, MessageId!, Read.IsPresent);
+                await MicrosoftGraphUtils.SetMailMessageAsync(cred, UserPrincipalName!, MessageId!, Read.IsPresent, dryRun: false);
                 return;
             } catch (Exception ex) {
                 lastException = ex;

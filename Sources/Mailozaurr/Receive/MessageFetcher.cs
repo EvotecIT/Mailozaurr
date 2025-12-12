@@ -31,7 +31,7 @@ public static class MessageFetcher {
     /// <param name="additionalQueries">Additional <see cref="SearchQuery"/> filters.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     /// <returns>Collection of matching messages.</returns>
-    public static async IAsyncEnumerable<ImapEmailMessage> Fetch(
+    public static IAsyncEnumerable<ImapEmailMessage> Fetch(
         ImapClient client,
         string? folder = null,
         string? subject = null,
@@ -44,10 +44,45 @@ public static class MessageFetcher {
         bool delete = false,
         bool hasAttachment = false,
         IEnumerable<SearchQuery>? additionalQueries = null,
+        CancellationToken cancellationToken = default) =>
+        Fetch(
+            client,
+            folder,
+            subject,
+            fromContains,
+            toContains,
+            priority,
+            since,
+            before,
+            all,
+            delete,
+            hasAttachment,
+            additionalQueries,
+            dryRun: false,
+            cancellationToken);
+
+    /// <summary>
+    /// Fetches messages from an IMAP client using optional filters, optionally simulating deletes.
+    /// </summary>
+    public static async IAsyncEnumerable<ImapEmailMessage> Fetch(
+        ImapClient client,
+        string? folder,
+        string? subject,
+        string? fromContains,
+        string? toContains,
+        MessagePriority? priority,
+        DateTime? since,
+        DateTime? before,
+        bool all,
+        bool delete,
+        bool hasAttachment,
+        IEnumerable<SearchQuery>? additionalQueries,
+        bool dryRun,
         [EnumeratorCancellation] CancellationToken cancellationToken = default) {
+        var performDelete = delete && !dryRun;
         IMailFolder mailFolder;
         try {
-            mailFolder = client.GetCachedFolder(folder, delete ? FolderAccess.ReadWrite : FolderAccess.ReadOnly);
+            mailFolder = client.GetCachedFolder(folder, performDelete ? FolderAccess.ReadWrite : FolderAccess.ReadOnly);
         } catch (FolderNotFoundException ex) {
             LoggingMessages.Logger.WriteError($"Failed to get folder '{folder}': {ex.Message}");
             throw;
@@ -97,11 +132,11 @@ public static class MessageFetcher {
             }
             var reports = MimeKitUtils.GetNonDeliveryReports(msg);
             yield return new ImapEmailMessage(uid, msg, reports);
-            if (delete) {
+            if (performDelete) {
                 await mailFolder.AddFlagsAsync(uid, MessageFlags.Deleted, true, cancellationToken).ConfigureAwait(false);
             }
         }
-        if (delete && uids.Count > 0) {
+        if (performDelete && uids.Count > 0) {
             await mailFolder.ExpungeAsync(cancellationToken).ConfigureAwait(false);
         }
     }
@@ -121,7 +156,7 @@ public static class MessageFetcher {
     /// <param name="hasAttachment">When set, only messages with attachments are returned.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     /// <returns>Collection of matching messages.</returns>
-    public static async IAsyncEnumerable<Pop3EmailMessage> Fetch(
+    public static IAsyncEnumerable<Pop3EmailMessage> Fetch(
         Pop3Client client,
         string? subject = null,
         string? fromContains = null,
@@ -132,7 +167,38 @@ public static class MessageFetcher {
         bool all = false,
         bool delete = false,
         bool hasAttachment = false,
+        CancellationToken cancellationToken = default) =>
+        Fetch(
+            client,
+            subject,
+            fromContains,
+            toContains,
+            priority,
+            since,
+            before,
+            all,
+            delete,
+            hasAttachment,
+            dryRun: false,
+            cancellationToken);
+
+    /// <summary>
+    /// Fetches messages from a POP3 client using optional filters, optionally simulating deletes.
+    /// </summary>
+    public static async IAsyncEnumerable<Pop3EmailMessage> Fetch(
+        Pop3Client client,
+        string? subject,
+        string? fromContains,
+        string? toContains,
+        MessagePriority? priority,
+        DateTime? since,
+        DateTime? before,
+        bool all,
+        bool delete,
+        bool hasAttachment,
+        bool dryRun,
         [EnumeratorCancellation] CancellationToken cancellationToken = default) {
+        var performDelete = delete && !dryRun;
         for (int i = 0; i < client.Count; i++) {
             MimeMessage message;
             try {
@@ -170,7 +236,7 @@ public static class MessageFetcher {
 
             var reports = MimeKitUtils.GetNonDeliveryReports(message);
             yield return new Pop3EmailMessage(i, message, reports);
-            if (delete) {
+            if (performDelete) {
                 await client.DeleteMessageAsync(i, cancellationToken).ConfigureAwait(false);
             }
         }

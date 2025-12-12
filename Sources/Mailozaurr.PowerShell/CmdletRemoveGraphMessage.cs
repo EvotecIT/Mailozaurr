@@ -72,16 +72,18 @@ public class CmdletRemoveGraphMessage : AsyncPSCmdlet {
     }
 
     private async Task ProcessGraphAsync(GraphCredential cred) {
-        if (!ShouldProcess(MessageId!, "Deleting message via Graph")) {
-            return;
-        }
+        var dryRun = !ShouldProcess(MessageId!, "Deleting message via Graph");
         MicrosoftGraphUtils.TimeoutSeconds = TimeoutSeconds;
         MicrosoftGraphUtils.MaxConcurrentRequests = MaxConcurrentRequests;
+        if (dryRun) {
+            await MicrosoftGraphUtils.DeleteMailMessageAsync(cred, UserPrincipalName!, MessageId!, dryRun: true);
+            return;
+        }
         int attempts = 0;
         Exception? lastException = null;
         do {
             try {
-                await MicrosoftGraphUtils.DeleteMailMessageAsync(cred, UserPrincipalName!, MessageId!);
+                await MicrosoftGraphUtils.DeleteMailMessageAsync(cred, UserPrincipalName!, MessageId!, dryRun: false);
                 return;
             } catch (Exception ex) {
                 lastException = ex;

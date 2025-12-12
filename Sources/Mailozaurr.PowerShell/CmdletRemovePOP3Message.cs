@@ -1,5 +1,6 @@
 using System.Management.Automation;
 using Mailozaurr;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
@@ -22,16 +23,16 @@ public sealed class CmdletRemovePOP3Message : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.Pop3Session;
         if (conn != null && conn.Data != null) {
-            if (!ShouldProcess(string.Join(",", Index ?? System.Array.Empty<int>()), "Deleting POP3 message")) {
-                return;
-            }
+            var dryRun = !ShouldProcess(string.Join(",", Index ?? System.Array.Empty<int>()), "Deleting POP3 message");
+            var valid = new List<int>();
             foreach (var i in Index!) {
                 if (i < conn.Data.Count) {
-                    await MessageRemover.DeleteAsync(conn.Data, i, CancelToken);
+                    valid.Add(i);
                 } else {
                     WriteWarning($"Remove-POP3Message - Index is out of range. Use index less than {conn.Data.Count}.");
                 }
             }
+            await MessageRemover.DeleteAsync(conn.Data, valid, dryRun, CancelToken);
         } else {
             ThrowTerminatingError(new ErrorRecord(
                 new InvalidOperationException("Remove-POP3Message - POP3 client not provided or not connected."),

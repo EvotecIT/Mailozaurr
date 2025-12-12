@@ -43,16 +43,17 @@ public sealed class CmdletSetIMAPMessage : AsyncPSCmdlet {
             return;
         }
         var actionText = Read.IsPresent ? "Marking IMAP message as read" : "Marking IMAP message as unread";
-        if (!ShouldProcess(Uid.ToString(), actionText)) {
+        var dryRun = !ShouldProcess(Uid.ToString(), actionText);
+        if (dryRun) {
             return;
         }
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
             var uid = new UniqueId(Uid);
             if (Read) {
-                await MessageFlagSetter.SetFlagsAsync(conn.Data, uid, MessageFlags.Seen, true, Folder ?? conn.Folder?.FullName, CancelToken);
+                await MessageFlagSetter.SetFlagsAsync(conn.Data, uid, MessageFlags.Seen, true, dryRun, Folder ?? conn.Folder?.FullName, CancelToken);
             } else if (Unread) {
-                await MessageFlagSetter.SetFlagsAsync(conn.Data, uid, MessageFlags.Seen, false, Folder ?? conn.Folder?.FullName, CancelToken);
+                await MessageFlagSetter.SetFlagsAsync(conn.Data, uid, MessageFlags.Seen, false, dryRun, Folder ?? conn.Folder?.FullName, CancelToken);
             }
         } else {
             ThrowTerminatingError(new ErrorRecord(
