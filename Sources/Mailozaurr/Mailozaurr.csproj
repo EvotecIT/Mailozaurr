@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
+    <PropertyGroup>
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
         <VersionPrefix>2.0.3</VersionPrefix>
@@ -17,15 +17,17 @@
         <!-- Required for pointer operations in Helpers/SecureStringHelper.cs -->
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <RepositoryUrl>https://github.com/EvotecIT/Mailozaurr</RepositoryUrl>
-        <PackageTags>Windows;MacOS;Linux;Mail;Email;MX;SPF;DMARC;DKIM;GraphApi;SendGrid;Graph;IMAP;POP3</PackageTags>
-  </PropertyGroup>
+        <PackageTags>
+            Windows;MacOS;Linux;Mail;Email;MX;SPF;DMARC;DKIM;GraphApi;SendGrid;Graph;IMAP;POP3</PackageTags>
+    </PropertyGroup>
 
-  <!-- Include referenced assemblies alongside output -->
-  <PropertyGroup>
+    <!-- Include referenced assemblies alongside output -->
+    <PropertyGroup>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-  </PropertyGroup>
+    </PropertyGroup>
 
-  <ItemGroup>
+    <ItemGroup>
+
         <PackageReference Include="EmailValidation" Version="1.3.0" />
         <PackageReference Include="Google.Apis.Auth" Version="1.73.0" />
         <PackageReference Include="MailKit" Version="4.14.1" />
@@ -81,7 +83,7 @@
         <Using Include="System.Diagnostics" />
     </ItemGroup>
 
-  <ItemGroup>
+    <ItemGroup>
         <EmbeddedResource Include="Resources\disposable_email_blocklist.conf" />
         <EmbeddedResource Include="Resources\allowlist.conf" />
     </ItemGroup>
