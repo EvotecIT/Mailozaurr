@@ -8,12 +8,12 @@
     Description          = 'Mailozaurr is a PowerShell module that aims to provide SMTP, POP3, IMAP and few other ways to interact with Email. Underneath it uses MimeKit and MailKit and EmailValidation libraries written by Jeffrey Stedfast.            '
     FunctionsToExport    = @()
     GUID                 = '2b0ea9f1-3ff1-4300-b939-106d5da608fa'
-    ModuleVersion        = '2.0.0'
+    ModuleVersion        = '2.0.1'
     PowerShellVersion    = '5.1'
     PrivateData          = @{
         PSData = @{
             IconUri                  = 'https://evotec.xyz/wp-content/uploads/2020/07/MailoZaurr.png'
-            Prerelease               = 'Preview11'
+            Prerelease               = 'Preview1'
             ProjectUri               = 'https://github.com/EvotecIT/MailoZaurr'
             RequireLicenseAcceptance = $false
             Tags                     = @('Windows', 'MacOS', 'Linux', 'Mail', 'Email', 'MX', 'SPF', 'DMARC', 'DKIM', 'GraphApi', 'SendGrid', 'Graph', 'IMAP', 'POP3')
