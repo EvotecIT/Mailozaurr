@@ -1217,8 +1217,8 @@ public class Smtp {
     public SmtpResult Pkcs7Sign(X509Certificate2 certificate) {
         try {
             MimeMessage message = Message;
-            // digitally sign our message body using our custom S/MIME cryptography context
-            using (var ctx = new DefaultSecureMimeContext()) {
+            // digitally sign our message body using a temporary S/MIME context to avoid SQLite dependency
+            using (var ctx = new TemporarySecureMimeContext()) {
                 // Create a signer with the certificate
                 var signer = new CmsSigner(certificate) {
                     DigestAlgorithm = DigestAlgorithm.Sha256
