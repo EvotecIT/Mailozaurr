@@ -33,21 +33,29 @@ public static class EmailMessage {
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) {
                 Directory.CreateDirectory(dir);
             }
+            var msgFilePath = msgFile.FullName;
+            if (File.Exists(msgFilePath) && !force) {
+                LoggingMessages.Logger.WriteWarning("MSG file already exists: {0}", msgFile);
+                return new EmlConversionResult() { EmlFile = emlFile.FullName, MsgFile = msgFilePath, Status = false, Error = "MSG file already exists" };
+            }
+
+            if (File.Exists(msgFilePath) && force) {
+                LoggingMessages.Logger.WriteVerbose("Replacing existing MSG file: {0}", msgFile);
+            }
+
+            var tempFile = CreateTempOutputPath(msgFile);
             try {
-                if (File.Exists(msgFile.FullName) && !force) {
-                    LoggingMessages.Logger.WriteWarning("MSG file already exists: {0}", msgFile);
-                    return new EmlConversionResult() { EmlFile = emlFile.FullName, MsgFile = msgFile.FullName, Status = false, Error = "MSG file already exists" };
-                } else {
-                    if (File.Exists(msgFile.FullName)) {
-                        LoggingMessages.Logger.WriteVerbose("Removing existing MSG file: {0}", msgFile);
-                        File.Delete(msgFile.FullName);
-                    }
-                    Converter.ConvertEmlToMsg(emlFile.FullName, msgFile.FullName);
-                    return new EmlConversionResult() { EmlFile = emlFile.FullName, MsgFile = msgFile.FullName, Status = true };
+                Converter.ConvertEmlToMsg(emlFile.FullName, tempFile);
+                if (TryFinalizeConvertedFile(tempFile, msgFilePath, force, "MSG file already exists", out var finalizeError)) {
+                    return new EmlConversionResult() { EmlFile = emlFile.FullName, MsgFile = msgFilePath, Status = true };
                 }
+
+                return new EmlConversionResult() { EmlFile = emlFile.FullName, MsgFile = msgFilePath, Status = false, Error = finalizeError };
             } catch (IOException ex) {
                 LoggingMessages.Logger.WriteWarning("Error converting EML to MSG: {0}", ex.Message);
-                return new EmlConversionResult() { EmlFile = emlFile.FullName, MsgFile = msgFile.FullName, Status = false, Error = ex.Message };
+                return new EmlConversionResult() { EmlFile = emlFile.FullName, MsgFile = msgFilePath, Status = false, Error = ex.Message };
+            } finally {
+                SafeDelete(tempFile);
             }
         }
         return new EmlConversionResult() { EmlFile = emlFile.FullName, MsgFile = msgFile.FullName, Status = false, Error = "EML file does not exist" };
@@ -79,21 +87,29 @@ public static class EmailMessage {
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) {
                 Directory.CreateDirectory(dir);
             }
+            var emlFilePath = emlFile.FullName;
+            if (File.Exists(emlFilePath) && !force) {
+                LoggingMessages.Logger.WriteWarning("EML file already exists: {0}", emlFile);
+                return new MsgConversionResult() { MsgFile = msgFile.FullName, EmlFile = emlFilePath, Status = false, Error = "EML file already exists" };
+            }
+
+            if (File.Exists(emlFilePath) && force) {
+                LoggingMessages.Logger.WriteVerbose("Replacing existing EML file: {0}", emlFile);
+            }
+
+            var tempFile = CreateTempOutputPath(emlFile);
             try {
-                if (File.Exists(emlFile.FullName) && !force) {
-                    LoggingMessages.Logger.WriteWarning("EML file already exists: {0}", emlFile);
-                    return new MsgConversionResult() { MsgFile = msgFile.FullName, EmlFile = emlFile.FullName, Status = false, Error = "EML file already exists" };
-                } else {
-                    if (File.Exists(emlFile.FullName)) {
-                        LoggingMessages.Logger.WriteVerbose("Removing existing EML file: {0}", emlFile);
-                        File.Delete(emlFile.FullName);
-                    }
-                    Converter.ConvertMsgToEml(msgFile.FullName, emlFile.FullName);
-                    return new MsgConversionResult() { MsgFile = msgFile.FullName, EmlFile = emlFile.FullName, Status = true };
+                Converter.ConvertMsgToEml(msgFile.FullName, tempFile);
+                if (TryFinalizeConvertedFile(tempFile, emlFilePath, force, "EML file already exists", out var finalizeError)) {
+                    return new MsgConversionResult() { MsgFile = msgFile.FullName, EmlFile = emlFilePath, Status = true };
                 }
+
+                return new MsgConversionResult() { MsgFile = msgFile.FullName, EmlFile = emlFilePath, Status = false, Error = finalizeError };
             } catch (IOException ex) {
                 LoggingMessages.Logger.WriteWarning("Error converting MSG to EML: {0}", ex.Message);
-                return new MsgConversionResult() { MsgFile = msgFile.FullName, EmlFile = emlFile.FullName, Status = false, Error = ex.Message };
+                return new MsgConversionResult() { MsgFile = msgFile.FullName, EmlFile = emlFilePath, Status = false, Error = ex.Message };
+            } finally {
+                SafeDelete(tempFile);
             }
         }
         return new MsgConversionResult() { MsgFile = msgFile.FullName, EmlFile = emlFile.FullName, Status = false, Error = "MSG file does not exist" };
@@ -107,6 +123,75 @@ public static class EmailMessage {
             var fileName = Path.GetFileNameWithoutExtension(file);
             var targetFile = Path.Combine(outputFolder, $"{fileName}{targetExtension}");
             yield return converter(new FileInfo(file), new FileInfo(targetFile), force);
+        }
+    }
+
+    private static string CreateTempOutputPath(FileInfo targetFile) {
+        var directory = targetFile.DirectoryName ?? Path.GetTempPath();
+        var baseName = Path.GetFileNameWithoutExtension(targetFile.Name);
+        var extension = targetFile.Extension;
+        var tempName = $"{baseName}.{Guid.NewGuid():N}{extension}.tmp";
+        return Path.Combine(directory, tempName);
+    }
+
+    private static bool TryFinalizeConvertedFile(string tempFile, string targetFile, bool force, string existingFileError, out string? error) {
+        error = null;
+        if (File.Exists(targetFile)) {
+            if (!force) {
+                error = existingFileError;
+                return false;
+            }
+
+            if (TryReplaceFile(tempFile, targetFile, out error)) {
+                return true;
+            }
+
+            return false;
+        }
+
+        try {
+            File.Move(tempFile, targetFile);
+            return true;
+        } catch (Exception ex) {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private static bool TryReplaceFile(string sourceFile, string destinationFile, out string? error) {
+        error = null;
+        try {
+            File.Replace(sourceFile, destinationFile, null);
+            return true;
+        } catch (PlatformNotSupportedException) {
+            // Fall through to delete + move.
+        } catch (IOException) {
+            // Fall through to delete + move.
+        } catch (UnauthorizedAccessException) {
+            // Fall through to delete + move.
+        }
+
+        try {
+            if (File.Exists(destinationFile)) {
+                File.Delete(destinationFile);
+            }
+            File.Move(sourceFile, destinationFile);
+            return true;
+        } catch (Exception ex) {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private static void SafeDelete(string path) {
+        try {
+            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path)) {
+                File.Delete(path);
+            }
+        } catch (IOException) {
+            // Best effort cleanup only.
+        } catch (UnauthorizedAccessException) {
+            // Best effort cleanup only.
         }
     }
 }

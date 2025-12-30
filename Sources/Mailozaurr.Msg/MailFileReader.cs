@@ -1,7 +1,6 @@
 using System.Collections.Specialized;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using MsgReader.Mime;
 using MsgReader.Mime.Header;
@@ -234,7 +233,9 @@ public static class MailFileReader {
         var encoding = part.BodyEncoding ?? Encoding.UTF8;
         try {
             return encoding.GetString(part.Body);
-        } catch {
+        } catch (DecoderFallbackException) {
+            return Encoding.UTF8.GetString(part.Body);
+        } catch (ArgumentException) {
             return Encoding.UTF8.GetString(part.Body);
         }
     }
@@ -259,9 +260,7 @@ public static class MailFileReader {
                 continue;
             }
 
-            if (TryBuildInlineAttachment(attachmentObj, out var inlineAttachment)) {
-                results.Add(inlineAttachment);
-            }
+            // Ignore unknown attachment types to stay AOT-friendly (no reflection).
         }
 
         return results;
@@ -315,7 +314,10 @@ public static class MailFileReader {
     }
 
     private static IReadOnlyDictionary<string, string> MergeHeaders(NameValueCollection? headers, NameValueCollection? unknownHeaders) {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var count = (headers?.Count ?? 0) + (unknownHeaders?.Count ?? 0);
+        var result = count > 0
+            ? new Dictionary<string, string>(count, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         AddHeaders(result, headers);
         AddHeaders(result, unknownHeaders);
         return result;
@@ -344,39 +346,4 @@ public static class MailFileReader {
         }
     }
 
-    private static bool TryBuildInlineAttachment(object attachmentObj, out MailFileAttachment attachment) {
-        attachment = null!;
-
-        if (attachmentObj == null) {
-            return false;
-        }
-
-        var type = attachmentObj.GetType();
-        if (!string.Equals(type.FullName, "MsgReader.Mime.InlineAttachment", StringComparison.Ordinal)) {
-            return false;
-        }
-
-        var fileName = GetStringProperty(type, attachmentObj, "AttachmentFileName")
-            ?? GetStringProperty(type, attachmentObj, "FullName");
-
-        attachment = new MailFileAttachment {
-            FileName = fileName,
-            ContentType = null,
-            ContentId = null,
-            IsInline = true,
-            Size = null,
-            Content = null
-        };
-
-        return true;
-    }
-
-    private static string? GetStringProperty(Type type, object instance, string propertyName) {
-        var property = type.GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-        if (property == null) {
-            return null;
-        }
-
-        return property.GetValue(instance) as string;
-    }
 }
