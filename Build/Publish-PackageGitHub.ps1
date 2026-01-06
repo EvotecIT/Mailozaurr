@@ -11,6 +11,7 @@ $publishGitHubReleaseAssetSplat = @{
     GitHubUsername       = "EvotecIT"
     GitHubRepositoryName = "Mailozaurr"
     IsPreRelease         = $false
+    GenerateReleaseNotes = $true
 }
 
 Publish-GitHubReleaseAsset @publishGitHubReleaseAssetSplat
