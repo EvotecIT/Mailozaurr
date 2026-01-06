@@ -232,9 +232,17 @@ public static class MailFileReader {
         var encoding = part.BodyEncoding ?? Encoding.UTF8;
         try {
             return encoding.GetString(part.Body);
-        } catch (DecoderFallbackException) {
+        } catch (DecoderFallbackException ex) {
+            LoggingMessages.Logger.WriteWarning(
+                "MailFileReader - Failed to decode body using {0}. Falling back to UTF-8. Error: {1}",
+                encoding.WebName,
+                ex.Message);
             return Encoding.UTF8.GetString(part.Body);
-        } catch (ArgumentException) {
+        } catch (ArgumentException ex) {
+            LoggingMessages.Logger.WriteWarning(
+                "MailFileReader - Failed to decode body using {0}. Falling back to UTF-8. Error: {1}",
+                encoding.WebName,
+                ex.Message);
             return Encoding.UTF8.GetString(part.Body);
         }
     }

@@ -34,10 +34,6 @@ public static class EmailMessage {
                 Directory.CreateDirectory(dir);
             }
             var msgFilePath = msgFile.FullName;
-            if (File.Exists(msgFilePath) && force) {
-                LoggingMessages.Logger.WriteVerbose("Replacing existing MSG file: {0}", msgFile);
-            }
-
             var tempFile = CreateTempOutputPath(msgFile);
             try {
                 Converter.ConvertEmlToMsg(emlFile.FullName, tempFile);
@@ -83,10 +79,6 @@ public static class EmailMessage {
                 Directory.CreateDirectory(dir);
             }
             var emlFilePath = emlFile.FullName;
-            if (File.Exists(emlFilePath) && force) {
-                LoggingMessages.Logger.WriteVerbose("Replacing existing EML file: {0}", emlFile);
-            }
-
             var tempFile = CreateTempOutputPath(emlFile);
             try {
                 Converter.ConvertMsgToEml(msgFile.FullName, tempFile);
