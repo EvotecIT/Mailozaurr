@@ -267,6 +267,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         graph.Bcc = Bcc;
         graph.ReplyTo = ReplyTo;
         graph.Subject = Subject ?? string.Empty;
+        graph.Priority = Priority;
         graph.DoNotSaveToSentItems = DoNotSaveToSentItems;
         graph.ErrorAction = errorAction;
         graph.RetryCount = RetryCount;

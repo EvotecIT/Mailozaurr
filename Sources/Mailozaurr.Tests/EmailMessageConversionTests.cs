@@ -66,4 +66,52 @@ public class EmailMessageConversionTests {
         Directory.Delete(msgDir, true);
         Directory.Delete(outputDir, true);
     }
+
+    [Fact]
+    public void ConvertEmlToMsg_DoesNotOverwriteWhenForceFalse() {
+        var tmpDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var outputDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tmpDir);
+        Directory.CreateDirectory(outputDir);
+        try {
+            var emlPath = Path.Combine(tmpDir, "sample.eml");
+            File.WriteAllText(emlPath, "From: a@example.com\r\nTo: a@example.com\r\nSubject: Test\r\nDate: Mon, 21 Jun 2021 10:00:00 +0000\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nHello");
+            var msgPath = Path.Combine(outputDir, "sample.msg");
+            File.WriteAllText(msgPath, "sentinel");
+
+            var result = EmailMessage.ConvertEmlToMsg(new FileInfo(emlPath), new FileInfo(msgPath), false);
+
+            Assert.False(result.Status);
+            Assert.NotNull(result.Error);
+            Assert.Contains("already exists", result.Error!, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal("sentinel", File.ReadAllText(msgPath));
+        } finally {
+            Directory.Delete(tmpDir, true);
+            Directory.Delete(outputDir, true);
+        }
+    }
+
+    [Fact]
+    public void ConvertEmlToMsg_OverwritesWhenForceTrue() {
+        var tmpDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var outputDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tmpDir);
+        Directory.CreateDirectory(outputDir);
+        try {
+            var emlPath = Path.Combine(tmpDir, "sample.eml");
+            File.WriteAllText(emlPath, "From: a@example.com\r\nTo: a@example.com\r\nSubject: Test\r\nDate: Mon, 21 Jun 2021 10:00:00 +0000\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nHello");
+            var msgPath = Path.Combine(outputDir, "sample.msg");
+            File.WriteAllText(msgPath, "sentinel");
+            var sentinelLength = new FileInfo(msgPath).Length;
+
+            var result = EmailMessage.ConvertEmlToMsg(new FileInfo(emlPath), new FileInfo(msgPath), true);
+
+            Assert.True(result.Status);
+            Assert.True(File.Exists(msgPath));
+            Assert.True(new FileInfo(msgPath).Length > sentinelLength);
+        } finally {
+            Directory.Delete(tmpDir, true);
+            Directory.Delete(outputDir, true);
+        }
+    }
 }

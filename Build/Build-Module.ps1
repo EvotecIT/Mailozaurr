@@ -4,7 +4,7 @@ Import-Module PSPublishModule -Force
 Build-Module -ModuleName 'Mailozaurr' {
     # Usual defaults as per standard module
     $Manifest = [ordered] @{
-        ModuleVersion        = '2.0.0'
+        ModuleVersion        = '2.0.1'
         # Supported PSEditions
         CompatiblePSEditions = @('Desktop', 'Core')
         # ID used to uniquely identify this module
@@ -26,7 +26,7 @@ Build-Module -ModuleName 'Mailozaurr' {
 
         ProjectUri           = 'https://github.com/EvotecIT/MailoZaurr'
 
-        PreReleaseTag        = 'Preview10'
+        PreReleaseTag        = 'Preview1'
     }
     New-ConfigurationManifest @Manifest
 
@@ -93,7 +93,7 @@ Build-Module -ModuleName 'Mailozaurr' {
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
         NETBinaryModuleDocumenation       = $true
-        RefreshPSD1Only                   = $true
+        RefreshPSD1Only                   = $false
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat #-DotSourceLibraries -DotSourceClasses -MergeModuleOnBuild -Enable -SignModule -DeleteTargetModuleBeforeBuild -CertificateThumbprint '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703' -MergeFunctionsFromApprovedModules
@@ -104,6 +104,6 @@ Build-Module -ModuleName 'Mailozaurr' {
     #New-ConfigurationTest -TestsPath "$PSScriptRoot\..\Tests" -Enable
 
     # global options for publishing to github/psgallery
-    #New-ConfigurationPublish -Type PowerShellGallery -FilePath 'C:\Support\Important\PowerShellGalleryAPI.txt' -Enabled:$true
-    #New-ConfigurationPublish -Type GitHub -FilePath 'C:\Support\Important\GitHubAPI.txt' -UserName 'EvotecIT' -Enabled:$true
+    New-ConfigurationPublish -Type PowerShellGallery -FilePath 'C:\Support\Important\PowerShellGalleryAPI.txt' -Enabled:$true
+    New-ConfigurationPublish -Type GitHub -FilePath 'C:\Support\Important\GitHubAPI.txt' -UserName 'EvotecIT' -Enabled:$true
 } -ExitCode

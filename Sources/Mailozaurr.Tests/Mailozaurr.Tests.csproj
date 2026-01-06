@@ -31,6 +31,7 @@
 
   <ItemGroup>
         <ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
+        <ProjectReference Include="..\Mailozaurr.Msg\Mailozaurr.Msg.csproj" />
         <ProjectReference Include="..\Mailozaurr.PowerShell\Mailozaurr.PowerShell.csproj" />
         <ProjectReference Include="..\Mailozaurr.Examples\Mailozaurr.Examples.csproj" Condition=" '$(TargetFramework)' == 'net8.0' " />
   </ItemGroup>

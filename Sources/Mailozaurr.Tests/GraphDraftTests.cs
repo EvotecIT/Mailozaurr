@@ -73,4 +73,21 @@ public class GraphDraftTests
         var warnings = graph.LogCollector.Logs.ToArray();
         Assert.True(warnings.Count(entry => entry.Type == LogType.Warning && entry.Message.IndexOf(missing, StringComparison.OrdinalIgnoreCase) >= 0) >= 1);
     }
+
+    [Fact]
+    public void CreateDraft_SetsImportanceFromPriority()
+    {
+        using var graph = new Graph
+        {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "sub",
+            HTML = "body",
+            ContentType = "HTML",
+            Priority = MessagePriority.High
+        };
+
+        string json = graph.CreateDraft();
+        Assert.Contains("\"importance\":\"high\"", json, StringComparison.OrdinalIgnoreCase);
+    }
 }

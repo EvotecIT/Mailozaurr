@@ -91,6 +91,11 @@ namespace Mailozaurr;
     /// </summary>
     public string HTML { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Priority of the message (mapped to Graph importance).
+    /// </summary>
+    public MessagePriority Priority { get; set; } = MessagePriority.Normal;
+
     private string _contentType = "HTML";
 
     /// <summary>
@@ -295,6 +300,23 @@ namespace Mailozaurr;
         LogCollector.LogWarning($"Send-EmailMessage - Possible issue: Path '{pathForMessage}' is invalid. Verify the file exists and the path is correct.");
     }
 
+    private Stopwatch StartOperationTimer() {
+        Stopwatch.Reset();
+        Stopwatch.Start();
+        return System.Diagnostics.Stopwatch.StartNew();
+    }
+
+    private async Task WaitForConcurrencyAsync(Stopwatch operationStopwatch, CancellationToken cancellationToken) {
+        operationStopwatch.Stop();
+        Stopwatch.Stop();
+        try {
+            await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
+        } finally {
+            Stopwatch.Start();
+            operationStopwatch.Start();
+        }
+    }
+
     /// <summary>
     /// Converts the <see cref="Attachments"/> collection into <see cref="GraphAttachment"/> instances.
     /// </summary>
@@ -370,6 +392,7 @@ namespace Mailozaurr;
                     : new List<GraphEmailAddress> { ConvertToGraphEmailAddress(ReplyTo)! },
                 Subject = Subject,
                 Body = new GraphContent { Content = HTML, Type = ContentType },
+                Importance = MapImportance(Priority),
                 IsDeliveryReceiptRequested = RequestDeliveryReceipt,
                 IsReadReceiptRequested = RequestReadReceipt
             },
@@ -452,10 +475,10 @@ namespace Mailozaurr;
     /// </summary>
     /// <returns>The result of the connection attempt.</returns>
     public async Task<SmtpResult> ConnectO365GraphAsync(CancellationToken cancellationToken = default) {
-        Stopwatch.Restart();
+        var operationStopwatch = StartOperationTimer();
         if (DryRun) {
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph authentication.");
-            return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "Connection skipped (WhatIf)");
+            return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, "Connection skipped (WhatIf)");
         }
         string resource = "https://graph.microsoft.com";
         var body = new Dictionary<string, string> {
@@ -466,12 +489,7 @@ namespace Mailozaurr;
         };
 
         try {
-            Stopwatch.Stop();
-            try {
-                await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
-            } finally {
-                Stopwatch.Start();
-            }
+            await WaitForConcurrencyAsync(operationStopwatch, cancellationToken);
             try {
                 using var response = await _client.PostAsync($"https://login.microsoftonline.com/{TenantDomain}/oauth2/token", new FormUrlEncodedContent(body), cancellationToken);
                 var content = await response.Content.ReadAsStringAsync();
@@ -480,25 +498,25 @@ namespace Mailozaurr;
                     if (ErrorAction == ActionPreference.Stop) {
                         response.EnsureSuccessStatusCode();
                     }
-                    return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, content, content);
+                    return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, content, content);
                 }
 
                 var authorization = JsonSerializer.Deserialize(content, MailozaurrJsonContext.Default.GraphAuthorization);
                 AccessToken = authorization?.AccessToken ?? string.Empty;
                 TokenType = authorization?.TokenType ?? string.Empty;
-                return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", "");
+                return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, "", "");
             } finally {
                 MicrosoftGraphUtils.ConcurrencySemaphore.Release();
             }
         } catch (TaskCanceledException ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Connection to Graph API cancelled: {ex.Message}");
-            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, ex.Message);
+            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, ex.Message);
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Error during connection using Graph API: {ex.Message}");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
-            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, ex.Message);
+            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, ex.Message);
         }
     }
 
@@ -507,12 +525,12 @@ namespace Mailozaurr;
     /// </summary>
     /// <returns>The result of the send operation.</returns>
     public async Task<SmtpResult> SendMessageAsync(CancellationToken cancellationToken = default) {
-        Stopwatch.Restart();
+        var operationStopwatch = StartOperationTimer();
         // create message
         CreateMessage();
         if (DryRun) {
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph send.");
-            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
+            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
         }
         LogCollector.LogVerbose("Send-EmailMessage - Sending email via Graph API");
         // Create the request URI outside the loop.
@@ -539,17 +557,12 @@ namespace Mailozaurr;
                 };
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
 
-                Stopwatch.Stop();
-                try {
-                    await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
-                } finally {
-                    Stopwatch.Start();
-                }
+                await WaitForConcurrencyAsync(operationStopwatch, cancellationToken);
                 try {
                     using var response = await _client.SendAsync(request, cancellationToken);
                     var content = await response.Content.ReadAsStringAsync();
                     if (response.IsSuccessStatusCode) {
-                        var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, response.StatusCode.ToString(), "");
+                        var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, response.StatusCode.ToString(), "");
                         await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken);
                         return okResult;
                     }
@@ -568,7 +581,7 @@ namespace Mailozaurr;
                 var maxRetries = policy?.MaxRetries ?? RetryCount;
                 var shouldRetry = (policy?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
                 if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
-                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, ex.Message);
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, ex.Message);
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
                     return await TrySmtpFallbackAsync(policy, failResult, ex, cancellationToken);
                 }
@@ -582,7 +595,7 @@ namespace Mailozaurr;
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }
-                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", ex.Message);
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, "", ex.Message);
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
                     return await TrySmtpFallbackAsync(policy, failResult, ex, cancellationToken);
                 }
@@ -592,7 +605,7 @@ namespace Mailozaurr;
             attempts++;
         } while (attempts <= (policy?.MaxRetries ?? RetryCount));
 
-        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", lastException?.Message);
+        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, "", lastException?.Message);
         await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken);
         return await TrySmtpFallbackAsync(policy, finalResult, lastException, cancellationToken);
     }
@@ -602,11 +615,11 @@ namespace Mailozaurr;
     /// </summary>
     /// <returns>The result of the send operation.</returns>
     public async Task<SmtpResult> SendMessageDraftAsync(CancellationToken cancellationToken = default) {
-        Stopwatch.Restart();
+        var operationStopwatch = StartOperationTimer();
         if (DryRun) {
             CreateMessage();
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph draft send.");
-            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
+            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
         }
         // Create the draft message using the new method
         var draftMessage = await CreateDraftMessageAsync(cancellationToken);
@@ -630,7 +643,7 @@ namespace Mailozaurr;
                 var maxRetries = policyDraft?.MaxRetries ?? RetryCount;
                 var shouldRetry = (policyDraft?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
                 if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
-                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, ex.Message);
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, ex.Message);
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
                     return await TrySmtpFallbackAsync(policyDraft, failResult, ex, cancellationToken);
                 }
@@ -644,7 +657,7 @@ namespace Mailozaurr;
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }
-                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", ex.Message);
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, "", ex.Message);
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
                     return await TrySmtpFallbackAsync(policyDraft, failResult, ex, cancellationToken);
                 }
@@ -654,7 +667,7 @@ namespace Mailozaurr;
             attempts++;
         } while (attempts <= (policyDraft?.MaxRetries ?? RetryCount));
 
-        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, "", lastException?.Message);
+        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, "", lastException?.Message);
         await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken);
         return await TrySmtpFallbackAsync(policyDraft, finalResult, lastException, cancellationToken);
     }
@@ -666,10 +679,10 @@ namespace Mailozaurr;
         /// <param name="cancellationToken">Token used to cancel the operation.</param>
         /// <returns>The result of the send operation.</returns>
         public async Task<SmtpResult> SendDraftMessage(GraphMessage draftMessage, CancellationToken cancellationToken = default) {
-        Stopwatch.Restart();
+        var operationStopwatch = StartOperationTimer();
         if (DryRun) {
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph draft send.");
-            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
+            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
         }
         // Send the draft message
         var sendRequestUri = MicrosoftGraphUtils.BuildGraphUri(
@@ -681,18 +694,13 @@ namespace Mailozaurr;
         sendRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenType, AccessToken);
 
         // Send the HTTP request for sending the draft message
-        Stopwatch.Stop();
-        try {
-            await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
-        } finally {
-            Stopwatch.Start();
-        }
+        await WaitForConcurrencyAsync(operationStopwatch, cancellationToken);
         try {
             using var sendResponse = await _client.SendAsync(sendRequest, cancellationToken);
 
             // If the status code indicates success, return a successful result
             if (sendResponse.IsSuccessStatusCode) {
-                var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, sendResponse.StatusCode.ToString(), "");
+                var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, sendResponse.StatusCode.ToString(), "");
                 await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken);
                 return okResult;
             }
@@ -707,7 +715,7 @@ namespace Mailozaurr;
             throw new GraphApiException(sendResponse.StatusCode, sendErrorMessage, sendContent, retryAfter);
         } catch (GraphApiException ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
-            var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, ex.ResponseContent, ex.Message);
+            var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, ex.ResponseContent, ex.Message);
             await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
             throw;
         } finally {
@@ -719,11 +727,11 @@ namespace Mailozaurr;
     /// Sends the current message using Microsoft Graph batch requests.
     /// </summary>
     public async Task<SmtpResult> SendMessageBatchAsync(CancellationToken cancellationToken = default) {
-        Stopwatch.Restart();
+        var operationStopwatch = StartOperationTimer();
         CreateMessage();
         if (DryRun) {
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph batch send.");
-            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, Stopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
+            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
         }
         var credential = new GraphCredential {
             ClientId = ApplicationID,
@@ -748,7 +756,7 @@ namespace Mailozaurr;
             SentFrom,
             "GraphAPI",
             0,
-            Stopwatch.Elapsed,
+            operationStopwatch.Elapsed,
             response?.Status.ToString() ?? string.Empty,
             success ? string.Empty : response?.Body.ToString());
     }
@@ -1085,6 +1093,7 @@ namespace Mailozaurr;
             smtp.HtmlBody = this.HTML;
             smtp.Headers = this.Headers;
             smtp.WebhookUrl = this.WebhookUrl;
+            smtp.Priority = this.Priority;
 
             if (this.ConvertedAttachments != null && this.ConvertedAttachments.Count > 0) {
                 var attachments = new List<Definitions.AttachmentDescriptor>();
@@ -1119,6 +1128,14 @@ namespace Mailozaurr;
                 MessageId = current.MessageId
             };
         }
+    }
+
+    private static string MapImportance(MessagePriority priority) {
+        return priority switch {
+            MessagePriority.High => "high",
+            MessagePriority.Low => "low",
+            _ => "normal"
+        };
     }
 
     /// <summary>
