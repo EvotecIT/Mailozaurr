@@ -6,7 +6,6 @@ using MsgReader.Mime;
 using MsgReader.Mime.Header;
 using MsgReader.Outlook;
 using OutlookMessage = MsgReader.Outlook.Storage.Message;
-using OutlookRecipient = MsgReader.Outlook.Storage.Recipient;
 using OutlookAttachment = MsgReader.Outlook.Storage.Attachment;
 
 namespace Mailozaurr;
@@ -160,7 +159,7 @@ public static class MailFileReader {
         };
     }
 
-    private static List<MailFileRecipient> BuildRecipients(List<OutlookRecipient>? recipients) {
+    private static List<MailFileRecipient> BuildRecipients(List<MsgReader.Outlook.Storage.Recipient>? recipients) {
         var result = new List<MailFileRecipient>();
         if (recipients == null || recipients.Count == 0) {
             return result;

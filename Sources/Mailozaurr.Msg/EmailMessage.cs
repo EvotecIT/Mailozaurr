@@ -34,11 +34,6 @@ public static class EmailMessage {
                 Directory.CreateDirectory(dir);
             }
             var msgFilePath = msgFile.FullName;
-            if (File.Exists(msgFilePath) && !force) {
-                LoggingMessages.Logger.WriteWarning("MSG file already exists: {0}", msgFile);
-                return new EmlConversionResult() { EmlFile = emlFile.FullName, MsgFile = msgFilePath, Status = false, Error = "MSG file already exists" };
-            }
-
             if (File.Exists(msgFilePath) && force) {
                 LoggingMessages.Logger.WriteVerbose("Replacing existing MSG file: {0}", msgFile);
             }
@@ -88,11 +83,6 @@ public static class EmailMessage {
                 Directory.CreateDirectory(dir);
             }
             var emlFilePath = emlFile.FullName;
-            if (File.Exists(emlFilePath) && !force) {
-                LoggingMessages.Logger.WriteWarning("EML file already exists: {0}", emlFile);
-                return new MsgConversionResult() { MsgFile = msgFile.FullName, EmlFile = emlFilePath, Status = false, Error = "EML file already exists" };
-            }
-
             if (File.Exists(emlFilePath) && force) {
                 LoggingMessages.Logger.WriteVerbose("Replacing existing EML file: {0}", emlFile);
             }
@@ -136,26 +126,20 @@ public static class EmailMessage {
 
     private static bool TryFinalizeConvertedFile(string tempFile, string targetFile, bool force, string existingFileError, out string? error) {
         error = null;
-        if (File.Exists(targetFile)) {
-            if (!force) {
-                error = existingFileError;
+        if (!force) {
+            try {
+                File.Move(tempFile, targetFile);
+                return true;
+            } catch (IOException ex) {
+                error = File.Exists(targetFile) ? existingFileError : ex.Message;
+                return false;
+            } catch (UnauthorizedAccessException ex) {
+                error = File.Exists(targetFile) ? existingFileError : ex.Message;
                 return false;
             }
-
-            if (TryReplaceFile(tempFile, targetFile, out error)) {
-                return true;
-            }
-
-            return false;
         }
 
-        try {
-            File.Move(tempFile, targetFile);
-            return true;
-        } catch (Exception ex) {
-            error = ex.Message;
-            return false;
-        }
+        return TryReplaceFile(tempFile, targetFile, out error);
     }
 
     private static bool TryReplaceFile(string sourceFile, string destinationFile, out string? error) {
