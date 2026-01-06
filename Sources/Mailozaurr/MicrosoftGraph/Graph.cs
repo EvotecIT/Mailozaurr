@@ -91,6 +91,11 @@ namespace Mailozaurr;
     /// </summary>
     public string HTML { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Priority of the message (mapped to Graph importance).
+    /// </summary>
+    public MessagePriority Priority { get; set; } = MessagePriority.Normal;
+
     private string _contentType = "HTML";
 
     /// <summary>
@@ -370,6 +375,7 @@ namespace Mailozaurr;
                     : new List<GraphEmailAddress> { ConvertToGraphEmailAddress(ReplyTo)! },
                 Subject = Subject,
                 Body = new GraphContent { Content = HTML, Type = ContentType },
+                Importance = MapImportance(Priority),
                 IsDeliveryReceiptRequested = RequestDeliveryReceipt,
                 IsReadReceiptRequested = RequestReadReceipt
             },
@@ -1085,6 +1091,7 @@ namespace Mailozaurr;
             smtp.HtmlBody = this.HTML;
             smtp.Headers = this.Headers;
             smtp.WebhookUrl = this.WebhookUrl;
+            smtp.Priority = this.Priority;
 
             if (this.ConvertedAttachments != null && this.ConvertedAttachments.Count > 0) {
                 var attachments = new List<Definitions.AttachmentDescriptor>();
@@ -1119,6 +1126,14 @@ namespace Mailozaurr;
                 MessageId = current.MessageId
             };
         }
+    }
+
+    private static string MapImportance(MessagePriority priority) {
+        return priority switch {
+            MessagePriority.High => "high",
+            MessagePriority.Low => "low",
+            _ => "normal"
+        };
     }
 
     /// <summary>
