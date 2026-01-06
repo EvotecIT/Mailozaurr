@@ -3,7 +3,7 @@
     <PropertyGroup>
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
-        <VersionPrefix>2.0.3</VersionPrefix>
+        <VersionPrefix>2.0.4</VersionPrefix>
         <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
         <AssemblyName>Mailozaurr</AssemblyName>
         <Copyright>(c) 2011 - 2024 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
