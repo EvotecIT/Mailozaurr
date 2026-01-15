@@ -1009,7 +1009,7 @@ namespace Mailozaurr;
         int bytesRead;
         long offset = 0;
         try {
-            while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0) {
+            while ((bytesRead = fileStream.Read(buffer, 0, chunkSize)) > 0) {
                 if (cancellationToken.IsCancellationRequested) {
                     return fileContents;
                 }
