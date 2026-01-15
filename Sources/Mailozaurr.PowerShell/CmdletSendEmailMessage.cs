@@ -37,6 +37,6 @@ namespace Mailozaurr.PowerShell;
 [Cmdlet(VerbsCommunications.Send, "EmailMessage", DefaultParameterSetName = "Compatibility", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 [CmdletBinding()]
 public sealed partial class CmdletSendEmailMessage : PSCmdlet {
-    private const long GraphAttachmentLimitBytes = 150000000;
+    private const long GraphAttachmentLimitBytes = 150_000_000;
 
 }

@@ -71,5 +71,27 @@ public class SmtpConnectionPoolMetricsTests {
         SmtpConnectionPool.ClearConnectionPool();
         SmtpConnectionPool.SetPoolingEnabled(false);
     }
+
+    [Fact]
+    public void GetSnapshot_DecodesServerWithDelimiters() {
+        SmtpConnectionPool.SetPoolingEnabled(true);
+        SmtpConnectionPool.ClearConnectionPool();
+
+        var client = new FakeClient();
+        var server = "smtp:host|name";
+        var identity = "user|domain:ssl";
+        SmtpConnectionPool.ReturnClient(server, 25, client, identity);
+
+        var snapshot = SmtpConnectionPool.GetSnapshot();
+        Assert.Equal(1, snapshot.CurrentPoolSize);
+        Assert.Single(snapshot.Entries);
+        var entry = snapshot.Entries[0];
+        Assert.Equal(server, entry.Server);
+        Assert.Equal(25, entry.Port);
+        Assert.Equal(1, entry.Count);
+
+        SmtpConnectionPool.ClearConnectionPool();
+        SmtpConnectionPool.SetPoolingEnabled(false);
+    }
 }
 

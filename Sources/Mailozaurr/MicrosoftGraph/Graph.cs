@@ -16,9 +16,10 @@ namespace Mailozaurr;
     public class Graph : IDisposable {
         private readonly HttpClient _client;
         /// <summary>
-        /// Maximum size of an attachment chunk when uploading large files (4 MB).
+        /// Maximum size of an attachment chunk when uploading large files (4 MiB).
         /// </summary>
         public const int MaxChunkSize = 4 * 1024 * 1024;
+        private const long GraphPayloadLimitBytes = 4_000_000;
     private int _chunkSize = MaxChunkSize;
     /// <summary>
     /// Serialized JSON representation of the current Graph message.
@@ -34,7 +35,7 @@ namespace Mailozaurr;
     public readonly Stopwatch Stopwatch;
 
         /// <summary>
-        /// Value indicating whether the total size of the attachments is larger than 4MB.
+        /// Value indicating whether the total size of the attachments is larger than the Graph payload limit.
         /// </summary>
         public bool IsLargerAttachment { get; set; }
 
@@ -364,7 +365,7 @@ namespace Mailozaurr;
 
             _inlineAttachmentSizeBytes = inMemoryTotalBytes;
             TotalAttachmentSizeBytes = fileTotalBytes + inMemoryTotalBytes;
-            IsLargerAttachment = TotalAttachmentSizeBytes > 4_000_000;
+            IsLargerAttachment = TotalAttachmentSizeBytes > GraphPayloadLimitBytes;
 
             // Only load file attachments into memory when they fit in a simple send payload.
             if (!IsLargerAttachment && fileAttachments.Count > 0) {
@@ -373,7 +374,7 @@ namespace Mailozaurr;
                 }
             }
 
-            if (_inlineAttachmentSizeBytes > 4_000_000) {
+            if (_inlineAttachmentSizeBytes > GraphPayloadLimitBytes) {
                 LogCollector.LogWarning("Send-EmailMessage - Large in-memory attachments detected. Consider using file paths for large attachments to enable upload sessions.");
             }
         }
@@ -448,10 +449,10 @@ namespace Mailozaurr;
             },
             SaveToSentItems = !DoNotSaveToSentItems
         };
-        if (_inlineAttachmentSizeBytes > 4_000_000) {
+        if (_inlineAttachmentSizeBytes > GraphPayloadLimitBytes) {
             throw new InvalidOperationException("In-memory attachments exceed the 4MB Graph payload limit. Use file path attachments or reduce attachment size.");
         }
-        if (!IsLargerAttachment && TotalAttachmentSizeBytes > 4_000_000 && _fileAttachmentCount > 0) {
+        if (!IsLargerAttachment && TotalAttachmentSizeBytes > GraphPayloadLimitBytes && _fileAttachmentCount > 0) {
             throw new InvalidOperationException("Total attachment payload exceeds the 4MB Graph limit after embedding images. Use file attachments or reduce attachment size.");
         }
         if (ConvertedAttachments.Count > 0) {

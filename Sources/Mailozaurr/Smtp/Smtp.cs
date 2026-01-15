@@ -953,6 +953,60 @@ public class Smtp {
             : TimeSpan.Zero;
     }
 
+    private string EnsureMessageId() {
+        var id = Message.MessageId;
+        if (string.IsNullOrEmpty(id)) {
+            Message.MessageId = id = MimeKit.Utils.MimeUtils.GenerateMessageId();
+        }
+        return id;
+    }
+
+    private async Task SaveSentMessageAsync(string messageId, CancellationToken cancellationToken) {
+        if (SentMessageRepository == null) {
+            return;
+        }
+
+        var record = new SentMessageRecord {
+            MessageId = messageId,
+            Recipients = SentTo,
+            Subject = Subject,
+            Timestamp = DateTimeOffset.UtcNow
+        };
+        await SentMessageRepository.SaveAsync(record, cancellationToken);
+    }
+
+    private async Task RemovePendingMessageAsync(string? messageId, CancellationToken cancellationToken) {
+        if (PendingMessageRepository == null || string.IsNullOrEmpty(messageId)) {
+            return;
+        }
+
+        await PendingMessageRepository.RemoveAsync(messageId, cancellationToken);
+    }
+
+    private async Task EnqueuePendingMessageAsync(string messageId, CredentialProtection credentialProtector, CancellationToken cancellationToken) {
+        if (PendingMessageRepository == null) {
+            return;
+        }
+
+        using var ms = new MemoryStream();
+        await Message.WriteToAsync(ms, cancellationToken);
+        var record = new PendingMessageRecord {
+            MessageId = messageId,
+            MimeMessage = Convert.ToBase64String(ms.ToArray()),
+            Timestamp = DateTimeOffset.UtcNow,
+            NextAttemptAt = DateTimeOffset.UtcNow,
+            Provider = EmailProvider.None,
+            Server = Server,
+            Port = Port,
+            UserName = Credential?.UserName,
+            Password = string.IsNullOrEmpty(Credential?.Password)
+                ? null
+                : credentialProtector.Protect(Credential!.Password),
+            ProviderData = CreateProviderDataSnapshot()
+        };
+        await PendingMessageRepository.SaveAsync(record, cancellationToken);
+    }
+
     private async Task<SmtpResult> SendCoreAsync(CancellationToken cancellationToken = default) {
         if (DryRun) {
             LogVerbose("Send-EmailMessage - DryRun enabled, skipping send.");
@@ -968,18 +1022,8 @@ public class Smtp {
             try {
                 await Client.SendAsync(Message, cancellationToken);
                 LogVerbose($"Send-EmailMessage - Sent email to {SentTo}");
-                if (SentMessageRepository != null) {
-                    var record = new SentMessageRecord {
-                        MessageId = Message.MessageId ?? string.Empty,
-                        Recipients = SentTo,
-                        Subject = Subject,
-                        Timestamp = DateTimeOffset.UtcNow
-                    };
-                    await SentMessageRepository.SaveAsync(record, cancellationToken);
-                }
-                if (PendingMessageRepository != null && !string.IsNullOrEmpty(Message.MessageId)) {
-                    await PendingMessageRepository.RemoveAsync(Message.MessageId!, cancellationToken);
-                }
+                await SaveSentMessageAsync(Message.MessageId ?? string.Empty, cancellationToken);
+                await RemovePendingMessageAsync(Message.MessageId, cancellationToken);
                 var result = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging) {
                     MessageId = Message.MessageId
                 };
@@ -992,29 +1036,8 @@ public class Smtp {
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }
-                    var id = Message.MessageId;
-                    if (string.IsNullOrEmpty(id)) {
-                        Message.MessageId = id = MimeKit.Utils.MimeUtils.GenerateMessageId();
-                    }
-                    if (PendingMessageRepository != null) {
-                        using var ms = new MemoryStream();
-                        await Message.WriteToAsync(ms, cancellationToken);
-                        var record = new PendingMessageRecord {
-                            MessageId = id,
-                            MimeMessage = Convert.ToBase64String(ms.ToArray()),
-                            Timestamp = DateTimeOffset.UtcNow,
-                            NextAttemptAt = DateTimeOffset.UtcNow,
-                            Provider = EmailProvider.None,
-                            Server = Server,
-                            Port = Port,
-                            UserName = Credential?.UserName,
-                            Password = string.IsNullOrEmpty(Credential?.Password)
-                                ? null
-                                : credentialProtector.Protect(Credential!.Password),
-                            ProviderData = CreateProviderDataSnapshot()
-                        };
-                        await PendingMessageRepository.SaveAsync(record, cancellationToken);
-                    }
+                    var id = EnsureMessageId();
+                    await EnqueuePendingMessageAsync(id, credentialProtector, cancellationToken);
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message) {
                         MessageId = id
                     };
@@ -1022,43 +1045,16 @@ public class Smtp {
                     return failResult;
                 }
 
-                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
-                if (MaxDelayMilliseconds > 0 && delayMilliseconds > MaxDelayMilliseconds) {
-                    delayMilliseconds = MaxDelayMilliseconds;
-                }
-                if (JitterMilliseconds > 0 && delayMilliseconds > 0) {
-                    delayMilliseconds += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
-                }
-                if (delayMilliseconds > 0) {
-                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken);
+                var delay = CalculateRetryDelay(attempts);
+                if (delay > TimeSpan.Zero) {
+                    await Task.Delay(delay, cancellationToken);
                 }
             }
             attempts++;
         } while (attempts <= RetryCount);
 
-        var finalId = Message.MessageId;
-        if (string.IsNullOrEmpty(finalId)) {
-            Message.MessageId = finalId = MimeKit.Utils.MimeUtils.GenerateMessageId();
-        }
-        if (PendingMessageRepository != null) {
-            using var ms = new MemoryStream();
-            await Message.WriteToAsync(ms, cancellationToken);
-            var record = new PendingMessageRecord {
-                MessageId = finalId,
-                MimeMessage = Convert.ToBase64String(ms.ToArray()),
-                Timestamp = DateTimeOffset.UtcNow,
-                NextAttemptAt = DateTimeOffset.UtcNow,
-                Provider = EmailProvider.None,
-                Server = Server,
-                Port = Port,
-                UserName = Credential?.UserName,
-                Password = string.IsNullOrEmpty(Credential?.Password)
-                    ? null
-                    : credentialProtector.Protect(Credential!.Password),
-                ProviderData = CreateProviderDataSnapshot()
-            };
-            await PendingMessageRepository.SaveAsync(record, cancellationToken);
-        }
+        var finalId = EnsureMessageId();
+        await EnqueuePendingMessageAsync(finalId, credentialProtector, cancellationToken);
         var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", lastException?.Message) {
             MessageId = finalId
         };
