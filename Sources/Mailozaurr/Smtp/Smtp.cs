@@ -76,6 +76,11 @@ public class Smtp {
     /// <summary>Credentials used during authentication.</summary>
     public NetworkCredential? Credential { get; private set; }
 
+    /// <summary>
+    /// Optional identity hint used to isolate SMTP connection pooling by credentials.
+    /// </summary>
+    public string? ConnectionPoolIdentity { get; set; }
+
     /// <summary>Subject of the message.</summary>
     public string Subject {
         get => Client.Subject;
@@ -217,6 +222,7 @@ public class Smtp {
 
     private bool _skipCertificateValidation;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private string? _poolIdentity;
     /// <summary>Skip server certificate validation.</summary>
     public bool SkipCertificateValidation {
         get => _skipCertificateValidation;
@@ -439,7 +445,7 @@ public class Smtp {
     public SmtpResult Connect(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false) {
         var oldServer = Server;
         var oldPort = Port;
-        var oldPoolIdentity = GetConnectionPoolIdentity();
+        var oldPoolIdentity = _poolIdentity ?? GetConnectionPoolIdentity();
         Server = server;
         Port = port;
         var effectiveOptions = secureSocketOptions;
@@ -468,7 +474,8 @@ public class Smtp {
             Client = ClientFactory(Logging?.ProtocolLogger);
         }
 
-        var pooled = SmtpConnectionPool.PoolingEnabled ? SmtpConnectionPool.TryRentClient(server, port, GetConnectionPoolIdentity()) : null;
+        var poolIdentity = GetConnectionPoolIdentity();
+        var pooled = SmtpConnectionPool.PoolingEnabled ? SmtpConnectionPool.TryRentClient(server, port, poolIdentity) : null;
         if (pooled != null)
         {
             Client = pooled;
@@ -478,6 +485,7 @@ public class Smtp {
             {
                 Client.Connect(server, port, effectiveOptions);
             }
+            _poolIdentity = poolIdentity;
             LogVerbose($"Connected to {server} on {port} port using SSL: {effectiveOptions}");
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "");
         } catch (Exception ex) {
@@ -505,7 +513,7 @@ public class Smtp {
     public async Task<SmtpResult> ConnectAsync(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false) {
         var oldServer = Server;
         var oldPort = Port;
-        var oldPoolIdentity = GetConnectionPoolIdentity();
+        var oldPoolIdentity = _poolIdentity ?? GetConnectionPoolIdentity();
         Server = server;
         Port = port;
         var effectiveOptions = secureSocketOptions;
@@ -534,7 +542,8 @@ public class Smtp {
             Client = ClientFactory(Logging?.ProtocolLogger);
         }
 
-        var pooled = SmtpConnectionPool.PoolingEnabled ? SmtpConnectionPool.TryRentClient(server, port, GetConnectionPoolIdentity()) : null;
+        var poolIdentity = GetConnectionPoolIdentity();
+        var pooled = SmtpConnectionPool.PoolingEnabled ? SmtpConnectionPool.TryRentClient(server, port, poolIdentity) : null;
         if (pooled != null)
         {
             Client = pooled;
@@ -544,6 +553,7 @@ public class Smtp {
             {
                 await Client.ConnectAsync(server, port, effectiveOptions);
             }
+            _poolIdentity = poolIdentity;
             LogVerbose($"Connected to {server} on {port} port using SSL: {effectiveOptions}");
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "");
         } catch (Exception ex) {
@@ -806,6 +816,7 @@ public class Smtp {
             var originalTimeout = Timeout;
             var originalSecureOptions = _activeSecureSocketOptions;
             var originalUseSsl = _activeUseSsl;
+            var originalPoolIdentity = ConnectionPoolIdentity;
             var secureSocketOptions = _activeSecureSocketOptions;
             var useSsl = _activeUseSsl;
             if (record.ProviderData != null && record.ProviderData.Count > 0) {
@@ -829,6 +840,9 @@ public class Smtp {
                     && int.TryParse(timeoutValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var timeout)) {
                     Timeout = timeout;
                 }
+            }
+            if (!string.IsNullOrWhiteSpace(record.UserName)) {
+                ConnectionPoolIdentity = record.UserName;
             }
 
             try {
@@ -870,6 +884,7 @@ public class Smtp {
                 Timeout = originalTimeout;
                 _activeSecureSocketOptions = originalSecureOptions;
                 _activeUseSsl = originalUseSsl;
+                ConnectionPoolIdentity = originalPoolIdentity;
             }
         }
     }
@@ -909,8 +924,12 @@ public class Smtp {
     }
 
     private string GetConnectionPoolIdentity() {
-        var userName = Credential?.UserName;
-        var domain = Credential?.Domain;
+        var userName = ConnectionPoolIdentity;
+        var domain = string.Empty;
+        if (string.IsNullOrWhiteSpace(userName)) {
+            userName = Credential?.UserName;
+            domain = Credential?.Domain ?? string.Empty;
+        }
         if (!string.IsNullOrWhiteSpace(domain)) {
             userName = string.IsNullOrWhiteSpace(userName) ? domain : $"{domain}\\{userName}";
         }
@@ -1054,7 +1073,8 @@ public class Smtp {
     public void Disconnect() {
         if (Client.IsConnected) {
             if (SmtpConnectionPool.PoolingEnabled) {
-                SmtpConnectionPool.ReturnClient(Server, Port, Client, GetConnectionPoolIdentity());
+                var identity = _poolIdentity ?? GetConnectionPoolIdentity();
+                SmtpConnectionPool.ReturnClient(Server, Port, Client, identity);
                 Client = ClientFactory(Logging?.ProtocolLogger);
             } else {
                 Client.Disconnect(true);
@@ -1069,7 +1089,8 @@ public class Smtp {
     public void Dispose() {
         if (Client.IsConnected) {
             if (SmtpConnectionPool.PoolingEnabled) {
-                SmtpConnectionPool.ReturnClient(Server, Port, Client, GetConnectionPoolIdentity());
+                var identity = _poolIdentity ?? GetConnectionPoolIdentity();
+                SmtpConnectionPool.ReturnClient(Server, Port, Client, identity);
             } else {
                 Client.Disconnect(true);
             }

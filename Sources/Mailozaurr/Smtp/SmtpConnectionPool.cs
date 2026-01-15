@@ -78,7 +78,7 @@ public static class SmtpConnectionPool {
         PoolSizeChanged?.Invoke(size);
     }
 
-    private static string EncodeKeyPart(string value) {
+    private static string EncodeKeyPart(string? value) {
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(value ?? string.Empty));
     }
 

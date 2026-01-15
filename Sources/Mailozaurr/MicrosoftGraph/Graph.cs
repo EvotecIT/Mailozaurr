@@ -38,10 +38,13 @@ namespace Mailozaurr;
         /// </summary>
         public bool IsLargerAttachment { get; set; }
 
-        /// <summary>
-        /// Total size of all attachments in bytes (including file paths and in-memory attachments).
-        /// </summary>
-        public long TotalAttachmentSizeBytes { get; private set; }
+    /// <summary>
+    /// Total size of all attachments in bytes (including file paths and in-memory attachments).
+    /// </summary>
+    public long TotalAttachmentSizeBytes { get; private set; }
+
+    private long _inlineAttachmentSizeBytes;
+    private int _fileAttachmentCount;
 
     /// <summary>
     /// List of GraphAttachment objects created from the file paths in the Attachments property.
@@ -330,6 +333,8 @@ namespace Mailozaurr;
         ConvertedAttachments.Clear();
         TotalAttachmentSizeBytes = 0;
         IsLargerAttachment = false;
+        _inlineAttachmentSizeBytes = 0;
+        _fileAttachmentCount = 0;
         if (Attachments != null && Attachments.Any()) {
             var fileAttachments = new List<string>();
             long fileTotalBytes = 0;
@@ -346,17 +351,20 @@ namespace Mailozaurr;
                     try {
                         var length = new FileInfo(path).Length;
                         fileTotalBytes += length;
+                        _fileAttachmentCount++;
                     } catch (Exception ex) {
                         LogCollector.LogError($"Send-EmailMessage - Failed to read attachment '{path}': {ex.Message}");
                     }
                 } else if (item is GraphAttachment ga) {
                     ConvertedAttachments.Add(ga);
-                    inMemoryTotalBytes += EstimateAttachmentSize(ga);
+                    var size = EstimateAttachmentSize(ga);
+                    inMemoryTotalBytes += size;
                 }
             }
 
+            _inlineAttachmentSizeBytes = inMemoryTotalBytes;
             TotalAttachmentSizeBytes = fileTotalBytes + inMemoryTotalBytes;
-            IsLargerAttachment = fileAttachments.Count > 0 && TotalAttachmentSizeBytes > 4_000_000;
+            IsLargerAttachment = TotalAttachmentSizeBytes > 4_000_000;
 
             // Only load file attachments into memory when they fit in a simple send payload.
             if (!IsLargerAttachment && fileAttachments.Count > 0) {
@@ -365,7 +373,7 @@ namespace Mailozaurr;
                 }
             }
 
-            if (inMemoryTotalBytes > 4_000_000) {
+            if (_inlineAttachmentSizeBytes > 4_000_000) {
                 LogCollector.LogWarning("Send-EmailMessage - Large in-memory attachments detected. Consider using file paths for large attachments to enable upload sessions.");
             }
         }
@@ -410,6 +418,9 @@ namespace Mailozaurr;
                 att.IsInline = true;
                 att.ContentId = Path.GetFileName(p);
                 ConvertedAttachments.Add(att);
+                var size = EstimateAttachmentSize(att);
+                _inlineAttachmentSizeBytes += size;
+                TotalAttachmentSizeBytes += size;
             }
         }
         if (From is null) {
@@ -437,6 +448,12 @@ namespace Mailozaurr;
             },
             SaveToSentItems = !DoNotSaveToSentItems
         };
+        if (_inlineAttachmentSizeBytes > 4_000_000) {
+            throw new InvalidOperationException("In-memory attachments exceed the 4MB Graph payload limit. Use file path attachments or reduce attachment size.");
+        }
+        if (!IsLargerAttachment && TotalAttachmentSizeBytes > 4_000_000 && _fileAttachmentCount > 0) {
+            throw new InvalidOperationException("Total attachment payload exceeds the 4MB Graph limit after embedding images. Use file attachments or reduce attachment size.");
+        }
         if (ConvertedAttachments.Count > 0) {
             MessageContainer.Message.Attachments = ConvertedAttachments;
         }
@@ -530,7 +547,8 @@ namespace Mailozaurr;
         try {
             await WaitForConcurrencyAsync(operationStopwatch, cancellationToken);
             try {
-                using var response = await _client.PostAsync($"https://login.microsoftonline.com/{TenantDomain}/oauth2/token", new FormUrlEncodedContent(body), cancellationToken);
+                using var requestContent = new FormUrlEncodedContent(body);
+                using var response = await _client.PostAsync($"https://login.microsoftonline.com/{TenantDomain}/oauth2/token", requestContent, cancellationToken);
                 var content = await response.Content.ReadAsStringAsync();
                 if (!response.IsSuccessStatusCode) {
                     LogCollector.LogWarning($"Send-EmailMessage - Error during connection using Graph API: {content}");
@@ -820,7 +838,7 @@ namespace Mailozaurr;
         var draftRequestUri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
             $"/users/{MessageContainer.Message.From!.Email.Address}/mailfolders/drafts/messages");
-        var draftRequest = new HttpRequestMessage(HttpMethod.Post, draftRequestUri) {
+        using var draftRequest = new HttpRequestMessage(HttpMethod.Post, draftRequestUri) {
             Content = new StringContent(messageJson, Encoding.UTF8, "application/json")
         };
 
