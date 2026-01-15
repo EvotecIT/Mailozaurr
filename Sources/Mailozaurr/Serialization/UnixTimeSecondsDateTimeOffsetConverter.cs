@@ -52,6 +52,7 @@ internal sealed class UnixTimeSecondsDateTimeOffsetConverter : JsonConverter<Dat
     }
 
     private static DateTimeOffset FromUnix(long value) {
+        // Threshold: ~316 years from epoch (year 2286); values beyond are assumed to be milliseconds.
         return value > 9_999_999_999L
             ? DateTimeOffset.FromUnixTimeMilliseconds(value)
             : DateTimeOffset.FromUnixTimeSeconds(value);
