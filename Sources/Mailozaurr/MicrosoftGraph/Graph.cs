@@ -518,11 +518,9 @@ namespace Mailozaurr;
             return null;
         }
 
-        var list = new List<GraphEmailAddress>();
-        foreach (var email in Helpers.UniqueAddresses(emails, seen)) {
-            var address = Helpers.GetEmailAddress(email);
-            list.Add(new GraphEmailAddress { Email = new GraphEmail { Address = address } });
-        }
+        var list = Helpers.UniqueAddresses(emails, seen)
+            .Select(email => new GraphEmailAddress { Email = new GraphEmail { Address = Helpers.GetEmailAddress(email) } })
+            .ToList();
         return list.Count == 0 ? null : list;
     }
 
@@ -1039,13 +1037,11 @@ namespace Mailozaurr;
         /// <param name="cancellationToken">Token used to cancel the operation.</param>
         public async Task UploadAttachmentsAsync(GraphMessage draftMessage, CancellationToken cancellationToken = default) {
         if (Attachments != null && Attachments.Length > 0) {
-            foreach (var attachmentPath in Attachments) {
-                if (attachmentPath is string path) {
-                    try {
-                        await UploadAttachmentWithRetryAsync(draftMessage, path, cancellationToken);
-                    } catch (FileNotFoundException) {
-                        // Already logged by CreateGraphAttachment.
-                    }
+            foreach (var path in Attachments.OfType<string>()) {
+                try {
+                    await UploadAttachmentWithRetryAsync(draftMessage, path, cancellationToken);
+                } catch (FileNotFoundException) {
+                    // Already logged by CreateGraphAttachment.
                 }
             }
         }
@@ -1057,14 +1053,12 @@ namespace Mailozaurr;
         /// <param name="cancellationToken">Token used to cancel the operation.</param>
         public async Task PrepareAttachments(CancellationToken cancellationToken = default) {
         if (Attachments != null && Attachments.Length > 0) {
-            foreach (var attachmentPath in Attachments) {
-                if (attachmentPath is string path) {
-                    try {
-                        var attachmentItemJson = await CreateGraphAttachment(path, cancellationToken);
-                        AttachmentsPlaceHolders.Add(attachmentItemJson);
-                    } catch (FileNotFoundException) {
-                        // Already logged by CreateGraphAttachment.
-                    }
+            foreach (var path in Attachments.OfType<string>()) {
+                try {
+                    var attachmentItemJson = await CreateGraphAttachment(path, cancellationToken);
+                    AttachmentsPlaceHolders.Add(attachmentItemJson);
+                } catch (FileNotFoundException) {
+                    // Already logged by CreateGraphAttachment.
                 }
             }
         }

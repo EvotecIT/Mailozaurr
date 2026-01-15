@@ -748,28 +748,16 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             return null;
         }
 
-        var result = new List<AttachmentDescriptor>();
-        foreach (var entry in attachments) {
-            if (entry == null) {
-                continue;
-            }
-
-            switch (entry) {
-                case AttachmentDescriptor descriptor:
-                    result.Add(descriptor);
-                    break;
-                case string path:
-                    result.Add(new FileAttachmentDescriptor(path));
-                    break;
-                case FileInfo fileInfo:
-                    result.Add(new FileAttachmentDescriptor(fileInfo.FullName));
-                    break;
-                default:
-                    throw new ArgumentException($"Unsupported attachment type: {entry.GetType().Name}");
-            }
-        }
-
-        return result;
+        return attachments
+            .Where(entry => entry != null)
+            .Select(entry => entry!)
+            .Select(entry => entry switch {
+                AttachmentDescriptor descriptor => descriptor,
+                string path => new FileAttachmentDescriptor(path),
+                FileInfo fileInfo => new FileAttachmentDescriptor(fileInfo.FullName),
+                _ => throw new ArgumentException($"Unsupported attachment type: {entry.GetType().Name}")
+            })
+            .ToList();
     }
 
     private object[]? FilterExistingPaths(object[]? paths, string parameterName) {
