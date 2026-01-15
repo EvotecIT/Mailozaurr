@@ -669,12 +669,15 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
                 if (results.Count > 0) {
                     // Assuming the first result contains the property you're interested in
                     var result = results[0];
-                    if (result.BaseObject is IDictionary dictionary && dictionary.Contains("uploadUrl")) {
-                        return dictionary["uploadUrl"]?.ToString() ?? string.Empty;
-                    } else {
+                    if (result.BaseObject is IDictionary dictionary) {
+                        var uploadUrl = dictionary["uploadUrl"]?.ToString();
+                        if (!string.IsNullOrEmpty(uploadUrl)) {
+                            return uploadUrl;
+                        }
                         // Handle the case where the property is not present
                         throw new InvalidOperationException("The result does not contain an 'uploadUrl' property.");
                     }
+                    throw new InvalidOperationException("The result does not contain an 'uploadUrl' property.");
                 } else {
                     // Handle the case where no results were returned
                     throw new InvalidOperationException("No results were returned from the Invoke-MgGraphRequest command.");
@@ -711,12 +714,15 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
                 if (results.Count > 0) {
                     // Assuming the first result contains the property you're interested in
                     var result = results[0];
-                    if (result.BaseObject is IDictionary dictionary && dictionary.Contains("id")) {
-                        return dictionary["id"]?.ToString() ?? string.Empty;
-                    } else {
+                    if (result.BaseObject is IDictionary dictionary) {
+                        var id = dictionary["id"]?.ToString();
+                        if (!string.IsNullOrEmpty(id)) {
+                            return id;
+                        }
                         // Handle the case where the property is not present
                         throw new InvalidOperationException("The result does not contain an 'id' property.");
                     }
+                    throw new InvalidOperationException("The result does not contain an 'id' property.");
                 } else {
                     // Handle the case where no results were returned
                     throw new InvalidOperationException("No results were returned from the Invoke-MgGraphRequest command.");
