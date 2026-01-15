@@ -40,4 +40,13 @@ public class SerializationContextTests {
         Assert.Equal(record.Provider, roundtrip.Provider);
         Assert.Equal(record.ProviderData["k"], roundtrip.ProviderData["k"]);
     }
+
+    [Fact]
+    public void ShouldDeserializeGraphAuthorizationExpiresOnFromUnixSeconds() {
+        const long unixSeconds = 1700000000;
+        var json = $"{{\"token_type\":\"Bearer\",\"access_token\":\"abc\",\"expires_on\":\"{unixSeconds}\"}}";
+        var auth = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GraphAuthorization);
+        Assert.NotNull(auth);
+        Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(unixSeconds), auth!.ExpiresOn);
+    }
 }
