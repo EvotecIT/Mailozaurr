@@ -980,7 +980,8 @@ public class Smtp {
             return;
         }
 
-        await PendingMessageRepository.RemoveAsync(messageId, cancellationToken);
+        var safeMessageId = messageId!;
+        await PendingMessageRepository.RemoveAsync(safeMessageId, cancellationToken);
     }
 
     private async Task EnqueuePendingMessageAsync(string messageId, ICredentialProtector credentialProtector, CancellationToken cancellationToken) {
