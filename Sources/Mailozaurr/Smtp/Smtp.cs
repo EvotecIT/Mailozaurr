@@ -439,6 +439,7 @@ public class Smtp {
     public SmtpResult Connect(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false) {
         var oldServer = Server;
         var oldPort = Port;
+        var oldPoolIdentity = GetConnectionPoolIdentity();
         Server = server;
         Port = port;
         var effectiveOptions = secureSocketOptions;
@@ -458,7 +459,7 @@ public class Smtp {
         {
             if (SmtpConnectionPool.PoolingEnabled)
             {
-                SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client);
+                SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client, oldPoolIdentity);
             }
             else
             {
@@ -467,7 +468,7 @@ public class Smtp {
             Client = ClientFactory(Logging?.ProtocolLogger);
         }
 
-        var pooled = SmtpConnectionPool.PoolingEnabled ? SmtpConnectionPool.TryRentClient(server, port) : null;
+        var pooled = SmtpConnectionPool.PoolingEnabled ? SmtpConnectionPool.TryRentClient(server, port, GetConnectionPoolIdentity()) : null;
         if (pooled != null)
         {
             Client = pooled;
@@ -504,6 +505,7 @@ public class Smtp {
     public async Task<SmtpResult> ConnectAsync(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false) {
         var oldServer = Server;
         var oldPort = Port;
+        var oldPoolIdentity = GetConnectionPoolIdentity();
         Server = server;
         Port = port;
         var effectiveOptions = secureSocketOptions;
@@ -523,7 +525,7 @@ public class Smtp {
         {
             if (SmtpConnectionPool.PoolingEnabled)
             {
-                SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client);
+                SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client, oldPoolIdentity);
             }
             else
             {
@@ -532,7 +534,7 @@ public class Smtp {
             Client = ClientFactory(Logging?.ProtocolLogger);
         }
 
-        var pooled = SmtpConnectionPool.PoolingEnabled ? SmtpConnectionPool.TryRentClient(server, port) : null;
+        var pooled = SmtpConnectionPool.PoolingEnabled ? SmtpConnectionPool.TryRentClient(server, port, GetConnectionPoolIdentity()) : null;
         if (pooled != null)
         {
             Client = pooled;
@@ -799,11 +801,41 @@ public class Smtp {
                 continue;
             }
 
+            var originalSkipValidation = SkipCertificateValidation;
+            var originalCheckRevocation = CheckCertificateRevocation;
+            var originalTimeout = Timeout;
+            var originalSecureOptions = _activeSecureSocketOptions;
+            var originalUseSsl = _activeUseSsl;
+            var secureSocketOptions = _activeSecureSocketOptions;
+            var useSsl = _activeUseSsl;
+            if (record.ProviderData != null && record.ProviderData.Count > 0) {
+                if (record.ProviderData.TryGetValue(ProviderDataSecureSocketOptionsKey, out var secureValue)
+                    && Enum.TryParse(secureValue, out SecureSocketOptions parsedSecure)) {
+                    secureSocketOptions = parsedSecure;
+                }
+                if (record.ProviderData.TryGetValue(ProviderDataUseSslKey, out var useSslValue)
+                    && bool.TryParse(useSslValue, out var parsedUseSsl)) {
+                    useSsl = parsedUseSsl;
+                }
+                if (record.ProviderData.TryGetValue(ProviderDataSkipCertificateValidationKey, out var skipValue)
+                    && bool.TryParse(skipValue, out var parsedSkip)) {
+                    SkipCertificateValidation = parsedSkip;
+                }
+                if (record.ProviderData.TryGetValue(ProviderDataCheckCertificateRevocationKey, out var revocationValue)
+                    && bool.TryParse(revocationValue, out var parsedRevocation)) {
+                    CheckCertificateRevocation = parsedRevocation;
+                }
+                if (record.ProviderData.TryGetValue(ProviderDataTimeoutKey, out var timeoutValue)
+                    && int.TryParse(timeoutValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var timeout)) {
+                    Timeout = timeout;
+                }
+            }
+
             try {
                 var server = record.Server ?? Server;
                 var port = record.Port ?? Port;
                 if (!string.IsNullOrWhiteSpace(server)) {
-                    Connect(server, port);
+                    Connect(server, port, secureSocketOptions, useSsl);
                     if (!string.IsNullOrEmpty(record.UserName)) {
                         var pwd = CredentialProtection.UnprotectWithFallback(record.Password);
                         var cred = Helpers.ConvertFromPlainText(record.UserName!, pwd);
@@ -825,10 +857,19 @@ public class Smtp {
                 await PendingMessageRepository.RemoveAsync(record.MessageId!, cancellationToken);
             } catch (Exception ex) {
                 LogWarning($"ProcessPendingMessages - Error sending {record.MessageId}: {ex.Message}");
-                record.NextAttemptAt = DateTimeOffset.UtcNow;
+                var attempt = record.IncrementAttemptCount();
+                var delay = CalculateRetryDelay(attempt - 1);
+                record.NextAttemptAt = delay > TimeSpan.Zero
+                    ? DateTimeOffset.UtcNow.Add(delay)
+                    : DateTimeOffset.UtcNow;
                 await PendingMessageRepository.SaveAsync(record, cancellationToken);
             } finally {
                 Disconnect();
+                SkipCertificateValidation = originalSkipValidation;
+                CheckCertificateRevocation = originalCheckRevocation;
+                Timeout = originalTimeout;
+                _activeSecureSocketOptions = originalSecureOptions;
+                _activeUseSsl = originalUseSsl;
             }
         }
     }
@@ -865,6 +906,32 @@ public class Smtp {
         };
 
         return data;
+    }
+
+    private string GetConnectionPoolIdentity() {
+        var userName = Credential?.UserName;
+        var domain = Credential?.Domain;
+        if (!string.IsNullOrWhiteSpace(domain)) {
+            userName = string.IsNullOrWhiteSpace(userName) ? domain : $"{domain}\\{userName}";
+        }
+        if (string.IsNullOrWhiteSpace(userName)) {
+            userName = "anonymous";
+        }
+        return $"{userName}|{_activeSecureSocketOptions}|{_activeUseSsl}";
+    }
+
+    private TimeSpan CalculateRetryDelay(int attempt) {
+        if (attempt < 0) attempt = 0;
+        var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempt));
+        if (MaxDelayMilliseconds > 0 && delayMilliseconds > MaxDelayMilliseconds) {
+            delayMilliseconds = MaxDelayMilliseconds;
+        }
+        if (JitterMilliseconds > 0 && delayMilliseconds > 0) {
+            delayMilliseconds += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
+        }
+        return delayMilliseconds > 0
+            ? TimeSpan.FromMilliseconds(delayMilliseconds)
+            : TimeSpan.Zero;
     }
 
     private async Task<SmtpResult> SendCoreAsync(CancellationToken cancellationToken = default) {
@@ -987,7 +1054,7 @@ public class Smtp {
     public void Disconnect() {
         if (Client.IsConnected) {
             if (SmtpConnectionPool.PoolingEnabled) {
-                SmtpConnectionPool.ReturnClient(Server, Port, Client);
+                SmtpConnectionPool.ReturnClient(Server, Port, Client, GetConnectionPoolIdentity());
                 Client = ClientFactory(Logging?.ProtocolLogger);
             } else {
                 Client.Disconnect(true);
@@ -1002,7 +1069,7 @@ public class Smtp {
     public void Dispose() {
         if (Client.IsConnected) {
             if (SmtpConnectionPool.PoolingEnabled) {
-                SmtpConnectionPool.ReturnClient(Server, Port, Client);
+                SmtpConnectionPool.ReturnClient(Server, Port, Client, GetConnectionPoolIdentity());
             } else {
                 Client.Disconnect(true);
             }

@@ -32,10 +32,15 @@ namespace Mailozaurr;
     /// <summary>Measures elapsed time spent during send operations.</summary>
     public readonly Stopwatch Stopwatch;
 
-    /// <summary>
-    /// Value indicating whether the total size of the attachments is larger than 4MB.
-    /// </summary>
-    public bool IsLargerAttachment { get; set; }
+        /// <summary>
+        /// Value indicating whether the total size of the attachments is larger than 4MB.
+        /// </summary>
+        public bool IsLargerAttachment { get; set; }
+
+        /// <summary>
+        /// Total size of all attachments in bytes (including file paths and in-memory attachments).
+        /// </summary>
+        public long TotalAttachmentSizeBytes { get; private set; }
 
     /// <summary>
     /// List of GraphAttachment objects created from the file paths in the Attachments property.
@@ -322,40 +327,73 @@ namespace Mailozaurr;
     /// </summary>
     public void CreateAttachments() {
         ConvertedAttachments.Clear();
+        TotalAttachmentSizeBytes = 0;
+        IsLargerAttachment = false;
         if (Attachments != null && Attachments.Any()) {
-            // Convert provided attachments into GraphAttachment objects
+            var fileAttachments = new List<string>();
+            long fileTotalBytes = 0;
+            long inMemoryTotalBytes = 0;
+
+            // First pass: compute total size without loading file contents.
             foreach (var item in Attachments) {
                 if (item is string path) {
                     if (!File.Exists(path)) {
                         LogMissingAttachmentWarning(path);
                         continue;
                     }
-                    ConvertedAttachments.Add(GraphAttachment.FromFile(path));
+                    fileAttachments.Add(path);
+                    try {
+                        var length = new FileInfo(path).Length;
+                        fileTotalBytes += length;
+                    } catch (Exception ex) {
+                        LogCollector.LogError($"Send-EmailMessage - Failed to read attachment '{path}': {ex.Message}");
+                    }
                 } else if (item is GraphAttachment ga) {
                     ConvertedAttachments.Add(ga);
+                    inMemoryTotalBytes += EstimateAttachmentSize(ga);
                 }
             }
 
-            var totalSize = 0;
-            foreach (var a in ConvertedAttachments) {
-                if (string.IsNullOrWhiteSpace(a.ContentBytes)) {
-                    continue;
-                }
-                try {
-                    totalSize += Convert.FromBase64String(a.ContentBytes).Length;
-                } catch (FormatException ex) {
-                    LogCollector.LogError($"Send-EmailMessage - Invalid base64 for attachment '{a.Name}': {ex.Message}");
+            TotalAttachmentSizeBytes = fileTotalBytes + inMemoryTotalBytes;
+            IsLargerAttachment = fileAttachments.Count > 0 && TotalAttachmentSizeBytes > 4_000_000;
+
+            // Only load file attachments into memory when they fit in a simple send payload.
+            if (!IsLargerAttachment && fileAttachments.Count > 0) {
+                foreach (var path in fileAttachments) {
+                    ConvertedAttachments.Add(GraphAttachment.FromFile(path));
                 }
             }
 
-            if (totalSize > 4_000_000) {
-                // Create a draft message if the total size of the attachments is larger than 4MB
-                IsLargerAttachment = true;
-            } else {
-                // Otherwise, include the attachments in the message
-                IsLargerAttachment = false;
+            if (inMemoryTotalBytes > 4_000_000) {
+                LogCollector.LogWarning("Send-EmailMessage - Large in-memory attachments detected. Consider using file paths for large attachments to enable upload sessions.");
             }
         }
+    }
+
+    private static long EstimateTotalSize(IEnumerable<GraphAttachment> attachments) {
+        long total = 0;
+        foreach (var attachment in attachments) {
+            total += EstimateAttachmentSize(attachment);
+        }
+        return total;
+    }
+
+    private static long EstimateAttachmentSize(GraphAttachment attachment) {
+        if (string.IsNullOrWhiteSpace(attachment.ContentBytes)) {
+            return 0;
+        }
+        var value = attachment.ContentBytes.Trim();
+        if (value.Length == 0) {
+            return 0;
+        }
+        var padding = 0;
+        if (value.EndsWith("==", StringComparison.Ordinal)) {
+            padding = 2;
+        } else if (value.EndsWith("=", StringComparison.Ordinal)) {
+            padding = 1;
+        }
+        var bytes = (long)value.Length * 3 / 4 - padding;
+        return bytes < 0 ? 0 : bytes;
     }
 
     /// <summary>
@@ -398,7 +436,7 @@ namespace Mailozaurr;
             },
             SaveToSentItems = !DoNotSaveToSentItems
         };
-        if (ConvertedAttachments.Count > 0 && IsLargerAttachment == false) {
+        if (ConvertedAttachments.Count > 0) {
             MessageContainer.Message.Attachments = ConvertedAttachments;
         }
         if (Headers != null && Headers.Count > 0) {
@@ -850,8 +888,12 @@ namespace Mailozaurr;
         /// </summary>
         /// <param name="attachmentPath">Path to the attachment file.</param>
         /// <param name="cancellationToken">Token used to cancel the operation.</param>
+        /// <param name="preloadContent">
+        /// When true, loads file chunks into memory and populates <see cref="GraphAttachmentPlaceHolder.Content"/>.
+        /// When false, only metadata is prepared and chunk content is generated on demand.
+        /// </param>
         /// <returns>The placeholder representing the attachment.</returns>
-        public Task<GraphAttachmentPlaceHolder> CreateGraphAttachment(string attachmentPath, CancellationToken cancellationToken = default) {
+        public Task<GraphAttachmentPlaceHolder> CreateGraphAttachment(string attachmentPath, CancellationToken cancellationToken = default, bool preloadContent = true) {
         if (!File.Exists(attachmentPath)) {
             LogMissingAttachmentWarning(attachmentPath);
             throw new FileNotFoundException($"Send-EmailMessage - Attachment file not found: {attachmentPath}", attachmentPath);
@@ -864,7 +906,9 @@ namespace Mailozaurr;
         var attachmentItemWrapper = new GraphAttachmentItemWrapper(attachmentItem);
         var attachmentItemJson = JsonSerializer.Serialize(attachmentItemWrapper, MailozaurrJsonContext.Default.GraphAttachmentItemWrapper);
 
-        List<StreamContent> content = PrepareByteArrayContentForUpload(attachmentPath, ChunkSize, cancellationToken);
+        List<StreamContent> content = preloadContent
+            ? PrepareByteArrayContentForUpload(attachmentPath, ChunkSize, cancellationToken)
+            : new List<StreamContent>();
 
         var placeholder = new GraphAttachmentPlaceHolder {
             Json = attachmentItemJson,
@@ -888,25 +932,29 @@ namespace Mailozaurr;
         var uploadSessionUrl = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
             $"/users('{SentFrom}')/messages/{draftMessage.Id}/attachments/createUploadSession");
-        using var client = new HttpClient();
-        client.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", AccessToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, uploadSessionUrl) {
+            Content = new StringContent(attachmentItemJson, Encoding.UTF8, "application/json")
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue(TokenType, AccessToken);
         await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
         HttpResponseMessage uploadSessionResponse;
         try {
-            uploadSessionResponse = await client.PostAsync(
-                uploadSessionUrl,
-                new StringContent(attachmentItemJson, Encoding.UTF8, "application/json"),
-                cancellationToken);
+            uploadSessionResponse = await _client.SendAsync(request, cancellationToken);
         } finally {
             MicrosoftGraphUtils.ConcurrencySemaphore.Release();
         }
 
         using (uploadSessionResponse) {
             var uploadSessionContent = await uploadSessionResponse.Content.ReadAsStringAsync();
+            if (!uploadSessionResponse.IsSuccessStatusCode) {
+                var error = JsonSerializer.Deserialize(uploadSessionContent, MailozaurrJsonContext.Default.GraphApiError);
+                var errorMessage = (error == null || error.Error == null)
+                    ? $"Unknown error: {uploadSessionContent}"
+                    : $"Error code: {error.Error.Code}, message: {error.Error.Message}";
+                var retryAfter = ParseRetryAfter(uploadSessionResponse);
+                throw new GraphApiException(uploadSessionResponse.StatusCode, errorMessage, uploadSessionContent, retryAfter);
+            }
 
-            // {"error":{"code":"InvalidAuthenticationToken","message":"Access token is empty.","innerError":{"date":"2024-06-15T09:51:54","request-id":"4a43e743-e897-4758-8d7d-21858c198e1d","client-request-id":"4a43e743-e897-4758-8d7d-21858c198e1d"}}}
-            //Console.WriteLine(uploadSessionContent);
             return ParseUploadSessionResult(uploadSessionContent);
         }
     }
@@ -966,9 +1014,7 @@ namespace Mailozaurr;
             foreach (var attachmentPath in Attachments) {
                 if (attachmentPath is string path) {
                     try {
-                        var attachmentItemJson = await CreateGraphAttachment(path, cancellationToken);
-                        var uploadUrl = await CreateUploadSession(draftMessage, attachmentItemJson.Json, cancellationToken);
-                        await SendFileChunks(uploadUrl, attachmentItemJson.Content, cancellationToken);
+                        await UploadAttachmentWithRetryAsync(draftMessage, path, cancellationToken);
                     } catch (FileNotFoundException) {
                         // Already logged by CreateGraphAttachment.
                     }
@@ -1009,6 +1055,23 @@ namespace Mailozaurr;
     }
 
         /// <summary>
+        /// Uploads all chunks of a file to the provided upload session URL without buffering the entire file.
+        /// </summary>
+        public async Task SendFileChunks(string uploadUrl, string filePath, long fileSize, CancellationToken cancellationToken = default) {
+        var chunkSize = Math.Min(ChunkSize, MaxChunkSize);
+        var buffer = new byte[chunkSize];
+        long offset = 0;
+        using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        int bytesRead;
+        while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0) {
+            var chunk = new byte[bytesRead];
+            Buffer.BlockCopy(buffer, 0, chunk, 0, bytesRead);
+            await SendAttachmentChunkWithRetryAsync(uploadUrl, chunk, offset, fileSize, cancellationToken);
+            offset += bytesRead;
+        }
+    }
+
+        /// <summary>
         /// Uploads a single attachment chunk to the Graph API.
         /// </summary>
         /// <param name="uploadUrl">The upload session URL.</param>
@@ -1018,16 +1081,93 @@ namespace Mailozaurr;
         using var requestMessage = new HttpRequestMessage(HttpMethod.Put, uploadUrl) {
             Content = byteArrayContent
         };
-        requestMessage.Headers.Add("AnchorMailbox", SentFrom); // This is correctly added to HttpRequestMessage
-        using var client = new HttpClient();
-        client.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
+        requestMessage.Headers.Add("AnchorMailbox", SentFrom);
         await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
         try {
-            var uploadChunkResponse = await client.SendAsync(requestMessage, cancellationToken);
+            using var uploadChunkResponse = await _client.SendAsync(requestMessage, cancellationToken);
             if (!uploadChunkResponse.IsSuccessStatusCode) {
-                // Handle upload error
                 LogCollector.LogWarning(uploadChunkResponse.ToString());
+            }
+        } finally {
+            MicrosoftGraphUtils.ConcurrencySemaphore.Release();
+        }
+    }
+
+    private async Task SendAttachmentChunkWithRetryAsync(string uploadUrl, byte[] chunk, long offset, long fileSize, CancellationToken cancellationToken) {
+        var policy = SendPolicy ?? MailozaurrOptions.DefaultGraphPolicy;
+        int attempts = 0;
+        Exception? lastException = null;
+        var maxRetries = policy?.MaxRetries ?? RetryCount;
+        do {
+            try {
+                await SendAttachmentChunkOnceAsync(uploadUrl, chunk, offset, fileSize, cancellationToken);
                 return;
+            } catch (Exception ex) {
+                lastException = ex;
+                var shouldRetry = (policy?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
+                if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
+                    throw;
+                }
+                var retryAfter = (ex as GraphApiException)?.RetryAfter;
+                await DelayWithBackoffAsync(policy, attempts, retryAfter, ex, cancellationToken);
+            }
+            attempts++;
+        } while (attempts <= maxRetries);
+
+        if (lastException != null) {
+            throw lastException;
+        }
+    }
+
+    private async Task UploadAttachmentWithRetryAsync(GraphMessage draftMessage, string path, CancellationToken cancellationToken) {
+        var policy = SendPolicy ?? MailozaurrOptions.DefaultGraphPolicy;
+        int attempts = 0;
+        Exception? lastException = null;
+        var maxRetries = policy?.MaxRetries ?? RetryCount;
+        do {
+            try {
+                var attachmentItemJson = await CreateGraphAttachment(path, cancellationToken, preloadContent: false);
+                var uploadUrl = await CreateUploadSession(draftMessage, attachmentItemJson.Json, cancellationToken);
+                await SendFileChunks(uploadUrl, attachmentItemJson.FilePath, attachmentItemJson.FileSize, cancellationToken);
+                return;
+            } catch (FileNotFoundException) {
+                throw;
+            } catch (Exception ex) {
+                lastException = ex;
+                var shouldRetry = (policy?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
+                if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
+                    throw;
+                }
+                var retryAfter = (ex as GraphApiException)?.RetryAfter;
+                await DelayWithBackoffAsync(policy, attempts, retryAfter, ex, cancellationToken);
+            }
+            attempts++;
+        } while (attempts <= maxRetries);
+
+        if (lastException != null) {
+            throw lastException;
+        }
+    }
+
+    private async Task SendAttachmentChunkOnceAsync(string uploadUrl, byte[] chunk, long offset, long fileSize, CancellationToken cancellationToken) {
+        using var content = new StreamContent(new MemoryStream(chunk, writable: false));
+        var contentRange = $"bytes {offset}-{offset + chunk.Length - 1}/{fileSize}";
+        content.Headers.Add("Content-Range", contentRange);
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Put, uploadUrl) {
+            Content = content
+        };
+        requestMessage.Headers.Add("AnchorMailbox", SentFrom);
+        await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
+        try {
+            using var uploadChunkResponse = await _client.SendAsync(requestMessage, cancellationToken);
+            if (!uploadChunkResponse.IsSuccessStatusCode) {
+                var responseContent = await uploadChunkResponse.Content.ReadAsStringAsync();
+                var error = JsonSerializer.Deserialize(responseContent, MailozaurrJsonContext.Default.GraphApiError);
+                var errorMessage = (error == null || error.Error == null)
+                    ? $"Unknown error: {responseContent}"
+                    : $"Error code: {error.Error.Code}, message: {error.Error.Message}";
+                var retryAfter = ParseRetryAfter(uploadChunkResponse);
+                throw new GraphApiException(uploadChunkResponse.StatusCode, errorMessage, responseContent, retryAfter);
             }
         } finally {
             MicrosoftGraphUtils.ConcurrencySemaphore.Release();

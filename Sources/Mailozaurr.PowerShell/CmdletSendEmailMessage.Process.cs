@@ -311,7 +311,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             graph.WithSendPolicy(p);
         }
         graph.CreateAttachments();
-        long graphSize = GetTotalAttachmentSize(graph.ConvertedAttachments);
+        long graphSize = graph.TotalAttachmentSizeBytes;
         if (graphSize > GraphAttachmentLimitBytes) {
             WriteError(new ErrorRecord(
                 new ArgumentException("Attachments exceed Graph limit of 150MB."),
@@ -371,6 +371,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         graph.Bcc = Bcc;
         graph.ReplyTo = ReplyTo;
         graph.Subject = Subject ?? string.Empty;
+        graph.Priority = Priority;
         graph.DoNotSaveToSentItems = DoNotSaveToSentItems;
         graph.ErrorAction = errorAction;
         graph.RetryCount = RetryCount;
@@ -383,7 +384,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         graph.Attachments = Attachment;
         if (Headers != null) graph.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         graph.CreateAttachments();
-        long size = GetTotalAttachmentSize(graph.ConvertedAttachments);
+        long size = graph.TotalAttachmentSizeBytes;
         if (size > GraphAttachmentLimitBytes) {
             WriteError(new ErrorRecord(
                 new ArgumentException("Attachments exceed Graph limit of 150MB."),

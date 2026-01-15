@@ -77,12 +77,17 @@ public static class SmtpConnectionPool {
         PoolSizeChanged?.Invoke(size);
     }
 
-    internal static ClientSmtp? TryRentClient(string server, int port) {
+    private static string BuildKey(string server, int port, string? identity) {
+        var baseKey = $"{server}:{port}";
+        return string.IsNullOrWhiteSpace(identity) ? baseKey : $"{baseKey}|{identity}";
+    }
+
+    internal static ClientSmtp? TryRentClient(string server, int port, string? identity = null) {
         if (!PoolingEnabled) {
             return null;
         }
 
-        var key = $"{server}:{port}";
+        var key = BuildKey(server, port, identity);
         if (_connectionPool.TryGetValue(key, out var entry)) {
             while (entry.Bag.TryTake(out var pooled)) {
                 Interlocked.Decrement(ref entry.Count);
@@ -98,7 +103,7 @@ public static class SmtpConnectionPool {
         return null;
     }
 
-    internal static void ReturnClient(string server, int port, ClientSmtp client) {
+    internal static void ReturnClient(string server, int port, ClientSmtp client, string? identity = null) {
         if (!PoolingEnabled) {
             client.Dispose();
             return;
@@ -109,7 +114,7 @@ public static class SmtpConnectionPool {
             return;
         }
 
-        var key = $"{server}:{port}";
+        var key = BuildKey(server, port, identity);
         var entry = _connectionPool.GetOrAdd(key, _ => new PoolEntry());
         var current = Interlocked.Increment(ref entry.Count);
         if (current > MaxPoolSize) {
@@ -146,6 +151,10 @@ public static class SmtpConnectionPool {
         var entries = new List<SmtpConnectionPoolEntry>();
         foreach (var kv in _connectionPool) {
             var key = kv.Key;
+            var identitySeparator = key.IndexOf('|');
+            if (identitySeparator >= 0) {
+                key = key.Substring(0, identitySeparator);
+            }
             var index = key.LastIndexOf(':');
             var server = index >= 0 ? key.Substring(0, index) : key;
             var port = 0;
