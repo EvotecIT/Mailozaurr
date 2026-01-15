@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Threading;
@@ -947,7 +948,12 @@ namespace Mailozaurr;
         using (uploadSessionResponse) {
             var uploadSessionContent = await uploadSessionResponse.Content.ReadAsStringAsync();
             if (!uploadSessionResponse.IsSuccessStatusCode) {
-                var error = JsonSerializer.Deserialize(uploadSessionContent, MailozaurrJsonContext.Default.GraphApiError);
+                GraphApiError? error = null;
+                try {
+                    error = JsonSerializer.Deserialize(uploadSessionContent, MailozaurrJsonContext.Default.GraphApiError);
+                } catch (JsonException) {
+                    // Non-JSON error response; fall back to raw content.
+                }
                 var errorMessage = (error == null || error.Error == null)
                     ? $"Unknown error: {uploadSessionContent}"
                     : $"Error code: {error.Error.Code}, message: {error.Error.Message}";
@@ -983,22 +989,26 @@ namespace Mailozaurr;
         var fileSize = new FileInfo(filePath).Length;
 
         using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var buffer = new byte[chunkSize];
+        var buffer = ArrayPool<byte>.Shared.Rent(chunkSize);
         int bytesRead;
         long offset = 0;
-        while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0) {
-            if (cancellationToken.IsCancellationRequested) {
-                return fileContents;
-            }
+        try {
+            while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0) {
+                if (cancellationToken.IsCancellationRequested) {
+                    return fileContents;
+                }
 
-            var chunk = new byte[bytesRead];
-            Array.Copy(buffer, chunk, bytesRead);
-            var memoryStream = new MemoryStream(chunk, writable: false);
-            var contentRange = $"bytes {offset}-{offset + bytesRead - 1}/{fileSize}";
-            var streamContent = new StreamContent(memoryStream);
-            streamContent.Headers.Add("Content-Range", contentRange);
-            fileContents.Add(streamContent);
-            offset += bytesRead;
+                var chunk = new byte[bytesRead];
+                Array.Copy(buffer, chunk, bytesRead);
+                var memoryStream = new MemoryStream(chunk, writable: false);
+                var contentRange = $"bytes {offset}-{offset + bytesRead - 1}/{fileSize}";
+                var streamContent = new StreamContent(memoryStream);
+                streamContent.Headers.Add("Content-Range", contentRange);
+                fileContents.Add(streamContent);
+                offset += bytesRead;
+            }
+        } finally {
+            ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
         }
 
         return fileContents;
@@ -1162,7 +1172,12 @@ namespace Mailozaurr;
             using var uploadChunkResponse = await _client.SendAsync(requestMessage, cancellationToken);
             if (!uploadChunkResponse.IsSuccessStatusCode) {
                 var responseContent = await uploadChunkResponse.Content.ReadAsStringAsync();
-                var error = JsonSerializer.Deserialize(responseContent, MailozaurrJsonContext.Default.GraphApiError);
+                GraphApiError? error = null;
+                try {
+                    error = JsonSerializer.Deserialize(responseContent, MailozaurrJsonContext.Default.GraphApiError);
+                } catch (JsonException) {
+                    // Non-JSON error response; fall back to raw content.
+                }
                 var errorMessage = (error == null || error.Error == null)
                     ? $"Unknown error: {responseContent}"
                     : $"Error code: {error.Error.Code}, message: {error.Error.Message}";
@@ -1259,9 +1274,10 @@ namespace Mailozaurr;
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - SMTP fallback failed: {ex.Message}");
             // Preserve original Graph failure, but add fallback context to Error for diagnostics
+            var fallbackError = ex.ToString();
             var mergedError = string.IsNullOrWhiteSpace(current.Error)
-                ? $"Graph failed; SMTP fallback error: {ex.Message}"
-                : $"{current.Error} | SMTP fallback error: {ex.Message}";
+                ? $"Graph failed; SMTP fallback error: {fallbackError}"
+                : $"{current.Error} | SMTP fallback error: {fallbackError}";
             return new SmtpResult(current.Status, current.EmailAction, current.SentTo, current.SentFrom, current.Server, current.Port, current.TimeToExecute, current.Message, mergedError)
             {
                 GraphError = current.GraphError,
