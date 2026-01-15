@@ -983,7 +983,7 @@ public class Smtp {
         await PendingMessageRepository.RemoveAsync(messageId, cancellationToken);
     }
 
-    private async Task EnqueuePendingMessageAsync(string messageId, CredentialProtection credentialProtector, CancellationToken cancellationToken) {
+    private async Task EnqueuePendingMessageAsync(string messageId, ICredentialProtector credentialProtector, CancellationToken cancellationToken) {
         if (PendingMessageRepository == null) {
             return;
         }
