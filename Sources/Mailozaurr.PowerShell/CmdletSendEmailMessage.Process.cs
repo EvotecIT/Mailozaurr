@@ -435,11 +435,10 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         // Attach the LogCollector to the SMTP client's logger
         smtpClient.LogCollector = logCollector;
         
-        string sentLogPath;
         var providedSentLogPath = SentLogPath;
-        sentLogPath = string.IsNullOrWhiteSpace(providedSentLogPath)
+        var sentLogPath = string.IsNullOrWhiteSpace(providedSentLogPath)
             ? Path.Combine(Path.GetTempPath(), "Mailozaurr", "sentlog.json")
-            : providedSentLogPath;
+            : providedSentLogPath!;
         smtpClient.SentMessageRepository = new FileSentMessageRepository(sentLogPath);
         smtpClient.From = Helpers.GetFromObject(fromEmail, fromName);
         smtpClient.ReplyTo = ReplyTo;
@@ -672,7 +671,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
                     if (result.BaseObject is IDictionary dictionary) {
                         var uploadUrl = dictionary["uploadUrl"]?.ToString();
                         if (!string.IsNullOrEmpty(uploadUrl)) {
-                            return uploadUrl;
+                            return uploadUrl!;
                         }
                         // Handle the case where the property is not present
                         throw new InvalidOperationException("The result does not contain an 'uploadUrl' property.");
@@ -717,7 +716,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
                     if (result.BaseObject is IDictionary dictionary) {
                         var id = dictionary["id"]?.ToString();
                         if (!string.IsNullOrEmpty(id)) {
-                            return id;
+                            return id!;
                         }
                         // Handle the case where the property is not present
                         throw new InvalidOperationException("The result does not contain an 'id' property.");
