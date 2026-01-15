@@ -20,5 +20,6 @@ public class GraphAuthorization {
 
     /// <summary>Time when the access token expires.</summary>
     [JsonPropertyName("expires_on")]
+    [JsonConverter(typeof(UnixTimeSecondsDateTimeOffsetConverter))]
     public DateTimeOffset ExpiresOn { get; set; }
 }
