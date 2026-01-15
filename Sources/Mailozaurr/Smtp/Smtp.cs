@@ -76,6 +76,11 @@ public class Smtp {
     /// <summary>Credentials used during authentication.</summary>
     public NetworkCredential? Credential { get; private set; }
 
+    /// <summary>
+    /// Optional identity hint used to isolate SMTP connection pooling by credentials.
+    /// </summary>
+    public string? ConnectionPoolIdentity { get; set; }
+
     /// <summary>Subject of the message.</summary>
     public string Subject {
         get => Client.Subject;
@@ -217,6 +222,7 @@ public class Smtp {
 
     private bool _skipCertificateValidation;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
+    private string? _poolIdentity;
     /// <summary>Skip server certificate validation.</summary>
     public bool SkipCertificateValidation {
         get => _skipCertificateValidation;
@@ -439,6 +445,7 @@ public class Smtp {
     public SmtpResult Connect(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false) {
         var oldServer = Server;
         var oldPort = Port;
+        var oldPoolIdentity = _poolIdentity ?? GetConnectionPoolIdentity();
         Server = server;
         Port = port;
         var effectiveOptions = secureSocketOptions;
@@ -458,7 +465,7 @@ public class Smtp {
         {
             if (SmtpConnectionPool.PoolingEnabled)
             {
-                SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client);
+                SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client, oldPoolIdentity);
             }
             else
             {
@@ -467,7 +474,8 @@ public class Smtp {
             Client = ClientFactory(Logging?.ProtocolLogger);
         }
 
-        var pooled = SmtpConnectionPool.PoolingEnabled ? SmtpConnectionPool.TryRentClient(server, port) : null;
+        var poolIdentity = GetConnectionPoolIdentity();
+        var pooled = SmtpConnectionPool.PoolingEnabled ? SmtpConnectionPool.TryRentClient(server, port, poolIdentity) : null;
         if (pooled != null)
         {
             Client = pooled;
@@ -477,6 +485,7 @@ public class Smtp {
             {
                 Client.Connect(server, port, effectiveOptions);
             }
+            _poolIdentity = poolIdentity;
             LogVerbose($"Connected to {server} on {port} port using SSL: {effectiveOptions}");
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "");
         } catch (Exception ex) {
@@ -504,6 +513,7 @@ public class Smtp {
     public async Task<SmtpResult> ConnectAsync(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false) {
         var oldServer = Server;
         var oldPort = Port;
+        var oldPoolIdentity = _poolIdentity ?? GetConnectionPoolIdentity();
         Server = server;
         Port = port;
         var effectiveOptions = secureSocketOptions;
@@ -523,7 +533,7 @@ public class Smtp {
         {
             if (SmtpConnectionPool.PoolingEnabled)
             {
-                SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client);
+                SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client, oldPoolIdentity);
             }
             else
             {
@@ -532,7 +542,8 @@ public class Smtp {
             Client = ClientFactory(Logging?.ProtocolLogger);
         }
 
-        var pooled = SmtpConnectionPool.PoolingEnabled ? SmtpConnectionPool.TryRentClient(server, port) : null;
+        var poolIdentity = GetConnectionPoolIdentity();
+        var pooled = SmtpConnectionPool.PoolingEnabled ? SmtpConnectionPool.TryRentClient(server, port, poolIdentity) : null;
         if (pooled != null)
         {
             Client = pooled;
@@ -542,6 +553,7 @@ public class Smtp {
             {
                 await Client.ConnectAsync(server, port, effectiveOptions);
             }
+            _poolIdentity = poolIdentity;
             LogVerbose($"Connected to {server} on {port} port using SSL: {effectiveOptions}");
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "");
         } catch (Exception ex) {
@@ -799,11 +811,45 @@ public class Smtp {
                 continue;
             }
 
+            var originalSkipValidation = SkipCertificateValidation;
+            var originalCheckRevocation = CheckCertificateRevocation;
+            var originalTimeout = Timeout;
+            var originalSecureOptions = _activeSecureSocketOptions;
+            var originalUseSsl = _activeUseSsl;
+            var originalPoolIdentity = ConnectionPoolIdentity;
+            var secureSocketOptions = _activeSecureSocketOptions;
+            var useSsl = _activeUseSsl;
+            if (record.ProviderData != null && record.ProviderData.Count > 0) {
+                if (record.ProviderData.TryGetValue(ProviderDataSecureSocketOptionsKey, out var secureValue)
+                    && Enum.TryParse(secureValue, out SecureSocketOptions parsedSecure)) {
+                    secureSocketOptions = parsedSecure;
+                }
+                if (record.ProviderData.TryGetValue(ProviderDataUseSslKey, out var useSslValue)
+                    && bool.TryParse(useSslValue, out var parsedUseSsl)) {
+                    useSsl = parsedUseSsl;
+                }
+                if (record.ProviderData.TryGetValue(ProviderDataSkipCertificateValidationKey, out var skipValue)
+                    && bool.TryParse(skipValue, out var parsedSkip)) {
+                    SkipCertificateValidation = parsedSkip;
+                }
+                if (record.ProviderData.TryGetValue(ProviderDataCheckCertificateRevocationKey, out var revocationValue)
+                    && bool.TryParse(revocationValue, out var parsedRevocation)) {
+                    CheckCertificateRevocation = parsedRevocation;
+                }
+                if (record.ProviderData.TryGetValue(ProviderDataTimeoutKey, out var timeoutValue)
+                    && int.TryParse(timeoutValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var timeout)) {
+                    Timeout = timeout;
+                }
+            }
+            if (!string.IsNullOrWhiteSpace(record.UserName)) {
+                ConnectionPoolIdentity = record.UserName;
+            }
+
             try {
                 var server = record.Server ?? Server;
                 var port = record.Port ?? Port;
                 if (!string.IsNullOrWhiteSpace(server)) {
-                    Connect(server, port);
+                    Connect(server, port, secureSocketOptions, useSsl);
                     if (!string.IsNullOrEmpty(record.UserName)) {
                         var pwd = CredentialProtection.UnprotectWithFallback(record.Password);
                         var cred = Helpers.ConvertFromPlainText(record.UserName!, pwd);
@@ -825,10 +871,20 @@ public class Smtp {
                 await PendingMessageRepository.RemoveAsync(record.MessageId!, cancellationToken);
             } catch (Exception ex) {
                 LogWarning($"ProcessPendingMessages - Error sending {record.MessageId}: {ex.Message}");
-                record.NextAttemptAt = DateTimeOffset.UtcNow;
+                var attempt = record.IncrementAttemptCount();
+                var delay = CalculateRetryDelay(attempt - 1);
+                record.NextAttemptAt = delay > TimeSpan.Zero
+                    ? DateTimeOffset.UtcNow.Add(delay)
+                    : DateTimeOffset.UtcNow;
                 await PendingMessageRepository.SaveAsync(record, cancellationToken);
             } finally {
                 Disconnect();
+                SkipCertificateValidation = originalSkipValidation;
+                CheckCertificateRevocation = originalCheckRevocation;
+                Timeout = originalTimeout;
+                _activeSecureSocketOptions = originalSecureOptions;
+                _activeUseSsl = originalUseSsl;
+                ConnectionPoolIdentity = originalPoolIdentity;
             }
         }
     }
@@ -867,6 +923,91 @@ public class Smtp {
         return data;
     }
 
+    private string GetConnectionPoolIdentity() {
+        var userName = ConnectionPoolIdentity;
+        var domain = string.Empty;
+        if (string.IsNullOrWhiteSpace(userName)) {
+            userName = Credential?.UserName;
+            domain = Credential?.Domain ?? string.Empty;
+        }
+        if (!string.IsNullOrWhiteSpace(domain)) {
+            userName = string.IsNullOrWhiteSpace(userName) ? domain : $"{domain}\\{userName}";
+        }
+        if (string.IsNullOrWhiteSpace(userName)) {
+            userName = "anonymous";
+        }
+        return $"{userName}|{_activeSecureSocketOptions}|{_activeUseSsl}";
+    }
+
+    private TimeSpan CalculateRetryDelay(int attempt) {
+        if (attempt < 0) attempt = 0;
+        var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempt));
+        if (MaxDelayMilliseconds > 0 && delayMilliseconds > MaxDelayMilliseconds) {
+            delayMilliseconds = MaxDelayMilliseconds;
+        }
+        if (JitterMilliseconds > 0 && delayMilliseconds > 0) {
+            delayMilliseconds += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
+        }
+        return delayMilliseconds > 0
+            ? TimeSpan.FromMilliseconds(delayMilliseconds)
+            : TimeSpan.Zero;
+    }
+
+    private string EnsureMessageId() {
+        var id = Message.MessageId;
+        if (string.IsNullOrEmpty(id)) {
+            Message.MessageId = id = MimeKit.Utils.MimeUtils.GenerateMessageId();
+        }
+        return id;
+    }
+
+    private async Task SaveSentMessageAsync(string messageId, CancellationToken cancellationToken) {
+        if (SentMessageRepository == null) {
+            return;
+        }
+
+        var record = new SentMessageRecord {
+            MessageId = messageId,
+            Recipients = SentTo,
+            Subject = Subject,
+            Timestamp = DateTimeOffset.UtcNow
+        };
+        await SentMessageRepository.SaveAsync(record, cancellationToken);
+    }
+
+    private async Task RemovePendingMessageAsync(string? messageId, CancellationToken cancellationToken) {
+        if (PendingMessageRepository == null || string.IsNullOrEmpty(messageId)) {
+            return;
+        }
+
+        var safeMessageId = messageId!;
+        await PendingMessageRepository.RemoveAsync(safeMessageId, cancellationToken);
+    }
+
+    private async Task EnqueuePendingMessageAsync(string messageId, ICredentialProtector credentialProtector, CancellationToken cancellationToken) {
+        if (PendingMessageRepository == null) {
+            return;
+        }
+
+        using var ms = new MemoryStream();
+        await Message.WriteToAsync(ms, cancellationToken);
+        var record = new PendingMessageRecord {
+            MessageId = messageId,
+            MimeMessage = Convert.ToBase64String(ms.ToArray()),
+            Timestamp = DateTimeOffset.UtcNow,
+            NextAttemptAt = DateTimeOffset.UtcNow,
+            Provider = EmailProvider.None,
+            Server = Server,
+            Port = Port,
+            UserName = Credential?.UserName,
+            Password = string.IsNullOrEmpty(Credential?.Password)
+                ? null
+                : credentialProtector.Protect(Credential!.Password),
+            ProviderData = CreateProviderDataSnapshot()
+        };
+        await PendingMessageRepository.SaveAsync(record, cancellationToken);
+    }
+
     private async Task<SmtpResult> SendCoreAsync(CancellationToken cancellationToken = default) {
         if (DryRun) {
             LogVerbose("Send-EmailMessage - DryRun enabled, skipping send.");
@@ -882,18 +1023,8 @@ public class Smtp {
             try {
                 await Client.SendAsync(Message, cancellationToken);
                 LogVerbose($"Send-EmailMessage - Sent email to {SentTo}");
-                if (SentMessageRepository != null) {
-                    var record = new SentMessageRecord {
-                        MessageId = Message.MessageId ?? string.Empty,
-                        Recipients = SentTo,
-                        Subject = Subject,
-                        Timestamp = DateTimeOffset.UtcNow
-                    };
-                    await SentMessageRepository.SaveAsync(record, cancellationToken);
-                }
-                if (PendingMessageRepository != null && !string.IsNullOrEmpty(Message.MessageId)) {
-                    await PendingMessageRepository.RemoveAsync(Message.MessageId!, cancellationToken);
-                }
+                await SaveSentMessageAsync(Message.MessageId ?? string.Empty, cancellationToken);
+                await RemovePendingMessageAsync(Message.MessageId, cancellationToken);
                 var result = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging) {
                     MessageId = Message.MessageId
                 };
@@ -906,29 +1037,8 @@ public class Smtp {
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }
-                    var id = Message.MessageId;
-                    if (string.IsNullOrEmpty(id)) {
-                        Message.MessageId = id = MimeKit.Utils.MimeUtils.GenerateMessageId();
-                    }
-                    if (PendingMessageRepository != null) {
-                        using var ms = new MemoryStream();
-                        await Message.WriteToAsync(ms, cancellationToken);
-                        var record = new PendingMessageRecord {
-                            MessageId = id,
-                            MimeMessage = Convert.ToBase64String(ms.ToArray()),
-                            Timestamp = DateTimeOffset.UtcNow,
-                            NextAttemptAt = DateTimeOffset.UtcNow,
-                            Provider = EmailProvider.None,
-                            Server = Server,
-                            Port = Port,
-                            UserName = Credential?.UserName,
-                            Password = string.IsNullOrEmpty(Credential?.Password)
-                                ? null
-                                : credentialProtector.Protect(Credential!.Password),
-                            ProviderData = CreateProviderDataSnapshot()
-                        };
-                        await PendingMessageRepository.SaveAsync(record, cancellationToken);
-                    }
+                    var id = EnsureMessageId();
+                    await EnqueuePendingMessageAsync(id, credentialProtector, cancellationToken);
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message) {
                         MessageId = id
                     };
@@ -936,43 +1046,16 @@ public class Smtp {
                     return failResult;
                 }
 
-                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
-                if (MaxDelayMilliseconds > 0 && delayMilliseconds > MaxDelayMilliseconds) {
-                    delayMilliseconds = MaxDelayMilliseconds;
-                }
-                if (JitterMilliseconds > 0 && delayMilliseconds > 0) {
-                    delayMilliseconds += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
-                }
-                if (delayMilliseconds > 0) {
-                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken);
+                var delay = CalculateRetryDelay(attempts);
+                if (delay > TimeSpan.Zero) {
+                    await Task.Delay(delay, cancellationToken);
                 }
             }
             attempts++;
         } while (attempts <= RetryCount);
 
-        var finalId = Message.MessageId;
-        if (string.IsNullOrEmpty(finalId)) {
-            Message.MessageId = finalId = MimeKit.Utils.MimeUtils.GenerateMessageId();
-        }
-        if (PendingMessageRepository != null) {
-            using var ms = new MemoryStream();
-            await Message.WriteToAsync(ms, cancellationToken);
-            var record = new PendingMessageRecord {
-                MessageId = finalId,
-                MimeMessage = Convert.ToBase64String(ms.ToArray()),
-                Timestamp = DateTimeOffset.UtcNow,
-                NextAttemptAt = DateTimeOffset.UtcNow,
-                Provider = EmailProvider.None,
-                Server = Server,
-                Port = Port,
-                UserName = Credential?.UserName,
-                Password = string.IsNullOrEmpty(Credential?.Password)
-                    ? null
-                    : credentialProtector.Protect(Credential!.Password),
-                ProviderData = CreateProviderDataSnapshot()
-            };
-            await PendingMessageRepository.SaveAsync(record, cancellationToken);
-        }
+        var finalId = EnsureMessageId();
+        await EnqueuePendingMessageAsync(finalId, credentialProtector, cancellationToken);
         var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", lastException?.Message) {
             MessageId = finalId
         };
@@ -987,7 +1070,8 @@ public class Smtp {
     public void Disconnect() {
         if (Client.IsConnected) {
             if (SmtpConnectionPool.PoolingEnabled) {
-                SmtpConnectionPool.ReturnClient(Server, Port, Client);
+                var identity = _poolIdentity ?? GetConnectionPoolIdentity();
+                SmtpConnectionPool.ReturnClient(Server, Port, Client, identity);
                 Client = ClientFactory(Logging?.ProtocolLogger);
             } else {
                 Client.Disconnect(true);
@@ -1002,7 +1086,8 @@ public class Smtp {
     public void Dispose() {
         if (Client.IsConnected) {
             if (SmtpConnectionPool.PoolingEnabled) {
-                SmtpConnectionPool.ReturnClient(Server, Port, Client);
+                var identity = _poolIdentity ?? GetConnectionPoolIdentity();
+                SmtpConnectionPool.ReturnClient(Server, Port, Client, identity);
             } else {
                 Client.Disconnect(true);
             }

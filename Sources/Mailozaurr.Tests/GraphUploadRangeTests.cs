@@ -54,4 +54,27 @@ public class GraphUploadRangeTests
         Assert.Equal(allBytes.Skip(10).Take(10), chunk1);
         Assert.Equal(allBytes.Skip(20).Take(5), chunk2);
     }
+
+    [Fact]
+    public void PrepareByteArrayContentForUpload_ClampsChunkSizeToMax()
+    {
+        string tmp = Path.GetTempFileName();
+        var fileSize = Graph.MaxChunkSize + 10;
+        var bytes = new byte[fileSize];
+        for (var i = 0; i < bytes.Length; i++) {
+            bytes[i] = (byte)(i % 256);
+        }
+        File.WriteAllBytes(tmp, bytes);
+        using Graph graph = new Graph();
+        MethodInfo? method = typeof(Graph).GetMethod(
+            "PrepareByteArrayContentForUpload",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(method);
+        var nonNullMethod = method!;
+        List<StreamContent> chunks = (List<StreamContent>)nonNullMethod.Invoke(graph, new object[] { tmp, Graph.MaxChunkSize * 2, CancellationToken.None })!;
+        File.Delete(tmp);
+        Assert.Equal(2, chunks.Count);
+        Assert.Equal($"bytes 0-{Graph.MaxChunkSize - 1}/{fileSize}", chunks[0].Headers.GetValues("Content-Range").First());
+        Assert.Equal($"bytes {Graph.MaxChunkSize}-{fileSize - 1}/{fileSize}", chunks[1].Headers.GetValues("Content-Range").First());
+    }
 }

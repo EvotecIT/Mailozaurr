@@ -3,6 +3,7 @@ namespace Mailozaurr;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 
 /// <summary>
@@ -77,12 +78,25 @@ public static class SmtpConnectionPool {
         PoolSizeChanged?.Invoke(size);
     }
 
-    internal static ClientSmtp? TryRentClient(string server, int port) {
+    private static string EncodeKeyPart(string? value) {
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes(value ?? string.Empty));
+    }
+
+    private static string BuildKey(string server, int port, string? identity) {
+        var serverKey = EncodeKeyPart(server);
+        if (string.IsNullOrWhiteSpace(identity)) {
+            return $"{serverKey}:{port}";
+        }
+        var identityKey = EncodeKeyPart(identity);
+        return $"{serverKey}:{port}:{identityKey}";
+    }
+
+    internal static ClientSmtp? TryRentClient(string server, int port, string? identity = null) {
         if (!PoolingEnabled) {
             return null;
         }
 
-        var key = $"{server}:{port}";
+        var key = BuildKey(server, port, identity);
         if (_connectionPool.TryGetValue(key, out var entry)) {
             while (entry.Bag.TryTake(out var pooled)) {
                 Interlocked.Decrement(ref entry.Count);
@@ -98,7 +112,7 @@ public static class SmtpConnectionPool {
         return null;
     }
 
-    internal static void ReturnClient(string server, int port, ClientSmtp client) {
+    internal static void ReturnClient(string server, int port, ClientSmtp client, string? identity = null) {
         if (!PoolingEnabled) {
             client.Dispose();
             return;
@@ -109,7 +123,7 @@ public static class SmtpConnectionPool {
             return;
         }
 
-        var key = $"{server}:{port}";
+        var key = BuildKey(server, port, identity);
         var entry = _connectionPool.GetOrAdd(key, _ => new PoolEntry());
         var current = Interlocked.Increment(ref entry.Count);
         if (current > MaxPoolSize) {
@@ -146,11 +160,16 @@ public static class SmtpConnectionPool {
         var entries = new List<SmtpConnectionPoolEntry>();
         foreach (var kv in _connectionPool) {
             var key = kv.Key;
-            var index = key.LastIndexOf(':');
-            var server = index >= 0 ? key.Substring(0, index) : key;
+            var parts = key.Split(':');
+            var server = parts.Length > 0 ? parts[0] : key;
             var port = 0;
-            if (index >= 0) {
-                int.TryParse(key.Substring(index + 1), out port);
+            if (parts.Length > 1) {
+                int.TryParse(parts[1], out port);
+            }
+            try {
+                server = Encoding.UTF8.GetString(Convert.FromBase64String(server));
+            } catch (FormatException) {
+                // Keep raw server key if decoding fails.
             }
             entries.Add(new SmtpConnectionPoolEntry(server, port, kv.Value.Count));
         }
