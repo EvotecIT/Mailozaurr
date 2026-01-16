@@ -1,0 +1,16 @@
+* text=auto eol=lf
+
+*.png binary
+*.psd binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.7z binary
+*.dll binary
+*.exe binary
+*.pfx binary
+*.snk binary
