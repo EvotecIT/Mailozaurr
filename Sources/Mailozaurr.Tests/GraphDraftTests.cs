@@ -90,4 +90,21 @@ public class GraphDraftTests
         string json = graph.CreateDraft();
         Assert.Contains("\"importance\":\"high\"", json, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void CreateDraftForMg_SetsImportanceFromPriority()
+    {
+        using var graph = new Graph
+        {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "sub",
+            HTML = "body",
+            ContentType = "HTML",
+            Priority = MessagePriority.Low
+        };
+
+        string json = graph.CreateDraftForMg();
+        Assert.Contains("\"importance\":\"low\"", json, StringComparison.OrdinalIgnoreCase);
+    }
 }
