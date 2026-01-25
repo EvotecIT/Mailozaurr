@@ -1019,9 +1019,11 @@ public class Smtp {
         var message = Message;
         bool messageHasContent = message != null && MessageHasContent(message);
         bool hasPayload = HasPropertyPayload();
-        bool hasHeaderPayload = message != null && message.Headers != null && message.Headers.Count > 0;
+        bool hasHeaderPayload = (message != null && message.Headers != null && message.Headers.Count > 0) ||
+                                (Headers != null && Headers.Count > 0);
 
-        if (AutoCreateMessage && !messageHasContent && hasPayload)
+        bool shouldAutoCreate = AutoCreateMessage && !messageHasContent && hasPayload;
+        if (shouldAutoCreate)
         {
             PreserveCustomHeaders(message);
             await CreateMessageAsync(cancellationToken).ConfigureAwait(false);
@@ -1030,7 +1032,8 @@ public class Smtp {
         }
 
         bool hasSender = message != null && MessageHasSender(message);
-        if (!hasSender && (hasPayload || messageHasContent || hasHeaderPayload))
+        bool hasMaterial = hasPayload || messageHasContent || hasHeaderPayload;
+        if (!hasSender && hasMaterial)
         {
             string messageText = "SMTP message has no sender. Call CreateMessage/CreateMessageAsync after setting From/To/Subject, or enable AutoCreateMessage.";
             LogWarning($"Send-EmailMessage - {messageText}");
@@ -1131,6 +1134,15 @@ public class Smtp {
         }
 
         Dictionary<string, string>? merged = null;
+        if (Headers is Dictionary<string, string> headerDict)
+        {
+            merged = headerDict;
+        }
+        else if (Headers != null && Headers.Count > 0)
+        {
+            merged = new Dictionary<string, string>(Headers, StringComparer.OrdinalIgnoreCase);
+        }
+
         foreach (var header in message.Headers)
         {
             if (header.Id != MimeKit.HeaderId.Unknown)
@@ -1143,7 +1155,7 @@ public class Smtp {
                 continue;
             }
 
-            merged ??= Headers as Dictionary<string, string> ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            merged ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (!merged.ContainsKey(header.Field))
             {
                 merged[header.Field] = header.Value ?? string.Empty;
