@@ -63,6 +63,26 @@ namespace Mailozaurr.Tests {
         }
 
         [Fact]
+        public void SendEmail_Smtp_WithAutoCreateMessage_PreservesCustomHeaders() {
+            var smtp = new Smtp { AutoCreateMessage = true };
+            var fake = new FakeSmtpClient();
+            var field = typeof(Smtp).GetField("<Client>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            field.SetValue(smtp, fake);
+
+            smtp.Message.Headers.Add("X-Test", "1");
+            smtp.From = "sender@example.com";
+            smtp.To = new[] { "recipient@example.com" };
+            smtp.Subject = "Test Email (SMTP)";
+            smtp.HtmlBody = "<b>Hello from Mailozaurr SMTP!</b>";
+
+            var result = smtp.Send();
+
+            Assert.True(result.Status, $"SMTP send failed: {result.Error}");
+            Assert.NotNull(fake.LastMessage);
+            Assert.Equal("1", fake.LastMessage!.Headers["X-Test"]);
+        }
+
+        [Fact]
         public void SendEmail_Smtp_WithoutCreateMessage_ReturnsHelpfulError() {
             var smtp = new Smtp();
             var fake = new FakeSmtpClient();

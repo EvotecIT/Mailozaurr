@@ -1019,16 +1019,18 @@ public class Smtp {
         var message = Message;
         bool messageHasContent = message != null && MessageHasContent(message);
         bool hasPayload = HasPropertyPayload();
+        bool hasHeaderPayload = message != null && message.Headers != null && message.Headers.Count > 0;
 
         if (AutoCreateMessage && !messageHasContent && hasPayload)
         {
+            PreserveCustomHeaders(message);
             await CreateMessageAsync(cancellationToken).ConfigureAwait(false);
             message = Message;
             messageHasContent = message != null && MessageHasContent(message);
         }
 
         bool hasSender = message != null && MessageHasSender(message);
-        if (!hasSender && (hasPayload || messageHasContent))
+        if (!hasSender && (hasPayload || messageHasContent || hasHeaderPayload))
         {
             string messageText = "SMTP message has no sender. Call CreateMessage/CreateMessageAsync after setting From/To/Subject, or enable AutoCreateMessage.";
             LogWarning($"Send-EmailMessage - {messageText}");
@@ -1119,6 +1121,39 @@ public class Smtp {
         }
 
         return message.Body != null;
+    }
+
+    private void PreserveCustomHeaders(MimeMessage? message)
+    {
+        if (message == null || message.Headers == null || message.Headers.Count == 0)
+        {
+            return;
+        }
+
+        Dictionary<string, string>? merged = null;
+        foreach (var header in message.Headers)
+        {
+            if (header.Id != MimeKit.HeaderId.Unknown)
+            {
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(header.Field))
+            {
+                continue;
+            }
+
+            merged ??= Headers as Dictionary<string, string> ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (!merged.ContainsKey(header.Field))
+            {
+                merged[header.Field] = header.Value ?? string.Empty;
+            }
+        }
+
+        if (merged != null && !ReferenceEquals(merged, Headers))
+        {
+            Headers = merged;
+        }
     }
 
     private static bool HasAddressValue(object? value)
