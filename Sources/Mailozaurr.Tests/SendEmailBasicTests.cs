@@ -13,10 +13,12 @@ namespace Mailozaurr.Tests {
         private class FakeSmtpClient : ClientSmtp
         {
             public bool SendCalled;
+            public MimeMessage? LastMessage;
 
             public override Task<string> SendAsync(MimeMessage message, System.Threading.CancellationToken cancellationToken = default, MailKit.ITransferProgress? progress = null)
             {
                 SendCalled = true;
+                LastMessage = message;
                 return Task.FromResult(string.Empty);
             }
         }
@@ -38,6 +40,45 @@ namespace Mailozaurr.Tests {
 
             Assert.True(result.Status, $"SMTP send failed: {result.Error}");
             Assert.True(fake.SendCalled);
+        }
+
+        [Fact]
+        public void SendEmail_Smtp_WithAutoCreateMessage_BuildsMessage() {
+            var smtp = new Smtp { AutoCreateMessage = true };
+            var fake = new FakeSmtpClient();
+            var field = typeof(Smtp).GetField("<Client>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            field.SetValue(smtp, fake);
+
+            smtp.From = "sender@example.com";
+            smtp.To = new[] { "recipient@example.com" };
+            smtp.Subject = "Test Email (SMTP)";
+            smtp.HtmlBody = "<b>Hello from Mailozaurr SMTP!</b>";
+
+            var result = smtp.Send();
+
+            Assert.True(result.Status, $"SMTP send failed: {result.Error}");
+            Assert.True(fake.SendCalled);
+            Assert.NotNull(fake.LastMessage);
+            Assert.NotEmpty(fake.LastMessage!.From);
+        }
+
+        [Fact]
+        public void SendEmail_Smtp_WithoutCreateMessage_ReturnsHelpfulError() {
+            var smtp = new Smtp();
+            var fake = new FakeSmtpClient();
+            var field = typeof(Smtp).GetField("<Client>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            field.SetValue(smtp, fake);
+
+            smtp.From = "sender@example.com";
+            smtp.To = new[] { "recipient@example.com" };
+            smtp.Subject = "Test Email (SMTP)";
+            smtp.HtmlBody = "<b>Hello from Mailozaurr SMTP!</b>";
+
+            var result = smtp.Send();
+
+            Assert.False(result.Status);
+            Assert.Contains("CreateMessage", result.Error);
+            Assert.False(fake.SendCalled);
         }
 
         [Fact]
