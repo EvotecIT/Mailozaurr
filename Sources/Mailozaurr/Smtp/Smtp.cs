@@ -454,6 +454,15 @@ public class Smtp {
         var oldPoolIdentity = _poolIdentity ?? GetConnectionPoolIdentity();
         Server = server;
         Port = port;
+        if (!SmtpValidation.TryValidateServer(server, port, out var validationError))
+        {
+            string message = validationError ?? "Invalid SMTP server settings.";
+            LogWarning($"Send-EmailMessage - {message}");
+            if (ErrorAction == ActionPreference.Stop) {
+                throw new InvalidOperationException(message);
+            }
+            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, server ?? string.Empty, port, Stopwatch.Elapsed, "", message);
+        }
         var effectiveOptions = secureSocketOptions;
         if (useSsl && effectiveOptions == SecureSocketOptions.Auto) {
             // Maintain backwards compatibility with Send-MailMessage by
@@ -522,6 +531,15 @@ public class Smtp {
         var oldPoolIdentity = _poolIdentity ?? GetConnectionPoolIdentity();
         Server = server;
         Port = port;
+        if (!SmtpValidation.TryValidateServer(server, port, out var validationError))
+        {
+            string message = validationError ?? "Invalid SMTP server settings.";
+            LogWarning($"Send-EmailMessage - {message}");
+            if (ErrorAction == ActionPreference.Stop) {
+                throw new InvalidOperationException(message);
+            }
+            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, server ?? string.Empty, port, Stopwatch.Elapsed, "", message);
+        }
         var effectiveOptions = secureSocketOptions;
         if (useSsl && effectiveOptions == SecureSocketOptions.Auto) {
             // Maintain backwards compatibility with Send-MailMessage by
@@ -583,12 +601,24 @@ public class Smtp {
             LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "Authentication skipped (WhatIf)");
         }
+        if (Credentials is NetworkCredential networkCredential)
+        {
+            if (!SmtpValidation.TryValidateCredentials(networkCredential.UserName, networkCredential.Password, out var validationError))
+            {
+                string message = validationError ?? "Invalid SMTP credentials.";
+                LogWarning($"Send-EmailMessage - {message}");
+                if (ErrorAction == ActionPreference.Stop) {
+                    throw new InvalidOperationException(message);
+                }
+                return new SmtpResult(false, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", message);
+            }
+        }
         try {
             if (isOAuth) {
-                var networkCredential = Credentials as NetworkCredential;
-                if (networkCredential != null) {
-                    Credential = networkCredential;
-                    var (userName, token) = Helpers.ConvertFromOAuth2Credential(networkCredential);
+                var oauthCredential = Credentials as NetworkCredential;
+                if (oauthCredential != null) {
+                    Credential = oauthCredential;
+                    var (userName, token) = Helpers.ConvertFromOAuth2Credential(oauthCredential);
                     var oauth2 = new SaslMechanismOAuth2(userName, token);
                     Client.Authenticate(oauth2);
                 }
@@ -713,6 +743,15 @@ public class Smtp {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         Credential = new NetworkCredential(username, password);
         try {
+            if (!SmtpValidation.TryValidateCredentials(username, password, out var validationError))
+            {
+                string message = validationError ?? "Invalid SMTP credentials.";
+                LogWarning($"Send-EmailMessage - {message}");
+                if (ErrorAction == ActionPreference.Stop) {
+                    throw new InvalidOperationException(message);
+                }
+                return new SmtpResult(false, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", message);
+            }
             switch (mechanism) {
                 case AuthenticationMechanism.CramMd5:
                     Client.Authenticate(new SaslMechanismCramMd5(username, password));
