@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.IO;
+using System.Management.Automation;
 using MimeKit;
 
 namespace Mailozaurr.Tests {
@@ -98,6 +99,25 @@ namespace Mailozaurr.Tests {
 
             Assert.False(result.Status);
             Assert.Contains("CreateMessage", result.Error);
+            Assert.False(fake.SendCalled);
+        }
+
+        [Fact]
+        public void SendEmail_Smtp_WithErrorActionStopAndMissingSender_Throws() {
+            var smtp = new Smtp {
+                AutoCreateMessage = true,
+                ErrorAction = ActionPreference.Stop
+            };
+            var fake = new FakeSmtpClient();
+            var field = typeof(Smtp).GetField("<Client>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            field.SetValue(smtp, fake);
+
+            smtp.To = new[] { "recipient@example.com" };
+            smtp.Subject = "Missing sender";
+            smtp.HtmlBody = "<b>Hello</b>";
+
+            var ex = Assert.Throws<InvalidOperationException>(() => smtp.Send());
+            Assert.Contains("no sender", ex.Message, System.StringComparison.OrdinalIgnoreCase);
             Assert.False(fake.SendCalled);
         }
 
