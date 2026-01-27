@@ -197,6 +197,12 @@ public class Smtp {
     public bool AutoEmbedImages { get; set; } = false;
 
     /// <summary>
+    /// When set to <see langword="true"/>, automatically builds the MIME message
+    /// from the configured properties before sending when the message is empty.
+    /// </summary>
+    public bool AutoCreateMessage { get; set; } = false;
+
+    /// <summary>
     /// When set to <see langword="true"/>, downloads remote images referenced in
     /// <see cref="HtmlBody"/> and embeds them as inline attachments.
     /// </summary>
@@ -448,6 +454,15 @@ public class Smtp {
         var oldPoolIdentity = _poolIdentity ?? GetConnectionPoolIdentity();
         Server = server;
         Port = port;
+        if (!SmtpValidation.TryValidateServer(server, port, out var validationError))
+        {
+            string message = validationError ?? "Invalid SMTP server settings.";
+            LogWarning($"Send-EmailMessage - {message}");
+            if (ErrorAction == ActionPreference.Stop) {
+                throw new InvalidOperationException(message);
+            }
+            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, server ?? string.Empty, port, Stopwatch.Elapsed, "", message);
+        }
         var effectiveOptions = secureSocketOptions;
         if (useSsl && effectiveOptions == SecureSocketOptions.Auto) {
             // Maintain backwards compatibility with Send-MailMessage by
@@ -516,6 +531,15 @@ public class Smtp {
         var oldPoolIdentity = _poolIdentity ?? GetConnectionPoolIdentity();
         Server = server;
         Port = port;
+        if (!SmtpValidation.TryValidateServer(server, port, out var validationError))
+        {
+            string message = validationError ?? "Invalid SMTP server settings.";
+            LogWarning($"Send-EmailMessage - {message}");
+            if (ErrorAction == ActionPreference.Stop) {
+                throw new InvalidOperationException(message);
+            }
+            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, server ?? string.Empty, port, Stopwatch.Elapsed, "", message);
+        }
         var effectiveOptions = secureSocketOptions;
         if (useSsl && effectiveOptions == SecureSocketOptions.Auto) {
             // Maintain backwards compatibility with Send-MailMessage by
@@ -577,12 +601,24 @@ public class Smtp {
             LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "Authentication skipped (WhatIf)");
         }
+        if (Credentials is NetworkCredential networkCredential)
+        {
+            if (!SmtpValidation.TryValidateCredentials(networkCredential.UserName, networkCredential.Password, out var validationError))
+            {
+                string message = validationError ?? "Invalid SMTP credentials.";
+                LogWarning($"Send-EmailMessage - {message}");
+                if (ErrorAction == ActionPreference.Stop) {
+                    throw new InvalidOperationException(message);
+                }
+                return new SmtpResult(false, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", message);
+            }
+        }
         try {
             if (isOAuth) {
-                var networkCredential = Credentials as NetworkCredential;
-                if (networkCredential != null) {
-                    Credential = networkCredential;
-                    var (userName, token) = Helpers.ConvertFromOAuth2Credential(networkCredential);
+                var oauthCredential = Credentials as NetworkCredential;
+                if (oauthCredential != null) {
+                    Credential = oauthCredential;
+                    var (userName, token) = Helpers.ConvertFromOAuth2Credential(oauthCredential);
                     var oauth2 = new SaslMechanismOAuth2(userName, token);
                     Client.Authenticate(oauth2);
                 }
@@ -707,6 +743,15 @@ public class Smtp {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         Credential = new NetworkCredential(username, password);
         try {
+            if (!SmtpValidation.TryValidateCredentials(username, password, out var validationError))
+            {
+                string message = validationError ?? "Invalid SMTP credentials.";
+                LogWarning($"Send-EmailMessage - {message}");
+                if (ErrorAction == ActionPreference.Stop) {
+                    throw new InvalidOperationException(message);
+                }
+                return new SmtpResult(false, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", message);
+            }
             switch (mechanism) {
                 case AuthenticationMechanism.CramMd5:
                     Client.Authenticate(new SaslMechanismCramMd5(username, password));
@@ -1008,6 +1053,205 @@ public class Smtp {
         await PendingMessageRepository.SaveAsync(record, cancellationToken);
     }
 
+    private async Task<SmtpResult?> EnsureMessageReadyAsync(CancellationToken cancellationToken)
+    {
+        var message = Message;
+        bool messageHasContent = message != null && MessageHasContent(message);
+        bool hasPayload = HasPropertyPayload();
+        bool hasHeaderPayload = (message != null && message.Headers != null && message.Headers.Count > 0) ||
+                                (Headers != null && Headers.Count > 0);
+
+        bool shouldAutoCreate = AutoCreateMessage && !messageHasContent && hasPayload;
+        if (shouldAutoCreate)
+        {
+            PreserveCustomHeaders(message);
+            await CreateMessageAsync(cancellationToken).ConfigureAwait(false);
+            message = Message;
+            messageHasContent = message != null && MessageHasContent(message);
+        }
+
+        bool hasSender = message != null && MessageHasSender(message);
+        bool hasMaterial = hasPayload || messageHasContent || hasHeaderPayload;
+        if (!hasSender && hasMaterial)
+        {
+            string messageText = "SMTP message has no sender. Call CreateMessage/CreateMessageAsync after setting From/To/Subject, or enable AutoCreateMessage.";
+            LogWarning($"Send-EmailMessage - {messageText}");
+            if (ErrorAction == ActionPreference.Stop)
+            {
+                throw new InvalidOperationException(messageText);
+            }
+
+            var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText)
+            {
+                MessageId = Message?.MessageId
+            };
+            await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
+            return failResult;
+        }
+
+        return null;
+    }
+
+    private bool HasPropertyPayload()
+    {
+        if (HasAddressValue(From) || HasAddressValue(ReplyTo))
+        {
+            return true;
+        }
+
+        if (HasRecipientValues(To) || HasRecipientValues(Cc) || HasRecipientValues(Bcc))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(Subject) ||
+            !string.IsNullOrWhiteSpace(HtmlBody) ||
+            !string.IsNullOrWhiteSpace(TextBody))
+        {
+            return true;
+        }
+
+        if (Attachments != null && Attachments.Count > 0)
+        {
+            return true;
+        }
+
+        if (InlineAttachments != null && InlineAttachments.Count > 0)
+        {
+            return true;
+        }
+
+        if (Headers != null && Headers.Count > 0)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool MessageHasSender(MimeMessage message)
+    {
+        if (message == null)
+        {
+            return false;
+        }
+
+        if (message.From.Count > 0)
+        {
+            return true;
+        }
+
+        return message.Sender != null;
+    }
+
+    private static bool MessageHasContent(MimeMessage message)
+    {
+        if (message == null)
+        {
+            return false;
+        }
+
+        if (message.From.Count > 0 || message.To.Count > 0 || message.Cc.Count > 0 || message.Bcc.Count > 0 ||
+            message.ReplyTo.Count > 0 || message.Sender != null)
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(message.Subject))
+        {
+            return true;
+        }
+
+        return message.Body != null;
+    }
+
+    private void PreserveCustomHeaders(MimeMessage? message)
+    {
+        if (message == null || message.Headers == null || message.Headers.Count == 0)
+        {
+            return;
+        }
+
+        Dictionary<string, string>? merged = null;
+        if (Headers is Dictionary<string, string> headerDict)
+        {
+            merged = headerDict;
+        }
+        else if (Headers != null && Headers.Count > 0)
+        {
+            merged = new Dictionary<string, string>(Headers, StringComparer.OrdinalIgnoreCase);
+        }
+
+        foreach (var header in message.Headers)
+        {
+            if (header.Id != MimeKit.HeaderId.Unknown)
+            {
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(header.Field))
+            {
+                continue;
+            }
+
+            merged ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (!merged.ContainsKey(header.Field))
+            {
+                merged[header.Field] = header.Value ?? string.Empty;
+            }
+        }
+
+        if (merged != null && !ReferenceEquals(merged, Headers))
+        {
+            Headers = merged;
+        }
+    }
+
+    private static bool HasAddressValue(object? value)
+    {
+        if (value == null)
+        {
+            return false;
+        }
+
+        if (value is string text)
+        {
+            return !string.IsNullOrWhiteSpace(text);
+        }
+
+        return true;
+    }
+
+    private static bool HasRecipientValues(IEnumerable<object>? recipients)
+    {
+        if (recipients == null)
+        {
+            return false;
+        }
+
+        foreach (var recipient in recipients)
+        {
+            if (recipient == null)
+            {
+                continue;
+            }
+
+            if (recipient is string text)
+            {
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    return true;
+                }
+
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
     private async Task<SmtpResult> SendCoreAsync(CancellationToken cancellationToken = default) {
         if (DryRun) {
             LogVerbose("Send-EmailMessage - DryRun enabled, skipping send.");
@@ -1018,6 +1262,11 @@ public class Smtp {
         int attempts = 0;
         Exception? lastException = null;
         var credentialProtector = CredentialProtection.Default;
+        var readinessResult = await EnsureMessageReadyAsync(cancellationToken).ConfigureAwait(false);
+        if (readinessResult != null)
+        {
+            return readinessResult;
+        }
 
         do {
             try {

@@ -47,6 +47,9 @@ smtp.SecureSocketOptions = SecureSocketOptions.StartTls;
 // Optional: authentication
 smtp.Authenticate("username", "password");
 
+// Build the MIME message
+smtp.CreateMessage();
+
 // Send the email
 var result = smtp.Send();
 if (result.Status)
@@ -58,6 +61,10 @@ else
 Console.WriteLine($"Failed: {result.ErrorMessage}");
 }
 ```
+
+> **Tip**
+> You can set `smtp.AutoCreateMessage = true` to build the MIME message
+> automatically before sending if you forget to call `CreateMessage()`.
 
 > **Note**
 > When `Connect` is called with the `useSsl` flag and
