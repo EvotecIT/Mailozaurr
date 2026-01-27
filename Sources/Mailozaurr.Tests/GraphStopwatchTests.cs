@@ -26,6 +26,8 @@ public class GraphStopwatchTests
     [Fact]
     public async Task ConnectO365GraphAsync_SuccessiveCallsHaveIndependentDurations()
     {
+        var interCallDelay = TimeSpan.FromSeconds(1);
+        var maxExpectedDuration = TimeSpan.FromMilliseconds(800);
         var responsePayload = "{\"access_token\":\"token\",\"token_type\":\"Bearer\"}";
         var handler = new RecordingHandler(
             CreateJsonResponse(responsePayload),
@@ -35,24 +37,26 @@ public class GraphStopwatchTests
         SetHttpClient(graph, handler);
         graph.Authenticate(new NetworkCredential("client@tenant", "secret"));
 
-        await Task.Delay(TimeSpan.FromMilliseconds(300));
+        await Task.Delay(interCallDelay);
         var first = await graph.ConnectO365GraphAsync();
         Assert.True(first.Status);
         Assert.True(
-            first.TimeToExecute < TimeSpan.FromMilliseconds(250),
-            $"Expected first elapsed time to be reset but was {first.TimeToExecute.TotalMilliseconds}ms");
+            first.TimeToExecute < maxExpectedDuration,
+            $"Expected first elapsed time to be well below the idle delay of {interCallDelay.TotalMilliseconds}ms but was {first.TimeToExecute.TotalMilliseconds}ms");
 
-        await Task.Delay(TimeSpan.FromMilliseconds(300));
+        await Task.Delay(interCallDelay);
         var second = await graph.ConnectO365GraphAsync();
         Assert.True(second.Status);
         Assert.True(
-            second.TimeToExecute < TimeSpan.FromMilliseconds(250),
-            $"Expected second elapsed time to be reset but was {second.TimeToExecute.TotalMilliseconds}ms");
+            second.TimeToExecute < maxExpectedDuration,
+            $"Expected second elapsed time to be well below the idle delay of {interCallDelay.TotalMilliseconds}ms but was {second.TimeToExecute.TotalMilliseconds}ms");
     }
 
     [Fact]
     public async Task SendMessageAsync_SuccessiveCallsHaveIndependentDurations()
     {
+        var interCallDelay = TimeSpan.FromSeconds(1);
+        var maxExpectedDuration = TimeSpan.FromMilliseconds(800);
         var handler = new RecordingHandler(
             CreateJsonResponse("{}"),
             CreateJsonResponse("{}"));
@@ -67,18 +71,18 @@ public class GraphStopwatchTests
         graph.AccessToken = "token";
         graph.TokenType = "Bearer";
 
-        await Task.Delay(TimeSpan.FromMilliseconds(300));
+        await Task.Delay(interCallDelay);
         var first = await graph.SendMessageAsync();
         Assert.True(first.Status);
         Assert.True(
-            first.TimeToExecute < TimeSpan.FromMilliseconds(250),
-            $"Expected first elapsed time to be reset but was {first.TimeToExecute.TotalMilliseconds}ms");
+            first.TimeToExecute < maxExpectedDuration,
+            $"Expected first elapsed time to be well below the idle delay of {interCallDelay.TotalMilliseconds}ms but was {first.TimeToExecute.TotalMilliseconds}ms");
 
-        await Task.Delay(TimeSpan.FromMilliseconds(300));
+        await Task.Delay(interCallDelay);
         var second = await graph.SendMessageAsync();
         Assert.True(second.Status);
         Assert.True(
-            second.TimeToExecute < TimeSpan.FromMilliseconds(250),
-            $"Expected second elapsed time to be reset but was {second.TimeToExecute.TotalMilliseconds}ms");
+            second.TimeToExecute < maxExpectedDuration,
+            $"Expected second elapsed time to be well below the idle delay of {interCallDelay.TotalMilliseconds}ms but was {second.TimeToExecute.TotalMilliseconds}ms");
     }
 }
