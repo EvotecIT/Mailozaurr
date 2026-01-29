@@ -1,5 +1,5 @@
 ﻿# Install-Module PSPublishModule -Force
-Import-Module PSPublishModule -Force
+Import-Module PSPublishModule -Force -RequiredVersion '2.0.27'
 
 Build-Module -ModuleName 'Mailozaurr' {
     # Usual defaults as per standard module
@@ -26,7 +26,7 @@ Build-Module -ModuleName 'Mailozaurr' {
 
         ProjectUri           = 'https://github.com/EvotecIT/MailoZaurr'
 
-        PreReleaseTag        = 'Preview1'
+        PreReleaseTag        = 'Preview2'
     }
     New-ConfigurationManifest @Manifest
 
