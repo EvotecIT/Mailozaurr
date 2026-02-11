@@ -1,5 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using MailKit;
+using MailKit.Search;
 using MimeKit;
 
 namespace Mailozaurr;
@@ -69,6 +73,62 @@ public static class SmtpSendPipeline {
             if (seen.Add(token)) {
                 refs.Add(token);
             }
+        }
+    }
+
+    /// <summary>
+    /// Probes a sent folder for an existing copy using idempotency header, then Message-Id fallback.
+    /// </summary>
+    /// <param name="sentFolder">Opened sent folder to probe.</param>
+    /// <param name="idempotencyHeaderName">Header name used for idempotency tagging.</param>
+    /// <param name="idempotencyKey">Idempotency value to search by.</param>
+    /// <param name="idempotentMessageId">Optional deterministic Message-Id fallback.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Duplicate probe result.</returns>
+    public static async Task<SmtpDuplicateProbeResult> TryFindExistingSentCopyAsync(
+        IMailFolder sentFolder,
+        string idempotencyHeaderName,
+        string idempotencyKey,
+        string? idempotentMessageId,
+        CancellationToken cancellationToken = default) {
+        if (sentFolder is null) {
+            throw new ArgumentNullException(nameof(sentFolder));
+        }
+        if (string.IsNullOrWhiteSpace(idempotencyHeaderName)) {
+            throw new ArgumentException("Value cannot be null or whitespace.", nameof(idempotencyHeaderName));
+        }
+        if (string.IsNullOrWhiteSpace(idempotencyKey)) {
+            throw new ArgumentException("Value cannot be null or whitespace.", nameof(idempotencyKey));
+        }
+
+        try {
+            var uids = await sentFolder.SearchAsync(SearchQuery.HeaderContains(idempotencyHeaderName, idempotencyKey), cancellationToken).ConfigureAwait(false);
+            if (uids.Count == 0) {
+                var token = NormalizeMessageIdToken(idempotentMessageId);
+                if (!string.IsNullOrWhiteSpace(token)) {
+                    uids = await sentFolder.SearchAsync(SearchQuery.HeaderContains("Message-Id", token), cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            if (uids.Count == 0) {
+                return SmtpDuplicateProbeResult.None;
+            }
+
+            string? matchedMessageId = null;
+            try {
+                var message = await sentFolder.GetMessageAsync(uids[0], cancellationToken).ConfigureAwait(false);
+                matchedMessageId = message?.MessageId;
+            } catch {
+                // best-effort
+            }
+
+            return new SmtpDuplicateProbeResult {
+                IsMatch = true,
+                Folder = sentFolder.FullName,
+                MessageId = string.IsNullOrWhiteSpace(matchedMessageId) ? idempotentMessageId : matchedMessageId
+            };
+        } catch {
+            return SmtpDuplicateProbeResult.None;
         }
     }
 
