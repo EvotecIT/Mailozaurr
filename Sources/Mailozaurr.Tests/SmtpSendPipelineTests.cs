@@ -10,6 +10,46 @@ namespace Mailozaurr.Tests;
 
 public class SmtpSendPipelineTests {
     [Fact]
+    public void BuildExecutionResult_MapsSuccessOutcome() {
+        var result = SmtpSendPipeline.BuildExecutionResult(
+            sendRequested: true,
+            sendSucceeded: true,
+            messageId: "msg-1@example.test",
+            sendError: null,
+            appendedToSent: true,
+            appendedSentFolder: "Sent",
+            appendError: null);
+
+        Assert.True(result.Ok);
+        Assert.True(result.Sent);
+        Assert.Equal("msg-1@example.test", result.MessageId);
+        Assert.Null(result.Error);
+        Assert.True(result.AppendedToSent);
+        Assert.Equal("Sent", result.AppendedSentFolder);
+        Assert.Null(result.AppendError);
+    }
+
+    [Fact]
+    public void BuildExecutionResult_MapsDryRunAndAppendFailureOutcome() {
+        var result = SmtpSendPipeline.BuildExecutionResult(
+            sendRequested: false,
+            sendSucceeded: true,
+            messageId: "msg-2@example.test",
+            sendError: null,
+            appendedToSent: false,
+            appendedSentFolder: null,
+            appendError: "append failed");
+
+        Assert.True(result.Ok);
+        Assert.False(result.Sent);
+        Assert.Equal("msg-2@example.test", result.MessageId);
+        Assert.Null(result.Error);
+        Assert.False(result.AppendedToSent);
+        Assert.Null(result.AppendedSentFolder);
+        Assert.Equal("append failed", result.AppendError);
+    }
+
+    [Fact]
     public void ApplyThreadingHeaders_SetsNormalizedMessageThreadAndIdempotencyHeaders() {
         var message = new MimeMessage();
         var references = new List<string?> { "ref-1@example.test", " <ref-1@example.test> ", "ref-2@example.test" };

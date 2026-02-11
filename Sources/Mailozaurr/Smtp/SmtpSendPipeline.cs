@@ -13,6 +13,36 @@ namespace Mailozaurr;
 /// </summary>
 public static class SmtpSendPipeline {
     /// <summary>
+    /// Creates a normalized send execution result contract for pipeline consumers.
+    /// </summary>
+    /// <param name="sendRequested">Whether send was requested by caller.</param>
+    /// <param name="sendSucceeded">Whether send execution succeeded.</param>
+    /// <param name="messageId">Optional emitted message-id.</param>
+    /// <param name="sendError">Optional send error.</param>
+    /// <param name="appendedToSent">Whether append-to-sent succeeded.</param>
+    /// <param name="appendedSentFolder">Optional appended sent folder name.</param>
+    /// <param name="appendError">Optional append error.</param>
+    /// <returns>Normalized execution result.</returns>
+    public static SmtpSendExecutionResult BuildExecutionResult(
+        bool sendRequested,
+        bool sendSucceeded,
+        string? messageId,
+        string? sendError,
+        bool appendedToSent,
+        string? appendedSentFolder,
+        string? appendError) {
+        return new SmtpSendExecutionResult {
+            Ok = sendSucceeded,
+            Sent = sendRequested && sendSucceeded,
+            MessageId = messageId,
+            Error = sendError,
+            AppendedToSent = appendedToSent,
+            AppendedSentFolder = appendedSentFolder,
+            AppendError = appendError
+        };
+    }
+
+    /// <summary>
     /// Applies normalized threading/idempotency headers to a MIME message.
     /// </summary>
     /// <param name="message">Message instance to update.</param>
