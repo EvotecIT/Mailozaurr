@@ -16,6 +16,9 @@ public class ConnectorTests
     {
         public int FailuresBeforeSuccess { get; set; }
         public int ConnectCalls { get; private set; }
+        public string? LastHost { get; private set; }
+        public int LastPort { get; private set; }
+        public SecureSocketOptions LastSecureSocketOptions { get; private set; }
         public new bool Authenticated { get; set; }
         public override bool IsAuthenticated => Authenticated;
         private bool _connected;
@@ -26,6 +29,9 @@ public class ConnectorTests
         public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default)
         {
             ConnectCalls++;
+            LastHost = host;
+            LastPort = port;
+            LastSecureSocketOptions = options;
             if (ConnectCalls <= FailuresBeforeSuccess)
             {
                 throw new HttpRequestException("fail");
@@ -123,6 +129,49 @@ public class ConnectorTests
         ImapConnector.DelayAsync = null;
         Assert.Equal(3, fake.ConnectCalls);
         Assert.Equal(new[] { 10, 20 }, delays);
+    }
+
+    [Fact]
+    public async Task ImapConnector_RequestOverload_UsesRequestSettings()
+    {
+        var fake = new FakeImapClient();
+        ImapConnector.ClientFactory = () => fake;
+        var request = new ImapConnectionRequest(
+            "imap.example.test",
+            1993,
+            SecureSocketOptions.SslOnConnect,
+            timeout: 4321,
+            skipCertificateRevocation: true,
+            skipCertificateValidation: true,
+            retryCount: 0,
+            retryDelayMilliseconds: 10,
+            retryDelayBackoff: 2.0);
+
+        var client = await ImapConnector.ConnectAsync(
+            request,
+            (c, ct) => { ((FakeImapClient)c).Authenticated = true; return Task.CompletedTask; });
+
+        ImapConnector.ClientFactory = () => new ImapClient();
+
+        Assert.Same(fake, client);
+        Assert.Equal("imap.example.test", fake.LastHost);
+        Assert.Equal(1993, fake.LastPort);
+        Assert.Equal(SecureSocketOptions.SslOnConnect, fake.LastSecureSocketOptions);
+        Assert.Equal(4321, fake.Timeout);
+    }
+
+    [Fact]
+    public async Task ImapConnector_RequestOverload_ValidatesArguments()
+    {
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            ImapConnector.ConnectAsync(
+                null!,
+                (_, _) => Task.CompletedTask));
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            ImapConnector.ConnectAsync(
+                new ImapConnectionRequest("imap.example.test", 993),
+                null!));
     }
 
     [Fact]
