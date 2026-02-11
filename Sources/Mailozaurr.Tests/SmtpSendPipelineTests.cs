@@ -303,6 +303,6 @@ public class SmtpSendPipelineTests {
         if (string.IsNullOrWhiteSpace(value)) {
             return string.Empty;
         }
-        return value.Trim().Trim('<', '>');
+        return (value ?? string.Empty).Trim().Trim('<', '>');
     }
 }

@@ -7,35 +7,35 @@ public sealed class SmtpSendExecutionResult {
     /// <summary>
     /// Gets a value indicating whether send execution completed successfully.
     /// </summary>
-    public bool Ok { get; init; }
+    public bool Ok { get; set; }
 
     /// <summary>
     /// Gets a value indicating whether the message was actually sent.
     /// </summary>
-    public bool Sent { get; init; }
+    public bool Sent { get; set; }
 
     /// <summary>
     /// Gets emitted message-id when available.
     /// </summary>
-    public string? MessageId { get; init; }
+    public string? MessageId { get; set; }
 
     /// <summary>
     /// Gets send error when send execution failed.
     /// </summary>
-    public string? Error { get; init; }
+    public string? Error { get; set; }
 
     /// <summary>
     /// Gets a value indicating whether append-to-sent completed.
     /// </summary>
-    public bool AppendedToSent { get; init; }
+    public bool AppendedToSent { get; set; }
 
     /// <summary>
     /// Gets appended sent folder name when append completed.
     /// </summary>
-    public string? AppendedSentFolder { get; init; }
+    public string? AppendedSentFolder { get; set; }
 
     /// <summary>
     /// Gets append-to-sent error when append failed.
     /// </summary>
-    public string? AppendError { get; init; }
+    public string? AppendError { get; set; }
 }

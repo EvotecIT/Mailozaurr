@@ -145,7 +145,7 @@ public static class SmtpSendPipeline {
 
         void AddReference(string? candidate) {
             var token = NormalizeMessageIdToken(candidate);
-            if (string.IsNullOrWhiteSpace(token)) {
+            if (token is null || token.Length == 0) {
                 return;
             }
             if (seen.Add(token)) {
@@ -211,11 +211,14 @@ public static class SmtpSendPipeline {
     }
 
     private static string? NormalizeMessageIdToken(string? value) {
-        if (string.IsNullOrWhiteSpace(value)) {
+        if (value is null) {
             return null;
         }
 
         var normalized = value.Trim();
+        if (normalized.Length == 0) {
+            return null;
+        }
         if (normalized.StartsWith("<", StringComparison.Ordinal)) {
             normalized = normalized.Substring(1);
         }

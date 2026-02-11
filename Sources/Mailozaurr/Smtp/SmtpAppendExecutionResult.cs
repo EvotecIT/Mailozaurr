@@ -7,17 +7,17 @@ public sealed class SmtpAppendExecutionResult {
     /// <summary>
     /// Gets a value indicating whether append operation succeeded.
     /// </summary>
-    public bool Appended { get; init; }
+    public bool Appended { get; set; }
 
     /// <summary>
     /// Gets appended folder name when append succeeded.
     /// </summary>
-    public string? Folder { get; init; }
+    public string? Folder { get; set; }
 
     /// <summary>
     /// Gets append error when append failed.
     /// </summary>
-    public string? Error { get; init; }
+    public string? Error { get; set; }
 
     /// <summary>
     /// Gets empty append outcome.
