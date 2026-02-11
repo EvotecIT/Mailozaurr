@@ -43,6 +43,54 @@ public static class SmtpSendPipeline {
     }
 
     /// <summary>
+    /// Builds send execution result and optionally performs append-to-sent orchestration.
+    /// </summary>
+    /// <param name="sendRequested">Whether send was requested by caller.</param>
+    /// <param name="sendSucceeded">Whether send execution succeeded.</param>
+    /// <param name="messageId">Optional emitted message-id.</param>
+    /// <param name="sendError">Optional send error.</param>
+    /// <param name="appendToSentRequested">Whether append-to-sent was requested.</param>
+    /// <param name="appendAsync">Optional append callback executed only on successful real send + append request.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Normalized execution result with append metadata.</returns>
+    public static async Task<SmtpSendExecutionResult> BuildExecutionResultWithOptionalSentAppendAsync(
+        bool sendRequested,
+        bool sendSucceeded,
+        string? messageId,
+        string? sendError,
+        bool appendToSentRequested,
+        Func<CancellationToken, Task<SmtpAppendExecutionResult>>? appendAsync = null,
+        CancellationToken cancellationToken = default) {
+        var appendedToSent = false;
+        string? appendedSentFolder = null;
+        string? appendError = null;
+
+        if (sendRequested && sendSucceeded && appendToSentRequested) {
+            if (appendAsync is null) {
+                appendError = "append callback is not configured";
+            } else {
+                try {
+                    var appendResult = await appendAsync(cancellationToken).ConfigureAwait(false) ?? SmtpAppendExecutionResult.None;
+                    appendedToSent = appendResult.Appended;
+                    appendedSentFolder = appendResult.Folder;
+                    appendError = appendResult.Error;
+                } catch (Exception ex) {
+                    appendError = ex.Message;
+                }
+            }
+        }
+
+        return BuildExecutionResult(
+            sendRequested,
+            sendSucceeded,
+            messageId,
+            sendError,
+            appendedToSent,
+            appendedSentFolder,
+            appendError);
+    }
+
+    /// <summary>
     /// Applies normalized threading/idempotency headers to a MIME message.
     /// </summary>
     /// <param name="message">Message instance to update.</param>

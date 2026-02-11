@@ -50,6 +50,72 @@ public class SmtpSendPipelineTests {
     }
 
     [Fact]
+    public async Task BuildExecutionResultWithOptionalSentAppendAsync_InvokesAppend_WhenRealSendSucceeded() {
+        var appendCalled = 0;
+
+        var result = await SmtpSendPipeline.BuildExecutionResultWithOptionalSentAppendAsync(
+            sendRequested: true,
+            sendSucceeded: true,
+            messageId: "msg-3@example.test",
+            sendError: null,
+            appendToSentRequested: true,
+            appendAsync: _ => {
+                appendCalled++;
+                return Task.FromResult(new SmtpAppendExecutionResult {
+                    Appended = true,
+                    Folder = "Sent Items",
+                    Error = null
+                });
+            });
+
+        Assert.Equal(1, appendCalled);
+        Assert.True(result.Ok);
+        Assert.True(result.Sent);
+        Assert.True(result.AppendedToSent);
+        Assert.Equal("Sent Items", result.AppendedSentFolder);
+        Assert.Null(result.AppendError);
+    }
+
+    [Fact]
+    public async Task BuildExecutionResultWithOptionalSentAppendAsync_DoesNotInvokeAppend_WhenDryRun() {
+        var appendCalled = 0;
+
+        var result = await SmtpSendPipeline.BuildExecutionResultWithOptionalSentAppendAsync(
+            sendRequested: false,
+            sendSucceeded: true,
+            messageId: "msg-4@example.test",
+            sendError: null,
+            appendToSentRequested: true,
+            appendAsync: _ => {
+                appendCalled++;
+                return Task.FromResult(SmtpAppendExecutionResult.None);
+            });
+
+        Assert.Equal(0, appendCalled);
+        Assert.True(result.Ok);
+        Assert.False(result.Sent);
+        Assert.False(result.AppendedToSent);
+        Assert.Null(result.AppendedSentFolder);
+        Assert.Null(result.AppendError);
+    }
+
+    [Fact]
+    public async Task BuildExecutionResultWithOptionalSentAppendAsync_CapturesAppendException() {
+        var result = await SmtpSendPipeline.BuildExecutionResultWithOptionalSentAppendAsync(
+            sendRequested: true,
+            sendSucceeded: true,
+            messageId: "msg-5@example.test",
+            sendError: null,
+            appendToSentRequested: true,
+            appendAsync: _ => throw new InvalidOperationException("append crashed"));
+
+        Assert.True(result.Ok);
+        Assert.True(result.Sent);
+        Assert.False(result.AppendedToSent);
+        Assert.Equal("append crashed", result.AppendError);
+    }
+
+    [Fact]
     public void ApplyThreadingHeaders_SetsNormalizedMessageThreadAndIdempotencyHeaders() {
         var message = new MimeMessage();
         var references = new List<string?> { "ref-1@example.test", " <ref-1@example.test> ", "ref-2@example.test" };
