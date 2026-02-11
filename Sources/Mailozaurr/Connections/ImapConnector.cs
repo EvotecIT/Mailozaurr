@@ -23,6 +23,38 @@ public static class ImapConnector {
     /// <summary>
     /// Connects and authenticates to an IMAP server with retry support.
     /// </summary>
+    /// <param name="request">Connection request settings.</param>
+    /// <param name="authenticateAsync">Delegate performing authentication.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    /// <returns>Authenticated <see cref="ImapClient"/> instance.</returns>
+    public static Task<ImapClient> ConnectAsync(
+        ImapConnectionRequest request,
+        Func<ImapClient, CancellationToken, Task> authenticateAsync,
+        CancellationToken cancellationToken = default) {
+        if (request is null) {
+            throw new ArgumentNullException(nameof(request));
+        }
+        if (authenticateAsync is null) {
+            throw new ArgumentNullException(nameof(authenticateAsync));
+        }
+
+        return ConnectAsync(
+            request.Server,
+            request.Port,
+            request.Options,
+            request.Timeout,
+            request.SkipCertificateRevocation,
+            request.SkipCertificateValidation,
+            authenticateAsync,
+            request.RetryCount,
+            request.RetryDelayMilliseconds,
+            request.RetryDelayBackoff,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Connects and authenticates to an IMAP server with retry support.
+    /// </summary>
     /// <param name="server">Server hostname.</param>
     /// <param name="port">Server port.</param>
     /// <param name="options">Secure socket options.</param>
