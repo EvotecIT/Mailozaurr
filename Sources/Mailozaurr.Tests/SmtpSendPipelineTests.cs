@@ -116,6 +116,61 @@ public class SmtpSendPipelineTests {
     }
 
     [Fact]
+    public async Task TryAppendToSentAsync_AppendsMessage_WhenFolderIsWritable() {
+        var folder = new Mock<IMailFolder>();
+        var appendCalls = 0;
+        folder.SetupGet(f => f.FullName).Returns("Sent");
+        folder.SetupGet(f => f.IsOpen).Returns(true);
+        folder.SetupGet(f => f.Access).Returns(FolderAccess.ReadWrite);
+
+        var result = await SmtpAppendPipeline.TryAppendToSentAsync(
+            folder.Object,
+            new MimeMessage(),
+            MessageFlags.Seen,
+            appendAsync: (_, _, _, _) => {
+                appendCalls++;
+                return Task.CompletedTask;
+            });
+
+        Assert.Equal(1, appendCalls);
+        Assert.True(result.Appended);
+        Assert.Equal("Sent", result.Folder);
+        Assert.Null(result.Error);
+    }
+
+    [Fact]
+    public async Task TryAppendToSentAsync_ReturnsFailure_WhenAppendThrows() {
+        var folder = new Mock<IMailFolder>();
+        folder.SetupGet(f => f.FullName).Returns("Sent");
+        folder.SetupGet(f => f.IsOpen).Returns(true);
+        folder.SetupGet(f => f.Access).Returns(FolderAccess.ReadWrite);
+
+        var result = await SmtpAppendPipeline.TryAppendToSentAsync(
+            folder.Object,
+            new MimeMessage(),
+            MessageFlags.Seen,
+            appendAsync: (_, _, _, _) => throw new InvalidOperationException("append failed"));
+
+        Assert.False(result.Appended);
+        Assert.Equal("Sent", result.Folder);
+        Assert.Equal("append failed", result.Error);
+    }
+
+    [Fact]
+    public async Task TryAppendToSentAsync_Throws_ForInvalidArguments() {
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            SmtpAppendPipeline.TryAppendToSentAsync(
+                sentFolder: null!,
+                message: new MimeMessage()));
+
+        var folder = new Mock<IMailFolder>();
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            SmtpAppendPipeline.TryAppendToSentAsync(
+                folder.Object,
+                message: null!));
+    }
+
+    [Fact]
     public void ApplyThreadingHeaders_SetsNormalizedMessageThreadAndIdempotencyHeaders() {
         var message = new MimeMessage();
         var references = new List<string?> { "ref-1@example.test", " <ref-1@example.test> ", "ref-2@example.test" };
