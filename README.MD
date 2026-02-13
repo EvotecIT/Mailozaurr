@@ -1,50 +1,61 @@
-<p align="center">
-  <a href="https://dev.azure.com/evotecpl/Mailozaurr/_build/results?buildId=latest"><img src="https://dev.azure.com/evotecpl/Mailozaurr/_apis/build/status/EvotecIT.Mailozaurr"></a>
-  <a href="https://codecov.io/gh/EvotecIT/Mailozaurr"><img src="https://codecov.io/gh/EvotecIT/Mailozaurr/branch/v2-speedygonzales/graph/badge.svg"></a>
-  <a href="https://www.powershellgallery.com/packages/Mailozaurr"><img src="https://img.shields.io/powershellgallery/v/Mailozaurr.svg"></a>
-  <a href="https://www.powershellgallery.com/packages/Mailozaurr"><img src="https://img.shields.io/powershellgallery/vpre/Mailozaurr.svg?label=powershell%20gallery%20preview&colorB=yellow"></a>
-  <a href="https://github.com/EvotecIT/Mailozaurr"><img src="https://img.shields.io/github/license/EvotecIT/Mailozaurr.svg"></a>
-</p>
+# Mailozaurr - Modern Email Toolkit for .NET and PowerShell
 
-<p align="center">
-  <a href="https://www.powershellgallery.com/packages/Mailozaurr"><img src="https://img.shields.io/powershellgallery/p/Mailozaurr.svg"></a>
-  <a href="https://github.com/EvotecIT/Mailozaurr"><img src="https://img.shields.io/github/languages/top/evotecit/Mailozaurr.svg"></a>
-  <a href="https://github.com/EvotecIT/Mailozaurr"><img src="https://img.shields.io/github/languages/code-size/evotecit/Mailozaurr.svg"></a>
-  <a href="https://www.powershellgallery.com/packages/Mailozaurr"><img src="https://img.shields.io/powershellgallery/dt/Mailozaurr.svg"></a>
-</p>
+Mailozaurr is available as a NuGet package and as a PowerShell module from PSGallery.
 
-<p align="center">
-  <a href="https://twitter.com/PrzemyslawKlys"><img src="https://img.shields.io/twitter/follow/PrzemyslawKlys.svg?label=Twitter%20%40PrzemyslawKlys&style=social"></a>
-  <a href="https://evotec.xyz/hub"><img src="https://img.shields.io/badge/Blog-evotec.xyz-2A6496.svg"></a>
-  <a href="https://www.linkedin.com/in/pklys"><img src="https://img.shields.io/badge/LinkedIn-pklys-0077B5.svg?logo=LinkedIn"></a>
-  <a href="https://evo.yt/discord"><img src="https://img.shields.io/discord/508328927853281280?style=flat-square&label=discord%20chat"></a>
-</p>
+NuGet Package
 
-# Mailozaurr - PowerShell Module
+[![nuget downloads](https://img.shields.io/nuget/dt/Mailozaurr?label=nuget%20downloads)](https://www.nuget.org/packages/Mailozaurr)
+[![nuget version](https://img.shields.io/nuget/v/Mailozaurr)](https://www.nuget.org/packages/Mailozaurr)
 
-Mailozaurr is a PowerShell module that aims to provide SMTP, POP3, IMAP and few other ways to interact with Email. Underneath it uses MimeKit and MailKit and EmailValidation libraries written by Jeffrey Stedfast.
+PowerShell Module
 
-This project has 2 branches:
-- `v1-legacy` - this is the old version of the module. It's working, it's stable and has been around for a while. It's written entirely in PowerShell, and has nice features. It will be maintained until v2 is ready.
-- `v2-speedygonzales` - this is the new version of the module. It's a complete rewrite. It's written in C#, it's faster, and has couple of new features. To simplify the support and functionality:
-  - Removed **DNS** functions as they are moved to [DnsClientX](https://github.com/EvotecIT/DnsClientX) module
-  - Removed **SPF/DKIM/DMARC/MX/DMARC (except download functionality)** functions as they are moved to [DomainDetective](https://github.com/EvotecIT/DomainDetective) module
+[![powershell gallery version](https://img.shields.io/powershellgallery/v/Mailozaurr.svg)](https://www.powershellgallery.com/packages/Mailozaurr)
+[![powershell gallery preview](https://img.shields.io/powershellgallery/vpre/Mailozaurr.svg?label=powershell%20gallery%20preview&colorB=yellow)](https://www.powershellgallery.com/packages/Mailozaurr)
+[![powershell gallery platforms](https://img.shields.io/powershellgallery/p/Mailozaurr.svg)](https://www.powershellgallery.com/packages/Mailozaurr)
+[![powershell gallery downloads](https://img.shields.io/powershellgallery/dt/Mailozaurr.svg)](https://www.powershellgallery.com/packages/Mailozaurr)
 
-This **V2** branch uses following libraries:
+Project Information
+
+[![build status](https://dev.azure.com/evotecpl/Mailozaurr/_apis/build/status/EvotecIT.Mailozaurr)](https://dev.azure.com/evotecpl/Mailozaurr/_build/results?buildId=latest)
+[![codecov](https://codecov.io/gh/EvotecIT/Mailozaurr/branch/v2-speedygonzales/graph/badge.svg)](https://codecov.io/gh/EvotecIT/Mailozaurr)
+[![top language](https://img.shields.io/github/languages/top/evotecit/Mailozaurr.svg)](https://github.com/EvotecIT/Mailozaurr)
+[![license](https://img.shields.io/github/license/EvotecIT/Mailozaurr.svg)](https://github.com/EvotecIT/Mailozaurr)
+[![code size](https://img.shields.io/github/languages/code-size/evotecit/Mailozaurr.svg)](https://github.com/EvotecIT/Mailozaurr)
+
+Author and Social
+
+[![Twitter follow](https://img.shields.io/twitter/follow/PrzemyslawKlys.svg?label=Twitter%20%40PrzemyslawKlys&style=social)](https://twitter.com/PrzemyslawKlys)
+[![Blog](https://img.shields.io/badge/Blog-evotec.xyz-2A6496.svg)](https://evotec.xyz/hub)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-pklys-0077B5.svg?logo=LinkedIn)](https://www.linkedin.com/in/pklys)
+[![Discord](https://img.shields.io/discord/508328927853281280?style=flat-square&label=discord%20chat)](https://evo.yt/discord)
+
+## What it's all about
+
+Mailozaurr provides SMTP, POP3, IMAP, Microsoft Graph mail support, and mail-format tooling for PowerShell and .NET. Underneath it uses MimeKit and MailKit libraries written by Jeffrey Stedfast.
+
+This repository has two branches:
+- `v1-legacy`: old module generation, written in PowerShell and still maintained until V2 is finalized.
+- `v2-speedygonzales`: current rewrite in C# with newer functionality and better performance.
+
+In V2, some functionality was moved to dedicated projects:
+- DNS features moved to [DnsClientX](https://github.com/EvotecIT/DnsClientX).
+- SPF, DKIM, DMARC, and MX validation (except download-focused functionality) moved to [DomainDetective](https://github.com/EvotecIT/DomainDetective).
+
+## Core dependencies (V2)
 
 - [MailKit](https://github.com/jstedfast/MailKit) - licensed MIT
 - [MimeKit](https://github.com/jstedfast/MimeKit) - licensed MIT
 - [MsgKit](https://github.com/Sicos1977/MsgKit) - licensed MIT
 - [MsgReader](https://github.com/Sicos1977/MSGReader) - licensed MIT
 
-For oAuth2 it also requires some Microsoft and Google libraries that are also bundled in
+For OAuth2 support, Mailozaurr also bundles:
 
 - [Microsoft.Identity.Client](https://www.nuget.org/packages/Microsoft.Identity.Client/)
 - [Google.Apis](https://www.nuget.org/packages/Google.Apis)
 - [Google.Apis.Core](https://www.nuget.org/packages/Google.Apis.Core)
 - [Google.Apis.Auth](https://www.nuget.org/packages/Google.Apis.Auth)
 
-Additional dependencies due to features added
+Additional dependency:
 
 - [System.DataSQLite](https://system.data.sqlite.org/)
 
