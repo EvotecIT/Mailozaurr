@@ -14,7 +14,7 @@
   "OutputPath": null,
   "StagingPath": "Artefacts/ProjectBuild",
   "CleanStaging": true,
-  "PlanOutputPath": "Artefacts/ProjectBuild/project.build.plan.json",
+  "PlanOutputPath": null,
   "UpdateVersions": true,
   "Build": true,
   "PublishNuget": false,
@@ -38,3 +38,4 @@
   "GitHubTagTemplate": "{Repo}-v{UtcTimestamp}",
   "GitHubReleaseName": "{Repo} {UtcDateTime}"
 }
+
