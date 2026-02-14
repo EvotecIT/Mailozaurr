@@ -10,7 +10,7 @@ NuGet Package
 PowerShell Module
 
 [![powershell gallery version](https://img.shields.io/powershellgallery/v/Mailozaurr.svg)](https://www.powershellgallery.com/packages/Mailozaurr)
-[![powershell gallery preview](https://img.shields.io/powershellgallery/vpre/Mailozaurr.svg?label=powershell%20gallery%20preview&colorB=yellow)](https://www.powershellgallery.com/packages/Mailozaurr)
+[![powershell gallery preview](https://img.shields.io/powershellgallery/v/Mailozaurr.svg?label=powershell%20gallery%20preview&colorB=yellow&include_prereleases)](https://www.powershellgallery.com/packages/Mailozaurr)
 [![powershell gallery platforms](https://img.shields.io/powershellgallery/p/Mailozaurr.svg)](https://www.powershellgallery.com/packages/Mailozaurr)
 [![powershell gallery downloads](https://img.shields.io/powershellgallery/dt/Mailozaurr.svg)](https://www.powershellgallery.com/packages/Mailozaurr)
 
