@@ -269,49 +269,121 @@ public sealed class GmailApiClient : IDisposable {
     /// <summary>
     /// Lists messages matching the supplied query.
     /// </summary>
-    public async Task<IList<GmailMessage>> ListAsync(string userId, string? query = null, int? maxResults = null, CancellationToken cancellationToken = default) {
+    public Task<IList<GmailMessage>> ListAsync(string userId, string? query = null, int? maxResults = null, CancellationToken cancellationToken = default) =>
+        ListAdvancedAsync(userId, query, labelIds: null, includeSpamTrash: false, maxResultsTotal: maxResults, fields: null, cancellationToken: cancellationToken);
+
+    private static int? ClampMaxResults(int? maxResults) {
+        if (!maxResults.HasValue) {
+            return null;
+        }
+        var v = maxResults.Value;
+        if (v < 1) {
+            return 1;
+        }
+        if (v > 500) {
+            return 500;
+        }
+        return v;
+    }
+
+    /// <summary>
+    /// Lists a single page of messages.
+    /// </summary>
+    public async Task<GmailListResponse> ListPageAsync(
+        string userId,
+        string? query = null,
+        IReadOnlyList<string>? labelIds = null,
+        bool includeSpamTrash = false,
+        int? maxResults = null,
+        string? pageToken = null,
+        string? fields = null,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+
+        var url = new StringBuilder($"users/{userId}/messages");
+        var qs = new List<string>();
+        if (!string.IsNullOrWhiteSpace(query)) qs.Add($"q={Uri.EscapeDataString(query)}");
+        var safeMax = ClampMaxResults(maxResults);
+        if (safeMax.HasValue) qs.Add($"maxResults={safeMax.Value}");
+        if (!string.IsNullOrWhiteSpace(pageToken)) qs.Add($"pageToken={Uri.EscapeDataString(pageToken)}");
+        if (includeSpamTrash) qs.Add("includeSpamTrash=true");
+        if (labelIds != null) {
+            for (var i = 0; i < labelIds.Count; i++) {
+                var lid = labelIds[i];
+                if (!string.IsNullOrWhiteSpace(lid)) {
+                    qs.Add($"labelIds={Uri.EscapeDataString(lid.Trim())}");
+                }
+            }
+        }
+        if (!string.IsNullOrWhiteSpace(fields)) qs.Add($"fields={Uri.EscapeDataString(fields)}");
+        if (qs.Count > 0) {
+            url.Append('?').Append(string.Join("&", qs));
+        }
+
+        using var response = await _client.GetAsync(url.ToString(), cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        GmailListResponse? list;
+        try {
+            list = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailListResponse);
+        } catch (JsonException ex) {
+            throw new GmailApiException("Failed to parse Gmail API list response.", json, ex);
+        }
+        if (list is null) {
+            throw new InvalidDataException("Gmail API returned an invalid list response.");
+        }
+        return list;
+    }
+
+    /// <summary>
+    /// Lists messages matching the supplied query.
+    /// </summary>
+    public async Task<IList<GmailMessage>> ListAdvancedAsync(
+        string userId,
+        string? query = null,
+        IReadOnlyList<string>? labelIds = null,
+        bool includeSpamTrash = false,
+        int? maxResultsTotal = null,
+        string? fields = null,
+        CancellationToken cancellationToken = default) {
         ThrowIfDisposed();
         var messages = new List<GmailMessage>();
         string? pageToken = null;
-        int? remaining = maxResults;
+        int? remaining = maxResultsTotal;
         while (true) {
-            var url = new StringBuilder($"users/{userId}/messages");
-            var qs = new List<string>();
-            if (!string.IsNullOrWhiteSpace(query)) qs.Add($"q={Uri.EscapeDataString(query)}");
-            if (remaining.HasValue) qs.Add($"maxResults={remaining.Value}");
-            if (!string.IsNullOrEmpty(pageToken)) qs.Add($"pageToken={pageToken}");
-            if (qs.Count > 0) {
-                url.Append('?').Append(string.Join("&", qs));
-            }
-            using var response = await _client.GetAsync(url.ToString(), cancellationToken).ConfigureAwait(false);
-            await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
-#if NET5_0_OR_GREATER
-            var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-#else
-            var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-#endif
-            GmailListResponse? list;
-            try {
-                list = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailListResponse);
-            } catch (JsonException ex) {
-                throw new GmailApiException("Failed to parse Gmail API list response.", json, ex);
-            }
-            if (list?.Messages != null) {
+            var list = await ListPageAsync(
+                userId,
+                query: query,
+                labelIds: labelIds,
+                includeSpamTrash: includeSpamTrash,
+                maxResults: remaining,
+                pageToken: pageToken,
+                fields: fields,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+
+            if (list.Messages != null) {
                 messages.AddRange(list.Messages);
             }
-            if (maxResults.HasValue && messages.Count >= maxResults.Value) {
+            if (maxResultsTotal.HasValue && messages.Count >= maxResultsTotal.Value) {
                 break;
             }
-            pageToken = list?.NextPageToken;
+            pageToken = list.NextPageToken;
             if (string.IsNullOrEmpty(pageToken)) {
                 break;
             }
-            if (maxResults.HasValue) {
-                remaining = maxResults.Value - messages.Count;
+            if (maxResultsTotal.HasValue) {
+                remaining = maxResultsTotal.Value - messages.Count;
             }
         }
 
+        if (maxResultsTotal.HasValue && messages.Count > maxResultsTotal.Value) {
+            messages = messages.GetRange(0, maxResultsTotal.Value);
+        }
         return messages;
     }
 
@@ -340,12 +412,24 @@ public sealed class GmailApiClient : IDisposable {
         return message;
     }
 
-    /// <summary>
-    /// Retrieves a MIME message by id.
-    /// </summary>
-    public async Task<MimeMessage> GetMimeMessageAsync(string userId, string id, CancellationToken cancellationToken = default) {
+    private async Task<GmailMessage> GetMessageWithFormatAsync(
+        string userId,
+        string id,
+        string format,
+        string? fields,
+        CancellationToken cancellationToken) {
         ThrowIfDisposed();
-        using var response = await _client.GetAsync($"users/{userId}/messages/{id}?format=raw", cancellationToken).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(id)) {
+            throw new ArgumentException("id is required.", nameof(id));
+        }
+
+        var safeId = Uri.EscapeDataString(id.Trim());
+        var url = new StringBuilder($"users/{userId}/messages/{safeId}?format={Uri.EscapeDataString(format)}");
+        if (!string.IsNullOrWhiteSpace(fields)) {
+            url.Append("&fields=").Append(Uri.EscapeDataString(fields!.Trim()));
+        }
+
+        using var response = await _client.GetAsync(url.ToString(), cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 #if NET5_0_OR_GREATER
@@ -353,16 +437,27 @@ public sealed class GmailApiClient : IDisposable {
 #else
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
-        GmailMessage? msg;
+        GmailMessage? message;
         try {
-            msg = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailMessage);
+            message = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailMessage);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API message response.", json, ex);
         }
-        if (string.IsNullOrEmpty(msg?.Raw)) {
+        if (message is null) {
             throw new InvalidDataException("Gmail API returned an invalid message response.");
         }
-        var raw = msg!.Raw!;
+        return message;
+    }
+
+    /// <summary>
+    /// Retrieves a MIME message by id.
+    /// </summary>
+    public async Task<MimeMessage> GetMimeMessageAsync(string userId, string id, CancellationToken cancellationToken = default) {
+        var msg = await GetMessageWithFormatAsync(userId, id, format: "raw", fields: null, cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (string.IsNullOrEmpty(msg.Raw)) {
+            throw new InvalidDataException("Gmail API returned an invalid message response.");
+        }
+        var raw = msg.Raw!;
         var data = raw.Replace('-', '+').Replace('_', '/');
         int padding = (4 - data.Length % 4) % 4;
         if (padding > 0) data = data.PadRight(data.Length + padding, '=');
@@ -370,6 +465,18 @@ public sealed class GmailApiClient : IDisposable {
         using var ms = new MemoryStream(bytes);
         return MimeMessage.Load(ms);
     }
+
+    /// <summary>
+    /// Retrieves a raw message (base64url MIME) by id.
+    /// </summary>
+    public Task<GmailMessage> GetRawAsync(string userId, string id, string? fields = null, CancellationToken cancellationToken = default) =>
+        GetMessageWithFormatAsync(userId, id, format: "raw", fields: fields, cancellationToken: cancellationToken);
+
+    /// <summary>
+    /// Retrieves a full message by id.
+    /// </summary>
+    public Task<GmailMessage> GetFullAsync(string userId, string id, string? fields = null, CancellationToken cancellationToken = default) =>
+        GetMessageWithFormatAsync(userId, id, format: "full", fields: fields, cancellationToken: cancellationToken);
 
     /// <summary>
     /// Deletes a message by id.
@@ -814,6 +921,49 @@ public sealed class GmailApiClient : IDisposable {
     }
 
     /// <summary>
+    /// Retrieves a single thread by id, optionally requesting a partial response.
+    /// </summary>
+    public async Task<GmailThread> GetThreadWithOptionsAsync(
+        string userId,
+        string id,
+        string? format = null,
+        string? fields = null,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(id)) {
+            throw new ArgumentException("id is required.", nameof(id));
+        }
+
+        var safeId = Uri.EscapeDataString(id.Trim());
+        var url = new StringBuilder($"users/{userId}/threads/{safeId}");
+        var qs = new List<string>();
+        if (!string.IsNullOrWhiteSpace(format)) qs.Add($"format={Uri.EscapeDataString(format!.Trim())}");
+        if (!string.IsNullOrWhiteSpace(fields)) qs.Add($"fields={Uri.EscapeDataString(fields!.Trim())}");
+        if (qs.Count > 0) {
+            url.Append('?').Append(string.Join("&", qs));
+        }
+
+        using var response = await _client.GetAsync(url.ToString(), cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        GmailThread? thread;
+        try {
+            thread = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailThread);
+        } catch (JsonException ex) {
+            throw new GmailApiException("Failed to parse Gmail API thread response.", json, ex);
+        }
+        if (thread is null) {
+            throw new InvalidDataException("Gmail API returned an invalid thread response.");
+        }
+        return thread;
+    }
+
+    /// <summary>
     /// Lists attachment metadata for a message.
     /// </summary>
     public async Task<IList<GmailAttachmentInfo>> ListAttachmentsAsync(string userId, string id, CancellationToken cancellationToken = default) {
@@ -903,6 +1053,10 @@ public sealed class GmailApiClient : IDisposable {
         public List<GmailMessage>? Messages { get; set; }
         /// <summary>Token for the next page of results.</summary>
         public string? NextPageToken { get; set; }
+        /// <summary>Estimated total number of results.</summary>
+        [JsonPropertyName("resultSizeEstimate")]
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+        public long? ResultSizeEstimate { get; set; }
     }
 
     /// <summary>Response envelope for Gmail thread listing.</summary>
