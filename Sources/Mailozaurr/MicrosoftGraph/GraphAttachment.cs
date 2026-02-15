@@ -21,6 +21,13 @@ public class GraphAttachment {
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets attachment content type.
+    /// </summary>
+    [JsonPropertyName("contentType")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ContentType { get; set; }
+
+    /// <summary>
     /// Gets or sets the file content encoded as a Base64 string.
     /// </summary>
     [JsonPropertyName("contentBytes")]

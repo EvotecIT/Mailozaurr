@@ -79,4 +79,66 @@ public class GraphApiClientMailboxTests {
         Assert.Contains("\"url\":\"me/messages/123\"", body);
         Assert.Contains("\"method\":\"DELETE\"", body);
     }
+
+    [Fact]
+    public async System.Threading.Tasks.Task CreateMessageAsync_CreatesDraftInFolder() {
+        var json = "{\"id\":\"m-created\",\"subject\":\"s\"}";
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new StringContent(json)
+        });
+        var api = new GraphApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = DateTimeOffset.MaxValue });
+        var field = typeof(GraphApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(api, new HttpClient(handler) { BaseAddress = new Uri("https://graph.microsoft.com/v1.0/") });
+
+        var created = await api.CreateMessageAsync(
+            new GraphMessage {
+                Subject = "s",
+                Body = new GraphContent { Type = "Text", Content = "body" }
+            },
+            folderIdOrWellKnownName: "sentitems");
+
+        Assert.Equal("m-created", created.Id);
+        Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Post, handler.Requests[0].Method);
+        Assert.Contains("/me/mailFolders/sentitems/messages", handler.Requests[0].RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task SendDraftMessageAsync_PostsToSendEndpoint() {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.Accepted) {
+            Content = new StringContent(string.Empty)
+        });
+        var api = new GraphApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = DateTimeOffset.MaxValue });
+        var field = typeof(GraphApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(api, new HttpClient(handler) { BaseAddress = new Uri("https://graph.microsoft.com/v1.0/") });
+
+        await api.SendDraftMessageAsync("m123");
+
+        Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Post, handler.Requests[0].Method);
+        Assert.Contains("/me/messages/m123/send", handler.Requests[0].RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task CreateAttachmentUploadSessionAsync_UsesAttachmentItemEnvelope() {
+        var json = "{\"uploadUrl\":\"https://upload.example/session\"}";
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new StringContent(json)
+        });
+        var api = new GraphApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = DateTimeOffset.MaxValue });
+        var field = typeof(GraphApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(api, new HttpClient(handler) { BaseAddress = new Uri("https://graph.microsoft.com/v1.0/") });
+
+        var session = await api.CreateAttachmentUploadSessionAsync(
+            "m123",
+            new GraphAttachmentItem("file", "a.txt", 10));
+
+        Assert.Equal("https://upload.example/session", session.UploadUrl);
+        Assert.Single(handler.Requests);
+        var body = await handler.Requests[0].Content!.ReadAsStringAsync();
+        Assert.Contains("\"attachmentItem\"", body);
+        Assert.Contains("\"attachmentType\":\"file\"", body);
+        Assert.Contains("\"name\":\"a.txt\"", body);
+        Assert.Contains("\"size\":10", body);
+    }
 }
