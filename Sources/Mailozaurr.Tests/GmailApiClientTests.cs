@@ -5,6 +5,44 @@ using Xunit;
 namespace Mailozaurr.Tests;
 
 public class GmailApiClientTests {
+    private static Dictionary<string, List<string>> ParseQueryParams(Uri uri) {
+        // Uri.ToString()/Query behave differently across runtimes (notably net472 vs net8).
+        // Parse and compare decoded query params so tests are stable across TFMs.
+        var dict = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var q = uri.Query;
+        if (string.IsNullOrEmpty(q) || q == "?") {
+            return dict;
+        }
+        if (q[0] == '?') {
+            q = q.Substring(1);
+        }
+
+        foreach (var part in q.Split(new[] { '&' }, StringSplitOptions.RemoveEmptyEntries)) {
+            var idx = part.IndexOf('=');
+            string rawKey;
+            string rawValue;
+            if (idx < 0) {
+                rawKey = part;
+                rawValue = string.Empty;
+            } else {
+                rawKey = part.Substring(0, idx);
+                rawValue = part.Substring(idx + 1);
+            }
+
+            // Query encoding may use '+' for space; normalize before unescaping.
+            var key = Uri.UnescapeDataString(rawKey.Replace("+", " "));
+            var value = Uri.UnescapeDataString(rawValue.Replace("+", " "));
+
+            if (!dict.TryGetValue(key, out var list)) {
+                list = new List<string>();
+                dict[key] = list;
+            }
+            list.Add(value);
+        }
+
+        return dict;
+    }
+
     private sealed class CancelAwareHandler : HttpMessageHandler {
         private readonly HttpResponseMessage _response;
         public CancelAwareHandler(HttpResponseMessage response) => _response = response;
@@ -206,15 +244,17 @@ public class GmailApiClientTests {
         Assert.Equal(123, page.ResultSizeEstimate);
 
         Assert.Single(handler.Requests);
-        var uri = handler.Requests[0].RequestUri!.ToString();
-        Assert.Contains("https://gmail.googleapis.com/gmail/v1/users/me/messages?", uri);
-        Assert.Contains("q=from%3Atest%40example.com", uri);
-        Assert.Contains("maxResults=500", uri); // clamped
-        Assert.Contains("pageToken=tok", uri);
-        Assert.Contains("includeSpamTrash=true", uri);
-        Assert.Contains("labelIds=INBOX", uri);
-        Assert.Contains("labelIds=Label_1", uri);
-        Assert.Contains("fields=messages%28id%2CthreadId%29%2CnextPageToken%2CresultSizeEstimate", uri);
+        var uri = handler.Requests[0].RequestUri!;
+        Assert.StartsWith("https://gmail.googleapis.com/gmail/v1/users/me/messages", uri.ToString());
+
+        var qp = ParseQueryParams(uri);
+        Assert.Equal("from:test@example.com", Assert.Single(qp["q"]));
+        Assert.Equal("500", Assert.Single(qp["maxResults"])); // clamped
+        Assert.Equal("tok", Assert.Single(qp["pageToken"]));
+        Assert.Equal("true", Assert.Single(qp["includeSpamTrash"]));
+        Assert.Contains("INBOX", qp["labelIds"]);
+        Assert.Contains("Label_1", qp["labelIds"]);
+        Assert.Equal("messages(id,threadId),nextPageToken,resultSizeEstimate", Assert.Single(qp["fields"]));
     }
 
     [Fact]
@@ -253,8 +293,11 @@ public class GmailApiClientTests {
         Assert.Equal("m1", thread.Messages![0].Id);
 
         Assert.Single(handler.Requests);
-        var uri = handler.Requests[0].RequestUri!.ToString();
-        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/threads/t1?format=full&fields=id%2Cmessages%28id%2CthreadId%29", uri);
+        var uri = handler.Requests[0].RequestUri!;
+        Assert.StartsWith("https://gmail.googleapis.com/gmail/v1/users/me/threads/t1", uri.ToString());
+        var qp = ParseQueryParams(uri);
+        Assert.Equal("full", Assert.Single(qp["format"]));
+        Assert.Equal("id,messages(id,threadId)", Assert.Single(qp["fields"]));
     }
 
     [Fact]
