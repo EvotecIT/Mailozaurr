@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using MimeKit;
@@ -412,6 +413,7 @@ public sealed class GmailApiClient : IDisposable {
         var request = new GmailWatchRequest { TopicName = topicName };
         if (labelIds != null && labelIds.Count > 0) {
             request.LabelIds = new List<string>(labelIds);
+            request.LabelFilterAction = "include";
         }
 
         var body = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GmailWatchRequest);
@@ -674,38 +676,53 @@ public sealed class GmailApiClient : IDisposable {
     /// <summary>Request payload for Gmail watch API.</summary>
     public sealed class GmailWatchRequest {
         /// <summary>Pub/Sub topic name to deliver notifications to.</summary>
+        [JsonPropertyName("topicName")]
         public string TopicName { get; set; } = string.Empty;
         /// <summary>Optional label filters.</summary>
+        [JsonPropertyName("labelIds")]
         public List<string>? LabelIds { get; set; }
+        /// <summary>Action to apply to the label filter (usually <c>include</c>).</summary>
+        [JsonPropertyName("labelFilterAction")]
+        public string? LabelFilterAction { get; set; }
     }
 
     /// <summary>Response payload for Gmail watch API.</summary>
     public sealed class GmailWatchResponse {
         /// <summary>History id at the start of the watch.</summary>
+        [JsonPropertyName("historyId")]
         public string? HistoryId { get; set; }
         /// <summary>Watch expiration as milliseconds since epoch.</summary>
+        [JsonPropertyName("expiration")]
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
         public long Expiration { get; set; }
     }
 
     /// <summary>Gmail profile response.</summary>
     public sealed class GmailProfile {
         /// <summary>Email address associated with the mailbox.</summary>
+        [JsonPropertyName("emailAddress")]
         public string? EmailAddress { get; set; }
         /// <summary>Total number of messages.</summary>
+        [JsonPropertyName("messagesTotal")]
         public long MessagesTotal { get; set; }
         /// <summary>Total number of threads.</summary>
+        [JsonPropertyName("threadsTotal")]
         public long ThreadsTotal { get; set; }
         /// <summary>Current history id.</summary>
+        [JsonPropertyName("historyId")]
         public string? HistoryId { get; set; }
     }
 
     /// <summary>Gmail history list response.</summary>
     public sealed class GmailHistoryListResponse {
         /// <summary>History records.</summary>
+        [JsonPropertyName("history")]
         public List<GmailHistoryRecord>? History { get; set; }
         /// <summary>Token for the next page of results.</summary>
+        [JsonPropertyName("nextPageToken")]
         public string? NextPageToken { get; set; }
         /// <summary>Latest history id.</summary>
+        [JsonPropertyName("historyId")]
         public string? HistoryId { get; set; }
     }
 
