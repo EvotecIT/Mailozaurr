@@ -31,6 +31,14 @@ public sealed class GraphApiClient : IDisposable {
         }
     }
 
+    private void ApplyAuthHeader(HttpRequestMessage request) {
+        // Avoid mutating HttpClient.DefaultRequestHeaders.Authorization (thread-safety + token refresh semantics).
+        // If no credential was provided, we assume the caller configured auth on the HttpClient itself.
+        if (_credential != null && !string.IsNullOrWhiteSpace(_credential.AccessToken) && request.Headers.Authorization == null) {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _credential.AccessToken);
+        }
+    }
+
     /// <summary>
     /// Initializes the client using the provided OAuth credential.
     /// </summary>
@@ -49,7 +57,6 @@ public sealed class GraphApiClient : IDisposable {
         _client = new HttpClient {
             BaseAddress = baseAddress ?? new Uri("https://graph.microsoft.com/v1.0/")
         };
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credential.AccessToken);
     }
 
     /// <summary>
@@ -74,9 +81,6 @@ public sealed class GraphApiClient : IDisposable {
         if (_client.BaseAddress == null) {
             _client.BaseAddress = baseAddress ?? new Uri("https://graph.microsoft.com/v1.0/");
         }
-        if (credential != null && !string.IsNullOrEmpty(credential.AccessToken) && _client.DefaultRequestHeaders.Authorization == null) {
-            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credential.AccessToken);
-        }
     }
 
     /// <inheritdoc />
@@ -94,7 +98,6 @@ public sealed class GraphApiClient : IDisposable {
             response.StatusCode == HttpStatusCode.Forbidden) {
             if (_refreshToken != null) {
                 string token = await _refreshToken(cancellationToken).ConfigureAwait(false);
-                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 if (_credential != null) {
                     _credential.AccessToken = token;
                 }
@@ -148,7 +151,9 @@ public sealed class GraphApiClient : IDisposable {
 
         var json = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GraphCreateSubscriptionRequest);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
-        using var response = await _client.PostAsync("subscriptions", content, cancellationToken).ConfigureAwait(false);
+        using var req = new HttpRequestMessage(HttpMethod.Post, "subscriptions") { Content = content };
+        ApplyAuthHeader(req);
+        using var response = await _client.SendAsync(req, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -186,10 +191,11 @@ public sealed class GraphApiClient : IDisposable {
         var requestUri = _client.BaseAddress != null
             ? new Uri(_client.BaseAddress, $"subscriptions/{encodedId}")
             : new Uri($"subscriptions/{encodedId}", UriKind.Relative);
-        using var msg = new HttpRequestMessage(new HttpMethod("PATCH"), requestUri) {
+        using var req = new HttpRequestMessage(new HttpMethod("PATCH"), requestUri) {
             Content = new StringContent(json, Encoding.UTF8, "application/json")
         };
-        using var response = await _client.SendAsync(msg, cancellationToken).ConfigureAwait(false);
+        ApplyAuthHeader(req);
+        using var response = await _client.SendAsync(req, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -221,7 +227,9 @@ public sealed class GraphApiClient : IDisposable {
             throw new ArgumentException("subscriptionId is required.", nameof(subscriptionId));
         }
         var encodedId = Uri.EscapeDataString(subscriptionId.Trim());
-        using var response = await _client.DeleteAsync($"subscriptions/{encodedId}", cancellationToken).ConfigureAwait(false);
+        using var req = new HttpRequestMessage(HttpMethod.Delete, $"subscriptions/{encodedId}");
+        ApplyAuthHeader(req);
+        using var response = await _client.SendAsync(req, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -238,7 +246,9 @@ public sealed class GraphApiClient : IDisposable {
     /// </summary>
     public async Task<IReadOnlyList<GraphSubscription>> ListSubscriptionsAsync(CancellationToken cancellationToken = default) {
         ThrowIfDisposed();
-        using var response = await _client.GetAsync("subscriptions", cancellationToken).ConfigureAwait(false);
+        using var req = new HttpRequestMessage(HttpMethod.Get, "subscriptions");
+        ApplyAuthHeader(req);
+        using var response = await _client.SendAsync(req, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -457,6 +467,7 @@ public sealed class GraphApiClient : IDisposable {
 
             var url = pending.Dequeue();
             using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            ApplyAuthHeader(req);
             using var resp = await _client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
             await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
@@ -532,7 +543,9 @@ public sealed class GraphApiClient : IDisposable {
             url.Append("?$select=").Append(Uri.EscapeDataString(selectValue));
         }
 
-        using var resp = await _client.GetAsync(url.ToString(), cancellationToken).ConfigureAwait(false);
+        using var req = new HttpRequestMessage(HttpMethod.Get, url.ToString());
+        ApplyAuthHeader(req);
+        using var resp = await _client.SendAsync(req, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
         var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -600,6 +613,7 @@ public sealed class GraphApiClient : IDisposable {
         }
 
         using var req = new HttpRequestMessage(HttpMethod.Get, url.ToString());
+        ApplyAuthHeader(req);
         if (searchValue != null && searchValue.Length > 0) {
             req.Headers.TryAddWithoutValidation("ConsistencyLevel", "eventual");
             req.Headers.TryAddWithoutValidation("Prefer", "HonorNonIndexedQueriesWarning=true");
@@ -662,7 +676,9 @@ public sealed class GraphApiClient : IDisposable {
         string nextUrl = url.ToString();
         while (pages++ < safeMaxPages) {
             cancellationToken.ThrowIfCancellationRequested();
-            using var resp = await _client.GetAsync(nextUrl, cancellationToken).ConfigureAwait(false);
+            using var req = new HttpRequestMessage(HttpMethod.Get, nextUrl);
+            ApplyAuthHeader(req);
+            using var resp = await _client.SendAsync(req, cancellationToken).ConfigureAwait(false);
             await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
             var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -741,7 +757,9 @@ public sealed class GraphApiClient : IDisposable {
         string nextUrl = url.ToString();
         while (pages++ < safeMaxPages) {
             cancellationToken.ThrowIfCancellationRequested();
-            using var resp = await _client.GetAsync(nextUrl, cancellationToken).ConfigureAwait(false);
+            using var req = new HttpRequestMessage(HttpMethod.Get, nextUrl);
+            ApplyAuthHeader(req);
+            using var resp = await _client.SendAsync(req, cancellationToken).ConfigureAwait(false);
             await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
             var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -800,7 +818,9 @@ public sealed class GraphApiClient : IDisposable {
             url.Append("?$select=").Append(Uri.EscapeDataString(selectValue));
         }
 
-        using var resp = await _client.GetAsync(url.ToString(), cancellationToken).ConfigureAwait(false);
+        using var req = new HttpRequestMessage(HttpMethod.Get, url.ToString());
+        ApplyAuthHeader(req);
+        using var resp = await _client.SendAsync(req, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
         var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -808,7 +828,7 @@ public sealed class GraphApiClient : IDisposable {
         var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
         if (!resp.IsSuccessStatusCode) {
-            throw new GraphApiException(resp.StatusCode, $"Graph message get failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
+            throw new GraphApiException(resp.StatusCode, $"Graph message get failed for messageId '{messageId.Trim()}' ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
         }
 
         using var doc = JsonDocument.Parse(body);
@@ -834,12 +854,18 @@ public sealed class GraphApiClient : IDisposable {
         if (maxBytes <= 0) {
             throw new ArgumentOutOfRangeException(nameof(maxBytes), "maxBytes must be > 0.");
         }
+        const int hardLimitBytes = 256 * 1024 * 1024;
+        if (maxBytes > hardLimitBytes) {
+            throw new ArgumentOutOfRangeException(nameof(maxBytes), $"maxBytes must be <= {hardLimitBytes}.");
+        }
 
         var userSegment = BuildUserSegment(userId);
         var selector = Uri.EscapeDataString(messageId.Trim());
         var url = userSegment + "/messages/" + selector + "/$value";
 
-        using var resp = await _client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        ApplyAuthHeader(req);
+        using var resp = await _client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
         if (!resp.IsSuccessStatusCode) {
 #if NET5_0_OR_GREATER
@@ -914,7 +940,9 @@ public sealed class GraphApiClient : IDisposable {
             url = sb.ToString();
         }
 
-        using var resp = await _client.GetAsync(url, cancellationToken).ConfigureAwait(false);
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        ApplyAuthHeader(req);
+        using var resp = await _client.SendAsync(req, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
         var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -982,7 +1010,9 @@ public sealed class GraphApiClient : IDisposable {
         var selector = Uri.EscapeDataString(messageId.Trim());
         var json = JsonSerializer.Serialize(new GraphDestinationRequest { DestinationId = destinationId.Trim() }, MailozaurrJsonContext.Default.GraphDestinationRequest);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
-        using var resp = await _client.PostAsync(userSegment + "/messages/" + selector + "/move", content, cancellationToken).ConfigureAwait(false);
+        using var req = new HttpRequestMessage(HttpMethod.Post, userSegment + "/messages/" + selector + "/move") { Content = content };
+        ApplyAuthHeader(req);
+        using var resp = await _client.SendAsync(req, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
         var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -990,7 +1020,7 @@ public sealed class GraphApiClient : IDisposable {
         var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
         if (!resp.IsSuccessStatusCode) {
-            throw new GraphApiException(resp.StatusCode, $"Graph move failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
+            throw new GraphApiException(resp.StatusCode, $"Graph move failed for messageId '{messageId.Trim()}' ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
         }
     }
 
@@ -1004,7 +1034,9 @@ public sealed class GraphApiClient : IDisposable {
         }
         var userSegment = BuildUserSegment(userId);
         var selector = Uri.EscapeDataString(messageId.Trim());
-        using var resp = await _client.DeleteAsync(userSegment + "/messages/" + selector, cancellationToken).ConfigureAwait(false);
+        using var req = new HttpRequestMessage(HttpMethod.Delete, userSegment + "/messages/" + selector);
+        ApplyAuthHeader(req);
+        using var resp = await _client.SendAsync(req, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
         var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -1012,7 +1044,7 @@ public sealed class GraphApiClient : IDisposable {
         var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
         if (!resp.IsSuccessStatusCode) {
-            throw new GraphApiException(resp.StatusCode, $"Graph delete failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
+            throw new GraphApiException(resp.StatusCode, $"Graph delete failed for messageId '{messageId.Trim()}' ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
         }
     }
 
@@ -1031,10 +1063,11 @@ public sealed class GraphApiClient : IDisposable {
         var userSegment = BuildUserSegment(userId);
         var selector = Uri.EscapeDataString(messageId.Trim());
         var json = JsonSerializer.Serialize(new GraphMarkReadRequest { IsRead = isRead }, MailozaurrJsonContext.Default.GraphMarkReadRequest);
-        using var msg = new HttpRequestMessage(new HttpMethod("PATCH"), userSegment + "/messages/" + selector) {
+        using var req = new HttpRequestMessage(new HttpMethod("PATCH"), userSegment + "/messages/" + selector) {
             Content = new StringContent(json, Encoding.UTF8, "application/json")
         };
-        using var resp = await _client.SendAsync(msg, cancellationToken).ConfigureAwait(false);
+        ApplyAuthHeader(req);
+        using var resp = await _client.SendAsync(req, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
         var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -1061,11 +1094,14 @@ public sealed class GraphApiClient : IDisposable {
         var userSegment = BuildUserSegment(userId);
         var selector = Uri.EscapeDataString(messageId.Trim());
         var status = flagged ? "flagged" : "notFlagged";
-        var json = "{\"flag\":{\"flagStatus\":\"" + status + "\"}}";
-        using var msg = new HttpRequestMessage(new HttpMethod("PATCH"), userSegment + "/messages/" + selector) {
+        var json = JsonSerializer.Serialize(
+            new GraphSetFlagRequest { Flag = new GraphSetFlagRequestFlag { FlagStatus = status } },
+            MailozaurrJsonContext.Default.GraphSetFlagRequest);
+        using var req = new HttpRequestMessage(new HttpMethod("PATCH"), userSegment + "/messages/" + selector) {
             Content = new StringContent(json, Encoding.UTF8, "application/json")
         };
-        using var resp = await _client.SendAsync(msg, cancellationToken).ConfigureAwait(false);
+        ApplyAuthHeader(req);
+        using var resp = await _client.SendAsync(req, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
         var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -1109,7 +1145,9 @@ public sealed class GraphApiClient : IDisposable {
 
         var json = JsonSerializer.Serialize(payload, MailozaurrJsonContext.Default.GraphBatchPayload);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
-        using var resp = await _client.PostAsync("$batch", content, cancellationToken).ConfigureAwait(false);
+        using var req = new HttpRequestMessage(HttpMethod.Post, "$batch") { Content = content };
+        ApplyAuthHeader(req);
+        using var resp = await _client.SendAsync(req, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
         var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);

@@ -56,6 +56,8 @@ namespace Mailozaurr;
 [JsonSerializable(typeof(GraphSearchQuery))]
 [JsonSerializable(typeof(GraphDestinationRequest))]
 [JsonSerializable(typeof(GraphMarkReadRequest))]
+[JsonSerializable(typeof(GraphSetFlagRequest))]
+[JsonSerializable(typeof(GraphSetFlagRequestFlag))]
 [JsonSerializable(typeof(GraphFolderRenameRequest))]
 [JsonSerializable(typeof(GraphApiClient.GraphCreateSubscriptionRequest))]
 [JsonSerializable(typeof(GraphApiClient.GraphRenewSubscriptionRequest))]

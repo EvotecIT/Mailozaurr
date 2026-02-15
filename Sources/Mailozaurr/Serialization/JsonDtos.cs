@@ -95,6 +95,20 @@ public sealed class GraphMarkReadRequest {
     public bool IsRead { get; set; }
 }
 
+/// <summary>Payload to flag/unflag messages.</summary>
+public sealed class GraphSetFlagRequest {
+    /// <summary>Flag object.</summary>
+    [JsonPropertyName("flag")]
+    public GraphSetFlagRequestFlag Flag { get; set; } = new();
+}
+
+/// <summary>Flag object for <see cref="GraphSetFlagRequest"/>.</summary>
+public sealed class GraphSetFlagRequestFlag {
+    /// <summary>Flag status (for example: flagged, notFlagged).</summary>
+    [JsonPropertyName("flagStatus")]
+    public string? FlagStatus { get; set; }
+}
+
 /// <summary>Payload to rename a Graph mail folder.</summary>
 public sealed class GraphFolderRenameRequest {
     /// <summary>New display name.</summary>
