@@ -229,6 +229,202 @@ public sealed class GraphMailboxBrowser {
         }
     }
 
+    /// <summary>
+    /// Sets message read/unread state.
+    /// </summary>
+    public async Task SetMessageSeenAsync(
+        string messageId,
+        bool seen,
+        CancellationToken cancellationToken = default) {
+        if (string.IsNullOrWhiteSpace(messageId)) {
+            throw new ArgumentException("messageId is required.", nameof(messageId));
+        }
+
+        await _graph.SetMessageIsReadAsync(
+            messageId.Trim(),
+            seen,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sets message flagged/unflagged state.
+    /// </summary>
+    public async Task SetMessageFlaggedAsync(
+        string messageId,
+        bool flagged,
+        CancellationToken cancellationToken = default) {
+        if (string.IsNullOrWhiteSpace(messageId)) {
+            throw new ArgumentException("messageId is required.", nameof(messageId));
+        }
+
+        await _graph.SetMessageFlaggedAsync(
+            messageId.Trim(),
+            flagged,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Moves a message to a target folder alias/id.
+    /// </summary>
+    public async Task MoveMessageAsync(
+        string messageId,
+        string targetFolder,
+        CancellationToken cancellationToken = default) {
+        if (string.IsNullOrWhiteSpace(messageId)) {
+            throw new ArgumentException("messageId is required.", nameof(messageId));
+        }
+
+        var destinationId = await ResolveFolderIdAsync(targetFolder, cancellationToken).ConfigureAwait(false);
+        await _graph.MoveMessageAsync(
+            messageId.Trim(),
+            destinationId,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Deletes a message.
+    /// </summary>
+    public async Task DeleteMessageAsync(
+        string messageId,
+        CancellationToken cancellationToken = default) {
+        if (string.IsNullOrWhiteSpace(messageId)) {
+            throw new ArgumentException("messageId is required.", nameof(messageId));
+        }
+
+        await _graph.DeleteMessageAsync(
+            messageId.Trim(),
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Moves many messages to a target folder alias/id.
+    /// </summary>
+    public async Task<IReadOnlyList<GraphBulkOperationResult>> MoveMessagesAsync(
+        IEnumerable<string> messageIds,
+        string targetFolder,
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        if (messageIds == null) {
+            throw new ArgumentNullException(nameof(messageIds));
+        }
+
+        var destinationId = await ResolveFolderIdAsync(targetFolder, cancellationToken).ConfigureAwait(false);
+        return await _graph.BatchMoveMessagesAsync(
+            messageIds,
+            destinationId,
+            batchSize: batchSize,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Deletes many messages.
+    /// </summary>
+    public async Task<IReadOnlyList<GraphBulkOperationResult>> DeleteMessagesAsync(
+        IEnumerable<string> messageIds,
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        if (messageIds == null) {
+            throw new ArgumentNullException(nameof(messageIds));
+        }
+
+        return await _graph.BatchDeleteMessagesAsync(
+            messageIds,
+            batchSize: batchSize,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sets read/unread state on many messages.
+    /// </summary>
+    public async Task<IReadOnlyList<GraphBulkOperationResult>> SetMessagesSeenAsync(
+        IEnumerable<string> messageIds,
+        bool seen,
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        if (messageIds == null) {
+            throw new ArgumentNullException(nameof(messageIds));
+        }
+
+        return await _graph.BatchSetMessagesIsReadAsync(
+            messageIds,
+            seen,
+            batchSize: batchSize,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sets flagged/unflagged state on many messages.
+    /// </summary>
+    public async Task<IReadOnlyList<GraphBulkOperationResult>> SetMessagesFlaggedAsync(
+        IEnumerable<string> messageIds,
+        bool flagged,
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        if (messageIds == null) {
+            throw new ArgumentNullException(nameof(messageIds));
+        }
+
+        return await _graph.BatchSetMessagesFlaggedAsync(
+            messageIds,
+            flagged,
+            batchSize: batchSize,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Moves many conversations to a target folder alias/id.
+    /// </summary>
+    public async Task<IReadOnlyList<GraphBulkOperationResult>> MoveConversationsAsync(
+        IEnumerable<string> conversationIds,
+        string targetFolder,
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        if (conversationIds == null) {
+            throw new ArgumentNullException(nameof(conversationIds));
+        }
+
+        var destinationId = await ResolveFolderIdAsync(targetFolder, cancellationToken).ConfigureAwait(false);
+        return await _graph.BatchMoveConversationsAsync(
+            conversationIds,
+            destinationId,
+            batchSize: batchSize,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Deletes many conversations.
+    /// </summary>
+    public async Task<IReadOnlyList<GraphBulkOperationResult>> DeleteConversationsAsync(
+        IEnumerable<string> conversationIds,
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        if (conversationIds == null) {
+            throw new ArgumentNullException(nameof(conversationIds));
+        }
+
+        return await _graph.BatchDeleteConversationsAsync(
+            conversationIds,
+            batchSize: batchSize,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<string> ResolveFolderIdAsync(string targetFolder, CancellationToken cancellationToken) {
+        if (string.IsNullOrWhiteSpace(targetFolder)) {
+            throw new ArgumentException("targetFolder is required.", nameof(targetFolder));
+        }
+
+        var folderSelector = ResolveFolderSelector(targetFolder);
+        var folder = await _graph.GetMailFolderAsync(
+            folderSelector,
+            select: "id",
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        var id = (folder.Id ?? string.Empty).Trim();
+        if (id.Length == 0) {
+            throw new InvalidOperationException($"Graph folder id resolution returned an empty id for selector '{folderSelector}'.");
+        }
+        return id;
+    }
+
     private static int ClampInt(int value, int min, int max) {
         if (value < min) return min;
         if (value > max) return max;
