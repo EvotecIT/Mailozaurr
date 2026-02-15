@@ -42,6 +42,24 @@ public class GraphApiClientMailboxTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task ListConversationMessagesAsync_BuildsFilterQuery() {
+        var json = "{\"value\":[{\"id\":\"m1\",\"subject\":\"s\"}]}";
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });
+        var api = new GraphApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GraphApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(api, new HttpClient(handler) { BaseAddress = new System.Uri("https://graph.microsoft.com/v1.0/") });
+
+        var msgs = await api.ListConversationMessagesAsync("conv-1");
+        Assert.Single(msgs);
+        Assert.Single(handler.Requests);
+        var uri = handler.Requests[0].RequestUri!.ToString();
+        Assert.Contains("/me/messages?", uri);
+        Assert.Contains("$filter=", uri);
+        Assert.Contains("conversationId", uri);
+        Assert.Contains("conv-1", uri);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task SendBatchAsync_UsesBatchEndpoint_AndSerializesRelativeUrls() {
         var json = "{\"responses\":[{\"id\":\"1\",\"status\":204,\"headers\":{},\"body\":{}}]}";
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });
@@ -62,4 +80,3 @@ public class GraphApiClientMailboxTests {
         Assert.Contains("\"method\":\"DELETE\"", body);
     }
 }
-

@@ -702,6 +702,83 @@ public sealed class GraphApiClient : IDisposable {
     }
 
     /// <summary>
+    /// Lists message metadata for a Graph conversation.
+    /// </summary>
+    public async Task<IReadOnlyList<GraphMailMessage>> ListConversationMessagesAsync(
+        string conversationId,
+        string userId = "me",
+        int top = 100,
+        int maxPages = 25,
+        string? select = "id,subject,receivedDateTime,from,toRecipients,internetMessageId,hasAttachments,isRead,flag,conversationId",
+        string? orderBy = "receivedDateTime desc",
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(conversationId)) {
+            throw new ArgumentException("conversationId is required.", nameof(conversationId));
+        }
+
+        var safeTop = ClampInt(top, 1, 999);
+        var safeMaxPages = ClampInt(maxPages, 1, 500);
+        var userSegment = BuildUserSegment(userId);
+
+        var messages = new List<GraphMailMessage>();
+        var pages = 0;
+        var filter = "conversationId eq '" + EscapeODataStringLiteral(conversationId.Trim()) + "'";
+        var url = new StringBuilder();
+        url.Append(userSegment).Append("/messages?$top=").Append(safeTop.ToString(CultureInfo.InvariantCulture));
+        url.Append("&$filter=").Append(Uri.EscapeDataString(filter));
+
+        var selectValue = select == null ? null : select.Trim();
+        if (selectValue != null && selectValue.Length > 0) {
+            url.Append("&$select=").Append(Uri.EscapeDataString(selectValue));
+        }
+
+        var orderByValue = orderBy == null ? null : orderBy.Trim();
+        if (orderByValue != null && orderByValue.Length > 0) {
+            url.Append("&$orderby=").Append(Uri.EscapeDataString(orderByValue));
+        }
+
+        string nextUrl = url.ToString();
+        while (pages++ < safeMaxPages) {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var resp = await _client.GetAsync(nextUrl, cancellationToken).ConfigureAwait(false);
+            await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
+#if NET5_0_OR_GREATER
+            var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+            var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+            if (!resp.IsSuccessStatusCode) {
+                throw new GraphApiException(resp.StatusCode, $"Graph conversation list failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
+            }
+
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("value", out var value) && value.ValueKind == JsonValueKind.Array) {
+                foreach (var it in value.EnumerateArray()) {
+                    var msg = TryParseMailMessage(it);
+                    if (msg != null) {
+                        messages.Add(msg);
+                    }
+                }
+            }
+
+            if (doc.RootElement.TryGetProperty("@odata.nextLink", out var next) && next.ValueKind == JsonValueKind.String) {
+                var link = next.GetString();
+                if (link != null) {
+                    var trimmed = link.Trim();
+                    if (trimmed.Length > 0) {
+                        nextUrl = trimmed;
+                        continue;
+                    }
+                }
+            }
+            break;
+        }
+
+        return messages;
+    }
+
+    /// <summary>
     /// Gets message metadata.
     /// </summary>
     public async Task<GraphMailMessage> GetMessageAsync(
