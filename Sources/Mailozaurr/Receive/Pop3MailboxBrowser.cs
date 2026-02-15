@@ -209,7 +209,7 @@ public static class Pop3MailboxBrowser {
     }
 
     internal static string? NormalizeOptional(string? raw) =>
-        string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
+        string.IsNullOrWhiteSpace(raw) ? null : raw!.Trim();
 
     internal static string? NormalizeMessageIdValue(string? value) {
         if (string.IsNullOrWhiteSpace(value)) {
