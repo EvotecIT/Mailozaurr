@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -256,11 +257,828 @@ public sealed class GraphApiClient : IDisposable {
         return (IReadOnlyList<GraphSubscription>?)result?.Value ?? Array.Empty<GraphSubscription>();
     }
 
+    private static string BuildUserSegment(string userId) {
+        var u = (userId ?? string.Empty).Trim();
+        if (u.Length == 0 || u.Equals("me", StringComparison.OrdinalIgnoreCase)) {
+            return "me";
+        }
+        return "users/" + Uri.EscapeDataString(u);
+    }
+
+    private static int ClampInt(int value, int min, int max) {
+        if (value < min) return min;
+        if (value > max) return max;
+        return value;
+    }
+
+    private static string EscapeODataStringLiteral(string value) => value.Replace("'", "''");
+
+    private static string? TryGetString(JsonElement obj, string propertyName) {
+        if (obj.ValueKind != JsonValueKind.Object) {
+            return null;
+        }
+        if (!obj.TryGetProperty(propertyName, out var el) || el.ValueKind != JsonValueKind.String) {
+            return null;
+        }
+        var s = el.GetString();
+        return string.IsNullOrWhiteSpace(s) ? null : s;
+    }
+
+    private static int? TryGetInt(JsonElement obj, string propertyName) {
+        if (obj.ValueKind != JsonValueKind.Object) {
+            return null;
+        }
+        if (!obj.TryGetProperty(propertyName, out var el) || el.ValueKind != JsonValueKind.Number) {
+            return null;
+        }
+        return el.TryGetInt32(out var v) ? v : null;
+    }
+
+    private static bool? TryGetBool(JsonElement obj, string propertyName) {
+        if (obj.ValueKind != JsonValueKind.Object) {
+            return null;
+        }
+        if (!obj.TryGetProperty(propertyName, out var el)) {
+            return null;
+        }
+        if (el.ValueKind == JsonValueKind.True) {
+            return true;
+        }
+        if (el.ValueKind == JsonValueKind.False) {
+            return false;
+        }
+        return null;
+    }
+
+    private static DateTimeOffset? TryGetDateTimeOffset(JsonElement obj, string propertyName) {
+        var s = TryGetString(obj, propertyName);
+        if (string.IsNullOrWhiteSpace(s)) {
+            return null;
+        }
+        return DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var dt)
+            ? dt
+            : null;
+    }
+
+    private static GraphEmailAddress? TryParseEmailAddress(JsonElement recipient) {
+        if (recipient.ValueKind != JsonValueKind.Object) {
+            return null;
+        }
+        if (!recipient.TryGetProperty("emailAddress", out var emailAddress) || emailAddress.ValueKind != JsonValueKind.Object) {
+            return null;
+        }
+        if (!emailAddress.TryGetProperty("address", out var addressEl) || addressEl.ValueKind != JsonValueKind.String) {
+            return null;
+        }
+        var address = addressEl.GetString();
+        if (address == null) {
+            return null;
+        }
+        address = address.Trim();
+        if (address.Length == 0) {
+            return null;
+        }
+        return new GraphEmailAddress { Email = new GraphEmail { Address = address } };
+    }
+
+    private static List<GraphEmailAddress>? TryParseEmailAddressList(JsonElement obj, string propertyName) {
+        if (obj.ValueKind != JsonValueKind.Object) {
+            return null;
+        }
+        if (!obj.TryGetProperty(propertyName, out var el) || el.ValueKind != JsonValueKind.Array) {
+            return null;
+        }
+        var list = new List<GraphEmailAddress>();
+        foreach (var item in el.EnumerateArray()) {
+            var addr = TryParseEmailAddress(item);
+            if (addr != null) {
+                list.Add(addr);
+            }
+        }
+        return list.Count == 0 ? null : list;
+    }
+
+    private static GraphMailMessage? TryParseMailMessage(JsonElement obj) {
+        if (obj.ValueKind != JsonValueKind.Object) {
+            return null;
+        }
+        var idRaw = TryGetString(obj, "id");
+        if (idRaw == null) {
+            return null;
+        }
+        var id = idRaw.Trim();
+        if (id.Length == 0) {
+            return null;
+        }
+        var msg = new GraphMailMessage {
+            Id = id,
+            Subject = TryGetString(obj, "subject"),
+            ReceivedDateTime = TryGetDateTimeOffset(obj, "receivedDateTime"),
+            InternetMessageId = TryGetString(obj, "internetMessageId"),
+            HasAttachments = TryGetBool(obj, "hasAttachments"),
+            IsRead = TryGetBool(obj, "isRead"),
+            ConversationId = TryGetString(obj, "conversationId")
+        };
+
+        if (obj.TryGetProperty("from", out var fromEl)) {
+            msg.From = TryParseEmailAddress(fromEl);
+        }
+        msg.ToRecipients = TryParseEmailAddressList(obj, "toRecipients");
+
+        if (obj.TryGetProperty("flag", out var flagEl) && flagEl.ValueKind == JsonValueKind.Object) {
+            var status = TryGetString(flagEl, "flagStatus");
+            if (status != null) {
+                var trimmed = status.Trim();
+                if (trimmed.Length > 0) {
+                    msg.Flag = new GraphMailMessageFlag { FlagStatus = trimmed };
+                }
+            }
+        }
+        return msg;
+    }
+
+    private static GraphMailFolder? TryParseMailFolder(JsonElement obj) {
+        if (obj.ValueKind != JsonValueKind.Object) {
+            return null;
+        }
+        var idRaw = TryGetString(obj, "id");
+        if (idRaw == null) {
+            return null;
+        }
+        var id = idRaw.Trim();
+        if (id.Length == 0) {
+            return null;
+        }
+        return new GraphMailFolder {
+            Id = id,
+            DisplayName = (TryGetString(obj, "displayName") ?? string.Empty).Trim(),
+            ParentFolderId = TryGetString(obj, "parentFolderId")?.Trim(),
+            ChildFolderCount = TryGetInt(obj, "childFolderCount"),
+            WellKnownName = TryGetString(obj, "wellKnownName")?.Trim(),
+            TotalItemCount = TryGetInt(obj, "totalItemCount"),
+            UnreadItemCount = TryGetInt(obj, "unreadItemCount")
+        };
+    }
+
+    /// <summary>
+    /// Lists mail folders for the given user, recursively expanding child folders.
+    /// </summary>
+    /// <remarks>
+    /// This performs best-effort traversal with safeguards to prevent infinite loops in pathological cases.
+    /// </remarks>
+    public async Task<IReadOnlyList<GraphMailFolder>> ListMailFoldersRecursiveAsync(
+        string userId = "me",
+        int top = 200,
+        string? select = "id,displayName,parentFolderId,childFolderCount,wellKnownName,totalItemCount,unreadItemCount",
+        int maxRequests = 250,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+
+        var safeTop = ClampInt(top, 1, 999);
+        var safeMax = ClampInt(maxRequests, 1, 5000);
+        var userSegment = BuildUserSegment(userId);
+
+        var foldersById = new Dictionary<string, GraphMailFolder>(StringComparer.Ordinal);
+        var pending = new Queue<string>();
+        var initial = new StringBuilder();
+        initial.Append(userSegment).Append("/mailFolders?$top=").Append(safeTop.ToString(CultureInfo.InvariantCulture));
+        var selectValue = select == null ? null : select.Trim();
+        if (selectValue != null && selectValue.Length > 0) {
+            initial.Append("&$select=").Append(Uri.EscapeDataString(selectValue));
+        }
+        pending.Enqueue(initial.ToString());
+
+        var processed = 0;
+        while (pending.Count > 0) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (processed++ >= safeMax) {
+                break;
+            }
+
+            var url = pending.Dequeue();
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            using var resp = await _client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
+#if NET5_0_OR_GREATER
+            var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+            var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+            if (!resp.IsSuccessStatusCode) {
+                throw new GraphApiException(resp.StatusCode, $"Graph mailFolders list failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
+            }
+
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("value", out var value) && value.ValueKind == JsonValueKind.Array) {
+                foreach (var item in value.EnumerateArray()) {
+                    var folder = TryParseMailFolder(item);
+                    if (folder == null || string.IsNullOrWhiteSpace(folder.Id)) {
+                        continue;
+                    }
+                    foldersById[folder.Id] = folder;
+
+                    if (folder.ChildFolderCount.HasValue && folder.ChildFolderCount.Value > 0) {
+                        var childUrl = new StringBuilder();
+                        childUrl.Append(userSegment)
+                            .Append("/mailFolders/")
+                            .Append(Uri.EscapeDataString(folder.Id))
+                            .Append("/childFolders?$top=")
+                            .Append(safeTop.ToString(CultureInfo.InvariantCulture));
+                        if (selectValue != null && selectValue.Length > 0) {
+                            childUrl.Append("&$select=").Append(Uri.EscapeDataString(selectValue));
+                        }
+                        pending.Enqueue(childUrl.ToString());
+                    }
+                }
+            }
+
+            if (doc.RootElement.TryGetProperty("@odata.nextLink", out var next) && next.ValueKind == JsonValueKind.String) {
+                var nextLink = next.GetString();
+                if (nextLink != null && nextLink.Trim().Length > 0) {
+                    pending.Enqueue(nextLink);
+                }
+            }
+        }
+
+        var output = new List<GraphMailFolder>(foldersById.Count);
+        output.AddRange(foldersById.Values);
+        output.Sort(static (a, b) => {
+            var r = string.Compare(a.DisplayName, b.DisplayName, StringComparison.OrdinalIgnoreCase);
+            if (r != 0) return r;
+            return string.Compare(a.Id, b.Id, StringComparison.Ordinal);
+        });
+        return output;
+    }
+
+    /// <summary>
+    /// Gets a single mail folder record.
+    /// </summary>
+    public async Task<GraphMailFolder> GetMailFolderAsync(
+        string folderIdOrWellKnownName,
+        string userId = "me",
+        string? select = "id,displayName,parentFolderId,childFolderCount,wellKnownName,totalItemCount,unreadItemCount",
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(folderIdOrWellKnownName)) {
+            throw new ArgumentException("folderIdOrWellKnownName is required.", nameof(folderIdOrWellKnownName));
+        }
+
+        var userSegment = BuildUserSegment(userId);
+        var selector = Uri.EscapeDataString(folderIdOrWellKnownName.Trim());
+        var url = new StringBuilder();
+        url.Append(userSegment).Append("/mailFolders/").Append(selector);
+        var selectValue = select == null ? null : select.Trim();
+        if (selectValue != null && selectValue.Length > 0) {
+            url.Append("?$select=").Append(Uri.EscapeDataString(selectValue));
+        }
+
+        using var resp = await _client.GetAsync(url.ToString(), cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
+#if NET5_0_OR_GREATER
+        var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        if (!resp.IsSuccessStatusCode) {
+            throw new GraphApiException(resp.StatusCode, $"Graph mailFolder get failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
+        }
+
+        using var doc = JsonDocument.Parse(body);
+        var folder = TryParseMailFolder(doc.RootElement);
+        if (folder is null) {
+            throw new InvalidDataException("Graph returned an invalid mail folder response.");
+        }
+        return folder;
+    }
+
+    /// <summary>
+    /// Lists messages within a mail folder.
+    /// </summary>
+    public async Task<GraphPage<GraphMailMessage>> ListMessagesAsync(
+        string folderIdOrWellKnownName,
+        string userId = "me",
+        int top = 100,
+        int? skip = null,
+        string? select = "id,subject,receivedDateTime,from,toRecipients,internetMessageId,hasAttachments,isRead,flag,conversationId",
+        string? orderBy = "receivedDateTime desc",
+        string? filter = null,
+        string? search = null,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(folderIdOrWellKnownName)) {
+            throw new ArgumentException("folderIdOrWellKnownName is required.", nameof(folderIdOrWellKnownName));
+        }
+
+        var safeTop = ClampInt(top, 1, 999);
+        var userSegment = BuildUserSegment(userId);
+        var folderSelector = Uri.EscapeDataString(folderIdOrWellKnownName.Trim());
+
+        var url = new StringBuilder();
+        url.Append(userSegment).Append("/mailFolders/").Append(folderSelector).Append("/messages");
+        url.Append("?$top=").Append(safeTop.ToString(CultureInfo.InvariantCulture));
+        if (skip.HasValue && skip.Value > 0) {
+            url.Append("&$skip=").Append(skip.Value.ToString(CultureInfo.InvariantCulture));
+        }
+        var orderByValue = orderBy == null ? null : orderBy.Trim();
+        if (orderByValue != null && orderByValue.Length > 0) {
+            url.Append("&$orderby=").Append(Uri.EscapeDataString(orderByValue));
+        }
+        var selectValue = select == null ? null : select.Trim();
+        if (selectValue != null && selectValue.Length > 0) {
+            url.Append("&$select=").Append(Uri.EscapeDataString(selectValue));
+        }
+        var filterValue = filter == null ? null : filter.Trim();
+        if (filterValue != null && filterValue.Length > 0) {
+            url.Append("&$filter=").Append(Uri.EscapeDataString(filterValue));
+        }
+        var searchValue = search == null ? null : search.Trim();
+        if (searchValue != null && searchValue.Length > 0) {
+            var sanitized = searchValue.Replace("\"", string.Empty).Trim();
+            if (sanitized.Length > 0) {
+                url.Append("&$search=").Append(Uri.EscapeDataString("\"" + sanitized + "\""));
+            }
+        }
+
+        using var req = new HttpRequestMessage(HttpMethod.Get, url.ToString());
+        if (searchValue != null && searchValue.Length > 0) {
+            req.Headers.TryAddWithoutValidation("ConsistencyLevel", "eventual");
+            req.Headers.TryAddWithoutValidation("Prefer", "HonorNonIndexedQueriesWarning=true");
+        }
+        using var resp = await _client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
+#if NET5_0_OR_GREATER
+        var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        if (!resp.IsSuccessStatusCode) {
+            throw new GraphApiException(resp.StatusCode, $"Graph messages list failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
+        }
+
+        var items = new List<GraphMailMessage>();
+        string? nextLink = null;
+        using (var doc = JsonDocument.Parse(body)) {
+            if (doc.RootElement.TryGetProperty("@odata.nextLink", out var next) && next.ValueKind == JsonValueKind.String) {
+                nextLink = next.GetString();
+            }
+            if (doc.RootElement.TryGetProperty("value", out var value) && value.ValueKind == JsonValueKind.Array) {
+                foreach (var it in value.EnumerateArray()) {
+                    var msg = TryParseMailMessage(it);
+                    if (msg != null) {
+                        items.Add(msg);
+                    }
+                }
+            }
+        }
+
+        return new GraphPage<GraphMailMessage>(items, nextLink);
+    }
+
+    /// <summary>
+    /// Lists message ids for a Graph conversation.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> ListConversationMessageIdsAsync(
+        string conversationId,
+        string userId = "me",
+        int top = 100,
+        int maxPages = 25,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(conversationId)) {
+            throw new ArgumentException("conversationId is required.", nameof(conversationId));
+        }
+
+        var safeTop = ClampInt(top, 1, 999);
+        var safeMaxPages = ClampInt(maxPages, 1, 500);
+        var userSegment = BuildUserSegment(userId);
+
+        var ids = new List<string>();
+        var pages = 0;
+        var filter = "conversationId eq '" + EscapeODataStringLiteral(conversationId.Trim()) + "'";
+        var url = new StringBuilder();
+        url.Append(userSegment).Append("/messages?$select=id&$top=").Append(safeTop.ToString(CultureInfo.InvariantCulture));
+        url.Append("&$filter=").Append(Uri.EscapeDataString(filter));
+
+        string nextUrl = url.ToString();
+        while (pages++ < safeMaxPages) {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var resp = await _client.GetAsync(nextUrl, cancellationToken).ConfigureAwait(false);
+            await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
+#if NET5_0_OR_GREATER
+            var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+            var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+            if (!resp.IsSuccessStatusCode) {
+                throw new GraphApiException(resp.StatusCode, $"Graph conversation list failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
+            }
+
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("value", out var value) && value.ValueKind == JsonValueKind.Array) {
+                foreach (var it in value.EnumerateArray()) {
+                    var id = TryGetString(it, "id");
+                    if (id != null) {
+                        var trimmed = id.Trim();
+                        if (trimmed.Length > 0) {
+                            ids.Add(trimmed);
+                        }
+                    }
+                }
+            }
+            if (doc.RootElement.TryGetProperty("@odata.nextLink", out var next) && next.ValueKind == JsonValueKind.String) {
+                var link = next.GetString();
+                if (link != null) {
+                    var trimmed = link.Trim();
+                    if (trimmed.Length > 0) {
+                        nextUrl = trimmed;
+                        continue;
+                    }
+                }
+            }
+            break;
+        }
+
+        return ids;
+    }
+
+    /// <summary>
+    /// Gets message metadata.
+    /// </summary>
+    public async Task<GraphMailMessage> GetMessageAsync(
+        string messageId,
+        string userId = "me",
+        string? select = "id,subject,receivedDateTime,from,toRecipients,internetMessageId,hasAttachments,isRead,flag,conversationId",
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(messageId)) {
+            throw new ArgumentException("messageId is required.", nameof(messageId));
+        }
+
+        var userSegment = BuildUserSegment(userId);
+        var selector = Uri.EscapeDataString(messageId.Trim());
+        var url = new StringBuilder();
+        url.Append(userSegment).Append("/messages/").Append(selector);
+        var selectValue = select == null ? null : select.Trim();
+        if (selectValue != null && selectValue.Length > 0) {
+            url.Append("?$select=").Append(Uri.EscapeDataString(selectValue));
+        }
+
+        using var resp = await _client.GetAsync(url.ToString(), cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
+#if NET5_0_OR_GREATER
+        var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        if (!resp.IsSuccessStatusCode) {
+            throw new GraphApiException(resp.StatusCode, $"Graph message get failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
+        }
+
+        using var doc = JsonDocument.Parse(body);
+        var msg = TryParseMailMessage(doc.RootElement);
+        if (msg is null) {
+            throw new InvalidDataException("Graph returned an invalid message response.");
+        }
+        return msg;
+    }
+
+    /// <summary>
+    /// Downloads the message MIME content via the <c>/$value</c> endpoint.
+    /// </summary>
+    public async Task<byte[]> GetMessageMimeAsync(
+        string messageId,
+        string userId = "me",
+        int maxBytes = 25 * 1024 * 1024,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(messageId)) {
+            throw new ArgumentException("messageId is required.", nameof(messageId));
+        }
+        if (maxBytes <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(maxBytes), "maxBytes must be > 0.");
+        }
+
+        var userSegment = BuildUserSegment(userId);
+        var selector = Uri.EscapeDataString(messageId.Trim());
+        var url = userSegment + "/messages/" + selector + "/$value";
+
+        using var resp = await _client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
+        if (!resp.IsSuccessStatusCode) {
+#if NET5_0_OR_GREATER
+            var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+            var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+            throw new GraphApiException(resp.StatusCode, $"Graph MIME fetch failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
+        }
+
+#if NET5_0_OR_GREATER
+        await using var stream = await resp.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+#else
+        using var stream = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false);
+#endif
+        using var ms = new MemoryStream();
+        var buffer = new byte[81920];
+        while (true) {
+            cancellationToken.ThrowIfCancellationRequested();
+#if NET5_0_OR_GREATER
+            var read = await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+#else
+            var read = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
+#endif
+            if (read <= 0) {
+                break;
+            }
+            if (ms.Length + read > maxBytes) {
+                throw new InvalidDataException($"Graph MIME content exceeds {maxBytes} bytes.");
+            }
+#if NET5_0_OR_GREATER
+            await ms.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+#else
+            ms.Write(buffer, 0, read);
+#endif
+        }
+        return ms.ToArray();
+    }
+
+    /// <summary>
+    /// Retrieves a delta page for messages in a folder.
+    /// </summary>
+    /// <remarks>
+    /// When <paramref name="cursor"/> is empty, starts a new delta query for the folder.
+    /// Otherwise, continues from a previously returned nextLink/deltaLink.
+    /// </remarks>
+    public async Task<GraphDeltaPage<GraphMailMessage>> DeltaMessagesAsync(
+        string folderIdOrWellKnownName,
+        string? cursor = null,
+        string userId = "me",
+        int top = 100,
+        string? select = "id,subject,receivedDateTime,from,toRecipients,internetMessageId,hasAttachments,isRead,flag,conversationId",
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(folderIdOrWellKnownName)) {
+            throw new ArgumentException("folderIdOrWellKnownName is required.", nameof(folderIdOrWellKnownName));
+        }
+
+        var safeTop = ClampInt(top, 1, 999);
+        var userSegment = BuildUserSegment(userId);
+
+        var url = (cursor ?? string.Empty).Trim();
+        if (url.Length == 0) {
+            var folderSelector = Uri.EscapeDataString(folderIdOrWellKnownName.Trim());
+            var sb = new StringBuilder();
+            sb.Append(userSegment).Append("/mailFolders/").Append(folderSelector).Append("/messages/delta");
+            sb.Append("?$top=").Append(safeTop.ToString(CultureInfo.InvariantCulture));
+            var selectValue = select == null ? null : select.Trim();
+            if (selectValue != null && selectValue.Length > 0) {
+                sb.Append("&$select=").Append(Uri.EscapeDataString(selectValue));
+            }
+            url = sb.ToString();
+        }
+
+        using var resp = await _client.GetAsync(url, cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
+#if NET5_0_OR_GREATER
+        var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        if (!resp.IsSuccessStatusCode) {
+            throw new GraphApiException(resp.StatusCode, $"Graph delta failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
+        }
+
+        var upserts = new List<GraphMailMessage>();
+        var deletedIds = new List<string>();
+        string? nextLink = null;
+        string? deltaLink = null;
+
+        using (var doc = JsonDocument.Parse(body)) {
+            if (doc.RootElement.TryGetProperty("@odata.nextLink", out var next) && next.ValueKind == JsonValueKind.String) {
+                nextLink = next.GetString();
+            }
+            if (doc.RootElement.TryGetProperty("@odata.deltaLink", out var delta) && delta.ValueKind == JsonValueKind.String) {
+                deltaLink = delta.GetString();
+            }
+            if (doc.RootElement.TryGetProperty("value", out var value) && value.ValueKind == JsonValueKind.Array) {
+                foreach (var item in value.EnumerateArray()) {
+                    var id = TryGetString(item, "id");
+                    if (id == null) {
+                        continue;
+                    }
+                    var trimmedId = id.Trim();
+                    if (trimmedId.Length == 0) {
+                        continue;
+                    }
+                    if (item.TryGetProperty("@removed", out _)) {
+                        deletedIds.Add(trimmedId);
+                        continue;
+                    }
+                    var msg = TryParseMailMessage(item);
+                    if (msg != null) {
+                        upserts.Add(msg);
+                    }
+                }
+            }
+        }
+
+        return new GraphDeltaPage<GraphMailMessage>(upserts, nextLink, deltaLink, deletedIds);
+    }
+
+    /// <summary>
+    /// Moves a message to the specified destination folder id.
+    /// </summary>
+    public async Task MoveMessageAsync(
+        string messageId,
+        string destinationId,
+        string userId = "me",
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(messageId)) {
+            throw new ArgumentException("messageId is required.", nameof(messageId));
+        }
+        if (string.IsNullOrWhiteSpace(destinationId)) {
+            throw new ArgumentException("destinationId is required.", nameof(destinationId));
+        }
+
+        var userSegment = BuildUserSegment(userId);
+        var selector = Uri.EscapeDataString(messageId.Trim());
+        var json = JsonSerializer.Serialize(new GraphDestinationRequest { DestinationId = destinationId.Trim() }, MailozaurrJsonContext.Default.GraphDestinationRequest);
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
+        using var resp = await _client.PostAsync(userSegment + "/messages/" + selector + "/move", content, cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
+#if NET5_0_OR_GREATER
+        var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        if (!resp.IsSuccessStatusCode) {
+            throw new GraphApiException(resp.StatusCode, $"Graph move failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
+        }
+    }
+
+    /// <summary>
+    /// Deletes a message.
+    /// </summary>
+    public async Task DeleteMessageAsync(string messageId, string userId = "me", CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(messageId)) {
+            throw new ArgumentException("messageId is required.", nameof(messageId));
+        }
+        var userSegment = BuildUserSegment(userId);
+        var selector = Uri.EscapeDataString(messageId.Trim());
+        using var resp = await _client.DeleteAsync(userSegment + "/messages/" + selector, cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
+#if NET5_0_OR_GREATER
+        var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        if (!resp.IsSuccessStatusCode) {
+            throw new GraphApiException(resp.StatusCode, $"Graph delete failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
+        }
+    }
+
+    /// <summary>
+    /// Sets the read state of a message.
+    /// </summary>
+    public async Task SetMessageIsReadAsync(
+        string messageId,
+        bool isRead,
+        string userId = "me",
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(messageId)) {
+            throw new ArgumentException("messageId is required.", nameof(messageId));
+        }
+        var userSegment = BuildUserSegment(userId);
+        var selector = Uri.EscapeDataString(messageId.Trim());
+        var json = JsonSerializer.Serialize(new GraphMarkReadRequest { IsRead = isRead }, MailozaurrJsonContext.Default.GraphMarkReadRequest);
+        using var msg = new HttpRequestMessage(new HttpMethod("PATCH"), userSegment + "/messages/" + selector) {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+        using var resp = await _client.SendAsync(msg, cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
+#if NET5_0_OR_GREATER
+        var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        if (!resp.IsSuccessStatusCode) {
+            throw new GraphApiException(resp.StatusCode, $"Graph set-isRead failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
+        }
+    }
+
+    /// <summary>
+    /// Sets the flagged state of a message.
+    /// </summary>
+    public async Task SetMessageFlaggedAsync(
+        string messageId,
+        bool flagged,
+        string userId = "me",
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(messageId)) {
+            throw new ArgumentException("messageId is required.", nameof(messageId));
+        }
+        var userSegment = BuildUserSegment(userId);
+        var selector = Uri.EscapeDataString(messageId.Trim());
+        var status = flagged ? "flagged" : "notFlagged";
+        var json = "{\"flag\":{\"flagStatus\":\"" + status + "\"}}";
+        using var msg = new HttpRequestMessage(new HttpMethod("PATCH"), userSegment + "/messages/" + selector) {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+        using var resp = await _client.SendAsync(msg, cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
+#if NET5_0_OR_GREATER
+        var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        if (!resp.IsSuccessStatusCode) {
+            throw new GraphApiException(resp.StatusCode, $"Graph set-flag failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
+        }
+    }
+
+    /// <summary>
+    /// Sends a Graph batch request using the current bearer token.
+    /// </summary>
+    public async Task<IReadOnlyList<GraphBatchResult>> SendBatchAsync(IEnumerable<GraphBatchRequest> requests, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (requests == null) {
+            throw new ArgumentNullException(nameof(requests));
+        }
+
+        var payload = new GraphBatchPayload();
+        var i = 0;
+        foreach (var r in requests) {
+            if (r == null) {
+                continue;
+            }
+            var id = string.IsNullOrWhiteSpace(r.Id) ? (++i).ToString(CultureInfo.InvariantCulture) : r.Id.Trim();
+            var url = (r.Url ?? string.Empty).Trim();
+            if (url.Length == 0) {
+                throw new ArgumentException("GraphBatchRequest.Url is required.", nameof(requests));
+            }
+
+            payload.Requests.Add(new GraphBatchRequestPayload {
+                Id = id,
+                Method = r.Method.ToString(),
+                Url = url.TrimStart('/'),
+                Headers = r.Headers,
+                Body = r.Body
+            });
+        }
+
+        var json = JsonSerializer.Serialize(payload, MailozaurrJsonContext.Default.GraphBatchPayload);
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
+        using var resp = await _client.PostAsync("$batch", content, cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
+#if NET5_0_OR_GREATER
+        var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        if (!resp.IsSuccessStatusCode) {
+            throw new GraphApiException(resp.StatusCode, $"Graph batch failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
+        }
+
+        var results = new List<GraphBatchResult>();
+        using (var doc = JsonDocument.Parse(body)) {
+            if (doc.RootElement.TryGetProperty("responses", out var responses) && responses.ValueKind == JsonValueKind.Array) {
+                foreach (var item in responses.EnumerateArray()) {
+                    var result = new GraphBatchResult();
+                    if (item.TryGetProperty("id", out var idEl) && idEl.ValueKind == JsonValueKind.String) {
+                        result.Id = idEl.GetString() ?? string.Empty;
+                    }
+                    if (item.TryGetProperty("status", out var statusEl) && statusEl.TryGetInt32(out var status)) {
+                        result.Status = status;
+                    }
+                    if (item.TryGetProperty("headers", out var headersEl) && headersEl.ValueKind == JsonValueKind.Object) {
+                        var h = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var prop in headersEl.EnumerateObject()) {
+                            if (prop.Value.ValueKind == JsonValueKind.String) {
+                                h[prop.Name] = prop.Value.GetString() ?? string.Empty;
+                            }
+                        }
+                        result.Headers = h;
+                    }
+                    if (item.TryGetProperty("body", out var bodyEl)) {
+                        result.Body = bodyEl;
+                    }
+                    results.Add(result);
+                }
+            }
+        }
+
+        return results;
+    }
+
     /// <summary>Create subscription request payload.</summary>
     public sealed class GraphCreateSubscriptionRequest {
         /// <summary>
-        /// Resource to subscribe to (for example, <c>me/mailFolders('inbox')/messages</c>).
-        /// </summary>
+         /// Resource to subscribe to (for example, <c>me/mailFolders('inbox')/messages</c>).
+         /// </summary>
         [JsonPropertyName("resource")]
         public string Resource { get; set; } = string.Empty;
 
