@@ -34,7 +34,10 @@ public sealed class GraphApiClient : IDisposable {
     /// Initializes the client using the provided OAuth credential.
     /// </summary>
     /// <param name="credential">OAuth credential holding an access token.</param>
-    /// <param name="refreshToken">Optional delegate used to refresh an access token when a request returns 401/403.</param>
+    /// <param name="refreshToken">
+    /// Optional delegate used to refresh an access token when a request returns 401/403.
+    /// Note: the client updates its Authorization header (and the credential's AccessToken, if provided), but does not retry the failed request automatically.
+    /// </param>
     /// <param name="baseAddress">Optional Graph base address (defaults to v1.0 endpoint).</param>
     public GraphApiClient(
         OAuthCredential credential,
@@ -111,6 +114,18 @@ public sealed class GraphApiClient : IDisposable {
         if (request == null) {
             throw new ArgumentNullException(nameof(request));
         }
+        if (string.IsNullOrWhiteSpace(request.Resource)) {
+            throw new ArgumentException("Resource is required.", nameof(request));
+        }
+        if (string.IsNullOrWhiteSpace(request.ChangeType)) {
+            throw new ArgumentException("ChangeType is required.", nameof(request));
+        }
+        if (string.IsNullOrWhiteSpace(request.NotificationUrl)) {
+            throw new ArgumentException("NotificationUrl is required.", nameof(request));
+        }
+        if (request.ExpirationDateTime == default) {
+            throw new ArgumentException("ExpirationDateTime is required.", nameof(request));
+        }
 
         var json = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GraphCreateSubscriptionRequest);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -146,11 +161,12 @@ public sealed class GraphApiClient : IDisposable {
             throw new ArgumentException("subscriptionId is required.", nameof(subscriptionId));
         }
 
+        var encodedId = Uri.EscapeDataString(subscriptionId.Trim());
         var request = new GraphRenewSubscriptionRequest { ExpirationDateTime = expirationDateTime };
         var json = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GraphRenewSubscriptionRequest);
         var requestUri = _client.BaseAddress != null
-            ? new Uri(_client.BaseAddress, $"subscriptions/{subscriptionId}")
-            : new Uri($"subscriptions/{subscriptionId}", UriKind.Relative);
+            ? new Uri(_client.BaseAddress, $"subscriptions/{encodedId}")
+            : new Uri($"subscriptions/{encodedId}", UriKind.Relative);
         using var msg = new HttpRequestMessage(new HttpMethod("PATCH"), requestUri) {
             Content = new StringContent(json, Encoding.UTF8, "application/json")
         };
@@ -185,7 +201,8 @@ public sealed class GraphApiClient : IDisposable {
         if (string.IsNullOrWhiteSpace(subscriptionId)) {
             throw new ArgumentException("subscriptionId is required.", nameof(subscriptionId));
         }
-        using var response = await _client.DeleteAsync($"subscriptions/{subscriptionId}", cancellationToken).ConfigureAwait(false);
+        var encodedId = Uri.EscapeDataString(subscriptionId.Trim());
+        using var response = await _client.DeleteAsync($"subscriptions/{encodedId}", cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
