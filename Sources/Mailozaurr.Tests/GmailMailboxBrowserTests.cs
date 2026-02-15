@@ -24,6 +24,30 @@ public sealed class GmailMailboxBrowserTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task ListFoldersAsync_ReturnsSortedLabelFolders() {
+        var labelsJson = "{" +
+                         "\"labels\":[" +
+                         "{\"id\":\"Label_2\",\"name\":\"Zeta\",\"type\":\"user\"}," +
+                         "{\"id\":\"INBOX\",\"name\":\"Inbox\",\"type\":\"system\"}," +
+                         "{\"id\":\"Label_1\",\"name\":\"Alpha\",\"type\":\"user\"}" +
+                         "]" +
+                         "}";
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(labelsJson) });
+        var browser = CreateBrowser(handler);
+
+        var folders = await browser.ListFoldersAsync();
+
+        Assert.Equal(3, folders.Count);
+        Assert.Equal("Alpha", folders[0].Name);
+        Assert.Equal("Inbox", folders[1].Name);
+        Assert.Equal("Zeta", folders[2].Name);
+        Assert.Equal("INBOX", folders[1].Id);
+        Assert.Equal("system", folders[1].Type);
+        Assert.Single(handler.Requests);
+        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/labels?fields=labels(id,name,type)", handler.Requests[0].RequestUri!.ToString());
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task ListMessagesAsync_UsesListThenLoadsSummaries() {
         var listJson = "{\"messages\":[{\"id\":\"m1\",\"threadId\":\"t1\"},{\"id\":\"m2\",\"threadId\":\"t1\"}],\"resultSizeEstimate\":\"9\"}";
         var m2Json = "{" +

@@ -88,6 +88,39 @@ public sealed class GmailMailboxBrowser {
     }
 
     /// <summary>
+    /// Lists available Gmail labels as mailbox folders.
+    /// </summary>
+    public async Task<IReadOnlyList<GmailMailboxFolderSummary>> ListFoldersAsync(
+        CancellationToken cancellationToken = default) {
+        var labels = await _gmail.ListLabelsAsync(_userId, cancellationToken).ConfigureAwait(false);
+        if (labels == null || labels.Count == 0) {
+            return Array.Empty<GmailMailboxFolderSummary>();
+        }
+
+        var output = new List<GmailMailboxFolderSummary>(labels.Count);
+        foreach (var label in labels) {
+            if (label == null) {
+                continue;
+            }
+
+            var id = NormalizeOptional(label.Id);
+            var name = NormalizeOptional(label.Name);
+            if (id == null || name == null) {
+                continue;
+            }
+
+            output.Add(new GmailMailboxFolderSummary {
+                Id = id,
+                Name = name,
+                Type = NormalizeOptional(label.Type)
+            });
+        }
+
+        output.Sort(static (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+        return output;
+    }
+
+    /// <summary>
     /// Lists messages in a Gmail label.
     /// </summary>
     public async Task<GmailMailboxListResult> ListMessagesAsync(
@@ -1293,6 +1326,20 @@ public sealed class GmailMailboxBrowser {
         } catch (FormatException ex) {
             throw new InvalidDataException("Attachment data is not a valid Base64 string.", ex);
         }
+    }
+
+    /// <summary>
+    /// Gmail mailbox folder summary.
+    /// </summary>
+    public sealed class GmailMailboxFolderSummary {
+        /// <summary>Gmail label id.</summary>
+        public string Id { get; set; } = string.Empty;
+
+        /// <summary>Gmail label display name.</summary>
+        public string Name { get; set; } = string.Empty;
+
+        /// <summary>Gmail label type (for example, <c>system</c> or <c>user</c>).</summary>
+        public string? Type { get; set; }
     }
 
     /// <summary>
