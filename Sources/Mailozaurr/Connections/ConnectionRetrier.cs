@@ -50,16 +50,18 @@ internal static class ConnectionRetrier {
         do {
             var client = clientFactory();
             try {
-                await client.ConnectAsync(server, port, options, cancellationToken).ConfigureAwait(false);
+                // These options affect the TLS handshake and must be configured before ConnectAsync.
                 if (skipCertificateRevocation) {
                     client.CheckCertificateRevocation = false;
                 }
                 if (skipCertificateValidation) {
-                    client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+                    client.ServerCertificateValidationCallback = static (_, _, _, _) => true;
                 }
-                if (client.Timeout != timeout) {
+                if (timeout > 0 && client.Timeout != timeout) {
                     client.Timeout = timeout;
                 }
+
+                await client.ConnectAsync(server, port, options, cancellationToken).ConfigureAwait(false);
                 await authenticateAsync(client, cancellationToken).ConfigureAwait(false);
                 if (!client.IsAuthenticated) {
                     throw new InvalidOperationException("Authentication failed.");
@@ -94,4 +96,3 @@ internal static class ConnectionRetrier {
         throw lastException ?? new InvalidOperationException("Operation failed without exception");
     }
 }
-
