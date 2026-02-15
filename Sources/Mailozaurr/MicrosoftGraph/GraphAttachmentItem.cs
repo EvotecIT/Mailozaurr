@@ -26,6 +26,27 @@ public class GraphAttachmentItem {
     [JsonPropertyName("size")]
     public long Size { get; set; }
 
+    /// <summary>
+    /// Gets or sets optional content type.
+    /// </summary>
+    [JsonPropertyName("contentType")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ContentType { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether attachment should be rendered inline.
+    /// </summary>
+    [JsonPropertyName("isInline")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? IsInline { get; set; }
+
+    /// <summary>
+    /// Gets or sets optional content identifier for inline attachments.
+    /// </summary>
+    [JsonPropertyName("contentId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ContentId { get; set; }
+
     /// <summary>Creates a new attachment item.</summary>
     /// <param name="attachmentType">Type of the attachment.</param>
     /// <param name="name">File name.</param>
