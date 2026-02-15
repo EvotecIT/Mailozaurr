@@ -79,6 +79,7 @@ namespace Mailozaurr;
 [JsonSerializable(typeof(GmailApiClient.GmailModifyLabelsRequest))]
 [JsonSerializable(typeof(GmailApiClient.GmailBatchModifyRequest))]
 [JsonSerializable(typeof(GmailApiClient.GmailBatchDeleteRequest))]
+[JsonSerializable(typeof(GmailApiClient.GmailImportMessageRequest))]
 [JsonSerializable(typeof(GmailApiClient.GmailWatchRequest))]
 [JsonSerializable(typeof(GmailApiClient.GmailWatchResponse))]
 [JsonSerializable(typeof(GmailApiClient.GmailProfile))]

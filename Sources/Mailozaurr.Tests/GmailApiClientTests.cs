@@ -301,6 +301,61 @@ public class GmailApiClientTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task GetMessageWithOptionsAsync_MetadataFormat_BuildsQuery() {
+        var json = "{\"id\":\"m1\",\"threadId\":\"t1\",\"payload\":{\"headers\":[{\"name\":\"Message-ID\",\"value\":\"<x>\"}]}}";
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+
+        var msg = await client.GetMessageWithOptionsAsync(
+            "me",
+            "m1",
+            format: "metadata",
+            metadataHeaders: new[] { "Message-ID", "References" },
+            fields: "id,payload(headers)");
+
+        Assert.Equal("m1", msg.Id);
+        Assert.NotNull(msg.Payload);
+        Assert.NotNull(msg.Payload!.Headers);
+        Assert.Single(msg.Payload!.Headers!);
+        Assert.Equal("Message-ID", msg.Payload!.Headers![0].Name);
+
+        Assert.Single(handler.Requests);
+        var uri = handler.Requests[0].RequestUri!;
+        Assert.StartsWith("https://gmail.googleapis.com/gmail/v1/users/me/messages/m1", uri.ToString());
+        var qp = ParseQueryParams(uri);
+        Assert.Equal("metadata", Assert.Single(qp["format"]));
+        Assert.Equal("id,payload(headers)", Assert.Single(qp["fields"]));
+        Assert.Contains("Message-ID", qp["metadataHeaders"]);
+        Assert.Contains("References", qp["metadataHeaders"]);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ImportAsync_BuildsQueryAndSendsBody() {
+        var json = "{\"id\":\"m1\",\"threadId\":\"t1\"}";
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+
+        var msg = await client.ImportAsync("me", raw: "dGVzdA", labelIds: new[] { "SENT" });
+        Assert.Equal("m1", msg.Id);
+
+        Assert.Single(handler.Requests);
+        Assert.Equal(System.Net.Http.HttpMethod.Post, handler.Requests[0].Method);
+        var uri = handler.Requests[0].RequestUri!;
+        Assert.StartsWith("https://gmail.googleapis.com/gmail/v1/users/me/messages/import", uri.ToString());
+        var qp = ParseQueryParams(uri);
+        Assert.Equal("dateHeader", Assert.Single(qp["internalDateSource"]));
+        Assert.Equal("true", Assert.Single(qp["neverMarkSpam"]));
+
+        var body = await handler.Requests[0].Content!.ReadAsStringAsync();
+        Assert.Contains("\"raw\":\"dGVzdA\"", body);
+        Assert.Contains("\"labelIds\":[\"SENT\"]", body);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task ModifyMessageLabelsAsync_SendsModifyRequest() {
         var json = "{\"id\":\"m1\",\"threadId\":\"t1\"}";
         var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });

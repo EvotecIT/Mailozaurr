@@ -412,10 +412,27 @@ public sealed class GmailApiClient : IDisposable {
         return message;
     }
 
-    private async Task<GmailMessage> GetMessageWithFormatAsync(
+    /// <summary>
+    /// Retrieves a single message by id, optionally requesting a specific format/fields subset and metadata headers.
+    /// </summary>
+    /// <remarks>
+    /// This is a low-level helper for callers that need Gmail partial responses or <c>format=metadata</c>.
+    /// Prefer <see cref="GetFullAsync"/> and <see cref="GetRawAsync"/> when possible.
+    /// </remarks>
+    public Task<GmailMessage> GetMessageWithOptionsAsync(
         string userId,
         string id,
-        string format,
+        string? format = null,
+        IReadOnlyCollection<string>? metadataHeaders = null,
+        string? fields = null,
+        CancellationToken cancellationToken = default)
+        => GetMessageWithOptionsCoreAsync(userId, id, format, metadataHeaders, fields, cancellationToken);
+
+    private async Task<GmailMessage> GetMessageWithOptionsCoreAsync(
+        string userId,
+        string id,
+        string? format,
+        IReadOnlyCollection<string>? metadataHeaders,
         string? fields,
         CancellationToken cancellationToken) {
         ThrowIfDisposed();
@@ -424,9 +441,19 @@ public sealed class GmailApiClient : IDisposable {
         }
 
         var safeId = Uri.EscapeDataString(id.Trim());
-        var url = new StringBuilder($"users/{userId}/messages/{safeId}?format={Uri.EscapeDataString(format)}");
-        if (!string.IsNullOrWhiteSpace(fields)) {
-            url.Append("&fields=").Append(Uri.EscapeDataString(fields!.Trim()));
+        var url = new StringBuilder($"users/{userId}/messages/{safeId}");
+        var qs = new List<string>();
+        if (!string.IsNullOrWhiteSpace(format)) qs.Add($"format={Uri.EscapeDataString(format!.Trim())}");
+        if (!string.IsNullOrWhiteSpace(fields)) qs.Add($"fields={Uri.EscapeDataString(fields!.Trim())}");
+        if (metadataHeaders != null) {
+            foreach (var h in metadataHeaders) {
+                if (!string.IsNullOrWhiteSpace(h)) {
+                    qs.Add($"metadataHeaders={Uri.EscapeDataString(h.Trim())}");
+                }
+            }
+        }
+        if (qs.Count > 0) {
+            url.Append('?').Append(string.Join("&", qs));
         }
 
         using var response = await _client.GetAsync(url.ToString(), cancellationToken).ConfigureAwait(false);
@@ -448,6 +475,14 @@ public sealed class GmailApiClient : IDisposable {
         }
         return message;
     }
+
+    private Task<GmailMessage> GetMessageWithFormatAsync(
+        string userId,
+        string id,
+        string format,
+        string? fields,
+        CancellationToken cancellationToken)
+        => GetMessageWithOptionsCoreAsync(userId, id, format, metadataHeaders: null, fields: fields, cancellationToken);
 
     /// <summary>
     /// Retrieves a MIME message by id.
@@ -477,6 +512,61 @@ public sealed class GmailApiClient : IDisposable {
     /// </summary>
     public Task<GmailMessage> GetFullAsync(string userId, string id, string? fields = null, CancellationToken cancellationToken = default) =>
         GetMessageWithFormatAsync(userId, id, format: "full", fields: fields, cancellationToken: cancellationToken);
+
+    /// <summary>
+    /// Imports a message (MIME base64url) into a mailbox.
+    /// </summary>
+    /// <remarks>
+    /// This calls <c>users.messages.import</c>. It is typically used to append a sent copy into Gmail.
+    /// </remarks>
+    public async Task<GmailMessage> ImportAsync(
+        string userId,
+        string raw,
+        IReadOnlyCollection<string>? labelIds = null,
+        string internalDateSource = "dateHeader",
+        bool neverMarkSpam = true,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(raw)) {
+            throw new ArgumentException("raw is required.", nameof(raw));
+        }
+        if (DryRun) {
+            return new GmailMessage { Id = string.Empty, ThreadId = string.Empty };
+        }
+
+        var url = new StringBuilder($"users/{userId}/messages/import");
+        var qs = new List<string>();
+        if (!string.IsNullOrWhiteSpace(internalDateSource)) qs.Add($"internalDateSource={Uri.EscapeDataString(internalDateSource.Trim())}");
+        qs.Add($"neverMarkSpam={(neverMarkSpam ? "true" : "false")}");
+        if (qs.Count > 0) {
+            url.Append('?').Append(string.Join("&", qs));
+        }
+
+        var request = new GmailImportMessageRequest {
+            Raw = raw.Trim(),
+            LabelIds = labelIds is null || labelIds.Count == 0 ? null : new List<string>(labelIds)
+        };
+        var jsonRequest = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GmailImportMessageRequest);
+        using var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
+        using var response = await _client.PostAsync(url.ToString(), content, cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        GmailMessage? message;
+        try {
+            message = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailMessage);
+        } catch (JsonException ex) {
+            throw new GmailApiException("Failed to parse Gmail API import response.", json, ex);
+        }
+        if (message is null) {
+            throw new InvalidDataException("Gmail API returned an invalid import response.");
+        }
+        return message;
+    }
 
     /// <summary>
     /// Deletes a message by id.
@@ -1207,5 +1297,16 @@ public sealed class GmailApiClient : IDisposable {
         /// <summary>Message ids.</summary>
         [JsonPropertyName("ids")]
         public IReadOnlyCollection<string> Ids { get; set; } = Array.Empty<string>();
+    }
+
+    /// <summary>Request payload for Gmail import message endpoint.</summary>
+    public sealed class GmailImportMessageRequest {
+        /// <summary>Raw message content as base64url.</summary>
+        [JsonPropertyName("raw")]
+        public string Raw { get; set; } = string.Empty;
+
+        /// <summary>Optional label ids to apply to the imported message.</summary>
+        [JsonPropertyName("labelIds")]
+        public List<string>? LabelIds { get; set; }
     }
 }
