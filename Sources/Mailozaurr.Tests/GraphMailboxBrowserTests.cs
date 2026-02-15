@@ -116,7 +116,7 @@ public class GraphMailboxBrowserTests {
 
     [Fact]
     public async System.Threading.Tasks.Task SetMessageSeenAsync_PatchesReadState() {
-        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK));
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(string.Empty) });
         var client = CreateClient(handler);
         var browser = new GraphMailboxBrowser(client);
 
@@ -132,7 +132,7 @@ public class GraphMailboxBrowserTests {
 
     [Fact]
     public async System.Threading.Tasks.Task SetMessageFlaggedAsync_PatchesFlagState() {
-        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK));
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(string.Empty) });
         var client = CreateClient(handler);
         var browser = new GraphMailboxBrowser(client);
 
@@ -167,7 +167,7 @@ public class GraphMailboxBrowserTests {
 
     [Fact]
     public async System.Threading.Tasks.Task DeleteMessageAsync_UsesDeleteEndpoint() {
-        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.NoContent));
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.NoContent) { Content = new StringContent(string.Empty) });
         var client = CreateClient(handler);
         var browser = new GraphMailboxBrowser(client);
 
