@@ -51,10 +51,28 @@ public sealed class GraphApiClient : IDisposable {
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credential.AccessToken);
     }
 
-    internal GraphApiClient(HttpClient client, Func<CancellationToken, Task<string>>? refreshToken = null, OAuthCredential? credential = null) {
+    /// <summary>
+    /// Initializes the client using an externally managed <see cref="HttpClient"/>.
+    /// </summary>
+    /// <remarks>
+    /// If <paramref name="client"/> does not specify <see cref="HttpClient.BaseAddress"/>, it will be set to the Graph v1.0 endpoint
+    /// (or <paramref name="baseAddress"/> if provided).
+    /// </remarks>
+    /// <param name="client">HTTP client to use for requests.</param>
+    /// <param name="refreshToken">Optional delegate used to refresh an access token when a request returns 401/403.</param>
+    /// <param name="credential">Optional OAuth credential holding an access token.</param>
+    /// <param name="baseAddress">Optional Graph base address used when <paramref name="client"/> has no base address configured.</param>
+    public GraphApiClient(
+        HttpClient client,
+        Func<CancellationToken, Task<string>>? refreshToken = null,
+        OAuthCredential? credential = null,
+        Uri? baseAddress = null) {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _refreshToken = refreshToken;
         _credential = credential;
+        if (_client.BaseAddress == null) {
+            _client.BaseAddress = baseAddress ?? new Uri("https://graph.microsoft.com/v1.0/");
+        }
         if (credential != null && !string.IsNullOrEmpty(credential.AccessToken) && _client.DefaultRequestHeaders.Authorization == null) {
             _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credential.AccessToken);
         }
