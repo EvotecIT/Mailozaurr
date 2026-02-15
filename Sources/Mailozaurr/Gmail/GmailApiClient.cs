@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using MimeKit;
@@ -366,6 +367,149 @@ public sealed class GmailApiClient : IDisposable {
     }
 
     /// <summary>
+    /// Gets the Gmail profile for the specified user.
+    /// </summary>
+    public async Task<GmailProfile> GetProfileAsync(string userId, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        using var response = await _client.GetAsync($"users/{userId}/profile", cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        GmailProfile? profile;
+        try {
+            profile = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailProfile);
+        } catch (JsonException ex) {
+            throw new GmailApiException("Failed to parse Gmail API profile response.", json, ex);
+        }
+        if (profile is null) {
+            throw new InvalidDataException("Gmail API returned an invalid profile response.");
+        }
+        return profile;
+    }
+
+    /// <summary>
+    /// Starts a Gmail push notification watch for the specified topic.
+    /// </summary>
+    /// <remarks>
+    /// This calls <c>users.watch</c> and returns the watch response (historyId + expiration).
+    /// </remarks>
+    public async Task<GmailWatchResponse> WatchAsync(
+        string userId,
+        string topicName,
+        IReadOnlyList<string>? labelIds = null,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(topicName)) {
+            throw new ArgumentException("topicName is required.", nameof(topicName));
+        }
+        if (DryRun) {
+            return new GmailWatchResponse { HistoryId = string.Empty, Expiration = 0 };
+        }
+
+        var request = new GmailWatchRequest { TopicName = topicName };
+        if (labelIds != null && labelIds.Count > 0) {
+            request.LabelIds = new List<string>(labelIds);
+            request.LabelFilterAction = "include";
+        }
+
+        var body = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GmailWatchRequest);
+        using var content = new StringContent(body, Encoding.UTF8, "application/json");
+        using var response = await _client.PostAsync($"users/{userId}/watch", content, cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        GmailWatchResponse? watch;
+        try {
+            watch = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailWatchResponse);
+        } catch (JsonException ex) {
+            throw new GmailApiException("Failed to parse Gmail API watch response.", json, ex);
+        }
+        if (watch is null) {
+            throw new InvalidDataException("Gmail API returned an invalid watch response.");
+        }
+        return watch;
+    }
+
+    /// <summary>
+    /// Stops Gmail push notification watches for the specified user.
+    /// </summary>
+    /// <remarks>
+    /// This calls <c>users.stop</c>.
+    /// </remarks>
+    public async Task StopWatchAsync(string userId, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (DryRun) {
+            return;
+        }
+        using var response = await _client.PostAsync($"users/{userId}/stop", new StringContent("{}", Encoding.UTF8, "application/json"), cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
+    /// Lists Gmail history changes for the specified user.
+    /// </summary>
+    public async Task<GmailHistoryListResponse> ListHistoryAsync(
+        string userId,
+        string startHistoryId,
+        string? labelId = null,
+        IReadOnlyList<string>? historyTypes = null,
+        int? maxResults = null,
+        string? pageToken = null,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(startHistoryId)) {
+            throw new ArgumentException("startHistoryId is required.", nameof(startHistoryId));
+        }
+
+        var url = new StringBuilder($"users/{userId}/history");
+        var qs = new List<string> {
+            $"startHistoryId={Uri.EscapeDataString(startHistoryId)}"
+        };
+        if (!string.IsNullOrWhiteSpace(labelId)) qs.Add($"labelId={Uri.EscapeDataString(labelId)}");
+        if (maxResults.HasValue) qs.Add($"maxResults={maxResults.Value}");
+        if (!string.IsNullOrWhiteSpace(pageToken)) qs.Add($"pageToken={Uri.EscapeDataString(pageToken)}");
+        if (historyTypes != null) {
+            for (var i = 0; i < historyTypes.Count; i++) {
+                var t = historyTypes[i];
+                if (!string.IsNullOrWhiteSpace(t)) {
+                    qs.Add($"historyTypes={Uri.EscapeDataString(t)}");
+                }
+            }
+        }
+        if (qs.Count > 0) {
+            url.Append('?').Append(string.Join("&", qs));
+        }
+
+        using var response = await _client.GetAsync(url.ToString(), cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        GmailHistoryListResponse? history;
+        try {
+            history = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailHistoryListResponse);
+        } catch (JsonException ex) {
+            throw new GmailApiException("Failed to parse Gmail API history response.", json, ex);
+        }
+        if (history is null) {
+            throw new InvalidDataException("Gmail API returned an invalid history response.");
+        }
+        return history;
+    }
+
+    /// <summary>
     /// Lists threads matching the supplied query.
     /// </summary>
     public async Task<IList<GmailThreadInfo>> ListThreadsAsync(string userId, string? query = null, int? maxResults = null, CancellationToken cancellationToken = default) {
@@ -527,5 +671,108 @@ public sealed class GmailApiClient : IDisposable {
         public List<GmailThreadInfo>? Threads { get; set; }
         /// <summary>Token for the next page of results.</summary>
         public string? NextPageToken { get; set; }
+    }
+
+    /// <summary>Request payload for Gmail watch API.</summary>
+    public sealed class GmailWatchRequest {
+        /// <summary>Pub/Sub topic name to deliver notifications to.</summary>
+        [JsonPropertyName("topicName")]
+        public string TopicName { get; set; } = string.Empty;
+        /// <summary>Optional label filters.</summary>
+        [JsonPropertyName("labelIds")]
+        public List<string>? LabelIds { get; set; }
+        /// <summary>Action to apply to the label filter (usually <c>include</c>).</summary>
+        [JsonPropertyName("labelFilterAction")]
+        public string? LabelFilterAction { get; set; }
+    }
+
+    /// <summary>Response payload for Gmail watch API.</summary>
+    public sealed class GmailWatchResponse {
+        /// <summary>History id at the start of the watch.</summary>
+        [JsonPropertyName("historyId")]
+        public string? HistoryId { get; set; }
+        /// <summary>Watch expiration as milliseconds since epoch.</summary>
+        [JsonPropertyName("expiration")]
+        [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+        public long Expiration { get; set; }
+    }
+
+    /// <summary>Gmail profile response.</summary>
+    public sealed class GmailProfile {
+        /// <summary>Email address associated with the mailbox.</summary>
+        [JsonPropertyName("emailAddress")]
+        public string? EmailAddress { get; set; }
+        /// <summary>Total number of messages.</summary>
+        [JsonPropertyName("messagesTotal")]
+        public long MessagesTotal { get; set; }
+        /// <summary>Total number of threads.</summary>
+        [JsonPropertyName("threadsTotal")]
+        public long ThreadsTotal { get; set; }
+        /// <summary>Current history id.</summary>
+        [JsonPropertyName("historyId")]
+        public string? HistoryId { get; set; }
+    }
+
+    /// <summary>Gmail history list response.</summary>
+    public sealed class GmailHistoryListResponse {
+        /// <summary>History records.</summary>
+        [JsonPropertyName("history")]
+        public List<GmailHistoryRecord>? History { get; set; }
+        /// <summary>Token for the next page of results.</summary>
+        [JsonPropertyName("nextPageToken")]
+        public string? NextPageToken { get; set; }
+        /// <summary>Latest history id.</summary>
+        [JsonPropertyName("historyId")]
+        public string? HistoryId { get; set; }
+    }
+
+    /// <summary>History record returned by Gmail history API.</summary>
+    public sealed class GmailHistoryRecord {
+        /// <summary>History record id.</summary>
+        public string? Id { get; set; }
+        /// <summary>Messages added in this history record.</summary>
+        public List<GmailHistoryMessageAdded>? MessagesAdded { get; set; }
+        /// <summary>Messages deleted in this history record.</summary>
+        public List<GmailHistoryMessageDeleted>? MessagesDeleted { get; set; }
+        /// <summary>Labels added in this history record.</summary>
+        public List<GmailHistoryLabelAdded>? LabelsAdded { get; set; }
+        /// <summary>Labels removed in this history record.</summary>
+        public List<GmailHistoryLabelRemoved>? LabelsRemoved { get; set; }
+    }
+
+    /// <summary>History wrapper for a message added event.</summary>
+    public sealed class GmailHistoryMessageAdded {
+        /// <summary>Message reference associated with the event.</summary>
+        public GmailHistoryMessageRef? Message { get; set; }
+    }
+
+    /// <summary>History wrapper for a message deleted event.</summary>
+    public sealed class GmailHistoryMessageDeleted {
+        /// <summary>Message reference associated with the event.</summary>
+        public GmailHistoryMessageRef? Message { get; set; }
+    }
+
+    /// <summary>History wrapper for a label added event.</summary>
+    public sealed class GmailHistoryLabelAdded {
+        /// <summary>Message reference associated with the event.</summary>
+        public GmailHistoryMessageRef? Message { get; set; }
+        /// <summary>Label ids associated with the event.</summary>
+        public List<string>? LabelIds { get; set; }
+    }
+
+    /// <summary>History wrapper for a label removed event.</summary>
+    public sealed class GmailHistoryLabelRemoved {
+        /// <summary>Message reference associated with the event.</summary>
+        public GmailHistoryMessageRef? Message { get; set; }
+        /// <summary>Label ids associated with the event.</summary>
+        public List<string>? LabelIds { get; set; }
+    }
+
+    /// <summary>Reference to a Gmail message returned by the history API.</summary>
+    public sealed class GmailHistoryMessageRef {
+        /// <summary>Message id.</summary>
+        public string? Id { get; set; }
+        /// <summary>Thread id.</summary>
+        public string? ThreadId { get; set; }
     }
 }
