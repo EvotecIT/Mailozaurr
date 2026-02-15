@@ -114,6 +114,117 @@ public class GraphMailboxBrowserTests {
         Assert.Contains("/me/messages/m1/$value", handler.Requests[1].RequestUri!.ToString());
     }
 
+    [Fact]
+    public async System.Threading.Tasks.Task SetMessageSeenAsync_PatchesReadState() {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK));
+        var client = CreateClient(handler);
+        var browser = new GraphMailboxBrowser(client);
+
+        await browser.SetMessageSeenAsync("m1", seen: true);
+
+        Assert.Single(handler.Requests);
+        var request = handler.Requests[0];
+        Assert.Equal(new HttpMethod("PATCH"), request.Method);
+        Assert.Contains("/me/messages/m1", request.RequestUri!.ToString());
+        var body = await request.Content!.ReadAsStringAsync();
+        Assert.Contains("\"isRead\":true", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task SetMessageFlaggedAsync_PatchesFlagState() {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK));
+        var client = CreateClient(handler);
+        var browser = new GraphMailboxBrowser(client);
+
+        await browser.SetMessageFlaggedAsync("m1", flagged: true);
+
+        Assert.Single(handler.Requests);
+        var request = handler.Requests[0];
+        Assert.Equal(new HttpMethod("PATCH"), request.Method);
+        Assert.Contains("/me/messages/m1", request.RequestUri!.ToString());
+        var body = await request.Content!.ReadAsStringAsync();
+        Assert.Contains("\"flagStatus\":\"flagged\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task MoveMessageAsync_ResolvesFolderAliasAndUsesDestinationId() {
+        var folderJson = "{\"id\":\"archive-id\"}";
+        var movedJson = "{\"id\":\"m1\"}";
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(folderJson) },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(movedJson) });
+        var client = CreateClient(handler);
+        var browser = new GraphMailboxBrowser(client);
+
+        await browser.MoveMessageAsync("m1", "Archive");
+
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Contains("/me/mailFolders/archive?$select=id", handler.Requests[0].RequestUri!.ToString());
+        Assert.Contains("/me/messages/m1/move", handler.Requests[1].RequestUri!.ToString());
+        var body = await handler.Requests[1].Content!.ReadAsStringAsync();
+        Assert.Contains("\"destinationId\":\"archive-id\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task DeleteMessageAsync_UsesDeleteEndpoint() {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.NoContent));
+        var client = CreateClient(handler);
+        var browser = new GraphMailboxBrowser(client);
+
+        await browser.DeleteMessageAsync("m1");
+
+        Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Delete, handler.Requests[0].Method);
+        Assert.Contains("/me/messages/m1", handler.Requests[0].RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task MoveMessagesAsync_ResolvesFolderAliasAndBatchesMoveRequests() {
+        var folderJson = "{\"id\":\"archive-id\"}";
+        var batchJson = "{\"responses\":[{\"id\":\"1\",\"status\":201},{\"id\":\"2\",\"status\":201}]}";
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(folderJson) },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(batchJson) });
+        var client = CreateClient(handler);
+        var browser = new GraphMailboxBrowser(client);
+
+        var results = await browser.MoveMessagesAsync(new[] { "m1", "m2" }, "Archive");
+
+        Assert.Equal(2, results.Count);
+        Assert.All(results, r => Assert.True(r.Ok, r.Error));
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Contains("/me/mailFolders/archive?$select=id", handler.Requests[0].RequestUri!.ToString());
+        Assert.Contains("/$batch", handler.Requests[1].RequestUri!.ToString());
+        var body = await handler.Requests[1].Content!.ReadAsStringAsync();
+        Assert.Contains("me/messages/m1/move", body, StringComparison.Ordinal);
+        Assert.Contains("me/messages/m2/move", body, StringComparison.Ordinal);
+        Assert.Contains("\"destinationId\":\"archive-id\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task DeleteConversationsAsync_ExpandsAndDeletesConversationMessages() {
+        var listJson = "{\"value\":[{\"id\":\"m1\"},{\"id\":\"m2\"}]}";
+        var batchJson = "{\"responses\":[{\"id\":\"1\",\"status\":204},{\"id\":\"2\",\"status\":204}]}";
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(listJson) },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(batchJson) });
+        var client = CreateClient(handler);
+        var browser = new GraphMailboxBrowser(client);
+
+        var results = await browser.DeleteConversationsAsync(new[] { "conv-1" });
+
+        Assert.Single(results);
+        Assert.True(results[0].Ok, results[0].Error);
+        Assert.Equal("conv-1", results[0].Id);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Contains("/me/messages?", handler.Requests[0].RequestUri!.ToString());
+        Assert.Contains("conversationId", handler.Requests[0].RequestUri!.ToString());
+        Assert.Contains("/$batch", handler.Requests[1].RequestUri!.ToString());
+        var body = await handler.Requests[1].Content!.ReadAsStringAsync();
+        Assert.Contains("me/messages/m1", body, StringComparison.Ordinal);
+        Assert.Contains("me/messages/m2", body, StringComparison.Ordinal);
+    }
+
     private static GraphApiClient CreateClient(HttpMessageHandler handler) {
         var api = new GraphApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = DateTimeOffset.MaxValue });
         var field = typeof(GraphApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
