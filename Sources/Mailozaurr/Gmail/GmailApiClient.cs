@@ -385,6 +385,228 @@ public sealed class GmailApiClient : IDisposable {
     }
 
     /// <summary>
+    /// Moves a message to trash.
+    /// </summary>
+    public async Task<GmailMessage> TrashMessageAsync(string userId, string id, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (DryRun) {
+            return new GmailMessage { Id = id, ThreadId = string.Empty };
+        }
+        using var response = await _client.PostAsync($"users/{userId}/messages/{id}/trash", content: null, cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        GmailMessage? message;
+        try {
+            message = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailMessage);
+        } catch (JsonException ex) {
+            throw new GmailApiException("Failed to parse Gmail API trash response.", json, ex);
+        }
+        if (message is null) {
+            throw new InvalidDataException("Gmail API returned an invalid trash response.");
+        }
+        return message;
+    }
+
+    /// <summary>
+    /// Modifies labels on a single message.
+    /// </summary>
+    public async Task<GmailMessage> ModifyMessageLabelsAsync(
+        string userId,
+        string id,
+        IReadOnlyCollection<string>? addLabelIds = null,
+        IReadOnlyCollection<string>? removeLabelIds = null,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (DryRun) {
+            return new GmailMessage { Id = id, ThreadId = string.Empty };
+        }
+        var request = new GmailModifyLabelsRequest {
+            AddLabelIds = addLabelIds ?? Array.Empty<string>(),
+            RemoveLabelIds = removeLabelIds ?? Array.Empty<string>()
+        };
+        var jsonRequest = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GmailModifyLabelsRequest);
+        using var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
+        using var response = await _client.PostAsync($"users/{userId}/messages/{id}/modify", content, cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        GmailMessage? message;
+        try {
+            message = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailMessage);
+        } catch (JsonException ex) {
+            throw new GmailApiException("Failed to parse Gmail API message modify response.", json, ex);
+        }
+        if (message is null) {
+            throw new InvalidDataException("Gmail API returned an invalid message modify response.");
+        }
+        return message;
+    }
+
+    /// <summary>
+    /// Modifies labels on multiple messages.
+    /// </summary>
+    public async Task BatchModifyMessagesAsync(
+        string userId,
+        IReadOnlyCollection<string> ids,
+        IReadOnlyCollection<string>? addLabelIds = null,
+        IReadOnlyCollection<string>? removeLabelIds = null,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (DryRun) {
+            return;
+        }
+        if (ids == null) {
+            throw new ArgumentNullException(nameof(ids));
+        }
+        if (ids.Count == 0) {
+            return;
+        }
+        var request = new GmailBatchModifyRequest {
+            Ids = ids,
+            AddLabelIds = addLabelIds ?? Array.Empty<string>(),
+            RemoveLabelIds = removeLabelIds ?? Array.Empty<string>()
+        };
+        var jsonRequest = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GmailBatchModifyRequest);
+        using var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
+        using var response = await _client.PostAsync($"users/{userId}/messages/batchModify", content, cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
+    /// Deletes multiple messages.
+    /// </summary>
+    public async Task BatchDeleteMessagesAsync(string userId, IReadOnlyCollection<string> ids, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (DryRun) {
+            return;
+        }
+        if (ids == null) {
+            throw new ArgumentNullException(nameof(ids));
+        }
+        if (ids.Count == 0) {
+            return;
+        }
+        var request = new GmailBatchDeleteRequest { Ids = ids };
+        var jsonRequest = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GmailBatchDeleteRequest);
+        using var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
+        using var response = await _client.PostAsync($"users/{userId}/messages/batchDelete", content, cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
+    /// Lists labels for the specified user.
+    /// </summary>
+    public async Task<IList<GmailLabel>> ListLabelsAsync(string userId, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        using var response = await _client.GetAsync($"users/{userId}/labels?fields=labels(id,name,type)", cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        GmailLabelListResponse? list;
+        try {
+            list = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailLabelListResponse);
+        } catch (JsonException ex) {
+            throw new GmailApiException("Failed to parse Gmail API labels response.", json, ex);
+        }
+        return (IList<GmailLabel>)(list?.Labels ?? new List<GmailLabel>());
+    }
+
+    /// <summary>
+    /// Modifies labels on a thread.
+    /// </summary>
+    public async Task<GmailThread> ModifyThreadLabelsAsync(
+        string userId,
+        string id,
+        IReadOnlyCollection<string>? addLabelIds = null,
+        IReadOnlyCollection<string>? removeLabelIds = null,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (DryRun) {
+            return new GmailThread { Id = id, Messages = new List<GmailMessage>() };
+        }
+        var request = new GmailModifyLabelsRequest {
+            AddLabelIds = addLabelIds ?? Array.Empty<string>(),
+            RemoveLabelIds = removeLabelIds ?? Array.Empty<string>()
+        };
+        var jsonRequest = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GmailModifyLabelsRequest);
+        using var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
+        using var response = await _client.PostAsync($"users/{userId}/threads/{id}/modify", content, cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        GmailThread? thread;
+        try {
+            thread = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailThread);
+        } catch (JsonException ex) {
+            throw new GmailApiException("Failed to parse Gmail API thread modify response.", json, ex);
+        }
+        if (thread is null) {
+            throw new InvalidDataException("Gmail API returned an invalid thread modify response.");
+        }
+        return thread;
+    }
+
+    /// <summary>
+    /// Moves a thread to trash.
+    /// </summary>
+    public async Task<GmailThread> TrashThreadAsync(string userId, string id, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (DryRun) {
+            return new GmailThread { Id = id, Messages = new List<GmailMessage>() };
+        }
+        using var response = await _client.PostAsync($"users/{userId}/threads/{id}/trash", content: null, cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+#if NET5_0_OR_GREATER
+        var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        GmailThread? thread;
+        try {
+            thread = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailThread);
+        } catch (JsonException ex) {
+            throw new GmailApiException("Failed to parse Gmail API thread trash response.", json, ex);
+        }
+        if (thread is null) {
+            throw new InvalidDataException("Gmail API returned an invalid thread trash response.");
+        }
+        return thread;
+    }
+
+    /// <summary>
+    /// Deletes a thread by id.
+    /// </summary>
+    public async Task DeleteThreadAsync(string userId, string id, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (DryRun) {
+            return;
+        }
+        using var response = await _client.DeleteAsync($"users/{userId}/threads/{id}", cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>
     /// Gets the Gmail profile for the specified user.
     /// </summary>
     public async Task<GmailProfile> GetProfileAsync(string userId, CancellationToken cancellationToken = default) {
@@ -792,5 +1014,44 @@ public sealed class GmailApiClient : IDisposable {
         public string? Id { get; set; }
         /// <summary>Thread id.</summary>
         public string? ThreadId { get; set; }
+    }
+
+    /// <summary>Response envelope for Gmail list labels API.</summary>
+    public sealed class GmailLabelListResponse {
+        /// <summary>Labels returned by the API.</summary>
+        public List<GmailLabel>? Labels { get; set; }
+    }
+
+    /// <summary>Request payload for Gmail modify label endpoints.</summary>
+    public sealed class GmailModifyLabelsRequest {
+        /// <summary>Label ids to add.</summary>
+        [JsonPropertyName("addLabelIds")]
+        public IReadOnlyCollection<string> AddLabelIds { get; set; } = Array.Empty<string>();
+
+        /// <summary>Label ids to remove.</summary>
+        [JsonPropertyName("removeLabelIds")]
+        public IReadOnlyCollection<string> RemoveLabelIds { get; set; } = Array.Empty<string>();
+    }
+
+    /// <summary>Request payload for Gmail batch modify messages endpoint.</summary>
+    public sealed class GmailBatchModifyRequest {
+        /// <summary>Message ids.</summary>
+        [JsonPropertyName("ids")]
+        public IReadOnlyCollection<string> Ids { get; set; } = Array.Empty<string>();
+
+        /// <summary>Label ids to add.</summary>
+        [JsonPropertyName("addLabelIds")]
+        public IReadOnlyCollection<string> AddLabelIds { get; set; } = Array.Empty<string>();
+
+        /// <summary>Label ids to remove.</summary>
+        [JsonPropertyName("removeLabelIds")]
+        public IReadOnlyCollection<string> RemoveLabelIds { get; set; } = Array.Empty<string>();
+    }
+
+    /// <summary>Request payload for Gmail batch delete messages endpoint.</summary>
+    public sealed class GmailBatchDeleteRequest {
+        /// <summary>Message ids.</summary>
+        [JsonPropertyName("ids")]
+        public IReadOnlyCollection<string> Ids { get; set; } = Array.Empty<string>();
     }
 }

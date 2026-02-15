@@ -162,6 +162,145 @@ public class GmailApiClientTests {
         await Assert.ThrowsAsync<System.IO.InvalidDataException>(() => client.DownloadAttachmentAsync("me", "123", "att"));
     }
 
+    [Fact]
+    public async System.Threading.Tasks.Task ListLabelsAsync_SendsRequestAndParsesResponse() {
+        var json = "{\"labels\":[{\"id\":\"INBOX\",\"name\":\"Inbox\",\"type\":\"system\"},{\"id\":\"Label_1\",\"name\":\"X\",\"type\":\"user\"}]}";
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+
+        var labels = await client.ListLabelsAsync("me");
+        Assert.Equal(2, labels.Count);
+        Assert.Equal("INBOX", labels[0].Id);
+        Assert.Equal("Inbox", labels[0].Name);
+        Assert.Equal("system", labels[0].Type);
+
+        Assert.Single(handler.Requests);
+        Assert.Equal(System.Net.Http.HttpMethod.Get, handler.Requests[0].Method);
+        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/labels?fields=labels(id,name,type)", handler.Requests[0].RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ModifyMessageLabelsAsync_SendsModifyRequest() {
+        var json = "{\"id\":\"m1\",\"threadId\":\"t1\"}";
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+
+        var message = await client.ModifyMessageLabelsAsync("me", "m1", addLabelIds: new[] { "INBOX" }, removeLabelIds: new[] { "UNREAD" });
+        Assert.Equal("m1", message.Id);
+        Assert.Equal("t1", message.ThreadId);
+
+        Assert.Single(handler.Requests);
+        Assert.Equal(System.Net.Http.HttpMethod.Post, handler.Requests[0].Method);
+        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/messages/m1/modify", handler.Requests[0].RequestUri!.ToString());
+        var body = await handler.Requests[0].Content!.ReadAsStringAsync();
+        Assert.Contains("\"addLabelIds\":[\"INBOX\"]", body);
+        Assert.Contains("\"removeLabelIds\":[\"UNREAD\"]", body);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task TrashMessageAsync_SendsTrashRequest() {
+        var json = "{\"id\":\"m1\",\"threadId\":\"t1\"}";
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+
+        var message = await client.TrashMessageAsync("me", "m1");
+        Assert.Equal("m1", message.Id);
+
+        Assert.Single(handler.Requests);
+        Assert.Equal(System.Net.Http.HttpMethod.Post, handler.Requests[0].Method);
+        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/messages/m1/trash", handler.Requests[0].RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task BatchModifyMessagesAsync_SendsBatchModifyRequest() {
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent("{}") });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+
+        await client.BatchModifyMessagesAsync("me", new[] { "m1", "m2" }, addLabelIds: new[] { "INBOX" }, removeLabelIds: new[] { "TRASH" });
+
+        Assert.Single(handler.Requests);
+        Assert.Equal(System.Net.Http.HttpMethod.Post, handler.Requests[0].Method);
+        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/messages/batchModify", handler.Requests[0].RequestUri!.ToString());
+        var body = await handler.Requests[0].Content!.ReadAsStringAsync();
+        Assert.Contains("\"ids\":[\"m1\",\"m2\"]", body);
+        Assert.Contains("\"addLabelIds\":[\"INBOX\"]", body);
+        Assert.Contains("\"removeLabelIds\":[\"TRASH\"]", body);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task BatchDeleteMessagesAsync_SendsBatchDeleteRequest() {
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent("{}") });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+
+        await client.BatchDeleteMessagesAsync("me", new[] { "m1", "m2" });
+
+        Assert.Single(handler.Requests);
+        Assert.Equal(System.Net.Http.HttpMethod.Post, handler.Requests[0].Method);
+        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/messages/batchDelete", handler.Requests[0].RequestUri!.ToString());
+        var body = await handler.Requests[0].Content!.ReadAsStringAsync();
+        Assert.Contains("\"ids\":[\"m1\",\"m2\"]", body);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ModifyThreadLabelsAsync_SendsModifyRequest() {
+        var json = "{\"id\":\"t1\",\"messages\":[{\"id\":\"m1\"}]}"; 
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+
+        var thread = await client.ModifyThreadLabelsAsync("me", "t1", addLabelIds: new[] { "INBOX" }, removeLabelIds: new[] { "TRASH" });
+        Assert.Equal("t1", thread.Id);
+        Assert.Single(thread.Messages!);
+
+        Assert.Single(handler.Requests);
+        Assert.Equal(System.Net.Http.HttpMethod.Post, handler.Requests[0].Method);
+        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/threads/t1/modify", handler.Requests[0].RequestUri!.ToString());
+        var body = await handler.Requests[0].Content!.ReadAsStringAsync();
+        Assert.Contains("\"addLabelIds\":[\"INBOX\"]", body);
+        Assert.Contains("\"removeLabelIds\":[\"TRASH\"]", body);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task TrashThreadAsync_SendsTrashRequest() {
+        var json = "{\"id\":\"t1\",\"messages\":[]}";
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+
+        var thread = await client.TrashThreadAsync("me", "t1");
+        Assert.Equal("t1", thread.Id);
+
+        Assert.Single(handler.Requests);
+        Assert.Equal(System.Net.Http.HttpMethod.Post, handler.Requests[0].Method);
+        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/threads/t1/trash", handler.Requests[0].RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task DeleteThreadAsync_SendsDeleteRequest() {
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK));
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+
+        await client.DeleteThreadAsync("me", "t1");
+
+        Assert.Single(handler.Requests);
+        Assert.Equal(System.Net.Http.HttpMethod.Delete, handler.Requests[0].Method);
+        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/threads/t1", handler.Requests[0].RequestUri!.ToString());
+    }
+
     [Theory]
     [InlineData(System.Net.HttpStatusCode.Unauthorized)]
     [InlineData(System.Net.HttpStatusCode.Forbidden)]
@@ -413,6 +552,14 @@ public class GmailApiClientTests {
         yield return new object[] { (Func<GmailApiClient, Task>)(c => c.GetAsync("u", "id")) };
         yield return new object[] { (Func<GmailApiClient, Task>)(c => c.GetMimeMessageAsync("u", "id")) };
         yield return new object[] { (Func<GmailApiClient, Task>)(c => c.DeleteAsync("u", "id")) };
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.TrashMessageAsync("u", "id")) };
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.ModifyMessageLabelsAsync("u", "id")) };
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.BatchModifyMessagesAsync("u", new[] { "id" })) };
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.BatchDeleteMessagesAsync("u", new[] { "id" })) };
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.ListLabelsAsync("u")) };
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.ModifyThreadLabelsAsync("u", "id")) };
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.TrashThreadAsync("u", "id")) };
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.DeleteThreadAsync("u", "id")) };
         yield return new object[] { (Func<GmailApiClient, Task>)(c => c.GetProfileAsync("u")) };
         yield return new object[] { (Func<GmailApiClient, Task>)(c => c.WatchAsync("u", "topic")) };
         yield return new object[] { (Func<GmailApiClient, Task>)(c => c.StopWatchAsync("u")) };
