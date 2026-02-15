@@ -29,6 +29,91 @@ public sealed class GraphMailboxBrowser {
     }
 
     /// <summary>
+    /// Lists mailbox folders and returns normalized hierarchical folder names.
+    /// </summary>
+    public async Task<IReadOnlyList<GraphMailboxFolderSummary>> ListFoldersAsync(
+        int top = 200,
+        int maxRequests = 250,
+        CancellationToken cancellationToken = default) {
+        var folders = await _graph.ListMailFoldersRecursiveAsync(
+            top: ClampInt(top, 1, 999),
+            select: "id,displayName,parentFolderId,childFolderCount,wellKnownName,totalItemCount,unreadItemCount",
+            maxRequests: ClampInt(maxRequests, 1, 5000),
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        var nodes = new Dictionary<string, GraphFolderPathNode>(StringComparer.Ordinal);
+        foreach (var folder in folders) {
+            if (folder == null) {
+                continue;
+            }
+
+            var id = string.IsNullOrWhiteSpace(folder.Id) ? null : folder.Id.Trim();
+            if (id == null) {
+                continue;
+            }
+
+            var displayName = string.IsNullOrWhiteSpace(folder.DisplayName) ? id : folder.DisplayName.Trim();
+            var parentIdRaw = folder.ParentFolderId;
+            string? parentId = null;
+            if (!string.IsNullOrWhiteSpace(parentIdRaw)) {
+                parentId = parentIdRaw!.Trim();
+            }
+            var wellKnownNameRaw = folder.WellKnownName;
+            string? wellKnownName = null;
+            if (!string.IsNullOrWhiteSpace(wellKnownNameRaw)) {
+                wellKnownName = wellKnownNameRaw!.Trim();
+            }
+            nodes[id] = new GraphFolderPathNode(
+                id,
+                displayName,
+                parentId,
+                wellKnownName,
+                folder.TotalItemCount,
+                folder.UnreadItemCount);
+        }
+
+        string BuildPath(string id) {
+            if (!nodes.TryGetValue(id, out var node)) {
+                return id;
+            }
+
+            var parts = new List<string>();
+            var current = node;
+            var guard = 0;
+            while (guard++ < 100) {
+                parts.Add(current.DisplayName);
+                var parentId = current.ParentId;
+                if (string.IsNullOrWhiteSpace(parentId)) {
+                    break;
+                }
+
+                var parentKey = parentId!.Trim();
+                if (!nodes.TryGetValue(parentKey, out current)) {
+                    break;
+                }
+            }
+            parts.Reverse();
+            return string.Join("/", parts);
+        }
+
+        var output = new List<GraphMailboxFolderSummary>(nodes.Count);
+        foreach (var node in nodes.Values) {
+            output.Add(new GraphMailboxFolderSummary {
+                Id = node.Id,
+                Name = BuildPath(node.Id),
+                DisplayName = node.DisplayName,
+                ParentId = node.ParentId,
+                WellKnownName = node.WellKnownName,
+                TotalItemCount = node.TotalItemCount,
+                UnreadItemCount = node.UnreadItemCount
+            });
+        }
+
+        output.Sort(static (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+        return output;
+    }
+
+    /// <summary>
     /// Lists messages in a Graph folder.
     /// </summary>
     public async Task<GraphMailboxListResult> ListMessagesAsync(
@@ -443,6 +528,30 @@ public sealed class GraphMailboxBrowser {
     private static bool IsFlagged(GraphMailMessageFlag? flag) =>
         string.Equals(flag?.FlagStatus, "flagged", StringComparison.OrdinalIgnoreCase);
 
+    private sealed class GraphFolderPathNode {
+        public GraphFolderPathNode(
+            string id,
+            string displayName,
+            string? parentId,
+            string? wellKnownName,
+            int? totalItemCount,
+            int? unreadItemCount) {
+            Id = id;
+            DisplayName = displayName;
+            ParentId = parentId;
+            WellKnownName = wellKnownName;
+            TotalItemCount = totalItemCount;
+            UnreadItemCount = unreadItemCount;
+        }
+
+        public string Id { get; }
+        public string DisplayName { get; }
+        public string? ParentId { get; }
+        public string? WellKnownName { get; }
+        public int? TotalItemCount { get; }
+        public int? UnreadItemCount { get; }
+    }
+
     private static string JoinRecipients(IReadOnlyList<GraphEmailAddress>? recipients) {
         if (recipients == null || recipients.Count == 0) {
             return string.Empty;
@@ -547,6 +656,32 @@ public sealed class GraphMailboxBrowser {
 
         // Allow callers to pass a Graph folder id directly.
         return folder;
+    }
+
+    /// <summary>
+    /// Graph mailbox folder summary.
+    /// </summary>
+    public sealed class GraphMailboxFolderSummary {
+        /// <summary>Graph folder identifier.</summary>
+        public string Id { get; set; } = string.Empty;
+
+        /// <summary>Hierarchical display path (for example, <c>Inbox/Projects</c>).</summary>
+        public string Name { get; set; } = string.Empty;
+
+        /// <summary>Folder display name.</summary>
+        public string DisplayName { get; set; } = string.Empty;
+
+        /// <summary>Parent folder id, when available.</summary>
+        public string? ParentId { get; set; }
+
+        /// <summary>Graph well-known folder name, when available.</summary>
+        public string? WellKnownName { get; set; }
+
+        /// <summary>Total item count, when available.</summary>
+        public int? TotalItemCount { get; set; }
+
+        /// <summary>Unread item count, when available.</summary>
+        public int? UnreadItemCount { get; set; }
     }
 
     /// <summary>

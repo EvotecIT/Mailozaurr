@@ -25,6 +25,40 @@ public class GraphMailboxBrowserTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task ListFoldersAsync_BuildsHierarchicalNames() {
+        var topLevelJson = "{" +
+                           "\"value\":[" +
+                           "{\"id\":\"inbox-id\",\"displayName\":\"Inbox\",\"childFolderCount\":1,\"wellKnownName\":\"inbox\",\"totalItemCount\":10,\"unreadItemCount\":2}," +
+                           "{\"id\":\"archive-id\",\"displayName\":\"Archive\",\"childFolderCount\":0,\"wellKnownName\":\"archive\"}" +
+                           "]" +
+                           "}";
+        var childJson = "{" +
+                        "\"value\":[" +
+                        "{\"id\":\"projects-id\",\"displayName\":\"Projects\",\"parentFolderId\":\"inbox-id\",\"childFolderCount\":0}" +
+                        "]" +
+                        "}";
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(topLevelJson) },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(childJson) });
+        var client = CreateClient(handler);
+        var browser = new GraphMailboxBrowser(client);
+
+        var folders = await browser.ListFoldersAsync();
+
+        Assert.Equal(3, folders.Count);
+        Assert.Equal("Archive", folders[0].Name);
+        Assert.Equal("Inbox", folders[1].Name);
+        Assert.Equal("Inbox/Projects", folders[2].Name);
+        Assert.Equal("inbox", folders[1].WellKnownName);
+        Assert.Equal(10, folders[1].TotalItemCount);
+        Assert.Equal(2, folders[1].UnreadItemCount);
+
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Contains("/me/mailFolders?$top=200", handler.Requests[0].RequestUri!.ToString());
+        Assert.Contains("/me/mailFolders/inbox-id/childFolders?$top=200", handler.Requests[1].RequestUri!.ToString());
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task ListMessagesAsync_ReturnsTotalCount_AndMappedSummaries() {
         var folderJson = "{\"id\":\"inbox\",\"totalItemCount\":12}";
         var listJson = "{\"value\":[{\"id\":\"m1\",\"subject\":\"s\",\"receivedDateTime\":\"2026-02-15T00:00:00Z\",\"internetMessageId\":\"<msg@example.test>\",\"hasAttachments\":true,\"isRead\":false,\"conversationId\":\"conv-1\",\"from\":{\"emailAddress\":{\"address\":\"a@example.test\"}},\"toRecipients\":[{\"emailAddress\":{\"address\":\"b@example.test\"}}],\"flag\":{\"flagStatus\":\"flagged\"}}]}";
