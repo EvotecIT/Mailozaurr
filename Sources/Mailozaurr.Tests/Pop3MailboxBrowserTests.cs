@@ -86,6 +86,39 @@ public sealed class Pop3MailboxBrowserTests {
     }
 
     [Fact]
+    public async Task DeleteMessageCoreAsync_ResolvesByUid_AndDeletesResolvedIndex() {
+        var fake = new FakePop3Client(count: 3);
+        fake.Uids = new List<string> { "u0", "u1", "u2" };
+        fake.SetMessage(1, new MimeMessage { Subject = "x" });
+        fake.SetUid(1, "u1");
+
+        var result = await Pop3MailboxBrowser.DeleteMessageCoreAsync(fake, requestedIndex: null, requestedUid: "u1", CancellationToken.None);
+
+        Assert.Equal(Pop3MailboxBrowser.Pop3MessageResolveStatus.Success, result.Status);
+        Assert.Equal(1, result.DeletedIndex);
+        Assert.Equal("u1", result.DeletedUid);
+        Assert.Equal(new[] { 1 }, fake.DeletedIndices);
+    }
+
+    [Fact]
+    public async Task DeleteMessageCoreAsync_MissingIdentifier_ReturnsMissingIdentifier() {
+        var fake = new FakePop3Client(count: 1);
+        var result = await Pop3MailboxBrowser.DeleteMessageCoreAsync(fake, requestedIndex: null, requestedUid: null, CancellationToken.None);
+
+        Assert.Equal(Pop3MailboxBrowser.Pop3MessageResolveStatus.MissingIdentifier, result.Status);
+        Assert.Empty(fake.DeletedIndices);
+    }
+
+    [Fact]
+    public async Task DeleteMessageCoreAsync_UidLookupUnsupported_ReturnsUidLookupUnsupported() {
+        var fake = new FakePop3Client(count: 1) { ThrowUidListNotSupported = true };
+        var result = await Pop3MailboxBrowser.DeleteMessageCoreAsync(fake, requestedIndex: null, requestedUid: "u1", CancellationToken.None);
+
+        Assert.Equal(Pop3MailboxBrowser.Pop3MessageResolveStatus.UidLookupUnsupported, result.Status);
+        Assert.Empty(fake.DeletedIndices);
+    }
+
+    [Fact]
     public void NormalizeMessageIdValue_StripsAngleBrackets() {
         Assert.Equal("x@y", Pop3MailboxBrowser.NormalizeMessageIdValue("<x@y>"));
         Assert.Equal("x@y", Pop3MailboxBrowser.NormalizeMessageIdValue("x@y"));
@@ -115,6 +148,7 @@ public sealed class Pop3MailboxBrowserTests {
         public int Count { get; }
         public bool ThrowUidListNotSupported { get; set; }
         public IList<string> Uids { get; set; } = new List<string>();
+        public List<int> DeletedIndices { get; } = new();
 
         internal void SetHeaders(int index, HeaderList headers) => _headers[index] = headers;
         internal void SetUid(int index, string uid) => _uids[index] = uid;
@@ -137,8 +171,12 @@ public sealed class Pop3MailboxBrowserTests {
             return Task.FromResult(Uids);
         }
 
+        public Task DeleteMessageAsync(int index, CancellationToken cancellationToken) {
+            DeletedIndices.Add(index);
+            return Task.CompletedTask;
+        }
+
         public long GetMessageSize(int index, CancellationToken cancellationToken) =>
             _sizes.TryGetValue(index, out var s) ? s : 0;
     }
 }
-

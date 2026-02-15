@@ -58,6 +58,12 @@ public static class Pop3MailboxBrowser {
         Pop3MessageResolveStatus Status,
         Pop3ResolvedMessageSnapshot? Snapshot);
 
+    /// <summary>Result of deleting a POP3 message by index/UIDL identifier.</summary>
+    public sealed record Pop3MessageDeleteResult(
+        Pop3MessageResolveStatus Status,
+        int? DeletedIndex,
+        string? DeletedUid);
+
     /// <summary>
     /// Lists messages as header-only snapshots, starting from the newest message.
     /// </summary>
@@ -90,12 +96,27 @@ public static class Pop3MailboxBrowser {
         return ResolveMessageCoreAsync(new MailKitPop3MailboxClient(client), requestedIndex, requestedUid, cancellationToken);
     }
 
+    /// <summary>
+    /// Resolves a POP3 message by index or UIDL and marks it for deletion.
+    /// </summary>
+    public static Task<Pop3MessageDeleteResult> DeleteMessageAsync(
+        Pop3Client client,
+        int? requestedIndex,
+        string? requestedUid,
+        CancellationToken cancellationToken = default) {
+        if (client == null) {
+            throw new ArgumentNullException(nameof(client));
+        }
+        return DeleteMessageCoreAsync(new MailKitPop3MailboxClient(client), requestedIndex, requestedUid, cancellationToken);
+    }
+
     internal interface IPop3MailboxClient {
         int Count { get; }
         Task<HeaderList> GetMessageHeadersAsync(int index, CancellationToken cancellationToken);
         Task<MimeMessage> GetMessageAsync(int index, CancellationToken cancellationToken);
         Task<string> GetMessageUidAsync(int index, CancellationToken cancellationToken);
         Task<IList<string>> GetMessageUidsAsync(CancellationToken cancellationToken);
+        Task DeleteMessageAsync(int index, CancellationToken cancellationToken);
         long GetMessageSize(int index, CancellationToken cancellationToken);
     }
 
@@ -119,6 +140,9 @@ public static class Pop3MailboxBrowser {
 
         public Task<IList<string>> GetMessageUidsAsync(CancellationToken cancellationToken) =>
             _client.GetMessageUidsAsync(cancellationToken);
+
+        public Task DeleteMessageAsync(int index, CancellationToken cancellationToken) =>
+            _client.DeleteMessageAsync(index, cancellationToken);
 
         public long GetMessageSize(int index, CancellationToken cancellationToken) =>
             _client.GetMessageSize(index, cancellationToken);
@@ -206,6 +230,20 @@ public static class Pop3MailboxBrowser {
         return new Pop3MessageResolveResult(
             Pop3MessageResolveStatus.Success,
             new Pop3ResolvedMessageSnapshot(resolvedIndex, resolvedUid, messageSize, message));
+    }
+
+    internal static async Task<Pop3MessageDeleteResult> DeleteMessageCoreAsync(
+        IPop3MailboxClient client,
+        int? requestedIndex,
+        string? requestedUid,
+        CancellationToken cancellationToken) {
+        var resolved = await ResolveMessageCoreAsync(client, requestedIndex, requestedUid, cancellationToken).ConfigureAwait(false);
+        if (resolved.Status != Pop3MessageResolveStatus.Success || resolved.Snapshot is null) {
+            return new Pop3MessageDeleteResult(resolved.Status, null, null);
+        }
+
+        await client.DeleteMessageAsync(resolved.Snapshot.Index, cancellationToken).ConfigureAwait(false);
+        return new Pop3MessageDeleteResult(Pop3MessageResolveStatus.Success, resolved.Snapshot.Index, resolved.Snapshot.Uid);
     }
 
     internal static string? NormalizeOptional(string? raw) =>
