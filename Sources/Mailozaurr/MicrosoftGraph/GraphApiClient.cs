@@ -1323,6 +1323,283 @@ public sealed class GraphApiClient : IDisposable {
     }
 
     /// <summary>
+    /// Moves many messages using Graph batch requests.
+    /// </summary>
+    public async Task<IReadOnlyList<GraphBulkOperationResult>> BatchMoveMessagesAsync(
+        IEnumerable<string> messageIds,
+        string destinationFolderId,
+        string userId = "me",
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (messageIds == null) {
+            throw new ArgumentNullException(nameof(messageIds));
+        }
+        if (string.IsNullOrWhiteSpace(destinationFolderId)) {
+            throw new ArgumentException("destinationFolderId is required.", nameof(destinationFolderId));
+        }
+
+        var ids = NormalizeBulkIds(messageIds);
+        if (ids.Count == 0) {
+            return Array.Empty<GraphBulkOperationResult>();
+        }
+
+        var userSegment = BuildUserSegment(userId);
+        var batch = ClampInt(batchSize, 1, 20);
+        var payloadJson = JsonSerializer.Serialize(
+            new GraphDestinationRequest { DestinationId = destinationFolderId.Trim() },
+            MailozaurrJsonContext.Default.GraphDestinationRequest);
+        using var bodyDoc = JsonDocument.Parse(payloadJson);
+        var body = bodyDoc.RootElement.Clone();
+
+        return await ExecuteMessageBatchAsync(
+            ids,
+            batch,
+            messageId => new GraphBatchRequest {
+                Method = GraphHttpMethod.POST,
+                Url = userSegment + "/messages/" + Uri.EscapeDataString(messageId) + "/move",
+                Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Content-Type"] = "application/json" },
+                Body = body
+            },
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Deletes many messages using Graph batch requests.
+    /// </summary>
+    public async Task<IReadOnlyList<GraphBulkOperationResult>> BatchDeleteMessagesAsync(
+        IEnumerable<string> messageIds,
+        string userId = "me",
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (messageIds == null) {
+            throw new ArgumentNullException(nameof(messageIds));
+        }
+
+        var ids = NormalizeBulkIds(messageIds);
+        if (ids.Count == 0) {
+            return Array.Empty<GraphBulkOperationResult>();
+        }
+
+        var userSegment = BuildUserSegment(userId);
+        var batch = ClampInt(batchSize, 1, 20);
+        return await ExecuteMessageBatchAsync(
+            ids,
+            batch,
+            messageId => new GraphBatchRequest {
+                Method = GraphHttpMethod.DELETE,
+                Url = userSegment + "/messages/" + Uri.EscapeDataString(messageId)
+            },
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sets read/unread state for many messages using Graph batch requests.
+    /// </summary>
+    public async Task<IReadOnlyList<GraphBulkOperationResult>> BatchSetMessagesIsReadAsync(
+        IEnumerable<string> messageIds,
+        bool isRead,
+        string userId = "me",
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (messageIds == null) {
+            throw new ArgumentNullException(nameof(messageIds));
+        }
+
+        var ids = NormalizeBulkIds(messageIds);
+        if (ids.Count == 0) {
+            return Array.Empty<GraphBulkOperationResult>();
+        }
+
+        var userSegment = BuildUserSegment(userId);
+        var batch = ClampInt(batchSize, 1, 20);
+        var payloadJson = JsonSerializer.Serialize(
+            new GraphMarkReadRequest { IsRead = isRead },
+            MailozaurrJsonContext.Default.GraphMarkReadRequest);
+        using var bodyDoc = JsonDocument.Parse(payloadJson);
+        var body = bodyDoc.RootElement.Clone();
+
+        return await ExecuteMessageBatchAsync(
+            ids,
+            batch,
+            messageId => new GraphBatchRequest {
+                Method = GraphHttpMethod.PATCH,
+                Url = userSegment + "/messages/" + Uri.EscapeDataString(messageId),
+                Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Content-Type"] = "application/json" },
+                Body = body
+            },
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sets flagged/unflagged state for many messages using Graph batch requests.
+    /// </summary>
+    public async Task<IReadOnlyList<GraphBulkOperationResult>> BatchSetMessagesFlaggedAsync(
+        IEnumerable<string> messageIds,
+        bool flagged,
+        string userId = "me",
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (messageIds == null) {
+            throw new ArgumentNullException(nameof(messageIds));
+        }
+
+        var ids = NormalizeBulkIds(messageIds);
+        if (ids.Count == 0) {
+            return Array.Empty<GraphBulkOperationResult>();
+        }
+
+        var userSegment = BuildUserSegment(userId);
+        var batch = ClampInt(batchSize, 1, 20);
+        var payloadJson = JsonSerializer.Serialize(
+            new GraphSetFlagRequest { Flag = new GraphSetFlagRequestFlag { FlagStatus = flagged ? "flagged" : "notFlagged" } },
+            MailozaurrJsonContext.Default.GraphSetFlagRequest);
+        using var bodyDoc = JsonDocument.Parse(payloadJson);
+        var body = bodyDoc.RootElement.Clone();
+
+        return await ExecuteMessageBatchAsync(
+            ids,
+            batch,
+            messageId => new GraphBatchRequest {
+                Method = GraphHttpMethod.PATCH,
+                Url = userSegment + "/messages/" + Uri.EscapeDataString(messageId),
+                Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Content-Type"] = "application/json" },
+                Body = body
+            },
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Moves all messages in each conversation using Graph batch requests.
+    /// </summary>
+    public async Task<IReadOnlyList<GraphBulkOperationResult>> BatchMoveConversationsAsync(
+        IEnumerable<string> conversationIds,
+        string destinationFolderId,
+        string userId = "me",
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (conversationIds == null) {
+            throw new ArgumentNullException(nameof(conversationIds));
+        }
+        if (string.IsNullOrWhiteSpace(destinationFolderId)) {
+            throw new ArgumentException("destinationFolderId is required.", nameof(destinationFolderId));
+        }
+
+        var conversations = NormalizeBulkIds(conversationIds);
+        if (conversations.Count == 0) {
+            return Array.Empty<GraphBulkOperationResult>();
+        }
+
+        var output = new List<GraphBulkOperationResult>(conversations.Count);
+        foreach (var conversationId in conversations) {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            IReadOnlyList<string> messageIds;
+            try {
+                messageIds = await ListConversationMessageIdsAsync(conversationId, userId: userId, cancellationToken: cancellationToken).ConfigureAwait(false);
+            } catch (OperationCanceledException) {
+                throw;
+            } catch (Exception ex) {
+                output.Add(new GraphBulkOperationResult {
+                    Id = conversationId,
+                    Ok = false,
+                    Error = ex.Message
+                });
+                continue;
+            }
+
+            if (messageIds.Count == 0) {
+                output.Add(new GraphBulkOperationResult { Id = conversationId, Ok = true });
+                continue;
+            }
+
+            var moved = await BatchMoveMessagesAsync(
+                messageIds,
+                destinationFolderId,
+                userId: userId,
+                batchSize: batchSize,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+            var failed = FindFirstFailedBulkResult(moved);
+            if (failed is not null) {
+                output.Add(new GraphBulkOperationResult {
+                    Id = conversationId,
+                    Ok = false,
+                    Error = failed.Error ?? "Graph conversation move failed."
+                });
+                continue;
+            }
+            output.Add(new GraphBulkOperationResult { Id = conversationId, Ok = true });
+        }
+
+        return output;
+    }
+
+    /// <summary>
+    /// Deletes all messages in each conversation using Graph batch requests.
+    /// </summary>
+    public async Task<IReadOnlyList<GraphBulkOperationResult>> BatchDeleteConversationsAsync(
+        IEnumerable<string> conversationIds,
+        string userId = "me",
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (conversationIds == null) {
+            throw new ArgumentNullException(nameof(conversationIds));
+        }
+
+        var conversations = NormalizeBulkIds(conversationIds);
+        if (conversations.Count == 0) {
+            return Array.Empty<GraphBulkOperationResult>();
+        }
+
+        var output = new List<GraphBulkOperationResult>(conversations.Count);
+        foreach (var conversationId in conversations) {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            IReadOnlyList<string> messageIds;
+            try {
+                messageIds = await ListConversationMessageIdsAsync(conversationId, userId: userId, cancellationToken: cancellationToken).ConfigureAwait(false);
+            } catch (OperationCanceledException) {
+                throw;
+            } catch (Exception ex) {
+                output.Add(new GraphBulkOperationResult {
+                    Id = conversationId,
+                    Ok = false,
+                    Error = ex.Message
+                });
+                continue;
+            }
+
+            if (messageIds.Count == 0) {
+                output.Add(new GraphBulkOperationResult { Id = conversationId, Ok = true });
+                continue;
+            }
+
+            var deleted = await BatchDeleteMessagesAsync(
+                messageIds,
+                userId: userId,
+                batchSize: batchSize,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+            var failed = FindFirstFailedBulkResult(deleted);
+            if (failed is not null) {
+                output.Add(new GraphBulkOperationResult {
+                    Id = conversationId,
+                    Ok = false,
+                    Error = failed.Error ?? "Graph conversation delete failed."
+                });
+                continue;
+            }
+            output.Add(new GraphBulkOperationResult { Id = conversationId, Ok = true });
+        }
+
+        return output;
+    }
+
+    /// <summary>
     /// Sends a Graph batch request using the current bearer token.
     /// </summary>
     public async Task<IReadOnlyList<GraphBatchResult>> SendBatchAsync(IEnumerable<GraphBatchRequest> requests, CancellationToken cancellationToken = default) {
@@ -1388,7 +1665,7 @@ public sealed class GraphApiClient : IDisposable {
                         result.Headers = h;
                     }
                     if (item.TryGetProperty("body", out var bodyEl)) {
-                        result.Body = bodyEl;
+                        result.Body = bodyEl.Clone();
                     }
                     results.Add(result);
                 }
@@ -1396,6 +1673,153 @@ public sealed class GraphApiClient : IDisposable {
         }
 
         return results;
+    }
+
+    private static List<string> NormalizeBulkIds(IEnumerable<string> ids) {
+        var output = new List<string>();
+        foreach (var raw in ids) {
+            if (string.IsNullOrWhiteSpace(raw)) {
+                continue;
+            }
+            var id = raw.Trim();
+            if (id.Length == 0) {
+                continue;
+            }
+            output.Add(id);
+        }
+        return output;
+    }
+
+    private async Task<IReadOnlyList<GraphBulkOperationResult>> ExecuteMessageBatchAsync(
+        List<string> messageIds,
+        int batchSize,
+        Func<string, GraphBatchRequest> requestFactory,
+        CancellationToken cancellationToken) {
+        var output = new List<GraphBulkOperationResult>(messageIds.Count);
+        var chunkSize = ClampInt(batchSize, 1, 20);
+
+        for (var i = 0; i < messageIds.Count; i += chunkSize) {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var count = Math.Min(chunkSize, messageIds.Count - i);
+            var chunk = messageIds.GetRange(i, count);
+            var subIds = new List<string>(chunk.Count);
+            var requests = new List<GraphBatchRequest>(chunk.Count);
+            for (var j = 0; j < chunk.Count; j++) {
+                var subId = (j + 1).ToString(CultureInfo.InvariantCulture);
+                subIds.Add(subId);
+                var req = requestFactory(chunk[j]);
+                req.Id = subId;
+                requests.Add(req);
+            }
+
+            IReadOnlyList<GraphBatchResult> responses;
+            try {
+                responses = await SendBatchAsync(requests, cancellationToken).ConfigureAwait(false);
+            } catch (OperationCanceledException) {
+                throw;
+            } catch (Exception ex) {
+                var err = ex.Message;
+                foreach (var id in chunk) {
+                    output.Add(new GraphBulkOperationResult { Id = id, Ok = false, Error = err });
+                }
+                continue;
+            }
+
+            var byId = new Dictionary<string, GraphBatchResult>(StringComparer.Ordinal);
+            foreach (var response in responses) {
+                if (response == null || string.IsNullOrWhiteSpace(response.Id)) {
+                    continue;
+                }
+                byId[response.Id.Trim()] = response;
+            }
+
+            for (var j = 0; j < chunk.Count; j++) {
+                var messageId = chunk[j];
+                var subId = subIds[j];
+                if (!byId.TryGetValue(subId, out var response)) {
+                    output.Add(new GraphBulkOperationResult {
+                        Id = messageId,
+                        Ok = false,
+                        Error = "Graph batch response missing for message id."
+                    });
+                    continue;
+                }
+
+                if (response.Status >= 200 && response.Status <= 299) {
+                    output.Add(new GraphBulkOperationResult { Id = messageId, Ok = true });
+                    continue;
+                }
+
+                output.Add(new GraphBulkOperationResult {
+                    Id = messageId,
+                    Ok = false,
+                    Error = TryExtractBatchErrorMessage(response) ?? ("Graph batch request failed (" + response.Status.ToString(CultureInfo.InvariantCulture) + ").")
+                });
+            }
+        }
+
+        return output;
+    }
+
+    private static GraphBulkOperationResult? FindFirstFailedBulkResult(IReadOnlyList<GraphBulkOperationResult> results) {
+        if (results == null) {
+            return null;
+        }
+        foreach (var result in results) {
+            if (result != null && !result.Ok) {
+                return result;
+            }
+        }
+        return null;
+    }
+
+    private static string? TryExtractBatchErrorMessage(GraphBatchResult response) {
+        if (response?.Body == null) {
+            return null;
+        }
+
+        var body = response.Body.Value;
+        if (body.ValueKind != JsonValueKind.Object) {
+            return null;
+        }
+
+        if (body.TryGetProperty("error", out var error)) {
+            if (error.ValueKind == JsonValueKind.String) {
+                var text = error.GetString();
+                if (text != null) {
+                    var trimmed = text.Trim();
+                    if (trimmed.Length > 0) {
+                        return trimmed;
+                    }
+                }
+            }
+
+            if (error.ValueKind == JsonValueKind.Object &&
+                error.TryGetProperty("message", out var messageEl) &&
+                messageEl.ValueKind == JsonValueKind.String) {
+                var msg = messageEl.GetString();
+                if (msg != null) {
+                    var trimmed = msg.Trim();
+                    if (trimmed.Length > 0) {
+                        return trimmed;
+                    }
+                }
+            }
+        }
+
+        if (body.TryGetProperty("message", out var fallbackMessageEl) &&
+            fallbackMessageEl.ValueKind == JsonValueKind.String) {
+            var fallback = fallbackMessageEl.GetString();
+            if (fallback != null) {
+                var trimmed = fallback.Trim();
+                if (trimmed.Length > 0) {
+                    return trimmed;
+                }
+            }
+        }
+
+        return null;
     }
 
     /// <summary>Create subscription request payload.</summary>

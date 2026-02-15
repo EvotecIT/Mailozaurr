@@ -141,4 +141,78 @@ public class GraphApiClientMailboxTests {
         Assert.Contains("\"name\":\"a.txt\"", body);
         Assert.Contains("\"size\":10", body);
     }
+
+    [Fact]
+    public async System.Threading.Tasks.Task BatchSetMessagesIsReadAsync_ReturnsPerMessageStatus() {
+        var batchResponse = "{\"responses\":[{\"id\":\"1\",\"status\":200,\"headers\":{},\"body\":{}},{\"id\":\"2\",\"status\":400,\"headers\":{},\"body\":{\"error\":{\"message\":\"bad-request\"}}}]}";
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new StringContent(batchResponse)
+        });
+        var api = new GraphApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = DateTimeOffset.MaxValue });
+        var field = typeof(GraphApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(api, new HttpClient(handler) { BaseAddress = new Uri("https://graph.microsoft.com/v1.0/") });
+
+        var results = await api.BatchSetMessagesIsReadAsync(new[] { "m-1", "m-2" }, isRead: true);
+
+        Assert.Equal(2, results.Count);
+        Assert.True(results[0].Ok);
+        Assert.Equal("m-1", results[0].Id);
+        Assert.False(results[1].Ok);
+        Assert.Equal("m-2", results[1].Id);
+        Assert.Contains("bad-request", results[1].Error);
+
+        Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Post, handler.Requests[0].Method);
+        Assert.Contains("/$batch", handler.Requests[0].RequestUri!.ToString());
+        var body = await handler.Requests[0].Content!.ReadAsStringAsync();
+        Assert.Contains("\"url\":\"me/messages/m-1\"", body);
+        Assert.Contains("\"isRead\":true", body);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task BatchMoveConversationsAsync_ListsConversationMessages_ThenMovesInBatch() {
+        var listResponse = "{\"value\":[{\"id\":\"m-1\"},{\"id\":\"m-2\"}]}";
+        var batchResponse = "{\"responses\":[{\"id\":\"1\",\"status\":201,\"headers\":{},\"body\":{}},{\"id\":\"2\",\"status\":201,\"headers\":{},\"body\":{}}]}";
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(listResponse) },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(batchResponse) });
+        var api = new GraphApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = DateTimeOffset.MaxValue });
+        var field = typeof(GraphApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(api, new HttpClient(handler) { BaseAddress = new Uri("https://graph.microsoft.com/v1.0/") });
+
+        var results = await api.BatchMoveConversationsAsync(new[] { "conv-1" }, destinationFolderId: "archive");
+
+        Assert.Single(results);
+        Assert.Equal("conv-1", results[0].Id);
+        Assert.True(results[0].Ok);
+
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Equal(HttpMethod.Get, handler.Requests[0].Method);
+        Assert.Contains("conversationId", handler.Requests[0].RequestUri!.ToString());
+        Assert.Equal(HttpMethod.Post, handler.Requests[1].Method);
+        var body = await handler.Requests[1].Content!.ReadAsStringAsync();
+        Assert.Contains("\"url\":\"me/messages/m-1/move\"", body);
+        Assert.Contains("\"url\":\"me/messages/m-2/move\"", body);
+        Assert.Contains("\"destinationId\":\"archive\"", body);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task BatchDeleteMessagesAsync_WhenBatchFails_ReturnsFailurePerMessage() {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.InternalServerError) {
+            Content = new StringContent("{\"error\":{\"message\":\"batch-down\"}}")
+        });
+        var api = new GraphApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = DateTimeOffset.MaxValue });
+        var field = typeof(GraphApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(api, new HttpClient(handler) { BaseAddress = new Uri("https://graph.microsoft.com/v1.0/") });
+
+        var results = await api.BatchDeleteMessagesAsync(new[] { "m-1", "m-2" });
+
+        Assert.Equal(2, results.Count);
+        Assert.All(results, r => Assert.False(r.Ok));
+        Assert.Contains("Graph batch failed (500).", results[0].Error);
+        Assert.Contains("Graph batch failed (500).", results[1].Error);
+        Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Post, handler.Requests[0].Method);
+        Assert.Contains("/$batch", handler.Requests[0].RequestUri!.ToString());
+    }
 }
