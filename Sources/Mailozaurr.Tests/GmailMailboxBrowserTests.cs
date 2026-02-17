@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Text;
+using MimeKit;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -141,6 +142,26 @@ public sealed class GmailMailboxBrowserTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task ListThreadMessagesPageAsync_ReturnsPagedSortedSummaries() {
+        var threadJson = "{" +
+                         "\"id\":\"thr-1\",\"messages\":[" +
+                         "{\"id\":\"m1\",\"threadId\":\"thr-1\",\"internalDate\":\"1739491200000\",\"payload\":{\"headers\":[{\"name\":\"Subject\",\"value\":\"first\"}]}}," +
+                         "{\"id\":\"m2\",\"threadId\":\"thr-1\",\"internalDate\":\"1739577600000\",\"payload\":{\"headers\":[{\"name\":\"Subject\",\"value\":\"second\"}]}}" +
+                         "]}";
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(threadJson) });
+        var browser = CreateBrowser(handler);
+
+        var page = await browser.ListThreadMessagesPageAsync("thr-1", limit: 1, offset: 1);
+
+        Assert.Equal("thr-1", page.ThreadId);
+        Assert.Equal(2, page.TotalCount);
+        Assert.Single(page.Messages);
+        Assert.Equal("m1", page.Messages[0].NativeId);
+        Assert.Single(handler.Requests);
+        Assert.Contains("/users/me/threads/thr-1", handler.Requests[0].RequestUri!.ToString());
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task GetMessageContentAsync_ReturnsMimeAndFlags() {
         var mime = "From: a@example.test\r\nTo: b@example.test\r\nSubject: Sample\r\nMessage-Id: <m1@example.test>\r\n\r\nhello";
         var raw = Convert.ToBase64String(Encoding.UTF8.GetBytes(mime)).Replace('+', '-').Replace('/', '_').TrimEnd('=');
@@ -154,6 +175,63 @@ public sealed class GmailMailboxBrowserTests {
         Assert.Equal("Sample", result.Message.Subject);
         Assert.False(result.Seen);
         Assert.True(result.Flagged);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task SendMessageAsync_UsesGmailSendEndpoint() {
+        var sentJson = "{\"id\":\"gmail-sent-id\",\"threadId\":\"gmail-thread-id\"}";
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(sentJson) });
+        var browser = CreateBrowser(handler);
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse("sender@example.test"));
+        message.To.Add(MailboxAddress.Parse("recipient@example.test"));
+        message.Subject = "Send me";
+        message.Body = new TextPart("plain") { Text = "hello" };
+
+        var result = await browser.SendMessageAsync(message);
+
+        Assert.Equal("gmail-sent-id", result.NativeId);
+        Assert.Equal("gmail-thread-id", result.NativeThreadId);
+        Assert.Single(handler.Requests);
+        Assert.Contains("/users/me/messages/send", handler.Requests[0].RequestUri!.ToString());
+        var body = await handler.Requests[0].Content!.ReadAsStringAsync();
+        Assert.Contains("\"raw\":\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetThreadingMetadataAsync_ParsesSelectedHeaders() {
+        var json = "{" +
+                   "\"id\":\"m1\"," +
+                   "\"payload\":{\"headers\":[" +
+                   "{\"name\":\"Message-ID\",\"value\":\"<thread-child@example.test>\"}," +
+                   "{\"name\":\"In-Reply-To\",\"value\":\"<thread-parent@example.test>\"}," +
+                   "{\"name\":\"References\",\"value\":\"<thread-root@example.test> <thread-parent@example.test> <thread-root@example.test>\"}," +
+                   "{\"name\":\"Reply-To\",\"value\":\"replies@example.test\"}," +
+                   "{\"name\":\"Cc\",\"value\":\"cc@example.test\"}" +
+                   "]}}";
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
+        var browser = CreateBrowser(handler);
+
+        var result = await browser.GetThreadingMetadataAsync("m1");
+
+        Assert.Equal("thread-child@example.test", result.MessageId);
+        Assert.Equal("thread-parent@example.test", result.InReplyTo);
+        Assert.Equal("replies@example.test", result.ReplyTo);
+        Assert.Equal("cc@example.test", result.Cc);
+        Assert.Equal(2, result.References.Count);
+        Assert.Equal("thread-root@example.test", result.References[0]);
+        Assert.Equal("thread-parent@example.test", result.References[1]);
+
+        Assert.Single(handler.Requests);
+        var uri = handler.Requests[0].RequestUri!;
+        var query = ParseQueryParams(uri);
+        Assert.Equal("metadata", Assert.Single(query["format"]));
+        Assert.Equal("id,payload(headers)", Assert.Single(query["fields"]));
+        Assert.Contains("Message-ID", query["metadataHeaders"]);
+        Assert.Contains("In-Reply-To", query["metadataHeaders"]);
+        Assert.Contains("References", query["metadataHeaders"]);
+        Assert.Contains("Reply-To", query["metadataHeaders"]);
+        Assert.Contains("Cc", query["metadataHeaders"]);
     }
 
     [Fact]
@@ -177,6 +255,27 @@ public sealed class GmailMailboxBrowserTests {
         Assert.Contains("\"topicName\":\"projects/p/topics/t\"", body);
         Assert.Contains("INBOX", body);
         Assert.Contains("Label_1", body);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task StopWatchAsync_ReturnsAlreadyStopped_WhenMissingAndConfigured() {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.NotFound) { Content = new StringContent("{\"error\":\"missing\"}") });
+        var browser = CreateBrowser(handler);
+
+        var result = await browser.StopWatchAsync(treatMissingAsSuccess: true);
+
+        Assert.True(result.Stopped);
+        Assert.True(result.AlreadyStopped);
+        Assert.Single(handler.Requests);
+        Assert.Contains("/users/me/stop", handler.Requests[0].RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task StopWatchAsync_Throws_WhenMissingAndStrictMode() {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.NotFound) { Content = new StringContent("{\"error\":\"missing\"}") });
+        var browser = CreateBrowser(handler);
+
+        await Assert.ThrowsAsync<GmailApiException>(() => browser.StopWatchAsync(treatMissingAsSuccess: false));
     }
 
     [Fact]

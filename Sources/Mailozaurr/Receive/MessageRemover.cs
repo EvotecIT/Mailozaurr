@@ -34,12 +34,27 @@ public static class MessageRemover {
         bool dryRun,
         string? folder = null,
         CancellationToken cancellationToken = default) {
+        await DeleteAsync(client, uid, dryRun, folder, expunge: true, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Deletes a single message from an IMAP folder, optionally simulating the change and controlling expunge behavior.
+    /// </summary>
+    public static async Task DeleteAsync(
+        ImapClient client,
+        UniqueId uid,
+        bool dryRun,
+        string? folder,
+        bool expunge,
+        CancellationToken cancellationToken = default) {
         if (dryRun) {
             return;
         }
         var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadWrite);
         await mailFolder.AddFlagsAsync(uid, MessageFlags.Deleted, true, cancellationToken).ConfigureAwait(false);
-        await mailFolder.ExpungeAsync(cancellationToken).ConfigureAwait(false);
+        if (expunge) {
+            await mailFolder.ExpungeAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <summary>
@@ -65,6 +80,19 @@ public static class MessageRemover {
         bool dryRun,
         string? folder = null,
         CancellationToken cancellationToken = default) {
+        await DeleteAsync(client, uids, dryRun, folder, expunge: true, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Deletes multiple messages from an IMAP folder, optionally simulating the change and controlling expunge behavior.
+    /// </summary>
+    public static async Task DeleteAsync(
+        ImapClient client,
+        IEnumerable<UniqueId> uids,
+        bool dryRun,
+        string? folder,
+        bool expunge,
+        CancellationToken cancellationToken = default) {
         if (dryRun) {
             return;
         }
@@ -74,7 +102,9 @@ public static class MessageRemover {
         }
         var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadWrite);
         await mailFolder.AddFlagsAsync(list, MessageFlags.Deleted, true, cancellationToken).ConfigureAwait(false);
-        await mailFolder.ExpungeAsync(cancellationToken).ConfigureAwait(false);
+        if (expunge) {
+            await mailFolder.ExpungeAsync(cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <summary>

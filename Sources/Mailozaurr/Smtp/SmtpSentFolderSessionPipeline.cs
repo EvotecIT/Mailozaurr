@@ -108,6 +108,51 @@ public static class SmtpSentFolderSessionPipeline {
         }
     }
 
+    /// <summary>
+    /// Connects IMAP session, reads threading metadata for a folder + UID, and disconnects.
+    /// </summary>
+    /// <param name="connectAsync">Callback used to create and connect IMAP client.</param>
+    /// <param name="folder">Folder name containing the message.</param>
+    /// <param name="uid">Message UID in the folder.</param>
+    /// <param name="getMetadataAsync">Optional metadata callback override.</param>
+    /// <param name="disconnectAsync">Optional disconnect callback override.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Threading metadata when found; otherwise null.</returns>
+    public static async Task<ImapSentMessageOperations.ImapThreadingMetadataResult?> TryGetThreadingMetadataAsync(
+        Func<CancellationToken, Task<ImapClient>> connectAsync,
+        string folder,
+        uint uid,
+        Func<ImapClient, string, uint, CancellationToken, Task<ImapSentMessageOperations.ImapThreadingMetadataResult?>>? getMetadataAsync = null,
+        Func<ImapClient, CancellationToken, Task>? disconnectAsync = null,
+        CancellationToken cancellationToken = default) {
+        if (connectAsync is null) {
+            throw new ArgumentNullException(nameof(connectAsync));
+        }
+        if (string.IsNullOrWhiteSpace(folder)) {
+            throw new ArgumentException("Value cannot be null or whitespace.", nameof(folder));
+        }
+        if (uid == 0) {
+            throw new ArgumentOutOfRangeException(nameof(uid), "uid must be greater than zero.");
+        }
+
+        var client = await connectAsync(cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidOperationException("Connected IMAP client is required.");
+
+        try {
+            if (getMetadataAsync is null) {
+                return await ImapSentMessageOperations.GetThreadingMetadataAsync(
+                    client,
+                    folder,
+                    uid,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            return await getMetadataAsync(client, folder, uid, cancellationToken).ConfigureAwait(false);
+        } finally {
+            await DisconnectAndDisposeAsync(client, disconnectAsync, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     private static async Task DisconnectAndDisposeAsync(
         ImapClient client,
         Func<ImapClient, CancellationToken, Task>? disconnectAsync,
