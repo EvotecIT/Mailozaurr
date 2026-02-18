@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using MimeKit;
@@ -227,6 +228,32 @@ public sealed class GmailMailboxBrowser {
     }
 
     /// <summary>
+    /// Lists a paged slice of messages in a Gmail thread.
+    /// </summary>
+    public async Task<GmailMailboxThreadListResult> ListThreadMessagesPageAsync(
+        string threadId,
+        int limit,
+        int offset,
+        int maxItems = 2000,
+        CancellationToken cancellationToken = default) {
+        var messages = await ListThreadMessagesAsync(
+            threadId,
+            maxItems: maxItems,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        var total = messages.Count;
+        var skip = Math.Max(0, offset);
+        var take = ClampInt(limit, 1, 1000);
+        var page = messages.Skip(skip).Take(take).ToList();
+
+        return new GmailMailboxThreadListResult {
+            ThreadId = threadId.Trim(),
+            TotalCount = total,
+            Messages = page
+        };
+    }
+
+    /// <summary>
     /// Searches messages in a Gmail label.
     /// </summary>
     public async Task<GmailMailboxSearchResult> SearchMessagesAsync(
@@ -369,6 +396,172 @@ public sealed class GmailMailboxBrowser {
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
         return MapSummary(message);
+    }
+
+    /// <summary>
+    /// Imports a MIME message into Gmail with a target label (typically <c>SENT</c>).
+    /// </summary>
+    /// <param name="message">MIME message to import.</param>
+    /// <param name="labelId">Target label id.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Import result.</returns>
+    public async Task<GmailMailboxImportResult> ImportMessageAsync(
+        MimeMessage message,
+        string labelId = "SENT",
+        CancellationToken cancellationToken = default) {
+        if (message == null) {
+            throw new ArgumentNullException(nameof(message));
+        }
+        if (string.IsNullOrWhiteSpace(labelId)) {
+            throw new ArgumentException("labelId is required.", nameof(labelId));
+        }
+
+        string raw;
+        using (var ms = new MemoryStream()) {
+            await message.WriteToAsync(ms, cancellationToken).ConfigureAwait(false);
+            raw = Base64UrlEncode(ms.ToArray());
+        }
+
+        var imported = await _gmail.ImportAsync(
+            _userId,
+            raw,
+            labelIds: new[] { labelId.Trim() },
+            internalDateSource: "dateHeader",
+            neverMarkSpam: true,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        return new GmailMailboxImportResult {
+            LabelId = labelId.Trim(),
+            NativeId = NormalizeOptional(imported.Id),
+            NativeThreadId = NormalizeOptional(imported.ThreadId)
+        };
+    }
+
+    /// <summary>
+    /// Sends a MIME message through Gmail.
+    /// </summary>
+    /// <param name="message">MIME message to send.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Send result metadata.</returns>
+    public async Task<GmailMailboxSendResult> SendMessageAsync(
+        MimeMessage message,
+        CancellationToken cancellationToken = default) {
+        if (message == null) {
+            throw new ArgumentNullException(nameof(message));
+        }
+
+        var sent = await _gmail.SendAsync(_userId, message, cancellationToken).ConfigureAwait(false);
+        return new GmailMailboxSendResult {
+            NativeId = NormalizeOptional(sent.Id),
+            NativeThreadId = NormalizeOptional(sent.ThreadId)
+        };
+    }
+
+    /// <summary>
+    /// Probes a Gmail label for a message with a matching RFC822 <c>Message-Id</c> token.
+    /// </summary>
+    /// <param name="messageIdToken">Message-Id token (with or without angle brackets).</param>
+    /// <param name="sentLabelId">Label id to probe. Defaults to <c>SENT</c>.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Duplicate probe result.</returns>
+    public async Task<GmailMailboxDuplicateProbeResult> FindSentMessageByRfc822MessageIdAsync(
+        string messageIdToken,
+        string sentLabelId = "SENT",
+        CancellationToken cancellationToken = default) {
+        var normalizedToken = NormalizeMessageIdValue(messageIdToken);
+        if (normalizedToken == null) {
+            throw new ArgumentException("messageIdToken is required.", nameof(messageIdToken));
+        }
+
+        var query = "rfc822msgid:" + normalizedToken;
+        var page = await _gmail.ListPageAsync(
+            _userId,
+            query: query,
+            labelIds: new[] { sentLabelId },
+            includeSpamTrash: false,
+            maxResults: 1,
+            pageToken: null,
+            fields: ListFields,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        var first = page.Messages?.FirstOrDefault();
+        if (first == null) {
+            return new GmailMailboxDuplicateProbeResult {
+                IsMatch = false,
+                LabelId = sentLabelId
+            };
+        }
+
+        return new GmailMailboxDuplicateProbeResult {
+            IsMatch = true,
+            LabelId = sentLabelId,
+            NativeId = NormalizeOptional(first.Id),
+            NativeThreadId = NormalizeOptional(first.ThreadId),
+            MessageId = normalizedToken
+        };
+    }
+
+    /// <summary>
+    /// Reads provider threading metadata for a single message.
+    /// </summary>
+    /// <param name="messageId">Gmail message id.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Threading metadata parsed from selected headers.</returns>
+    public async Task<GmailMailboxThreadingMetadataResult> GetThreadingMetadataAsync(
+        string messageId,
+        CancellationToken cancellationToken = default) {
+        if (string.IsNullOrWhiteSpace(messageId)) {
+            throw new ArgumentException("messageId is required.", nameof(messageId));
+        }
+
+        var message = await _gmail.GetMessageWithOptionsAsync(
+            _userId,
+            messageId.Trim(),
+            format: "metadata",
+            metadataHeaders: new[] { "Message-ID", "In-Reply-To", "References", "Reply-To", "Cc" },
+            fields: "id,payload(headers)",
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        var headers = message.Payload?.Headers;
+        if (headers == null || headers.Count == 0) {
+            return new GmailMailboxThreadingMetadataResult();
+        }
+
+        string? messageIdHeader = null;
+        string? inReplyTo = null;
+        string? referencesRaw = null;
+        string? replyTo = null;
+        string? cc = null;
+
+        foreach (var header in headers) {
+            var name = header?.Name;
+            var value = header?.Value;
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(value)) {
+                continue;
+            }
+
+            var headerName = name!.Trim();
+            var headerValue = value!.Trim();
+            if (headerName.Equals("Message-ID", StringComparison.OrdinalIgnoreCase)) {
+                messageIdHeader = NormalizeMessageIdValue(headerValue);
+            } else if (headerName.Equals("In-Reply-To", StringComparison.OrdinalIgnoreCase)) {
+                inReplyTo = NormalizeMessageIdValue(headerValue);
+            } else if (headerName.Equals("References", StringComparison.OrdinalIgnoreCase)) {
+                referencesRaw = headerValue;
+            } else if (headerName.Equals("Reply-To", StringComparison.OrdinalIgnoreCase)) {
+                replyTo = NormalizeOptional(headerValue);
+            } else if (headerName.Equals("Cc", StringComparison.OrdinalIgnoreCase)) {
+                cc = NormalizeOptional(headerValue);
+            }
+        }
+
+        return new GmailMailboxThreadingMetadataResult {
+            MessageId = messageIdHeader,
+            ReplyTo = replyTo,
+            Cc = cc,
+            InReplyTo = inReplyTo,
+            References = SplitMessageIdTokens(referencesRaw)
+        };
     }
 
     /// <summary>
@@ -847,6 +1040,26 @@ public sealed class GmailMailboxBrowser {
     /// </summary>
     public Task StopWatchAsync(CancellationToken cancellationToken = default) =>
         _gmail.StopWatchAsync(_userId, cancellationToken);
+
+    /// <summary>
+    /// Stops Gmail watch subscription with stale-remote handling.
+    /// </summary>
+    public async Task<GmailMailboxStopWatchResult> StopWatchAsync(
+        bool treatMissingAsSuccess,
+        CancellationToken cancellationToken = default) {
+        try {
+            await _gmail.StopWatchAsync(_userId, cancellationToken).ConfigureAwait(false);
+            return new GmailMailboxStopWatchResult {
+                Stopped = true
+            };
+        } catch (GmailApiException ex) when (treatMissingAsSuccess &&
+                                             (ex.StatusCode == HttpStatusCode.NotFound || ex.StatusCode == HttpStatusCode.Gone)) {
+            return new GmailMailboxStopWatchResult {
+                Stopped = true,
+                AlreadyStopped = true
+            };
+        }
+    }
 
     /// <summary>
     /// Gets Gmail history changes for a folder.
@@ -1328,6 +1541,29 @@ public sealed class GmailMailboxBrowser {
         }
     }
 
+    private static string Base64UrlEncode(byte[] bytes) {
+        var base64 = Convert.ToBase64String(bytes);
+        return base64.TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+
+    private static List<string> SplitMessageIdTokens(string? raw) {
+        if (string.IsNullOrWhiteSpace(raw)) {
+            return new List<string>();
+        }
+
+        var output = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var tokens = raw!.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var token in tokens) {
+            var normalized = NormalizeMessageIdValue(token);
+            if (normalized == null || !seen.Add(normalized)) {
+                continue;
+            }
+            output.Add(normalized);
+        }
+        return output;
+    }
+
     /// <summary>
     /// Gmail mailbox folder summary.
     /// </summary>
@@ -1353,6 +1589,20 @@ public sealed class GmailMailboxBrowser {
         public int TotalCount { get; set; }
 
         /// <summary>Message summaries.</summary>
+        public List<GmailMailboxMessageSummary> Messages { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Gmail mailbox thread list result.
+    /// </summary>
+    public sealed class GmailMailboxThreadListResult {
+        /// <summary>Gmail thread id used for listing.</summary>
+        public string ThreadId { get; set; } = string.Empty;
+
+        /// <summary>Total number of messages available in the thread slice source.</summary>
+        public int TotalCount { get; set; }
+
+        /// <summary>Paged thread message summaries.</summary>
         public List<GmailMailboxMessageSummary> Messages { get; set; } = new();
     }
 
@@ -1403,6 +1653,71 @@ public sealed class GmailMailboxBrowser {
     }
 
     /// <summary>
+    /// Gmail mailbox import result.
+    /// </summary>
+    public sealed class GmailMailboxImportResult {
+        /// <summary>Label id used for import.</summary>
+        public string? LabelId { get; set; }
+
+        /// <summary>Imported Gmail native message id, when available.</summary>
+        public string? NativeId { get; set; }
+
+        /// <summary>Imported Gmail native thread id, when available.</summary>
+        public string? NativeThreadId { get; set; }
+    }
+
+    /// <summary>
+    /// Gmail mailbox send result.
+    /// </summary>
+    public sealed class GmailMailboxSendResult {
+        /// <summary>Sent Gmail native message id, when available.</summary>
+        public string? NativeId { get; set; }
+
+        /// <summary>Sent Gmail native thread id, when available.</summary>
+        public string? NativeThreadId { get; set; }
+    }
+
+    /// <summary>
+    /// Gmail mailbox duplicate probe result.
+    /// </summary>
+    public sealed class GmailMailboxDuplicateProbeResult {
+        /// <summary>True when a matching message was found.</summary>
+        public bool IsMatch { get; set; }
+
+        /// <summary>Label id used for probing.</summary>
+        public string? LabelId { get; set; }
+
+        /// <summary>Matched Gmail native message id, when available.</summary>
+        public string? NativeId { get; set; }
+
+        /// <summary>Matched Gmail native thread id, when available.</summary>
+        public string? NativeThreadId { get; set; }
+
+        /// <summary>Matched normalized RFC822 Message-Id.</summary>
+        public string? MessageId { get; set; }
+    }
+
+    /// <summary>
+    /// Gmail mailbox threading metadata.
+    /// </summary>
+    public sealed class GmailMailboxThreadingMetadataResult {
+        /// <summary>Normalized RFC822 Message-Id.</summary>
+        public string? MessageId { get; set; }
+
+        /// <summary>Reply-To header value.</summary>
+        public string? ReplyTo { get; set; }
+
+        /// <summary>Cc header value.</summary>
+        public string? Cc { get; set; }
+
+        /// <summary>Normalized RFC822 In-Reply-To value.</summary>
+        public string? InReplyTo { get; set; }
+
+        /// <summary>Normalized RFC822 References tokens.</summary>
+        public List<string> References { get; set; } = new();
+    }
+
+    /// <summary>
     /// Gmail mailbox get-message result.
     /// </summary>
     public sealed class GmailMailboxGetResult {
@@ -1448,6 +1763,17 @@ public sealed class GmailMailboxBrowser {
     }
 
     /// <summary>
+    /// Gmail mailbox stop-watch result.
+    /// </summary>
+    public sealed class GmailMailboxStopWatchResult {
+        /// <summary>True when stop call succeeded.</summary>
+        public bool Stopped { get; set; }
+
+        /// <summary>True when stop succeeded because watch was already missing.</summary>
+        public bool AlreadyStopped { get; set; }
+    }
+
+    /// <summary>
     /// Gmail mailbox history result.
     /// </summary>
     public sealed class GmailMailboxHistoryResult {
@@ -1467,16 +1793,7 @@ public sealed class GmailMailboxBrowser {
     /// <summary>
     /// Gmail mailbox bulk action result.
     /// </summary>
-    public sealed class GmailMailboxBulkOperationResult {
-        /// <summary>Message/thread id.</summary>
-        public string Id { get; set; } = string.Empty;
-
-        /// <summary>True when action succeeded.</summary>
-        public bool Ok { get; set; }
-
-        /// <summary>Error message when action failed.</summary>
-        public string? Error { get; set; }
-    }
+    public sealed class GmailMailboxBulkOperationResult : MailboxBulkOperationResult;
 
     /// <summary>
     /// Provider-agnostic Gmail mailbox message summary.

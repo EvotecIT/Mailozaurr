@@ -888,7 +888,17 @@ public sealed class GmailApiClient : IDisposable {
         }
         using var response = await _client.PostAsync($"users/{userId}/stop", new StringContent("{}", Encoding.UTF8, "application/json"), cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode) {
+#if NET5_0_OR_GREATER
+            var content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+            var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+            throw new GmailApiException(
+                response.StatusCode,
+                $"Gmail users.stop failed ({(int)response.StatusCode}).",
+                content);
+        }
     }
 
     /// <summary>

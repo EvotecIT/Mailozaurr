@@ -110,4 +110,59 @@ public class SmtpSentFolderSessionPipelineTests {
                 resolveSentFolderAsync: (_, _) => Task.FromResult(Mock.Of<IMailFolder>()),
                 message: null!));
     }
+
+    [Fact]
+    public async Task TryGetThreadingMetadataAsync_UsesConnectedSession_AndDisconnects() {
+        var connectCalls = 0;
+        var metadataCalls = 0;
+        var disconnectCalls = 0;
+        var expected = new ImapSentMessageOperations.ImapThreadingMetadataResult {
+            MessageId = "child@example.test",
+            InReplyTo = "parent@example.test"
+        };
+
+        var actual = await SmtpSentFolderSessionPipeline.TryGetThreadingMetadataAsync(
+            connectAsync: _ => {
+                connectCalls++;
+                return Task.FromResult(new ImapClient());
+            },
+            folder: "INBOX",
+            uid: 42,
+            getMetadataAsync: (_, folder, uid, _) => {
+                metadataCalls++;
+                Assert.Equal("INBOX", folder);
+                Assert.Equal((uint)42, uid);
+                return Task.FromResult<ImapSentMessageOperations.ImapThreadingMetadataResult?>(expected);
+            },
+            disconnectAsync: (_, _) => {
+                disconnectCalls++;
+                return Task.CompletedTask;
+            });
+
+        Assert.Same(expected, actual);
+        Assert.Equal(1, connectCalls);
+        Assert.Equal(1, metadataCalls);
+        Assert.Equal(1, disconnectCalls);
+    }
+
+    [Fact]
+    public async Task TryGetThreadingMetadataAsync_Throws_ForInvalidArguments() {
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            SmtpSentFolderSessionPipeline.TryGetThreadingMetadataAsync(
+                connectAsync: null!,
+                folder: "INBOX",
+                uid: 1));
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            SmtpSentFolderSessionPipeline.TryGetThreadingMetadataAsync(
+                connectAsync: _ => Task.FromResult(new ImapClient()),
+                folder: " ",
+                uid: 1));
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            SmtpSentFolderSessionPipeline.TryGetThreadingMetadataAsync(
+                connectAsync: _ => Task.FromResult(new ImapClient()),
+                folder: "INBOX",
+                uid: 0));
+    }
 }

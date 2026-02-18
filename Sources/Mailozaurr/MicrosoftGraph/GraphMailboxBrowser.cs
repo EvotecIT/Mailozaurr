@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -13,12 +14,19 @@ namespace Mailozaurr;
 /// </summary>
 public sealed class GraphMailboxBrowser {
     private const string SummarySelect = "id,subject,receivedDateTime,from,toRecipients,internetMessageId,hasAttachments,isRead,flag,conversationId";
+    // Must be a multiple of 320 KiB (except last chunk).
+    private const int LargeAttachmentChunkSize = 327_680 * 32; // 10 MiB
     private readonly GraphApiClient _graph;
 
     /// <summary>
     /// Maximum MIME payload size used by <see cref="GetMessageContentAsync"/> when no explicit limit is provided.
     /// </summary>
     public const int DefaultMaxMimeBytes = 25 * 1024 * 1024;
+
+    /// <summary>
+    /// Maximum MIME payload size used by <see cref="GetThreadingMetadataAsync"/> when no explicit limit is provided.
+    /// </summary>
+    public const int DefaultThreadingMetadataMaxMimeBytes = 2 * 1024 * 1024;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="GraphMailboxBrowser"/> class.
@@ -176,6 +184,36 @@ public sealed class GraphMailboxBrowser {
     }
 
     /// <summary>
+    /// Lists a paged slice of messages in a Graph conversation.
+    /// </summary>
+    public async Task<GraphMailboxConversationListResult> ListConversationMessagesPageAsync(
+        string conversationId,
+        int limit,
+        int offset,
+        int top = 100,
+        int maxPages = 25,
+        int maxItems = 2000,
+        CancellationToken cancellationToken = default) {
+        var messages = await ListConversationMessagesAsync(
+            conversationId,
+            top: top,
+            maxPages: maxPages,
+            maxItems: maxItems,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        var total = messages.Count;
+        var skip = Math.Max(0, offset);
+        var take = ClampInt(limit, 1, 1000);
+        var page = messages.Skip(skip).Take(take).ToList();
+
+        return new GraphMailboxConversationListResult {
+            ConversationId = conversationId.Trim(),
+            TotalCount = total,
+            Messages = page
+        };
+    }
+
+    /// <summary>
     /// Searches messages in a Graph folder.
     /// </summary>
     public async Task<GraphMailboxSearchResult> SearchMessagesAsync(
@@ -287,6 +325,287 @@ public sealed class GraphMailboxBrowser {
     }
 
     /// <summary>
+    /// Imports a MIME message into a Graph folder (typically <c>sentitems</c>).
+    /// </summary>
+    /// <param name="message">MIME message to import.</param>
+    /// <param name="folder">Folder alias/id. Defaults to <c>Sent Items</c>.</param>
+    /// <param name="maxInlineAttachmentBytes">Maximum inline-attachment budget in bytes.</param>
+    /// <param name="idempotencyHeaderName">Optional idempotency header name to preserve.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Import result.</returns>
+    public async Task<GraphMailboxImportResult> ImportMessageAsync(
+        MimeMessage message,
+        string? folder = "Sent Items",
+        int maxInlineAttachmentBytes = GraphMimePreparation.DefaultMaxInlineAttachmentBytes,
+        string? idempotencyHeaderName = null,
+        CancellationToken cancellationToken = default) {
+        if (message == null) {
+            throw new ArgumentNullException(nameof(message));
+        }
+        if (maxInlineAttachmentBytes < 0) {
+            throw new ArgumentOutOfRangeException(nameof(maxInlineAttachmentBytes), "maxInlineAttachmentBytes must be zero or greater.");
+        }
+
+        var folderSelector = ResolveFolderSelector(folder);
+        var prepared = GraphMimePreparation.PrepareMessage(
+            message,
+            maxInlineAttachmentBytes: maxInlineAttachmentBytes,
+            idempotencyHeaderName: idempotencyHeaderName);
+        try {
+            var created = await _graph.CreateMessageAsync(
+                prepared.Message,
+                folderIdOrWellKnownName: folderSelector,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+            var nativeId = NormalizeOptional(created.Id);
+            if (nativeId == null) {
+                throw new InvalidDataException("Graph returned an invalid created message response (missing id).");
+            }
+
+            if (prepared.UploadAttachments.Count > 0) {
+                await UploadLargeAttachmentsAsync(
+                    nativeId,
+                    prepared.UploadAttachments,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            return new GraphMailboxImportResult {
+                FolderSelector = folderSelector,
+                NativeId = nativeId,
+                MessageId = NormalizeMessageIdValue(message.MessageId)
+            };
+        } finally {
+            foreach (var attachment in prepared.UploadAttachments) {
+                attachment.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sends a MIME message by creating a Graph draft and dispatching it.
+    /// </summary>
+    /// <param name="message">MIME message to send.</param>
+    /// <param name="maxInlineAttachmentBytes">Maximum inline-attachment budget in bytes.</param>
+    /// <param name="idempotencyHeaderName">Optional idempotency header name to preserve.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Send result metadata.</returns>
+    public async Task<GraphMailboxSendResult> SendMessageAsync(
+        MimeMessage message,
+        int maxInlineAttachmentBytes = GraphMimePreparation.DefaultMaxInlineAttachmentBytes,
+        string? idempotencyHeaderName = null,
+        CancellationToken cancellationToken = default) {
+        var draft = await ImportMessageAsync(
+            message,
+            folder: "Drafts",
+            maxInlineAttachmentBytes: maxInlineAttachmentBytes,
+            idempotencyHeaderName: idempotencyHeaderName,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        var draftId = NormalizeOptional(draft.NativeId);
+        if (draftId == null) {
+            throw new InvalidDataException("Graph draft created but response did not include message id.");
+        }
+
+        await _graph.SendDraftMessageAsync(draftId, cancellationToken: cancellationToken).ConfigureAwait(false);
+        return new GraphMailboxSendResult {
+            DraftId = draftId,
+            MessageId = draft.MessageId
+        };
+    }
+
+    /// <summary>
+    /// Probes a Graph folder for a message with a matching RFC822 <c>Message-Id</c> token.
+    /// </summary>
+    /// <param name="messageIdToken">Message-Id token (with or without angle brackets).</param>
+    /// <param name="folder">Folder alias/id. Defaults to <c>Sent Items</c>.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Duplicate probe result.</returns>
+    public async Task<GraphMailboxDuplicateProbeResult> FindMessageByInternetMessageIdAsync(
+        string messageIdToken,
+        string? folder = "Sent Items",
+        CancellationToken cancellationToken = default) {
+        var normalizedToken = NormalizeMessageIdValue(messageIdToken);
+        if (normalizedToken == null) {
+            throw new ArgumentException("messageIdToken is required.", nameof(messageIdToken));
+        }
+
+        var folderSelector = ResolveFolderSelector(folder);
+        var bracketedToken = "<" + normalizedToken + ">";
+        var filter = "internetMessageId eq '" + EscapeODataStringLiteral(bracketedToken) +
+                     "' or internetMessageId eq '" + EscapeODataStringLiteral(normalizedToken) + "'";
+        var page = await _graph.ListMessagesAsync(
+            folderSelector,
+            top: 1,
+            skip: null,
+            select: "id,internetMessageId",
+            orderBy: null,
+            filter: filter,
+            search: null,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        var match = page.Items.FirstOrDefault(x =>
+            string.Equals(
+                NormalizeMessageIdValue(x.InternetMessageId),
+                normalizedToken,
+                StringComparison.OrdinalIgnoreCase));
+        if (match == null) {
+            return new GraphMailboxDuplicateProbeResult {
+                IsMatch = false,
+                FolderSelector = folderSelector
+            };
+        }
+
+        return new GraphMailboxDuplicateProbeResult {
+            IsMatch = true,
+            FolderSelector = folderSelector,
+            NativeId = NormalizeOptional(match.Id),
+            MessageId = NormalizeMessageIdValue(match.InternetMessageId)
+        };
+    }
+
+    /// <summary>
+    /// Creates a Graph webhook subscription for message changes in a selected folder.
+    /// </summary>
+    public async Task<GraphMailboxSubscriptionResult> CreateMessageSubscriptionAsync(
+        string notificationUrl,
+        string folder = "INBOX",
+        DateTimeOffset? expirationDateTime = null,
+        string changeType = "created,updated,deleted",
+        string? clientState = null,
+        CancellationToken cancellationToken = default) {
+        if (string.IsNullOrWhiteSpace(notificationUrl)) {
+            throw new ArgumentException("notificationUrl is required.", nameof(notificationUrl));
+        }
+        if (string.IsNullOrWhiteSpace(changeType)) {
+            throw new ArgumentException("changeType is required.", nameof(changeType));
+        }
+
+        var resource = BuildMessageSubscriptionResource(folder);
+        var request = new GraphApiClient.GraphCreateSubscriptionRequest {
+            ChangeType = changeType.Trim(),
+            NotificationUrl = notificationUrl.Trim(),
+            Resource = resource,
+            ExpirationDateTime = expirationDateTime ?? DateTimeOffset.UtcNow.AddHours(8),
+            ClientState = string.IsNullOrWhiteSpace(clientState) ? null : clientState!.Trim()
+        };
+
+        var created = await _graph.CreateSubscriptionAsync(request, cancellationToken).ConfigureAwait(false);
+        return MapSubscription(created, resource);
+    }
+
+    /// <summary>
+    /// Renews an existing Graph webhook subscription.
+    /// </summary>
+    public async Task<GraphMailboxSubscriptionResult> RenewSubscriptionAsync(
+        string subscriptionId,
+        DateTimeOffset expirationDateTime,
+        CancellationToken cancellationToken = default) {
+        if (string.IsNullOrWhiteSpace(subscriptionId)) {
+            throw new ArgumentException("subscriptionId is required.", nameof(subscriptionId));
+        }
+
+        var renewed = await _graph.RenewSubscriptionAsync(
+            subscriptionId.Trim(),
+            expirationDateTime,
+            cancellationToken).ConfigureAwait(false);
+        return MapSubscription(renewed, NormalizeOptional(renewed.Resource));
+    }
+
+    /// <summary>
+    /// Renews an existing Graph webhook subscription with stale-remote handling.
+    /// </summary>
+    public async Task<GraphMailboxSubscriptionRenewResult> RenewSubscriptionSafeAsync(
+        string subscriptionId,
+        DateTimeOffset expirationDateTime,
+        bool treatMissingAsStale = true,
+        CancellationToken cancellationToken = default) {
+        try {
+            var renewed = await RenewSubscriptionAsync(subscriptionId, expirationDateTime, cancellationToken).ConfigureAwait(false);
+            return new GraphMailboxSubscriptionRenewResult {
+                Renewed = true,
+                Missing = false,
+                Subscription = renewed
+            };
+        } catch (GraphApiException ex) when (treatMissingAsStale &&
+                                             (ex.StatusCode == HttpStatusCode.NotFound || ex.StatusCode == HttpStatusCode.Gone)) {
+            return new GraphMailboxSubscriptionRenewResult {
+                Renewed = false,
+                Missing = true,
+                Subscription = null
+            };
+        }
+    }
+
+    /// <summary>
+    /// Deletes an existing Graph webhook subscription.
+    /// </summary>
+    public async Task<GraphMailboxSubscriptionDeleteResult> DeleteSubscriptionAsync(
+        string subscriptionId,
+        bool treatMissingAsSuccess = true,
+        CancellationToken cancellationToken = default) {
+        if (string.IsNullOrWhiteSpace(subscriptionId)) {
+            throw new ArgumentException("subscriptionId is required.", nameof(subscriptionId));
+        }
+
+        try {
+            await _graph.DeleteSubscriptionAsync(subscriptionId.Trim(), cancellationToken).ConfigureAwait(false);
+            return new GraphMailboxSubscriptionDeleteResult { Deleted = true };
+        } catch (GraphApiException ex) when (treatMissingAsSuccess &&
+                                             (ex.StatusCode == HttpStatusCode.NotFound || ex.StatusCode == HttpStatusCode.Gone)) {
+            return new GraphMailboxSubscriptionDeleteResult {
+                Deleted = true,
+                AlreadyDeleted = true
+            };
+        }
+    }
+
+    /// <summary>
+    /// Builds Graph subscription resource for folder message notifications.
+    /// </summary>
+    public static string BuildMessageSubscriptionResource(string folder) {
+        var selector = ResolveFolderSelector(folder);
+        return "me/mailFolders('" + EscapeGraphLiteral(selector) + "')/messages";
+    }
+
+    /// <summary>
+    /// Reads provider threading metadata for a single message.
+    /// </summary>
+    /// <param name="messageId">Graph message id.</param>
+    /// <param name="maxMimeBytes">Maximum MIME payload size to read.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Threading metadata parsed from MIME headers.</returns>
+    public async Task<GraphMailboxThreadingMetadataResult> GetThreadingMetadataAsync(
+        string messageId,
+        int maxMimeBytes = DefaultThreadingMetadataMaxMimeBytes,
+        CancellationToken cancellationToken = default) {
+        if (string.IsNullOrWhiteSpace(messageId)) {
+            throw new ArgumentException("messageId is required.", nameof(messageId));
+        }
+        if (maxMimeBytes <= 0) {
+            throw new ArgumentOutOfRangeException(nameof(maxMimeBytes), "maxMimeBytes must be greater than zero.");
+        }
+
+        var mimeBytes = await _graph.GetMessageMimeAsync(
+            messageId.Trim(),
+            maxBytes: maxMimeBytes,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        MimeMessage message;
+        try {
+            message = MimeMessage.Load(new MemoryStream(mimeBytes, writable: false));
+        } catch (Exception ex) {
+            throw new InvalidDataException("Failed to parse Graph MIME message.", ex);
+        }
+
+        return new GraphMailboxThreadingMetadataResult {
+            MessageId = NormalizeMessageIdValue(message.MessageId),
+            ReplyTo = NormalizeOptional(message.ReplyTo?.ToString()),
+            Cc = NormalizeOptional(message.Cc?.ToString()),
+            InReplyTo = NormalizeMessageIdValue(message.InReplyTo),
+            References = NormalizeMessageIdValues(message.References)
+        };
+    }
+
+    /// <summary>
     /// Gets one message content by downloading MIME payload and parsing it to <see cref="MimeMessage"/>.
     /// </summary>
     public async Task<GraphMailboxGetResult> GetMessageContentAsync(
@@ -367,6 +686,24 @@ public sealed class GraphMailboxBrowser {
     }
 
     /// <summary>
+    /// Archives a single message.
+    /// </summary>
+    public Task ArchiveMessageAsync(
+        string messageId,
+        CancellationToken cancellationToken = default) {
+        return MoveMessageAsync(messageId, "Archive", cancellationToken);
+    }
+
+    /// <summary>
+    /// Moves a single message to trash.
+    /// </summary>
+    public Task TrashMessageAsync(
+        string messageId,
+        CancellationToken cancellationToken = default) {
+        return MoveMessageAsync(messageId, "Trash", cancellationToken);
+    }
+
+    /// <summary>
     /// Deletes a message.
     /// </summary>
     public async Task DeleteMessageAsync(
@@ -399,6 +736,26 @@ public sealed class GraphMailboxBrowser {
             destinationId,
             batchSize: batchSize,
             cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Archives many messages.
+    /// </summary>
+    public Task<IReadOnlyList<GraphBulkOperationResult>> ArchiveMessagesAsync(
+        IEnumerable<string> messageIds,
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        return MoveMessagesAsync(messageIds, "Archive", batchSize, cancellationToken);
+    }
+
+    /// <summary>
+    /// Moves many messages to trash.
+    /// </summary>
+    public Task<IReadOnlyList<GraphBulkOperationResult>> TrashMessagesAsync(
+        IEnumerable<string> messageIds,
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        return MoveMessagesAsync(messageIds, "Trash", batchSize, cancellationToken);
     }
 
     /// <summary>
@@ -477,6 +834,26 @@ public sealed class GraphMailboxBrowser {
     }
 
     /// <summary>
+    /// Archives many conversations.
+    /// </summary>
+    public Task<IReadOnlyList<GraphBulkOperationResult>> ArchiveConversationsAsync(
+        IEnumerable<string> conversationIds,
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        return MoveConversationsAsync(conversationIds, "Archive", batchSize, cancellationToken);
+    }
+
+    /// <summary>
+    /// Moves many conversations to trash.
+    /// </summary>
+    public Task<IReadOnlyList<GraphBulkOperationResult>> TrashConversationsAsync(
+        IEnumerable<string> conversationIds,
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        return MoveConversationsAsync(conversationIds, "Trash", batchSize, cancellationToken);
+    }
+
+    /// <summary>
     /// Deletes many conversations.
     /// </summary>
     public async Task<IReadOnlyList<GraphBulkOperationResult>> DeleteConversationsAsync(
@@ -491,6 +868,102 @@ public sealed class GraphMailboxBrowser {
             conversationIds,
             batchSize: batchSize,
             cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task UploadLargeAttachmentsAsync(
+        string messageId,
+        IReadOnlyList<DecodedMimeAttachment> attachments,
+        CancellationToken cancellationToken) {
+        foreach (var attachment in attachments) {
+            if (attachment == null) {
+                continue;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            await UploadLargeAttachmentAsync(messageId, attachment, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task UploadLargeAttachmentAsync(
+        string messageId,
+        DecodedMimeAttachment attachment,
+        CancellationToken cancellationToken) {
+        if (attachment.Length <= 0) {
+            throw new InvalidDataException(
+                $"Graph upload failed: attachment '{attachment.Name}' length is {attachment.Length.ToString(CultureInfo.InvariantCulture)}.");
+        }
+
+        var uploadSession = await _graph.CreateAttachmentUploadSessionAsync(
+            messageId,
+            BuildAttachmentItem(attachment),
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        var uploadUrl = NormalizeOptional(uploadSession.UploadUrl);
+        if (uploadUrl == null) {
+            throw new InvalidDataException("Graph upload session creation failed (empty uploadUrl).");
+        }
+
+        using var stream = attachment.OpenRead();
+        long offset = 0;
+        while (offset < attachment.Length) {
+            cancellationToken.ThrowIfCancellationRequested();
+            var remaining = attachment.Length - offset;
+            var chunkLen = (int)Math.Min(LargeAttachmentChunkSize, remaining);
+            var buffer = new byte[chunkLen];
+
+            var read = 0;
+            while (read < chunkLen) {
+#if NET5_0_OR_GREATER
+                var count = await stream.ReadAsync(buffer.AsMemory(read, chunkLen - read), cancellationToken).ConfigureAwait(false);
+#else
+                var count = await stream.ReadAsync(buffer, read, chunkLen - read, cancellationToken).ConfigureAwait(false);
+#endif
+                if (count <= 0) {
+                    break;
+                }
+
+                read += count;
+            }
+
+            if (read <= 0) {
+                throw new InvalidDataException(
+                    $"Graph upload failed: unexpected end of stream for '{attachment.Name}' at {offset.ToString(CultureInfo.InvariantCulture)}.");
+            }
+
+            var start = offset;
+            var end = offset + read - 1;
+            if (read == buffer.Length) {
+                await _graph.UploadAttachmentChunkAsync(
+                    uploadUrl,
+                    buffer,
+                    start,
+                    end,
+                    attachment.Length,
+                    cancellationToken).ConfigureAwait(false);
+            } else {
+                var trimmed = new byte[read];
+                Buffer.BlockCopy(buffer, 0, trimmed, 0, read);
+                await _graph.UploadAttachmentChunkAsync(
+                    uploadUrl,
+                    trimmed,
+                    start,
+                    end,
+                    attachment.Length,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            offset += read;
+        }
+    }
+
+    private static GraphAttachmentItem BuildAttachmentItem(DecodedMimeAttachment attachment) {
+        var item = new GraphAttachmentItem("file", attachment.Name, attachment.Length) {
+            ContentType = NormalizeOptional(attachment.ContentType)
+        };
+        if (attachment.IsInline) {
+            item.IsInline = true;
+            item.ContentId = NormalizeOptional(attachment.ContentId);
+        }
+        return item;
     }
 
     private async Task<string> ResolveFolderIdAsync(string targetFolder, CancellationToken cancellationToken) {
@@ -564,6 +1037,17 @@ public sealed class GraphMailboxBrowser {
         return items.Count == 0 ? string.Empty : string.Join(", ", items);
     }
 
+    private static string? NormalizeOptional(string? raw) {
+        var trimmed = (raw ?? string.Empty).Trim();
+        return trimmed.Length == 0 ? null : trimmed;
+    }
+
+    private static string EscapeGraphLiteral(string value) =>
+        (value ?? string.Empty).Replace("'", "''");
+
+    private static string EscapeODataStringLiteral(string value) =>
+        (value ?? string.Empty).Replace("'", "''");
+
     private static string? NormalizeMessageIdValue(string? value) {
         if (string.IsNullOrWhiteSpace(value)) {
             return null;
@@ -578,6 +1062,23 @@ public sealed class GraphMailboxBrowser {
         }
         normalized = normalized.Trim();
         return normalized.Length == 0 ? null : normalized;
+    }
+
+    private static List<string> NormalizeMessageIdValues(IEnumerable<string>? values) {
+        if (values == null) {
+            return new List<string>();
+        }
+
+        var output = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var value in values) {
+            var normalized = NormalizeMessageIdValue(value);
+            if (normalized == null || !seen.Add(normalized)) {
+                continue;
+            }
+            output.Add(normalized);
+        }
+        return output;
     }
 
     private static GraphMailboxMessageSummary MapSummary(GraphMailMessage message) {
@@ -612,6 +1113,19 @@ public sealed class GraphMailboxBrowser {
             output.Add(MapSummary(message));
         }
         return output;
+    }
+
+    private static GraphMailboxSubscriptionResult MapSubscription(GraphApiClient.GraphSubscription subscription, string? resource) {
+        if (subscription == null) {
+            throw new ArgumentNullException(nameof(subscription));
+        }
+
+        return new GraphMailboxSubscriptionResult {
+            SubscriptionId = NormalizeOptional(subscription.Id),
+            Resource = NormalizeOptional(resource ?? subscription.Resource),
+            ClientState = NormalizeOptional(subscription.ClientState),
+            ExpirationDateTime = subscription.ExpirationDateTime
+        };
     }
 
     /// <summary>
@@ -699,6 +1213,20 @@ public sealed class GraphMailboxBrowser {
     }
 
     /// <summary>
+    /// Graph mailbox conversation list result.
+    /// </summary>
+    public sealed class GraphMailboxConversationListResult {
+        /// <summary>Graph conversation id used for listing.</summary>
+        public string ConversationId { get; set; } = string.Empty;
+
+        /// <summary>Total number of messages available in the conversation slice source.</summary>
+        public int TotalCount { get; set; }
+
+        /// <summary>Paged conversation message summaries.</summary>
+        public List<GraphMailboxMessageSummary> Messages { get; set; } = new();
+    }
+
+    /// <summary>
     /// Graph mailbox search request.
     /// </summary>
     public sealed class GraphMailboxSearchRequest {
@@ -742,6 +1270,110 @@ public sealed class GraphMailboxBrowser {
 
         /// <summary>Matched messages.</summary>
         public List<GraphMailboxMessageSummary> Messages { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Graph mailbox import result.
+    /// </summary>
+    public sealed class GraphMailboxImportResult {
+        /// <summary>Resolved Graph folder selector used for import.</summary>
+        public string FolderSelector { get; set; } = string.Empty;
+
+        /// <summary>Created Graph native message id.</summary>
+        public string? NativeId { get; set; }
+
+        /// <summary>Normalized RFC822 Message-Id used for import.</summary>
+        public string? MessageId { get; set; }
+    }
+
+    /// <summary>
+    /// Graph mailbox send result.
+    /// </summary>
+    public sealed class GraphMailboxSendResult {
+        /// <summary>Graph draft id that was sent.</summary>
+        public string? DraftId { get; set; }
+
+        /// <summary>Normalized RFC822 Message-Id used for send.</summary>
+        public string? MessageId { get; set; }
+    }
+
+    /// <summary>
+    /// Graph mailbox duplicate probe result.
+    /// </summary>
+    public sealed class GraphMailboxDuplicateProbeResult {
+        /// <summary>True when a matching message was found.</summary>
+        public bool IsMatch { get; set; }
+
+        /// <summary>Resolved Graph folder selector used for probing.</summary>
+        public string? FolderSelector { get; set; }
+
+        /// <summary>Matched Graph native message id, when available.</summary>
+        public string? NativeId { get; set; }
+
+        /// <summary>Matched normalized RFC822 Message-Id.</summary>
+        public string? MessageId { get; set; }
+    }
+
+    /// <summary>
+    /// Graph mailbox webhook subscription result.
+    /// </summary>
+    public sealed class GraphMailboxSubscriptionResult {
+        /// <summary>Graph subscription id.</summary>
+        public string? SubscriptionId { get; set; }
+
+        /// <summary>Subscription resource path.</summary>
+        public string? Resource { get; set; }
+
+        /// <summary>Client-state value when provided.</summary>
+        public string? ClientState { get; set; }
+
+        /// <summary>Subscription expiration value.</summary>
+        public DateTimeOffset ExpirationDateTime { get; set; }
+    }
+
+    /// <summary>
+    /// Graph mailbox webhook delete result.
+    /// </summary>
+    public sealed class GraphMailboxSubscriptionDeleteResult {
+        /// <summary>True when delete operation succeeded.</summary>
+        public bool Deleted { get; set; }
+
+        /// <summary>True when delete succeeded because subscription was already gone.</summary>
+        public bool AlreadyDeleted { get; set; }
+    }
+
+    /// <summary>
+    /// Graph mailbox webhook renew result.
+    /// </summary>
+    public sealed class GraphMailboxSubscriptionRenewResult {
+        /// <summary>True when renew operation succeeded.</summary>
+        public bool Renewed { get; set; }
+
+        /// <summary>True when renew failed because subscription was already missing.</summary>
+        public bool Missing { get; set; }
+
+        /// <summary>Renewed subscription payload when available.</summary>
+        public GraphMailboxSubscriptionResult? Subscription { get; set; }
+    }
+
+    /// <summary>
+    /// Graph mailbox threading metadata.
+    /// </summary>
+    public sealed class GraphMailboxThreadingMetadataResult {
+        /// <summary>Normalized RFC822 Message-Id.</summary>
+        public string? MessageId { get; set; }
+
+        /// <summary>Reply-To header value.</summary>
+        public string? ReplyTo { get; set; }
+
+        /// <summary>Cc header value.</summary>
+        public string? Cc { get; set; }
+
+        /// <summary>Normalized RFC822 In-Reply-To value.</summary>
+        public string? InReplyTo { get; set; }
+
+        /// <summary>Normalized RFC822 References tokens.</summary>
+        public List<string> References { get; set; } = new();
     }
 
     /// <summary>
