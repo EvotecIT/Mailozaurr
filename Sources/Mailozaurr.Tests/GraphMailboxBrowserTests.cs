@@ -210,6 +210,42 @@ public class GraphMailboxBrowserTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task FindMessageByInternetMessageIdAsync_UsesBracketedFilterAndReturnsMatch() {
+        var listJson = "{\"value\":[{\"id\":\"m1\",\"internetMessageId\":\"<msg-123@example.test>\"}]}";
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(listJson) });
+        var client = CreateClient(handler);
+        var browser = new GraphMailboxBrowser(client);
+
+        var result = await browser.FindMessageByInternetMessageIdAsync("msg-123@example.test", folder: "Sent Items");
+
+        Assert.True(result.IsMatch);
+        Assert.Equal("sentitems", result.FolderSelector);
+        Assert.Equal("m1", result.NativeId);
+        Assert.Equal("msg-123@example.test", result.MessageId);
+        Assert.Single(handler.Requests);
+        var requestUri = handler.Requests[0].RequestUri!;
+        Assert.Contains("/me/mailFolders/sentitems/messages?", requestUri.ToString());
+        var decodedQuery = Uri.UnescapeDataString(requestUri.Query);
+        Assert.Contains("internetMessageId eq '<msg-123@example.test>'", decodedQuery, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("internetMessageId eq 'msg-123@example.test'", decodedQuery, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task FindMessageByInternetMessageIdAsync_ReturnsNoMatch_WhenResponseContainsDifferentMessageId() {
+        var listJson = "{\"value\":[{\"id\":\"m1\",\"internetMessageId\":\"<other@example.test>\"}]}";
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(listJson) });
+        var client = CreateClient(handler);
+        var browser = new GraphMailboxBrowser(client);
+
+        var result = await browser.FindMessageByInternetMessageIdAsync("msg-123@example.test", folder: "Sent Items");
+
+        Assert.False(result.IsMatch);
+        Assert.Equal("sentitems", result.FolderSelector);
+        Assert.Null(result.NativeId);
+        Assert.Null(result.MessageId);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task SearchMessagesAsync_UsesGraphSearchWhenTextIsProvided() {
         var listJson = "{\"value\":[{\"id\":\"m1\",\"subject\":\"hello\"}]}";
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(listJson) });

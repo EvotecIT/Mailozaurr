@@ -429,7 +429,9 @@ public sealed class GraphMailboxBrowser {
         }
 
         var folderSelector = ResolveFolderSelector(folder);
-        var filter = "internetMessageId eq '" + EscapeODataStringLiteral(normalizedToken) + "'";
+        var bracketedToken = "<" + normalizedToken + ">";
+        var filter = "internetMessageId eq '" + EscapeODataStringLiteral(bracketedToken) +
+                     "' or internetMessageId eq '" + EscapeODataStringLiteral(normalizedToken) + "'";
         var page = await _graph.ListMessagesAsync(
             folderSelector,
             top: 1,
@@ -440,7 +442,11 @@ public sealed class GraphMailboxBrowser {
             search: null,
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        var match = page.Items.FirstOrDefault(x => NormalizeMessageIdValue(x.InternetMessageId) != null);
+        var match = page.Items.FirstOrDefault(x =>
+            string.Equals(
+                NormalizeMessageIdValue(x.InternetMessageId),
+                normalizedToken,
+                StringComparison.OrdinalIgnoreCase));
         if (match == null) {
             return new GraphMailboxDuplicateProbeResult {
                 IsMatch = false,

@@ -123,9 +123,6 @@ public static class ImapSentMessageOperations {
 
         /// <summary>Matched message-id when available.</summary>
         public string? MessageId { get; set; }
-
-        /// <summary>Non-match helper value.</summary>
-        public static ImapSentDuplicateProbeResult None { get; } = new();
     }
 
     /// <summary>
@@ -264,7 +261,7 @@ public static class ImapSentMessageOperations {
         }
 
         if (uids.Count == 0) {
-            return ImapSentDuplicateProbeResult.None;
+            return new ImapSentDuplicateProbeResult();
         }
 
         var matchedMessageId = await folder.FetchEnvelopeMessageIdAsync(uids[0], cancellationToken).ConfigureAwait(false);

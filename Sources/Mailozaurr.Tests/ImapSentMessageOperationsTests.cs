@@ -97,6 +97,42 @@ public sealed class ImapSentMessageOperationsTests {
     }
 
     [Fact]
+    public async Task FindSentDuplicateAsync_NoMatch_ReturnsDistinctInstances() {
+        var folderA = new FakeImapSentFolder {
+            FullNameValue = "Sent-A",
+            IsOpenValue = true,
+            AccessValue = FolderAccess.ReadOnly
+        };
+        folderA.SearchResults.Enqueue(new List<UniqueId>());
+
+        var folderB = new FakeImapSentFolder {
+            FullNameValue = "Sent-B",
+            IsOpenValue = true,
+            AccessValue = FolderAccess.ReadOnly
+        };
+        folderB.SearchResults.Enqueue(new List<UniqueId>());
+
+        var resultA = await ImapSentMessageOperations.FindSentDuplicateAsync(
+            folderA,
+            idempotencyHeaderName: "X-BayManager-Idempotency-Key",
+            idempotencyKey: "idem-123",
+            messageIdToken: null);
+        var resultB = await ImapSentMessageOperations.FindSentDuplicateAsync(
+            folderB,
+            idempotencyHeaderName: "X-BayManager-Idempotency-Key",
+            idempotencyKey: "idem-123",
+            messageIdToken: null);
+
+        Assert.False(resultA.IsMatch);
+        Assert.False(resultB.IsMatch);
+        Assert.NotSame(resultA, resultB);
+        Assert.Null(resultA.Folder);
+        Assert.Null(resultB.Folder);
+        Assert.Null(resultA.MessageId);
+        Assert.Null(resultB.MessageId);
+    }
+
+    [Fact]
     public async Task GetThreadingMetadataAsync_ReturnsFolderMetadata() {
         var uid = new UniqueId(777);
         var folder = new FakeImapSentFolder {
