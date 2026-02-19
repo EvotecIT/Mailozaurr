@@ -62,4 +62,30 @@ public sealed class NativeMailboxBrowserSessionsTests {
         Assert.Single(handler.Requests);
         Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/labels?fields=labels(id,name,type)", handler.Requests[0].RequestUri!.ToString());
     }
+
+    [Fact]
+    public async Task GraphMailboxBrowserSession_Dispose_IsIdempotent_AndPreventsFurtherUse() {
+        var handler = new RecordingHandler();
+        var client = new HttpClient(handler) { BaseAddress = new Uri("https://graph.microsoft.com/v1.0/") };
+        var credential = new OAuthCredential { UserName = "me", AccessToken = "graph-token", ExpiresOn = DateTimeOffset.MaxValue };
+        var session = new GraphMailboxBrowserSession(client, credential);
+
+        session.Dispose();
+        session.Dispose();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => session.Browser.ListFoldersAsync());
+    }
+
+    [Fact]
+    public async Task GmailMailboxBrowserSession_Dispose_IsIdempotent_AndPreventsFurtherUse() {
+        var handler = new RecordingHandler();
+        var client = new HttpClient(handler) { BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/") };
+        var credential = new OAuthCredential { UserName = "me", AccessToken = "gmail-token", ExpiresOn = DateTimeOffset.MaxValue };
+        var session = new GmailMailboxBrowserSession(client, credential);
+
+        session.Dispose();
+        session.Dispose();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => session.Browser.ListFoldersAsync());
+    }
 }
