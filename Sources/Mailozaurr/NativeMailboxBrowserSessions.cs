@@ -118,7 +118,9 @@ public sealed class GmailMailboxBrowserSession : IDisposable {
             throw new ArgumentNullException(nameof(credential));
         }
 
-        _gmail = new GmailApiClient(new HttpClient(), refreshToken, credential, baseAddress);
+        _gmail = baseAddress == null
+            ? new GmailApiClient(credential, refreshToken)
+            : new GmailApiClient(new HttpClient(), refreshToken, credential, baseAddress);
         Browser = new GmailMailboxBrowser(_gmail, userId);
     }
 
