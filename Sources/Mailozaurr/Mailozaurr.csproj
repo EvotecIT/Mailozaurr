@@ -14,6 +14,8 @@
         <Nullable>enable</Nullable>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <!-- Keep local build artifacts from being treated as SDK default items/references. -->
+        <DefaultItemExcludes>$(DefaultItemExcludes);**/artifacts/**;**/Artifacts/**</DefaultItemExcludes>
         <!-- Required for pointer operations in Helpers/SecureStringHelper.cs -->
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <RepositoryUrl>https://github.com/EvotecIT/Mailozaurr</RepositoryUrl>
