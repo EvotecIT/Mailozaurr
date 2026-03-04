@@ -435,11 +435,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         // Attach the LogCollector to the SMTP client's logger
         smtpClient.LogCollector = logCollector;
         
-        var providedSentLogPath = SentLogPath;
-        var sentLogPath = string.IsNullOrWhiteSpace(providedSentLogPath)
-            ? Path.Combine(Path.GetTempPath(), "Mailozaurr", "sentlog.json")
-            : providedSentLogPath!;
-        smtpClient.SentMessageRepository = new FileSentMessageRepository(sentLogPath);
+        if (!string.IsNullOrWhiteSpace(SentLogPath)) {
+            smtpClient.SentMessageRepository = new FileSentMessageRepository(SentLogPath!);
+        }
         smtpClient.From = Helpers.GetFromObject(fromEmail, fromName);
         smtpClient.ReplyTo = ReplyTo;
         smtpClient.Cc = Cc;
