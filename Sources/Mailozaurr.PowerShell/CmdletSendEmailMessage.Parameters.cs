@@ -451,7 +451,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
     public string? LogPath { get; set; }
 
     /// <summary>
-    /// <para>Specifies the path used to persist sent message metadata.</para>
+    /// <para>Specifies the path used to persist sent message metadata (opt-in).</para>
     /// </summary>
     [Parameter(Mandatory = false)]
     public string? SentLogPath { get; set; }
