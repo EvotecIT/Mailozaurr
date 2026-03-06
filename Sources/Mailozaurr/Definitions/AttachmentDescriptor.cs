@@ -62,7 +62,7 @@ public abstract class AttachmentDescriptor
                 ? MimeTypes.GetMimeType(FileName!)
                 : "application/octet-stream";
 
-        var part = new MimePart(mediaType!)
+        var part = new MimePart(mediaType ?? "application/octet-stream")
         {
             Content = new MimeContent(stream),
             FileName = FileName,

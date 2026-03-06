@@ -110,8 +110,10 @@ public static class SmtpSendPipeline {
             throw new ArgumentNullException(nameof(message));
         }
 
-        if (idempotencyHeaderName is { Length: > 0 } headerName &&
-            idempotencyKey is { Length: > 0 } headerValue) {
+        if (!string.IsNullOrWhiteSpace(idempotencyHeaderName) &&
+            !string.IsNullOrWhiteSpace(idempotencyKey)) {
+            var headerName = idempotencyHeaderName!.Trim();
+            var headerValue = idempotencyKey!.Trim();
             message.Headers.Replace(headerName, headerValue);
         }
 

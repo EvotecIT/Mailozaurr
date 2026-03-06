@@ -23,12 +23,16 @@ public static class MimeKitUtils {
                 using var fs = File.Create(file);
                 if (mp.Content != null) {
                     mp.Content.DecodeTo(fs);
+                } else {
+                    mp.WriteTo(fs);
                 }
             } else if (attachment is MessagePart msgPart) {
                 var name = msgPart.ContentDisposition?.FileName ?? msgPart.ContentType.Name ?? Path.GetRandomFileName();
                 var file = Path.Combine(resolved, name);
                 if (msgPart.Message != null) {
                     msgPart.Message.WriteTo(file);
+                } else {
+                    msgPart.WriteTo(file);
                 }
             }
         }
