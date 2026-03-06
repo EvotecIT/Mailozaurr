@@ -1003,7 +1003,7 @@ public class Smtp {
         if (string.IsNullOrEmpty(id)) {
             Message.MessageId = id = MimeKit.Utils.MimeUtils.GenerateMessageId();
         }
-        return id;
+        return id!;
     }
 
     private async Task SaveSentMessageAsync(string messageId, CancellationToken cancellationToken) {
@@ -1397,6 +1397,14 @@ public class Smtp {
     /// <returns></returns>
     public SmtpResult Encrypt(X509Certificate2 certificate) {
         MimeMessage message = Message;
+        var body = message.Body;
+        if (body is null) {
+            const string messageText = "Message body is empty.";
+            if (ErrorAction == ActionPreference.Stop) {
+                throw new InvalidOperationException(messageText);
+            }
+            return new SmtpResult(false, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
+        }
         // encrypt our message body using a temporary S/MIME context to avoid SQLite dependency
         using (var ctx = new TemporarySecureMimeContext()) {
             try {
@@ -1405,7 +1413,7 @@ public class Smtp {
                 recipients.Add(new CmsRecipient(certificate));
 
                 // Encrypt the message body with the certificate
-                message.Body = ApplicationPkcs7Mime.Encrypt(ctx, recipients, message.Body);
+                message.Body = ApplicationPkcs7Mime.Encrypt(ctx, recipients, body!);
             } catch (Exception ex) {
                 LogWarning($"Send-EmailMessage - Error during encryption: {ex.Message}");
                 LogWarning($"Send-EmailMessage - Possible issue: Certificate? ({certificate.Thumbprint} was used).");
@@ -1427,6 +1435,14 @@ public class Smtp {
     /// <returns></returns>
     public SmtpResult Sign(X509Certificate2 certificate) {
         MimeMessage message = Message;
+        var body = message.Body;
+        if (body is null) {
+            const string messageText = "Message body is empty.";
+            if (ErrorAction == ActionPreference.Stop) {
+                throw new InvalidOperationException(messageText);
+            }
+            return new SmtpResult(false, EmailAction.SMimeSignature, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
+        }
         // digitally sign our message body using a temporary S/MIME context
         // TemporarySecureMimeContext avoids the SQLite dependency of DefaultSecureMimeContext
         using (var ctx = new TemporarySecureMimeContext()) {
@@ -1434,7 +1450,7 @@ public class Smtp {
                 var signer = new CmsSigner(certificate) {
                     DigestAlgorithm = DigestAlgorithm.Sha1
                 };
-                message.Body = MultipartSigned.Create(ctx, signer, message.Body);
+                message.Body = MultipartSigned.Create(ctx, signer, body!);
             } catch (Exception ex) {
                 LogWarning($"Send-EmailMessage - Error during signing: {ex.Message}");
                 LogWarning($"Send-EmailMessage - Possible issue: Certificate? ({certificate.Thumbprint} was used).");
@@ -1551,6 +1567,14 @@ public class Smtp {
     public SmtpResult Pkcs7Sign(X509Certificate2 certificate) {
         try {
             MimeMessage message = Message;
+            var body = message.Body;
+            if (body is null) {
+                const string messageText = "Message body is empty.";
+                if (ErrorAction == ActionPreference.Stop) {
+                    throw new InvalidOperationException(messageText);
+                }
+                return new SmtpResult(false, EmailAction.SMimeSignaturePKCS7, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
+            }
             // digitally sign our message body using a temporary S/MIME context to avoid SQLite dependency
             using (var ctx = new TemporarySecureMimeContext()) {
                 // Create a signer with the certificate
@@ -1559,7 +1583,7 @@ public class Smtp {
                 };
 
                 // Sign the message body with the signer
-                message.Body = ApplicationPkcs7Mime.Sign(ctx, signer, message.Body);
+                message.Body = ApplicationPkcs7Mime.Sign(ctx, signer, body!);
             }
 
             Message = message;
@@ -1665,13 +1689,21 @@ public class Smtp {
         }
 
         MimeMessage message = Message;
+        var body = message.Body;
+        if (body is null) {
+            const string messageText = "Message body is empty.";
+            if (ErrorAction == ActionPreference.Stop) {
+                throw new InvalidOperationException(messageText);
+            }
+            return new SmtpResult(false, EmailAction.PgpEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
+        }
         using (var ctx = new EphemeralOpenPgpContext()) {
             using (var pub = File.OpenRead(publicKeyPath))
                 ctx.Import(pub);
             var recipients = message.To.Mailboxes.Concat(message.Cc.Mailboxes).Concat(message.Bcc.Mailboxes).ToList();
             try {
                 var keys = ctx.GetPublicKeys(recipients);
-                message.Body = MultipartEncrypted.Encrypt(ctx, keys, message.Body);
+                message.Body = MultipartEncrypted.Encrypt(ctx, keys, body!);
             } catch (Exception ex) {
                 if (ErrorAction == ActionPreference.Stop) throw;
                 return new SmtpResult(false, EmailAction.PgpEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
@@ -1693,6 +1725,14 @@ public class Smtp {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         try {
             MimeMessage message = Message;
+            var body = message.Body;
+            if (body is null) {
+                const string messageText = "Message body is empty.";
+                if (ErrorAction == ActionPreference.Stop) {
+                    throw new InvalidOperationException(messageText);
+                }
+                return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
+            }
             using (var ctx = new EphemeralOpenPgpContext(password)) {
                 if (!File.Exists(publicKeyPath)) {
                     string messageText = $"Public key file not found: {publicKeyPath}";
@@ -1714,7 +1754,7 @@ public class Smtp {
                 try {
                     var signer = message.From.Mailboxes.First();
                     var signingKey = ctx.GetSigningKey(signer);
-                    message.Body = MultipartSigned.Create(ctx, signingKey, DigestAlgorithm.Sha256, message.Body);
+                    message.Body = MultipartSigned.Create(ctx, signingKey, DigestAlgorithm.Sha256, body!);
                     var signed = (MultipartSigned)message.Body;
                     var sigs = signed.Verify(ctx);
                     foreach (var sig in sigs)
@@ -1748,6 +1788,14 @@ public class Smtp {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         try {
             MimeMessage message = Message;
+            var body = message.Body;
+            if (body is null) {
+                const string messageText = "Message body is empty.";
+                if (ErrorAction == ActionPreference.Stop) {
+                    throw new InvalidOperationException(messageText);
+                }
+                return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
+            }
             using (var ctx = new EphemeralOpenPgpContext(password)) {
                 if (!File.Exists(publicKeyPath)) {
                     string messageText = $"Public key file not found: {publicKeyPath}";
@@ -1770,7 +1818,7 @@ public class Smtp {
                 try {
                     var signingKey = ctx.GetSigningKey(message.From.Mailboxes.First());
                     var encKeys = ctx.GetPublicKeys(recipients);
-                    message.Body = MultipartEncrypted.SignAndEncrypt(ctx, signingKey, DigestAlgorithm.Sha256, EncryptionAlgorithm.Cast5, encKeys, message.Body);
+                    message.Body = MultipartEncrypted.SignAndEncrypt(ctx, signingKey, DigestAlgorithm.Sha256, EncryptionAlgorithm.Cast5, encKeys, body!);
                 } catch (Exception ex) {
                     if (ErrorAction == ActionPreference.Stop) throw;
                     return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);

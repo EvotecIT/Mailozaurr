@@ -58,7 +58,8 @@ public class SmtpAttachmentTests
         Assert.Equal("Stream", part.Headers["X-Test"]);
 
         using var extracted = new MemoryStream();
-        part.Content.DecodeTo(extracted);
+        var content = Assert.IsAssignableFrom<IMimeContent>(part.Content);
+        content.DecodeTo(extracted);
         Assert.Equal(data, extracted.ToArray());
 
         Assert.True(source.CanRead);
@@ -91,7 +92,8 @@ public class SmtpAttachmentTests
         Assert.Equal("application/octet-stream", part.ContentType.MimeType);
 
         using var extracted = new MemoryStream();
-        part.Content.DecodeTo(extracted);
+        var content = Assert.IsAssignableFrom<IMimeContent>(part.Content);
+        content.DecodeTo(extracted);
         Assert.Equal(data, extracted.ToArray());
     }
 }

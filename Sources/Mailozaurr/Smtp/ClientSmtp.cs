@@ -241,8 +241,8 @@ public partial class ClientSmtp : SmtpClient {
                 }
             }
         }
-        if (AutoEmbedRemoteImages && !string.IsNullOrWhiteSpace(bodyBuilder.HtmlBody)) {
-            var (html, images) = await HtmlUtils.DownloadRemoteImagesAsync(bodyBuilder.HtmlBody, cancellationToken).ConfigureAwait(false);
+        if (AutoEmbedRemoteImages && bodyBuilder.HtmlBody is { } htmlBody && !string.IsNullOrWhiteSpace(htmlBody)) {
+            var (html, images) = await HtmlUtils.DownloadRemoteImagesAsync(htmlBody, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             bodyBuilder.HtmlBody = html;
             HtmlBody = html;

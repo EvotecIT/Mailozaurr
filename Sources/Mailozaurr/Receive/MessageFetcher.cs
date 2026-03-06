@@ -252,10 +252,13 @@ public static class MessageFetcher {
 
     private static bool AddressMatches(InternetAddressList list, string filter) {
         foreach (var addr in list.Mailboxes) {
-            if (addr.Address.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) {
+            if (!string.IsNullOrWhiteSpace(addr.Address) &&
+                addr.Address.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) {
                 return true;
             }
-            if (!string.IsNullOrWhiteSpace(addr.Name) && addr.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) {
+            var displayName = addr.Name;
+            if (!string.IsNullOrWhiteSpace(displayName) &&
+                displayName!.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) {
                 return true;
             }
         }

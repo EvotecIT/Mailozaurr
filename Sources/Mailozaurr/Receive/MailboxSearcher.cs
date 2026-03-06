@@ -871,6 +871,10 @@ public static class MailboxSearcher {
             foreach (var att in message.Attachments) {
                 if (IsDmarcAttachment(att) && att is MimePart part) {
                     if (!string.IsNullOrWhiteSpace(domain) && !AttachmentMatchesDomain(part, domain!, maxUncompressedSize)) continue;
+                    if (part.Content == null) {
+                        continue;
+                    }
+
                     var stream = part.Content.Open();
                     report.Attachments.Add(new DmarcReportAttachment(part.FileName ?? "report.zip", stream));
                     if (!domainMatched) domainMatched = true;
@@ -883,6 +887,10 @@ public static class MailboxSearcher {
 
     private static bool AttachmentMatchesDomain(MimePart part, string domain, long maxUncompressedSize) {
         if (part.FileName?.IndexOf(domain, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        if (part.Content == null) {
+            return false;
+        }
+
         try {
             using var stream = part.Content.Open();
             var name = part.FileName ?? string.Empty;
@@ -954,7 +962,7 @@ public static class MailboxSearcher {
     private static bool IsDmarcAttachment(MimeEntity entity) {
         if (entity is MimePart part) {
             var name = part.FileName;
-            if (!string.IsNullOrEmpty(name) && (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".gz", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))) return true;
+            if (!string.IsNullOrEmpty(name) && (name!.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".gz", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))) return true;
             var ct = part.ContentType;
             if (ct != null) {
                 if (ct.MediaType.Equals("application", StringComparison.OrdinalIgnoreCase)) {
@@ -1037,8 +1045,10 @@ public static class MailboxSearcher {
 
     private static bool AddressMatches(InternetAddressList list, string filter) {
         foreach (var addr in list.Mailboxes) {
-            if (addr.Address.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) return true;
-            if (!string.IsNullOrWhiteSpace(addr.Name) && addr.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            if (!string.IsNullOrWhiteSpace(addr.Address) &&
+                addr.Address.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            var displayName = addr.Name;
+            if (!string.IsNullOrWhiteSpace(displayName) && displayName!.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0) return true;
         }
         return false;
     }

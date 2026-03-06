@@ -215,7 +215,7 @@ public class SesClient : IDisposable {
                 base64 = Convert.ToBase64String(stream.ToArray());
             }
 
-            messageId = message.MessageId;
+            messageId = message.MessageId!;
         }
         else
         {

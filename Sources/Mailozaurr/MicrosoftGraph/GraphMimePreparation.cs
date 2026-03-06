@@ -133,7 +133,7 @@ public static class GraphMimePreparation {
             recipients.Add(new GraphEmailAddress {
                 Email = new GraphEmail {
                     Address = address,
-                    Name = string.IsNullOrWhiteSpace(mailbox.Name) ? null : mailbox.Name.Trim()
+                    Name = string.IsNullOrWhiteSpace(mailbox.Name) ? null : mailbox.Name!.Trim()
                 }
             });
         }
@@ -213,7 +213,11 @@ public sealed class DecodedMimeAttachment : IDisposable {
 
         try {
             using var fs = new FileStream(tempPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
-            part.Content.DecodeTo(fs);
+            if (part.Content != null) {
+                part.Content.DecodeTo(fs);
+            } else {
+                part.WriteTo(fs);
+            }
             fs.Flush(true);
             return new DecodedMimeAttachment(tempPath, fileName, contentType, isInline, contentId, fs.Length);
         } catch {
