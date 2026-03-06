@@ -245,7 +245,7 @@ public class MailgunClient : IDisposable {
 
         var messageId = string.IsNullOrEmpty(message.MessageId)
             ? MimeKit.Utils.MimeUtils.GenerateMessageId(domain)
-            : message.MessageId;
+            : message.MessageId!;
 
         using var stream = new MemoryStream();
         await message.WriteToAsync(stream, cancellationToken).ConfigureAwait(false);

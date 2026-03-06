@@ -110,18 +110,19 @@ public static class SmtpSendPipeline {
             throw new ArgumentNullException(nameof(message));
         }
 
-        if (!string.IsNullOrWhiteSpace(idempotencyHeaderName) && !string.IsNullOrWhiteSpace(idempotencyKey)) {
-            message.Headers.Replace(idempotencyHeaderName, idempotencyKey);
+        if (idempotencyHeaderName is { Length: > 0 } headerName &&
+            idempotencyKey is { Length: > 0 } headerValue) {
+            message.Headers.Replace(headerName, headerValue);
         }
 
         var normalizedMessageId = NormalizeMessageIdToken(messageId);
-        if (!string.IsNullOrWhiteSpace(normalizedMessageId)) {
-            message.MessageId = normalizedMessageId;
+        if (normalizedMessageId is { Length: > 0 } ensuredMessageId) {
+            message.MessageId = ensuredMessageId;
         }
 
         var inReplyTo = NormalizeMessageIdToken(inReplyToCandidate);
-        if (!string.IsNullOrWhiteSpace(inReplyTo)) {
-            message.InReplyTo = inReplyTo;
+        if (inReplyTo is { Length: > 0 } ensuredInReplyTo) {
+            message.InReplyTo = ensuredInReplyTo;
         }
 
         var refs = new List<string>();

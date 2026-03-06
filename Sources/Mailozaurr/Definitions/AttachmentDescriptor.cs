@@ -59,10 +59,10 @@ public abstract class AttachmentDescriptor
         var mediaType = !string.IsNullOrWhiteSpace(ContentType)
             ? ContentType
             : !string.IsNullOrWhiteSpace(FileName)
-                ? MimeTypes.GetMimeType(FileName)
+                ? MimeTypes.GetMimeType(FileName!)
                 : "application/octet-stream";
 
-        var part = new MimePart(mediaType)
+        var part = new MimePart(mediaType!)
         {
             Content = new MimeContent(stream),
             FileName = FileName,

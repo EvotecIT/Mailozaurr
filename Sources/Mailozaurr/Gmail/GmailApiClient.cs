@@ -145,7 +145,7 @@ public sealed class GmailApiClient : IDisposable {
 
         var now = DateTimeOffset.UtcNow;
         var record = new PendingMessageRecord {
-            MessageId = message.MessageId,
+            MessageId = message.MessageId!,
             MimeMessage = Convert.ToBase64String(stream.ToArray()),
             Timestamp = now,
             NextAttemptAt = now,

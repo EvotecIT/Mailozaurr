@@ -21,11 +21,15 @@ public static class MimeKitUtils {
             if (attachment is MimePart mp) {
                 var file = Path.Combine(resolved, mp.FileName ?? Path.GetRandomFileName());
                 using var fs = File.Create(file);
-                mp.Content.DecodeTo(fs);
+                if (mp.Content != null) {
+                    mp.Content.DecodeTo(fs);
+                }
             } else if (attachment is MessagePart msgPart) {
                 var name = msgPart.ContentDisposition?.FileName ?? msgPart.ContentType.Name ?? Path.GetRandomFileName();
                 var file = Path.Combine(resolved, name);
-                msgPart.Message.WriteTo(file);
+                if (msgPart.Message != null) {
+                    msgPart.Message.WriteTo(file);
+                }
             }
         }
     }
@@ -70,7 +74,11 @@ public static class MimeKitUtils {
         return reports.Count > 0 ? reports[0] : null;
     }
 
-    private static MessageDeliveryStatus? FindDeliveryStatus(MimeEntity entity) {
+    private static MessageDeliveryStatus? FindDeliveryStatus(MimeEntity? entity) {
+        if (entity == null) {
+            return null;
+        }
+
         if (entity is MessageDeliveryStatus mds) {
             return mds;
         }
@@ -101,7 +109,7 @@ public static class MimeKitUtils {
     public static EmailEncryption GetEncryption(MimeMessage message) {
         if (message.Body is MultipartEncrypted encrypted) {
             var protocol = encrypted.ContentType.Parameters["protocol"];
-            if (!string.IsNullOrEmpty(protocol) && protocol.Equals("application/pgp-encrypted", System.StringComparison.OrdinalIgnoreCase)) {
+            if (!string.IsNullOrEmpty(protocol) && protocol!.Equals("application/pgp-encrypted", System.StringComparison.OrdinalIgnoreCase)) {
                 return EmailEncryption.PgpEncrypted;
             }
         }
@@ -111,12 +119,12 @@ public static class MimeKitUtils {
         }
 
         if (message.Body is MultipartSigned signed) {
-            var mimeType = signed[1].ContentType.MimeType;
-            if (mimeType.Equals("application/pgp-signature", System.StringComparison.OrdinalIgnoreCase)) {
+            var mimeType = signed.Count > 1 ? signed[1].ContentType?.MimeType : null;
+            if (string.Equals(mimeType, "application/pgp-signature", System.StringComparison.OrdinalIgnoreCase)) {
                 return EmailEncryption.PgpSigned;
             }
-            if (mimeType.Equals("application/pkcs7-signature", System.StringComparison.OrdinalIgnoreCase) ||
-                mimeType.Equals("application/x-pkcs7-signature", System.StringComparison.OrdinalIgnoreCase)) {
+            if (string.Equals(mimeType, "application/pkcs7-signature", System.StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(mimeType, "application/x-pkcs7-signature", System.StringComparison.OrdinalIgnoreCase)) {
                 return EmailEncryption.SmimeSigned;
             }
         }
@@ -130,7 +138,10 @@ public static class MimeKitUtils {
         using var ctx = new EphemeralOpenPgpContext(password);
         using (var sec = File.OpenRead(privateKeyPath))
             ctx.Import(new Org.BouncyCastle.Bcpg.OpenPgp.PgpSecretKeyRingBundle(new Org.BouncyCastle.Bcpg.ArmoredInputStream(sec)));
-        var encrypted = (MultipartEncrypted)message.Body;
+        if (message.Body is not MultipartEncrypted encrypted) {
+            return message;
+        }
+
         var decrypted = encrypted.Decrypt(ctx);
         var result = new MimeMessage(message.Headers);
         result.Body = decrypted;
@@ -142,7 +153,10 @@ public static class MimeKitUtils {
         if (GetEncryption(message) != EmailEncryption.SmimeEncrypted) return message;
         using var ctx = new MimeKit.Cryptography.TemporarySecureMimeContext();
         ctx.Import(certificate);
-        var pkcs7 = (ApplicationPkcs7Mime)message.Body;
+        if (message.Body is not ApplicationPkcs7Mime pkcs7) {
+            return message;
+        }
+
         var decrypted = pkcs7.Decrypt(ctx);
         var result = new MimeMessage(message.Headers);
         result.Body = decrypted;
@@ -155,7 +169,10 @@ public static class MimeKitUtils {
         using var ctx = new EphemeralOpenPgpContext();
         using (var pub = File.OpenRead(publicKeyPath))
             ctx.Import(pub);
-        var signed = (MultipartSigned)message.Body;
+        if (message.Body is not MultipartSigned signed) {
+            return false;
+        }
+
         var signatures = signed.Verify(ctx);
         foreach (var sig in signatures) sig.Verify();
         return true;
@@ -166,7 +183,10 @@ public static class MimeKitUtils {
         if (GetEncryption(message) != EmailEncryption.SmimeSigned) return false;
         using var ctx = new MimeKit.Cryptography.TemporarySecureMimeContext();
         foreach (var cert in certificates) ctx.Import(cert);
-        var signed = (MultipartSigned)message.Body;
+        if (message.Body is not MultipartSigned signed) {
+            return false;
+        }
+
         var signatures = signed.Verify(ctx);
         foreach (var sig in signatures) sig.Verify();
         return true;

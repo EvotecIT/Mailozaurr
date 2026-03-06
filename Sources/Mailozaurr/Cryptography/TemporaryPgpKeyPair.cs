@@ -161,8 +161,7 @@ public sealed class TemporaryPgpKeyPair : IDisposable
             var decrypted = encrypted.Decrypt(ctx);
             if (decrypted is TextPart text)
             {
-                using var reader = new StreamReader(text.Content.Open());
-                return reader.ReadToEnd();
+                return text.Text ?? string.Empty;
             }
         }
 

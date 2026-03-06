@@ -81,9 +81,17 @@ public static class Pop3AttachmentPayloadBuilder {
         try {
             using var limited = new SizeLimitedWriteStream(ms, maxBytes);
             if (entity is MimePart mimePart) {
-                mimePart.Content.DecodeTo(limited);
+                if (mimePart.Content != null) {
+                    mimePart.Content.DecodeTo(limited);
+                } else {
+                    mimePart.WriteTo(limited);
+                }
             } else if (entity is MessagePart nestedMessagePart) {
-                nestedMessagePart.Message.WriteTo(limited);
+                if (nestedMessagePart.Message != null) {
+                    nestedMessagePart.Message.WriteTo(limited);
+                } else {
+                    nestedMessagePart.WriteTo(limited);
+                }
             } else {
                 entity.WriteTo(limited);
             }
