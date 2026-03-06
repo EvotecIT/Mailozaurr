@@ -24,7 +24,7 @@ public class SmtpInlineAttachmentTests
         smtp.HtmlBody = "<img src=\"cid:test\">";
         smtp.InlineAttachments = new List<AttachmentDescriptor> { new FileAttachmentDescriptor(tmp) };
         smtp.CreateMessage();
-        var body = (MultipartRelated)smtp.Message.Body;
+        var body = Assert.IsType<MultipartRelated>(smtp.Message.Body);
         var inlineCount = body.OfType<MimePart>().Count(p => p.ContentDisposition?.Disposition == ContentDisposition.Inline);
         File.Delete(tmp);
         Assert.Equal(1, inlineCount);
