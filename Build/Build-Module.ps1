@@ -1,5 +1,5 @@
 ﻿# Install-Module PSPublishModule -Force
-Import-Module PSPublishModule -Force -RequiredVersion '2.0.27'
+Import-Module PSPublishModule -Force #-RequiredVersion '2.0.27'
 
 Build-Module -ModuleName 'Mailozaurr' {
     # Usual defaults as per standard module
@@ -84,6 +84,7 @@ Build-Module -ModuleName 'Mailozaurr' {
         CertificateThumbprint             = '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703'
         ResolveBinaryConflicts            = $true
         ResolveBinaryConflictsName        = 'Mailozaurr.PowerShell'
+        NETProjectPath                    = "$PSScriptRoot\..\Sources\Mailozaurr.PowerShell"
         NETProjectName                    = 'Mailozaurr.PowerShell'
         NETConfiguration                  = 'Release'
         NETFramework                      = 'net8.0', 'net472'
@@ -93,7 +94,7 @@ Build-Module -ModuleName 'Mailozaurr' {
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
         NETBinaryModuleDocumenation       = $true
-        RefreshPSD1Only                   = $false
+        RefreshPSD1Only                   = $true
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat #-DotSourceLibraries -DotSourceClasses -MergeModuleOnBuild -Enable -SignModule -DeleteTargetModuleBeforeBuild -CertificateThumbprint '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703' -MergeFunctionsFromApprovedModules
@@ -104,6 +105,6 @@ Build-Module -ModuleName 'Mailozaurr' {
     #New-ConfigurationTest -TestsPath "$PSScriptRoot\..\Tests" -Enable
 
     # global options for publishing to github/psgallery
-    New-ConfigurationPublish -Type PowerShellGallery -FilePath 'C:\Support\Important\PowerShellGalleryAPI.txt' -Enabled:$true
-    New-ConfigurationPublish -Type GitHub -FilePath 'C:\Support\Important\GitHubAPI.txt' -UserName 'EvotecIT' -Enabled:$true
+    #New-ConfigurationPublish -Type PowerShellGallery -FilePath 'C:\Support\Important\PowerShellGalleryAPI.txt' -Enabled:$true
+    #New-ConfigurationPublish -Type GitHub -FilePath 'C:\Support\Important\GitHubAPI.txt' -UserName 'EvotecIT' -Enabled:$true
 } -ExitCode
