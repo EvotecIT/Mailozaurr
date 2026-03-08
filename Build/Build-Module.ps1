@@ -1,5 +1,5 @@
 ﻿# Install-Module PSPublishModule -Force
-Import-Module PSPublishModule -Force #-RequiredVersion '2.0.27'
+Import-Module PSPublishModule -Force
 
 Build-Module -ModuleName 'Mailozaurr' {
     # Usual defaults as per standard module
@@ -26,7 +26,7 @@ Build-Module -ModuleName 'Mailozaurr' {
 
         ProjectUri           = 'https://github.com/EvotecIT/MailoZaurr'
 
-        PreReleaseTag        = 'Preview2'
+        PreReleaseTag        = 'Preview4'
     }
     New-ConfigurationManifest @Manifest
 
@@ -106,5 +106,5 @@ Build-Module -ModuleName 'Mailozaurr' {
 
     # global options for publishing to github/psgallery
     #New-ConfigurationPublish -Type PowerShellGallery -FilePath 'C:\Support\Important\PowerShellGalleryAPI.txt' -Enabled:$true
-    #New-ConfigurationPublish -Type GitHub -FilePath 'C:\Support\Important\GitHubAPI.txt' -UserName 'EvotecIT' -Enabled:$true
+    #New-ConfigurationPublish -Type GitHub -FilePath 'C:\Support\Important\GitHubAPI.txt' -UserName 'EvotecIT' -Enabled:$true -GenerateReleaseNotes -OverwriteTagName '{ModuleName}-v{ModuleVersionWithPreRelease}'
 } -ExitCode
