@@ -892,24 +892,29 @@ namespace Mailozaurr {
             bool skipHasAttachment = false) {
             var result = new List<Dictionary<string, object>>();
             var skipIdsSet = skipIds != null ? new HashSet<string>(skipIds, StringComparer.OrdinalIgnoreCase) : null;
+            var skipFromSet = skipFrom != null ? new HashSet<string>(skipFrom, StringComparer.OrdinalIgnoreCase) : null;
+            var skipToSet = skipTo != null ? new HashSet<string>(skipTo, StringComparer.OrdinalIgnoreCase) : null;
+            var skipSubjectTokens = skipSubjectContains?
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .ToArray();
             foreach (var msg in messages) {
                 var id = msg.TryGetValue("id", out var idObj) ? idObj as string : null;
                 if (!string.IsNullOrWhiteSpace(id) && skipIdsSet != null && skipIdsSet.Contains(id!)) {
                     continue;
                 }
 
-                if (skipFrom != null &&
+                if (skipFromSet != null &&
                     msg.TryGetValue("from", out var fromObj) &&
                     fromObj is Dictionary<string, object> fDict &&
                     fDict.TryGetValue("emailAddress", out var addrObj) &&
                     addrObj is Dictionary<string, object> addr &&
                     addr.TryGetValue("address", out var fromAddrObj) &&
                     fromAddrObj is string fromAddr &&
-                    skipFrom.Contains(fromAddr, StringComparer.OrdinalIgnoreCase)) {
+                    skipFromSet.Contains(fromAddr)) {
                     continue;
                 }
 
-                if (skipTo != null &&
+                if (skipToSet != null &&
                     msg.TryGetValue("toRecipients", out var toObj) &&
                     toObj is object[] arr &&
                     arr.OfType<Dictionary<string, object>>().Any(rec =>
@@ -917,14 +922,14 @@ namespace Mailozaurr {
                         tAddrObj is Dictionary<string, object> tAddr &&
                         tAddr.TryGetValue("address", out var addrVal) &&
                         addrVal is string addrStr &&
-                        skipTo.Contains(addrStr, StringComparer.OrdinalIgnoreCase))) {
+                        skipToSet.Contains(addrStr))) {
                     continue;
                 }
 
-                if (skipSubjectContains != null &&
+                if (skipSubjectTokens != null &&
                     msg.TryGetValue("subject", out var subjObj) &&
                     subjObj is string subj &&
-                    skipSubjectContains.Any(s => subj.IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0)) {
+                    skipSubjectTokens.Any(s => subj.IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0)) {
                     continue;
                 }
 
@@ -956,7 +961,21 @@ namespace Mailozaurr {
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
             var props = properties != null ? new List<string>(properties) : new List<string>();
-            if (skipHasAttachment || skipAttachmentExtension != null) {
+            HashSet<string>? skipAttachmentExtensions = null;
+            if (skipAttachmentExtension != null) {
+                skipAttachmentExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var ext in skipAttachmentExtension) {
+                    if (string.IsNullOrWhiteSpace(ext)) {
+                        continue;
+                    }
+
+                    var normalized = ext.Trim().TrimStart('.');
+                    if (normalized.Length > 0) {
+                        skipAttachmentExtensions.Add(normalized);
+                    }
+                }
+            }
+            if (skipHasAttachment || (skipAttachmentExtensions?.Count > 0)) {
                 if (!props.Contains("hasAttachments")) props.Add("hasAttachments");
             }
             var query = new Dictionary<string, object>();
@@ -980,7 +999,7 @@ namespace Mailozaurr {
                 messages = FilterJunkMessages(messages, skipIds, skipFrom, skipTo, skipSubjectContains, skipHasAttachment);
             }
 
-            if (skipAttachmentExtension != null && skipAttachmentExtension.Any()) {
+            if (skipAttachmentExtensions?.Count > 0) {
                 var result = new List<Dictionary<string, object>>();
                 foreach (var msg in messages) {
                     if (!msg.TryGetValue("id", out var idObj) || idObj is not string id) continue;
@@ -991,9 +1010,8 @@ namespace Mailozaurr {
                             id,
                             new[] { "name" }).ConfigureAwait(false);
                         if (atts.Any(att =>
-                                skipAttachmentExtension.Contains(
-                                    System.IO.Path.GetExtension(att.Name ?? string.Empty).TrimStart('.'),
-                                    StringComparer.OrdinalIgnoreCase))) {
+                                skipAttachmentExtensions.Contains(
+                                    System.IO.Path.GetExtension(att.Name ?? string.Empty).TrimStart('.')))) {
                             continue;
                         }
                     }
