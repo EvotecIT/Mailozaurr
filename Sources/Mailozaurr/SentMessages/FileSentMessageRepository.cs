@@ -21,17 +21,39 @@ public sealed class FileSentMessageRepository : ISentMessageRepository {
     }
 
     private void BuildIndex() {
+        index.Clear();
         long position = 0;
-        foreach (var line in File.ReadLines(filePath)) {
-            if (string.IsNullOrWhiteSpace(line)) {
-                position += newlineBytes.Length;
-                continue;
+        try {
+            foreach (var line in File.ReadLines(filePath)) {
+                if (string.IsNullOrWhiteSpace(line)) {
+                    position += newlineBytes.Length;
+                    continue;
+                }
+
+                if (TryDeserializeRecord(line, out var record) && !string.IsNullOrEmpty(record!.MessageId)) {
+                    index[record.MessageId] = position;
+                }
+
+                position += Encoding.UTF8.GetByteCount(line) + newlineBytes.Length;
             }
-            var record = JsonSerializer.Deserialize(line, MailozaurrJsonContext.Default.SentMessageRecord);
-            if (record != null && !string.IsNullOrEmpty(record.MessageId)) {
-                index[record.MessageId] = position;
-            }
-            position += Encoding.UTF8.GetByteCount(line) + newlineBytes.Length;
+        } catch (FileNotFoundException) {
+            index.Clear();
+        } catch (DirectoryNotFoundException) {
+            index.Clear();
+        }
+    }
+
+    private static bool TryDeserializeRecord(string json, out SentMessageRecord? record) {
+        record = null;
+        if (string.IsNullOrWhiteSpace(json)) {
+            return false;
+        }
+
+        try {
+            record = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.SentMessageRecord);
+            return record != null;
+        } catch (JsonException) {
+            return false;
         }
     }
 
@@ -70,10 +92,13 @@ public sealed class FileSentMessageRepository : ISentMessageRepository {
             if (string.IsNullOrWhiteSpace(line)) {
                 return null;
             }
-            var record = JsonSerializer.Deserialize(line, MailozaurrJsonContext.Default.SentMessageRecord);
-            if (record != null && string.Equals(record.MessageId, messageId, StringComparison.OrdinalIgnoreCase)) {
+            if (TryDeserializeRecord(line, out var record) && string.Equals(record!.MessageId, messageId, StringComparison.OrdinalIgnoreCase)) {
                 return record;
             }
+            return null;
+        } catch (FileNotFoundException) {
+            return null;
+        } catch (DirectoryNotFoundException) {
             return null;
         } finally {
             gate.Release();

@@ -77,6 +77,62 @@ public class SentMessageRepositoryTests {
         }
     }
 
+    [Fact]
+    public async Task Constructor_IgnoresMalformedLinesAndIndexesValidRecords() {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".json");
+        try {
+            var newline = Encoding.UTF8.GetBytes(Environment.NewLine);
+            using (var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read)) {
+                await JsonSerializer.SerializeAsync(stream, new SentMessageRecord {
+                    MessageId = "1",
+                    Recipients = "a@b.com",
+                    Subject = "ok-1",
+                    Timestamp = DateTimeOffset.UtcNow
+                });
+                await stream.WriteAsync(newline, 0, newline.Length);
+                await stream.WriteAsync(Encoding.UTF8.GetBytes("{not-json"), 0, Encoding.UTF8.GetByteCount("{not-json"));
+                await stream.WriteAsync(newline, 0, newline.Length);
+                await JsonSerializer.SerializeAsync(stream, new SentMessageRecord {
+                    MessageId = "2",
+                    Recipients = "c@d.com",
+                    Subject = "ok-2",
+                    Timestamp = DateTimeOffset.UtcNow
+                });
+                await stream.WriteAsync(newline, 0, newline.Length);
+            }
+
+            var repo = new FileSentMessageRepository(path);
+            var record = await repo.GetByMessageIdAsync("2");
+
+            Assert.NotNull(record);
+            Assert.Equal("ok-2", record!.Subject);
+        } finally {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task GetByMessageIdAsync_ReturnsNullWhenIndexedLineBecomesMalformed() {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".json");
+        try {
+            var repo = new FileSentMessageRepository(path);
+            await repo.SaveAsync(new SentMessageRecord {
+                MessageId = "1",
+                Recipients = "a@b.com",
+                Subject = "subject",
+                Timestamp = DateTimeOffset.UtcNow
+            });
+
+            File.WriteAllText(path, "{broken");
+
+            var record = await repo.GetByMessageIdAsync("1");
+
+            Assert.Null(record);
+        } finally {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
     private static async Task<SentMessageRecord?> SequentialSearchAsync(string path, string messageId) {
         using var read = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         using var reader = new StreamReader(read);
