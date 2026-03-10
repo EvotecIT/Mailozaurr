@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
 using Xunit;
@@ -8,8 +7,8 @@ namespace Mailozaurr.Tests;
 
 public class OAuthHelpersGoogleCachedTokenTests {
     public OAuthHelpersGoogleCachedTokenTests() {
-        ResetCache();
-        DeleteCacheFile();
+        OAuthCacheTestHelper.ResetOAuthTokenCache();
+        OAuthCacheTestHelper.DeleteOAuthCacheFile();
     }
 
     [Fact]
@@ -91,11 +90,6 @@ public class OAuthHelpersGoogleCachedTokenTests {
         Assert.Equal(clientId, legacy.ClientId);
     }
 
-    private static void ResetCache() {
-        var field = typeof(OAuthTokenCache).GetField("_cache", BindingFlags.Static | BindingFlags.NonPublic);
-        field?.SetValue(null, null);
-    }
-
     private static async Task PersistGoogleCredentialAsync(
         OAuthCredential credential,
         string gmailAccount,
@@ -105,11 +99,4 @@ public class OAuthHelpersGoogleCachedTokenTests {
         await task.ConfigureAwait(false);
     }
 
-    private static void DeleteCacheFile() {
-        var pathField = typeof(OAuthTokenCache).GetField("CacheFilePath", BindingFlags.Static | BindingFlags.NonPublic);
-        var path = pathField?.GetValue(null) as string;
-        if (!string.IsNullOrEmpty(path) && File.Exists(path)) {
-            File.Delete(path);
-        }
-    }
 }

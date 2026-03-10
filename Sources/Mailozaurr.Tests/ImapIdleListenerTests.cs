@@ -46,6 +46,19 @@ public class ImapIdleListenerTests {
     }
 
     [Fact]
+    public async Task StartAsync_FailureDuringInitialSetup_CleansUpState() {
+        var listener = new ImapIdleListener(new ImapClient());
+
+        await Assert.ThrowsAnyAsync<Exception>(() => listener.StartAsync());
+
+        Assert.Null(GetPrivateField<CancellationTokenSource?>(listener, "_cancel"));
+        Assert.Null(GetPrivateField<Task?>(listener, "_idleTask"));
+        Assert.Null(GetPrivateField<IMailFolder?>(listener, "_folder"));
+
+        await Assert.ThrowsAnyAsync<Exception>(() => listener.StartAsync());
+    }
+
+    [Fact]
     public async Task StopAsync_PropagatesExceptionsFromIdleLoop() {
         var listener = new ImapIdleListener(new ImapClient());
         var cancellation = new CancellationTokenSource();

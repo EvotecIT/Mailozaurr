@@ -50,15 +50,24 @@ public class Pop3PollListener : IDisposable, IAsyncDisposable {
         }
 
         _cancel = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        _knownUids.Clear();
-        var count = GetMessageCount();
-        for (var i = 0; i < count; i++) {
-            var uid = await GetMessageUidAsync(i, _cancel.Token).ConfigureAwait(false);
-            if (!string.IsNullOrEmpty(uid)) {
-                _knownUids.Add(uid);
+        try {
+            _knownUids.Clear();
+            var count = GetMessageCount();
+            for (var i = 0; i < count; i++) {
+                var uid = await GetMessageUidAsync(i, _cancel.Token).ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(uid)) {
+                    _knownUids.Add(uid);
+                }
             }
+
+            _pollingTask = PollLoopAsync();
+        } catch {
+            _knownUids.Clear();
+            _cancel.Dispose();
+            _cancel = null;
+            _pollingTask = null;
+            throw;
         }
-        _pollingTask = PollLoopAsync();
     }
 
     /// <summary>
