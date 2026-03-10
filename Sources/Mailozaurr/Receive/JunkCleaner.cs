@@ -1,7 +1,10 @@
 using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Search;
+using MimeKit;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,6 +15,15 @@ namespace Mailozaurr;
 /// Helper methods for clearing junk mail folders.
 /// </summary>
 public static class JunkCleaner {
+    private sealed class JunkSkipCriteria {
+        public HashSet<string>? MessageIds { get; init; }
+        public HashSet<uint>? Uids { get; init; }
+        public HashSet<string>? From { get; init; }
+        public HashSet<string>? To { get; init; }
+        public string[]? SubjectTokens { get; init; }
+        public HashSet<string>? AttachmentExtensions { get; init; }
+    }
+
     /// <summary>
     /// Deletes all messages from the specified junk folder.
     /// </summary>
@@ -74,20 +86,12 @@ public static class JunkCleaner {
             return;
         }
 
-        var skipUidSet = skipUid != null ? new HashSet<uint>(skipUid) : null;
+        var criteria = CreateSkipCriteria(skipFrom, skipTo, skipSubjectContains, skipMessageId, skipUid, skipAttachmentExtension);
         var toDelete = new List<UniqueId>(uids.Count);
         foreach (var uid in uids) {
-            if (skipUidSet != null && skipUidSet.Contains(uid.Id)) continue;
+            if (criteria.Uids != null && criteria.Uids.Contains(uid.Id)) continue;
             var message = await junk.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
-            if (skipMessageId != null && message.MessageId != null && skipMessageId.Contains(message.MessageId)) continue;
-            if (skipFrom != null && message.From.Mailboxes.Any(m => skipFrom.Contains(m.Address, StringComparer.OrdinalIgnoreCase))) continue;
-            if (skipTo != null && message.To.Mailboxes.Any(m => skipTo.Contains(m.Address, StringComparer.OrdinalIgnoreCase))) continue;
-            if (skipSubjectContains != null && message.Subject != null && skipSubjectContains.Any(s => message.Subject.IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0)) continue;
-            if (skipHasAttachment && message.Attachments.Any()) continue;
-            if (skipAttachmentExtension != null && message.Attachments.OfType<MimeKit.MimePart>().Any(att =>
-                    skipAttachmentExtension.Contains(
-                        System.IO.Path.GetExtension(att.FileName ?? string.Empty).TrimStart('.'),
-                        StringComparer.OrdinalIgnoreCase))) {
+            if (ShouldSkipMessage(message, skipHasAttachment, criteria)) {
                 continue;
             }
             toDelete.Add(uid);
@@ -125,22 +129,82 @@ public static class JunkCleaner {
         [EnumeratorCancellation] CancellationToken cancellationToken = default) {
         var junk = client.GetCachedFolder(folder ?? "Junk", FolderAccess.ReadOnly);
         var uids = await junk.SearchAsync(SearchQuery.All, cancellationToken).ConfigureAwait(false);
-        var skipUidSet = skipUid != null ? new HashSet<uint>(skipUid) : null;
+        var criteria = CreateSkipCriteria(skipFrom, skipTo, skipSubjectContains, skipMessageId, skipUid, skipAttachmentExtension);
         foreach (var uid in uids) {
-            if (skipUidSet != null && skipUidSet.Contains(uid.Id)) continue;
+            if (criteria.Uids != null && criteria.Uids.Contains(uid.Id)) continue;
             var message = await junk.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
-            if (skipMessageId != null && message.MessageId != null && skipMessageId.Contains(message.MessageId)) continue;
-            if (skipFrom != null && message.From.Mailboxes.Any(m => skipFrom.Contains(m.Address, StringComparer.OrdinalIgnoreCase))) continue;
-            if (skipTo != null && message.To.Mailboxes.Any(m => skipTo.Contains(m.Address, StringComparer.OrdinalIgnoreCase))) continue;
-            if (skipSubjectContains != null && message.Subject != null && skipSubjectContains.Any(s => message.Subject.IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0)) continue;
-            if (skipHasAttachment && message.Attachments.Any()) continue;
-            if (skipAttachmentExtension != null && message.Attachments.OfType<MimeKit.MimePart>().Any(att =>
-                    skipAttachmentExtension.Contains(
-                        System.IO.Path.GetExtension(att.FileName ?? string.Empty).TrimStart('.'),
-                        StringComparer.OrdinalIgnoreCase))) {
+            if (ShouldSkipMessage(message, skipHasAttachment, criteria)) {
                 continue;
             }
             yield return new ImapEmailMessage(uid, message);
         }
+    }
+
+    private static JunkSkipCriteria CreateSkipCriteria(
+        IEnumerable<string>? skipFrom,
+        IEnumerable<string>? skipTo,
+        IEnumerable<string>? skipSubjectContains,
+        IEnumerable<string>? skipMessageId,
+        IEnumerable<uint>? skipUid,
+        IEnumerable<string>? skipAttachmentExtension) =>
+        new() {
+            MessageIds = skipMessageId != null ? new HashSet<string>(skipMessageId, StringComparer.OrdinalIgnoreCase) : null,
+            Uids = skipUid != null ? new HashSet<uint>(skipUid) : null,
+            From = skipFrom != null ? new HashSet<string>(skipFrom, StringComparer.OrdinalIgnoreCase) : null,
+            To = skipTo != null ? new HashSet<string>(skipTo, StringComparer.OrdinalIgnoreCase) : null,
+            SubjectTokens = skipSubjectContains?
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToArray(),
+            AttachmentExtensions = NormalizeAttachmentExtensions(skipAttachmentExtension)
+        };
+
+    private static HashSet<string>? NormalizeAttachmentExtensions(IEnumerable<string>? skipAttachmentExtension) {
+        if (skipAttachmentExtension == null) {
+            return null;
+        }
+
+        var normalized = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var extension in skipAttachmentExtension) {
+            if (string.IsNullOrWhiteSpace(extension)) {
+                continue;
+            }
+
+            var value = extension.Trim().TrimStart('.');
+            if (value.Length > 0) {
+                normalized.Add(value);
+            }
+        }
+
+        return normalized;
+    }
+
+    private static bool ShouldSkipMessage(MimeMessage message, bool skipHasAttachment, JunkSkipCriteria criteria) {
+        if (criteria.MessageIds != null && message.MessageId != null && criteria.MessageIds.Contains(message.MessageId)) {
+            return true;
+        }
+
+        if (criteria.From != null && message.From.Mailboxes.Any(mailbox => criteria.From.Contains(mailbox.Address))) {
+            return true;
+        }
+
+        if (criteria.To != null && message.To.Mailboxes.Any(mailbox => criteria.To.Contains(mailbox.Address))) {
+            return true;
+        }
+
+        if (criteria.SubjectTokens != null && message.Subject != null &&
+            criteria.SubjectTokens.Any(token => message.Subject.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0)) {
+            return true;
+        }
+
+        if (skipHasAttachment && message.Attachments.Any()) {
+            return true;
+        }
+
+        if (criteria.AttachmentExtensions != null && message.Attachments.OfType<MimePart>().Any(att =>
+                criteria.AttachmentExtensions.Contains(System.IO.Path.GetExtension(att.FileName ?? string.Empty).TrimStart('.')))) {
+            return true;
+        }
+
+        return false;
     }
 }
