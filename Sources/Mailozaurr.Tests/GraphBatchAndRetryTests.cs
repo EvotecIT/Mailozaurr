@@ -76,6 +76,32 @@ public class GraphBatchAndRetryTests {
         }
     }
 
+    [Fact]
+    public async Task SendMessageBatchAsync_Canceled_ThrowsOperationCanceledException() {
+        var handler = new BatchHandler();
+        var field = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var client = (HttpClient)field.GetValue(null)!;
+        var handlerField = GetHandlerField();
+        var original = (HttpMessageHandler)handlerField.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        try {
+            using var graph = new Graph {
+                From = "sender@example.com",
+                To = new object[] { "recipient@example.com" },
+                Subject = "sub",
+                HTML = "body",
+                ContentType = "HTML"
+            };
+            graph.Authenticate(new System.Net.NetworkCredential("id@tenant", "secret"));
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => graph.SendMessageBatchAsync(cts.Token));
+        } finally {
+            handlerField.SetValue(client, original);
+        }
+    }
+
     private class RetryHandler : HttpMessageHandler {
         public int CallCount;
 
