@@ -385,6 +385,24 @@ public sealed class GmailMailboxBrowserTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task MoveMessageAsync_WithNullSourceFolder_DoesNotRemoveInbox() {
+        var labelsJson = "{\"labels\":[{\"id\":\"Label_Target\",\"name\":\"Archive\"}]}";
+        var modifyJson = "{\"id\":\"m1\",\"threadId\":\"t1\"}";
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(labelsJson) },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(modifyJson) });
+        var browser = CreateBrowser(handler);
+
+        await browser.MoveMessageAsync("m1", sourceFolder: null, targetFolder: "Archive");
+
+        Assert.Equal(2, handler.Requests.Count);
+        var body = await handler.Requests[1].Content!.ReadAsStringAsync();
+        Assert.Contains("\"addLabelIds\":[\"Label_Target\"]", body, StringComparison.Ordinal);
+        Assert.Contains("\"removeLabelIds\":[\"TRASH\"]", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("INBOX", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task ArchiveMessagesAsync_UsesBatchModify_AndReturnsPerMessageResults() {
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(string.Empty) });
         var browser = CreateBrowser(handler);
@@ -398,6 +416,26 @@ public sealed class GmailMailboxBrowserTests {
         var body = await handler.Requests[0].Content!.ReadAsStringAsync();
         Assert.Contains("\"ids\":[\"m1\",\"m2\"]", body, StringComparison.Ordinal);
         Assert.Contains("\"removeLabelIds\":[\"INBOX\",\"TRASH\"]", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task MoveMessagesAsync_WithNullSourceFolder_DoesNotRemoveInbox() {
+        var labelsJson = "{\"labels\":[{\"id\":\"Label_Target\",\"name\":\"Archive\"}]}";
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(labelsJson) },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(string.Empty) });
+        var browser = CreateBrowser(handler);
+
+        var results = await browser.MoveMessagesAsync(new[] { "m1", "m2" }, sourceFolder: null, targetFolder: "Archive");
+
+        Assert.Equal(2, results.Count);
+        Assert.All(results, x => Assert.True(x.Ok, x.Error));
+        Assert.Equal(2, handler.Requests.Count);
+        var body = await handler.Requests[1].Content!.ReadAsStringAsync();
+        Assert.Contains("\"ids\":[\"m1\",\"m2\"]", body, StringComparison.Ordinal);
+        Assert.Contains("\"addLabelIds\":[\"Label_Target\"]", body, StringComparison.Ordinal);
+        Assert.Contains("\"removeLabelIds\":[\"TRASH\"]", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("INBOX", body, StringComparison.Ordinal);
     }
 
     [Fact]
