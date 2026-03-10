@@ -542,6 +542,18 @@ public class GraphMailboxBrowserTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task MoveMessagesAsync_WithNoMessageIds_SkipsFolderResolution() {
+        var handler = new RecordingHandler();
+        var client = CreateClient(handler);
+        var browser = new GraphMailboxBrowser(client);
+
+        var results = await browser.MoveMessagesAsync(Array.Empty<string>(), "Archive");
+
+        Assert.Empty(results);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task ArchiveConversationsAsync_UsesArchiveDestinationAlias() {
         var folderJson = "{\"id\":\"archive-id\"}";
         var listJson = "{\"value\":[{\"id\":\"m1\"}]}";
@@ -565,6 +577,18 @@ public class GraphMailboxBrowserTests {
         var body = await handler.Requests[2].Content!.ReadAsStringAsync();
         Assert.Contains("me/messages/m1/move", body, StringComparison.Ordinal);
         Assert.Contains("\"destinationId\":\"archive-id\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task MoveConversationsAsync_WithNoConversationIds_SkipsFolderResolution() {
+        var handler = new RecordingHandler();
+        var client = CreateClient(handler);
+        var browser = new GraphMailboxBrowser(client);
+
+        var results = await browser.MoveConversationsAsync(Array.Empty<string>(), "Archive");
+
+        Assert.Empty(results);
+        Assert.Empty(handler.Requests);
     }
 
     [Fact]
