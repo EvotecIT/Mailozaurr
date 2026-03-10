@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -59,6 +60,25 @@ public class GraphDraftTests
 
         var warnings = graph.LogCollector.Logs.ToArray();
         Assert.Contains(warnings, entry => entry.Type == LogType.Warning && entry.Message.IndexOf(missing, StringComparison.OrdinalIgnoreCase) >= 0);
+    }
+
+    [Fact]
+    public async Task CreateGraphAttachment_Canceled_ThrowsOperationCanceledException()
+    {
+        string tmp = Path.GetTempFileName();
+        File.WriteAllBytes(tmp, new byte[1024]);
+        using var graph = new Graph();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        try
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => graph.CreateGraphAttachment(tmp, cts.Token));
+        }
+        finally
+        {
+            File.Delete(tmp);
+        }
     }
 
     [Fact]

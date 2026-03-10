@@ -4,6 +4,7 @@ using Mailozaurr;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using System.IO;
 using System.Management.Automation;
@@ -225,6 +226,50 @@ namespace Mailozaurr.Tests {
 
             Assert.True(result.Status, $"Graph send failed: {result.Error}");
             Assert.Single(handler.Requests);
+        }
+
+        [Fact]
+        public async Task ConnectO365GraphAsync_GraphCanceled_ThrowsOperationCanceledException() {
+            using var graph = new Graph();
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+            graph.Authenticate(new NetworkCredential("client@tenant", "secret"));
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => graph.ConnectO365GraphAsync(cts.Token));
+        }
+
+        [Fact]
+        public async Task SendEmail_GraphCanceled_ThrowsOperationCanceledException() {
+            using var graph = new Graph {
+                From = "sender@example.com",
+                To = new object[] { "recipient@example.com" },
+                Subject = "Test Email (Graph Cancel)",
+                HTML = "<b>Hello from Mailozaurr Graph!</b>",
+                ContentType = "HTML",
+                AccessToken = "token",
+                TokenType = "Bearer"
+            };
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => graph.SendMessageAsync(cts.Token));
+        }
+
+        [Fact]
+        public async Task SendDraftEmail_GraphCanceled_ThrowsOperationCanceledException() {
+            using var graph = new Graph {
+                From = "sender@example.com",
+                To = new object[] { "recipient@example.com" },
+                Subject = "Test Draft Email (Graph Cancel)",
+                HTML = "<b>Hello from Mailozaurr Graph Draft!</b>",
+                ContentType = "HTML",
+                AccessToken = "token",
+                TokenType = "Bearer"
+            };
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => graph.SendMessageDraftAsync(cts.Token));
         }
 
         [Fact]
