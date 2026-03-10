@@ -91,6 +91,8 @@ public static class HtmlUtils {
                 if (string.IsNullOrEmpty(fileName)) fileName = Guid.NewGuid().ToString("N");
                 replacements[url] = $"cid:{fileName}";
                 images.Add(new RemoteImage { ContentId = fileName, Data = data, MediaType = mediaType });
+            } catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested) {
+                throw new OperationCanceledException(ex.Message, ex, cancellationToken);
             } catch (Exception ex) {
                 LoggingMessages.Logger.WriteWarning($"Failed to download image '{url}': {ex.Message}");
             }

@@ -133,6 +133,37 @@ public class SentMessageRepositoryTests {
         }
     }
 
+    [Fact]
+    public async Task Constructor_RebuildsLfIndexedLogWithoutOffsetDrift() {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".json");
+        try {
+            var payload = string.Join("\n", new[] {
+                JsonSerializer.Serialize(new SentMessageRecord {
+                    MessageId = "1",
+                    Recipients = "first@example.com",
+                    Subject = "first",
+                    Timestamp = DateTimeOffset.UtcNow
+                }, MailozaurrJsonContext.Default.SentMessageRecord),
+                JsonSerializer.Serialize(new SentMessageRecord {
+                    MessageId = "2",
+                    Recipients = "second@example.com",
+                    Subject = "second",
+                    Timestamp = DateTimeOffset.UtcNow.AddMinutes(1)
+                }, MailozaurrJsonContext.Default.SentMessageRecord)
+            }) + "\n";
+            File.WriteAllText(path, payload, Encoding.UTF8);
+
+            var repo = new FileSentMessageRepository(path);
+            var record = await repo.GetByMessageIdAsync("2");
+
+            Assert.NotNull(record);
+            Assert.Equal("second", record!.Subject);
+            Assert.Equal("second@example.com", record.Recipients);
+        } finally {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
     private static async Task<SentMessageRecord?> SequentialSearchAsync(string path, string messageId) {
         using var read = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         using var reader = new StreamReader(read);
