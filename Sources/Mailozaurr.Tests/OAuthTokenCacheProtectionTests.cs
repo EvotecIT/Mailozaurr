@@ -94,6 +94,52 @@ public sealed class OAuthTokenCacheProtectionTests {
         Assert.Equal(credential.ServiceAccountSubject, loaded.ServiceAccountSubject);
     }
 
+    [Fact]
+    public async Task GetAsync_MalformedCacheFileReturnsNull() {
+        var cacheKey = "oauth:malformed@example.com";
+        var path = GetCacheFilePath();
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory)) {
+            Directory.CreateDirectory(directory);
+        }
+
+        File.WriteAllText(path, "{broken");
+
+        var loaded = await OAuthTokenCache.GetAsync(cacheKey);
+
+        Assert.Null(loaded);
+    }
+
+    [Fact]
+    public async Task SetAsync_MalformedCacheFileIsRecovered() {
+        var cacheKey = "oauth:recover@example.com";
+        var path = GetCacheFilePath();
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory)) {
+            Directory.CreateDirectory(directory);
+        }
+
+        File.WriteAllText(path, "{broken");
+
+        var credential = new OAuthCredential {
+            UserName = "recover@example.com",
+            AccessToken = "recovered-access-token",
+            ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(30)
+        };
+
+        await OAuthTokenCache.SetAsync(cacheKey, credential);
+
+        ResetCache();
+        var loaded = await OAuthTokenCache.GetAsync(cacheKey);
+
+        Assert.NotNull(loaded);
+        Assert.Equal(credential.UserName, loaded!.UserName);
+        Assert.Equal(credential.AccessToken, loaded.AccessToken);
+
+        var json = File.ReadAllText(path);
+        Assert.DoesNotContain("{broken", json, StringComparison.Ordinal);
+    }
+
     private static void ResetCache() {
         var field = typeof(OAuthTokenCache).GetField("_cache", BindingFlags.Static | BindingFlags.NonPublic);
         field?.SetValue(null, null);
