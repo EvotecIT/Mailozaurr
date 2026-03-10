@@ -791,16 +791,20 @@ namespace Mailozaurr {
         /// <summary>
         /// Retrieves the raw MIME content of a mail message.
         /// </summary>
-        public static async Task<MimeMessage> GetMailMessageMimeAsync(GraphCredential credential, string userPrincipalName, string messageId) {
-            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
+        public static async Task<MimeMessage> GetMailMessageMimeAsync(
+            GraphCredential credential,
+            string userPrincipalName,
+            string messageId,
+            CancellationToken cancellationToken = default) {
+            var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com", cancellationToken).ConfigureAwait(false);
             var request = new HttpRequestMessage(HttpMethod.Get, $"https://graph.microsoft.com/v1.0/users/{userPrincipalName}/messages/{messageId}/$value");
             request.Headers.TryAddWithoutValidation("Authorization", token);
-            await ConcurrencySemaphore.WaitAsync().ConfigureAwait(false);
+            await ConcurrencySemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
             try {
-                using var response = await HttpClient.SendAsync(request).ConfigureAwait(false);
+                using var response = await HttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
                 using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-                return await MimeMessage.LoadAsync(stream).ConfigureAwait(false);
+                return await MimeMessage.LoadAsync(stream, cancellationToken).ConfigureAwait(false);
             } finally {
                 ConcurrencySemaphore.Release();
             }

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace Mailozaurr.Tests;
 
+[Collection("GraphCollection")]
 public sealed class OAuthTokenCacheProtectionTests {
     public OAuthTokenCacheProtectionTests() {
         OAuthCacheTestHelper.ResetOAuthTokenCache();
