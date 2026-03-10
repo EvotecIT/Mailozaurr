@@ -84,6 +84,27 @@ public sealed class ProviderPendingMessageTests {
         }
     }
 
+    private sealed class CancellationOnSavePendingMessageRepository : IPendingMessageRepository {
+        private readonly TaskCompletionSource<bool> saveStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task WaitForSaveStartAsync() => saveStarted.Task;
+
+        public async Task SaveAsync(PendingMessageRecord record, CancellationToken cancellationToken = default) {
+            saveStarted.TrySetResult(true);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
+        }
+
+        public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<PendingMessageRecord?>(null);
+
+        public async IAsyncEnumerable<PendingMessageRecord> GetAllAsync([EnumeratorCancellation] CancellationToken cancellationToken = default) {
+            await Task.CompletedTask;
+            yield break;
+        }
+
+        public Task RemoveAsync(string messageId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
     [Fact]
     public async Task SendGridClientQueuesAndProcessesPendingMessage() {
         using var client = new SendGridClient {
@@ -163,6 +184,34 @@ public sealed class ProviderPendingMessageTests {
     }
 
     [Fact]
+    public async Task SendGridClient_CancellationDuringPendingSave_PropagatesCancellation() {
+        using var client = new SendGridClient {
+            Credentials = new NetworkCredential("apikey", "SG.API"),
+            From = "sender@example.com",
+            To = new List<object> { "recipient@example.com" },
+            Subject = "pending-save-cancel",
+            Text = "hello"
+        };
+        client.CreateMessage();
+
+        var repository = new CancellationOnSavePendingMessageRepository();
+        client.PendingMessageRepository = repository;
+
+        var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError) {
+            Content = new StringContent("failure", Encoding.UTF8, "text/plain")
+        }));
+        var httpClientField = typeof(SendGridClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        httpClientField.SetValue(client, new HttpClient(failureHandler));
+
+        using var cts = new CancellationTokenSource();
+        var sendTask = client.SendEmailAsync(cts.Token);
+        await repository.WaitForSaveStartAsync();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await sendTask);
+    }
+
+    [Fact]
     public async Task MailgunClientQueuesAndProcessesPendingMessage() {
         var repository = new InMemoryPendingMessageRepository();
         using var client = new MailgunClient {
@@ -210,6 +259,32 @@ public sealed class ProviderPendingMessageTests {
 
         Assert.Equal(1, successHandler.CallCount);
         Assert.Null(await repository.GetByMessageIdAsync(record!.MessageId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task MailgunClient_CancellationDuringPendingSave_PropagatesCancellation() {
+        var repository = new CancellationOnSavePendingMessageRepository();
+        using var client = new MailgunClient {
+            PendingMessageRepository = repository,
+            Credentials = new NetworkCredential("user", "mailgun-api-key"),
+            From = "sender@example.com",
+            To = new List<object> { "recipient@example.com" },
+            Subject = "mailgun-cancel",
+            Text = "body"
+        };
+
+        var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadGateway) {
+            Content = new StringContent("error", Encoding.UTF8, "text/plain")
+        }));
+        var httpClientField = typeof(MailgunClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        httpClientField.SetValue(client, new HttpClient(failureHandler));
+
+        using var cts = new CancellationTokenSource();
+        var sendTask = client.SendEmailAsync(cts.Token);
+        await repository.WaitForSaveStartAsync();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await sendTask);
     }
 
     [Fact]
@@ -280,6 +355,41 @@ public sealed class ProviderPendingMessageTests {
     }
 
     [Fact]
+    public async Task GmailClient_CancellationDuringPendingSave_PropagatesCancellation() {
+        var credential = new OAuthCredential {
+            UserName = "user@example.com",
+            AccessToken = "access-token",
+            RefreshToken = "refresh-token",
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
+            ClientId = "client-123",
+            ClientSecret = "client-secret"
+        };
+        var repository = new CancellationOnSavePendingMessageRepository();
+        var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError) {
+            Content = new StringContent("{\"error\":\"failed\"}", Encoding.UTF8, "application/json")
+        }));
+        using var failureClient = new HttpClient(failureHandler) {
+            BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/")
+        };
+        using var client = new GmailApiClient(failureClient, credential: credential) {
+            PendingMessageRepository = repository
+        };
+
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse("sender@example.com"));
+        message.To.Add(MailboxAddress.Parse("recipient@example.com"));
+        message.Subject = "gmail-cancel";
+        message.Body = new TextPart("plain") { Text = "body" };
+
+        using var cts = new CancellationTokenSource();
+        var sendTask = client.SendAsync("me", message, cts.Token);
+        await repository.WaitForSaveStartAsync();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await sendTask);
+    }
+
+    [Fact]
     public async Task SesClientQueuesAndProcessesPendingMessage() {
         var repository = new InMemoryPendingMessageRepository();
         using var client = new SesClient {
@@ -328,5 +438,32 @@ public sealed class ProviderPendingMessageTests {
 
         Assert.Equal(1, successHandler.CallCount);
         Assert.Null(await repository.GetByMessageIdAsync(record!.MessageId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task SesClient_CancellationDuringPendingSave_PropagatesCancellation() {
+        var repository = new CancellationOnSavePendingMessageRepository();
+        using var client = new SesClient {
+            PendingMessageRepository = repository,
+            Credentials = new NetworkCredential("AKIA123", "secret-key"),
+            Region = "us-east-1",
+            From = "sender@example.com",
+            To = new List<object> { "recipient@example.com" },
+            Subject = "ses-cancel",
+            Text = "body"
+        };
+
+        var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) {
+            Content = new StringContent("failure", Encoding.UTF8, "text/plain")
+        }));
+        var httpClientField = typeof(SesClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        httpClientField.SetValue(client, new HttpClient(failureHandler));
+
+        using var cts = new CancellationTokenSource();
+        var sendTask = client.SendEmailAsync(cts.Token);
+        await repository.WaitForSaveStartAsync();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await sendTask);
     }
 }
