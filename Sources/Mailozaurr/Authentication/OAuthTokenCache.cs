@@ -19,6 +19,40 @@ internal static class OAuthTokenCache {
 
     private static Dictionary<string, OAuthCredential>? _cache;
 
+    private static Dictionary<string, OAuthCredential> ConvertCacheEntries(
+        Dictionary<string, OAuthCredentialCacheEntry>? cacheEntries,
+        ICredentialProtector protector) {
+        var cache = new Dictionary<string, OAuthCredential>(StringComparer.Ordinal);
+        if (cacheEntries == null) {
+            return cache;
+        }
+
+        foreach (var pair in cacheEntries) {
+            if (pair.Value == null) {
+                continue;
+            }
+
+            cache[pair.Key] = pair.Value.ToCredential(protector);
+        }
+
+        return cache;
+    }
+
+    private static Dictionary<string, OAuthCredentialCacheEntry> CreateCacheEntries(
+        Dictionary<string, OAuthCredential> cache,
+        ICredentialProtector protector) {
+        var entries = new Dictionary<string, OAuthCredentialCacheEntry>(StringComparer.Ordinal);
+        foreach (var pair in cache) {
+            if (pair.Value == null) {
+                continue;
+            }
+
+            entries[pair.Key] = OAuthCredentialCacheEntry.FromCredential(pair.Value, protector);
+        }
+
+        return entries;
+    }
+
     private static async Task<Dictionary<string, OAuthCredential>> LoadCacheAsync(CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
         if (_cache != null) {
@@ -34,7 +68,9 @@ internal static class OAuthTokenCache {
 #else
                 var json = await File.ReadAllTextAsync(CacheFilePath, cancellationToken).ConfigureAwait(false);
 #endif
-                cache = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.DictionaryStringOAuthCredential) ?? new();
+                var protector = CredentialProtection.Default;
+                var cacheEntries = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.DictionaryStringOAuthCredentialCacheEntry);
+                cache = ConvertCacheEntries(cacheEntries, protector);
             } catch (FileNotFoundException) {
                 cache = new Dictionary<string, OAuthCredential>();
             } catch (DirectoryNotFoundException) {
@@ -82,7 +118,8 @@ internal static class OAuthTokenCache {
             if (!Directory.Exists(dir)) {
                 Directory.CreateDirectory(dir!);
             }
-            json = JsonSerializer.Serialize(cache, MailozaurrJsonContext.Default.DictionaryStringOAuthCredential);
+            var cacheEntries = CreateCacheEntries(cache, CredentialProtection.Default);
+            json = JsonSerializer.Serialize(cacheEntries, MailozaurrJsonContext.Default.DictionaryStringOAuthCredentialCacheEntry);
         }
         cancellationToken.ThrowIfCancellationRequested();
 #if NETFRAMEWORK || NETSTANDARD2_0
