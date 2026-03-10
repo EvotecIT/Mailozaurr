@@ -355,6 +355,30 @@ public class SearchNonDeliveryReportsTests {
         }
     }
 
+    [Fact]
+    public async Task SearchNonDeliveryReportsAsync_Graph_PropagatesCancellationToMessageListing() {
+        var handler = new CancelDuringGraphListHandler();
+        var field = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var client = (HttpClient)field.GetValue(null)!;
+        var handlerField = GetHandlerField();
+        var original = (HttpMessageHandler)handlerField.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        try {
+            var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", ClientSecret = "secret" };
+            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                MailboxSearcher.SearchNonDeliveryReportsAsync(
+                    cred,
+                    "user@example.com",
+                    cancellationToken: cts.Token));
+
+            Assert.True(handler.ListRequestCanceled);
+        } finally {
+            handlerField.SetValue(client, original);
+        }
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
@@ -471,6 +495,31 @@ public class SearchNonDeliveryReportsTests {
             }
 
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
+    }
+
+    private sealed class CancelDuringGraphListHandler : HttpMessageHandler {
+        public bool ListRequestCanceled { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            var uri = request.RequestUri!;
+            if (uri.AbsoluteUri.Contains("oauth2")) {
+                var json = "{\"access_token\":\"token\",\"token_type\":\"Bearer\"}";
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) };
+            }
+
+            if (uri.AbsolutePath.EndsWith("/messages", StringComparison.Ordinal)) {
+                try {
+                    await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken).ConfigureAwait(false);
+                } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                    ListRequestCanceled = true;
+                    throw;
+                }
+
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"value\":[]}") };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
         }
     }
 }

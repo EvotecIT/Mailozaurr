@@ -6,6 +6,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Net;
+using System.Net.Http;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -257,6 +260,36 @@ public class SearchDmarcReportsTests {
     }
 
     [Fact]
+    public async Task SearchDmarcReportsAsync_Graph_PropagatesCancellationToMimeDownload() {
+        var handler = new CancelDuringGraphMimeHandler();
+        var field = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var client = (HttpClient)field.GetValue(null)!;
+        var handlerField = GetHandlerField();
+        var original = (HttpMessageHandler)handlerField.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        try {
+            var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", ClientSecret = "secret" };
+            using var cts = new CancellationTokenSource();
+            var searchTask = MailboxSearcher.SearchDmarcReportsAsync(
+                cred,
+                "user@example.com",
+                cancellationToken: cts.Token);
+
+            var startedTask = handler.MimeStarted.Task;
+            var completed = await Task.WhenAny(startedTask, Task.Delay(TimeSpan.FromSeconds(1)));
+            Assert.Same(startedTask, completed);
+
+            cts.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await searchTask);
+
+            Assert.True(handler.MimeRequestCanceled);
+        } finally {
+            handlerField.SetValue(client, original);
+        }
+    }
+
+    [Fact]
     public void FilterDmarcReports_IgnoresMalformedArchive() {
         var now = DateTimeOffset.UtcNow;
         var message = new MimeMessage();
@@ -315,6 +348,44 @@ public class SearchDmarcReportsTests {
             Assert.True(logged);
         } finally {
             LoggingMessages.Logger.OnErrorMessage -= Handler;
+        }
+    }
+
+    private static FieldInfo GetHandlerField() =>
+        typeof(HttpMessageInvoker).GetField("_handler", BindingFlags.NonPublic | BindingFlags.Instance)
+        ?? typeof(HttpMessageInvoker).GetField("handler", BindingFlags.NonPublic | BindingFlags.Instance)
+        ?? throw new InvalidOperationException("HttpClient handler field not found");
+
+    private sealed class CancelDuringGraphMimeHandler : HttpMessageHandler {
+        public TaskCompletionSource<object?> MimeStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool MimeRequestCanceled { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            var uri = request.RequestUri!;
+            if (uri.AbsoluteUri.Contains("oauth2")) {
+                var json = "{\"access_token\":\"token\",\"token_type\":\"Bearer\"}";
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) };
+            }
+
+            if (uri.AbsolutePath.EndsWith("/messages", StringComparison.Ordinal)) {
+                var json = "{\"value\":[{\"id\":\"1\"}]}";
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) };
+            }
+
+            if (uri.AbsolutePath.Contains("/messages/", StringComparison.Ordinal) && uri.AbsolutePath.EndsWith("/$value", StringComparison.Ordinal)) {
+                MimeStarted.TrySetResult(null);
+                try {
+                    await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken).ConfigureAwait(false);
+                } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                    MimeRequestCanceled = true;
+                    throw;
+                }
+
+                const string raw = "Date: Mon, 1 Jan 2024 00:00:00 +0000\r\nSubject: report domain: example.com\r\n\r\nbody";
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(raw) };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
         }
     }
 }

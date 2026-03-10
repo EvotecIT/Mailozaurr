@@ -5,6 +5,7 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
+[Collection("GraphCollection")]
 public class OAuthHelpersGoogleCachedTokenTests {
     public OAuthHelpersGoogleCachedTokenTests() {
         OAuthCacheTestHelper.ResetOAuthTokenCache();
