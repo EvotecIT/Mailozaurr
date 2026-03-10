@@ -14,6 +14,30 @@ namespace Mailozaurr;
 /// Helper methods for acquiring OAuth tokens for various services.
 /// </summary>
 public static class OAuthHelpers {
+    private static string[] NormalizeScopes(IEnumerable<string> scopes) =>
+        scopes?
+            .Where(scope => !string.IsNullOrWhiteSpace(scope))
+            .Select(scope => scope.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(scope => scope, StringComparer.OrdinalIgnoreCase)
+            .ToArray()
+        ?? Array.Empty<string>();
+
+    private static string? BuildO365CacheKey(
+        string? login,
+        string clientId,
+        string tenantId,
+        string redirectUri,
+        IEnumerable<string> scopes) {
+        if (string.IsNullOrWhiteSpace(login)) {
+            return null;
+        }
+
+        var normalizedScopes = NormalizeScopes(scopes);
+        var scopeKey = normalizedScopes.Length == 0 ? "default" : string.Join(" ", normalizedScopes);
+        return $"o365:{login!.Trim()}|{clientId.Trim()}|{tenantId.Trim()}|{redirectUri.Trim()}|{scopeKey}";
+    }
+
     /// <summary>
     /// Acquires an OAuth token for Office 365 using an interactive browser flow.
     /// </summary>
@@ -60,7 +84,8 @@ public static class OAuthHelpers {
         var cred = new OAuthCredential {
             UserName = result.Account.Username,
             AccessToken = result.AccessToken,
-            ExpiresOn = result.ExpiresOn
+            ExpiresOn = result.ExpiresOn,
+            ClientId = clientId
         };
         await OAuthTokenCache.SetAsync($"o365:{cred.UserName}", cred);
         return cred;
@@ -97,7 +122,8 @@ public static class OAuthHelpers {
             return new OAuthCredential {
                 UserName = result.Account.Username,
                 AccessToken = result.AccessToken,
-                ExpiresOn = result.ExpiresOn
+                ExpiresOn = result.ExpiresOn,
+                ClientId = clientId
             };
         } catch (MsalUiRequiredException) {
             return null;
@@ -154,14 +180,15 @@ public static class OAuthHelpers {
         string tenantId,
         string redirectUri,
         IEnumerable<string> scopes) {
-        var cacheKey = string.IsNullOrWhiteSpace(login) ? null : $"o365:{login}";
+        var normalizedScopes = NormalizeScopes(scopes);
+        var cacheKey = BuildO365CacheKey(login, clientId, tenantId, redirectUri, normalizedScopes);
         if (cacheKey != null) {
             var cached = await OAuthTokenCache.GetAsync(cacheKey);
             if (cached != null && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
                 return cached;
             }
             if (cached != null) {
-                var refreshed = await AcquireO365TokenSilentAsync(login, clientId, tenantId, redirectUri, scopes);
+                var refreshed = await AcquireO365TokenSilentAsync(login, clientId, tenantId, redirectUri, normalizedScopes);
                 if (refreshed != null) {
                     await OAuthTokenCache.SetAsync(cacheKey, refreshed);
                     return refreshed;
@@ -169,7 +196,7 @@ public static class OAuthHelpers {
             }
         }
 
-        var cred = await AcquireO365TokenInteractiveAsync(login, clientId, tenantId, redirectUri, scopes);
+        var cred = await AcquireO365TokenInteractiveAsync(login, clientId, tenantId, redirectUri, normalizedScopes);
         if (cacheKey != null) {
             await OAuthTokenCache.SetAsync(cacheKey, cred);
         }

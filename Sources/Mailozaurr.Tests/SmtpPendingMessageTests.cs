@@ -200,6 +200,35 @@ public sealed class SmtpPendingMessageTests {
     }
 
     [Fact]
+    public async Task ProcessPendingMessages_StoresNormalizedRecipientAddressesInSentLog() {
+        var pending = new InMemoryPendingRepository();
+        var sent = new InMemorySentRepository();
+        var smtp = new Smtp { PendingMessageRepository = pending, SentMessageRepository = sent };
+        SetClient(smtp, new SuccessClient());
+
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse("sender@example.com"));
+        message.To.Add(new MailboxAddress("Doe, Jane", "jane@example.com"));
+        message.To.Add(new MailboxAddress("John Smith", "john@example.com"));
+        message.Subject = "queued";
+        message.Body = new TextPart("plain") { Text = "body" };
+        message.MessageId = "msg-normalized";
+        using (var ms = new MemoryStream()) {
+            await message.WriteToAsync(ms);
+            await pending.SaveAsync(new PendingMessageRecord {
+                MessageId = "msg-normalized",
+                MimeMessage = Convert.ToBase64String(ms.ToArray()),
+                Timestamp = DateTimeOffset.UtcNow
+            });
+        }
+
+        await smtp.ProcessPendingMessagesAsync();
+
+        var record = Assert.Single(sent.Saved);
+        Assert.Equal("jane@example.com,john@example.com", record.Recipients);
+    }
+
+    [Fact]
     public async Task ProcessPendingMessages_FailedSendRetainsMessage() {
         var pending = new InMemoryPendingRepository();
         var sent = new InMemorySentRepository();
@@ -383,4 +412,3 @@ public sealed class SmtpPendingMessageTests {
         }
     }
 }
-

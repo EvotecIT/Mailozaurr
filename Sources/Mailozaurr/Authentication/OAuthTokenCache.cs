@@ -28,12 +28,18 @@ internal static class OAuthTokenCache {
 
         Dictionary<string, OAuthCredential> cache;
         if (File.Exists(CacheFilePath)) {
+            try {
 #if NETFRAMEWORK || NETSTANDARD2_0
-            var json = await ReadCacheFileAsync(cancellationToken).ConfigureAwait(false);
+                var json = await ReadCacheFileAsync(cancellationToken).ConfigureAwait(false);
 #else
-            var json = await File.ReadAllTextAsync(CacheFilePath, cancellationToken).ConfigureAwait(false);
+                var json = await File.ReadAllTextAsync(CacheFilePath, cancellationToken).ConfigureAwait(false);
 #endif
-            cache = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.DictionaryStringOAuthCredential) ?? new();
+                cache = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.DictionaryStringOAuthCredential) ?? new();
+            } catch (FileNotFoundException) {
+                cache = new Dictionary<string, OAuthCredential>();
+            } catch (DirectoryNotFoundException) {
+                cache = new Dictionary<string, OAuthCredential>();
+            }
         } else {
             cache = new Dictionary<string, OAuthCredential>();
         }

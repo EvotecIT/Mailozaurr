@@ -15,11 +15,17 @@ public class OAuthHelpersCachedTokenTests {
 
     [Fact]
     public async Task AcquireO365TokenCachedAsync_ReturnsCachedToken() {
-        var cacheKey = "o365:test@example.com";
+        var cacheKey = BuildO365CacheKey(
+            "test@example.com",
+            "client-id",
+            "tenant-id",
+            "https://login.microsoftonline.com/common/oauth2/nativeclient",
+            Array.Empty<string>());
         var credential = new OAuthCredential {
             UserName = "test@example.com",
             AccessToken = "token",
-            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
+            ClientId = "client-id"
         };
         await OAuthTokenCache.SetAsync(cacheKey, credential);
 
@@ -32,6 +38,37 @@ public class OAuthHelpersCachedTokenTests {
 
         Assert.Equal(credential.AccessToken, result.AccessToken);
         Assert.Equal(credential.UserName, result.UserName);
+    }
+
+    [Fact]
+    public async Task AcquireO365TokenCachedAsync_SeparatesEntriesPerClientAndScope() {
+        var login = "test@example.com";
+        var redirectUri = "https://login.microsoftonline.com/common/oauth2/nativeclient";
+        var cacheKeyA = BuildO365CacheKey(login, "client-a", "tenant-id", redirectUri, new[] { "Mail.Read" });
+        var cacheKeyB = BuildO365CacheKey(login, "client-b", "tenant-id", redirectUri, new[] { "Mail.Read", "offline_access" });
+
+        await OAuthTokenCache.SetAsync(cacheKeyA, new OAuthCredential {
+            UserName = login,
+            AccessToken = "token-a",
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
+            ClientId = "client-a"
+        });
+        await OAuthTokenCache.SetAsync(cacheKeyB, new OAuthCredential {
+            UserName = login,
+            AccessToken = "token-b",
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
+            ClientId = "client-b"
+        });
+
+        var result = await OAuthHelpers.AcquireO365TokenCachedAsync(
+            login,
+            "client-b",
+            "tenant-id",
+            redirectUri,
+            new[] { "offline_access", "Mail.Read" });
+
+        Assert.Equal("token-b", result.AccessToken);
+        Assert.Equal("client-b", result.ClientId);
     }
 
     [Fact]
@@ -70,6 +107,16 @@ public class OAuthHelpersCachedTokenTests {
         field?.SetValue(null, null);
     }
 
+    private static string BuildO365CacheKey(
+        string login,
+        string clientId,
+        string tenantId,
+        string redirectUri,
+        string[] scopes) {
+        var method = typeof(OAuthHelpers).GetMethod("BuildO365CacheKey", BindingFlags.Static | BindingFlags.NonPublic);
+        return (string)method!.Invoke(null, new object[] { login, clientId, tenantId, redirectUri, scopes })!;
+    }
+
     private static void DeleteCacheFile() {
         var pathField = typeof(OAuthTokenCache).GetField("CacheFilePath", BindingFlags.Static | BindingFlags.NonPublic);
         var path = pathField?.GetValue(null) as string;
@@ -78,4 +125,3 @@ public class OAuthHelpersCachedTokenTests {
         }
     }
 }
-

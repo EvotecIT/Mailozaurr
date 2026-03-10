@@ -120,7 +120,7 @@ public sealed class GmailMailboxBrowserSession : IDisposable {
 
         _gmail = baseAddress == null
             ? new GmailApiClient(credential, refreshToken)
-            : new GmailApiClient(new HttpClient(), refreshToken, credential, baseAddress);
+            : new GmailApiClient(new HttpClient(), refreshToken, credential, baseAddress, ownsHttpClient: true);
         Browser = new GmailMailboxBrowser(_gmail, userId);
     }
 

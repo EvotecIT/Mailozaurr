@@ -907,7 +907,7 @@ public class Smtp {
                 if (SentMessageRepository != null) {
                     var sentRecord = new SentMessageRecord {
                         MessageId = message.MessageId ?? record.MessageId,
-                        Recipients = message.To.ToString(),
+                        Recipients = SentMessageRecipients.Serialize(message.To),
                         Subject = message.Subject ?? string.Empty,
                         Timestamp = DateTimeOffset.UtcNow
                     };
@@ -1013,7 +1013,7 @@ public class Smtp {
 
         var record = new SentMessageRecord {
             MessageId = messageId,
-            Recipients = SentTo,
+            Recipients = SentMessageRecipients.Serialize(Message?.To),
             Subject = Subject,
             Timestamp = DateTimeOffset.UtcNow
         };

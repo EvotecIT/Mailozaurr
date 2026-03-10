@@ -28,9 +28,9 @@ public sealed class SendLogResolver {
         var messageId = report.OriginalMessageId!;
         var record = await repository.GetByMessageIdAsync(messageId, cancellationToken);
         if (record != null) {
-            var recipient = report.FinalRecipientAddress ?? report.OriginalRecipientAddress;
+            var recipient = SentMessageRecipients.NormalizeAddress(report.FinalRecipientAddress ?? report.OriginalRecipientAddress);
             if (!string.IsNullOrWhiteSpace(recipient)) {
-                var recipients = record.Recipients.Split(',').Select(r => r.Trim());
+                var recipients = SentMessageRecipients.Parse(record.Recipients);
                 if (!recipients.Any(r => string.Equals(r, recipient, StringComparison.OrdinalIgnoreCase))) {
                     return null;
                 }
