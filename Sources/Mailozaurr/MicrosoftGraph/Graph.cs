@@ -808,7 +808,7 @@ namespace Mailozaurr;
             Headers = new Dictionary<string, string> { ["Content-Type"] = "application/json" },
             Body = bodyObj
         };
-        var results = await MicrosoftGraphUtils.SendBatchAsync(credential, new[] { request });
+        var results = await MicrosoftGraphUtils.SendBatchAsync(credential, new[] { request }, cancellationToken);
         var response = results.FirstOrDefault();
         var success = response != null && response.Status >= 200 && response.Status < 300;
         return new SmtpResult(
