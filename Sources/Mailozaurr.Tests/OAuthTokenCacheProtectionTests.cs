@@ -140,6 +140,45 @@ public sealed class OAuthTokenCacheProtectionTests {
         Assert.DoesNotContain("{broken", json, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task GetAsync_RetriesTransientFileLockAndLoadsCredential() {
+        var cacheKey = "oauth:locked@example.com";
+        var credential = new OAuthCredential {
+            UserName = "locked@example.com",
+            AccessToken = "locked-access-token",
+            ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(30)
+        };
+
+        var path = GetCacheFilePath();
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory)) {
+            Directory.CreateDirectory(directory);
+        }
+
+        var cacheEntries = new Dictionary<string, OAuthCredentialCacheEntry>(StringComparer.Ordinal) {
+            [cacheKey] = OAuthCredentialCacheEntry.FromCredential(credential, CredentialProtection.Default)
+        };
+        var json = JsonSerializer.Serialize(cacheEntries, MailozaurrJsonContext.Default.DictionaryStringOAuthCredentialCacheEntry);
+        File.WriteAllText(path, json);
+        ResetCache();
+
+        var lockStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
+        try {
+            var releaseTask = Task.Run(async () => {
+                await Task.Delay(75);
+                lockStream.Dispose();
+            });
+
+            var loaded = await OAuthTokenCache.GetAsync(cacheKey);
+            await releaseTask;
+
+            Assert.NotNull(loaded);
+            Assert.Equal(credential.AccessToken, loaded!.AccessToken);
+        } finally {
+            lockStream.Dispose();
+        }
+    }
+
     private static void ResetCache() {
         var field = typeof(OAuthTokenCache).GetField("_cache", BindingFlags.Static | BindingFlags.NonPublic);
         field?.SetValue(null, null);

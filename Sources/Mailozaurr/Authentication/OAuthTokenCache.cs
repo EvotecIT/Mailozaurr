@@ -64,11 +64,7 @@ internal static class OAuthTokenCache {
         Dictionary<string, OAuthCredential> cache;
         if (File.Exists(CacheFilePath)) {
             try {
-#if NETFRAMEWORK || NETSTANDARD2_0
                 var json = await ReadCacheFileAsync(cancellationToken).ConfigureAwait(false);
-#else
-                var json = await File.ReadAllTextAsync(CacheFilePath, cancellationToken).ConfigureAwait(false);
-#endif
                 var protector = CredentialProtection.Default;
                 var cacheEntries = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.DictionaryStringOAuthCredentialCacheEntry);
                 cache = ConvertCacheEntries(cacheEntries, protector);
