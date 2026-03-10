@@ -12,6 +12,8 @@ namespace Mailozaurr;
 [JsonSerializable(typeof(SentMessageRecord))]
 [JsonSerializable(typeof(OAuthCredential))]
 [JsonSerializable(typeof(Dictionary<string, OAuthCredential>))]
+[JsonSerializable(typeof(OAuthCredentialCacheEntry), TypeInfoPropertyName = "OAuthCredentialCacheEntry")]
+[JsonSerializable(typeof(Dictionary<string, OAuthCredentialCacheEntry>), TypeInfoPropertyName = "DictionaryStringOAuthCredentialCacheEntry")]
 [JsonSerializable(typeof(Dictionary<string, string>))]
 [JsonSerializable(typeof(Dictionary<string, bool>), TypeInfoPropertyName = "DictionaryStringBool")]
 [JsonSerializable(typeof(Dictionary<string, int>), TypeInfoPropertyName = "DictionaryStringInt")]
