@@ -77,6 +77,22 @@ public sealed class NativeMailboxBrowserSessionsTests {
     }
 
     [Fact]
+    public async Task GraphMailboxBrowserSession_Dispose_DoesNotDisposeProvidedHttpClient() {
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"value\":[]}") },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") });
+        var client = new HttpClient(handler) { BaseAddress = new Uri("https://graph.microsoft.com/v1.0/") };
+        var credential = new OAuthCredential { UserName = "me", AccessToken = "graph-token", ExpiresOn = DateTimeOffset.MaxValue };
+        var session = new GraphMailboxBrowserSession(client, credential);
+
+        await session.Browser.ListFoldersAsync();
+        session.Dispose();
+
+        using var response = await client.GetAsync("me");
+        Assert.True(response.IsSuccessStatusCode);
+    }
+
+    [Fact]
     public async Task GmailMailboxBrowserSession_Dispose_IsIdempotent_AndPreventsFurtherUse() {
         var handler = new RecordingHandler();
         var client = new HttpClient(handler) { BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/") };
@@ -87,5 +103,21 @@ public sealed class NativeMailboxBrowserSessionsTests {
         session.Dispose();
 
         await Assert.ThrowsAsync<ObjectDisposedException>(() => session.Browser.ListFoldersAsync());
+    }
+
+    [Fact]
+    public async Task GmailMailboxBrowserSession_Dispose_DoesNotDisposeProvidedHttpClient() {
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"labels\":[]}") },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") });
+        var client = new HttpClient(handler) { BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/") };
+        var credential = new OAuthCredential { UserName = "me", AccessToken = "gmail-token", ExpiresOn = DateTimeOffset.MaxValue };
+        var session = new GmailMailboxBrowserSession(client, credential);
+
+        await session.Browser.ListFoldersAsync();
+        session.Dispose();
+
+        using var response = await client.GetAsync("users/me/profile");
+        Assert.True(response.IsSuccessStatusCode);
     }
 }

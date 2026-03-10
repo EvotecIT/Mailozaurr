@@ -21,6 +21,7 @@ public sealed class GmailApiClient : IDisposable {
     private readonly HttpClient _client;
     private readonly Func<CancellationToken, Task<string>>? _refreshToken;
     private readonly OAuthCredential? _credential;
+    private readonly bool _disposeClient;
     private bool _disposed;
 
     private void ThrowIfDisposed() {
@@ -38,6 +39,7 @@ public sealed class GmailApiClient : IDisposable {
         }
 
         _credential = credential;
+        _disposeClient = true;
         _client = new HttpClient {
             BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/")
         };
@@ -56,14 +58,17 @@ public sealed class GmailApiClient : IDisposable {
     /// <param name="refreshToken">Optional delegate used to refresh an access token when a request returns 401/403.</param>
     /// <param name="credential">Optional OAuth credential holding an access token.</param>
     /// <param name="baseAddress">Optional Gmail base address used when <paramref name="client"/> has no base address configured.</param>
+    /// <param name="ownsHttpClient">When <c>true</c>, disposing this API client also disposes <paramref name="client"/>.</param>
     public GmailApiClient(
         HttpClient client,
         Func<CancellationToken, Task<string>>? refreshToken = null,
         OAuthCredential? credential = null,
-        Uri? baseAddress = null) {
+        Uri? baseAddress = null,
+        bool ownsHttpClient = false) {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _refreshToken = refreshToken;
         _credential = credential;
+        _disposeClient = ownsHttpClient;
         if (_client.BaseAddress == null) {
             _client.BaseAddress = baseAddress ?? new Uri("https://gmail.googleapis.com/gmail/v1/");
         }
@@ -88,7 +93,10 @@ public sealed class GmailApiClient : IDisposable {
             return;
         }
 
-        _client.Dispose();
+        if (_disposeClient) {
+            _client.Dispose();
+        }
+
         _disposed = true;
         GC.SuppressFinalize(this);
     }

@@ -48,4 +48,22 @@ public class SendLogResolverTests {
         var result = await resolver.ResolveAsync(report);
         Assert.Equal(record, result);
     }
+
+    [Fact]
+    public async Task ResolveAsync_MatchesLegacyFormattedRecipientsWithDisplayNameComma() {
+        var record = new SentMessageRecord {
+            MessageId = "id1",
+            Recipients = "\"Doe, Jane\" <jane@example.com>, John Smith <john@example.com>"
+        };
+        var repo = new InMemoryRepository(record);
+        var resolver = new SendLogResolver(repo);
+        var report = new NonDeliveryReport {
+            OriginalMessageId = "id1",
+            FinalRecipientAddress = "jane@example.com"
+        };
+
+        var result = await resolver.ResolveAsync(report);
+
+        Assert.Equal(record, result);
+    }
 }
