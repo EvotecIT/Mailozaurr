@@ -79,6 +79,72 @@ public class MicrosoftGraphUtilsPagingTests {
         }
     }
 
+    [Fact]
+    public async Task GetMailMessageAttachmentsAsync_FollowsNextLink() {
+        var page1 = new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new StringContent("{\"value\":[{\"name\":\"a1\",\"contentBytes\":\"QQ==\"}],\"@odata.nextLink\":\"https://graph.microsoft.com/v1.0/users/u/messages/m/attachments?$skip=1\"}")
+        };
+        var page2 = new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new StringContent("{\"value\":[{\"name\":\"a2\",\"contentBytes\":\"Qg==\"}]}")
+        };
+        var handler = new RecordingHandler(page1, page2);
+        var httpClientField = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var client = (HttpClient)httpClientField.GetValue(null)!;
+        var handlerField = GetHandlerField();
+        var original = (HttpMessageHandler)handlerField.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        var tokenCacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var tokenCache = (ConcurrentDictionary<string, GraphAuthorization>)tokenCacheField.GetValue(null)!;
+        var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", ClientSecret = "secret" };
+        var key = "id|tenant||secret|https://graph.microsoft.com";
+        tokenCache[key] = new GraphAuthorization { AccessToken = "token", TokenType = "Bearer", ExpiresOn = DateTimeOffset.UtcNow.AddHours(1) };
+        try {
+            var attachments = await MicrosoftGraphUtils.GetMailMessageAttachmentsAsync(cred, "u", "m");
+
+            Assert.Equal(2, attachments.Count);
+            Assert.Equal("a1", attachments[0].Name);
+            Assert.Equal("a2", attachments[1].Name);
+            Assert.Equal("https://graph.microsoft.com/v1.0/users/u/messages/m/attachments?$skip=1", handler.Requests[1].RequestUri!.AbsoluteUri);
+            Assert.Equal(2, handler.Requests.Count);
+        } finally {
+            handlerField.SetValue(client, original);
+            tokenCache.TryRemove(key, out _);
+        }
+    }
+
+    [Fact]
+    public async Task GetMailFoldersAsync_FollowsNextLink() {
+        var page1 = new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new StringContent("{\"value\":[{\"id\":\"f1\"}],\"@odata.nextLink\":\"https://graph.microsoft.com/v1.0/users/u/mailFolders?$skip=1\"}")
+        };
+        var page2 = new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new StringContent("{\"value\":[{\"id\":\"f2\"}]}")
+        };
+        var handler = new RecordingHandler(page1, page2);
+        var httpClientField = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var client = (HttpClient)httpClientField.GetValue(null)!;
+        var handlerField = GetHandlerField();
+        var original = (HttpMessageHandler)handlerField.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        var tokenCacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var tokenCache = (ConcurrentDictionary<string, GraphAuthorization>)tokenCacheField.GetValue(null)!;
+        var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", ClientSecret = "secret" };
+        var key = "id|tenant||secret|https://graph.microsoft.com";
+        tokenCache[key] = new GraphAuthorization { AccessToken = "token", TokenType = "Bearer", ExpiresOn = DateTimeOffset.UtcNow.AddHours(1) };
+        try {
+            var folders = await MicrosoftGraphUtils.GetMailFoldersAsync(cred, "u");
+
+            Assert.Equal(2, folders.Count);
+            Assert.Equal("f1", folders[0].GetProperty("id").GetString());
+            Assert.Equal("f2", folders[1].GetProperty("id").GetString());
+            Assert.Equal("https://graph.microsoft.com/v1.0/users/u/mailFolders?$skip=1", handler.Requests[1].RequestUri!.AbsoluteUri);
+            Assert.Equal(2, handler.Requests.Count);
+        } finally {
+            handlerField.SetValue(client, original);
+            tokenCache.TryRemove(key, out _);
+        }
+    }
+
     private sealed class BlockingHandler : HttpMessageHandler {
         private readonly string _firstPageJson;
         public List<HttpRequestMessage> Requests { get; } = new();
@@ -117,4 +183,3 @@ public class MicrosoftGraphUtilsPagingTests {
         }
     }
 }
-
