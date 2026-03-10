@@ -1,9 +1,10 @@
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using MimeKit;
-using System.Text.Json;
 
 namespace Mailozaurr.Tests;
 
@@ -212,6 +213,108 @@ public sealed class FilePendingMessageRepositoryTests {
 
             var loaded = await repo.GetByMessageIdAsync(record.MessageId);
             Assert.Null(loaded);
+        } finally {
+            if (File.Exists(filePath)) {
+                File.Delete(filePath);
+            }
+            if (Directory.Exists(dir)) {
+                Directory.Delete(dir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Constructor_RebuildsLfIndexedLogWithoutOffsetDrift() {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var filePath = Path.Combine(dir, "pending.log");
+        Directory.CreateDirectory(dir);
+
+        try {
+            var first = new PendingMessageRecord {
+                MessageId = "msg-1",
+                Timestamp = DateTimeOffset.UtcNow,
+                Provider = EmailProvider.SendGrid
+            };
+            var second = new PendingMessageRecord {
+                MessageId = "msg-2",
+                Timestamp = DateTimeOffset.UtcNow.AddMinutes(1),
+                Provider = EmailProvider.Mailgun
+            };
+
+            var payload = string.Join("\n", new[] {
+                JsonSerializer.Serialize(new PendingMessageLogEnvelope { EntryType = "upsert", MessageId = first.MessageId, Record = first }, MailozaurrJsonContext.Default.PendingMessageLogEnvelope),
+                JsonSerializer.Serialize(new PendingMessageLogEnvelope { EntryType = "upsert", MessageId = second.MessageId, Record = second }, MailozaurrJsonContext.Default.PendingMessageLogEnvelope)
+            }) + "\n";
+            File.WriteAllText(filePath, payload, Encoding.UTF8);
+
+            var repository = new FilePendingMessageRepository(filePath);
+            var loaded = await repository.GetByMessageIdAsync(second.MessageId);
+
+            Assert.NotNull(loaded);
+            Assert.Equal(second.MessageId, loaded!.MessageId);
+            Assert.Equal(second.Provider, loaded.Provider);
+        } finally {
+            if (File.Exists(filePath)) {
+                File.Delete(filePath);
+            }
+            if (Directory.Exists(dir)) {
+                Directory.Delete(dir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task GetByMessageIdAsync_ReturnsNullWhenFileIsDeletedAfterIndexing() {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var options = new PendingMessageRepositoryOptions { DirectoryPath = dir, FileNamingScheme = () => "pending.log" };
+        var filePath = Path.Combine(dir, "pending.log");
+        Directory.CreateDirectory(dir);
+
+        try {
+            var repository = new FilePendingMessageRepository(options);
+            var record = new PendingMessageRecord {
+                MessageId = Guid.NewGuid().ToString("N"),
+                Timestamp = DateTimeOffset.UtcNow,
+                Provider = EmailProvider.SendGrid
+            };
+
+            await repository.SaveAsync(record);
+            File.Delete(filePath);
+
+            var loaded = await repository.GetByMessageIdAsync(record.MessageId);
+
+            Assert.Null(loaded);
+        } finally {
+            if (File.Exists(filePath)) {
+                File.Delete(filePath);
+            }
+            if (Directory.Exists(dir)) {
+                Directory.Delete(dir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task GetAllAsync_ReturnsEmptyWhenFileIsDeletedAfterIndexing() {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var options = new PendingMessageRepositoryOptions { DirectoryPath = dir, FileNamingScheme = () => "pending.log" };
+        var filePath = Path.Combine(dir, "pending.log");
+        Directory.CreateDirectory(dir);
+
+        try {
+            var repository = new FilePendingMessageRepository(options);
+            var record = new PendingMessageRecord {
+                MessageId = Guid.NewGuid().ToString("N"),
+                Timestamp = DateTimeOffset.UtcNow,
+                Provider = EmailProvider.SendGrid
+            };
+
+            await repository.SaveAsync(record);
+            File.Delete(filePath);
+
+            var records = await ReadAllAsync(repository);
+
+            Assert.Empty(records);
         } finally {
             if (File.Exists(filePath)) {
                 File.Delete(filePath);

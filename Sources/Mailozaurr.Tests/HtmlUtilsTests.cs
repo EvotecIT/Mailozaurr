@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -171,5 +172,13 @@ public class HtmlUtilsTests
             handlerField.SetValue(client, original);
         }
     }
-}
 
+    [Fact]
+    public async Task DownloadRemoteImagesAsync_PropagatesCancellationAsync() {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await HtmlUtils.DownloadRemoteImagesAsync("<img src=\"https://example.com/img.png\">", cts.Token));
+    }
+}

@@ -7,7 +7,7 @@ public sealed class FileSentMessageRepository : ISentMessageRepository {
     private readonly string filePath;
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly Dictionary<string, long> index = new(StringComparer.OrdinalIgnoreCase);
-    private readonly byte[] newlineBytes = Encoding.UTF8.GetBytes(Environment.NewLine);
+    private static readonly byte[] NewlineBytes = Encoding.UTF8.GetBytes(Environment.NewLine);
 
     /// <summary>
     /// Creates a new repository using the specified file path.
@@ -22,19 +22,16 @@ public sealed class FileSentMessageRepository : ISentMessageRepository {
 
     private void BuildIndex() {
         index.Clear();
-        long position = 0;
         try {
-            foreach (var line in File.ReadLines(filePath)) {
+            foreach (var entry in LogFileLineReader.ReadLinesWithOffsets(filePath)) {
+                var line = entry.Line;
                 if (string.IsNullOrWhiteSpace(line)) {
-                    position += newlineBytes.Length;
                     continue;
                 }
 
                 if (TryDeserializeRecord(line, out var record) && !string.IsNullOrEmpty(record!.MessageId)) {
-                    index[record.MessageId] = position;
+                    index[record.MessageId] = entry.Offset;
                 }
-
-                position += Encoding.UTF8.GetByteCount(line) + newlineBytes.Length;
             }
         } catch (FileNotFoundException) {
             index.Clear();
@@ -68,7 +65,7 @@ public sealed class FileSentMessageRepository : ISentMessageRepository {
             using var write = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read);
             var offset = write.Position;
             await JsonSerializer.SerializeAsync(write, record, MailozaurrJsonContext.Default.SentMessageRecord, cancellationToken);
-            await write.WriteAsync(newlineBytes, 0, newlineBytes.Length, cancellationToken);
+            await write.WriteAsync(NewlineBytes, 0, NewlineBytes.Length, cancellationToken);
             index[record.MessageId] = offset;
         } finally {
             gate.Release();

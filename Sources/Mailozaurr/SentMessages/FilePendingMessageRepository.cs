@@ -14,7 +14,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
     private readonly string filePath;
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly Dictionary<string, long> index = new(StringComparer.OrdinalIgnoreCase);
-    private readonly byte[] newlineBytes = Encoding.UTF8.GetBytes(Environment.NewLine);
+    private static readonly byte[] NewlineBytes = Encoding.UTF8.GetBytes(Environment.NewLine);
     private int dirtyEntryCount;
 
     /// <summary>Creates a new repository using the specified options.</summary>
@@ -53,33 +53,31 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
             return;
         }
 
-        using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, bufferSize: 1024, leaveOpen: true);
+        try {
+            foreach (var line in LogFileLineReader.ReadLinesWithOffsets(filePath)) {
+                if (!TryParseLogEntry(line.Line, out var entry)) {
+                    continue;
+                }
 
-        long position = 0;
-        string? line;
-
-        while ((line = reader.ReadLine()) != null) {
-            var offset = position;
-            var byteLength = Encoding.UTF8.GetByteCount(line);
-            position += byteLength + newlineBytes.Length;
-
-            if (!TryParseLogEntry(line, out var entry)) {
-                continue;
-            }
-
-            switch (entry.Kind) {
-                case LogEntryKind.Upsert:
-                    if (index.ContainsKey(entry.MessageId)) {
+                switch (entry.Kind) {
+                    case LogEntryKind.Upsert:
+                        if (index.ContainsKey(entry.MessageId)) {
+                            dirtyEntryCount++;
+                        }
+                        index[entry.MessageId] = line.Offset;
+                        break;
+                    case LogEntryKind.Tombstone:
+                        index.Remove(entry.MessageId);
                         dirtyEntryCount++;
-                    }
-                    index[entry.MessageId] = offset;
-                    break;
-                case LogEntryKind.Tombstone:
-                    index.Remove(entry.MessageId);
-                    dirtyEntryCount++;
-                    break;
+                        break;
+                }
             }
+        } catch (FileNotFoundException) {
+            index.Clear();
+            dirtyEntryCount = 0;
+        } catch (DirectoryNotFoundException) {
+            index.Clear();
+            dirtyEntryCount = 0;
         }
     }
 
@@ -122,7 +120,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
         var offset = write.Position;
 
         await write.WriteAsync(payload, 0, payload.Length, cancellationToken).ConfigureAwait(false);
-        await write.WriteAsync(newlineBytes, 0, newlineBytes.Length, cancellationToken).ConfigureAwait(false);
+        await write.WriteAsync(NewlineBytes, 0, NewlineBytes.Length, cancellationToken).ConfigureAwait(false);
         await write.FlushAsync(cancellationToken).ConfigureAwait(false);
 
         return offset;
@@ -190,10 +188,10 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
                     var payload = SerializeEnvelope(envelope);
 
                     await write.WriteAsync(payload, 0, payload.Length, cancellationToken).ConfigureAwait(false);
-                    await write.WriteAsync(newlineBytes, 0, newlineBytes.Length, cancellationToken).ConfigureAwait(false);
+                    await write.WriteAsync(NewlineBytes, 0, NewlineBytes.Length, cancellationToken).ConfigureAwait(false);
 
                     newIndex[id] = position;
-                    position += payload.Length + newlineBytes.Length;
+                    position += payload.Length + NewlineBytes.Length;
                 }
 
                 await write.FlushAsync(cancellationToken).ConfigureAwait(false);
@@ -359,6 +357,10 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
                 return entry.Record;
             }
             return null;
+        } catch (FileNotFoundException) {
+            return null;
+        } catch (DirectoryNotFoundException) {
+            return null;
         } finally {
             gate.Release();
         }
@@ -404,6 +406,10 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
                     snapshot.Add(record);
                 }
             }
+        } catch (FileNotFoundException) {
+            snapshot.Clear();
+        } catch (DirectoryNotFoundException) {
+            snapshot.Clear();
         } finally {
             gate.Release();
         }
