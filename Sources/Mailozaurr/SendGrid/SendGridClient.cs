@@ -411,6 +411,8 @@ public sealed class SendGridClient : IDisposable {
                 if (delayMilliseconds > 0) {
                     await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken).ConfigureAwait(false);
                 }
+            } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                throw;
             } catch (TaskCanceledException ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Request canceled: {ex.Message}");
