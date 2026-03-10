@@ -564,6 +564,8 @@ namespace Mailozaurr;
             } finally {
                 MicrosoftGraphUtils.ConcurrencySemaphore.Release();
             }
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
         } catch (TaskCanceledException ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Connection to Graph API cancelled: {ex.Message}");
             return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, ex.Message);
@@ -631,6 +633,8 @@ namespace Mailozaurr;
                 } finally {
                     MicrosoftGraphUtils.ConcurrencySemaphore.Release();
                 }
+            } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                throw;
             } catch (TaskCanceledException ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Sending via Graph API cancelled: {ex.Message}");
@@ -693,6 +697,8 @@ namespace Mailozaurr;
         do {
             try {
                 return await SendDraftMessage(draftMessage, cancellationToken);
+            } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                throw;
             } catch (TaskCanceledException ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Sending draft via Graph API cancelled: {ex.Message}");
@@ -1010,10 +1016,9 @@ namespace Mailozaurr;
         int bytesRead;
         long offset = 0;
         try {
+            cancellationToken.ThrowIfCancellationRequested();
             while ((bytesRead = fileStream.Read(buffer, 0, chunkSize)) > 0) {
-                if (cancellationToken.IsCancellationRequested) {
-                    return fileContents;
-                }
+                cancellationToken.ThrowIfCancellationRequested();
 
                 var chunk = new byte[bytesRead];
                 Array.Copy(buffer, chunk, bytesRead);
@@ -1125,6 +1130,8 @@ namespace Mailozaurr;
             try {
                 await SendAttachmentChunkOnceAsync(uploadUrl, chunk, offset, fileSize, cancellationToken);
                 return;
+            } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                throw;
             } catch (Exception ex) {
                 lastException = ex;
                 var shouldRetry = (policy?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
@@ -1153,6 +1160,8 @@ namespace Mailozaurr;
                 var uploadUrl = await CreateUploadSession(draftMessage, attachmentItemJson.Json, cancellationToken);
                 await SendFileChunks(uploadUrl, attachmentItemJson.FilePath, attachmentItemJson.FileSize, cancellationToken);
                 return;
+            } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                throw;
             } catch (FileNotFoundException) {
                 throw;
             } catch (Exception ex) {
