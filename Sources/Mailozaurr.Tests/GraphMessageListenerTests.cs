@@ -12,20 +12,28 @@ namespace Mailozaurr.Tests;
 
 [Collection("GraphCollection")]
 public class GraphMessageListenerTests {
-    private class QueueHandler : HttpMessageHandler {
-        private readonly Queue<HttpResponseMessage> _responses;
+    private sealed class QueueHandler : HttpMessageHandler {
+        private readonly Queue<HttpResponseMessage> responses;
 
         public QueueHandler(IEnumerable<HttpResponseMessage> responses) {
-            _responses = new Queue<HttpResponseMessage>(responses);
+            this.responses = new Queue<HttpResponseMessage>(responses);
         }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
-            if (_responses.Count > 0) {
-                return Task.FromResult(_responses.Dequeue());
+            if (responses.Count > 0) {
+                return Task.FromResult(responses.Dequeue());
             }
+
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
                 Content = new StringContent("{\"value\":[]}")
             });
+        }
+    }
+
+    private sealed class HangingHandler : HttpMessageHandler {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("Unreachable");
         }
     }
 
@@ -87,4 +95,37 @@ public class GraphMessageListenerTests {
         } finally {
             handlerField.SetValue(client, original);
         }
-    }}
+    }
+
+    [Fact]
+    public async Task StartAsync_CancellationDuringInitialFetch_CleansUpState() {
+        var handler = new HangingHandler();
+        var clientField = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var client = (HttpClient)clientField.GetValue(null)!;
+        var handlerField = GetHandlerField();
+        var original = (HttpMessageHandler)handlerField.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var cache = (ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
+        cache.Clear();
+        var oauthType = typeof(MicrosoftGraphUtils).Assembly.GetType("Mailozaurr.OAuthTokenCache");
+        var oauthField = oauthType?.GetField("_cache", BindingFlags.NonPublic | BindingFlags.Static);
+        oauthField?.SetValue(null, null);
+        string cachePath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Mailozaurr", "oauth_cache.json");
+        if (System.IO.File.Exists(cachePath)) System.IO.File.Delete(cachePath);
+        try {
+            var cred = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
+            var listener = new GraphMessageListener(cred, "user", TimeSpan.FromSeconds(1));
+            var cancelField = typeof(GraphMessageListener).GetField("_cancel", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            var pollField = typeof(GraphMessageListener).GetField("_pollTask", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            using var cts = new CancellationTokenSource(100);
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => listener.StartAsync(cts.Token));
+
+            Assert.Null(cancelField.GetValue(listener));
+            Assert.Null(pollField.GetValue(listener));
+        } finally {
+            handlerField.SetValue(client, original);
+        }
+    }
+}

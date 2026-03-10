@@ -155,6 +155,31 @@ public class Pop3PollListenerTests {
         Assert.Equal("New", receivedSubjects[0]);
     }
 
+    [Fact]
+    public async Task StopAsync_DuringErrorBackoff_CompletesPollingTaskSuccessfully() {
+        var listener = new TestPop3PollListener();
+        listener.SetMessages(new TestPop3PollListener.TestMessage("uid1", CreateMessage("Initial")));
+
+        await listener.StartAsync();
+        await listener.WaitForDelayAsync();
+
+        listener.SetMessages(
+            new TestPop3PollListener.TestMessage("uid1", CreateMessage("Initial")),
+            new TestPop3PollListener.TestMessage("uid2", CreateMessage("New")));
+        listener.ThrowOnNextFetch(new InvalidOperationException("Boom"));
+        listener.ReleaseNextDelay();
+
+        await listener.WaitForDelayAsync();
+
+        var pollingTaskField = typeof(Pop3PollListener).GetField("_pollingTask", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var pollingTask = (Task)pollingTaskField.GetValue(listener)!;
+
+        await listener.StopAsync();
+
+        Assert.Equal(TaskStatus.RanToCompletion, pollingTask.Status);
+        Assert.Null(pollingTaskField.GetValue(listener));
+    }
+
     private static MimeMessage CreateMessage(string subject) {
         var message = new MimeMessage();
         message.Subject = subject;
