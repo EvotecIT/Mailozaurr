@@ -67,9 +67,42 @@ public class OAuthHelpersGoogleCachedTokenTests {
         Assert.Equal("legacy-token", migrated!.AccessToken);
     }
 
+    [Fact]
+    public async Task PersistGoogleCredentialAsync_WritesLegacyAndCompositeEntries() {
+        var account = "user3@example.com";
+        var clientId = "client-123";
+        var compositeKey = $"google:{clientId}:{account}";
+        var legacyKey = $"google:{account}";
+        var credential = new OAuthCredential {
+            UserName = account,
+            AccessToken = "persisted-token",
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
+        };
+
+        await PersistGoogleCredentialAsync(credential, account, clientId);
+
+        var composite = await OAuthTokenCache.GetAsync(compositeKey);
+        var legacy = await OAuthTokenCache.GetAsync(legacyKey);
+
+        Assert.NotNull(composite);
+        Assert.NotNull(legacy);
+        Assert.Equal("persisted-token", composite!.AccessToken);
+        Assert.Equal("persisted-token", legacy!.AccessToken);
+        Assert.Equal(clientId, legacy.ClientId);
+    }
+
     private static void ResetCache() {
         var field = typeof(OAuthTokenCache).GetField("_cache", BindingFlags.Static | BindingFlags.NonPublic);
         field?.SetValue(null, null);
+    }
+
+    private static async Task PersistGoogleCredentialAsync(
+        OAuthCredential credential,
+        string gmailAccount,
+        string clientId) {
+        var method = typeof(OAuthHelpers).GetMethod("PersistGoogleCredentialAsync", BindingFlags.Static | BindingFlags.NonPublic);
+        var task = (Task)method!.Invoke(null, new object[] { credential, gmailAccount, clientId })!;
+        await task.ConfigureAwait(false);
     }
 
     private static void DeleteCacheFile() {
@@ -80,4 +113,3 @@ public class OAuthHelpersGoogleCachedTokenTests {
         }
     }
 }
-

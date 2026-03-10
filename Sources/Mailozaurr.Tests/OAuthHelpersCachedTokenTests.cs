@@ -72,6 +72,33 @@ public class OAuthHelpersCachedTokenTests {
     }
 
     [Fact]
+    public async Task PersistO365CredentialAsync_WritesLegacyAndCompositeEntries() {
+        var login = "persist@example.com";
+        var redirectUri = "https://login.microsoftonline.com/common/oauth2/nativeclient";
+        var credential = new OAuthCredential {
+            UserName = login,
+            AccessToken = "persist-token",
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
+        };
+
+        await PersistO365CredentialAsync(
+            credential,
+            "client-id",
+            "tenant-id",
+            redirectUri,
+            new[] { "offline_access", "Mail.Read" });
+
+        var composite = await OAuthTokenCache.GetAsync(BuildO365CacheKey(login, "client-id", "tenant-id", redirectUri, new[] { "Mail.Read", "offline_access" }));
+        var legacy = await OAuthTokenCache.GetAsync("o365:persist@example.com");
+
+        Assert.NotNull(composite);
+        Assert.NotNull(legacy);
+        Assert.Equal("persist-token", composite!.AccessToken);
+        Assert.Equal("persist-token", legacy!.AccessToken);
+        Assert.Equal("client-id", legacy.ClientId);
+    }
+
+    [Fact]
     public async Task GetAsync_ThrowsWhenCancellationRequested() {
         var cacheKey = "o365:cancel@example.com";
         var credential = new OAuthCredential {
@@ -115,6 +142,17 @@ public class OAuthHelpersCachedTokenTests {
         string[] scopes) {
         var method = typeof(OAuthHelpers).GetMethod("BuildO365CacheKey", BindingFlags.Static | BindingFlags.NonPublic);
         return (string)method!.Invoke(null, new object[] { login, clientId, tenantId, redirectUri, scopes })!;
+    }
+
+    private static async Task PersistO365CredentialAsync(
+        OAuthCredential credential,
+        string clientId,
+        string tenantId,
+        string redirectUri,
+        string[] scopes) {
+        var method = typeof(OAuthHelpers).GetMethod("PersistO365CredentialAsync", BindingFlags.Static | BindingFlags.NonPublic);
+        var task = (Task)method!.Invoke(null, new object[] { credential, clientId, tenantId, redirectUri, scopes })!;
+        await task.ConfigureAwait(false);
     }
 
     private static void DeleteCacheFile() {
