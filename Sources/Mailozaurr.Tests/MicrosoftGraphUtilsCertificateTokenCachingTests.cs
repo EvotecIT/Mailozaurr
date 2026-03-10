@@ -83,14 +83,8 @@ public class MicrosoftGraphUtilsCertificateTokenCachingTests : IDisposable {
             cache.Clear();
         }
 
-        var oauthType = typeof(MicrosoftGraphUtils).Assembly.GetType("Mailozaurr.OAuthTokenCache");
-        var internalCacheField = oauthType?.GetField("_cache", BindingFlags.NonPublic | BindingFlags.Static);
-        internalCacheField?.SetValue(null, null);
-        var cachePathField = oauthType?.GetField("CacheFilePath", BindingFlags.NonPublic | BindingFlags.Static);
-        var cachePath = cachePathField?.GetValue(null) as string;
-        if (!string.IsNullOrEmpty(cachePath) && File.Exists(cachePath)) {
-            File.Delete(cachePath);
-        }
+        OAuthCacheTestHelper.ResetOAuthTokenCache();
+        OAuthCacheTestHelper.DeleteOAuthCacheFile();
     }
 
     public void Dispose() {

@@ -59,11 +59,8 @@ public class GraphMessageListenerTests {
         var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
         var cache = (ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
         cache.Clear();
-        var oauthType = typeof(MicrosoftGraphUtils).Assembly.GetType("Mailozaurr.OAuthTokenCache");
-        var oauthField = oauthType?.GetField("_cache", BindingFlags.NonPublic | BindingFlags.Static);
-        oauthField?.SetValue(null, null);
-        string cachePath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Mailozaurr", "oauth_cache.json");
-        if (System.IO.File.Exists(cachePath)) System.IO.File.Delete(cachePath);
+        OAuthCacheTestHelper.ResetOAuthTokenCache();
+        OAuthCacheTestHelper.DeleteOAuthCacheFile();
         try {
             var cred = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
             var listener = new GraphMessageListener(cred, "user", TimeSpan.FromSeconds(1));
@@ -108,11 +105,8 @@ public class GraphMessageListenerTests {
         var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
         var cache = (ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
         cache.Clear();
-        var oauthType = typeof(MicrosoftGraphUtils).Assembly.GetType("Mailozaurr.OAuthTokenCache");
-        var oauthField = oauthType?.GetField("_cache", BindingFlags.NonPublic | BindingFlags.Static);
-        oauthField?.SetValue(null, null);
-        string cachePath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Mailozaurr", "oauth_cache.json");
-        if (System.IO.File.Exists(cachePath)) System.IO.File.Delete(cachePath);
+        OAuthCacheTestHelper.ResetOAuthTokenCache();
+        OAuthCacheTestHelper.DeleteOAuthCacheFile();
         try {
             var cred = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
             var listener = new GraphMessageListener(cred, "user", TimeSpan.FromSeconds(1));

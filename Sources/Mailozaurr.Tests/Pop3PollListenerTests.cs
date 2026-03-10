@@ -43,6 +43,20 @@ public class Pop3PollListenerTests {
     }
 
     [Fact]
+    public async Task StartAsync_FailureDuringInitialSnapshot_CleansUpState() {
+        var listener = new Pop3PollListener(new Pop3Client());
+        var cancelField = typeof(Pop3PollListener).GetField("_cancel", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var pollingTaskField = typeof(Pop3PollListener).GetField("_pollingTask", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        await Assert.ThrowsAnyAsync<Exception>(() => listener.StartAsync());
+
+        Assert.Null(cancelField.GetValue(listener));
+        Assert.Null(pollingTaskField.GetValue(listener));
+
+        await Assert.ThrowsAnyAsync<Exception>(() => listener.StartAsync());
+    }
+
+    [Fact]
     public async Task StartAsync_RaisesEventsForNewUidsOnly() {
         var listener = new TestPop3PollListener();
         listener.SetMessages(

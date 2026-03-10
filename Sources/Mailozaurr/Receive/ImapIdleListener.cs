@@ -65,22 +65,36 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
         }
 
         _cancel = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        try {
+            _folder = _client.GetCachedFolder(_folderName, FolderAccess.ReadOnly);
+            await _folder.OpenAsync(FolderAccess.ReadOnly, _cancel.Token).ConfigureAwait(false);
 
-        _folder = _client.GetCachedFolder(_folderName, FolderAccess.ReadOnly);
-        await _folder.OpenAsync(FolderAccess.ReadOnly, _cancel.Token).ConfigureAwait(false);
+            var search = _searchQuery ?? SearchQuery.All;
+            var initialUids = await _folder.SearchAsync(search, _cancel.Token).ConfigureAwait(false);
+            var initial = await _folder.FetchAsync(initialUids, _fetchRequest, _cancel.Token).ConfigureAwait(false);
+            foreach (var summary in initial) {
+                _summaries.Add(summary);
+                _known.Add(summary.UniqueId);
+            }
 
-        var search = _searchQuery ?? SearchQuery.All;
-        var initialUids = await _folder.SearchAsync(search, _cancel.Token).ConfigureAwait(false);
-        var initial = await _folder.FetchAsync(initialUids, _fetchRequest, _cancel.Token).ConfigureAwait(false);
-        foreach (var summary in initial) {
-            _summaries.Add(summary);
-            _known.Add(summary.UniqueId);
+            _folder.CountChanged += OnCountChanged;
+            _folder.MessageExpunged += OnMessageExpunged;
+
+            _idleTask = IdleLoopAsync();
+        } catch {
+            if (_folder?.IsOpen == true) {
+                try {
+                    await _folder.CloseAsync(expunge: false, CancellationToken.None).ConfigureAwait(false);
+                } catch {
+                }
+            }
+
+            _summaries.Clear();
+            _known.Clear();
+            Cleanup();
+            _idleTask = null;
+            throw;
         }
-
-        _folder.CountChanged += OnCountChanged;
-        _folder.MessageExpunged += OnMessageExpunged;
-
-        _idleTask = IdleLoopAsync();
     }
 
     /// <summary>

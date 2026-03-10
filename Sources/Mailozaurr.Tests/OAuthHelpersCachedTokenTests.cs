@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Reflection;
-using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -9,8 +8,8 @@ namespace Mailozaurr.Tests;
 
 public class OAuthHelpersCachedTokenTests {
     public OAuthHelpersCachedTokenTests() {
-        ResetCache();
-        DeleteCacheFile();
+        OAuthCacheTestHelper.ResetOAuthTokenCache();
+        OAuthCacheTestHelper.DeleteOAuthCacheFile();
     }
 
     [Fact]
@@ -129,11 +128,6 @@ public class OAuthHelpersCachedTokenTests {
         await Assert.ThrowsAsync<OperationCanceledException>(() => OAuthTokenCache.SetAsync(cacheKey, credential, cts.Token));
     }
 
-    private static void ResetCache() {
-        var field = typeof(OAuthTokenCache).GetField("_cache", BindingFlags.Static | BindingFlags.NonPublic);
-        field?.SetValue(null, null);
-    }
-
     private static string BuildO365CacheKey(
         string login,
         string clientId,
@@ -155,11 +149,4 @@ public class OAuthHelpersCachedTokenTests {
         await task.ConfigureAwait(false);
     }
 
-    private static void DeleteCacheFile() {
-        var pathField = typeof(OAuthTokenCache).GetField("CacheFilePath", BindingFlags.Static | BindingFlags.NonPublic);
-        var path = pathField?.GetValue(null) as string;
-        if (!string.IsNullOrEmpty(path) && File.Exists(path)) {
-            File.Delete(path);
-        }
-    }
 }

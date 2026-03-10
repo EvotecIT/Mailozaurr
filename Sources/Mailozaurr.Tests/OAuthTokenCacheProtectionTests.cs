@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -9,8 +8,8 @@ namespace Mailozaurr.Tests;
 
 public sealed class OAuthTokenCacheProtectionTests {
     public OAuthTokenCacheProtectionTests() {
-        ResetCache();
-        DeleteCacheFile();
+        OAuthCacheTestHelper.ResetOAuthTokenCache();
+        OAuthCacheTestHelper.DeleteOAuthCacheFile();
     }
 
     [Fact]
@@ -29,7 +28,7 @@ public sealed class OAuthTokenCacheProtectionTests {
 
         await OAuthTokenCache.SetAsync(cacheKey, credential);
 
-        var path = GetCacheFilePath();
+        var path = OAuthCacheTestHelper.GetOAuthCacheFilePath();
         Assert.True(File.Exists(path));
 
         var json = File.ReadAllText(path);
@@ -45,7 +44,7 @@ public sealed class OAuthTokenCacheProtectionTests {
         Assert.True(entry.TryGetProperty("ClientSecretProtected", out _));
         Assert.True(entry.TryGetProperty("ServiceAccountJsonProtected", out _));
 
-        ResetCache();
+        OAuthCacheTestHelper.ResetOAuthTokenCache();
         var reloaded = await OAuthTokenCache.GetAsync(cacheKey);
 
         Assert.NotNull(reloaded);
@@ -70,7 +69,7 @@ public sealed class OAuthTokenCacheProtectionTests {
             ServiceAccountSubject = "legacy-subject@example.com"
         };
 
-        var path = GetCacheFilePath();
+        var path = OAuthCacheTestHelper.GetOAuthCacheFilePath();
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory)) {
             Directory.CreateDirectory(directory);
@@ -97,7 +96,7 @@ public sealed class OAuthTokenCacheProtectionTests {
     [Fact]
     public async Task GetAsync_MalformedCacheFileReturnsNull() {
         var cacheKey = "oauth:malformed@example.com";
-        var path = GetCacheFilePath();
+        var path = OAuthCacheTestHelper.GetOAuthCacheFilePath();
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory)) {
             Directory.CreateDirectory(directory);
@@ -113,7 +112,7 @@ public sealed class OAuthTokenCacheProtectionTests {
     [Fact]
     public async Task SetAsync_MalformedCacheFileIsRecovered() {
         var cacheKey = "oauth:recover@example.com";
-        var path = GetCacheFilePath();
+        var path = OAuthCacheTestHelper.GetOAuthCacheFilePath();
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory)) {
             Directory.CreateDirectory(directory);
@@ -129,7 +128,7 @@ public sealed class OAuthTokenCacheProtectionTests {
 
         await OAuthTokenCache.SetAsync(cacheKey, credential);
 
-        ResetCache();
+        OAuthCacheTestHelper.ResetOAuthTokenCache();
         var loaded = await OAuthTokenCache.GetAsync(cacheKey);
 
         Assert.NotNull(loaded);
@@ -149,7 +148,7 @@ public sealed class OAuthTokenCacheProtectionTests {
             ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(30)
         };
 
-        var path = GetCacheFilePath();
+        var path = OAuthCacheTestHelper.GetOAuthCacheFilePath();
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory)) {
             Directory.CreateDirectory(directory);
@@ -160,8 +159,6 @@ public sealed class OAuthTokenCacheProtectionTests {
         };
         var json = JsonSerializer.Serialize(cacheEntries, MailozaurrJsonContext.Default.DictionaryStringOAuthCredentialCacheEntry);
         File.WriteAllText(path, json);
-        ResetCache();
-
         var lockStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
         try {
             var releaseTask = Task.Run(async () => {
@@ -179,20 +176,4 @@ public sealed class OAuthTokenCacheProtectionTests {
         }
     }
 
-    private static void ResetCache() {
-        var field = typeof(OAuthTokenCache).GetField("_cache", BindingFlags.Static | BindingFlags.NonPublic);
-        field?.SetValue(null, null);
-    }
-
-    private static string GetCacheFilePath() {
-        var pathField = typeof(OAuthTokenCache).GetField("CacheFilePath", BindingFlags.Static | BindingFlags.NonPublic);
-        return (string)pathField!.GetValue(null)!;
-    }
-
-    private static void DeleteCacheFile() {
-        var path = GetCacheFilePath();
-        if (File.Exists(path)) {
-            File.Delete(path);
-        }
-    }
 }

@@ -147,11 +147,8 @@ public class GraphBatchAndRetryTests {
         var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
         var cache = (System.Collections.Concurrent.ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
         cache.Clear();
-        var oauthType = typeof(MicrosoftGraphUtils).Assembly.GetType("Mailozaurr.OAuthTokenCache");
-        var oauthField = oauthType?.GetField("_cache", BindingFlags.NonPublic | BindingFlags.Static);
-        oauthField?.SetValue(null, null);
-        string cachePath = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "Mailozaurr", "oauth_cache.json");
-        if (System.IO.File.Exists(cachePath)) System.IO.File.Delete(cachePath);
+        OAuthCacheTestHelper.ResetOAuthTokenCache();
+        OAuthCacheTestHelper.DeleteOAuthCacheFile();
         try {
             var credential = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
             string token = await MicrosoftGraphUtils.ConnectO365GraphWithRetryAsync(credential, "tenant", 2, 0, 1);
@@ -173,11 +170,8 @@ public class GraphBatchAndRetryTests {
         var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
         var cache = (System.Collections.Concurrent.ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
         cache.Clear();
-        var oauthType = typeof(MicrosoftGraphUtils).Assembly.GetType("Mailozaurr.OAuthTokenCache");
-        var oauthField = oauthType?.GetField("_cache", BindingFlags.NonPublic | BindingFlags.Static);
-        oauthField?.SetValue(null, null);
-        string cachePath = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "Mailozaurr", "oauth_cache.json");
-        if (System.IO.File.Exists(cachePath)) System.IO.File.Delete(cachePath);
+        OAuthCacheTestHelper.ResetOAuthTokenCache();
+        OAuthCacheTestHelper.DeleteOAuthCacheFile();
         try {
             var credential = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
             await Assert.ThrowsAsync<GraphApiException>(() => MicrosoftGraphUtils.ConnectO365GraphWithRetryAsync(credential, "tenant", 0, 0, 1));
@@ -198,11 +192,8 @@ public class GraphBatchAndRetryTests {
         var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
         var cache = (System.Collections.Concurrent.ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
         cache.Clear();
-        var oauthType = typeof(MicrosoftGraphUtils).Assembly.GetType("Mailozaurr.OAuthTokenCache");
-        var oauthField = oauthType?.GetField("_cache", BindingFlags.NonPublic | BindingFlags.Static);
-        oauthField?.SetValue(null, null);
-        string cachePath = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "Mailozaurr", "oauth_cache.json");
-        if (System.IO.File.Exists(cachePath)) System.IO.File.Delete(cachePath);
+        OAuthCacheTestHelper.ResetOAuthTokenCache();
+        OAuthCacheTestHelper.DeleteOAuthCacheFile();
         try {
             var credential = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
             string token = await MicrosoftGraphUtils.ConnectO365GraphAsync(credential, "tenant", "https://graph.microsoft.com");
@@ -224,11 +215,8 @@ public class GraphBatchAndRetryTests {
         var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
         var cache = (System.Collections.Concurrent.ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
         cache.Clear();
-        var oauthType = typeof(MicrosoftGraphUtils).Assembly.GetType("Mailozaurr.OAuthTokenCache");
-        var oauthField = oauthType?.GetField("_cache", BindingFlags.NonPublic | BindingFlags.Static);
-        oauthField?.SetValue(null, null);
-        string cachePath = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "Mailozaurr", "oauth_cache.json");
-        if (System.IO.File.Exists(cachePath)) System.IO.File.Delete(cachePath);
+        OAuthCacheTestHelper.ResetOAuthTokenCache();
+        OAuthCacheTestHelper.DeleteOAuthCacheFile();
         var cts = new CancellationTokenSource(100);
         try {
             var credential = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
@@ -249,11 +237,8 @@ public class GraphBatchAndRetryTests {
         var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
         var cache = (System.Collections.Concurrent.ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
         cache.Clear();
-        var oauthType = typeof(MicrosoftGraphUtils).Assembly.GetType("Mailozaurr.OAuthTokenCache");
-        var oauthField = oauthType?.GetField("_cache", BindingFlags.NonPublic | BindingFlags.Static);
-        oauthField?.SetValue(null, null);
-        string cachePath = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "Mailozaurr", "oauth_cache.json");
-        if (System.IO.File.Exists(cachePath)) System.IO.File.Delete(cachePath);
+        OAuthCacheTestHelper.ResetOAuthTokenCache();
+        OAuthCacheTestHelper.DeleteOAuthCacheFile();
         var cts = new CancellationTokenSource(100);
         try {
             var credential = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
