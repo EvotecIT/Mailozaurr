@@ -75,6 +75,8 @@ internal static class OAuthTokenCache {
                 cache = new Dictionary<string, OAuthCredential>();
             } catch (DirectoryNotFoundException) {
                 cache = new Dictionary<string, OAuthCredential>();
+            } catch (JsonException) {
+                cache = new Dictionary<string, OAuthCredential>();
             }
         } else {
             cache = new Dictionary<string, OAuthCredential>();
