@@ -730,9 +730,14 @@ public sealed class GraphMailboxBrowser {
             throw new ArgumentNullException(nameof(messageIds));
         }
 
+        var ids = NormalizeBulkIds(messageIds);
+        if (ids.Count == 0) {
+            return Array.Empty<GraphBulkOperationResult>();
+        }
+
         var destinationId = await ResolveFolderIdAsync(targetFolder, cancellationToken).ConfigureAwait(false);
         return await _graph.BatchMoveMessagesAsync(
-            messageIds,
+            ids,
             destinationId,
             batchSize: batchSize,
             cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -825,9 +830,14 @@ public sealed class GraphMailboxBrowser {
             throw new ArgumentNullException(nameof(conversationIds));
         }
 
+        var ids = NormalizeBulkIds(conversationIds);
+        if (ids.Count == 0) {
+            return Array.Empty<GraphBulkOperationResult>();
+        }
+
         var destinationId = await ResolveFolderIdAsync(targetFolder, cancellationToken).ConfigureAwait(false);
         return await _graph.BatchMoveConversationsAsync(
-            conversationIds,
+            ids,
             destinationId,
             batchSize: batchSize,
             cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -1040,6 +1050,17 @@ public sealed class GraphMailboxBrowser {
     private static string? NormalizeOptional(string? raw) {
         var trimmed = (raw ?? string.Empty).Trim();
         return trimmed.Length == 0 ? null : trimmed;
+    }
+
+    private static List<string> NormalizeBulkIds(IEnumerable<string> values) {
+        var normalized = new List<string>();
+        foreach (var value in values) {
+            var trimmed = NormalizeOptional(value);
+            if (trimmed != null) {
+                normalized.Add(trimmed);
+            }
+        }
+        return normalized;
     }
 
     private static string EscapeGraphLiteral(string value) =>
