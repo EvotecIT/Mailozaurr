@@ -26,8 +26,14 @@ internal static class TokenCacheHelper {
     private static void BeforeAccessNotification(TokenCacheNotificationArgs args) {
         lock (FileLock) {
             if (File.Exists(CacheFilePath)) {
-                var data = File.ReadAllBytes(CacheFilePath);
-                args.TokenCache.DeserializeMsalV3(data, shouldClearExistingCache: true);
+                try {
+                    var data = File.ReadAllBytes(CacheFilePath);
+                    args.TokenCache.DeserializeMsalV3(data, shouldClearExistingCache: true);
+                } catch (FileNotFoundException) {
+                    // another thread/process deleted the cache between the existence check and read
+                } catch (DirectoryNotFoundException) {
+                    // treat a missing cache directory as an empty cache
+                }
             }
         }
     }
