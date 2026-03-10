@@ -51,15 +51,21 @@ public class GraphMessageListener : IDisposable {
         }
 
         _cancel = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-
-        var initial = await MicrosoftGraphUtils.GetMailMessagesAsync(_credential, _userPrincipalName).ConfigureAwait(false);
-        foreach (var msg in initial) {
-            if (msg.TryGetValue("id", out var idObj) && idObj is string id) {
-                _seenIds.Add(id);
+        try {
+            var initial = await MicrosoftGraphUtils.GetMailMessagesAsync(_credential, _userPrincipalName, cancellationToken: _cancel.Token).ConfigureAwait(false);
+            foreach (var msg in initial) {
+                if (msg.TryGetValue("id", out var idObj) && idObj is string id) {
+                    _seenIds.Add(id);
+                }
             }
-        }
 
-        _pollTask = PollLoopAsync();
+            _pollTask = PollLoopAsync();
+        } catch {
+            _cancel.Dispose();
+            _cancel = null;
+            _pollTask = null;
+            throw;
+        }
     }
 
     /// <summary>
@@ -86,7 +92,7 @@ public class GraphMessageListener : IDisposable {
         while (!_cancel!.IsCancellationRequested) {
             try {
                 await Task.Delay(_interval, _cancel.Token).ConfigureAwait(false);
-                var messages = await MicrosoftGraphUtils.GetMailMessagesAsync(_credential, _userPrincipalName).ConfigureAwait(false);
+                var messages = await MicrosoftGraphUtils.GetMailMessagesAsync(_credential, _userPrincipalName, cancellationToken: _cancel.Token).ConfigureAwait(false);
                 foreach (var msg in messages) {
                     if (msg.TryGetValue("id", out var idObj) && idObj is string id && !_seenIds.Contains(id)) {
                         _seenIds.Add(id);
@@ -97,7 +103,11 @@ public class GraphMessageListener : IDisposable {
                 break;
             } catch (Exception ex) {
                 PollError?.Invoke(this, ex);
-                await Task.Delay(TimeSpan.FromSeconds(5), _cancel.Token).ConfigureAwait(false);
+                try {
+                    await Task.Delay(TimeSpan.FromSeconds(5), _cancel.Token).ConfigureAwait(false);
+                } catch (OperationCanceledException) when (_cancel.IsCancellationRequested) {
+                    break;
+                }
             }
         }
     }

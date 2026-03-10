@@ -129,7 +129,11 @@ public class Pop3PollListener : IDisposable, IAsyncDisposable {
                 break;
             } catch (Exception ex) {
                 PollError?.Invoke(this, ex);
-                await DelayAsync(TimeSpan.FromSeconds(5), _cancel.Token).ConfigureAwait(false);
+                try {
+                    await DelayAsync(TimeSpan.FromSeconds(5), _cancel.Token).ConfigureAwait(false);
+                } catch (OperationCanceledException) when (_cancel.IsCancellationRequested) {
+                    break;
+                }
             }
         }
     }
