@@ -556,16 +556,28 @@ namespace Mailozaurr {
             var queryParams = new Dictionary<string, object>();
             if (properties != null && properties.Any()) queryParams["$select"] = string.Join(",", properties);
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages/{messageId}/attachments", queryParams);
-            var doc = await InvokeGraphApiAsync("GET", uri, headers, cancellationToken: cancellationToken).ConfigureAwait(false);
             var attachments = new List<Attachment>();
-            if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
-                foreach (var item in valueElement.EnumerateArray()) {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var att = JsonSerializer.Deserialize(item.GetRawText(), MailozaurrJsonContext.Default.Attachment);
-                    if (att != null) {
-                        attachments.Add(att);
+            while (!string.IsNullOrEmpty(uri)) {
+                cancellationToken.ThrowIfCancellationRequested();
+                var doc = await InvokeGraphApiAsync("GET", uri!, headers, cancellationToken: cancellationToken).ConfigureAwait(false);
+                if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
+                    foreach (var item in valueElement.EnumerateArray()) {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var att = JsonSerializer.Deserialize(item.GetRawText(), MailozaurrJsonContext.Default.Attachment);
+                        if (att != null) {
+                            attachments.Add(att);
+                        }
                     }
                 }
+
+                if (!doc.RootElement.TryGetProperty("@odata.nextLink", out var nextLinkElement)) {
+                    break;
+                }
+                var nextLink = nextLinkElement.GetString();
+                if (string.IsNullOrEmpty(nextLink)) {
+                    break;
+                }
+                uri = nextLink;
             }
             return attachments;
         }
@@ -579,13 +591,25 @@ namespace Mailozaurr {
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com", cancellationToken).ConfigureAwait(false);
             headers["Authorization"] = token;
             var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/mailFolders");
-            var doc = await InvokeGraphApiAsync("GET", uri, headers, cancellationToken: cancellationToken).ConfigureAwait(false);
             var folders = new List<JsonElement>();
-            if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
-                foreach (var item in valueElement.EnumerateArray()) {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    folders.Add(item);
+            while (!string.IsNullOrEmpty(uri)) {
+                cancellationToken.ThrowIfCancellationRequested();
+                var doc = await InvokeGraphApiAsync("GET", uri!, headers, cancellationToken: cancellationToken).ConfigureAwait(false);
+                if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
+                    foreach (var item in valueElement.EnumerateArray()) {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        folders.Add(item);
+                    }
                 }
+
+                if (!doc.RootElement.TryGetProperty("@odata.nextLink", out var nextLinkElement)) {
+                    break;
+                }
+                var nextLink = nextLinkElement.GetString();
+                if (string.IsNullOrEmpty(nextLink)) {
+                    break;
+                }
+                uri = nextLink;
             }
             return folders;
         }
