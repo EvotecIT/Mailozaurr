@@ -64,6 +64,43 @@ public class GmailApiClientTests {
             base.Dispose(disposing);
         }
     }
+
+    private sealed class PendingRepositoryStub : IPendingMessageRepository {
+        public List<PendingMessageRecord> Saved { get; } = new();
+
+        public Task SaveAsync(PendingMessageRecord record, CancellationToken cancellationToken = default) {
+            Saved.Add(record);
+            return Task.CompletedTask;
+        }
+
+        public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<PendingMessageRecord?>(Saved.FirstOrDefault(r => string.Equals(r.MessageId, messageId, StringComparison.OrdinalIgnoreCase)));
+
+        public async IAsyncEnumerable<PendingMessageRecord> GetAllAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default) {
+            foreach (var record in Saved) {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return record;
+                await Task.Yield();
+            }
+        }
+
+        public Task RemoveAsync(string messageId, CancellationToken cancellationToken = default) {
+            Saved.RemoveAll(r => string.Equals(r.MessageId, messageId, StringComparison.OrdinalIgnoreCase));
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class DelayedCancellationHandler : HttpMessageHandler {
+        private readonly TaskCompletionSource<bool> _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task WaitForStartAsync() => _started.Task;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            _started.TrySetResult(true);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("Unreachable");
+        }
+    }
     [Fact]
     public void Constructor_SetsAuthorizationHeader() {
         var cred = new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue };
@@ -570,6 +607,30 @@ public class GmailApiClientTests {
         cts.Cancel();
         var message = new MimeKit.MimeMessage();
         await Assert.ThrowsAnyAsync<System.OperationCanceledException>(() => client.SendAsync("me", message, cts.Token));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task SendAsync_CallerCancellation_DoesNotQueuePendingMessage() {
+        var handler = new DelayedCancellationHandler();
+        var repository = new PendingRepositoryStub();
+        var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue }) {
+            PendingMessageRepository = repository
+        };
+        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
+
+        var message = new MimeKit.MimeMessage();
+        message.From.Add(MimeKit.MailboxAddress.Parse("sender@example.com"));
+        message.To.Add(MimeKit.MailboxAddress.Parse("recipient@example.com"));
+        message.Body = new MimeKit.TextPart("plain") { Text = "body" };
+
+        using var cts = new System.Threading.CancellationTokenSource();
+        var task = client.SendAsync("me", message, cts.Token);
+        await handler.WaitForStartAsync();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<System.OperationCanceledException>(async () => await task);
+        Assert.Empty(repository.Saved);
     }
 
     [Fact]

@@ -250,6 +250,8 @@ public sealed class GmailApiClient : IDisposable {
                 queued = true;
             }
             throw;
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
         } catch (TaskCanceledException) {
             if (!queued) {
                 await QueuePendingMessageAsync(userId, message, cancellationToken).ConfigureAwait(false);
