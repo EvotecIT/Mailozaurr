@@ -23,6 +23,8 @@ public static class OAuthHelpers {
             .ToArray()
         ?? Array.Empty<string>();
 
+    private static string BuildO365LegacyCacheKey(string userName) => $"o365:{userName}";
+
     private static string? BuildO365CacheKey(
         string? login,
         string clientId,
@@ -36,6 +38,49 @@ public static class OAuthHelpers {
         var normalizedScopes = NormalizeScopes(scopes);
         var scopeKey = normalizedScopes.Length == 0 ? "default" : string.Join(" ", normalizedScopes);
         return $"o365:{login!.Trim()}|{clientId.Trim()}|{tenantId.Trim()}|{redirectUri.Trim()}|{scopeKey}";
+    }
+
+    private static string BuildGoogleLegacyCacheKey(string gmailAccount) => $"google:{gmailAccount}";
+
+    private static string BuildGoogleCacheKey(string gmailAccount, string clientId) => $"google:{clientId}:{gmailAccount}";
+
+    private static async Task PersistO365CredentialAsync(
+        OAuthCredential credential,
+        string clientId,
+        string tenantId,
+        string redirectUri,
+        IEnumerable<string> scopes) {
+        if (credential == null) {
+            throw new ArgumentNullException(nameof(credential));
+        }
+        if (string.IsNullOrWhiteSpace(credential.UserName)) {
+            return;
+        }
+
+        credential.ClientId = clientId;
+        await OAuthTokenCache.SetAsync(BuildO365LegacyCacheKey(credential.UserName), credential).ConfigureAwait(false);
+
+        var compositeKey = BuildO365CacheKey(credential.UserName, clientId, tenantId, redirectUri, scopes);
+        if (compositeKey != null) {
+            await OAuthTokenCache.SetAsync(compositeKey, credential).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task PersistGoogleCredentialAsync(
+        OAuthCredential credential,
+        string gmailAccount,
+        string clientId) {
+        if (credential == null) {
+            throw new ArgumentNullException(nameof(credential));
+        }
+        if (string.IsNullOrWhiteSpace(gmailAccount) && string.IsNullOrWhiteSpace(credential.UserName)) {
+            return;
+        }
+
+        var account = string.IsNullOrWhiteSpace(gmailAccount) ? credential.UserName : gmailAccount.Trim();
+        credential.ClientId = clientId;
+        await OAuthTokenCache.SetAsync(BuildGoogleLegacyCacheKey(account), credential).ConfigureAwait(false);
+        await OAuthTokenCache.SetAsync(BuildGoogleCacheKey(account, clientId), credential).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -87,7 +132,7 @@ public static class OAuthHelpers {
             ExpiresOn = result.ExpiresOn,
             ClientId = clientId
         };
-        await OAuthTokenCache.SetAsync($"o365:{cred.UserName}", cred);
+        await PersistO365CredentialAsync(cred, clientId, tenantId, redirectUri, scopes).ConfigureAwait(false);
         return cred;
     }
 
@@ -167,7 +212,7 @@ public static class OAuthHelpers {
             ClientId = clientId,
             ClientSecret = clientSecret
         };
-        await OAuthTokenCache.SetAsync($"google:{cred.UserName}", cred);
+        await PersistGoogleCredentialAsync(cred, gmailAccount, clientId).ConfigureAwait(false);
         return cred;
     }
 
@@ -190,16 +235,13 @@ public static class OAuthHelpers {
             if (cached != null) {
                 var refreshed = await AcquireO365TokenSilentAsync(login, clientId, tenantId, redirectUri, normalizedScopes);
                 if (refreshed != null) {
-                    await OAuthTokenCache.SetAsync(cacheKey, refreshed);
+                    await PersistO365CredentialAsync(refreshed, clientId, tenantId, redirectUri, normalizedScopes).ConfigureAwait(false);
                     return refreshed;
                 }
             }
         }
 
         var cred = await AcquireO365TokenInteractiveAsync(login, clientId, tenantId, redirectUri, normalizedScopes);
-        if (cacheKey != null) {
-            await OAuthTokenCache.SetAsync(cacheKey, cred);
-        }
         return cred;
     }
 
@@ -212,8 +254,8 @@ public static class OAuthHelpers {
         string clientSecret,
         IEnumerable<string> scopes) {
         // Prefer a cache key that includes client id to avoid token confusion across apps.
-        var compositeKey = $"google:{clientId}:{gmailAccount}";
-        var legacyKey = $"google:{gmailAccount}";
+        var compositeKey = BuildGoogleCacheKey(gmailAccount, clientId);
+        var legacyKey = BuildGoogleLegacyCacheKey(gmailAccount);
 
         bool loadedFromLegacy = false;
         var cached = await OAuthTokenCache.GetAsync(compositeKey).ConfigureAwait(false);
@@ -241,7 +283,7 @@ public static class OAuthHelpers {
         if (cached != null && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
             // Migrate legacy entries to composite key to prevent cross-app confusion.
             if (loadedFromLegacy) {
-                await OAuthTokenCache.SetAsync(compositeKey, cached).ConfigureAwait(false);
+                await PersistGoogleCredentialAsync(cached, gmailAccount, clientId).ConfigureAwait(false);
             }
             return cached;
         }
@@ -266,13 +308,12 @@ public static class OAuthHelpers {
                     ClientId = clientId,
                     ClientSecret = clientSecret
                 };
-                await OAuthTokenCache.SetAsync(compositeKey, newCred).ConfigureAwait(false);
+                await PersistGoogleCredentialAsync(newCred, gmailAccount, clientId).ConfigureAwait(false);
                 return newCred;
             }
         }
 
         var cred = await AcquireGoogleTokenInteractiveAsync(gmailAccount, clientId, clientSecret, scopes).ConfigureAwait(false);
-        await OAuthTokenCache.SetAsync(compositeKey, cred).ConfigureAwait(false);
         return cred;
     }
 
@@ -303,9 +344,10 @@ public static class OAuthHelpers {
         var cred = new OAuthCredential {
             UserName = result.Account.Username,
             AccessToken = result.AccessToken,
-            ExpiresOn = result.ExpiresOn
+            ExpiresOn = result.ExpiresOn,
+            ClientId = clientId
         };
-        await OAuthTokenCache.SetAsync($"o365:{cred.UserName}", cred);
+        await OAuthTokenCache.SetAsync(BuildO365LegacyCacheKey(cred.UserName), cred).ConfigureAwait(false);
         return cred;
     }
 
