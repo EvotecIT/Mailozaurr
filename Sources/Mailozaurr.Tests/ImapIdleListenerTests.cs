@@ -62,6 +62,35 @@ public class ImapIdleListenerTests {
         Assert.Null(GetPrivateField<CancellationTokenSource?>(listener, "_cancel"));
     }
 
+    [Fact]
+    public async Task StopAsync_IgnoresCancellationFromIdleLoopWhenStopping() {
+        var listener = new ImapIdleListener(new ImapClient());
+        var cancellation = new CancellationTokenSource();
+
+        SetPrivateField(listener, "_cancel", cancellation);
+        SetPrivateField(listener, "_idleTask", Task.FromCanceled(new CancellationToken(canceled: true)));
+
+        await listener.StopAsync();
+
+        Assert.True(cancellation.IsCancellationRequested);
+        Assert.Null(GetPrivateField<Task?>(listener, "_idleTask"));
+        Assert.Null(GetPrivateField<CancellationTokenSource?>(listener, "_cancel"));
+    }
+
+    [Fact]
+    public void Dispose_IgnoresCancellationFromIdleLoopWhenStopping() {
+        var listener = new ImapIdleListener(new ImapClient());
+        var cancellation = new CancellationTokenSource();
+
+        SetPrivateField(listener, "_cancel", cancellation);
+        SetPrivateField(listener, "_idleTask", Task.FromCanceled(new CancellationToken(canceled: true)));
+
+        listener.Dispose();
+
+        Assert.Null(GetPrivateField<Task?>(listener, "_idleTask"));
+        Assert.Null(GetPrivateField<CancellationTokenSource?>(listener, "_cancel"));
+    }
+
     private static void SetPrivateField<T>(ImapIdleListener listener, string name, T value) =>
         typeof(ImapIdleListener).GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(listener, value);
 

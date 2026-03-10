@@ -93,6 +93,7 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
     /// </summary>
     public async Task StopAsync() {
         var idleTask = _idleTask;
+        var cancel = _cancel;
 
         Stop();
 
@@ -103,6 +104,8 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
 
         try {
             await idleTask.ConfigureAwait(false);
+        } catch (OperationCanceledException) when (cancel?.IsCancellationRequested == true) {
+            // Listener shutdown requested cancellation while the loop was unwinding.
         } finally {
             Cleanup();
             if (ReferenceEquals(_idleTask, idleTask)) {
@@ -125,7 +128,11 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
                     break;
                 } catch (Exception ex) {
                     IdleError?.Invoke(this, ex);
-                    await Task.Delay(TimeSpan.FromSeconds(5), _cancel.Token).ConfigureAwait(false);
+                    try {
+                        await Task.Delay(TimeSpan.FromSeconds(5), _cancel.Token).ConfigureAwait(false);
+                    } catch (OperationCanceledException) when (_cancel.IsCancellationRequested) {
+                        break;
+                    }
                 }
             }
         } finally {
@@ -197,7 +204,11 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
 
             var idleTask = _idleTask;
             if (idleTask != null) {
-                idleTask.GetAwaiter().GetResult();
+                try {
+                    idleTask.GetAwaiter().GetResult();
+                } catch (OperationCanceledException) when (_cancel?.IsCancellationRequested == true) {
+                    // Listener shutdown requested cancellation while the loop was unwinding.
+                }
             }
         } finally {
             Cleanup();
