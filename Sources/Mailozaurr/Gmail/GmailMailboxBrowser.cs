@@ -677,7 +677,7 @@ public sealed class GmailMailboxBrowser {
         }
 
         var remove = new List<string>();
-        var sourceLabelId = NormalizeOptional(await ResolveLabelIdAsync(sourceFolder, cancellationToken).ConfigureAwait(false));
+        var sourceLabelId = await ResolveSourceLabelIdAsync(sourceFolder, cancellationToken).ConfigureAwait(false);
         if (sourceLabelId != null) {
             remove.Add(sourceLabelId);
         }
@@ -806,7 +806,7 @@ public sealed class GmailMailboxBrowser {
         }
 
         var remove = new List<string>();
-        var sourceLabelId = NormalizeOptional(await ResolveLabelIdAsync(sourceFolder, cancellationToken).ConfigureAwait(false));
+        var sourceLabelId = await ResolveSourceLabelIdAsync(sourceFolder, cancellationToken).ConfigureAwait(false);
         if (sourceLabelId != null) {
             remove.Add(sourceLabelId);
         }
@@ -1205,6 +1205,16 @@ public sealed class GmailMailboxBrowser {
         }
 
         return results;
+    }
+
+    private async Task<string?> ResolveSourceLabelIdAsync(
+        string? sourceFolder,
+        CancellationToken cancellationToken) {
+        if (string.IsNullOrWhiteSpace(sourceFolder)) {
+            return null;
+        }
+
+        return NormalizeOptional(await ResolveLabelIdAsync(sourceFolder, cancellationToken).ConfigureAwait(false));
     }
 
     private static List<string> NormalizeIds(IEnumerable<string> ids) {
