@@ -646,12 +646,17 @@ namespace Mailozaurr {
             string queryString,
             int from = 0,
             int size = 25) {
+            var mailboxList = userPrincipalNames as IList<string> ?? userPrincipalNames.ToList();
+            if (mailboxList.Count == 0) {
+                return new List<GraphMessageInfo>();
+            }
+
             var headers = new Dictionary<string, string>();
             var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
             headers["Authorization"] = token;
 
             var searchPayload = new GraphSearchPayload();
-            foreach (var upn in userPrincipalNames) {
+            foreach (var upn in mailboxList) {
                 searchPayload.Requests.Add(new GraphSearchRequest {
                     EntityTypes = new[] { "message" },
                     From = from,
@@ -669,7 +674,11 @@ namespace Mailozaurr {
             int index = 0;
             if (doc.RootElement.TryGetProperty("value", out var valueElement) && valueElement.ValueKind == JsonValueKind.Array) {
                 foreach (var item in valueElement.EnumerateArray()) {
-                    var upn = userPrincipalNames.ElementAt(index++);
+                    if (index >= mailboxList.Count) {
+                        break;
+                    }
+
+                    var upn = mailboxList[index++];
                     if (item.TryGetProperty("hitsContainers", out var containers) && containers.ValueKind == JsonValueKind.Array) {
                         foreach (var container in containers.EnumerateArray()) {
                             if (container.TryGetProperty("hits", out var hits) && hits.ValueKind == JsonValueKind.Array) {
