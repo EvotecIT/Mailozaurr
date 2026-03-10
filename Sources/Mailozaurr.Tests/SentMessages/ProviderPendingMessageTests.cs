@@ -72,6 +72,18 @@ public sealed class ProviderPendingMessageTests {
         }
     }
 
+    private sealed class DelayedCancellationHandler : HttpMessageHandler {
+        private readonly TaskCompletionSource<bool> started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task WaitForStartAsync() => started.Task;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            started.TrySetResult(true);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
+            throw new InvalidOperationException("Unreachable");
+        }
+    }
+
     [Fact]
     public async Task SendGridClientQueuesAndProcessesPendingMessage() {
         using var client = new SendGridClient {
@@ -121,6 +133,33 @@ public sealed class ProviderPendingMessageTests {
 
         Assert.Equal(1, successHandler.CallCount);
         Assert.Null(await repository.GetByMessageIdAsync(record!.MessageId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task SendGridClient_CallerCancellation_DoesNotQueuePendingMessage() {
+        using var client = new SendGridClient {
+            Credentials = new NetworkCredential("apikey", "SG.API"),
+            From = "sender@example.com",
+            To = new List<object> { "recipient@example.com" },
+            Subject = "canceled",
+            Text = "hello"
+        };
+        client.CreateMessage();
+
+        var repository = new InMemoryPendingMessageRepository();
+        client.PendingMessageRepository = repository;
+
+        var delayedHandler = new DelayedCancellationHandler();
+        var httpClientField = typeof(SendGridClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        httpClientField.SetValue(client, new HttpClient(delayedHandler));
+
+        using var cts = new CancellationTokenSource();
+        var sendTask = client.SendEmailAsync(cts.Token);
+        await delayedHandler.WaitForStartAsync();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await sendTask);
+        Assert.Null(repository.LastSaved);
     }
 
     [Fact]
