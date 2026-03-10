@@ -266,6 +266,8 @@ public class MailgunClient : IDisposable {
 
         try {
             await PendingMessageRepository.SaveAsync(record, cancellationToken).ConfigureAwait(false);
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Failed to persist Mailgun pending message: {ex.Message}");
         }

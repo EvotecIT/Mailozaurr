@@ -254,6 +254,10 @@ public class SesClient : IDisposable {
         {
             await PendingMessageRepository.SaveAsync(record, cancellationToken).ConfigureAwait(false);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             LogCollector.LogWarning($"Send-EmailMessage - Failed to persist SES pending message: {ex.Message}");

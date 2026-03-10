@@ -12,6 +12,7 @@ namespace Mailozaurr;
 /// </summary>
 internal static class OAuthTokenCache {
     private static readonly object LockObj = new();
+    private const int IoRetryCount = 5;
     private static readonly string CacheFilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Mailozaurr",
@@ -77,6 +78,8 @@ internal static class OAuthTokenCache {
                 cache = new Dictionary<string, OAuthCredential>();
             } catch (JsonException) {
                 cache = new Dictionary<string, OAuthCredential>();
+            } catch (IOException) {
+                cache = new Dictionary<string, OAuthCredential>();
             }
         } else {
             cache = new Dictionary<string, OAuthCredential>();
@@ -124,45 +127,95 @@ internal static class OAuthTokenCache {
             json = JsonSerializer.Serialize(cacheEntries, MailozaurrJsonContext.Default.DictionaryStringOAuthCredentialCacheEntry);
         }
         cancellationToken.ThrowIfCancellationRequested();
-#if NETFRAMEWORK || NETSTANDARD2_0
         await WriteCacheFileAsync(json, cancellationToken).ConfigureAwait(false);
-#else
-        await File.WriteAllTextAsync(CacheFilePath, json, cancellationToken).ConfigureAwait(false);
-#endif
     }
 
-#if NETFRAMEWORK || NETSTANDARD2_0
     private static async Task<string> ReadCacheFileAsync(CancellationToken cancellationToken) {
-        cancellationToken.ThrowIfCancellationRequested();
-        using (var stream = new FileStream(CacheFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true))
-        using (cancellationToken.Register(() => stream.Dispose()))
-        using (var reader = new StreamReader(stream))
-        using (cancellationToken.Register(() => reader.Dispose())) {
+        for (var attempt = 0; ; attempt++) {
+            cancellationToken.ThrowIfCancellationRequested();
             try {
-                var json = await reader.ReadToEndAsync().ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
-                return json;
-            } catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested) {
-                throw new OperationCanceledException(cancellationToken);
+                using (var stream = new FileStream(CacheFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096, true))
+                using (cancellationToken.Register(() => stream.Dispose()))
+                using (var reader = new StreamReader(stream))
+                using (cancellationToken.Register(() => reader.Dispose())) {
+                    try {
+                        var json = await reader.ReadToEndAsync().ConfigureAwait(false);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        return json;
+                    } catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested) {
+                        throw new OperationCanceledException(cancellationToken);
+                    }
+                }
+            } catch (IOException) when (attempt < IoRetryCount - 1) {
+                await Task.Delay(GetRetryDelay(attempt), cancellationToken).ConfigureAwait(false);
             }
         }
     }
 
     private static async Task WriteCacheFileAsync(string json, CancellationToken cancellationToken) {
-        cancellationToken.ThrowIfCancellationRequested();
-        using (var stream = new FileStream(CacheFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 4096, true))
-        using (cancellationToken.Register(() => stream.Dispose()))
-        using (var writer = new StreamWriter(stream))
-        using (cancellationToken.Register(() => writer.Dispose())) {
+        var directory = Path.GetDirectoryName(CacheFilePath);
+        if (string.IsNullOrWhiteSpace(directory)) {
+            throw new InvalidOperationException("OAuth cache path is invalid.");
+        }
+
+        for (var attempt = 0; ; attempt++) {
+            cancellationToken.ThrowIfCancellationRequested();
+            var tempPath = Path.Combine(directory, Path.GetRandomFileName());
             try {
-                await writer.WriteAsync(json).ConfigureAwait(false);
-                await writer.FlushAsync().ConfigureAwait(false);
-                await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
-            } catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested) {
-                throw new OperationCanceledException(cancellationToken);
+                using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete, 4096, true))
+                using (cancellationToken.Register(() => stream.Dispose()))
+                using (var writer = new StreamWriter(stream))
+                using (cancellationToken.Register(() => writer.Dispose())) {
+                    try {
+                        await writer.WriteAsync(json).ConfigureAwait(false);
+                        await writer.FlushAsync().ConfigureAwait(false);
+                        await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+                        cancellationToken.ThrowIfCancellationRequested();
+                    } catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested) {
+                        throw new OperationCanceledException(cancellationToken);
+                    }
+                }
+
+                ReplaceCacheFile(tempPath);
+                tempPath = string.Empty;
+                return;
+            } catch (IOException) when (attempt < IoRetryCount - 1) {
+                await Task.Delay(GetRetryDelay(attempt), cancellationToken).ConfigureAwait(false);
+            } finally {
+                if (!string.IsNullOrEmpty(tempPath) && File.Exists(tempPath)) {
+                    try {
+                        File.Delete(tempPath);
+                    } catch (IOException) {
+                    }
+                }
             }
         }
     }
-#endif
+
+    private static void ReplaceCacheFile(string tempPath) {
+        if (File.Exists(CacheFilePath)) {
+            try {
+                File.Replace(tempPath, CacheFilePath, null, ignoreMetadataErrors: true);
+                return;
+            } catch (FileNotFoundException) {
+            } catch (PlatformNotSupportedException) {
+            }
+        }
+
+        if (File.Exists(CacheFilePath)) {
+            File.Copy(tempPath, CacheFilePath, overwrite: true);
+            File.Delete(tempPath);
+            return;
+        }
+
+        try {
+            File.Move(tempPath, CacheFilePath);
+        } catch (IOException) when (File.Exists(CacheFilePath)) {
+            File.Copy(tempPath, CacheFilePath, overwrite: true);
+            File.Delete(tempPath);
+        }
+    }
+
+    private static TimeSpan GetRetryDelay(int attempt) =>
+        TimeSpan.FromMilliseconds(25 * (attempt + 1));
 }

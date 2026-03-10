@@ -200,6 +200,8 @@ public sealed class GmailApiClient : IDisposable {
 
         try {
             await PendingMessageRepository.SaveAsync(record, cancellationToken).ConfigureAwait(false);
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
         } catch (Exception ex) {
             LoggingMessages.Logger.WriteWarning($"Failed to persist Gmail pending message: {ex.Message}");
         }
