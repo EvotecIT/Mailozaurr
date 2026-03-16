@@ -16,9 +16,24 @@ public class SmtpAsyncWrappersTests
     private class FakeConnectClient : ClientSmtp
     {
         public bool ConnectCalled;
+        public bool ThrowOnConnect;
+        public bool ThrowOnAuthenticate;
+        public SecureSocketOptions? LastSecureSocketOptions;
+        public string? AuthMechanism;
         public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default)
         {
+            if (ThrowOnConnect) {
+                throw new InvalidOperationException("connect failed");
+            }
             ConnectCalled = true;
+            LastSecureSocketOptions = options;
+            return Task.CompletedTask;
+        }
+        public override Task AuthenticateAsync(SaslMechanism mechanism, CancellationToken cancellationToken = default) {
+            if (ThrowOnAuthenticate) {
+                throw new InvalidOperationException("auth failed");
+            }
+            AuthMechanism = mechanism.GetType().Name;
             return Task.CompletedTask;
         }
     }
@@ -40,6 +55,65 @@ public class SmtpAsyncWrappersTests
 
         Assert.True(fake.ConnectCalled);
         Assert.True(result.Status);
+    }
+
+    [Fact]
+    public async Task ConnectAndAuthenticateAsync_ReturnsSuccessForOAuthAuthentication()
+    {
+        var smtp = new Smtp();
+        var fake = new FakeConnectClient();
+        SetClient(smtp, fake);
+
+        var result = await smtp.ConnectAndAuthenticateAsync(
+            "host",
+            587,
+            "user@example.com",
+            "oauth-token",
+            SecureSocketOptions.StartTls,
+            useSsl: false,
+            authMode: ProtocolAuthMode.OAuth2);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SecureSocketOptions.StartTls, result.SecureSocketOptions);
+        Assert.Equal(nameof(SaslMechanismOAuth2), fake.AuthMechanism);
+    }
+
+    [Fact]
+    public async Task ConnectAndAuthenticateAsync_MapsConnectFailure()
+    {
+        var smtp = new Smtp();
+        var fake = new FakeConnectClient { ThrowOnConnect = true };
+        SetClient(smtp, fake);
+
+        var result = await smtp.ConnectAndAuthenticateAsync(
+            "host",
+            587,
+            "user@example.com",
+            "secret",
+            authMode: ProtocolAuthMode.OAuth2);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("connect_failed", result.ErrorCode);
+        Assert.True(result.IsTransient);
+    }
+
+    [Fact]
+    public async Task ConnectAndAuthenticateAsync_MapsAuthenticationFailure()
+    {
+        var smtp = new Smtp();
+        var fake = new FakeConnectClient { ThrowOnAuthenticate = true };
+        SetClient(smtp, fake);
+
+        var result = await smtp.ConnectAndAuthenticateAsync(
+            "host",
+            587,
+            "user@example.com",
+            "secret",
+            authMode: ProtocolAuthMode.OAuth2);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("auth_failed", result.ErrorCode);
+        Assert.False(result.IsTransient);
     }
 
     [Fact]
