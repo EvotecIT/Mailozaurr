@@ -529,14 +529,34 @@ public class Smtp {
     /// <param name="useSsl">Compatibility switch. Overrides
     /// <paramref name="secureSocketOptions"/> only when set to <c>true</c> and the
     /// option is left as <see cref="SecureSocketOptions.Auto"/>.</param>
+    /// <returns></returns>
+    public Task<SmtpResult> ConnectAsync(
+        string server,
+        int port,
+        SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto,
+        bool useSsl = false) {
+        return ConnectAsync(server, port, secureSocketOptions, useSsl, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Asynchronously connect to the SMTP server using the provided server and port.
+    /// </summary>
+    /// <param name="server"></param>
+    /// <param name="port"></param>
+    /// <param name="secureSocketOptions">Options controlling SSL/TLS usage. If left
+    /// as <see cref="SecureSocketOptions.Auto"/> and <paramref name="useSsl"/> is
+    /// <c>true</c>, <see cref="SecureSocketOptions.StartTls"/> will be used.</param>
+    /// <param name="useSsl">Compatibility switch. Overrides
+    /// <paramref name="secureSocketOptions"/> only when set to <c>true</c> and the
+    /// option is left as <see cref="SecureSocketOptions.Auto"/>.</param>
     /// <param name="cancellationToken">Cancellation token for the connect operation.</param>
     /// <returns></returns>
     public async Task<SmtpResult> ConnectAsync(
         string server,
         int port,
-        SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto,
-        bool useSsl = false,
-        CancellationToken cancellationToken = default) {
+        SecureSocketOptions secureSocketOptions,
+        bool useSsl,
+        CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         var oldServer = Server;
         var oldPort = Port;

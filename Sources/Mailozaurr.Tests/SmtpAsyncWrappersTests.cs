@@ -82,6 +82,17 @@ public class SmtpAsyncWrappersTests
     }
 
     [Fact]
+    public void ConnectAsync_PreservesLegacyFourArgumentOverload()
+    {
+        var method = typeof(Smtp).GetMethod(
+            nameof(Smtp.ConnectAsync),
+            new[] { typeof(string), typeof(int), typeof(SecureSocketOptions), typeof(bool) });
+
+        Assert.NotNull(method);
+        Assert.Equal(typeof(Task<SmtpResult>), method!.ReturnType);
+    }
+
+    [Fact]
     public async Task ConnectAndAuthenticateAsync_ReturnsSuccessForOAuthAuthentication()
     {
         var smtp = new Smtp();
