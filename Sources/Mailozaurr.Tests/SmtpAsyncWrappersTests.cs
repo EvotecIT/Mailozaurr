@@ -18,16 +18,27 @@ public class SmtpAsyncWrappersTests
         public bool ConnectCalled;
         public bool ThrowOnConnect;
         public bool ThrowOnAuthenticate;
+        public bool BlockConnectUntilCanceled;
+        public bool ConnectCanceled;
         public SecureSocketOptions? LastSecureSocketOptions;
+        public CancellationToken LastConnectCancellationToken;
         public string? AuthMechanism;
-        public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default)
+        public override async Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default)
         {
+            LastConnectCancellationToken = cancellationToken;
             if (ThrowOnConnect) {
                 throw new InvalidOperationException("connect failed");
             }
+            if (BlockConnectUntilCanceled) {
+                try {
+                    await Task.Delay(global::System.Threading.Timeout.InfiniteTimeSpan, cancellationToken);
+                } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                    ConnectCanceled = true;
+                    throw;
+                }
+            }
             ConnectCalled = true;
             LastSecureSocketOptions = options;
-            return Task.CompletedTask;
         }
         public override Task AuthenticateAsync(SaslMechanism mechanism, CancellationToken cancellationToken = default) {
             if (ThrowOnAuthenticate) {
@@ -98,6 +109,26 @@ public class SmtpAsyncWrappersTests
     }
 
     [Fact]
+    public async Task ConnectAndAuthenticateAsync_MapsValidationFailureAsNonTransient()
+    {
+        var smtp = new Smtp();
+        var fake = new FakeConnectClient();
+        SetClient(smtp, fake);
+
+        var result = await smtp.ConnectAndAuthenticateAsync(
+            string.Empty,
+            0,
+            "user@example.com",
+            "secret",
+            authMode: ProtocolAuthMode.OAuth2);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("connect_failed", result.ErrorCode);
+        Assert.False(result.IsTransient);
+        Assert.False(fake.ConnectCalled);
+    }
+
+    [Fact]
     public async Task ConnectAndAuthenticateAsync_MapsAuthenticationFailure()
     {
         var smtp = new Smtp();
@@ -156,6 +187,33 @@ public class SmtpAsyncWrappersTests
             cancellationToken: cts.Token));
 
         Assert.False(fake.ConnectCalled);
+        Assert.Null(fake.AuthMechanism);
+    }
+
+    [Fact]
+    public async Task ConnectAndAuthenticateAsync_PropagatesCancellationIntoConnect()
+    {
+        var smtp = new Smtp();
+        var fake = new FakeConnectClient {
+            BlockConnectUntilCanceled = true
+        };
+        SetClient(smtp, fake);
+
+        using var cts = new CancellationTokenSource();
+        var operation = smtp.ConnectAndAuthenticateAsync(
+            "host",
+            587,
+            "user@example.com",
+            "secret",
+            authMode: ProtocolAuthMode.OAuth2,
+            cancellationToken: cts.Token);
+
+        cts.CancelAfter(TimeSpan.FromMilliseconds(25));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
+
+        Assert.True(fake.ConnectCanceled);
+        Assert.True(fake.LastConnectCancellationToken.CanBeCanceled);
         Assert.Null(fake.AuthMechanism);
     }
 

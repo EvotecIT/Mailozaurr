@@ -529,8 +529,15 @@ public class Smtp {
     /// <param name="useSsl">Compatibility switch. Overrides
     /// <paramref name="secureSocketOptions"/> only when set to <c>true</c> and the
     /// option is left as <see cref="SecureSocketOptions.Auto"/>.</param>
+    /// <param name="cancellationToken">Cancellation token for the connect operation.</param>
     /// <returns></returns>
-    public async Task<SmtpResult> ConnectAsync(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false) {
+    public async Task<SmtpResult> ConnectAsync(
+        string server,
+        int port,
+        SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto,
+        bool useSsl = false,
+        CancellationToken cancellationToken = default) {
+        cancellationToken.ThrowIfCancellationRequested();
         var oldServer = Server;
         var oldPort = Port;
         var oldPoolIdentity = _poolIdentity ?? GetConnectionPoolIdentity();
@@ -580,11 +587,13 @@ public class Smtp {
         try {
             if (!Client.IsConnected)
             {
-                await Client.ConnectAsync(server, port, effectiveOptions);
+                await Client.ConnectAsync(server, port, effectiveOptions, cancellationToken).ConfigureAwait(false);
             }
             _poolIdentity = poolIdentity;
             LogVerbose($"Connected to {server} on {port} port using SSL: {effectiveOptions}");
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "");
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
         } catch (Exception ex) {
             LogWarning($"Send-EmailMessage - Error during connect: {ex.Message}");
             LogWarning($"Send-EmailMessage - Possible issue: Port? ({port} was used), Using SSL? ({effectiveOptions}, was used). You can also try 'SkipCertificateValidation' or 'SkipCertificateRevocation'.");
@@ -618,14 +627,14 @@ public class Smtp {
         CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var connectResult = await ConnectAsync(server, port, secureSocketOptions, useSsl).ConfigureAwait(false);
+        var connectResult = await ConnectAsync(server, port, secureSocketOptions, useSsl, cancellationToken).ConfigureAwait(false);
         if (!connectResult.Status) {
             return new SmtpConnectAuthenticateResult {
                 IsSuccess = false,
                 SecureSocketOptions = ActiveSecureSocketOptions,
                 ErrorCode = "connect_failed",
                 Error = connectResult.Error ?? "Connect failed.",
-                IsTransient = true
+                IsTransient = SmtpValidation.TryValidateServer(server, port, out _)
             };
         }
 
