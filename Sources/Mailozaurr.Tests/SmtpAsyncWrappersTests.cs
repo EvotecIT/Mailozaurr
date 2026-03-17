@@ -117,6 +117,49 @@ public class SmtpAsyncWrappersTests
     }
 
     [Fact]
+    public async Task ConnectAndAuthenticateAsync_DryRunSkipsAuthentication()
+    {
+        var smtp = new Smtp {
+            DryRun = true
+        };
+        var fake = new FakeConnectClient();
+        SetClient(smtp, fake);
+
+        var result = await smtp.ConnectAndAuthenticateAsync(
+            "host",
+            587,
+            "user@example.com",
+            "secret",
+            authMode: ProtocolAuthMode.OAuth2);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(string.IsNullOrWhiteSpace(result.ErrorCode));
+        Assert.Null(fake.AuthMechanism);
+    }
+
+    [Fact]
+    public async Task ConnectAndAuthenticateAsync_ThrowsWhenAlreadyCanceled()
+    {
+        var smtp = new Smtp();
+        var fake = new FakeConnectClient();
+        SetClient(smtp, fake);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => smtp.ConnectAndAuthenticateAsync(
+            "host",
+            587,
+            "user@example.com",
+            "secret",
+            authMode: ProtocolAuthMode.OAuth2,
+            cancellationToken: cts.Token));
+
+        Assert.False(fake.ConnectCalled);
+        Assert.Null(fake.AuthMechanism);
+    }
+
+    [Fact]
     public async Task CreateMessageAsync_AutoEmbedImagesAddsInlineAttachment()
     {
         var tempFile = Path.GetTempFileName();

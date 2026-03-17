@@ -616,6 +616,8 @@ public class Smtp {
         bool useSsl = false,
         ProtocolAuthMode authMode = ProtocolAuthMode.Basic,
         CancellationToken cancellationToken = default) {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var connectResult = await ConnectAsync(server, port, secureSocketOptions, useSsl).ConfigureAwait(false);
         if (!connectResult.Status) {
             return new SmtpConnectAuthenticateResult {
@@ -624,6 +626,15 @@ public class Smtp {
                 ErrorCode = "connect_failed",
                 Error = connectResult.Error ?? "Connect failed.",
                 IsTransient = true
+            };
+        }
+
+        if (DryRun) {
+            LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
+            Credential = new NetworkCredential(userName?.Trim() ?? string.Empty, secret ?? string.Empty);
+            return new SmtpConnectAuthenticateResult {
+                IsSuccess = true,
+                SecureSocketOptions = ActiveSecureSocketOptions
             };
         }
 
