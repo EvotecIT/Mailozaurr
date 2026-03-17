@@ -627,7 +627,25 @@ public class Smtp {
         CancellationToken cancellationToken = default) {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var connectResult = await ConnectAsync(server, port, secureSocketOptions, useSsl, cancellationToken).ConfigureAwait(false);
+        var normalizedUserName = userName?.Trim() ?? string.Empty;
+        var previousConnectionPoolIdentity = ConnectionPoolIdentity;
+        var shouldOverrideConnectionPoolIdentity =
+            string.IsNullOrWhiteSpace(previousConnectionPoolIdentity) &&
+            !string.IsNullOrWhiteSpace(normalizedUserName);
+
+        if (shouldOverrideConnectionPoolIdentity) {
+            ConnectionPoolIdentity = normalizedUserName;
+        }
+
+        SmtpResult connectResult;
+        try {
+            connectResult = await ConnectAsync(server, port, secureSocketOptions, useSsl, cancellationToken).ConfigureAwait(false);
+        } finally {
+            if (shouldOverrideConnectionPoolIdentity) {
+                ConnectionPoolIdentity = previousConnectionPoolIdentity;
+            }
+        }
+
         if (!connectResult.Status) {
             return new SmtpConnectAuthenticateResult {
                 IsSuccess = false,
@@ -640,7 +658,7 @@ public class Smtp {
 
         if (DryRun) {
             LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
-            Credential = new NetworkCredential(userName?.Trim() ?? string.Empty, secret ?? string.Empty);
+            Credential = new NetworkCredential(normalizedUserName, secret ?? string.Empty);
             return new SmtpConnectAuthenticateResult {
                 IsSuccess = true,
                 SecureSocketOptions = ActiveSecureSocketOptions
@@ -648,8 +666,8 @@ public class Smtp {
         }
 
         try {
-            await ProtocolAuth.AuthenticateSmtpAsync(Client, userName, secret, authMode, cancellationToken).ConfigureAwait(false);
-            Credential = new NetworkCredential(userName?.Trim() ?? string.Empty, secret ?? string.Empty);
+            await ProtocolAuth.AuthenticateSmtpAsync(Client, normalizedUserName, secret, authMode, cancellationToken).ConfigureAwait(false);
+            Credential = new NetworkCredential(normalizedUserName, secret ?? string.Empty);
             return new SmtpConnectAuthenticateResult {
                 IsSuccess = true,
                 SecureSocketOptions = ActiveSecureSocketOptions
@@ -657,6 +675,9 @@ public class Smtp {
         } catch (OperationCanceledException) {
             throw;
         } catch (Exception ex) {
+            if (ErrorAction == ActionPreference.Stop) {
+                throw;
+            }
             return new SmtpConnectAuthenticateResult {
                 IsSuccess = false,
                 SecureSocketOptions = ActiveSecureSocketOptions,

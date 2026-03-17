@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -53,6 +54,18 @@ public class SmtpAsyncWrappersTests
     {
         var field = typeof(Smtp).GetField("<Client>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!;
         field.SetValue(smtp, client);
+    }
+
+    private static void SetCredential(Smtp smtp, NetworkCredential credential)
+    {
+        var field = typeof(Smtp).GetField("<Credential>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        field.SetValue(smtp, credential);
+    }
+
+    private static string? GetPoolIdentity(Smtp smtp)
+    {
+        var field = typeof(Smtp).GetField("_poolIdentity", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        return field.GetValue(smtp) as string;
     }
 
     [Fact]
@@ -148,6 +161,23 @@ public class SmtpAsyncWrappersTests
     }
 
     [Fact]
+    public async Task ConnectAndAuthenticateAsync_ReThrowsAuthFailureWhenErrorActionStop()
+    {
+        var smtp = new Smtp {
+            ErrorAction = ActionPreference.Stop
+        };
+        var fake = new FakeConnectClient { ThrowOnAuthenticate = true };
+        SetClient(smtp, fake);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => smtp.ConnectAndAuthenticateAsync(
+            "host",
+            587,
+            "user@example.com",
+            "secret",
+            authMode: ProtocolAuthMode.OAuth2));
+    }
+
+    [Fact]
     public async Task ConnectAndAuthenticateAsync_DryRunSkipsAuthentication()
     {
         var smtp = new Smtp {
@@ -215,6 +245,29 @@ public class SmtpAsyncWrappersTests
         Assert.True(fake.ConnectCanceled);
         Assert.True(fake.LastConnectCancellationToken.CanBeCanceled);
         Assert.Null(fake.AuthMechanism);
+    }
+
+    [Fact]
+    public async Task ConnectAndAuthenticateAsync_UsesRequestedUsernameForPoolIdentityWhenCredentialWasStale()
+    {
+        var smtp = new Smtp();
+        var fake = new FakeConnectClient();
+        SetClient(smtp, fake);
+        SetCredential(smtp, new NetworkCredential("old.user@example.com", "old-secret"));
+
+        var result = await smtp.ConnectAndAuthenticateAsync(
+            "host",
+            587,
+            "new.user@example.com",
+            "secret",
+            authMode: ProtocolAuthMode.OAuth2);
+
+        var poolIdentity = GetPoolIdentity(smtp);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(poolIdentity);
+        Assert.StartsWith("new.user@example.com|", poolIdentity!, StringComparison.Ordinal);
+        Assert.Null(smtp.ConnectionPoolIdentity);
     }
 
     [Fact]
