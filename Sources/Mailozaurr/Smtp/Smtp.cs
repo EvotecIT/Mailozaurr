@@ -77,6 +77,11 @@ public class Smtp {
     public NetworkCredential? Credential { get; private set; }
 
     /// <summary>
+    /// Effective secure socket options used by the active or most recent connection attempt.
+    /// </summary>
+    public SecureSocketOptions ActiveSecureSocketOptions => _activeSecureSocketOptions;
+
+    /// <summary>
     /// Optional identity hint used to isolate SMTP connection pooling by credentials.
     /// </summary>
     public string? ConnectionPoolIdentity { get; set; }
@@ -525,7 +530,34 @@ public class Smtp {
     /// <paramref name="secureSocketOptions"/> only when set to <c>true</c> and the
     /// option is left as <see cref="SecureSocketOptions.Auto"/>.</param>
     /// <returns></returns>
-    public async Task<SmtpResult> ConnectAsync(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false) {
+    public Task<SmtpResult> ConnectAsync(
+        string server,
+        int port,
+        SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto,
+        bool useSsl = false) {
+        return ConnectAsync(server, port, secureSocketOptions, useSsl, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Asynchronously connect to the SMTP server using the provided server and port.
+    /// </summary>
+    /// <param name="server"></param>
+    /// <param name="port"></param>
+    /// <param name="secureSocketOptions">Options controlling SSL/TLS usage. If left
+    /// as <see cref="SecureSocketOptions.Auto"/> and <paramref name="useSsl"/> is
+    /// <c>true</c>, <see cref="SecureSocketOptions.StartTls"/> will be used.</param>
+    /// <param name="useSsl">Compatibility switch. Overrides
+    /// <paramref name="secureSocketOptions"/> only when set to <c>true</c> and the
+    /// option is left as <see cref="SecureSocketOptions.Auto"/>.</param>
+    /// <param name="cancellationToken">Cancellation token for the connect operation.</param>
+    /// <returns></returns>
+    public async Task<SmtpResult> ConnectAsync(
+        string server,
+        int port,
+        SecureSocketOptions secureSocketOptions,
+        bool useSsl,
+        CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
         var oldServer = Server;
         var oldPort = Port;
         var oldPoolIdentity = _poolIdentity ?? GetConnectionPoolIdentity();
@@ -575,11 +607,13 @@ public class Smtp {
         try {
             if (!Client.IsConnected)
             {
-                await Client.ConnectAsync(server, port, effectiveOptions);
+                await Client.ConnectAsync(server, port, effectiveOptions, cancellationToken).ConfigureAwait(false);
             }
             _poolIdentity = poolIdentity;
             LogVerbose($"Connected to {server} on {port} port using SSL: {effectiveOptions}");
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "");
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
         } catch (Exception ex) {
             LogWarning($"Send-EmailMessage - Error during connect: {ex.Message}");
             LogWarning($"Send-EmailMessage - Possible issue: Port? ({port} was used), Using SSL? ({effectiveOptions}, was used). You can also try 'SkipCertificateValidation' or 'SkipCertificateRevocation'.");
@@ -587,6 +621,90 @@ public class Smtp {
                 throw;
             }
             return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Connects and authenticates using the provided user name/secret in one step.
+    /// </summary>
+    /// <param name="server">SMTP server hostname.</param>
+    /// <param name="port">SMTP server port.</param>
+    /// <param name="userName">SMTP user name.</param>
+    /// <param name="secret">SMTP password or OAuth token.</param>
+    /// <param name="secureSocketOptions">TLS/SSL options.</param>
+    /// <param name="useSsl">Compatibility SSL switch.</param>
+    /// <param name="authMode">Authentication mode.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Combined connect/auth outcome.</returns>
+    public async Task<SmtpConnectAuthenticateResult> ConnectAndAuthenticateAsync(
+        string server,
+        int port,
+        string userName,
+        string secret,
+        SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto,
+        bool useSsl = false,
+        ProtocolAuthMode authMode = ProtocolAuthMode.Basic,
+        CancellationToken cancellationToken = default) {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var normalizedUserName = userName?.Trim() ?? string.Empty;
+        var previousConnectionPoolIdentity = ConnectionPoolIdentity;
+        var shouldOverrideConnectionPoolIdentity =
+            string.IsNullOrWhiteSpace(previousConnectionPoolIdentity) &&
+            !string.IsNullOrWhiteSpace(normalizedUserName);
+
+        if (shouldOverrideConnectionPoolIdentity) {
+            ConnectionPoolIdentity = normalizedUserName;
+        }
+
+        SmtpResult connectResult;
+        try {
+            connectResult = await ConnectAsync(server, port, secureSocketOptions, useSsl, cancellationToken).ConfigureAwait(false);
+        } finally {
+            if (shouldOverrideConnectionPoolIdentity) {
+                ConnectionPoolIdentity = previousConnectionPoolIdentity;
+            }
+        }
+
+        if (!connectResult.Status) {
+            return new SmtpConnectAuthenticateResult {
+                IsSuccess = false,
+                SecureSocketOptions = ActiveSecureSocketOptions,
+                ErrorCode = "connect_failed",
+                Error = connectResult.Error ?? "Connect failed.",
+                IsTransient = SmtpValidation.TryValidateServer(server, port, out _)
+            };
+        }
+
+        if (DryRun) {
+            LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
+            Credential = new NetworkCredential(normalizedUserName, secret ?? string.Empty);
+            return new SmtpConnectAuthenticateResult {
+                IsSuccess = true,
+                SecureSocketOptions = ActiveSecureSocketOptions
+            };
+        }
+
+        try {
+            await ProtocolAuth.AuthenticateSmtpAsync(Client, normalizedUserName, secret, authMode, cancellationToken).ConfigureAwait(false);
+            Credential = new NetworkCredential(normalizedUserName, secret ?? string.Empty);
+            return new SmtpConnectAuthenticateResult {
+                IsSuccess = true,
+                SecureSocketOptions = ActiveSecureSocketOptions
+            };
+        } catch (OperationCanceledException) {
+            throw;
+        } catch (Exception ex) {
+            if (ErrorAction == ActionPreference.Stop) {
+                throw;
+            }
+            return new SmtpConnectAuthenticateResult {
+                IsSuccess = false,
+                SecureSocketOptions = ActiveSecureSocketOptions,
+                ErrorCode = "auth_failed",
+                Error = ex.Message,
+                IsTransient = false
+            };
         }
     }
 

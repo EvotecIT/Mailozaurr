@@ -23,6 +23,7 @@ public class ConnectorTests
         public override bool IsAuthenticated => Authenticated;
         private bool _connected;
         private int _timeout;
+        public string? AuthMechanism { get; private set; }
         public override bool IsConnected => _connected;
         public override int Timeout { get => _timeout; set => _timeout = value; }
         public bool Disposed { get; private set; }
@@ -42,6 +43,11 @@ public class ConnectorTests
         public override Task DisconnectAsync(bool quit, CancellationToken cancellationToken = default)
         {
             _connected = false;
+            return Task.CompletedTask;
+        }
+        public override Task AuthenticateAsync(SaslMechanism mechanism, CancellationToken cancellationToken = default) {
+            AuthMechanism = mechanism.GetType().Name;
+            Authenticated = true;
             return Task.CompletedTask;
         }
         protected override void Dispose(bool disposing)
@@ -158,6 +164,25 @@ public class ConnectorTests
         Assert.Equal(1993, fake.LastPort);
         Assert.Equal(SecureSocketOptions.SslOnConnect, fake.LastSecureSocketOptions);
         Assert.Equal(4321, fake.Timeout);
+    }
+
+    [Fact]
+    public async Task ImapConnector_ConnectAuthenticatedAsync_UsesOAuthAuthentication() {
+        var fake = new FakeImapClient();
+        ImapConnector.ClientFactory = () => fake;
+        var request = new ImapConnectionRequest("imap.example.test", 993);
+
+        var client = await ImapConnector.ConnectAuthenticatedAsync(
+            request,
+            userName: "user@example.com",
+            secret: "oauth-token",
+            mode: ProtocolAuthMode.OAuth2);
+
+        ImapConnector.ClientFactory = () => new ImapClient();
+
+        Assert.Same(fake, client);
+        Assert.True(fake.IsAuthenticated);
+        Assert.Equal(nameof(SaslMechanismOAuth2), fake.AuthMechanism);
     }
 
     [Fact]

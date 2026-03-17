@@ -94,4 +94,29 @@ public static class ImapConnector {
             retryDelayBackoff,
             DelayAsync,
             cancellationToken);
+
+    /// <summary>
+    /// Connects and authenticates to an IMAP server using protocol auth settings in one step.
+    /// </summary>
+    /// <param name="request">Connection request settings.</param>
+    /// <param name="userName">IMAP user name.</param>
+    /// <param name="secret">IMAP password or OAuth token.</param>
+    /// <param name="mode">Authentication mode.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    /// <returns>Authenticated <see cref="ImapClient"/> instance.</returns>
+    public static Task<ImapClient> ConnectAuthenticatedAsync(
+        ImapConnectionRequest request,
+        string userName,
+        string secret,
+        ProtocolAuthMode mode = ProtocolAuthMode.Basic,
+        CancellationToken cancellationToken = default) {
+        if (request is null) {
+            throw new ArgumentNullException(nameof(request));
+        }
+
+        return ConnectAsync(
+            request,
+            (client, ct) => ProtocolAuth.AuthenticateImapAsync(client, userName, secret, mode, ct),
+            cancellationToken);
+    }
 }
