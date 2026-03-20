@@ -41,8 +41,16 @@ foreach ($Module in $PSDInformation.RequiredModules) {
     }
 }
 Write-Color
-
-Import-Module $PSScriptRoot\*.psd1 -Force
+$ImportedModule = Import-Module $PSScriptRoot\*.psd1 -Force -PassThru -ErrorAction Stop
+if (-not $ImportedModule) {
+    throw "Failed to import module from $PSScriptRoot."
+}
+foreach ($CommandName in 'Get-SmtpConnectionPool', 'Send-EmailMessage') {
+    $Command = Get-Command -Name $CommandName -ErrorAction Stop
+    if ($Command.ModuleName -ne $ImportedModule.Name) {
+        throw "Expected command '$CommandName' to be exported by module '$($ImportedModule.Name)', but got '$($Command.ModuleName)'."
+    }
+}
 $result = Invoke-Pester -Script $PSScriptRoot\Tests -Verbose -PassThru
 
 if ($result.FailedCount -gt 0) {

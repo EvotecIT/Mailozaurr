@@ -40,6 +40,20 @@ public sealed class SmtpPendingMessageTests {
             return Task.CompletedTask;
         }
 
+        public Task<PendingMessageRecord?> TryAcquireLeaseAsync(
+            string messageId,
+            DateTimeOffset dueBeforeOrAt,
+            DateTimeOffset leaseUntil,
+            CancellationToken cancellationToken = default) {
+            var record = Saved.FirstOrDefault(r => r.MessageId == messageId);
+            if (record == null || record.NextAttemptAt > dueBeforeOrAt) {
+                return Task.FromResult<PendingMessageRecord?>(null);
+            }
+
+            record.NextAttemptAt = leaseUntil;
+            return Task.FromResult<PendingMessageRecord?>(record);
+        }
+
         public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) =>
             Task.FromResult<PendingMessageRecord?>(Saved.FirstOrDefault(r => r.MessageId == messageId));
 

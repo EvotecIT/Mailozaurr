@@ -9,6 +9,22 @@ public interface IPendingMessageRepository {
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     Task SaveAsync(PendingMessageRecord record, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Atomically acquires a processing lease for a due message.
+    /// </summary>
+    /// <param name="messageId">The message id to lease.</param>
+    /// <param name="dueBeforeOrAt">Latest due time that still qualifies the message for processing.</param>
+    /// <param name="leaseUntil">Timestamp written to <see cref="PendingMessageRecord.NextAttemptAt"/> when the lease is acquired.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    /// <returns>
+    /// The current leased record when acquisition succeeds; otherwise <c>null</c>.
+    /// </returns>
+    Task<PendingMessageRecord?> TryAcquireLeaseAsync(
+        string messageId,
+        DateTimeOffset dueBeforeOrAt,
+        DateTimeOffset leaseUntil,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Gets a pending message by its unique message id.</summary>
     /// <param name="messageId">The message id to search for.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>

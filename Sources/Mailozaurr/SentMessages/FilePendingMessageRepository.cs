@@ -333,30 +333,27 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
         }
     }
 
-    /// <summary>Retrieves a pending message by its ID.</summary>
-    public async Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) {
-        if (!File.Exists(filePath)) {
-            return null;
-        }
+    /// <summary>Attempts to lease a due pending message for processing.</summary>
+    public async Task<PendingMessageRecord?> TryAcquireLeaseAsync(
+        string messageId,
+        DateTimeOffset dueBeforeOrAt,
+        DateTimeOffset leaseUntil,
+        CancellationToken cancellationToken = default) {
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
-            if (!index.TryGetValue(messageId, out var offset)) {
+            var current = await GetByMessageIdCoreAsync(messageId, cancellationToken).ConfigureAwait(false);
+            if (current == null || current.NextAttemptAt > dueBeforeOrAt) {
                 return null;
             }
-            using var read = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            read.Seek(offset, SeekOrigin.Begin);
-            using var reader = new StreamReader(read, Encoding.UTF8, false, 1024, leaveOpen: true);
-            string? line = await reader.ReadLineAsync().ConfigureAwait(false);
-            if (line == null) {
-                return null;
-            }
-            if (!TryParseLogEntry(line, out var entry) || entry.Kind != LogEntryKind.Upsert || entry.Record == null) {
-                return null;
-            }
-            if (string.Equals(entry.MessageId, messageId, StringComparison.OrdinalIgnoreCase)) {
-                return entry.Record;
-            }
-            return null;
+
+            _ = current.ProviderData;
+            current.NextAttemptAt = leaseUntil;
+            var offset = await AppendEnvelopeAsync(CreateUpsertEnvelope(current), cancellationToken).ConfigureAwait(false);
+            dirtyEntryCount++;
+            index[current.MessageId] = offset;
+
+            await CompactIfNeededAsync(cancellationToken).ConfigureAwait(false);
+            return current;
         } catch (FileNotFoundException) {
             return null;
         } catch (DirectoryNotFoundException) {
@@ -364,6 +361,48 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
         } finally {
             gate.Release();
         }
+    }
+
+    /// <summary>Retrieves a pending message by its ID.</summary>
+    public async Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) {
+        if (!File.Exists(filePath)) {
+            return null;
+        }
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try {
+            return await GetByMessageIdCoreAsync(messageId, cancellationToken).ConfigureAwait(false);
+        } catch (FileNotFoundException) {
+            return null;
+        } catch (DirectoryNotFoundException) {
+            return null;
+        } finally {
+            gate.Release();
+        }
+    }
+
+    private async Task<PendingMessageRecord?> GetByMessageIdCoreAsync(string messageId, CancellationToken cancellationToken) {
+        if (!index.TryGetValue(messageId, out var offset)) {
+            return null;
+        }
+
+        using var read = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        read.Seek(offset, SeekOrigin.Begin);
+        using var reader = new StreamReader(read, Encoding.UTF8, false, 1024, leaveOpen: true);
+        cancellationToken.ThrowIfCancellationRequested();
+        string? line = await reader.ReadLineAsync().ConfigureAwait(false);
+        if (line == null) {
+            return null;
+        }
+
+        if (!TryParseLogEntry(line, out var entry) || entry.Kind != LogEntryKind.Upsert || entry.Record == null) {
+            return null;
+        }
+
+        if (!string.Equals(entry.MessageId, messageId, StringComparison.OrdinalIgnoreCase)) {
+            return null;
+        }
+
+        return entry.Record;
     }
 
     /// <summary>Enumerates all pending messages.</summary>

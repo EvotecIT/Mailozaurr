@@ -30,6 +30,23 @@ public sealed class ProviderPendingMessageTests {
             return Task.CompletedTask;
         }
 
+        public Task<PendingMessageRecord?> TryAcquireLeaseAsync(
+            string messageId,
+            DateTimeOffset dueBeforeOrAt,
+            DateTimeOffset leaseUntil,
+            CancellationToken cancellationToken = default) {
+            if (messageId == null) {
+                throw new ArgumentNullException(nameof(messageId));
+            }
+
+            if (!records.TryGetValue(messageId, out var record) || record.NextAttemptAt > dueBeforeOrAt) {
+                return Task.FromResult<PendingMessageRecord?>(null);
+            }
+
+            record.NextAttemptAt = leaseUntil;
+            return Task.FromResult<PendingMessageRecord?>(record);
+        }
+
         public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) {
             if (messageId == null) {
                 throw new ArgumentNullException(nameof(messageId));
@@ -93,6 +110,13 @@ public sealed class ProviderPendingMessageTests {
             saveStarted.TrySetResult(true);
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
         }
+
+        public Task<PendingMessageRecord?> TryAcquireLeaseAsync(
+            string messageId,
+            DateTimeOffset dueBeforeOrAt,
+            DateTimeOffset leaseUntil,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<PendingMessageRecord?>(null);
 
         public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) =>
             Task.FromResult<PendingMessageRecord?>(null);

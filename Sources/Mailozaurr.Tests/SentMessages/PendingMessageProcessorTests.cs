@@ -11,6 +11,7 @@ namespace Mailozaurr.Tests;
 public sealed class PendingMessageProcessorTests {
     private sealed class InMemoryPendingMessageRepository : IPendingMessageRepository {
         private readonly ConcurrentDictionary<string, PendingMessageRecord> records = new(StringComparer.OrdinalIgnoreCase);
+        private readonly object syncRoot = new();
 
         public void Add(PendingMessageRecord record) {
             records[record.MessageId] = record;
@@ -19,6 +20,21 @@ public sealed class PendingMessageProcessorTests {
         public Task SaveAsync(PendingMessageRecord record, CancellationToken cancellationToken = default) {
             records[record.MessageId] = record;
             return Task.CompletedTask;
+        }
+
+        public Task<PendingMessageRecord?> TryAcquireLeaseAsync(
+            string messageId,
+            DateTimeOffset dueBeforeOrAt,
+            DateTimeOffset leaseUntil,
+            CancellationToken cancellationToken = default) {
+            lock (syncRoot) {
+                if (!records.TryGetValue(messageId, out var record) || record.NextAttemptAt > dueBeforeOrAt) {
+                    return Task.FromResult<PendingMessageRecord?>(null);
+                }
+
+                record.NextAttemptAt = leaseUntil;
+                return Task.FromResult<PendingMessageRecord?>(record);
+            }
         }
 
         public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) {
@@ -591,5 +607,114 @@ public sealed class PendingMessageProcessorTests {
         Assert.Equal(3, lastRecord.AttemptCount);
         Assert.Equal(EmailProvider.Mailgun, lastRecord.Provider);
         Assert.Equal(new[] { 1, 2 }, attempts);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_DoesNotDoubleSendWhenTwoProcessorsRace() {
+        var currentTime = DateTimeOffset.Parse("2024-06-13T09:00:00Z");
+        var repository = new CoordinatedPendingMessageRepository(currentTime.AddMinutes(-1));
+        var sender = new BlockingPendingMessageSender();
+        var observer = new RecordingObserver();
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            { EmailProvider.None, sender }
+        });
+        var first = new PendingMessageProcessor(repository, factory, clock: () => currentTime, observer: observer);
+        var second = new PendingMessageProcessor(repository, factory, clock: () => currentTime, observer: observer);
+
+        var firstTask = first.ProcessAsync();
+        var secondTask = second.ProcessAsync();
+
+        repository.ReleaseEnumerations();
+        await sender.WaitForFirstSendAsync();
+        sender.Release();
+        await Task.WhenAll(firstTask, secondTask);
+
+        Assert.Equal(1, sender.SendCount);
+        Assert.Contains(observer.Skipped, skipped => skipped.Reason == PendingMessageSkipReason.LeaseNotAcquired);
+    }
+
+    private sealed class CoordinatedPendingMessageRepository : IPendingMessageRepository {
+        private readonly object syncRoot = new();
+        private readonly PendingMessageRecord record;
+        private readonly TaskCompletionSource<bool> firstEnumeratorReached = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> secondEnumeratorReached = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> releaseEnumerators = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal CoordinatedPendingMessageRepository(DateTimeOffset nextAttemptAt) {
+            record = CreateRecord(nextAttemptAt, "coordinated-message");
+        }
+
+        public Task SaveAsync(PendingMessageRecord updatedRecord, CancellationToken cancellationToken = default) {
+            lock (syncRoot) {
+                record.AttemptCount = updatedRecord.AttemptCount;
+                record.NextAttemptAt = updatedRecord.NextAttemptAt;
+                record.Timestamp = updatedRecord.Timestamp;
+                record.MimeMessage = updatedRecord.MimeMessage;
+                record.Server = updatedRecord.Server;
+                record.Port = updatedRecord.Port;
+                record.UserName = updatedRecord.UserName;
+                record.Password = updatedRecord.Password;
+                record.Provider = updatedRecord.Provider;
+                record.ProviderData = new Dictionary<string, string>(updatedRecord.ProviderData);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task<PendingMessageRecord?> TryAcquireLeaseAsync(
+            string messageId,
+            DateTimeOffset dueBeforeOrAt,
+            DateTimeOffset leaseUntil,
+            CancellationToken cancellationToken = default) {
+            lock (syncRoot) {
+                if (!string.Equals(record.MessageId, messageId, StringComparison.OrdinalIgnoreCase) || record.NextAttemptAt > dueBeforeOrAt) {
+                    return Task.FromResult<PendingMessageRecord?>(null);
+                }
+
+                record.NextAttemptAt = leaseUntil;
+                return Task.FromResult<PendingMessageRecord?>(record.Clone());
+            }
+        }
+
+        public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) {
+            lock (syncRoot) {
+                return Task.FromResult<PendingMessageRecord?>(
+                    string.Equals(record.MessageId, messageId, StringComparison.OrdinalIgnoreCase) ? record.Clone() : null);
+            }
+        }
+
+        public async IAsyncEnumerable<PendingMessageRecord> GetAllAsync([EnumeratorCancellation] CancellationToken cancellationToken = default) {
+            if (!firstEnumeratorReached.Task.IsCompleted) {
+                firstEnumeratorReached.TrySetResult(true);
+            } else {
+                secondEnumeratorReached.TrySetResult(true);
+            }
+
+            await Task.WhenAll(firstEnumeratorReached.Task, secondEnumeratorReached.Task, releaseEnumerators.Task).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return record.Clone();
+        }
+
+        public Task RemoveAsync(string messageId, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        internal void ReleaseEnumerations() => releaseEnumerators.TrySetResult(true);
+    }
+
+    private sealed class BlockingPendingMessageSender : IPendingMessageSender {
+        private readonly TaskCompletionSource<bool> sendStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int SendCount { get; private set; }
+
+        public async Task SendAsync(PendingMessageRecord record, CancellationToken ct) {
+            SendCount++;
+            sendStarted.TrySetResult(true);
+            await release.Task.ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
+        }
+
+        internal Task WaitForFirstSendAsync() => sendStarted.Task;
+
+        internal void Release() => release.TrySetResult(true);
     }
 }
