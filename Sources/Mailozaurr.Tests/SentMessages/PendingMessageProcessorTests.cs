@@ -638,6 +638,8 @@ public sealed class PendingMessageProcessorTests {
         private readonly PendingMessageRecord record;
         private readonly TaskCompletionSource<bool> firstEnumeratorReached = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<bool> secondEnumeratorReached = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> firstSnapshotCaptured = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> secondSnapshotCaptured = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<bool> releaseEnumerators = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         internal CoordinatedPendingMessageRepository(DateTimeOffset nextAttemptAt) {
@@ -684,7 +686,8 @@ public sealed class PendingMessageProcessorTests {
         }
 
         public async IAsyncEnumerable<PendingMessageRecord> GetAllAsync([EnumeratorCancellation] CancellationToken cancellationToken = default) {
-            if (!firstEnumeratorReached.Task.IsCompleted) {
+            var isFirstEnumerator = !firstEnumeratorReached.Task.IsCompleted;
+            if (isFirstEnumerator) {
                 firstEnumeratorReached.TrySetResult(true);
             } else {
                 secondEnumeratorReached.TrySetResult(true);
@@ -692,7 +695,15 @@ public sealed class PendingMessageProcessorTests {
 
             await Task.WhenAll(firstEnumeratorReached.Task, secondEnumeratorReached.Task, releaseEnumerators.Task).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
-            yield return record.Clone();
+            var snapshot = record.Clone();
+            if (isFirstEnumerator) {
+                firstSnapshotCaptured.TrySetResult(true);
+            } else {
+                secondSnapshotCaptured.TrySetResult(true);
+            }
+
+            await Task.WhenAll(firstSnapshotCaptured.Task, secondSnapshotCaptured.Task).ConfigureAwait(false);
+            yield return snapshot;
         }
 
         public Task RemoveAsync(string messageId, CancellationToken cancellationToken = default) => Task.CompletedTask;

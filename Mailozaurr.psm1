@@ -146,7 +146,10 @@ $FoundErrors = @(
             $true
         } catch {
             Write-Warning "Processing $($Import.Name) Exception: $($_.Exception.Message)"
-            $LoaderExceptions = $($_.Exception.LoaderExceptions) | Sort-Object -Unique
+            $LoaderExceptions = @()
+            if ($_.Exception -is [System.Reflection.ReflectionTypeLoadException]) {
+                $LoaderExceptions = @($_.Exception.LoaderExceptions) | Sort-Object -Unique
+            }
             foreach ($E in $LoaderExceptions) {
                 Write-Warning "Processing $($Import.Name) LoaderExceptions: $($E.Message)"
             }
