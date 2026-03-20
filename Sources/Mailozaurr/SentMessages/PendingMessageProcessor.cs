@@ -9,6 +9,7 @@ namespace Mailozaurr;
 /// Processes pending messages by dispatching them through provider specific senders.
 /// </summary>
 public sealed class PendingMessageProcessor {
+    private static readonly TimeSpan MinimumLeaseDuration = TimeSpan.FromTicks(1);
     private readonly IPendingMessageRepository repository;
     private readonly PendingMessageSenderFactory senderFactory;
     private readonly Func<int, TimeSpan> retryDelaySelector;
@@ -92,28 +93,33 @@ public sealed class PendingMessageProcessor {
                 continue;
             }
 
-            await AcquireProcessingLeaseAsync(record, now, cancellationToken).ConfigureAwait(false);
+            var leasedRecord = await AcquireProcessingLeaseAsync(record, now, cancellationToken).ConfigureAwait(false);
+            if (leasedRecord == null) {
+                logger?.WriteVerbose($"Skipping message {record.MessageId} because another processor already acquired the processing lease.");
+                observer.MessageSkipped(record, PendingMessageSkipReason.LeaseNotAcquired);
+                continue;
+            }
 
-            var originalAttemptCount = record.AttemptCount;
-            var attempt = record.IncrementAttemptCount();
-            observer.MessageAttemptStarted(record, attempt);
+            var originalAttemptCount = leasedRecord.AttemptCount;
+            var attempt = leasedRecord.IncrementAttemptCount();
+            observer.MessageAttemptStarted(leasedRecord, attempt);
             var stopwatch = Stopwatch.StartNew();
 
             try {
-                var sender = senderFactory.GetSender(record);
-                await sender.SendAsync(record, cancellationToken).ConfigureAwait(false);
+                var sender = senderFactory.GetSender(leasedRecord);
+                await sender.SendAsync(leasedRecord, cancellationToken).ConfigureAwait(false);
                 stopwatch.Stop();
-                observer.MessageSent(record, attempt, stopwatch.Elapsed);
-                await repository.RemoveAsync(record.MessageId, cancellationToken).ConfigureAwait(false);
+                observer.MessageSent(leasedRecord, attempt, stopwatch.Elapsed);
+                await repository.RemoveAsync(leasedRecord.MessageId, cancellationToken).ConfigureAwait(false);
             } catch (OperationCanceledException ex) {
                 stopwatch.Stop();
-                record.ExchangeAttemptCount(originalAttemptCount);
-                record.NextAttemptAt = ApplyDelay(clock(), TimeSpan.Zero);
-                observer.MessageFailed(record, attempt, ex, stopwatch.Elapsed, willRetry: false, retryDelay: null);
+                leasedRecord.ExchangeAttemptCount(originalAttemptCount);
+                leasedRecord.NextAttemptAt = ApplyDelay(clock(), TimeSpan.Zero);
+                observer.MessageFailed(leasedRecord, attempt, ex, stopwatch.Elapsed, willRetry: false, retryDelay: null);
                 try {
-                    await repository.SaveAsync(record, CancellationToken.None).ConfigureAwait(false);
+                    await repository.SaveAsync(leasedRecord, CancellationToken.None).ConfigureAwait(false);
                 } catch (Exception saveEx) {
-                    logger?.WriteWarning($"Failed to release processing lease for message {record.MessageId} after cancellation: {saveEx.Message}");
+                    logger?.WriteWarning($"Failed to release processing lease for message {leasedRecord.MessageId} after cancellation: {saveEx.Message}");
                 }
                 throw;
             } catch (Exception ex) {
@@ -124,31 +130,31 @@ public sealed class PendingMessageProcessor {
                 if (willRetry) {
                     delay = NormalizeDelay(retryDelaySelector(attempt));
                     var failureTime = clock();
-                    record.NextAttemptAt = ApplyDelay(failureTime, delay.Value);
+                    leasedRecord.NextAttemptAt = ApplyDelay(failureTime, delay.Value);
                 }
 
-                observer.MessageFailed(record, attempt, ex, stopwatch.Elapsed, willRetry, delay);
+                observer.MessageFailed(leasedRecord, attempt, ex, stopwatch.Elapsed, willRetry, delay);
 
                 if (!willRetry) {
-                    logger?.WriteWarning($"Dropping message {record.MessageId} due to {(permanentFailure ? "permanent failure" : "exceeding retry attempts")}: {ex.Message}");
-                    observer.MessageDropped(record, attempt, permanentFailure ? PendingMessageDropReason.PermanentFailure : PendingMessageDropReason.RetryLimitReached, ex);
-                    await repository.RemoveAsync(record.MessageId, cancellationToken).ConfigureAwait(false);
+                    logger?.WriteWarning($"Dropping message {leasedRecord.MessageId} due to {(permanentFailure ? "permanent failure" : "exceeding retry attempts")}: {ex.Message}");
+                    observer.MessageDropped(leasedRecord, attempt, permanentFailure ? PendingMessageDropReason.PermanentFailure : PendingMessageDropReason.RetryLimitReached, ex);
+                    await repository.RemoveAsync(leasedRecord.MessageId, cancellationToken).ConfigureAwait(false);
                     continue;
                 }
 
-                logger?.WriteWarning($"Failed to send message {record.MessageId}. Scheduling retry #{attempt + 1} at {record.NextAttemptAt:O}. Error: {ex.Message}");
-                await repository.SaveAsync(record, cancellationToken).ConfigureAwait(false);
+                logger?.WriteWarning($"Failed to send message {leasedRecord.MessageId}. Scheduling retry #{attempt + 1} at {leasedRecord.NextAttemptAt:O}. Error: {ex.Message}");
+                await repository.SaveAsync(leasedRecord, cancellationToken).ConfigureAwait(false);
             }
         }
     }
 
-    private async Task AcquireProcessingLeaseAsync(PendingMessageRecord record, DateTimeOffset now, CancellationToken cancellationToken) {
-        if (processingLeaseDuration == TimeSpan.Zero) {
-            return;
-        }
-
-        record.NextAttemptAt = ApplyDelay(now, processingLeaseDuration);
-        await repository.SaveAsync(record, cancellationToken).ConfigureAwait(false);
+    private async Task<PendingMessageRecord?> AcquireProcessingLeaseAsync(
+        PendingMessageRecord record,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) {
+        var leaseDuration = processingLeaseDuration > TimeSpan.Zero ? processingLeaseDuration : MinimumLeaseDuration;
+        var leaseUntil = ApplyDelay(now, leaseDuration);
+        return await repository.TryAcquireLeaseAsync(record.MessageId, now, leaseUntil, cancellationToken).ConfigureAwait(false);
     }
 
     private static TimeSpan DefaultRetryDelaySelector(int attempt) {

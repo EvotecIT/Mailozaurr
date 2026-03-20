@@ -48,7 +48,10 @@ public enum PendingMessageSkipReason {
     MissingMessageId,
 
     /// <summary>The record is scheduled for a future attempt.</summary>
-    NotDue
+    NotDue,
+
+    /// <summary>The record was already leased by another processor.</summary>
+    LeaseNotAcquired
 }
 
 /// <summary>

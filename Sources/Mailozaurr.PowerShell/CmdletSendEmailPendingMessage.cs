@@ -106,7 +106,11 @@ public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
         }
 
         public void MessageSkipped(PendingMessageRecord record, PendingMessageSkipReason reason) {
-            _cmdlet.WriteVerbose($"Skipping message '{record.MessageId}' ({reason}).");
+            var message = reason switch {
+                PendingMessageSkipReason.LeaseNotAcquired => $"Skipping message '{record.MessageId}' because another processor already claimed it.",
+                _ => $"Skipping message '{record.MessageId}' ({reason})."
+            };
+            _cmdlet.WriteVerbose(message);
         }
 
         public void MessageAttemptStarted(PendingMessageRecord record, int attempt) {
@@ -170,6 +174,28 @@ public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
         public Task SaveAsync(PendingMessageRecord record, CancellationToken cancellationToken = default) =>
             _inner.SaveAsync(record, cancellationToken);
 
+        public async Task<PendingMessageRecord?> TryAcquireLeaseAsync(
+            string messageId,
+            DateTimeOffset dueBeforeOrAt,
+            DateTimeOffset leaseUntil,
+            CancellationToken cancellationToken = default) {
+            var record = await _inner.GetByMessageIdAsync(messageId, cancellationToken).ConfigureAwait(false);
+            if (record == null) {
+                return null;
+            }
+
+            if (_messageIds != null && !ContainsMessageId(record.MessageId)) {
+                return null;
+            }
+
+            if (_provider.HasValue && record.Provider != _provider.Value) {
+                return null;
+            }
+
+            var effectiveDueTime = _forceProcessing ? DateTimeOffset.MaxValue : dueBeforeOrAt;
+            return await _inner.TryAcquireLeaseAsync(messageId, effectiveDueTime, leaseUntil, cancellationToken).ConfigureAwait(false);
+        }
+
         public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) =>
             _inner.GetByMessageIdAsync(messageId, cancellationToken);
 
@@ -191,7 +217,10 @@ public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
                 }
 
                 if (_forceProcessing && record.NextAttemptAt > now) {
-                    record.NextAttemptAt = now;
+                    var forcedRecord = record.Clone();
+                    forcedRecord.NextAttemptAt = now;
+                    yield return forcedRecord;
+                    continue;
                 }
 
                 yield return record;

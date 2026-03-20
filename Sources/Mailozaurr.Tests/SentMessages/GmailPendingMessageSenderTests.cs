@@ -275,6 +275,20 @@ public sealed class GmailPendingMessageSenderTests {
             return Task.CompletedTask;
         }
 
+        public Task<PendingMessageRecord?> TryAcquireLeaseAsync(
+            string messageId,
+            DateTimeOffset dueBeforeOrAt,
+            DateTimeOffset leaseUntil,
+            CancellationToken cancellationToken = default) {
+            var current = record;
+            if (current == null || !string.Equals(current.MessageId, messageId, StringComparison.Ordinal) || current.NextAttemptAt > dueBeforeOrAt) {
+                return Task.FromResult<PendingMessageRecord?>(null);
+            }
+
+            current.NextAttemptAt = leaseUntil;
+            return Task.FromResult<PendingMessageRecord?>(current);
+        }
+
         public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) =>
             Task.FromResult(record);
 

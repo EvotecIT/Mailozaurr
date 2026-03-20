@@ -73,6 +73,20 @@ public class GmailApiClientTests {
             return Task.CompletedTask;
         }
 
+        public Task<PendingMessageRecord?> TryAcquireLeaseAsync(
+            string messageId,
+            DateTimeOffset dueBeforeOrAt,
+            DateTimeOffset leaseUntil,
+            CancellationToken cancellationToken = default) {
+            var record = Saved.FirstOrDefault(r => string.Equals(r.MessageId, messageId, StringComparison.OrdinalIgnoreCase));
+            if (record == null || record.NextAttemptAt > dueBeforeOrAt) {
+                return Task.FromResult<PendingMessageRecord?>(null);
+            }
+
+            record.NextAttemptAt = leaseUntil;
+            return Task.FromResult<PendingMessageRecord?>(record);
+        }
+
         public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) =>
             Task.FromResult<PendingMessageRecord?>(Saved.FirstOrDefault(r => string.Equals(r.MessageId, messageId, StringComparison.OrdinalIgnoreCase)));
 

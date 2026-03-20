@@ -67,4 +67,21 @@ public sealed class PendingMessageRecord {
     /// <param name="value">Value assigned to the attempt counter.</param>
     /// <returns>The previous value stored in the attempt counter.</returns>
     public int ExchangeAttemptCount(int value) => Interlocked.Exchange(ref attemptCount, value);
+
+    /// <summary>
+    /// Creates a detached copy of this record.
+    /// </summary>
+    public PendingMessageRecord Clone() => new() {
+        MessageId = MessageId,
+        Timestamp = Timestamp,
+        NextAttemptAt = NextAttemptAt,
+        AttemptCount = AttemptCount,
+        MimeMessage = MimeMessage,
+        Server = Server,
+        Port = Port,
+        UserName = UserName,
+        Password = Password,
+        Provider = Provider,
+        ProviderData = new Dictionary<string, string>(ProviderData)
+    };
 }
