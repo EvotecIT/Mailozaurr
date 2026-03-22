@@ -31,6 +31,11 @@ public enum EmailProvider {
     /// Use the Gmail REST API to deliver mail.
     /// </summary>
     Gmail,
+
+    /// <summary>
+    /// Use Microsoft Graph REST API to deliver mail.
+    /// </summary>
+    Graph,
     //MailChimp,
     //Moosend,
     //Postmark,
@@ -38,4 +43,3 @@ public enum EmailProvider {
     //MessageBird (SparkPost),
     //MailerSend
 }
-

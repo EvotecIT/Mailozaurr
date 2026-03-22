@@ -29,6 +29,13 @@ public sealed class PendingMessageRecordSerializationTests {
             }
         };
         yield return new object[] {
+            EmailProvider.Graph,
+            new Dictionary<string, string> {
+                ["TenantId"] = "tenant-id",
+                ["UserId"] = "shared@example.com"
+            }
+        };
+        yield return new object[] {
             EmailProvider.Mailgun,
             new Dictionary<string, string> {
                 ["Domain"] = "mg.example.com",

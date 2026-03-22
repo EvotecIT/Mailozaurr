@@ -59,6 +59,7 @@ public sealed class PendingMessageSenderFactoryTests {
     [InlineData(EmailProvider.Mailgun, typeof(MailgunPendingMessageSender))]
     [InlineData(EmailProvider.SES, typeof(SesPendingMessageSender))]
     [InlineData(EmailProvider.Gmail, typeof(GmailPendingMessageSender))]
+    [InlineData(EmailProvider.Graph, typeof(GraphPendingMessageSender))]
     public void Resolve_ReturnsDefaultSenderForKnownProviders(EmailProvider provider, Type expectedType) {
         var factory = new PendingMessageSenderFactory();
 
