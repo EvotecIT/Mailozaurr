@@ -414,6 +414,74 @@ public sealed class ProviderPendingMessageTests {
     }
 
     [Fact]
+    public async Task GraphApplicationHandlerQueuesAndProcessesPendingMessage() {
+        var repository = new InMemoryPendingMessageRepository();
+        var handler = new Application.GraphMailSendHandler(
+            new FakeGraphSessionFactory(),
+            pendingMessageRepository: repository,
+            sendAsync: (session, profile, request, message, cancellationToken) =>
+                Task.FromResult(new GraphMessage { Id = "sent-now" }));
+
+        var queued = await handler.SendAsync(
+            new Application.MailProfile {
+                Id = "graph-profile",
+                DisplayName = "Graph Profile",
+                Kind = Application.MailProfileKind.Graph,
+                DefaultMailbox = "shared@example.com",
+                DefaultSender = "sender@example.com",
+                Settings = new Dictionary<string, string> {
+                    [Application.MailProfileSettingsKeys.TenantId] = "tenant-id"
+                }
+            },
+            new Application.SendMessageRequest {
+                ProfileId = "graph-profile",
+                Message = new Application.DraftMessage {
+                    Subject = "graph-queued",
+                    TextBody = "body",
+                    To = {
+                        new Application.MessageRecipient { Address = "recipient@example.com" }
+                    }
+                }
+            },
+            CancellationToken.None);
+
+        Assert.True(queued.Queued);
+        var record = repository.LastSaved;
+        Assert.NotNull(record);
+        Assert.Equal(EmailProvider.Graph, record!.Provider);
+        Assert.Equal("shared@example.com", record.ProviderData[GraphPendingMessageSender.UserIdKey]);
+
+        var successHandler = new TestHandler((request, _) => {
+            if (request.RequestUri!.AbsoluteUri.EndsWith("/messages", StringComparison.OrdinalIgnoreCase)) {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Created) {
+                    Content = new StringContent("{\"id\":\"draft-graph\"}", Encoding.UTF8, "application/json")
+                });
+            }
+
+            if (request.RequestUri.AbsoluteUri.EndsWith("/send", StringComparison.OrdinalIgnoreCase)) {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Accepted) {
+                    Content = new StringContent(string.Empty, Encoding.UTF8, "text/plain")
+                });
+            }
+
+            throw new InvalidOperationException("Unexpected Graph request: " + request.RequestUri);
+        });
+        using var graphHttpClient = new HttpClient(successHandler) {
+            BaseAddress = new Uri("https://graph.microsoft.com/v1.0/")
+        };
+        var sender = new GraphPendingMessageSender(credential => new GraphApiClient(graphHttpClient, credential: credential));
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            { EmailProvider.Graph, sender }
+        });
+        var processor = new PendingMessageProcessor(repository, factory);
+
+        await processor.ProcessAsync(CancellationToken.None);
+
+        Assert.Equal(2, successHandler.CallCount);
+        Assert.Null(await repository.GetByMessageIdAsync(record.MessageId, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task SesClientQueuesAndProcessesPendingMessage() {
         var repository = new InMemoryPendingMessageRepository();
         using var client = new SesClient {
@@ -489,5 +557,26 @@ public sealed class ProviderPendingMessageTests {
         cts.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await sendTask);
+    }
+
+    private sealed class FakeGraphSessionFactory : Application.IGraphSessionFactory {
+        public Task<Application.GraphSession> ConnectAsync(Application.MailProfile profile, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new Application.GraphSession(
+                new GraphApiClient(new OAuthCredential {
+                    UserName = profile.DefaultMailbox ?? "me",
+                    AccessToken = "graph-token",
+                    ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
+                }),
+                profile.DefaultMailbox ?? "me",
+                new OAuthCredential {
+                    UserName = profile.DefaultMailbox ?? "me",
+                    AccessToken = "graph-token",
+                    ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
+                },
+                new GraphCredential {
+                    ClientId = "client-id",
+                    DirectoryId = "tenant-id",
+                    ClientSecret = "client-secret"
+                }));
     }
 }

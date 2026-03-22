@@ -76,5 +76,6 @@ public sealed class PendingMessageSenderFactory {
         yield return new KeyValuePair<EmailProvider, IPendingMessageSender>(EmailProvider.Mailgun, new MailgunPendingMessageSender());
         yield return new KeyValuePair<EmailProvider, IPendingMessageSender>(EmailProvider.SES, new SesPendingMessageSender());
         yield return new KeyValuePair<EmailProvider, IPendingMessageSender>(EmailProvider.Gmail, new GmailPendingMessageSender());
+        yield return new KeyValuePair<EmailProvider, IPendingMessageSender>(EmailProvider.Graph, new GraphPendingMessageSender());
     }
 }

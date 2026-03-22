@@ -246,6 +246,30 @@ public static class OAuthHelpers {
     }
 
     /// <summary>
+    /// Attempts to silently acquire an Office 365 token from the existing token cache without prompting the user.
+    /// </summary>
+    /// <param name="login">Optional login hint for the cached account.</param>
+    /// <param name="clientId">The application (client) identifier.</param>
+    /// <param name="tenantId">The tenant identifier.</param>
+    /// <param name="redirectUri">The redirect URI registered for the application.</param>
+    /// <param name="scopes">The scopes to request for the token.</param>
+    /// <returns>The refreshed credential when available; otherwise <c>null</c>.</returns>
+    public static async Task<OAuthCredential?> TryAcquireO365TokenSilentAsync(
+        string? login,
+        string clientId,
+        string tenantId,
+        string redirectUri,
+        IEnumerable<string> scopes) {
+        var normalizedScopes = NormalizeScopes(scopes);
+        var credential = await AcquireO365TokenSilentAsync(login, clientId, tenantId, redirectUri, normalizedScopes).ConfigureAwait(false);
+        if (credential != null) {
+            await PersistO365CredentialAsync(credential, clientId, tenantId, redirectUri, normalizedScopes).ConfigureAwait(false);
+        }
+
+        return credential;
+    }
+
+    /// <summary>
     /// Attempts to retrieve a cached Google token or acquire a new one if necessary.
     /// </summary>
     public static async Task<OAuthCredential> AcquireGoogleTokenCachedAsync(

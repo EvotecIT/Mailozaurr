@@ -173,7 +173,8 @@ public sealed class PendingMessageProcessorTests {
         EmailProvider.SendGrid,
         EmailProvider.Mailgun,
         EmailProvider.SES,
-        EmailProvider.Gmail
+        EmailProvider.Gmail,
+        EmailProvider.Graph
     };
 
     private static PendingMessageRecord CreateRecord(DateTimeOffset nextAttempt, string? messageId = null) => new() {
