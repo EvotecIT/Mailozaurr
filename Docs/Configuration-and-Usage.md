@@ -26,10 +26,10 @@ A profile contains:
 
 The shared model is implemented in:
 
-- [MailProfile.cs](C:\Support\GitHub\Mailozaurr\Sources\Mailozaurr.Application\MailProfile.cs)
-- [MailProfileKind.cs](C:\Support\GitHub\Mailozaurr\Sources\Mailozaurr.Application\MailProfileKind.cs)
-- [MailProfileSettingsKeys.cs](C:\Support\GitHub\Mailozaurr\Sources\Mailozaurr.Application\MailProfileSettingsKeys.cs)
-- [MailSecretNames.cs](C:\Support\GitHub\Mailozaurr\Sources\Mailozaurr.Application\MailSecretNames.cs)
+- [MailProfile.cs](../Sources/Mailozaurr.Application/MailProfile.cs)
+- [MailProfileKind.cs](../Sources/Mailozaurr.Application/MailProfileKind.cs)
+- [MailProfileSettingsKeys.cs](../Sources/Mailozaurr.Application/MailProfileSettingsKeys.cs)
+- [MailSecretNames.cs](../Sources/Mailozaurr.Application/MailSecretNames.cs)
 
 ## Supported profile kinds
 
@@ -48,7 +48,7 @@ Current shared profile kinds are:
 
 Mailozaurr does not pretend every provider supports the same operations.
 
-Default capabilities are defined in [MailCapabilityCatalog.cs](C:\Support\GitHub\Mailozaurr\Sources\Mailozaurr.Application\MailCapabilityCatalog.cs).
+Default capabilities are defined in [MailCapabilityCatalog.cs](../Sources/Mailozaurr.Application/MailCapabilityCatalog.cs).
 
 In practice:
 
@@ -93,7 +93,7 @@ Common secret names include:
 
 ## Minimum provider guidance
 
-The shared validator lives in [MailProfileValidator.cs](C:\Support\GitHub\Mailozaurr\Sources\Mailozaurr.Application\MailProfileValidator.cs).
+The shared validator lives in [MailProfileValidator.cs](../Sources/Mailozaurr.Application/MailProfileValidator.cs).
 
 The practical minimum shape by provider is:
 
@@ -147,7 +147,7 @@ These are send-only profiles. The exact provider-specific settings are still bes
 
 By default, the application layer stores reusable state under a `Mailozaurr` directory inside local application data.
 
-The path resolver is implemented in [MailApplicationPaths.cs](C:\Support\GitHub\Mailozaurr\Sources\Mailozaurr.Application\MailApplicationPaths.cs).
+The path resolver is implemented in [MailApplicationPaths.cs](../Sources/Mailozaurr.Application/MailApplicationPaths.cs).
 
 Default subdirectories are:
 
@@ -172,7 +172,7 @@ The CLI also supports per-run overrides:
 
 ## CLI usage overview
 
-The executable is built from [Mailozaurr.Cli](C:\Support\GitHub\Mailozaurr\Sources\Mailozaurr.Cli).
+The executable is built from [Mailozaurr.Cli](../Sources/Mailozaurr.Cli).
 
 To inspect current commands:
 
@@ -285,7 +285,7 @@ The MCP server is hosted by the same executable:
 mailozaurr mcp serve
 ```
 
-The MCP tool surface is implemented in [MailMcpTools.cs](C:\Support\GitHub\Mailozaurr\Sources\Mailozaurr.Cli\Mcp\MailMcpTools.cs).
+The MCP tool surface is implemented in [MailMcpTools.cs](../Sources/Mailozaurr.Cli/Mcp/MailMcpTools.cs).
 
 Current tool areas include:
 
@@ -311,10 +311,10 @@ PowerShell remains a first-class surface, but it does not use the same profile-o
 
 Today the best PowerShell references are:
 
-- [README.MD](C:\Support\GitHub\Mailozaurr\README.MD) for module usage and examples
-- [OAuthFlows.md](C:\Support\GitHub\Mailozaurr\Docs\OAuthFlows.md) for OAuth flows
-- [PGP.md](C:\Support\GitHub\Mailozaurr\Docs\PGP.md) for PGP support
-- the scripts under [Examples](C:\Support\GitHub\Mailozaurr\Examples)
+- [README.MD](../README.MD) for module usage and examples
+- [OAuthFlows.md](./OAuthFlows.md) for OAuth flows
+- [PGP.md](./PGP.md) for PGP support
+- the scripts under [Examples](../Examples)
 
 ## Recipes and provider-specific guidance
 
@@ -327,4 +327,4 @@ When adding a new provider recipe:
 - include a live verification command such as `profile test`
 - keep reusable logic in shared layers and keep wrapper-specific steps in wrapper docs
 
-If a feature is reusable across CLI, MCP, GUI, or PowerShell, it should follow the placement rules in [Platform-Architecture.md](C:\Support\GitHub\Mailozaurr\Docs\Platform-Architecture.md).
+If a feature is reusable across CLI, MCP, GUI, or PowerShell, it should follow the placement rules in [Platform-Architecture.md](./Platform-Architecture.md).
