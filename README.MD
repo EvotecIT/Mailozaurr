@@ -62,6 +62,7 @@ Additional dependency:
 ## Architecture notes
 
 - [Platform Architecture](Docs/Platform-Architecture.md) - layering and reuse rules for future library, PowerShell, CLI, MCP, and GUI work
+- [Configuration and Usage](Docs/Configuration-and-Usage.md) - profile model, provider setup guidance, CLI storage, recipes, and MCP usage
 
 ## Additional surfaces
 
@@ -75,6 +76,116 @@ Mailozaurr is no longer only a library and PowerShell module. The repository now
 CLI and MCP are intended to sit on top of shared Mailozaurr services instead of duplicating mailbox, draft, queue, send, and message-action behavior independently.
 
 If you want the placement rules and longer-term cross-surface direction, see [Platform Architecture](Docs/Platform-Architecture.md).
+If you want practical profile setup and usage guidance for CLI and MCP, see [Configuration and Usage](Docs/Configuration-and-Usage.md).
+
+## CLI and MCP usage
+
+The repository now includes a cross-platform `mailozaurr` executable and an MCP server hosted by that same executable.
+
+To see the current command surface from source:
+
+```powershell
+dotnet run --project Sources/Mailozaurr.Cli -- --help
+```
+
+After building, the executable is available at:
+
+- `Sources/Mailozaurr.Cli/bin/Debug/net8.0/mailozaurr.exe` on Windows
+- `Sources/Mailozaurr.Cli/bin/Debug/net8.0/mailozaurr` on macOS/Linux
+
+### CLI command groups
+
+The executable currently supports:
+
+- `profile ...` for profile creation, bootstrap, login, auth refresh, readiness checks, summaries, validation, and secret management
+- `draft ...` for saving, listing, exporting, importing, and deleting reusable drafts
+- `send ...` for sending from a stored draft, a draft file, or direct command-line fields
+- `queue ...` for viewing and processing queued outbound messages
+- `mail ...` for folders, folder aliases, search, message retrieval, attachment export, mailbox actions, previews, and reusable action-plan batches
+- `mcp serve` for exposing the same shared services as MCP tools over stdio
+
+Most list and inspection commands support `--json`, which makes the executable useful in scripts, CI, and other automation surfaces.
+
+### CLI examples
+
+Create a profile and inspect it:
+
+```powershell
+mailozaurr profile create --profile work-imap --kind imap --name "Work IMAP" `
+  --setting server=imap.example.com --setting port=993 --json
+
+mailozaurr profile set-secret --profile work-imap --name password --value "secret" --json
+mailozaurr profile summary --profile work-imap --json
+mailozaurr profile test --profile work-imap --scope mailbox --json
+```
+
+Search and inspect mail:
+
+```powershell
+mailozaurr mail folders --profile work-imap --compact --json
+mailozaurr mail search --profile work-imap --folder Inbox --query Invoice --compact --json
+mailozaurr mail get --profile work-imap --folder Inbox --message-id 123 --compact --json
+mailozaurr mail attachments --profile work-imap --folder Inbox --message-id 123 --json
+mailozaurr mail save-attachments --profile work-imap --folder Inbox --message-id 123 --path C:\Temp\Attachments --json
+```
+
+Draft, send, and queue mail:
+
+```powershell
+mailozaurr draft save --draft weekly-update --name "Weekly update" --profile work-smtp `
+  --to team@example.com --subject "Weekly update" --text "Status attached." --json
+
+mailozaurr send --draft weekly-update --json
+mailozaurr queue list --compact --json
+mailozaurr queue process --json
+```
+
+Preview and execute mailbox actions:
+
+```powershell
+mailozaurr mail preview-delete --profile work-imap --folder Inbox --message-id 123 --json
+mailozaurr mail delete --profile work-imap --folder Inbox --message-id 123 --confirm-token <token> --json
+
+mailozaurr mail preview-move --profile work-imap --folder Inbox --message-id 123 --target-folder Archive --json
+mailozaurr mail move --profile work-imap --folder Inbox --message-id 123 --target-folder Archive --confirm-token <token> --json
+```
+
+### MCP server usage
+
+Mailozaurr can also run as an MCP server over stdio:
+
+```powershell
+mailozaurr mcp serve
+```
+
+The MCP surface is built on top of the same shared services as the CLI. Current tool areas include:
+
+- profile and auth management
+- folder and folder-alias discovery
+- mail search, get, batch get, and attachment save
+- draft, send, and queue operations
+- mailbox action preview and execution
+- action-plan import/export, execution, and stored batch management
+
+A minimal MCP client entry typically points to the executable and passes `mcp serve` as arguments:
+
+```json
+{
+  "command": "mailozaurr",
+  "args": ["mcp", "serve"]
+}
+```
+
+If your client prefers an absolute path, point it to the built executable instead.
+
+### Skills and MCP
+
+Skills are a good fit on top of the MCP server, but they are not a replacement for the server itself.
+
+- `mailozaurr mcp serve` provides the actual mailbox and send tools
+- skills provide workflow guidance, safety rules, and task-specific behavior for an MCP client or agent
+
+In practice, that means Mailozaurr should own the reusable mailbox, queue, send, and action logic, while skills can teach an agent how to use those tools safely and consistently.
 
 This started with a single goal to replace `Send-MailMessage` which is deprecated/obsolete with something more modern, but since MailKit and MimeKit have lots of options why not build on that?
 
@@ -401,6 +512,7 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - [ImapIdleListenerExample.cs](Sources/Mailozaurr.Examples/ImapIdleListenerExample.cs) - C# sample listening for new mail.
 - [PGP documentation](Docs/PGP.md) - overview of OpenPGP support.
 - [OAuth flow documentation](Docs/OAuthFlows.md) - device code and on-behalf-of usage.
+- [Configuration and Usage](Docs/Configuration-and-Usage.md) - profile configuration, provider recipes, CLI usage, and MCP usage.
 
 -Some useful examples:
 - `Examples/Example-AcquireO365TokenInteractive.ps1` – demonstrates `Connect-OAuthO365`, `ConvertFrom-OAuth2Credential`, and using the token with `Send-EmailMessage`, IMAP, and POP3.
