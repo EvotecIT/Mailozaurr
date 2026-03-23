@@ -34,6 +34,28 @@ internal sealed class CliArguments {
         throw new InvalidOperationException($"Option '--{name}' must be an integer.");
     }
 
+    public IReadOnlyList<int> GetIntOptionValues(string name) {
+        var values = GetOptionValues(name);
+        if (values.Count == 0) {
+            return Array.Empty<int>();
+        }
+
+        var parsed = new List<int>(values.Count);
+        foreach (var value in values) {
+            if (string.IsNullOrWhiteSpace(value)) {
+                continue;
+            }
+            if (int.TryParse(value, out var item)) {
+                parsed.Add(item);
+                continue;
+            }
+
+            throw new InvalidOperationException($"Option '--{name}' must be an integer.");
+        }
+
+        return parsed;
+    }
+
     public static CliArguments Parse(IReadOnlyList<string> args) {
         var result = new CliArguments();
         for (var i = 0; i < args.Count; i++) {

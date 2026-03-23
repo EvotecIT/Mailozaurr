@@ -124,6 +124,31 @@ public sealed class ApplicationRoutingServicesTests {
     }
 
     [Fact]
+    public async Task RoutedReadServiceBuildsBatchCompactMessageProjection() {
+        var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
+        await store.SaveAsync(new MailProfile {
+            Id = "work-imap",
+            DisplayName = "Work IMAP",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string> { [MailProfileSettingsKeys.Server] = "imap.example.com" }
+        });
+
+        var handler = new FakeReadHandler(MailProfileKind.Imap);
+        var service = new RoutedMailReadService(store, new[] { handler });
+
+        var results = await service.GetMessagesCompactAsync(new GetMessagesRequest {
+            ProfileId = "work-imap",
+            MessageIds = { "msg-1", "msg-2" }
+        });
+
+        Assert.Equal(2, results.Count);
+        Assert.Equal("msg-1", results[0].Id);
+        Assert.Equal("msg-2", results[1].Id);
+        Assert.Equal("msg-1 Subject", results[0].SummaryText);
+        Assert.Equal("msg-2 Subject", results[1].SummaryText);
+    }
+
+    [Fact]
     public async Task RoutedReadServiceSavesFilteredAttachmentsThroughSharedBatchWorkflow() {
         var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
         await store.SaveAsync(new MailProfile {
@@ -147,6 +172,36 @@ public sealed class ApplicationRoutingServicesTests {
         Assert.Equal(1, result.MatchedCount);
         Assert.Equal(1, result.SavedCount);
         Assert.Equal(0, result.FailedCount);
+    }
+
+    [Fact]
+    public async Task RoutedReadServiceSavesFilteredAttachmentsAcrossMultipleMessages() {
+        var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
+        await store.SaveAsync(new MailProfile {
+            Id = "work-imap",
+            DisplayName = "Work IMAP",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string> { [MailProfileSettingsKeys.Server] = "imap.example.com" }
+        });
+
+        var handler = new FakeReadHandler(MailProfileKind.Imap);
+        var service = new RoutedMailReadService(store, new[] { handler });
+
+        var result = await service.SaveAttachmentsManyAsync(new SaveAttachmentsManyRequest {
+            ProfileId = "work-imap",
+            MessageIds = { "msg-1", "msg-2" },
+            DestinationPath = @"C:\Temp",
+            FileNameContains = "report"
+        });
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(2, result.RequestedMessageCount);
+        Assert.Equal(2, result.AttemptedMessageCount);
+        Assert.Equal(2, result.SucceededMessageCount);
+        Assert.Equal(2, result.MatchedCount);
+        Assert.Equal(2, result.SavedCount);
+        Assert.Equal(0, result.FailedCount);
+        Assert.Equal(2, result.MessageResults.Count);
     }
 
     [Fact]
@@ -175,6 +230,245 @@ public sealed class ApplicationRoutingServicesTests {
 
         Assert.True(result.Succeeded);
         Assert.Equal(1, handler.SendCalls);
+    }
+
+    [Fact]
+    public async Task RoutedMessageActionServiceDispatchesToMatchingHandler() {
+        var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
+        await store.SaveAsync(new MailProfile {
+            Id = "work-imap",
+            DisplayName = "Work IMAP",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string> { [MailProfileSettingsKeys.Server] = "imap.example.com" }
+        });
+
+        var handler = new FakeMessageActionHandler(MailProfileKind.Imap);
+        var service = new RoutedMailMessageActionService(store, new[] { handler });
+
+        var result = await service.SetReadStateAsync(new SetReadStateRequest {
+            ProfileId = "work-imap",
+            MessageIds = { "1", "2" },
+            IsRead = true
+        });
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(1, handler.SetReadStateCalls);
+    }
+
+    [Fact]
+    public async Task RoutedMessageActionServiceRejectsMismatchedReadStateConfirmationToken() {
+        var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
+        await store.SaveAsync(new MailProfile {
+            Id = "work-imap",
+            DisplayName = "Work IMAP",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string> { [MailProfileSettingsKeys.Server] = "imap.example.com" }
+        });
+
+        var handler = new FakeMessageActionHandler(MailProfileKind.Imap);
+        var service = new RoutedMailMessageActionService(store, new[] { handler });
+
+        var result = await service.SetReadStateAsync(new SetReadStateRequest {
+            ProfileId = "work-imap",
+            MailboxId = "shared@example.com",
+            FolderId = "Inbox",
+            MessageIds = { "1", "2" },
+            IsRead = true,
+            ConfirmationToken = "mact_v1_invalid"
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("confirmation_token_mismatch", result.Code);
+        Assert.Equal(0, handler.SetReadStateCalls);
+    }
+
+    [Fact]
+    public async Task RoutedMessageActionServiceDispatchesFlaggedStateToMatchingHandler() {
+        var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
+        await store.SaveAsync(new MailProfile {
+            Id = "work-imap",
+            DisplayName = "Work IMAP",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string> { [MailProfileSettingsKeys.Server] = "imap.example.com" }
+        });
+
+        var handler = new FakeMessageActionHandler(MailProfileKind.Imap);
+        var service = new RoutedMailMessageActionService(store, new[] { handler });
+
+        var result = await service.SetFlaggedStateAsync(new SetFlaggedStateRequest {
+            ProfileId = "work-imap",
+            MessageIds = { "1", "2" },
+            IsFlagged = true
+        });
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(1, handler.SetFlaggedStateCalls);
+    }
+
+    [Fact]
+    public async Task RoutedMessageActionServiceRejectsMismatchedFlaggedStateConfirmationToken() {
+        var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
+        await store.SaveAsync(new MailProfile {
+            Id = "work-imap",
+            DisplayName = "Work IMAP",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string> { [MailProfileSettingsKeys.Server] = "imap.example.com" }
+        });
+
+        var handler = new FakeMessageActionHandler(MailProfileKind.Imap);
+        var service = new RoutedMailMessageActionService(store, new[] { handler });
+
+        var result = await service.SetFlaggedStateAsync(new SetFlaggedStateRequest {
+            ProfileId = "work-imap",
+            MailboxId = "shared@example.com",
+            FolderId = "Inbox",
+            MessageIds = { "1", "2" },
+            IsFlagged = true,
+            ConfirmationToken = "mact_v1_invalid"
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("confirmation_token_mismatch", result.Code);
+        Assert.Equal(0, handler.SetFlaggedStateCalls);
+    }
+
+    [Fact]
+    public async Task RoutedMessageActionServiceCanonicalizesKnownFolderAlias() {
+        var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
+        await store.SaveAsync(new MailProfile {
+            Id = "work-imap",
+            DisplayName = "Work IMAP",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string> { [MailProfileSettingsKeys.Server] = "imap.example.com" }
+        });
+
+        var handler = new FakeMessageActionHandler(MailProfileKind.Imap);
+        var service = new RoutedMailMessageActionService(store, new[] { handler });
+
+        var result = await service.MoveAsync(new MoveMessagesRequest {
+            ProfileId = "work-imap",
+            MessageIds = { "1", "2" },
+            DestinationFolderId = "archive"
+        });
+
+        Assert.True(result.Succeeded);
+        Assert.NotNull(handler.LastMoveRequest);
+        Assert.Equal(MailFolderAliases.Archive, handler.LastMoveRequest!.DestinationFolderId);
+    }
+
+    [Fact]
+    public async Task RoutedMessageActionServiceResolvesKnownFolderAliasThroughSharedAliasService() {
+        var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
+        await store.SaveAsync(new MailProfile {
+            Id = "work-imap",
+            DisplayName = "Work IMAP",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string> { [MailProfileSettingsKeys.Server] = "imap.example.com" }
+        });
+
+        var handler = new FakeMessageActionHandler(MailProfileKind.Imap);
+        var aliasService = new FakeFolderAliasService();
+        var service = new RoutedMailMessageActionService(store, new[] { handler }, aliasService);
+
+        var result = await service.MoveAsync(new MoveMessagesRequest {
+            ProfileId = "work-imap",
+            MailboxId = "shared@example.com",
+            MessageIds = { "1", "2" },
+            DestinationFolderId = MailFolderAliases.Archive
+        });
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("work-imap", aliasService.LastProfileId);
+        Assert.Equal("shared@example.com", aliasService.LastMailboxId);
+        Assert.NotNull(handler.LastMoveRequest);
+        Assert.Equal("archive-folder", handler.LastMoveRequest!.DestinationFolderId);
+    }
+
+    [Fact]
+    public async Task RoutedMessageActionServiceRejectsMismatchedMoveConfirmationToken() {
+        var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
+        await store.SaveAsync(new MailProfile {
+            Id = "work-imap",
+            DisplayName = "Work IMAP",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string> { [MailProfileSettingsKeys.Server] = "imap.example.com" }
+        });
+
+        var handler = new FakeMessageActionHandler(MailProfileKind.Imap);
+        var aliasService = new FakeFolderAliasService();
+        var service = new RoutedMailMessageActionService(store, new[] { handler }, aliasService);
+
+        var result = await service.MoveAsync(new MoveMessagesRequest {
+            ProfileId = "work-imap",
+            MailboxId = "shared@example.com",
+            FolderId = "Inbox",
+            MessageIds = { "1", "2" },
+            DestinationFolderId = MailFolderAliases.Archive,
+            ConfirmationToken = "mact_v1_invalid"
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("confirmation_token_mismatch", result.Code);
+        Assert.Null(handler.LastMoveRequest);
+    }
+
+    [Fact]
+    public async Task RoutedMessageActionServiceAcceptsMatchingMoveConfirmationToken() {
+        var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
+        await store.SaveAsync(new MailProfile {
+            Id = "work-imap",
+            DisplayName = "Work IMAP",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string> { [MailProfileSettingsKeys.Server] = "imap.example.com" }
+        });
+
+        var handler = new FakeMessageActionHandler(MailProfileKind.Imap);
+        var aliasService = new FakeFolderAliasService();
+        var service = new RoutedMailMessageActionService(store, new[] { handler }, aliasService);
+        var confirmationToken = MessageActionConfirmationTokens.CreateMoveToken(
+            "work-imap",
+            "shared@example.com",
+            "Inbox",
+            new[] { "1", "2" },
+            "archive-folder");
+
+        var result = await service.MoveAsync(new MoveMessagesRequest {
+            ProfileId = "work-imap",
+            MailboxId = "shared@example.com",
+            FolderId = "Inbox",
+            MessageIds = { "1", "2" },
+            DestinationFolderId = MailFolderAliases.Archive,
+            ConfirmationToken = confirmationToken
+        });
+
+        Assert.True(result.Succeeded);
+        Assert.NotNull(handler.LastMoveRequest);
+        Assert.Equal(confirmationToken, handler.LastMoveRequest!.ConfirmationToken);
+    }
+
+    [Fact]
+    public async Task RoutedMessageActionServiceRejectsMismatchedDeleteConfirmationToken() {
+        var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
+        await store.SaveAsync(new MailProfile {
+            Id = "work-imap",
+            DisplayName = "Work IMAP",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string> { [MailProfileSettingsKeys.Server] = "imap.example.com" }
+        });
+
+        var handler = new FakeMessageActionHandler(MailProfileKind.Imap);
+        var service = new RoutedMailMessageActionService(store, new[] { handler });
+
+        var result = await service.DeleteAsync(new DeleteMessagesRequest {
+            ProfileId = "work-imap",
+            MailboxId = "shared@example.com",
+            FolderId = "Inbox",
+            MessageIds = { "1", "2" },
+            ConfirmationToken = "mact_v1_invalid"
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("confirmation_token_mismatch", result.Code);
     }
 
     [Fact]
@@ -286,6 +580,101 @@ public sealed class ApplicationRoutingServicesTests {
                 Succeeded = true,
                 ProfileId = profile.Id,
                 ProfileKind = profile.Kind
+            });
+        }
+    }
+
+    private sealed class FakeMessageActionHandler : IMailMessageActionHandler {
+        public FakeMessageActionHandler(MailProfileKind kind) {
+            Kind = kind;
+        }
+
+        public MailProfileKind Kind { get; }
+
+        public int SetReadStateCalls { get; private set; }
+
+        public int SetFlaggedStateCalls { get; private set; }
+
+        public MoveMessagesRequest? LastMoveRequest { get; private set; }
+
+        public Task<MessageActionResult> SetReadStateAsync(MailProfile profile, SetReadStateRequest request, CancellationToken cancellationToken = default) {
+            SetReadStateCalls++;
+            return Task.FromResult(new MessageActionResult {
+                Succeeded = true,
+                ProfileId = profile.Id,
+                RequestedCount = request.MessageIds.Count,
+                SucceededCount = request.MessageIds.Count
+            });
+        }
+
+        public Task<MessageActionResult> SetFlaggedStateAsync(MailProfile profile, SetFlaggedStateRequest request, CancellationToken cancellationToken = default) {
+            SetFlaggedStateCalls++;
+            return Task.FromResult(new MessageActionResult {
+                Succeeded = true,
+                ProfileId = profile.Id,
+                RequestedCount = request.MessageIds.Count,
+                SucceededCount = request.MessageIds.Count
+            });
+        }
+
+        public Task<MessageActionResult> MoveAsync(MailProfile profile, MoveMessagesRequest request, CancellationToken cancellationToken = default) {
+            LastMoveRequest = request;
+            return Task.FromResult(new MessageActionResult {
+                Succeeded = true,
+                ProfileId = profile.Id,
+                RequestedCount = request.MessageIds.Count,
+                SucceededCount = request.MessageIds.Count
+            });
+        }
+
+        public Task<MessageActionResult> DeleteAsync(MailProfile profile, DeleteMessagesRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new MessageActionResult {
+                Succeeded = true,
+                ProfileId = profile.Id,
+                RequestedCount = request.MessageIds.Count,
+                SucceededCount = request.MessageIds.Count
+            });
+    }
+
+    private sealed class FakeFolderAliasService : IMailFolderAliasService {
+        public string? LastProfileId { get; private set; }
+
+        public string? LastMailboxId { get; private set; }
+
+        public Task<IReadOnlyList<MailFolderAliasSummary>> GetAliasesAsync(string profileId, string? mailboxId = null, CancellationToken cancellationToken = default) {
+            LastProfileId = profileId;
+            LastMailboxId = mailboxId;
+            return Task.FromResult<IReadOnlyList<MailFolderAliasSummary>>(new[] {
+                new MailFolderAliasSummary {
+                    ProfileId = profileId,
+                    MailboxId = mailboxId,
+                    Alias = MailFolderAliases.Archive,
+                    DisplayName = "Archive",
+                    IsSupported = true,
+                    IsResolved = true,
+                    FolderId = "archive-folder",
+                    FolderDisplayName = "Archive",
+                    FolderPath = "Archive",
+                    Summary = "Archive -> Archive"
+                }
+            });
+        }
+
+        public Task<MailFolderTargetResolution> ResolveAsync(string profileId, string targetFolderId, string? mailboxId = null, CancellationToken cancellationToken = default) {
+            LastProfileId = profileId;
+            LastMailboxId = mailboxId;
+            return Task.FromResult(new MailFolderTargetResolution {
+                ProfileId = profileId,
+                MailboxId = mailboxId,
+                RequestedValue = targetFolderId,
+                IsAlias = true,
+                Alias = MailFolderAliases.Archive,
+                IsSupported = true,
+                IsResolved = true,
+                EffectiveFolderId = "archive-folder",
+                FolderDisplayName = "Archive",
+                FolderPath = "Archive",
+                Summary = "Archive -> Archive"
             });
         }
     }

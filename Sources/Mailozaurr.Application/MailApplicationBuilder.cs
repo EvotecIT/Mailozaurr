@@ -5,20 +5,29 @@ namespace Mailozaurr.Application;
 /// </summary>
 public sealed class MailApplicationBuilder {
     private readonly List<IMailReadHandler> _readHandlers = new();
+    private readonly List<IMailMessageActionHandler> _messageActionHandlers = new();
     private readonly List<IMailSendHandler> _sendHandlers = new();
     private MailApplicationOptions _options = new();
     private IMailProfileStore? _profileStore;
     private IMailSecretStore? _secretStore;
     private IMailDraftStore? _draftStore;
+    private IMailMessageActionPlanBatchStore? _messageActionPlanBatchStore;
     private IMailProfileService? _profileService;
     private IMailProfileOverviewService? _profileOverviewService;
     private IMailProfileConnectionService? _profileConnectionService;
     private IMailProfileSecretService? _profileSecretService;
     private IMailProfileBootstrapService? _profileBootstrapService;
     private IMailProfileAuthService? _profileAuthService;
+    private IMailFolderAliasService? _folderAliasService;
     private IMailDraftService? _draftService;
     private IMailDraftExchangeService? _draftExchangeService;
     private IMailReadService? _readService;
+    private IMailMessageActionPreviewService? _messageActionPreviewService;
+    private IMailMessageActionPlanService? _messageActionPlanService;
+    private IMailMessageActionPlanExchangeService? _messageActionPlanExchangeService;
+    private IMailMessageActionPlanRegistryService? _messageActionPlanRegistryService;
+    private IMailMessageActionBatchService? _messageActionBatchService;
+    private IMailMessageActionService? _messageActionService;
     private IMailSendService? _sendService;
     private IMailQueueService? _queueService;
     private IDraftMimeMessageFactory? _draftMimeMessageFactory;
@@ -65,6 +74,12 @@ public sealed class MailApplicationBuilder {
         return this;
     }
 
+    /// <summary>Uses an explicit message-action plan batch store.</summary>
+    public MailApplicationBuilder UseMessageActionPlanBatchStore(IMailMessageActionPlanBatchStore messageActionPlanBatchStore) {
+        _messageActionPlanBatchStore = messageActionPlanBatchStore ?? throw new ArgumentNullException(nameof(messageActionPlanBatchStore));
+        return this;
+    }
+
     /// <summary>Uses an explicit profile service.</summary>
     public MailApplicationBuilder UseProfileService(IMailProfileService profileService) {
         _profileService = profileService ?? throw new ArgumentNullException(nameof(profileService));
@@ -101,6 +116,12 @@ public sealed class MailApplicationBuilder {
         return this;
     }
 
+    /// <summary>Uses an explicit folder alias discovery service.</summary>
+    public MailApplicationBuilder UseFolderAliasService(IMailFolderAliasService folderAliasService) {
+        _folderAliasService = folderAliasService ?? throw new ArgumentNullException(nameof(folderAliasService));
+        return this;
+    }
+
     /// <summary>Uses an explicit draft service.</summary>
     public MailApplicationBuilder UseDraftService(IMailDraftService draftService) {
         _draftService = draftService ?? throw new ArgumentNullException(nameof(draftService));
@@ -116,6 +137,42 @@ public sealed class MailApplicationBuilder {
     /// <summary>Uses an explicit read service.</summary>
     public MailApplicationBuilder UseReadService(IMailReadService readService) {
         _readService = readService ?? throw new ArgumentNullException(nameof(readService));
+        return this;
+    }
+
+    /// <summary>Uses an explicit message-action preview service.</summary>
+    public MailApplicationBuilder UseMessageActionPreviewService(IMailMessageActionPreviewService messageActionPreviewService) {
+        _messageActionPreviewService = messageActionPreviewService ?? throw new ArgumentNullException(nameof(messageActionPreviewService));
+        return this;
+    }
+
+    /// <summary>Uses an explicit message-action planning service.</summary>
+    public MailApplicationBuilder UseMessageActionPlanService(IMailMessageActionPlanService messageActionPlanService) {
+        _messageActionPlanService = messageActionPlanService ?? throw new ArgumentNullException(nameof(messageActionPlanService));
+        return this;
+    }
+
+    /// <summary>Uses an explicit message-action plan exchange service.</summary>
+    public MailApplicationBuilder UseMessageActionPlanExchangeService(IMailMessageActionPlanExchangeService messageActionPlanExchangeService) {
+        _messageActionPlanExchangeService = messageActionPlanExchangeService ?? throw new ArgumentNullException(nameof(messageActionPlanExchangeService));
+        return this;
+    }
+
+    /// <summary>Uses an explicit message-action plan registry service.</summary>
+    public MailApplicationBuilder UseMessageActionPlanRegistryService(IMailMessageActionPlanRegistryService messageActionPlanRegistryService) {
+        _messageActionPlanRegistryService = messageActionPlanRegistryService ?? throw new ArgumentNullException(nameof(messageActionPlanRegistryService));
+        return this;
+    }
+
+    /// <summary>Uses an explicit message-action batch execution service.</summary>
+    public MailApplicationBuilder UseMessageActionBatchService(IMailMessageActionBatchService messageActionBatchService) {
+        _messageActionBatchService = messageActionBatchService ?? throw new ArgumentNullException(nameof(messageActionBatchService));
+        return this;
+    }
+
+    /// <summary>Uses an explicit message-action service.</summary>
+    public MailApplicationBuilder UseMessageActionService(IMailMessageActionService messageActionService) {
+        _messageActionService = messageActionService ?? throw new ArgumentNullException(nameof(messageActionService));
         return this;
     }
 
@@ -173,6 +230,12 @@ public sealed class MailApplicationBuilder {
         return this;
     }
 
+    /// <summary>Adds a message-action handler.</summary>
+    public MailApplicationBuilder AddMessageActionHandler(IMailMessageActionHandler handler) {
+        _messageActionHandlers.Add(handler ?? throw new ArgumentNullException(nameof(handler)));
+        return this;
+    }
+
     /// <summary>Adds a send handler.</summary>
     public MailApplicationBuilder AddSendHandler(IMailSendHandler handler) {
         _sendHandlers.Add(handler ?? throw new ArgumentNullException(nameof(handler)));
@@ -186,6 +249,7 @@ public sealed class MailApplicationBuilder {
         var profileStore = _profileStore ?? new FileMailProfileStore(_options.ProfileStore);
         var secretStore = _secretStore ?? new FileMailSecretStore(_options.SecretStore);
         var draftStore = _draftStore ?? new FileMailDraftStore(_options.DraftStore);
+        var messageActionPlanBatchStore = _messageActionPlanBatchStore ?? new FileMailMessageActionPlanBatchStore(_options.ActionPlanBatchStore);
         var profileService = _profileService ?? new MailProfileService(profileStore, secretStore);
         var imapSessionFactory = _imapSessionFactory ?? new ImapSessionFactory(secretStore);
         var graphSessionFactory = _graphSessionFactory ?? new GraphSessionFactory(secretStore);
@@ -212,6 +276,17 @@ public sealed class MailApplicationBuilder {
             readHandlers.Add(new GmailMailReadHandler(gmailSessionFactory));
         }
 
+        var messageActionHandlers = new List<IMailMessageActionHandler>(_messageActionHandlers);
+        if (!messageActionHandlers.Any(handler => handler.Kind == MailProfileKind.Imap)) {
+            messageActionHandlers.Add(new ImapMailMessageActionHandler(imapSessionFactory));
+        }
+        if (!messageActionHandlers.Any(handler => handler.Kind == MailProfileKind.Graph)) {
+            messageActionHandlers.Add(new GraphMailMessageActionHandler(graphSessionFactory));
+        }
+        if (!messageActionHandlers.Any(handler => handler.Kind == MailProfileKind.Gmail)) {
+            messageActionHandlers.Add(new GmailMailMessageActionHandler(gmailSessionFactory));
+        }
+
         var sendHandlers = new List<IMailSendHandler>(_sendHandlers);
         if (_options.EnableGraphSendHandler && !sendHandlers.Any(handler => handler.Kind == MailProfileKind.Graph)) {
             sendHandlers.Add(new GraphMailSendHandler(graphSessionFactory, draftMimeMessageFactory, pendingMessageRepository));
@@ -224,6 +299,13 @@ public sealed class MailApplicationBuilder {
         }
 
         var readService = _readService ?? new RoutedMailReadService(profileStore, readHandlers);
+        var folderAliasService = _folderAliasService ?? new MailFolderAliasService(profileStore, readService);
+        var messageActionPreviewService = _messageActionPreviewService ?? new MailMessageActionPreviewService(profileStore, folderAliasService);
+        var messageActionService = _messageActionService ?? new RoutedMailMessageActionService(profileStore, messageActionHandlers, folderAliasService);
+        var messageActionPlanService = _messageActionPlanService ?? new MailMessageActionPlanService(messageActionPreviewService, messageActionService);
+        var messageActionPlanExchangeService = _messageActionPlanExchangeService ?? new JsonMailMessageActionPlanExchangeService();
+        var messageActionBatchService = _messageActionBatchService ?? new MailMessageActionBatchService(messageActionPlanService);
+        var messageActionPlanRegistryService = _messageActionPlanRegistryService ?? new MailMessageActionPlanRegistryService(messageActionPlanBatchStore, messageActionPlanExchangeService, messageActionPreviewService, messageActionPlanService, messageActionBatchService, profileStore);
         var sendService = _sendService ?? new RoutedMailSendService(profileStore, sendHandlers);
         var queueService = _queueService ?? new PendingMailQueueService(pendingMessageRepository);
 
@@ -237,12 +319,20 @@ public sealed class MailApplicationBuilder {
             profileSecretService,
             profileBootstrapService,
             profileAuthService,
+            folderAliasService,
             draftService,
             draftExchangeService,
             readService,
+            messageActionPreviewService,
+            messageActionPlanService,
+            messageActionPlanExchangeService,
+            messageActionPlanRegistryService,
+            messageActionBatchService,
+            messageActionService,
             sendService,
             queueService,
             readHandlers.AsReadOnly(),
+            messageActionHandlers.AsReadOnly(),
             sendHandlers.AsReadOnly());
     }
 }

@@ -38,6 +38,8 @@ public static class MailCapabilityCatalog {
                 | MailCapability.SearchMessages
                 | MailCapability.ReadMessages
                 | MailCapability.SaveAttachments
+                | MailCapability.MarkMessages
+                | MailCapability.MoveMessages
                 | MailCapability.DeleteMessages
                 | MailCapability.SendMessages
                 | MailCapability.UseThreads

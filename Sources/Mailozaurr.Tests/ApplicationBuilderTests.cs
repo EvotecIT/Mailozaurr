@@ -25,12 +25,22 @@ public sealed class ApplicationBuilderTests {
         Assert.NotNull(app.DraftExchange);
         Assert.NotNull(app.ProfileBootstrap);
         Assert.NotNull(app.ProfileAuth);
+        Assert.NotNull(app.FolderAliases);
         Assert.NotNull(app.Read);
+        Assert.NotNull(app.MessageActionPreview);
+        Assert.NotNull(app.MessageActionPlans);
+        Assert.NotNull(app.MessageActionPlanExchange);
+        Assert.NotNull(app.MessageActionPlanRegistry);
+        Assert.NotNull(app.MessageActionBatch);
+        Assert.NotNull(app.MessageActions);
         Assert.NotNull(app.Send);
         Assert.NotNull(app.Queue);
         Assert.Contains(app.ReadHandlers, handler => handler.Kind == MailProfileKind.Imap);
         Assert.Contains(app.ReadHandlers, handler => handler.Kind == MailProfileKind.Graph);
         Assert.Contains(app.ReadHandlers, handler => handler.Kind == MailProfileKind.Gmail);
+        Assert.Contains(app.MessageActionHandlers, handler => handler.Kind == MailProfileKind.Imap);
+        Assert.Contains(app.MessageActionHandlers, handler => handler.Kind == MailProfileKind.Graph);
+        Assert.Contains(app.MessageActionHandlers, handler => handler.Kind == MailProfileKind.Gmail);
         Assert.Contains(app.SendHandlers, handler => handler.Kind == MailProfileKind.Graph);
         Assert.Contains(app.SendHandlers, handler => handler.Kind == MailProfileKind.Gmail);
         Assert.Contains(app.SendHandlers, handler => handler.Kind == MailProfileKind.Smtp);
@@ -76,11 +86,13 @@ public sealed class ApplicationBuilderTests {
         builder.UseGmailSessionFactory(new FakeGmailSessionFactory());
         builder.UseSmtpSessionFactory(new FakeSmtpSessionFactory());
         builder.AddReadHandler(new FakeReadHandler(MailProfileKind.Graph));
+        builder.AddMessageActionHandler(new FakeMessageActionHandler(MailProfileKind.Graph));
         builder.AddSendHandler(new FakeSendHandler(MailProfileKind.Graph));
 
         var app = builder.Build();
 
         Assert.Contains(app.ReadHandlers, handler => handler.Kind == MailProfileKind.Graph);
+        Assert.Contains(app.MessageActionHandlers, handler => handler.Kind == MailProfileKind.Graph);
         Assert.Contains(app.SendHandlers, handler => handler.Kind == MailProfileKind.Graph);
     }
 
@@ -147,5 +159,25 @@ public sealed class ApplicationBuilderTests {
 
         public Task<SendResult> SendAsync(MailProfile profile, SendMessageRequest request, CancellationToken cancellationToken = default) =>
             Task.FromResult(new SendResult { Succeeded = true, ProfileKind = Kind });
+    }
+
+    private sealed class FakeMessageActionHandler : IMailMessageActionHandler {
+        public FakeMessageActionHandler(MailProfileKind kind) {
+            Kind = kind;
+        }
+
+        public MailProfileKind Kind { get; }
+
+        public Task<MessageActionResult> SetReadStateAsync(MailProfile profile, SetReadStateRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new MessageActionResult { Succeeded = true, ProfileId = profile.Id });
+
+        public Task<MessageActionResult> SetFlaggedStateAsync(MailProfile profile, SetFlaggedStateRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new MessageActionResult { Succeeded = true, ProfileId = profile.Id });
+
+        public Task<MessageActionResult> MoveAsync(MailProfile profile, MoveMessagesRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new MessageActionResult { Succeeded = true, ProfileId = profile.Id });
+
+        public Task<MessageActionResult> DeleteAsync(MailProfile profile, DeleteMessagesRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new MessageActionResult { Succeeded = true, ProfileId = profile.Id });
     }
 }

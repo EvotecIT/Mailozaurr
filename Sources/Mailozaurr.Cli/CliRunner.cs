@@ -43,6 +43,10 @@ public static class CliRunner {
         if (!string.IsNullOrWhiteSpace(draftsDir)) {
             options.DraftStore.DirectoryPath = draftsDir;
         }
+        var planBatchesDir = parseResult.GetOption("plan-batches-dir");
+        if (!string.IsNullOrWhiteSpace(planBatchesDir)) {
+            options.ActionPlanBatchStore.DirectoryPath = planBatchesDir;
+        }
 
         var application = (builderFactory ?? (appOptions => new MailApplicationBuilder(appOptions)))
             .Invoke(options)
@@ -267,7 +271,7 @@ public static class CliRunner {
         TextWriter output,
         TextWriter error) {
         if (parseResult.Positionals.Count < 2) {
-            await error.WriteLineAsync("Missing mail command. Use 'mail folders', 'mail search', 'mail attachments', 'mail get', 'mail save-attachment', or 'mail save-attachments'.").ConfigureAwait(false);
+            await error.WriteLineAsync("Missing mail command. Use 'mail folders', 'mail folder-aliases', 'mail resolve-folder', 'mail list-plan-batches', 'mail show-plan-batch', 'mail import-plan-batch', 'mail export-plan-batch', 'mail create-common-plan-batch', 'mail clone-plan-batch', 'mail preview-transform-plan-batch', 'mail transform-plan-batch', 'mail add-plan-to-batch', 'mail add-plan-file-to-batch', 'mail replace-plan-in-batch', 'mail replace-plan-file-in-batch', 'mail remove-plan-from-batch', 'mail delete-plan-batch', 'mail execute-plan-batch-stored', 'mail plan-action', 'mail export-plan', 'mail show-plan', 'mail execute-plan', 'mail execute-plan-file', 'mail execute-plan-batch', 'mail preview-all', 'mail preview-mark-read', 'mail preview-flag', 'mail preview-actions', 'mail preview-move', 'mail preview-delete', 'mail search', 'mail attachments', 'mail get', 'mail get-many', 'mail mark-read', 'mail flag', 'mail archive', 'mail trash', 'mail move', 'mail delete', 'mail save-attachment', 'mail save-attachments', or 'mail save-attachments-many'.").ConfigureAwait(false);
             return 1;
         }
 
@@ -291,6 +295,274 @@ public static class CliRunner {
                 await WriteSequenceAsync(output, folders, json, folder =>
                     $"{folder.Id} {folder.Path ?? folder.DisplayName}").ConfigureAwait(false);
                 return 0;
+            case "folder-aliases":
+                var aliases = await application.FolderAliases.GetAliasesAsync(
+                    RequireOption(parseResult, "profile"),
+                    parseResult.GetOption("mailbox")).ConfigureAwait(false);
+                await WriteSequenceAsync(output, aliases, json, value => value.Summary).ConfigureAwait(false);
+                return 0;
+            case "resolve-folder":
+                var resolution = await application.FolderAliases.ResolveAsync(
+                    RequireOption(parseResult, "profile"),
+                    RequireOption(parseResult, "target-folder"),
+                    parseResult.GetOption("mailbox")).ConfigureAwait(false);
+                await WriteItemAsync(output, resolution, json, value => value.Summary).ConfigureAwait(false);
+                return resolution.IsSupported ? 0 : 1;
+            case "list-plan-batches":
+                var batchQuery = BuildMessageActionPlanBatchQuery(parseResult);
+                if (parseResult.HasFlag("summary")) {
+                    var summaryBatches = await application.MessageActionPlanRegistry.GetBatchesSummaryAsync(batchQuery).ConfigureAwait(false);
+                    await WriteSequenceAsync(output, summaryBatches, json, value => value.Summary).ConfigureAwait(false);
+                    return 0;
+                }
+                if (parseResult.HasFlag("compact")) {
+                    var compactBatches = await application.MessageActionPlanRegistry.GetBatchesCompactAsync(batchQuery).ConfigureAwait(false);
+                    await WriteSequenceAsync(output, compactBatches, json, value => value.Summary).ConfigureAwait(false);
+                    return 0;
+                }
+                var batches = await application.MessageActionPlanRegistry.GetBatchesAsync(batchQuery).ConfigureAwait(false);
+                await WriteSequenceAsync(output, batches, json, value => $"{value.Id} [{value.Plans.Count} plan(s)] {value.Name}").ConfigureAwait(false);
+                return 0;
+            case "show-plan-batch":
+                var batchId = RequireOption(parseResult, "batch");
+                if (parseResult.HasFlag("summary")) {
+                    var summaryBatch = await application.MessageActionPlanRegistry.GetBatchSummaryAsync(batchId).ConfigureAwait(false);
+                    if (summaryBatch == null) {
+                        await error.WriteLineAsync($"Action plan batch '{batchId}' was not found.").ConfigureAwait(false);
+                        return 1;
+                    }
+                    await WriteItemAsync(output, summaryBatch, json, value => value.Summary).ConfigureAwait(false);
+                    return 0;
+                }
+                if (parseResult.HasFlag("compact")) {
+                    var compactBatch = await application.MessageActionPlanRegistry.GetBatchCompactAsync(batchId).ConfigureAwait(false);
+                    if (compactBatch == null) {
+                        await error.WriteLineAsync($"Action plan batch '{batchId}' was not found.").ConfigureAwait(false);
+                        return 1;
+                    }
+                    await WriteItemAsync(output, compactBatch, json, value => value.Summary).ConfigureAwait(false);
+                    return 0;
+                }
+                var batch = await application.MessageActionPlanRegistry.GetBatchAsync(batchId).ConfigureAwait(false);
+                if (batch == null) {
+                    await error.WriteLineAsync($"Action plan batch '{batchId}' was not found.").ConfigureAwait(false);
+                    return 1;
+                }
+                await WriteItemAsync(output, batch, json, value => $"{value.Id} [{value.Plans.Count} plan(s)] {value.Name}").ConfigureAwait(false);
+                return 0;
+            case "import-plan-batch":
+                var importBatchResult = await application.MessageActionPlanRegistry.ImportAsync(
+                    RequireOption(parseResult, "batch"),
+                    RequireOption(parseResult, "name"),
+                    RequireOption(parseResult, "path"),
+                    parseResult.GetOption("description")).ConfigureAwait(false);
+                await WriteItemAsync(output, importBatchResult, json, value => value.Message ?? "Action plan batch imported.").ConfigureAwait(false);
+                return importBatchResult.Succeeded ? 0 : 1;
+            case "export-plan-batch":
+                var exportBatchResult = await application.MessageActionPlanRegistry.ExportAsync(
+                    RequireOption(parseResult, "batch"),
+                    RequireOption(parseResult, "path")).ConfigureAwait(false);
+                await WriteItemAsync(output, exportBatchResult, json, value => value.Message ?? "Action plan batch exported.").ConfigureAwait(false);
+                return exportBatchResult.Succeeded ? 0 : 1;
+            case "create-common-plan-batch":
+                var createCommonBatchResult = await application.MessageActionPlanRegistry.CreateCommonBatchAsync(
+                    RequireOption(parseResult, "batch"),
+                    RequireOption(parseResult, "name"),
+                    BuildCommonActionsPreviewRequest(parseResult),
+                    parseResult.GetOptionValues("action")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToArray(),
+                    parseResult.GetOption("description")).ConfigureAwait(false);
+                await WriteItemAsync(output, createCommonBatchResult, json, value => value.Message ?? "Action plan batch created.").ConfigureAwait(false);
+                return createCommonBatchResult.Succeeded ? 0 : 1;
+            case "clone-plan-batch":
+                var cloneBatchResult = await application.MessageActionPlanRegistry.CloneAsync(
+                    RequireOption(parseResult, "source-batch"),
+                    RequireOption(parseResult, "target-batch"),
+                    RequireOption(parseResult, "name"),
+                    parseResult.GetOption("description")).ConfigureAwait(false);
+                await WriteItemAsync(output, cloneBatchResult, json, value => value.Message ?? "Action plan batch cloned.").ConfigureAwait(false);
+                return cloneBatchResult.Succeeded ? 0 : 1;
+            case "preview-transform-plan-batch":
+                var previewTransformBatchResult = await application.MessageActionPlanRegistry.PreviewTransformCloneAsync(
+                    RequireOption(parseResult, "source-batch"),
+                    BuildMessageActionPlanBatchTransformRequest(parseResult)).ConfigureAwait(false);
+                await WriteItemAsync(output, previewTransformBatchResult, json, value => value.Message ?? "Action plan batch transform preview generated.").ConfigureAwait(false);
+                return previewTransformBatchResult.Succeeded ? 0 : 1;
+            case "transform-plan-batch":
+                var transformBatchResult = await application.MessageActionPlanRegistry.TransformCloneAsync(
+                    RequireOption(parseResult, "source-batch"),
+                    RequireOption(parseResult, "target-batch"),
+                    RequireOption(parseResult, "name"),
+                    BuildMessageActionPlanBatchTransformRequest(parseResult),
+                    parseResult.GetOption("description")).ConfigureAwait(false);
+                await WriteItemAsync(output, transformBatchResult, json, value => value.Message ?? "Action plan batch transformed and cloned.").ConfigureAwait(false);
+                return transformBatchResult.Succeeded ? 0 : 1;
+            case "add-plan-to-batch":
+                var planToAppend = await application.MessageActionPlans.CreatePlanAsync(BuildMessageActionExecutionPlanRequest(parseResult)).ConfigureAwait(false);
+                var appendPlanResult = await application.MessageActionPlanRegistry.AppendPlanAsync(
+                    RequireOption(parseResult, "batch"),
+                    planToAppend).ConfigureAwait(false);
+                await WriteItemAsync(output, appendPlanResult, json, value => value.Message ?? "Action plan appended.").ConfigureAwait(false);
+                return appendPlanResult.Succeeded ? 0 : 1;
+            case "add-plan-file-to-batch":
+                var appendImportedPlanResult = await application.MessageActionPlanRegistry.AppendImportedPlanAsync(
+                    RequireOption(parseResult, "batch"),
+                    RequireOption(parseResult, "path")).ConfigureAwait(false);
+                await WriteItemAsync(output, appendImportedPlanResult, json, value => value.Message ?? "Imported action plan appended.").ConfigureAwait(false);
+                return appendImportedPlanResult.Succeeded ? 0 : 1;
+            case "replace-plan-in-batch":
+                var replaceIndex = parseResult.GetIntOption("index");
+                if (!replaceIndex.HasValue) {
+                    throw new InvalidOperationException("Missing required option '--index'.");
+                }
+                var replacementPlan = await application.MessageActionPlans.CreatePlanAsync(BuildMessageActionExecutionPlanRequest(parseResult)).ConfigureAwait(false);
+                var replacePlanResult = await application.MessageActionPlanRegistry.ReplacePlanAtAsync(
+                    RequireOption(parseResult, "batch"),
+                    replaceIndex.Value,
+                    replacementPlan).ConfigureAwait(false);
+                await WriteItemAsync(output, replacePlanResult, json, value => value.Message ?? "Action plan replaced.").ConfigureAwait(false);
+                return replacePlanResult.Succeeded ? 0 : 1;
+            case "replace-plan-file-in-batch":
+                var replaceImportedIndex = parseResult.GetIntOption("index");
+                if (!replaceImportedIndex.HasValue) {
+                    throw new InvalidOperationException("Missing required option '--index'.");
+                }
+                var replaceImportedPlanResult = await application.MessageActionPlanRegistry.ReplaceImportedPlanAtAsync(
+                    RequireOption(parseResult, "batch"),
+                    replaceImportedIndex.Value,
+                    RequireOption(parseResult, "path")).ConfigureAwait(false);
+                await WriteItemAsync(output, replaceImportedPlanResult, json, value => value.Message ?? "Imported action plan replaced.").ConfigureAwait(false);
+                return replaceImportedPlanResult.Succeeded ? 0 : 1;
+            case "remove-plan-from-batch":
+                var index = parseResult.GetIntOption("index");
+                if (!index.HasValue) {
+                    throw new InvalidOperationException("Missing required option '--index'.");
+                }
+                var removePlanResult = await application.MessageActionPlanRegistry.RemovePlanAtAsync(
+                    RequireOption(parseResult, "batch"),
+                    index.Value).ConfigureAwait(false);
+                await WriteItemAsync(output, removePlanResult, json, value => value.Message ?? "Action plan removed from batch.").ConfigureAwait(false);
+                return removePlanResult.Succeeded ? 0 : 1;
+            case "delete-plan-batch":
+                var deleteBatchResult = await application.MessageActionPlanRegistry.DeleteAsync(RequireOption(parseResult, "batch")).ConfigureAwait(false);
+                await WriteItemAsync(output, deleteBatchResult, json, value => value.Message ?? "Action plan batch deleted.").ConfigureAwait(false);
+                return deleteBatchResult.Succeeded ? 0 : 1;
+            case "execute-plan-batch-stored":
+                var storedBatchExecutionResult = await application.MessageActionPlanRegistry.ExecuteAsync(
+                    RequireOption(parseResult, "batch"),
+                    continueOnError: !parseResult.HasFlag("stop-on-error")).ConfigureAwait(false);
+                await WriteItemAsync(output, storedBatchExecutionResult, json, value => value.Message ?? "Stored action plan batch executed.").ConfigureAwait(false);
+                return storedBatchExecutionResult.Succeeded ? 0 : 1;
+            case "preview-move":
+                var preview = await application.MessageActionPreview.PreviewMoveAsync(new MoveMessagesPreviewRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
+                    FolderId = parseResult.GetOption("folder"),
+                    MessageIds = parseResult.GetOptionValues("message-id")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToList(),
+                    DestinationFolderId = RequireOption(parseResult, "target-folder")
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, preview, json, value => value.Message ?? "Move preview ready.").ConfigureAwait(false);
+                return preview.Succeeded ? 0 : 1;
+            case "preview-actions":
+                var standardPreview = await application.MessageActionPreview.PreviewStandardActionsAsync(new StandardMessageActionsPreviewRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
+                    FolderId = parseResult.GetOption("folder"),
+                    MessageIds = parseResult.GetOptionValues("message-id")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToList(),
+                    DestinationFolderId = parseResult.GetOption("target-folder")
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, standardPreview, json, value => value.Message ?? "Action previews ready.").ConfigureAwait(false);
+                return standardPreview.Succeeded ? 0 : 1;
+            case "preview-all":
+                var commonPreview = await application.MessageActionPreview.PreviewCommonActionsAsync(new CommonMessageActionsPreviewRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
+                    FolderId = parseResult.GetOption("folder"),
+                    MessageIds = parseResult.GetOptionValues("message-id")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToList(),
+                    DestinationFolderId = parseResult.GetOption("target-folder")
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, commonPreview, json, value => value.Message ?? "Common action previews ready.").ConfigureAwait(false);
+                return commonPreview.Succeeded ? 0 : 1;
+            case "plan-action":
+                var actionPlan = await application.MessageActionPlans.CreatePlanAsync(BuildMessageActionExecutionPlanRequest(parseResult)).ConfigureAwait(false);
+                await WriteItemAsync(output, actionPlan, json, value => value.Message ?? "Action plan ready.").ConfigureAwait(false);
+                return actionPlan.Succeeded ? 0 : 1;
+            case "export-plan":
+                var exportPlan = await application.MessageActionPlans.CreatePlanAsync(BuildMessageActionExecutionPlanRequest(parseResult)).ConfigureAwait(false);
+                await application.MessageActionPlanExchange.SaveAsync(RequireOption(parseResult, "path"), exportPlan).ConfigureAwait(false);
+                var exportPlanResult = OperationResult.Success("Action plan exported.");
+                await WriteItemAsync(output, exportPlanResult, json, value => value.Message ?? "Action plan exported.").ConfigureAwait(false);
+                return exportPlan.Succeeded ? 0 : 1;
+            case "show-plan":
+                var loadedPlan = await application.MessageActionPlanExchange.LoadAsync(RequireOption(parseResult, "path")).ConfigureAwait(false);
+                await WriteItemAsync(output, loadedPlan, json, value => value.Message ?? "Action plan loaded.").ConfigureAwait(false);
+                return loadedPlan.Succeeded ? 0 : 1;
+            case "execute-plan":
+                var executionPlan = await application.MessageActionPlans.CreatePlanAsync(BuildMessageActionExecutionPlanRequest(parseResult)).ConfigureAwait(false);
+                var executePlanResult = await application.MessageActionBatch.ExecuteAsync(new[] { executionPlan }).ConfigureAwait(false);
+                await WriteItemAsync(output, executePlanResult, json, value => value.Message ?? "Action plan executed.").ConfigureAwait(false);
+                return executePlanResult.Succeeded ? 0 : 1;
+            case "execute-plan-file":
+                var storedPlan = await application.MessageActionPlanExchange.LoadAsync(RequireOption(parseResult, "path")).ConfigureAwait(false);
+                var executePlanFileResult = await application.MessageActionBatch.ExecuteAsync(new[] { storedPlan }).ConfigureAwait(false);
+                await WriteItemAsync(output, executePlanFileResult, json, value => value.Message ?? "Stored action plan executed.").ConfigureAwait(false);
+                return executePlanFileResult.Succeeded ? 0 : 1;
+            case "execute-plan-batch":
+                var plans = await application.MessageActionPlanExchange.LoadBatchAsync(RequireOption(parseResult, "path")).ConfigureAwait(false);
+                var batchExecutionResult = await application.MessageActionBatch.ExecuteAsync(
+                    plans,
+                    continueOnError: !parseResult.HasFlag("stop-on-error")).ConfigureAwait(false);
+                await WriteItemAsync(output, batchExecutionResult, json, value => value.Message ?? "Action batch executed.").ConfigureAwait(false);
+                return batchExecutionResult.Succeeded ? 0 : 1;
+            case "preview-delete":
+                var deletePreview = await application.MessageActionPreview.PreviewDeleteAsync(new DeleteMessagesPreviewRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
+                    FolderId = parseResult.GetOption("folder"),
+                    MessageIds = parseResult.GetOptionValues("message-id")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToList()
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, deletePreview, json, value => value.Message ?? "Delete preview ready.").ConfigureAwait(false);
+                return deletePreview.Succeeded ? 0 : 1;
+            case "preview-mark-read":
+                var readPreview = await application.MessageActionPreview.PreviewReadStateAsync(new SetReadStateRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
+                    FolderId = parseResult.GetOption("folder"),
+                    MessageIds = parseResult.GetOptionValues("message-id")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToList(),
+                    IsRead = !parseResult.HasFlag("unread")
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, readPreview, json, value => value.Message ?? "Read-state preview ready.").ConfigureAwait(false);
+                return readPreview.Succeeded ? 0 : 1;
+            case "preview-flag":
+                var flagPreview = await application.MessageActionPreview.PreviewFlaggedStateAsync(new SetFlaggedStateRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
+                    FolderId = parseResult.GetOption("folder"),
+                    MessageIds = parseResult.GetOptionValues("message-id")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToList(),
+                    IsFlagged = !parseResult.HasFlag("unflag")
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, flagPreview, json, value => value.Message ?? "Flag preview ready.").ConfigureAwait(false);
+                return flagPreview.Succeeded ? 0 : 1;
             case "search":
                 var searchRequest = new MailSearchRequest {
                     ProfileId = RequireOption(parseResult, "profile"),
@@ -337,6 +609,117 @@ public static class CliRunner {
                 }
                 await WriteItemAsync(output, detail, json, value => value.Summary?.Subject ?? value.Id).ConfigureAwait(false);
                 return 0;
+            case "get-many":
+                var getMessagesRequest = new GetMessagesRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
+                    FolderId = parseResult.GetOption("folder"),
+                    MessageIds = parseResult.GetOptionValues("message-id")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToList(),
+                    IncludeRawContent = parseResult.HasFlag("include-raw")
+                };
+                if (getMessagesRequest.MessageIds.Count == 0) {
+                    throw new InvalidOperationException("Missing required option '--message-id'.");
+                }
+                if (parseResult.HasFlag("compact")) {
+                    var compactDetails = await application.Read.GetMessagesCompactAsync(getMessagesRequest).ConfigureAwait(false);
+                    await WriteSequenceAsync(output, compactDetails, json, value => value.SummaryText).ConfigureAwait(false);
+                    return 0;
+                }
+                var details = await application.Read.GetMessagesAsync(getMessagesRequest).ConfigureAwait(false);
+                await WriteSequenceAsync(output, details, json, value => value.Summary?.Subject ?? value.Id).ConfigureAwait(false);
+                return 0;
+            case "mark-read":
+                var markReadResult = await application.MessageActions.SetReadStateAsync(new SetReadStateRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
+                    FolderId = parseResult.GetOption("folder"),
+                    MessageIds = parseResult.GetOptionValues("message-id")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToList(),
+                    IsRead = !parseResult.HasFlag("unread"),
+                    ConfirmationToken = parseResult.GetOption("confirm-token")
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, markReadResult, json, value =>
+                    value.Message ?? $"Updated {value.SucceededCount} message(s).").ConfigureAwait(false);
+                return markReadResult.Succeeded ? 0 : 1;
+            case "flag":
+                var flagResult = await application.MessageActions.SetFlaggedStateAsync(new SetFlaggedStateRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
+                    FolderId = parseResult.GetOption("folder"),
+                    MessageIds = parseResult.GetOptionValues("message-id")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToList(),
+                    IsFlagged = !parseResult.HasFlag("unflag"),
+                    ConfirmationToken = parseResult.GetOption("confirm-token")
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, flagResult, json, value =>
+                    value.Message ?? $"Updated {value.SucceededCount} message(s).").ConfigureAwait(false);
+                return flagResult.Succeeded ? 0 : 1;
+            case "move":
+                var moveResult = await application.MessageActions.MoveAsync(new MoveMessagesRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
+                    FolderId = parseResult.GetOption("folder"),
+                    MessageIds = parseResult.GetOptionValues("message-id")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToList(),
+                    DestinationFolderId = RequireOption(parseResult, "target-folder"),
+                    ConfirmationToken = parseResult.GetOption("confirm-token")
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, moveResult, json, value =>
+                    value.Message ?? $"Moved {value.SucceededCount} message(s).").ConfigureAwait(false);
+                return moveResult.Succeeded ? 0 : 1;
+            case "archive":
+                var archiveResult = await application.MessageActions.MoveAsync(new MoveMessagesRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
+                    FolderId = parseResult.GetOption("folder"),
+                    MessageIds = parseResult.GetOptionValues("message-id")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToList(),
+                    DestinationFolderId = MailFolderAliases.Archive,
+                    ConfirmationToken = parseResult.GetOption("confirm-token")
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, archiveResult, json, value =>
+                    value.Message ?? $"Archived {value.SucceededCount} message(s).").ConfigureAwait(false);
+                return archiveResult.Succeeded ? 0 : 1;
+            case "trash":
+                var trashResult = await application.MessageActions.MoveAsync(new MoveMessagesRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
+                    FolderId = parseResult.GetOption("folder"),
+                    MessageIds = parseResult.GetOptionValues("message-id")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToList(),
+                    DestinationFolderId = MailFolderAliases.Trash,
+                    ConfirmationToken = parseResult.GetOption("confirm-token")
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, trashResult, json, value =>
+                    value.Message ?? $"Moved {value.SucceededCount} message(s) to trash.").ConfigureAwait(false);
+                return trashResult.Succeeded ? 0 : 1;
+            case "delete":
+                var deleteResult = await application.MessageActions.DeleteAsync(new DeleteMessagesRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
+                    FolderId = parseResult.GetOption("folder"),
+                    MessageIds = parseResult.GetOptionValues("message-id")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToList(),
+                    ConfirmationToken = parseResult.GetOption("confirm-token")
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, deleteResult, json, value =>
+                    value.Message ?? $"Deleted {value.SucceededCount} message(s).").ConfigureAwait(false);
+                return deleteResult.Succeeded ? 0 : 1;
             case "attachments":
                 var attachments = await application.Read.GetAttachmentsAsync(new ListAttachmentsRequest {
                     ProfileId = RequireOption(parseResult, "profile"),
@@ -378,6 +761,27 @@ public static class CliRunner {
                 await WriteItemAsync(output, saveAttachmentsResult, json, value =>
                     value.Message ?? $"Saved {value.SavedCount} attachment(s).").ConfigureAwait(false);
                 return saveAttachmentsResult.Succeeded ? 0 : 1;
+            case "save-attachments-many":
+                var saveAttachmentsManyResult = await application.Read.SaveAttachmentsManyAsync(new SaveAttachmentsManyRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
+                    FolderId = parseResult.GetOption("folder"),
+                    MessageIds = parseResult.GetOptionValues("message-id")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToList(),
+                    DestinationPath = RequireOption(parseResult, "path"),
+                    AttachmentIds = parseResult.GetOptionValues("attachment-id")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToList(),
+                    FileNameContains = parseResult.GetOption("name-contains"),
+                    ContentTypeContains = parseResult.GetOption("content-type"),
+                    Overwrite = parseResult.HasFlag("overwrite")
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, saveAttachmentsManyResult, json, value =>
+                    value.Message ?? $"Saved {value.SavedCount} attachment(s) across {value.AttemptedMessageCount} message(s).").ConfigureAwait(false);
+                return saveAttachmentsManyResult.Succeeded ? 0 : 1;
             default:
                 await error.WriteLineAsync($"Unknown mail command '{subCommand}'.").ConfigureAwait(false);
                 return 1;
@@ -583,6 +987,90 @@ public static class CliRunner {
         }
 
         return profile;
+    }
+
+    private static MessageActionExecutionPlanRequest BuildMessageActionExecutionPlanRequest(CliArguments parseResult) => new() {
+        Action = RequireOption(parseResult, "action"),
+        ProfileId = RequireOption(parseResult, "profile"),
+        MailboxId = parseResult.GetOption("mailbox"),
+        FolderId = parseResult.GetOption("folder"),
+        MessageIds = parseResult.GetOptionValues("message-id")
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim())
+            .ToList(),
+        DestinationFolderId = parseResult.GetOption("target-folder"),
+        ConfirmationToken = parseResult.GetOption("confirm-token")
+    };
+
+    private static CommonMessageActionsPreviewRequest BuildCommonActionsPreviewRequest(CliArguments parseResult) => new() {
+        ProfileId = RequireOption(parseResult, "profile"),
+        MailboxId = parseResult.GetOption("mailbox"),
+        FolderId = parseResult.GetOption("folder"),
+        MessageIds = parseResult.GetOptionValues("message-id")
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim())
+            .ToList(),
+        DestinationFolderId = parseResult.GetOption("target-folder")
+    };
+
+    private static MessageActionPlanBatchTransformRequest BuildMessageActionPlanBatchTransformRequest(CliArguments parseResult) => new() {
+        PlanIndexes = parseResult.GetIntOptionValues("index").ToList(),
+        PlanNames = parseResult.GetOptionValues("plan-name")
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim())
+            .ToList(),
+        ProfileId = parseResult.GetOption("target-profile"),
+        MailboxId = parseResult.GetOption("mailbox"),
+        FolderId = parseResult.GetOption("folder"),
+        DestinationFolderId = parseResult.GetOption("target-folder")
+    };
+
+    private static MailMessageActionPlanBatchQuery? BuildMessageActionPlanBatchQuery(CliArguments parseResult) {
+        var planNames = parseResult.GetOptionValues("plan-name")
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var profileIds = parseResult.GetOptionValues("profile")
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var actions = parseResult.GetOptionValues("action")
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var sortBy = ParseBatchSortBy(parseResult.GetOption("sort"));
+        var descending = parseResult.HasFlag("desc");
+
+        if (planNames.Count == 0 && profileIds.Count == 0 && actions.Count == 0 && sortBy == MailMessageActionPlanBatchSortBy.Id && !descending) {
+            return null;
+        }
+
+        return new MailMessageActionPlanBatchQuery {
+            PlanNames = planNames,
+            ProfileIds = profileIds,
+            Actions = actions,
+            SortBy = sortBy,
+            Descending = descending
+        };
+    }
+
+    private static MailMessageActionPlanBatchSortBy ParseBatchSortBy(string? rawSortBy) {
+        if (string.IsNullOrWhiteSpace(rawSortBy)) {
+            return MailMessageActionPlanBatchSortBy.Id;
+        }
+
+        return rawSortBy.Trim().ToLowerInvariant() switch {
+            "id" => MailMessageActionPlanBatchSortBy.Id,
+            "name" => MailMessageActionPlanBatchSortBy.Name,
+            "plans" or "plan-count" => MailMessageActionPlanBatchSortBy.PlanCount,
+            "ready" or "ready-count" => MailMessageActionPlanBatchSortBy.ReadyPlanCount,
+            "updated" or "updated-at" => MailMessageActionPlanBatchSortBy.UpdatedAt,
+            "actions" or "action-types" => MailMessageActionPlanBatchSortBy.ActionTypeCount,
+            _ => throw new InvalidOperationException($"Unsupported batch sort '{rawSortBy}'.")
+        };
     }
 
     private static async Task<SendMessageRequest> BuildSendRequestAsync(MailApplication application, CliArguments parseResult) {
@@ -793,11 +1281,48 @@ public static class CliRunner {
         output.WriteLine("  draft delete --draft <id> [--json]");
         output.WriteLine("  draft export --draft <id> --path <file> [--json]");
         output.WriteLine("  mail folders --profile <id> [--mailbox <id>] [--parent-folder <id>] [--root-only] [--compact] [--json]");
+        output.WriteLine("  mail folder-aliases --profile <id> [--mailbox <id>] [--json]");
+        output.WriteLine("  mail resolve-folder --profile <id> --target-folder <id> [--mailbox <id>] [--json]");
+        output.WriteLine("  mail list-plan-batches [--summary|--compact] [--plan-name <name>] [--plan-name <name>] [--profile <id>] [--profile <id>] [--action <name>] [--action <name>] [--sort <id|name|plans|ready|updated|actions>] [--desc] [--json]");
+        output.WriteLine("  mail show-plan-batch --batch <id> [--summary|--compact] [--json]");
+        output.WriteLine("  mail import-plan-batch --batch <id> --name <display-name> --path <file> [--description <text>] [--json]");
+        output.WriteLine("  mail export-plan-batch --batch <id> --path <file> [--json]");
+        output.WriteLine("  mail create-common-plan-batch --batch <id> --name <display-name> --profile <id> --message-id <id> [--message-id <id>] [--action <name>] [--action <name>] [--target-folder <id>] [--mailbox <id>] [--folder <name>] [--description <text>] [--json]");
+        output.WriteLine("  mail clone-plan-batch --source-batch <id> --target-batch <id> --name <display-name> [--description <text>] [--json]");
+        output.WriteLine("  mail preview-transform-plan-batch --source-batch <id> [--index <n>] [--index <n>] [--plan-name <name>] [--plan-name <name>] [--target-profile <id>] [--mailbox <id>] [--folder <name>] [--target-folder <id>] [--json]");
+        output.WriteLine("  mail transform-plan-batch --source-batch <id> --target-batch <id> --name <display-name> [--index <n>] [--index <n>] [--plan-name <name>] [--plan-name <name>] [--target-profile <id>] [--mailbox <id>] [--folder <name>] [--target-folder <id>] [--description <text>] [--json]");
+        output.WriteLine("  mail add-plan-to-batch --batch <id> --action <mark-read|mark-unread|flag|unflag|archive|trash|move|delete> --profile <id> --message-id <id> [--message-id <id>] [--target-folder <id>] [--mailbox <id>] [--folder <name>] [--confirm-token <token>] [--json]");
+        output.WriteLine("  mail add-plan-file-to-batch --batch <id> --path <file> [--json]");
+        output.WriteLine("  mail replace-plan-in-batch --batch <id> --index <n> --action <mark-read|mark-unread|flag|unflag|archive|trash|move|delete> --profile <id> --message-id <id> [--message-id <id>] [--target-folder <id>] [--mailbox <id>] [--folder <name>] [--confirm-token <token>] [--json]");
+        output.WriteLine("  mail replace-plan-file-in-batch --batch <id> --index <n> --path <file> [--json]");
+        output.WriteLine("  mail remove-plan-from-batch --batch <id> --index <n> [--json]");
+        output.WriteLine("  mail delete-plan-batch --batch <id> [--json]");
+        output.WriteLine("  mail execute-plan-batch-stored --batch <id> [--stop-on-error] [--json]");
+        output.WriteLine("  mail plan-action --action <mark-read|mark-unread|flag|unflag|archive|trash|move|delete> --profile <id> --message-id <id> [--message-id <id>] [--target-folder <id>] [--mailbox <id>] [--folder <name>] [--confirm-token <token>] [--json]");
+        output.WriteLine("  mail export-plan --action <mark-read|mark-unread|flag|unflag|archive|trash|move|delete> --profile <id> --message-id <id> [--message-id <id>] --path <file> [--target-folder <id>] [--mailbox <id>] [--folder <name>] [--confirm-token <token>] [--json]");
+        output.WriteLine("  mail show-plan --path <file> [--json]");
+        output.WriteLine("  mail execute-plan --action <mark-read|mark-unread|flag|unflag|archive|trash|move|delete> --profile <id> --message-id <id> [--message-id <id>] [--target-folder <id>] [--mailbox <id>] [--folder <name>] [--confirm-token <token>] [--json]");
+        output.WriteLine("  mail execute-plan-file --path <file> [--json]");
+        output.WriteLine("  mail execute-plan-batch --path <file> [--stop-on-error] [--json]");
+        output.WriteLine("  mail preview-all --profile <id> --message-id <id> [--message-id <id>] [--target-folder <id>] [--mailbox <id>] [--folder <name>] [--json]");
+        output.WriteLine("  mail preview-mark-read --profile <id> --message-id <id> [--message-id <id>] [--mailbox <id>] [--folder <name>] [--unread] [--json]");
+        output.WriteLine("  mail preview-flag --profile <id> --message-id <id> [--message-id <id>] [--mailbox <id>] [--folder <name>] [--unflag] [--json]");
+        output.WriteLine("  mail preview-actions --profile <id> --message-id <id> [--message-id <id>] [--target-folder <id>] [--mailbox <id>] [--folder <name>] [--json]");
+        output.WriteLine("  mail preview-move --profile <id> --message-id <id> [--message-id <id>] --target-folder <id> [--mailbox <id>] [--folder <name>] [--json]");
+        output.WriteLine("  mail preview-delete --profile <id> --message-id <id> [--message-id <id>] [--mailbox <id>] [--folder <name>] [--json]");
         output.WriteLine("  mail search --profile <id> [--mailbox <id>] [--folder <name>] [--query <text>] [--subject <text>] [--from <text>] [--to <text>] [--limit <n>] [--compact] [--json]");
         output.WriteLine("  mail get --profile <id> --message-id <id> [--mailbox <id>] [--folder <name>] [--include-raw] [--compact] [--json]");
+        output.WriteLine("  mail get-many --profile <id> --message-id <id> [--message-id <id>] [--mailbox <id>] [--folder <name>] [--include-raw] [--compact] [--json]");
+        output.WriteLine("  mail mark-read --profile <id> --message-id <id> [--message-id <id>] [--mailbox <id>] [--folder <name>] [--unread] [--confirm-token <token>] [--json]");
+        output.WriteLine("  mail flag --profile <id> --message-id <id> [--message-id <id>] [--mailbox <id>] [--folder <name>] [--unflag] [--confirm-token <token>] [--json]");
+        output.WriteLine("  mail archive --profile <id> --message-id <id> [--message-id <id>] [--mailbox <id>] [--folder <name>] [--confirm-token <token>] [--json]");
+        output.WriteLine("  mail trash --profile <id> --message-id <id> [--message-id <id>] [--mailbox <id>] [--folder <name>] [--confirm-token <token>] [--json]");
+        output.WriteLine("  mail move --profile <id> --message-id <id> [--message-id <id>] --target-folder <id> [--mailbox <id>] [--folder <name>] [--confirm-token <token>] [--json]");
+        output.WriteLine("  mail delete --profile <id> --message-id <id> [--message-id <id>] [--mailbox <id>] [--folder <name>] [--confirm-token <token>] [--json]");
         output.WriteLine("  mail attachments --profile <id> --message-id <id> [--mailbox <id>] [--folder <name>] [--json]");
         output.WriteLine("  mail save-attachment --profile <id> --message-id <id> --attachment-id <id> --path <destination> [--mailbox <id>] [--folder <name>] [--overwrite] [--json]");
         output.WriteLine("  mail save-attachments --profile <id> --message-id <id> --path <destination> [--mailbox <id>] [--folder <name>] [--attachment-id <id>] [--attachment-id <id>] [--name-contains <text>] [--content-type <text>] [--overwrite] [--json]");
+        output.WriteLine("  mail save-attachments-many --profile <id> --message-id <id> [--message-id <id>] --path <destination> [--mailbox <id>] [--folder <name>] [--attachment-id <id>] [--attachment-id <id>] [--name-contains <text>] [--content-type <text>] [--overwrite] [--json]");
         output.WriteLine("  mcp serve");
         output.WriteLine("  send --draft <id> [--send-now] [--json]");
         output.WriteLine("  send --file <path> [--send-now] [--json]");
@@ -811,6 +1336,7 @@ public static class CliRunner {
         output.WriteLine("  --profiles-dir <path>");
         output.WriteLine("  --secrets-dir <path>");
         output.WriteLine("  --drafts-dir <path>");
+        output.WriteLine("  --plan-batches-dir <path>");
         output.WriteLine("  --help");
     }
 

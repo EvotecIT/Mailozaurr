@@ -128,6 +128,69 @@ public sealed class RoutedMailReadService : IMailReadService {
     }
 
     /// <inheritdoc />
+    public async Task<SaveAttachmentsManyResult> SaveAttachmentsManyAsync(SaveAttachmentsManyRequest request, CancellationToken cancellationToken = default) {
+        if (request == null) {
+            throw new ArgumentNullException(nameof(request));
+        }
+
+        var messageIds = request.MessageIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (messageIds.Length == 0) {
+            return new SaveAttachmentsManyResult {
+                Succeeded = false,
+                Code = "messages_not_found",
+                Message = "No messages were provided for attachment export.",
+                ProfileId = request.ProfileId,
+                RequestedMessageCount = 0
+            };
+        }
+
+        var result = new SaveAttachmentsManyResult {
+            ProfileId = request.ProfileId,
+            RequestedMessageCount = messageIds.Length
+        };
+
+        foreach (var messageId in messageIds) {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var messageResult = await SaveAttachmentsAsync(new SaveAttachmentsRequest {
+                ProfileId = request.ProfileId,
+                MailboxId = request.MailboxId,
+                FolderId = request.FolderId,
+                MessageId = messageId,
+                DestinationPath = request.DestinationPath,
+                AttachmentIds = request.AttachmentIds.ToList(),
+                FileNameContains = request.FileNameContains,
+                ContentTypeContains = request.ContentTypeContains,
+                Overwrite = request.Overwrite
+            }, cancellationToken).ConfigureAwait(false);
+
+            result.AttemptedMessageCount++;
+            if (messageResult.Succeeded) {
+                result.SucceededMessageCount++;
+            } else {
+                result.FailedMessageCount++;
+            }
+
+            result.MatchedCount += messageResult.MatchedCount;
+            result.AttemptedCount += messageResult.AttemptedCount;
+            result.SavedCount += messageResult.SavedCount;
+            result.FailedCount += messageResult.FailedCount;
+            result.MessageResults.Add(messageResult);
+        }
+
+        result.Succeeded = result.FailedMessageCount == 0 && result.SavedCount > 0;
+        result.Code = result.Succeeded ? null : "attachment_save_failed";
+        result.Message = result.Succeeded
+            ? $"Saved {result.SavedCount} attachment(s) across {result.SucceededMessageCount} message(s)."
+            : $"Saved {result.SavedCount} attachment(s) across {result.AttemptedMessageCount} message(s); {result.FailedMessageCount} message(s) failed.";
+        return result;
+    }
+
+    /// <inheritdoc />
     public async Task<MessageDetail?> GetMessageAsync(GetMessageRequest request, CancellationToken cancellationToken = default) {
         var profile = await GetProfileAsync(request.ProfileId, cancellationToken).ConfigureAwait(false);
         EnsureCapability(profile, MailCapability.ReadMessages);
@@ -135,9 +198,41 @@ public sealed class RoutedMailReadService : IMailReadService {
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<MessageDetail>> GetMessagesAsync(GetMessagesRequest request, CancellationToken cancellationToken = default) {
+        if (request == null) {
+            throw new ArgumentNullException(nameof(request));
+        }
+
+        var results = new List<MessageDetail>();
+        foreach (var messageId in request.MessageIds.Where(id => !string.IsNullOrWhiteSpace(id))) {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var detail = await GetMessageAsync(new GetMessageRequest {
+                ProfileId = request.ProfileId,
+                MailboxId = request.MailboxId,
+                FolderId = request.FolderId,
+                MessageId = messageId.Trim(),
+                IncludeRawContent = request.IncludeRawContent
+            }, cancellationToken).ConfigureAwait(false);
+
+            if (detail != null) {
+                results.Add(detail);
+            }
+        }
+
+        return results;
+    }
+
+    /// <inheritdoc />
     public async Task<MessageDetailCompact?> GetMessageCompactAsync(GetMessageRequest request, CancellationToken cancellationToken = default) {
         var detail = await GetMessageAsync(request, cancellationToken).ConfigureAwait(false);
         return detail == null ? null : ToCompact(detail);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<MessageDetailCompact>> GetMessagesCompactAsync(GetMessagesRequest request, CancellationToken cancellationToken = default) {
+        var details = await GetMessagesAsync(request, cancellationToken).ConfigureAwait(false);
+        return details.Select(ToCompact).ToArray();
     }
 
     /// <inheritdoc />

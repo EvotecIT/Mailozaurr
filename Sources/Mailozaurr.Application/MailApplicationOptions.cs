@@ -13,6 +13,9 @@ public sealed class MailApplicationOptions {
     /// <summary>Options used for the default draft store.</summary>
     public MailDraftStoreOptions DraftStore { get; set; } = new();
 
+    /// <summary>Options used for the default reusable action plan batch store.</summary>
+    public MailMessageActionPlanBatchStoreOptions ActionPlanBatchStore { get; set; } = new();
+
     /// <summary>Options used for the default pending-message repository.</summary>
     public PendingMessageRepositoryOptions PendingMessageStore { get; set; } = new();
 
