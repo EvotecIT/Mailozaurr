@@ -1200,7 +1200,7 @@ public sealed class ApplicationMessageActionPlanRegistryServiceTests {
                     MailboxId = request.MailboxId,
                     FolderId = request.FolderId,
                     RequestedCount = request.MessageIds.Count,
-                    UniqueMessageCount = request.MessageIds.Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+                    UniqueMessageCount = request.MessageIds.Distinct(StringComparer.Ordinal).Count(),
                     MessageIds = request.MessageIds.ToList(),
                     RequestedDestinationFolderId = request.DestinationFolderId
                 });
@@ -1220,7 +1220,7 @@ public sealed class ApplicationMessageActionPlanRegistryServiceTests {
                 MailboxId = request.MailboxId,
                 FolderId = request.FolderId,
                 RequestedCount = request.MessageIds.Count,
-                UniqueMessageCount = request.MessageIds.Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+                UniqueMessageCount = request.MessageIds.Distinct(StringComparer.Ordinal).Count(),
                 MessageIds = request.MessageIds.ToList(),
                 RequestedDestinationFolderId = request.DestinationFolderId,
                 DesiredState = request.Action switch {

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -6,9 +7,24 @@ using System.Threading.Tasks;
 
 namespace Mailozaurr.Tests;
 
-public sealed class TokenCacheHelperTests {
+public sealed class TokenCacheHelperTests : IDisposable {
+    private readonly string _cachePath;
+
     public TokenCacheHelperTests() {
+        var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", "TokenCache", Process.GetCurrentProcess().Id.ToString(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        _cachePath = Path.Combine(directory, "msal_cache.bin");
+        Environment.SetEnvironmentVariable("MAILOZAURR_MSAL_CACHE_PATH", _cachePath);
         DeleteCacheFile();
+    }
+
+    public void Dispose() {
+        DeleteCacheFile();
+        var directory = Path.GetDirectoryName(_cachePath);
+        if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory)) {
+            Directory.Delete(directory, recursive: true);
+        }
+        Environment.SetEnvironmentVariable("MAILOZAURR_MSAL_CACHE_PATH", null);
     }
 
     [Fact]
@@ -73,8 +89,7 @@ public sealed class TokenCacheHelperTests {
     }
 
     private static string GetCacheFilePath() {
-        var pathField = typeof(TokenCacheHelper).GetField("CacheFilePath", BindingFlags.Static | BindingFlags.NonPublic);
-        return (string)pathField!.GetValue(null)!;
+        return Environment.GetEnvironmentVariable("MAILOZAURR_MSAL_CACHE_PATH")!;
     }
 
     private static void DeleteCacheFile() {

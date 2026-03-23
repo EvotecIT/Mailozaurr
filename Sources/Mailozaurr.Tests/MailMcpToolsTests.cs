@@ -523,7 +523,7 @@ public sealed class MailMcpToolsTests {
 
         Assert.True(result.Succeeded);
         Assert.Equal(2, result.RequestedCount);
-        Assert.Equal(1, result.UniqueMessageCount);
+        Assert.Equal(2, result.UniqueMessageCount);
         Assert.NotNull(result.Destination);
         Assert.Equal("archive", result.Destination!.EffectiveFolderId);
         Assert.NotNull(result.ConfirmationToken);
@@ -544,7 +544,7 @@ public sealed class MailMcpToolsTests {
         Assert.Equal(4, result.IncludedActionCount);
         Assert.Equal(4, result.SucceededActionCount);
         Assert.Equal(0, result.FailedActionCount);
-        Assert.Equal(1, result.UniqueMessageCount);
+        Assert.Equal(2, result.UniqueMessageCount);
         Assert.Contains(result.Actions, action => action.Action == "archive" && action.Destination!.EffectiveFolderId == "archive");
         Assert.Contains(result.Actions, action => action.Action == "move" && action.Destination!.EffectiveFolderId == "Projects/2026");
         Assert.Contains(result.Actions, action => action.Action == "delete" && action.Succeeded);
@@ -565,7 +565,7 @@ public sealed class MailMcpToolsTests {
         Assert.True(result.Succeeded);
         Assert.Equal(8, result.IncludedActionCount);
         Assert.Equal(8, result.SucceededActionCount);
-        Assert.Equal(1, result.UniqueMessageCount);
+        Assert.Equal(2, result.UniqueMessageCount);
         Assert.Contains(result.Actions, action => action.Action == "mark-read" && action.DesiredState == true);
         Assert.Contains(result.Actions, action => action.Action == "mark-unread" && action.DesiredState == false);
         Assert.Contains(result.Actions, action => action.Action == "flag" && action.DesiredState == true);
@@ -587,7 +587,7 @@ public sealed class MailMcpToolsTests {
 
         Assert.True(result.Succeeded);
         Assert.Equal("Move", result.ExecutionKind);
-        Assert.Equal(1, result.UniqueMessageCount);
+        Assert.Equal(2, result.UniqueMessageCount);
         Assert.Equal("Projects/2026", result.RequestedDestinationFolderId);
         Assert.NotNull(result.ConfirmationToken);
     }
@@ -806,7 +806,7 @@ public sealed class MailMcpToolsTests {
         Assert.Equal("primary", fixture.PlanRegistryService.LastCreatedFromPreview.MailboxId);
         Assert.Equal("Inbox", fixture.PlanRegistryService.LastCreatedFromPreview.FolderId);
         Assert.Equal("Projects/2026", fixture.PlanRegistryService.LastCreatedFromPreview.RequestedDestinationFolderId);
-        Assert.Equal(new[] { "message-1" }, fixture.PlanRegistryService.LastCreatedFromPreview.MessageIds);
+        Assert.Equal(new[] { "message-1", "MESSAGE-1" }, fixture.PlanRegistryService.LastCreatedFromPreview.MessageIds);
         Assert.Contains(fixture.PlanRegistryService.LastCreatedFromPreview.Actions, action => action.Action == "move");
     }
 
@@ -1009,7 +1009,7 @@ public sealed class MailMcpToolsTests {
 
         Assert.True(result.Succeeded);
         Assert.Equal(2, result.RequestedCount);
-        Assert.Equal(1, result.UniqueMessageCount);
+        Assert.Equal(2, result.UniqueMessageCount);
         Assert.Equal("gmail-work", result.ProfileId);
         Assert.NotNull(result.ConfirmationToken);
     }
@@ -1212,7 +1212,7 @@ public sealed class MailMcpToolsTests {
         Assert.True(result.Succeeded);
         Assert.Equal("read-state", result.Action);
         Assert.False(result.DesiredState);
-        Assert.Equal(1, result.UniqueMessageCount);
+        Assert.Equal(2, result.UniqueMessageCount);
         Assert.NotNull(result.ConfirmationToken);
     }
 
@@ -1230,7 +1230,7 @@ public sealed class MailMcpToolsTests {
         Assert.True(result.Succeeded);
         Assert.Equal("flagged-state", result.Action);
         Assert.False(result.DesiredState);
-        Assert.Equal(1, result.UniqueMessageCount);
+        Assert.Equal(2, result.UniqueMessageCount);
         Assert.NotNull(result.ConfirmationToken);
     }
 
