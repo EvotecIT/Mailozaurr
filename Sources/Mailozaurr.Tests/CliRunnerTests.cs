@@ -1192,6 +1192,24 @@ public sealed class CliRunnerTests {
     }
 
     [Fact]
+    public async Task MailListPlanBatchesPassesExplicitIdSortToSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "mail", "list-plan-batches", "--summary", "--sort", "id", "--json" },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.MessageActionPlanRegistryService.LastBatchQuery);
+        Assert.Equal(MailMessageActionPlanBatchSortBy.Id, fixture.MessageActionPlanRegistryService.LastBatchQuery!.SortBy);
+        Assert.False(fixture.MessageActionPlanRegistryService.LastBatchQuery.Descending);
+    }
+
+    [Fact]
     public async Task MailImportPlanBatchUsesSharedRegistryService() {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();

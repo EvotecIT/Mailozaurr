@@ -1041,10 +1041,11 @@ public static class CliRunner {
             .Select(value => value!.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+        var hasExplicitSort = parseResult.GetOptionValues("sort").Count > 0;
         var sortBy = ParseBatchSortBy(parseResult.GetOption("sort"));
         var descending = parseResult.HasFlag("desc");
 
-        if (planNames.Count == 0 && profileIds.Count == 0 && actions.Count == 0 && sortBy == MailMessageActionPlanBatchSortBy.Id && !descending) {
+        if (planNames.Count == 0 && profileIds.Count == 0 && actions.Count == 0 && !hasExplicitSort && sortBy == MailMessageActionPlanBatchSortBy.Id && !descending) {
             return null;
         }
 

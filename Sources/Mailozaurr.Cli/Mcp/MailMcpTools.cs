@@ -1438,9 +1438,10 @@ public sealed class MailMcpTools {
             .Select(value => value.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+        var hasExplicitSort = !string.IsNullOrWhiteSpace(sortBy);
         var parsedSortBy = ParseBatchSortBy(sortBy);
 
-        if (normalizedPlanNames.Count == 0 && normalizedProfileIds.Count == 0 && normalizedActions.Count == 0 && parsedSortBy == MailMessageActionPlanBatchSortBy.Id && !descending) {
+        if (normalizedPlanNames.Count == 0 && normalizedProfileIds.Count == 0 && normalizedActions.Count == 0 && !hasExplicitSort && parsedSortBy == MailMessageActionPlanBatchSortBy.Id && !descending) {
             return null;
         }
 

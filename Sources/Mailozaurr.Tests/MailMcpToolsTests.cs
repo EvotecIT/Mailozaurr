@@ -692,6 +692,19 @@ public sealed class MailMcpToolsTests {
     }
 
     [Fact]
+    public async Task MailActionBatchStoreSummaryListPassesExplicitIdSortToSharedRegistryService() {
+        using var fixture = new TestFixture();
+
+        var result = await fixture.Tools.mail_action_batch_store_summary_list(sortBy: "id");
+
+        var batch = Assert.Single(result);
+        Assert.Equal("cleanup", batch.Id);
+        Assert.NotNull(fixture.PlanRegistryService.LastBatchQuery);
+        Assert.Equal(MailMessageActionPlanBatchSortBy.Id, fixture.PlanRegistryService.LastBatchQuery!.SortBy);
+        Assert.False(fixture.PlanRegistryService.LastBatchQuery.Descending);
+    }
+
+    [Fact]
     public async Task MailActionBatchStoreListPassesPlanNameFilterToSharedRegistryService() {
         using var fixture = new TestFixture();
 
