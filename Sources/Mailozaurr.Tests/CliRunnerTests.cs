@@ -559,6 +559,127 @@ public sealed class CliRunnerTests {
     }
 
     [Fact]
+    public async Task MailFolderAliasesUseSharedFolderAliasService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "mail", "folder-aliases", "--profile", "work-imap", "--mailbox", "shared@example.com", "--json" },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.ReadService.LastFolderQuery);
+        Assert.Equal("work-imap", fixture.ReadService.LastFolderQuery!.ProfileId);
+        Assert.Equal("shared@example.com", fixture.ReadService.LastFolderQuery.MailboxId);
+        Assert.Contains("\"Alias\": \"Archive\"", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"IsResolved\": true", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailResolveFolderUsesSharedFolderAliasService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "mail", "resolve-folder", "--profile", "work-imap", "--mailbox", "shared@example.com", "--target-folder", "archive", "--json" },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.ReadService.LastFolderQuery);
+        Assert.Equal("shared@example.com", fixture.ReadService.LastFolderQuery!.MailboxId);
+        Assert.Contains("\"Alias\": \"Archive\"", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"EffectiveFolderId\": \"archive\"", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailPreviewMoveUsesSharedPreviewService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "preview-move",
+                "--profile", "work-imap",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--message-id", "msg-42",
+                "--message-id", "MSG-42",
+                "--target-folder", "archive",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("\"UniqueMessageCount\": 1", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"EffectiveFolderId\": \"archive\"", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"ConfirmationToken\":", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailPreviewActionsUsesSharedPreviewService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "preview-actions",
+                "--profile", "work-imap",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--message-id", "msg-42",
+                "--message-id", "MSG-42",
+                "--target-folder", "projects/2026",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("\"IncludedActionCount\": 4", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"SucceededActionCount\": 4", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"Action\": \"archive\"", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"Action\": \"move\"", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"EffectiveFolderId\": \"projects/2026\"", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"ConfirmationToken\":", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailPreviewDeleteUsesSharedPreviewService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "preview-delete",
+                "--profile", "work-imap",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--message-id", "msg-42",
+                "--message-id", "MSG-42",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("\"UniqueMessageCount\": 1", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"RequestedCount\": 2", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task MailSearchUsesApplicationReadService() {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
@@ -644,6 +765,863 @@ public sealed class CliRunnerTests {
     }
 
     [Fact]
+    public async Task MailGetManyCompactUsesApplicationReadService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "get-many",
+                "--profile", "work-imap",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--message-id", "msg-42",
+                "--message-id", "msg-84",
+                "--compact",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.ReadService.LastGetManyCompactRequest);
+        Assert.Equal("shared@example.com", fixture.ReadService.LastGetManyCompactRequest!.MailboxId);
+        Assert.Equal("Inbox", fixture.ReadService.LastGetManyCompactRequest.FolderId);
+        Assert.Equal(new[] { "msg-42", "msg-84" }, fixture.ReadService.LastGetManyCompactRequest.MessageIds);
+        Assert.Contains("\"Id\": \"msg-42\"", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"Id\": \"msg-84\"", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailMarkReadUsesApplicationMessageActionService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        var confirmationToken = "mact_v1_mark";
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "mark-read",
+                "--profile", "work-imap",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--message-id", "msg-42",
+                "--message-id", "msg-84",
+                "--unread",
+                "--confirm-token", confirmationToken,
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.MessageActionService.LastSetReadStateRequest);
+        Assert.Equal("shared@example.com", fixture.MessageActionService.LastSetReadStateRequest!.MailboxId);
+        Assert.Equal("Inbox", fixture.MessageActionService.LastSetReadStateRequest.FolderId);
+        Assert.False(fixture.MessageActionService.LastSetReadStateRequest.IsRead);
+        Assert.Equal(new[] { "msg-42", "msg-84" }, fixture.MessageActionService.LastSetReadStateRequest.MessageIds);
+        Assert.Equal(confirmationToken, fixture.MessageActionService.LastSetReadStateRequest.ConfirmationToken);
+    }
+
+    [Fact]
+    public async Task MailFlagUsesApplicationMessageActionService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        var confirmationToken = "mact_v1_flag";
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "flag",
+                "--profile", "work-imap",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--message-id", "msg-42",
+                "--message-id", "msg-84",
+                "--unflag",
+                "--confirm-token", confirmationToken,
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.MessageActionService.LastSetFlaggedStateRequest);
+        Assert.Equal("shared@example.com", fixture.MessageActionService.LastSetFlaggedStateRequest!.MailboxId);
+        Assert.Equal("Inbox", fixture.MessageActionService.LastSetFlaggedStateRequest.FolderId);
+        Assert.False(fixture.MessageActionService.LastSetFlaggedStateRequest.IsFlagged);
+        Assert.Equal(new[] { "msg-42", "msg-84" }, fixture.MessageActionService.LastSetFlaggedStateRequest.MessageIds);
+        Assert.Equal(confirmationToken, fixture.MessageActionService.LastSetFlaggedStateRequest.ConfirmationToken);
+    }
+
+    [Fact]
+    public async Task MailPreviewMarkReadUsesSharedPreviewService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "preview-mark-read",
+                "--profile", "work-imap",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--message-id", "msg-42",
+                "--message-id", "MSG-42",
+                "--unread",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("\"Action\": \"read-state\"", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"DesiredState\": false", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"ConfirmationToken\":", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailPreviewFlagUsesSharedPreviewService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "preview-flag",
+                "--profile", "work-imap",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--message-id", "msg-42",
+                "--message-id", "MSG-42",
+                "--unflag",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("\"Action\": \"flagged-state\"", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"DesiredState\": false", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"ConfirmationToken\":", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailPreviewAllUsesSharedBundlePreviewService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "preview-all",
+                "--profile", "work-imap",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--message-id", "msg-42",
+                "--message-id", "MSG-42",
+                "--target-folder", "projects/2026",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("\"IncludedActionCount\": 8", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"Action\": \"mark-read\"", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"Action\": \"flag\"", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"Action\": \"archive\"", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"Action\": \"move\"", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailPlanActionUsesSharedPlanningService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "plan-action",
+                "--action", "move",
+                "--profile", "work-imap",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--message-id", "msg-42",
+                "--message-id", "MSG-42",
+                "--target-folder", "projects/2026",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("\"ExecutionKind\": \"Move\"", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"UniqueMessageCount\": 1", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"RequestedDestinationFolderId\": \"projects/2026\"", stdout.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("\"ConfirmationToken\":", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailExecutePlanUsesSharedPlanningAndBatchServices() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "execute-plan",
+                "--action", "move",
+                "--profile", "work-imap",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--message-id", "msg-42",
+                "--message-id", "MSG-42",
+                "--target-folder", "projects/2026",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.MessageActionService.LastMoveRequest);
+        Assert.Equal("shared@example.com", fixture.MessageActionService.LastMoveRequest!.MailboxId);
+        Assert.Equal("Inbox", fixture.MessageActionService.LastMoveRequest.FolderId);
+        Assert.Equal("projects/2026", fixture.MessageActionService.LastMoveRequest.DestinationFolderId);
+        Assert.Contains("\"RequestedPlanCount\": 1", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"SucceededPlanCount\": 1", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailExportPlanUsesSharedPlanExchangeService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "export-plan",
+                "--action", "move",
+                "--profile", "work-imap",
+                "--message-id", "msg-42",
+                "--target-folder", "projects/2026",
+                "--path", @"C:\Temp\plan.json",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal(@"C:\Temp\plan.json", fixture.MessageActionPlanExchangeService.LastSavedPath);
+        Assert.NotNull(fixture.MessageActionPlanExchangeService.LastSavedPlan);
+        Assert.Equal("move", fixture.MessageActionPlanExchangeService.LastSavedPlan!.Action);
+        Assert.Contains("Action plan exported", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailShowPlanUsesSharedPlanExchangeService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        fixture.MessageActionPlanExchangeService.NextPlan = new MessageActionExecutionPlan {
+            Succeeded = true,
+            Action = "delete",
+            ExecutionKind = "Delete",
+            ProfileId = "work-imap",
+            RequestedCount = 1,
+            UniqueMessageCount = 1,
+            MessageIds = { "msg-42" }
+        };
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "mail", "show-plan", "--path", @"C:\Temp\plan.json", "--json" },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal(@"C:\Temp\plan.json", fixture.MessageActionPlanExchangeService.LastLoadedPath);
+        Assert.Contains("\"Action\": \"delete\"", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailExecutePlanFileUsesSharedPlanExchangeService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        fixture.MessageActionPlanExchangeService.NextPlan = new MessageActionExecutionPlan {
+            Succeeded = true,
+            Action = "move",
+            ExecutionKind = "Move",
+            ProfileId = "work-imap",
+            MailboxId = "shared@example.com",
+            FolderId = "Inbox",
+            RequestedCount = 1,
+            UniqueMessageCount = 1,
+            RequestedDestinationFolderId = "projects/2026",
+            MessageIds = { "msg-42" }
+        };
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "mail", "execute-plan-file", "--path", @"C:\Temp\plan.json", "--json" },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal(@"C:\Temp\plan.json", fixture.MessageActionPlanExchangeService.LastLoadedPath);
+        Assert.NotNull(fixture.MessageActionService.LastMoveRequest);
+        Assert.Equal("projects/2026", fixture.MessageActionService.LastMoveRequest!.DestinationFolderId);
+        Assert.Contains("\"SucceededPlanCount\": 1", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailListPlanBatchesUsesSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "mail", "list-plan-batches", "--compact", "--json" },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal(1, fixture.MessageActionPlanRegistryService.ListCompactCalls);
+        Assert.Contains("\"Id\": \"cleanup\"", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"PlanNames\": [", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"Delete spam\"", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailListPlanBatchesSummaryUsesSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "mail", "list-plan-batches", "--summary", "--json" },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal(1, fixture.MessageActionPlanRegistryService.ListSummaryCalls);
+        Assert.Contains("\"ActionCounts\": {", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"delete\": 1", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailListPlanBatchesPassesPlanNameFilterToSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "mail", "list-plan-batches", "--compact", "--plan-name", "Delete spam", "--json" },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.MessageActionPlanRegistryService.LastBatchQuery);
+        Assert.Equal(new[] { "Delete spam" }, fixture.MessageActionPlanRegistryService.LastBatchQuery!.PlanNames);
+    }
+
+    [Fact]
+    public async Task MailListPlanBatchesPassesProfileFilterToSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "mail", "list-plan-batches", "--compact", "--profile", "gmail-work", "--json" },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.MessageActionPlanRegistryService.LastBatchQuery);
+        Assert.Equal(new[] { "gmail-work" }, fixture.MessageActionPlanRegistryService.LastBatchQuery!.ProfileIds);
+    }
+
+    [Fact]
+    public async Task MailListPlanBatchesPassesActionFilterToSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "mail", "list-plan-batches", "--compact", "--action", "delete", "--json" },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.MessageActionPlanRegistryService.LastBatchQuery);
+        Assert.Equal(new[] { "delete" }, fixture.MessageActionPlanRegistryService.LastBatchQuery!.Actions);
+    }
+
+    [Fact]
+    public async Task MailListPlanBatchesPassesSortToSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "mail", "list-plan-batches", "--summary", "--sort", "plans", "--desc", "--json" },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.MessageActionPlanRegistryService.LastBatchQuery);
+        Assert.Equal(MailMessageActionPlanBatchSortBy.PlanCount, fixture.MessageActionPlanRegistryService.LastBatchQuery!.SortBy);
+        Assert.True(fixture.MessageActionPlanRegistryService.LastBatchQuery.Descending);
+    }
+
+    [Fact]
+    public async Task MailListPlanBatchesPassesExplicitIdSortToSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "mail", "list-plan-batches", "--summary", "--sort", "id", "--json" },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.MessageActionPlanRegistryService.LastBatchQuery);
+        Assert.Equal(MailMessageActionPlanBatchSortBy.Id, fixture.MessageActionPlanRegistryService.LastBatchQuery!.SortBy);
+        Assert.False(fixture.MessageActionPlanRegistryService.LastBatchQuery.Descending);
+    }
+
+    [Fact]
+    public async Task MailImportPlanBatchUsesSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "import-plan-batch",
+                "--batch", "cleanup",
+                "--name", "Cleanup batch",
+                "--path", @"C:\Temp\plans.json",
+                "--description", "Quarterly cleanup",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("cleanup", fixture.MessageActionPlanRegistryService.LastImportedBatchId);
+        Assert.Equal("Cleanup batch", fixture.MessageActionPlanRegistryService.LastImportedName);
+        Assert.Equal(@"C:\Temp\plans.json", fixture.MessageActionPlanRegistryService.LastImportedPath);
+    }
+
+    [Fact]
+    public async Task MailCreateCommonPlanBatchUsesSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "create-common-plan-batch",
+                "--batch", "cleanup",
+                "--name", "Cleanup batch",
+                "--profile", "work-imap",
+                "--message-id", "msg-1",
+                "--message-id", "MSG-1",
+                "--action", "archive",
+                "--action", "delete",
+                "--target-folder", "Archive",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--description", "Common action batch",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("cleanup", fixture.MessageActionPlanRegistryService.LastCreatedCommonBatchId);
+        Assert.Equal("Cleanup batch", fixture.MessageActionPlanRegistryService.LastCreatedCommonName);
+        Assert.Equal("Common action batch", fixture.MessageActionPlanRegistryService.LastCreatedCommonDescription);
+        Assert.Equal(new[] { "archive", "delete" }, fixture.MessageActionPlanRegistryService.LastCreatedCommonActions);
+        Assert.NotNull(fixture.MessageActionPlanRegistryService.LastCreatedCommonRequest);
+        Assert.Equal("work-imap", fixture.MessageActionPlanRegistryService.LastCreatedCommonRequest!.ProfileId);
+        Assert.Equal("shared@example.com", fixture.MessageActionPlanRegistryService.LastCreatedCommonRequest.MailboxId);
+        Assert.Equal("Inbox", fixture.MessageActionPlanRegistryService.LastCreatedCommonRequest.FolderId);
+        Assert.Equal("Archive", fixture.MessageActionPlanRegistryService.LastCreatedCommonRequest.DestinationFolderId);
+        Assert.Equal(new[] { "msg-1", "MSG-1" }, fixture.MessageActionPlanRegistryService.LastCreatedCommonRequest.MessageIds);
+    }
+
+    [Fact]
+    public async Task MailExecuteStoredPlanBatchUsesSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "mail", "execute-plan-batch-stored", "--batch", "cleanup", "--json" },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("cleanup", fixture.MessageActionPlanRegistryService.LastExecutedBatchId);
+        Assert.Contains("\"SucceededPlanCount\": 1", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailAddPlanToBatchUsesSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "add-plan-to-batch",
+                "--batch", "cleanup",
+                "--action", "move",
+                "--profile", "work-imap",
+                "--message-id", "msg-42",
+                "--target-folder", "projects/2026",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("cleanup", fixture.MessageActionPlanRegistryService.LastAppendedBatchId);
+        Assert.NotNull(fixture.MessageActionPlanRegistryService.LastAppendedPlan);
+        Assert.Equal("move", fixture.MessageActionPlanRegistryService.LastAppendedPlan!.Action);
+    }
+
+    [Fact]
+    public async Task MailRemovePlanFromBatchUsesSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "mail", "remove-plan-from-batch", "--batch", "cleanup", "--index", "1", "--json" },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("cleanup", fixture.MessageActionPlanRegistryService.LastRemovedBatchId);
+        Assert.Equal(1, fixture.MessageActionPlanRegistryService.LastRemovedIndex);
+    }
+
+    [Fact]
+    public async Task MailClonePlanBatchUsesSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "clone-plan-batch",
+                "--source-batch", "cleanup",
+                "--target-batch", "cleanup-copy",
+                "--name", "Cleanup copy",
+                "--description", "Cloned batch",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("cleanup", fixture.MessageActionPlanRegistryService.LastClonedSourceBatchId);
+        Assert.Equal("cleanup-copy", fixture.MessageActionPlanRegistryService.LastClonedTargetBatchId);
+    }
+
+    [Fact]
+    public async Task MailTransformPlanBatchUsesSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "transform-plan-batch",
+                "--source-batch", "cleanup",
+                "--target-batch", "cleanup-target",
+                "--name", "Cleanup Target",
+                "--index", "1",
+                "--index", "2",
+                "--plan-name", "Archive newsletter",
+                "--target-profile", "work-imap-target",
+                "--mailbox", "shared@example.com",
+                "--folder", "Projects",
+                "--target-folder", "Projects/Archive",
+                "--description", "Remapped batch",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("cleanup", fixture.MessageActionPlanRegistryService.LastTransformedSourceBatchId);
+        Assert.Equal("cleanup-target", fixture.MessageActionPlanRegistryService.LastTransformedTargetBatchId);
+        Assert.Equal("Cleanup Target", fixture.MessageActionPlanRegistryService.LastTransformedName);
+        Assert.Equal("Remapped batch", fixture.MessageActionPlanRegistryService.LastTransformedDescription);
+        Assert.NotNull(fixture.MessageActionPlanRegistryService.LastTransformRequest);
+        Assert.Equal("work-imap-target", fixture.MessageActionPlanRegistryService.LastTransformRequest!.ProfileId);
+        Assert.Equal(new[] { 1, 2 }, fixture.MessageActionPlanRegistryService.LastTransformRequest.PlanIndexes);
+        Assert.Equal(new[] { "Archive newsletter" }, fixture.MessageActionPlanRegistryService.LastTransformRequest.PlanNames);
+        Assert.Equal("shared@example.com", fixture.MessageActionPlanRegistryService.LastTransformRequest.MailboxId);
+        Assert.Equal("Projects", fixture.MessageActionPlanRegistryService.LastTransformRequest.FolderId);
+        Assert.Equal("Projects/Archive", fixture.MessageActionPlanRegistryService.LastTransformRequest.DestinationFolderId);
+    }
+
+    [Fact]
+    public async Task MailPreviewTransformPlanBatchUsesSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "preview-transform-plan-batch",
+                "--source-batch", "cleanup",
+                "--index", "1",
+                "--plan-name", "Archive newsletter",
+                "--target-profile", "work-imap-target",
+                "--mailbox", "shared@example.com",
+                "--folder", "Projects",
+                "--target-folder", "Projects/Archive",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("cleanup", fixture.MessageActionPlanRegistryService.LastPreviewedTransformSourceBatchId);
+        Assert.NotNull(fixture.MessageActionPlanRegistryService.LastPreviewedTransformRequest);
+        Assert.Equal("work-imap-target", fixture.MessageActionPlanRegistryService.LastPreviewedTransformRequest!.ProfileId);
+        Assert.Equal(new[] { 1 }, fixture.MessageActionPlanRegistryService.LastPreviewedTransformRequest.PlanIndexes);
+        Assert.Equal(new[] { "Archive newsletter" }, fixture.MessageActionPlanRegistryService.LastPreviewedTransformRequest.PlanNames);
+        Assert.Equal("shared@example.com", fixture.MessageActionPlanRegistryService.LastPreviewedTransformRequest.MailboxId);
+        Assert.Equal("Projects", fixture.MessageActionPlanRegistryService.LastPreviewedTransformRequest.FolderId);
+        Assert.Equal("Projects/Archive", fixture.MessageActionPlanRegistryService.LastPreviewedTransformRequest.DestinationFolderId);
+        Assert.Contains("\"ChangedPlanCount\": 1", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailReplacePlanInBatchUsesSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "replace-plan-in-batch",
+                "--batch", "cleanup",
+                "--index", "0",
+                "--action", "move",
+                "--profile", "work-imap",
+                "--message-id", "msg-42",
+                "--target-folder", "projects/2026",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("cleanup", fixture.MessageActionPlanRegistryService.LastReplacedBatchId);
+        Assert.Equal(0, fixture.MessageActionPlanRegistryService.LastReplacedIndex);
+        Assert.NotNull(fixture.MessageActionPlanRegistryService.LastReplacedPlan);
+        Assert.Equal("move", fixture.MessageActionPlanRegistryService.LastReplacedPlan!.Action);
+    }
+
+    [Fact]
+    public async Task MailExecutePlanBatchUsesSharedBatchService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        fixture.MessageActionPlanExchangeService.NextBatchPlans = new[] {
+            new MessageActionExecutionPlan {
+                Succeeded = true,
+                Action = "mark-read",
+                ExecutionKind = "SetReadState",
+                ProfileId = "work-imap",
+                MailboxId = "shared@example.com",
+                FolderId = "Inbox",
+                RequestedCount = 1,
+                UniqueMessageCount = 1,
+                DesiredState = true,
+                MessageIds = { "msg-1" }
+            },
+            new MessageActionExecutionPlan {
+                Succeeded = true,
+                Action = "move",
+                ExecutionKind = "Move",
+                ProfileId = "work-imap",
+                MailboxId = "shared@example.com",
+                FolderId = "Inbox",
+                RequestedCount = 1,
+                UniqueMessageCount = 1,
+                RequestedDestinationFolderId = "projects/2026",
+                MessageIds = { "msg-2" }
+            }
+        };
+        var path = @"C:\Temp\action-plans.json";
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "mail", "execute-plan-batch", "--path", path, "--json" },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal(path, fixture.MessageActionPlanExchangeService.LastLoadedBatchPath);
+        Assert.NotNull(fixture.MessageActionService.LastSetReadStateRequest);
+        Assert.NotNull(fixture.MessageActionService.LastMoveRequest);
+        Assert.Equal("projects/2026", fixture.MessageActionService.LastMoveRequest!.DestinationFolderId);
+        Assert.Contains("\"AttemptedPlanCount\": 2", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"SucceededPlanCount\": 2", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailArchiveUsesSharedArchiveAlias() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        var confirmationToken = "mact_v1_archive";
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "archive",
+                "--profile", "work-imap",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--message-id", "msg-42",
+                "--confirm-token", confirmationToken,
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.MessageActionService.LastMoveRequest);
+        Assert.Equal(MailFolderAliases.Archive, fixture.MessageActionService.LastMoveRequest!.DestinationFolderId);
+        Assert.Equal("shared@example.com", fixture.MessageActionService.LastMoveRequest.MailboxId);
+        Assert.Equal(confirmationToken, fixture.MessageActionService.LastMoveRequest.ConfirmationToken);
+    }
+
+    [Fact]
+    public async Task MailTrashUsesSharedTrashAlias() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        var confirmationToken = "mact_v1_trash";
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "trash",
+                "--profile", "work-imap",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--message-id", "msg-42",
+                "--confirm-token", confirmationToken,
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.MessageActionService.LastMoveRequest);
+        Assert.Equal(MailFolderAliases.Trash, fixture.MessageActionService.LastMoveRequest!.DestinationFolderId);
+        Assert.Equal("shared@example.com", fixture.MessageActionService.LastMoveRequest.MailboxId);
+        Assert.Equal(confirmationToken, fixture.MessageActionService.LastMoveRequest.ConfirmationToken);
+    }
+
+    [Fact]
+    public async Task MailMoveUsesApplicationMessageActionService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        var confirmationToken = "mact_v1_move";
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "move",
+                "--profile", "work-imap",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--message-id", "msg-42",
+                "--target-folder", "Archive",
+                "--confirm-token", confirmationToken,
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.MessageActionService.LastMoveRequest);
+        Assert.Equal("Archive", fixture.MessageActionService.LastMoveRequest!.DestinationFolderId);
+        Assert.Equal("shared@example.com", fixture.MessageActionService.LastMoveRequest.MailboxId);
+        Assert.Equal(confirmationToken, fixture.MessageActionService.LastMoveRequest.ConfirmationToken);
+    }
+
+    [Fact]
+    public async Task MailDeleteUsesApplicationMessageActionService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        var confirmationToken = "mact_v1_delete";
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "delete",
+                "--profile", "work-imap",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--message-id", "msg-42",
+                "--message-id", "msg-84",
+                "--confirm-token", confirmationToken,
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.MessageActionService.LastDeleteRequest);
+        Assert.Equal("shared@example.com", fixture.MessageActionService.LastDeleteRequest!.MailboxId);
+        Assert.Equal(new[] { "msg-42", "msg-84" }, fixture.MessageActionService.LastDeleteRequest.MessageIds);
+        Assert.Equal(confirmationToken, fixture.MessageActionService.LastDeleteRequest.ConfirmationToken);
+    }
+
+    [Fact]
     public async Task MailAttachmentsUsesApplicationReadService() {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
@@ -666,6 +1644,44 @@ public sealed class CliRunnerTests {
         Assert.Equal("shared@example.com", fixture.ReadService.LastListAttachmentsRequest!.MailboxId);
         Assert.Equal("msg-42", fixture.ReadService.LastListAttachmentsRequest.MessageId);
         Assert.Contains("\"report.pdf\"", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MailSaveAttachmentsManyUsesApplicationReadService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "save-attachments-many",
+                "--profile", "work-imap",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--message-id", "msg-42",
+                "--message-id", "msg-84",
+                "--path", @"C:\Temp",
+                "--attachment-id", "att-1",
+                "--name-contains", "report",
+                "--content-type", "pdf",
+                "--overwrite",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.ReadService.LastSaveAttachmentsManyRequest);
+        Assert.Equal("shared@example.com", fixture.ReadService.LastSaveAttachmentsManyRequest!.MailboxId);
+        Assert.Equal("Inbox", fixture.ReadService.LastSaveAttachmentsManyRequest.FolderId);
+        Assert.Equal(@"C:\Temp", fixture.ReadService.LastSaveAttachmentsManyRequest.DestinationPath);
+        Assert.Equal(new[] { "msg-42", "msg-84" }, fixture.ReadService.LastSaveAttachmentsManyRequest.MessageIds);
+        Assert.Equal(new[] { "att-1" }, fixture.ReadService.LastSaveAttachmentsManyRequest.AttachmentIds);
+        Assert.Equal("report", fixture.ReadService.LastSaveAttachmentsManyRequest.FileNameContains);
+        Assert.Equal("pdf", fixture.ReadService.LastSaveAttachmentsManyRequest.ContentTypeContains);
+        Assert.True(fixture.ReadService.LastSaveAttachmentsManyRequest.Overwrite);
+        Assert.Contains("\"SavedCount\": 2", stdout.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1082,7 +2098,15 @@ public sealed class CliRunnerTests {
     }
 
     private sealed class FakeReadService : IMailReadService {
+        public MailFolderQuery? LastFolderQuery { get; private set; }
+
         public GetMessageRequest? LastGetCompactRequest { get; private set; }
+
+        public GetMessagesRequest? LastGetManyCompactRequest { get; private set; }
+
+        public GetMessagesRequest? LastGetManyRequest { get; private set; }
+
+        public SaveAttachmentsManyRequest? LastSaveAttachmentsManyRequest { get; private set; }
 
         public SaveAttachmentsRequest? LastSaveAttachmentsRequest { get; private set; }
 
@@ -1115,6 +2139,22 @@ public sealed class CliRunnerTests {
             });
         }
 
+        public Task<IReadOnlyList<MessageDetailCompact>> GetMessagesCompactAsync(GetMessagesRequest request, CancellationToken cancellationToken = default) {
+            LastGetManyCompactRequest = request;
+            return Task.FromResult<IReadOnlyList<MessageDetailCompact>>(request.MessageIds.Select(messageId => new MessageDetailCompact {
+                ProfileId = request.ProfileId,
+                Id = messageId,
+                Summary = new MessageSummaryCompact {
+                    ProfileId = request.ProfileId,
+                    Id = messageId,
+                    Subject = "Subject",
+                    Summary = $"{messageId} Subject"
+                },
+                TextBodyPreview = "Body",
+                SummaryText = $"{messageId} Subject"
+            }).ToArray());
+        }
+
         private MessageDetail CaptureGetRequest(GetMessageRequest request) {
             LastGetRequest = request;
             return new MessageDetail {
@@ -1127,6 +2167,20 @@ public sealed class CliRunnerTests {
                 },
                 TextBody = "Body"
             };
+        }
+
+        public Task<IReadOnlyList<MessageDetail>> GetMessagesAsync(GetMessagesRequest request, CancellationToken cancellationToken = default) {
+            LastGetManyRequest = request;
+            return Task.FromResult<IReadOnlyList<MessageDetail>>(request.MessageIds.Select(messageId => new MessageDetail {
+                ProfileId = request.ProfileId,
+                Id = messageId,
+                Summary = new MessageSummary {
+                    ProfileId = request.ProfileId,
+                    Id = messageId,
+                    Subject = "Subject"
+                },
+                TextBody = "Body"
+            }).ToArray());
         }
 
         public Task<IReadOnlyList<FolderRefCompact>> GetFoldersCompactAsync(MailFolderQuery query, CancellationToken cancellationToken = default) {
@@ -1143,16 +2197,35 @@ public sealed class CliRunnerTests {
             });
         }
 
-        public Task<IReadOnlyList<FolderRef>> GetFoldersAsync(MailFolderQuery query, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<FolderRef>>(new[] {
+        public Task<IReadOnlyList<FolderRef>> GetFoldersAsync(MailFolderQuery query, CancellationToken cancellationToken = default) {
+            LastFolderQuery = query;
+            return Task.FromResult<IReadOnlyList<FolderRef>>(new[] {
                 new FolderRef {
                     ProfileId = query.ProfileId,
                     MailboxId = query.MailboxId,
                     Id = "inbox",
                     DisplayName = "Inbox",
-                    Path = "Inbox"
+                    Path = "Inbox",
+                    SpecialUse = "inbox"
+                },
+                new FolderRef {
+                    ProfileId = query.ProfileId,
+                    MailboxId = query.MailboxId,
+                    Id = "archive",
+                    DisplayName = "Archive",
+                    Path = "Archive",
+                    SpecialUse = "archive"
+                },
+                new FolderRef {
+                    ProfileId = query.ProfileId,
+                    MailboxId = query.MailboxId,
+                    Id = "trash",
+                    DisplayName = "Trash",
+                    Path = "Trash",
+                    SpecialUse = "trash"
                 }
             });
+        }
 
         public Task<OperationResult> SaveAttachmentAsync(SaveAttachmentRequest request, CancellationToken cancellationToken = default) {
             LastSaveAttachmentRequest = request;
@@ -1178,6 +2251,32 @@ public sealed class CliRunnerTests {
                         ContentType = "application/pdf"
                     }
                 }
+            });
+        }
+
+        public Task<SaveAttachmentsManyResult> SaveAttachmentsManyAsync(SaveAttachmentsManyRequest request, CancellationToken cancellationToken = default) {
+            LastSaveAttachmentsManyRequest = request;
+            return Task.FromResult(new SaveAttachmentsManyResult {
+                Succeeded = true,
+                ProfileId = request.ProfileId,
+                RequestedMessageCount = request.MessageIds.Count,
+                AttemptedMessageCount = request.MessageIds.Count,
+                SucceededMessageCount = request.MessageIds.Count,
+                MatchedCount = request.MessageIds.Count,
+                AttemptedCount = request.MessageIds.Count,
+                SavedCount = request.MessageIds.Count,
+                FailedCount = 0,
+                Message = $"Saved {request.MessageIds.Count} attachment(s) across {request.MessageIds.Count} message(s).",
+                MessageResults = request.MessageIds.Select(messageId => new SaveAttachmentsResult {
+                    Succeeded = true,
+                    ProfileId = request.ProfileId,
+                    MessageId = messageId,
+                    MatchedCount = 1,
+                    AttemptedCount = 1,
+                    SavedCount = 1,
+                    FailedCount = 0,
+                    Message = "Saved 1 attachment(s)."
+                }).ToList()
             });
         }
 
@@ -1228,6 +2327,471 @@ public sealed class CliRunnerTests {
                 Message = "Message sent successfully."
             });
         }
+    }
+
+    private sealed class FakeMessageActionService : IMailMessageActionService {
+        public SetReadStateRequest? LastSetReadStateRequest { get; private set; }
+
+        public SetFlaggedStateRequest? LastSetFlaggedStateRequest { get; private set; }
+
+        public MoveMessagesRequest? LastMoveRequest { get; private set; }
+
+        public DeleteMessagesRequest? LastDeleteRequest { get; private set; }
+
+        public Task<MessageActionResult> SetReadStateAsync(SetReadStateRequest request, CancellationToken cancellationToken = default) {
+            LastSetReadStateRequest = request;
+            return Task.FromResult(CreateResult(request.ProfileId, request.MessageIds, request.IsRead ? "Marked messages as read." : "Marked messages as unread."));
+        }
+
+        public Task<MessageActionResult> SetFlaggedStateAsync(SetFlaggedStateRequest request, CancellationToken cancellationToken = default) {
+            LastSetFlaggedStateRequest = request;
+            return Task.FromResult(CreateResult(request.ProfileId, request.MessageIds, request.IsFlagged ? "Flagged messages." : "Unflagged messages."));
+        }
+
+        public Task<MessageActionResult> MoveAsync(MoveMessagesRequest request, CancellationToken cancellationToken = default) {
+            LastMoveRequest = request;
+            return Task.FromResult(CreateResult(request.ProfileId, request.MessageIds, $"Moved messages to '{request.DestinationFolderId}'."));
+        }
+
+        public Task<MessageActionResult> DeleteAsync(DeleteMessagesRequest request, CancellationToken cancellationToken = default) {
+            LastDeleteRequest = request;
+            return Task.FromResult(CreateResult(request.ProfileId, request.MessageIds, "Deleted messages."));
+        }
+
+        private static MessageActionResult CreateResult(string profileId, IReadOnlyList<string> messageIds, string message) => new() {
+            Succeeded = true,
+            ProfileId = profileId,
+            RequestedCount = messageIds.Count,
+            SucceededCount = messageIds.Count,
+            FailedCount = 0,
+            Message = message,
+            Results = messageIds.Select(id => new MessageActionItemResult {
+                MessageId = id,
+                Succeeded = true
+            }).ToList()
+        };
+    }
+
+    private sealed class FakeMessageActionPlanExchangeService : IMailMessageActionPlanExchangeService {
+        public string? LastLoadedPath { get; private set; }
+
+        public string? LastLoadedBatchPath { get; private set; }
+
+        public string? LastSavedPath { get; private set; }
+
+        public string? LastSavedBatchPath { get; private set; }
+
+        public MessageActionExecutionPlan? LastSavedPlan { get; private set; }
+
+        public IReadOnlyList<MessageActionExecutionPlan>? LastSavedBatch { get; private set; }
+
+        public MessageActionExecutionPlan NextPlan { get; set; } = new() {
+            Succeeded = true,
+            Action = "mark-read",
+            ExecutionKind = "SetReadState",
+            ProfileId = "work-imap",
+            RequestedCount = 1,
+            UniqueMessageCount = 1,
+            DesiredState = true,
+            MessageIds = { "msg-1" }
+        };
+
+        public IReadOnlyList<MessageActionExecutionPlan> NextBatchPlans { get; set; } = Array.Empty<MessageActionExecutionPlan>();
+
+        public Task<MessageActionExecutionPlan> LoadAsync(string path, CancellationToken cancellationToken = default) {
+            LastLoadedPath = path;
+            return Task.FromResult(NextPlan);
+        }
+
+        public Task<IReadOnlyList<MessageActionExecutionPlan>> LoadBatchAsync(string path, CancellationToken cancellationToken = default) {
+            LastLoadedBatchPath = path;
+            return Task.FromResult(NextBatchPlans);
+        }
+
+        public Task SaveAsync(string path, MessageActionExecutionPlan plan, CancellationToken cancellationToken = default) {
+            LastSavedPath = path;
+            LastSavedPlan = plan;
+            return Task.CompletedTask;
+        }
+
+        public Task SaveBatchAsync(string path, IReadOnlyList<MessageActionExecutionPlan> plans, CancellationToken cancellationToken = default) {
+            LastSavedBatchPath = path;
+            LastSavedBatch = plans;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeMessageActionPlanRegistryService : IMailMessageActionPlanRegistryService {
+        public int ListCompactCalls { get; private set; }
+        public int ListSummaryCalls { get; private set; }
+        public MailMessageActionPlanBatchQuery? LastBatchQuery { get; private set; }
+
+        public string? LastAppendedBatchId { get; private set; }
+
+        public MessageActionExecutionPlan? LastAppendedPlan { get; private set; }
+
+        public string? LastClonedSourceBatchId { get; private set; }
+
+        public string? LastClonedTargetBatchId { get; private set; }
+
+        public string? LastImportedBatchId { get; private set; }
+
+        public string? LastImportedName { get; private set; }
+
+        public string? LastImportedPath { get; private set; }
+
+        public string? LastCreatedCommonBatchId { get; private set; }
+
+        public string? LastCreatedCommonName { get; private set; }
+
+        public string? LastCreatedCommonDescription { get; private set; }
+
+        public CommonMessageActionsPreviewRequest? LastCreatedCommonRequest { get; private set; }
+
+        public IReadOnlyList<string>? LastCreatedCommonActions { get; private set; }
+
+        public string? LastCreatedFromPreviewBatchId { get; private set; }
+
+        public string? LastCreatedFromPreviewName { get; private set; }
+
+        public string? LastCreatedFromPreviewDescription { get; private set; }
+
+        public CommonMessageActionsPreview? LastCreatedFromPreview { get; private set; }
+
+        public IReadOnlyList<string>? LastCreatedFromPreviewActions { get; private set; }
+
+        public string? LastTransformedSourceBatchId { get; private set; }
+
+        public string? LastTransformedTargetBatchId { get; private set; }
+
+        public string? LastTransformedName { get; private set; }
+
+        public string? LastTransformedDescription { get; private set; }
+
+        public MessageActionPlanBatchTransformRequest? LastTransformRequest { get; private set; }
+
+        public string? LastPreviewedTransformSourceBatchId { get; private set; }
+
+        public MessageActionPlanBatchTransformRequest? LastPreviewedTransformRequest { get; private set; }
+
+        public string? LastExecutedBatchId { get; private set; }
+
+        public string? LastRemovedBatchId { get; private set; }
+
+        public int? LastRemovedIndex { get; private set; }
+
+        public string? LastReplacedBatchId { get; private set; }
+
+        public int? LastReplacedIndex { get; private set; }
+
+        public MessageActionExecutionPlan? LastReplacedPlan { get; private set; }
+
+        public Task<OperationResult> AppendImportedPlanAsync(string batchId, string path, CancellationToken cancellationToken = default) {
+            LastAppendedBatchId = batchId;
+            LastImportedPath = path;
+            return Task.FromResult(OperationResult.Success($"Action plan batch '{batchId}' saved."));
+        }
+
+        public Task<OperationResult> AppendPlanAsync(string batchId, MessageActionExecutionPlan plan, CancellationToken cancellationToken = default) {
+            LastAppendedBatchId = batchId;
+            LastAppendedPlan = plan;
+            return Task.FromResult(OperationResult.Success($"Action plan batch '{batchId}' saved."));
+        }
+
+        public Task<OperationResult> CloneAsync(string sourceBatchId, string targetBatchId, string name, string? description = null, CancellationToken cancellationToken = default) {
+            LastClonedSourceBatchId = sourceBatchId;
+            LastClonedTargetBatchId = targetBatchId;
+            return Task.FromResult(OperationResult.Success($"Action plan batch '{targetBatchId}' saved."));
+        }
+
+        public Task<OperationResult> CreateCommonBatchAsync(
+            string batchId,
+            string name,
+            CommonMessageActionsPreviewRequest request,
+            IReadOnlyList<string>? actions = null,
+            string? description = null,
+            CancellationToken cancellationToken = default) {
+            LastCreatedCommonBatchId = batchId;
+            LastCreatedCommonName = name;
+            LastCreatedCommonDescription = description;
+            LastCreatedCommonRequest = new CommonMessageActionsPreviewRequest {
+                ProfileId = request.ProfileId,
+                MailboxId = request.MailboxId,
+                FolderId = request.FolderId,
+                DestinationFolderId = request.DestinationFolderId,
+                MessageIds = request.MessageIds.ToList()
+            };
+            LastCreatedCommonActions = actions?.ToArray();
+            return Task.FromResult(OperationResult.Success($"Action plan batch '{batchId}' saved."));
+        }
+
+        public Task<OperationResult> CreateCommonBatchFromPreviewAsync(
+            string batchId,
+            string name,
+            CommonMessageActionsPreview preview,
+            IReadOnlyList<string>? actions = null,
+            string? description = null,
+            CancellationToken cancellationToken = default) {
+            LastCreatedFromPreviewBatchId = batchId;
+            LastCreatedFromPreviewName = name;
+            LastCreatedFromPreviewDescription = description;
+            LastCreatedFromPreview = new CommonMessageActionsPreview {
+                ProfileId = preview.ProfileId,
+                MailboxId = preview.MailboxId,
+                FolderId = preview.FolderId,
+                RequestedDestinationFolderId = preview.RequestedDestinationFolderId,
+                RequestedCount = preview.RequestedCount,
+                UniqueMessageCount = preview.UniqueMessageCount,
+                DuplicateOrEmptyCount = preview.DuplicateOrEmptyCount,
+                MessageIds = preview.MessageIds.ToList(),
+                Actions = preview.Actions.Select(action => new MessageActionPreviewItem {
+                    Action = action.Action,
+                    DisplayName = action.DisplayName,
+                    Succeeded = action.Succeeded,
+                    Code = action.Code,
+                    Message = action.Message,
+                    RequestedDestinationFolderId = action.RequestedDestinationFolderId,
+                    DesiredState = action.DesiredState,
+                    ConfirmationToken = action.ConfirmationToken
+                }).ToList()
+            };
+            LastCreatedFromPreviewActions = actions?.ToArray();
+            return Task.FromResult(OperationResult.Success($"Action plan batch '{batchId}' saved."));
+        }
+
+        public Task<OperationResult> TransformCloneAsync(
+            string sourceBatchId,
+            string targetBatchId,
+            string name,
+            MessageActionPlanBatchTransformRequest transform,
+            string? description = null,
+            CancellationToken cancellationToken = default) {
+            LastTransformedSourceBatchId = sourceBatchId;
+            LastTransformedTargetBatchId = targetBatchId;
+            LastTransformedName = name;
+            LastTransformedDescription = description;
+            LastTransformRequest = new MessageActionPlanBatchTransformRequest {
+                PlanIndexes = transform.PlanIndexes.ToList(),
+                PlanNames = transform.PlanNames.ToList(),
+                ProfileId = transform.ProfileId,
+                MailboxId = transform.MailboxId,
+                FolderId = transform.FolderId,
+                DestinationFolderId = transform.DestinationFolderId
+            };
+            return Task.FromResult(OperationResult.Success($"Action plan batch '{targetBatchId}' saved."));
+        }
+
+        public Task<MailMessageActionPlanBatchTransformPreview> PreviewTransformCloneAsync(
+            string sourceBatchId,
+            MessageActionPlanBatchTransformRequest transform,
+            CancellationToken cancellationToken = default) {
+            LastPreviewedTransformSourceBatchId = sourceBatchId;
+            LastPreviewedTransformRequest = new MessageActionPlanBatchTransformRequest {
+                PlanIndexes = transform.PlanIndexes.ToList(),
+                PlanNames = transform.PlanNames.ToList(),
+                ProfileId = transform.ProfileId,
+                MailboxId = transform.MailboxId,
+                FolderId = transform.FolderId,
+                DestinationFolderId = transform.DestinationFolderId
+            };
+            return Task.FromResult(new MailMessageActionPlanBatchTransformPreview {
+                Succeeded = true,
+                SourceBatchId = sourceBatchId,
+                SourceBatchName = "Cleanup batch",
+                PlanCount = 1,
+                ChangedPlanCount = 1,
+                ConfirmationTokenChangedCount = 1,
+                TargetProfileExists = true,
+                Plans = {
+                    new MessageActionPlanBatchTransformPreviewItem {
+                        Index = 0,
+                        Action = "move",
+                        ExecutionKind = "Move",
+                        SourceProfileId = "work-imap",
+                        TargetProfileId = transform.ProfileId ?? "work-imap",
+                        SourceMailboxId = "source@example.com",
+                        TargetMailboxId = transform.MailboxId,
+                        SourceFolderId = "Inbox",
+                        TargetFolderId = transform.FolderId,
+                        SourceDestinationFolderId = "Archive",
+                        TargetDestinationFolderId = transform.DestinationFolderId,
+                        WillChange = true,
+                        ConfirmationTokenWillChange = true,
+                        Summary = "move: preview"
+                    }
+                },
+                Message = "Previewed transform."
+            });
+        }
+
+        public Task<OperationResult> DeleteAsync(string batchId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(OperationResult.Success($"Action plan batch '{batchId}' deleted."));
+
+        public Task<MessageActionBatchExecutionResult> ExecuteAsync(string batchId, bool continueOnError = true, CancellationToken cancellationToken = default) {
+            LastExecutedBatchId = batchId;
+            return Task.FromResult(new MessageActionBatchExecutionResult {
+                Succeeded = true,
+                RequestedPlanCount = 1,
+                AttemptedPlanCount = 1,
+                SucceededPlanCount = 1,
+                Message = "Stored batch executed."
+            });
+        }
+
+        public Task<OperationResult> ExportAsync(string batchId, string path, CancellationToken cancellationToken = default) =>
+            Task.FromResult(OperationResult.Success($"Action plan batch '{batchId}' exported."));
+
+        public Task<MailMessageActionPlanBatch?> GetBatchAsync(string batchId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<MailMessageActionPlanBatch?>(new MailMessageActionPlanBatch {
+                Id = batchId,
+                Name = "Cleanup batch",
+                Plans = {
+                    new MessageActionExecutionPlan {
+                        Succeeded = true,
+                        Action = "delete",
+                        ExecutionKind = "Delete",
+                        ProfileId = "work-imap",
+                        RequestedCount = 1,
+                        UniqueMessageCount = 1,
+                        MessageIds = { "msg-1" }
+                    }
+                }
+            });
+
+        public Task<MailMessageActionPlanBatchCompact?> GetBatchCompactAsync(string batchId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<MailMessageActionPlanBatchCompact?>(new MailMessageActionPlanBatchCompact {
+                Id = batchId,
+                Name = "Cleanup batch",
+                PlanCount = 1,
+                ReadyPlanCount = 1,
+                ProfileCount = 1,
+                PlanNames = { "Delete spam" },
+                Summary = $"{batchId} (1 plan(s), 1 ready)"
+            });
+
+        public Task<MailMessageActionPlanBatchSummary?> GetBatchSummaryAsync(string batchId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<MailMessageActionPlanBatchSummary?>(new MailMessageActionPlanBatchSummary {
+                Id = batchId,
+                Name = "Cleanup batch",
+                PlanCount = 1,
+                ReadyPlanCount = 1,
+                ProfileIds = { "gmail-work" },
+                ActionCounts = {
+                    ["delete"] = 1
+                },
+                PlanNames = { "Delete spam" },
+                Summary = $"{batchId} (1 plan(s), 1 ready, 1 action type(s))"
+            });
+
+        public Task<IReadOnlyList<MailMessageActionPlanBatch>> GetBatchesAsync(MailMessageActionPlanBatchQuery? query = null, CancellationToken cancellationToken = default) {
+            LastBatchQuery = query == null
+                ? null
+                : new MailMessageActionPlanBatchQuery {
+                    PlanNames = query.PlanNames.ToList(),
+                    ProfileIds = query.ProfileIds.ToList(),
+                    Actions = query.Actions.ToList(),
+                    SortBy = query.SortBy,
+                    Descending = query.Descending
+                };
+            return Task.FromResult<IReadOnlyList<MailMessageActionPlanBatch>>(new[] {
+                new MailMessageActionPlanBatch {
+                    Id = "cleanup",
+                    Name = "Cleanup batch",
+                    Plans = {
+                        new MessageActionExecutionPlan {
+                            Succeeded = true,
+                            Action = "delete",
+                            ExecutionKind = "Delete",
+                            ProfileId = "work-imap",
+                            RequestedCount = 1,
+                            UniqueMessageCount = 1,
+                            MessageIds = { "msg-1" }
+                        }
+                    }
+                }
+            });
+        }
+
+        public Task<IReadOnlyList<MailMessageActionPlanBatchCompact>> GetBatchesCompactAsync(MailMessageActionPlanBatchQuery? query = null, CancellationToken cancellationToken = default) {
+            LastBatchQuery = query == null
+                ? null
+                : new MailMessageActionPlanBatchQuery {
+                    PlanNames = query.PlanNames.ToList(),
+                    ProfileIds = query.ProfileIds.ToList(),
+                    Actions = query.Actions.ToList(),
+                    SortBy = query.SortBy,
+                    Descending = query.Descending
+                };
+            ListCompactCalls++;
+            return Task.FromResult<IReadOnlyList<MailMessageActionPlanBatchCompact>>(new[] {
+                new MailMessageActionPlanBatchCompact {
+                    Id = "cleanup",
+                    Name = "Cleanup batch",
+                    PlanCount = 1,
+                    ReadyPlanCount = 1,
+                    ProfileCount = 1,
+                    PlanNames = { "Delete spam" },
+                    Summary = "cleanup (1 plan(s), 1 ready)"
+                }
+            });
+        }
+
+        public Task<IReadOnlyList<MailMessageActionPlanBatchSummary>> GetBatchesSummaryAsync(MailMessageActionPlanBatchQuery? query = null, CancellationToken cancellationToken = default) {
+            LastBatchQuery = query == null
+                ? null
+                : new MailMessageActionPlanBatchQuery {
+                    PlanNames = query.PlanNames.ToList(),
+                    ProfileIds = query.ProfileIds.ToList(),
+                    Actions = query.Actions.ToList(),
+                    SortBy = query.SortBy,
+                    Descending = query.Descending
+                };
+            ListSummaryCalls++;
+            return Task.FromResult<IReadOnlyList<MailMessageActionPlanBatchSummary>>(new[] {
+                new MailMessageActionPlanBatchSummary {
+                    Id = "cleanup",
+                    Name = "Cleanup batch",
+                    PlanCount = 1,
+                    ReadyPlanCount = 1,
+                    ProfileIds = { "gmail-work" },
+                    ActionCounts = {
+                        ["delete"] = 1
+                    },
+                    PlanNames = { "Delete spam" },
+                    Summary = "cleanup (1 plan(s), 1 ready, 1 action type(s))"
+                }
+            });
+        }
+
+        public Task<OperationResult> ImportAsync(string batchId, string name, string path, string? description = null, CancellationToken cancellationToken = default) {
+            LastImportedBatchId = batchId;
+            LastImportedName = name;
+            LastImportedPath = path;
+            return Task.FromResult(OperationResult.Success($"Action plan batch '{batchId}' saved."));
+        }
+
+        public Task<OperationResult> ReplaceImportedPlanAtAsync(string batchId, int index, string path, CancellationToken cancellationToken = default) {
+            LastReplacedBatchId = batchId;
+            LastReplacedIndex = index;
+            LastImportedPath = path;
+            return Task.FromResult(OperationResult.Success($"Action plan batch '{batchId}' saved."));
+        }
+
+        public Task<OperationResult> ReplacePlanAtAsync(string batchId, int index, MessageActionExecutionPlan plan, CancellationToken cancellationToken = default) {
+            LastReplacedBatchId = batchId;
+            LastReplacedIndex = index;
+            LastReplacedPlan = plan;
+            return Task.FromResult(OperationResult.Success($"Action plan batch '{batchId}' saved."));
+        }
+
+        public Task<OperationResult> RemovePlanAtAsync(string batchId, int index, CancellationToken cancellationToken = default) {
+            LastRemovedBatchId = batchId;
+            LastRemovedIndex = index;
+            return Task.FromResult(OperationResult.Success($"Action plan batch '{batchId}' saved."));
+        }
+
+        public Task<OperationResult> SaveAsync(MailMessageActionPlanBatch batch, CancellationToken cancellationToken = default) =>
+            Task.FromResult(OperationResult.Success($"Action plan batch '{batch.Id}' saved."));
     }
 
     private sealed class FakeQueueService : IMailQueueService {
@@ -1562,6 +3126,12 @@ public sealed class CliRunnerTests {
 
         public FakeSendService SendService { get; } = new();
 
+        public FakeMessageActionService MessageActionService { get; } = new();
+
+        public FakeMessageActionPlanExchangeService MessageActionPlanExchangeService { get; } = new();
+
+        public FakeMessageActionPlanRegistryService MessageActionPlanRegistryService { get; } = new();
+
         public FakeDraftService DraftService { get; } = new();
 
         public FakeDraftExchangeService DraftExchangeService { get; } = new();
@@ -1582,6 +3152,9 @@ public sealed class CliRunnerTests {
                 .UseDraftService(DraftService)
                 .UseDraftExchangeService(DraftExchangeService)
                 .UseReadService(ReadService)
+                .UseMessageActionService(MessageActionService)
+                .UseMessageActionPlanExchangeService(MessageActionPlanExchangeService)
+                .UseMessageActionPlanRegistryService(MessageActionPlanRegistryService)
                 .UseQueueService(QueueService)
                 .UseSendService(SendService);
 

@@ -255,6 +255,58 @@ The recommended shape is:
 
 This avoids duplicating logic and gives one headless contract for the ecosystem.
 
+## Skills
+
+Skills should be treated as reusable agent guidance, not as a replacement for shared Mailozaurr capabilities.
+
+The preferred split is:
+
+- `MCP` exposes executable tools over shared Mailozaurr services
+- `skills` teach agents how to use those tools safely and consistently
+
+Examples of skill responsibilities:
+
+- when to prefer drafts over immediate send
+- when to use queue-first sending
+- how to summarize before delete/move
+- how to select compact versus rich read surfaces
+
+Examples of non-skill responsibilities:
+
+- mailbox search logic
+- message retrieval
+- attachment saving
+- queue processing
+- provider auth/session behavior
+
+Those belong in shared code, not only in prompt guidance.
+
+## HTML Body Projection Roadmap
+
+Mailozaurr should eventually support reusable HTML body projection for non-PowerShell headless surfaces, especially CLI and MCP.
+
+The recommended split is:
+
+- keep raw provider body retrieval in `Mailozaurr`
+- place body projection abstractions and policies in `Mailozaurr.Application`
+- keep PowerShell dependency-light by default
+- document PowerShell recipes for richer HTML handling instead of forcing heavy dependencies into the module
+
+### Recommended integration model
+
+- `CLI` / `MCP`
+  Add optional shared HTML-to-Markdown projection via `OfficeIMO.Markdown.Html`
+- `PowerShell`
+  Keep raw body access in the Mailozaurr module
+  Show examples using `PSWriteOffice` / `OfficeIMO.Markdown.Html` for Markdown projection
+  Show examples using `PSParseHTML` for DOM-style extraction and structured data recovery
+
+### Placement rule
+
+If HTML-to-Markdown projection becomes reusable across CLI, MCP, GUI, or plain C# consumers, the abstraction belongs in shared Mailozaurr layers.
+
+If a PowerShell workflow only demonstrates how to pipe a retrieved HTML body into another module, that belongs in documentation/examples, not in the core Mailozaurr PowerShell adapter by default.
+
 ## Migration Guidance
 
 Not every existing area must be refactored immediately.

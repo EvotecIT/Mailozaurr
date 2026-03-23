@@ -8,9 +8,11 @@ public static class MailApplicationPaths {
     private const string ProfilesSubDirectoryName = "Profiles";
     private const string SecretsSubDirectoryName = "Secrets";
     private const string DraftsSubDirectoryName = "Drafts";
+    private const string ActionPlanBatchesSubDirectoryName = "ActionPlanBatches";
     private const string ProfilesOverrideDirectoryVariable = "MAILOZAURR_PROFILE_DIRECTORY";
     private const string SecretsOverrideDirectoryVariable = "MAILOZAURR_SECRET_DIRECTORY";
     private const string DraftsOverrideDirectoryVariable = "MAILOZAURR_DRAFT_DIRECTORY";
+    private const string ActionPlanBatchesOverrideDirectoryVariable = "MAILOZAURR_ACTION_PLAN_DIRECTORY";
 
     /// <summary>
     /// Resolves the default directory used to store profile configuration.
@@ -32,6 +34,13 @@ public static class MailApplicationPaths {
     public static string ResolveDraftsDirectory() => ResolveDirectory(
         DraftsOverrideDirectoryVariable,
         DraftsSubDirectoryName);
+
+    /// <summary>
+    /// Resolves the default directory used to store reusable action plan batches.
+    /// </summary>
+    public static string ResolveActionPlanBatchesDirectory() => ResolveDirectory(
+        ActionPlanBatchesOverrideDirectoryVariable,
+        ActionPlanBatchesSubDirectoryName);
 
     private static string ResolveDirectory(string overrideVariableName, string subDirectoryName) {
         var overrideDirectory = Environment.GetEnvironmentVariable(overrideVariableName);

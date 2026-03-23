@@ -7,7 +7,7 @@ public sealed class ApplicationCapabilitiesTests {
     [InlineData(MailProfileKind.Imap, MailCapability.ListFolders | MailCapability.SearchMessages | MailCapability.ReadMessages | MailCapability.MoveMessages | MailCapability.WaitForMessages)]
     [InlineData(MailProfileKind.Pop3, MailCapability.SearchMessages | MailCapability.ReadMessages | MailCapability.DeleteMessages)]
     [InlineData(MailProfileKind.Graph, MailCapability.ListFolders | MailCapability.SendMessages | MailCapability.ManageRules | MailCapability.ManageEvents | MailCapability.ManagePermissions)]
-    [InlineData(MailProfileKind.Gmail, MailCapability.SearchMessages | MailCapability.SendMessages | MailCapability.UseThreads | MailCapability.UseLabels)]
+    [InlineData(MailProfileKind.Gmail, MailCapability.SearchMessages | MailCapability.MarkMessages | MailCapability.MoveMessages | MailCapability.SendMessages | MailCapability.UseThreads | MailCapability.UseLabels)]
     [InlineData(MailProfileKind.Smtp, MailCapability.SendMessages)]
     [InlineData(MailProfileKind.SendGrid, MailCapability.SendMessages)]
     public void CatalogExposesExpectedCapabilities(MailProfileKind kind, MailCapability required) {

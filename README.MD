@@ -63,6 +63,19 @@ Additional dependency:
 
 - [Platform Architecture](Docs/Platform-Architecture.md) - layering and reuse rules for future library, PowerShell, CLI, MCP, and GUI work
 
+## Additional surfaces
+
+Mailozaurr is no longer only a library and PowerShell module. The repository now also contains shared application-layer work and headless surfaces for broader automation scenarios:
+
+- `.NET library` for direct application and service integration
+- `PowerShell module` for administrators and automation users
+- `mailozaurr` executable for cross-platform CLI workflows
+- `mailozaurr mcp serve` for MCP-based integrations
+
+CLI and MCP are intended to sit on top of shared Mailozaurr services instead of duplicating mailbox, draft, queue, send, and message-action behavior independently.
+
+If you want the placement rules and longer-term cross-surface direction, see [Platform Architecture](Docs/Platform-Architecture.md).
+
 This started with a single goal to replace `Send-MailMessage` which is deprecated/obsolete with something more modern, but since MailKit and MimeKit have lots of options why not build on that?
 
 ## Support This Project
