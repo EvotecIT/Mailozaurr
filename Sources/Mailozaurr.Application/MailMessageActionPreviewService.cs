@@ -354,7 +354,7 @@ public sealed class MailMessageActionPreviewService : IMailMessageActionPreviewS
         messageIds
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .Select(id => id.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Distinct(StringComparer.Ordinal)
             .ToList();
 
     private static MoveMessagesPreview CreateMovePreview(
