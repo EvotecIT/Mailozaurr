@@ -62,8 +62,8 @@ public static class MessageActionConfirmationTokens {
         var normalizedMessageIds = messageIds
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .Select(id => id.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(id => id, StringComparer.Ordinal)
             .ToArray();
 
         var payload = string.Join("|", new[] {

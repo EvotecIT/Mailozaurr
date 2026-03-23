@@ -447,6 +447,42 @@ public sealed class ApplicationRoutingServicesTests {
     }
 
     [Fact]
+    public async Task RoutedMessageActionServiceAcceptsPreviewGeneratedDeleteConfirmationTokenWithCaseDistinctIds() {
+        var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
+        await store.SaveAsync(new MailProfile {
+            Id = "work-imap",
+            DisplayName = "Work IMAP",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string> { [MailProfileSettingsKeys.Server] = "imap.example.com" }
+        });
+
+        var previewService = new MailMessageActionPreviewService(store, new FakeFolderAliasService());
+        var preview = await previewService.PreviewDeleteAsync(new DeleteMessagesPreviewRequest {
+            ProfileId = "work-imap",
+            MailboxId = "shared@example.com",
+            FolderId = "Inbox",
+            MessageIds = { "msg-1", "MSG-1", "msg-2" }
+        });
+
+        Assert.True(preview.Succeeded);
+        Assert.NotNull(preview.ConfirmationToken);
+
+        var handler = new FakeMessageActionHandler(MailProfileKind.Imap);
+        var service = new RoutedMailMessageActionService(store, new[] { handler }, new FakeFolderAliasService());
+        var result = await service.DeleteAsync(new DeleteMessagesRequest {
+            ProfileId = "work-imap",
+            MailboxId = "shared@example.com",
+            FolderId = "Inbox",
+            MessageIds = { "msg-1", "MSG-1", "msg-2" },
+            ConfirmationToken = preview.ConfirmationToken
+        });
+
+        Assert.True(result.Succeeded);
+        Assert.NotNull(handler.LastDeleteRequest);
+        Assert.Equal(preview.ConfirmationToken, handler.LastDeleteRequest!.ConfirmationToken);
+    }
+
+    [Fact]
     public async Task RoutedMessageActionServiceRejectsMismatchedDeleteConfirmationToken() {
         var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
         await store.SaveAsync(new MailProfile {
@@ -597,6 +633,8 @@ public sealed class ApplicationRoutingServicesTests {
 
         public MoveMessagesRequest? LastMoveRequest { get; private set; }
 
+        public DeleteMessagesRequest? LastDeleteRequest { get; private set; }
+
         public Task<MessageActionResult> SetReadStateAsync(MailProfile profile, SetReadStateRequest request, CancellationToken cancellationToken = default) {
             SetReadStateCalls++;
             return Task.FromResult(new MessageActionResult {
@@ -627,13 +665,15 @@ public sealed class ApplicationRoutingServicesTests {
             });
         }
 
-        public Task<MessageActionResult> DeleteAsync(MailProfile profile, DeleteMessagesRequest request, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new MessageActionResult {
+        public Task<MessageActionResult> DeleteAsync(MailProfile profile, DeleteMessagesRequest request, CancellationToken cancellationToken = default) {
+            LastDeleteRequest = request;
+            return Task.FromResult(new MessageActionResult {
                 Succeeded = true,
                 ProfileId = profile.Id,
                 RequestedCount = request.MessageIds.Count,
                 SucceededCount = request.MessageIds.Count
             });
+        }
     }
 
     private sealed class FakeFolderAliasService : IMailFolderAliasService {

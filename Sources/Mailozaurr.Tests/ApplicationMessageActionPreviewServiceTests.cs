@@ -27,9 +27,9 @@ public sealed class ApplicationMessageActionPreviewServiceTests {
         Assert.True(preview.Succeeded);
         Assert.Equal("read-state", preview.Action);
         Assert.False(preview.DesiredState);
-        Assert.Equal(2, preview.UniqueMessageCount);
+        Assert.Equal(3, preview.UniqueMessageCount);
         Assert.Equal(
-            MessageActionConfirmationTokens.CreateReadStateToken("work-imap", "shared@example.com", "Inbox", new[] { "msg-1", "msg-2" }, isRead: false),
+            MessageActionConfirmationTokens.CreateReadStateToken("work-imap", "shared@example.com", "Inbox", new[] { "msg-1", "MSG-1", "msg-2" }, isRead: false),
             preview.ConfirmationToken);
     }
 
@@ -57,9 +57,9 @@ public sealed class ApplicationMessageActionPreviewServiceTests {
         Assert.True(preview.Succeeded);
         Assert.Equal("flagged-state", preview.Action);
         Assert.False(preview.DesiredState);
-        Assert.Equal(2, preview.UniqueMessageCount);
+        Assert.Equal(3, preview.UniqueMessageCount);
         Assert.Equal(
-            MessageActionConfirmationTokens.CreateFlaggedStateToken("work-imap", "shared@example.com", "Inbox", new[] { "msg-1", "msg-2" }, isFlagged: false),
+            MessageActionConfirmationTokens.CreateFlaggedStateToken("work-imap", "shared@example.com", "Inbox", new[] { "msg-1", "MSG-1", "msg-2" }, isFlagged: false),
             preview.ConfirmationToken);
     }
 
@@ -85,15 +85,15 @@ public sealed class ApplicationMessageActionPreviewServiceTests {
 
         Assert.True(preview.Succeeded);
         Assert.Equal(4, preview.RequestedCount);
-        Assert.Equal(2, preview.UniqueMessageCount);
-        Assert.Equal(2, preview.DuplicateOrEmptyCount);
-        Assert.Equal(new[] { "msg-1", "msg-2" }, preview.MessageIds);
+        Assert.Equal(3, preview.UniqueMessageCount);
+        Assert.Equal(1, preview.DuplicateOrEmptyCount);
+        Assert.Equal(new[] { "msg-1", "MSG-1", "msg-2" }, preview.MessageIds);
         Assert.NotNull(preview.Destination);
         Assert.Equal("archive-folder", preview.Destination!.EffectiveFolderId);
         Assert.Equal(
-            MessageActionConfirmationTokens.CreateMoveToken("work-imap", "shared@example.com", null, new[] { "msg-1", "msg-2" }, "archive-folder"),
+            MessageActionConfirmationTokens.CreateMoveToken("work-imap", "shared@example.com", null, new[] { "msg-1", "MSG-1", "msg-2" }, "archive-folder"),
             preview.ConfirmationToken);
-        Assert.Contains(preview.Warnings, warning => warning.Contains("Ignored 2 duplicate or empty", StringComparison.Ordinal));
+        Assert.Contains(preview.Warnings, warning => warning.Contains("Ignored 1 duplicate or empty", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -139,13 +139,13 @@ public sealed class ApplicationMessageActionPreviewServiceTests {
 
         Assert.True(preview.Succeeded);
         Assert.Equal(4, preview.RequestedCount);
-        Assert.Equal(2, preview.UniqueMessageCount);
-        Assert.Equal(2, preview.DuplicateOrEmptyCount);
-        Assert.Equal(new[] { "msg-1", "msg-2" }, preview.MessageIds);
+        Assert.Equal(3, preview.UniqueMessageCount);
+        Assert.Equal(1, preview.DuplicateOrEmptyCount);
+        Assert.Equal(new[] { "msg-1", "MSG-1", "msg-2" }, preview.MessageIds);
         Assert.Equal(
-            MessageActionConfirmationTokens.CreateDeleteToken("work-imap", null, null, new[] { "msg-1", "msg-2" }),
+            MessageActionConfirmationTokens.CreateDeleteToken("work-imap", null, null, new[] { "msg-1", "MSG-1", "msg-2" }),
             preview.ConfirmationToken);
-        Assert.Contains(preview.Warnings, warning => warning.Contains("Ignored 2 duplicate or empty", StringComparison.Ordinal));
+        Assert.Contains(preview.Warnings, warning => warning.Contains("Ignored 1 duplicate or empty", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -192,12 +192,12 @@ public sealed class ApplicationMessageActionPreviewServiceTests {
 
         Assert.True(preview.Succeeded);
         Assert.Equal(4, preview.RequestedCount);
-        Assert.Equal(2, preview.UniqueMessageCount);
-        Assert.Equal(2, preview.DuplicateOrEmptyCount);
+        Assert.Equal(3, preview.UniqueMessageCount);
+        Assert.Equal(1, preview.DuplicateOrEmptyCount);
         Assert.Equal(4, preview.IncludedActionCount);
         Assert.Equal(4, preview.SucceededActionCount);
         Assert.Equal(0, preview.FailedActionCount);
-        Assert.Contains(preview.Warnings, warning => warning.Contains("Ignored 2 duplicate or empty", StringComparison.Ordinal));
+        Assert.Contains(preview.Warnings, warning => warning.Contains("Ignored 1 duplicate or empty", StringComparison.Ordinal));
 
         var archive = Assert.Single(preview.Actions, action => action.Action == "archive");
         Assert.Equal("archive-folder", archive.Destination!.EffectiveFolderId);
@@ -270,7 +270,7 @@ public sealed class ApplicationMessageActionPreviewServiceTests {
         Assert.Equal(8, preview.IncludedActionCount);
         Assert.Equal(8, preview.SucceededActionCount);
         Assert.Equal(0, preview.FailedActionCount);
-        Assert.Equal(2, preview.UniqueMessageCount);
+        Assert.Equal(3, preview.UniqueMessageCount);
         Assert.Contains(preview.Actions, action => action.Action == "mark-read" && action.DesiredState == true);
         Assert.Contains(preview.Actions, action => action.Action == "mark-unread" && action.DesiredState == false);
         Assert.Contains(preview.Actions, action => action.Action == "flag" && action.DesiredState == true);
