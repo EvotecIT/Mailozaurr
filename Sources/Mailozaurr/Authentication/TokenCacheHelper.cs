@@ -11,10 +11,8 @@ namespace Mailozaurr;
 internal static class TokenCacheHelper {
     private static readonly object FileLock = new();
     private const int IoRetryCount = 5;
-    private static readonly string CacheFilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Mailozaurr",
-        "msal_cache.bin");
+    private const string CachePathEnvironmentVariable = "MAILOZAURR_MSAL_CACHE_PATH";
+    private static string CacheFilePath => ResolveCacheFilePath();
 
     /// <summary>
     /// Registers callbacks to persist the token cache before and after access.
@@ -128,4 +126,16 @@ internal static class TokenCacheHelper {
     }
 
     private static int GetRetryDelay(int attempt) => 25 * (attempt + 1);
+
+    private static string ResolveCacheFilePath() {
+        var overriddenPath = Environment.GetEnvironmentVariable(CachePathEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(overriddenPath)) {
+            return overriddenPath.Trim();
+        }
+
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Mailozaurr",
+            "msal_cache.bin");
+    }
 }

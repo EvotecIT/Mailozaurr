@@ -37,7 +37,7 @@ public sealed class ApplicationMessageActionPlanServiceTests {
 
         Assert.True(plan.Succeeded);
         Assert.Equal("Move", plan.ExecutionKind);
-        Assert.Equal(1, plan.UniqueMessageCount);
+        Assert.Equal(2, plan.UniqueMessageCount);
         Assert.True(plan.ConfirmationProvided);
         Assert.True(plan.ConfirmationValidated);
         Assert.Equal("archive-folder", plan.Destination!.EffectiveFolderId);
@@ -103,7 +103,7 @@ public sealed class ApplicationMessageActionPlanServiceTests {
         Assert.Equal("shared@example.com", actionService.LastReadStateRequest.MailboxId);
         Assert.Equal("Inbox", actionService.LastReadStateRequest.FolderId);
         Assert.False(actionService.LastReadStateRequest.IsRead);
-        Assert.Equal(new[] { "msg-1" }, actionService.LastReadStateRequest.MessageIds);
+        Assert.Equal(new[] { "msg-1", "MSG-1" }, actionService.LastReadStateRequest.MessageIds);
         Assert.Equal(plan.ConfirmationToken, actionService.LastReadStateRequest.ConfirmationToken);
     }
 

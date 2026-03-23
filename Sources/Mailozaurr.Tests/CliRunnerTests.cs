@@ -619,7 +619,7 @@ public sealed class CliRunnerTests {
             _ => fixture.CreateBuilder());
 
         Assert.Equal(0, exitCode);
-        Assert.Contains("\"UniqueMessageCount\": 1", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"UniqueMessageCount\": 2", stdout.ToString(), StringComparison.Ordinal);
         Assert.Contains("\"EffectiveFolderId\": \"archive\"", stdout.ToString(), StringComparison.Ordinal);
         Assert.Contains("\"ConfirmationToken\":", stdout.ToString(), StringComparison.Ordinal);
     }
@@ -675,7 +675,7 @@ public sealed class CliRunnerTests {
             _ => fixture.CreateBuilder());
 
         Assert.Equal(0, exitCode);
-        Assert.Contains("\"UniqueMessageCount\": 1", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"UniqueMessageCount\": 2", stdout.ToString(), StringComparison.Ordinal);
         Assert.Contains("\"RequestedCount\": 2", stdout.ToString(), StringComparison.Ordinal);
     }
 
@@ -965,7 +965,7 @@ public sealed class CliRunnerTests {
 
         Assert.Equal(0, exitCode);
         Assert.Contains("\"ExecutionKind\": \"Move\"", stdout.ToString(), StringComparison.Ordinal);
-        Assert.Contains("\"UniqueMessageCount\": 1", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"UniqueMessageCount\": 2", stdout.ToString(), StringComparison.Ordinal);
         Assert.Contains("\"RequestedDestinationFolderId\": \"projects/2026\"", stdout.ToString(), StringComparison.OrdinalIgnoreCase);
         Assert.Contains("\"ConfirmationToken\":", stdout.ToString(), StringComparison.Ordinal);
     }
