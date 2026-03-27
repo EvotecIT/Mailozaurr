@@ -620,12 +620,21 @@ public sealed class GraphMailboxBrowser {
         }
 
         var normalizedId = messageId.Trim();
-        var meta = await _graph.GetMessageAsync(normalizedId, select: "id,isRead,flag", cancellationToken: cancellationToken).ConfigureAwait(false);
+        var meta = await _graph.GetMessageAsync(normalizedId, select: "id,isRead,flag,conversationId", cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (meta == null) {
+            throw new InvalidDataException("Graph message metadata was not returned.");
+        }
         var mimeBytes = await _graph.GetMessageMimeAsync(normalizedId, maxBytes: maxMimeBytes, cancellationToken: cancellationToken).ConfigureAwait(false);
+        string? conversationId = null;
+        var trimmedConversationId = meta.ConversationId?.Trim();
+        if (!string.IsNullOrWhiteSpace(trimmedConversationId)) {
+            conversationId = trimmedConversationId;
+        }
         try {
             return new GraphMailboxGetResult {
                 Seen = meta.IsRead,
                 Flagged = meta.Flag == null ? null : IsFlagged(meta.Flag),
+                NativeThreadId = conversationId,
                 Message = MimeMessage.Load(new MemoryStream(mimeBytes, writable: false))
             };
         } catch (Exception ex) {
@@ -819,6 +828,52 @@ public sealed class GraphMailboxBrowser {
     }
 
     /// <summary>
+    /// Sets read/unread state on many conversations.
+    /// </summary>
+    public async Task<IReadOnlyList<GraphBulkOperationResult>> SetConversationsSeenAsync(
+        IEnumerable<string> conversationIds,
+        bool seen,
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        if (conversationIds == null) {
+            throw new ArgumentNullException(nameof(conversationIds));
+        }
+
+        return await ExecuteConversationMessageActionAsync(
+            conversationIds,
+            (messageIds, token) => _graph.BatchSetMessagesIsReadAsync(
+                messageIds,
+                seen,
+                batchSize: batchSize,
+                cancellationToken: token),
+            "Graph conversation set-seen failed.",
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sets flagged/unflagged state on many conversations.
+    /// </summary>
+    public async Task<IReadOnlyList<GraphBulkOperationResult>> SetConversationsFlaggedAsync(
+        IEnumerable<string> conversationIds,
+        bool flagged,
+        int batchSize = 20,
+        CancellationToken cancellationToken = default) {
+        if (conversationIds == null) {
+            throw new ArgumentNullException(nameof(conversationIds));
+        }
+
+        return await ExecuteConversationMessageActionAsync(
+            conversationIds,
+            (messageIds, token) => _graph.BatchSetMessagesFlaggedAsync(
+                messageIds,
+                flagged,
+                batchSize: batchSize,
+                cancellationToken: token),
+            "Graph conversation set-flagged failed.",
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Moves many conversations to a target folder alias/id.
     /// </summary>
     public async Task<IReadOnlyList<GraphBulkOperationResult>> MoveConversationsAsync(
@@ -878,6 +933,84 @@ public sealed class GraphMailboxBrowser {
             conversationIds,
             batchSize: batchSize,
             cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<GraphBulkOperationResult>> ExecuteConversationMessageActionAsync(
+        IEnumerable<string> conversationIds,
+        Func<IReadOnlyList<string>, CancellationToken, Task<IReadOnlyList<GraphBulkOperationResult>>> operationAsync,
+        string fallbackError,
+        CancellationToken cancellationToken) {
+        if (conversationIds == null) {
+            throw new ArgumentNullException(nameof(conversationIds));
+        }
+        if (operationAsync == null) {
+            throw new ArgumentNullException(nameof(operationAsync));
+        }
+
+        var conversations = NormalizeConversationIds(conversationIds);
+        if (conversations.Count == 0) {
+            return Array.Empty<GraphBulkOperationResult>();
+        }
+
+        var output = new List<GraphBulkOperationResult>(conversations.Count);
+        foreach (var conversationId in conversations) {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            IReadOnlyList<string> messageIds;
+            try {
+                messageIds = await _graph.ListConversationMessageIdsAsync(
+                    conversationId,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+            } catch (OperationCanceledException) {
+                throw;
+            } catch (Exception ex) {
+                output.Add(new GraphBulkOperationResult {
+                    Id = conversationId,
+                    Ok = false,
+                    Error = ex.Message
+                });
+                continue;
+            }
+
+            if (messageIds.Count == 0) {
+                output.Add(new GraphBulkOperationResult { Id = conversationId, Ok = true });
+                continue;
+            }
+
+            var results = await operationAsync(messageIds, cancellationToken).ConfigureAwait(false);
+            var failed = results.FirstOrDefault(result => result != null && !result.Ok);
+            if (failed is not null) {
+                output.Add(new GraphBulkOperationResult {
+                    Id = conversationId,
+                    Ok = false,
+                    Error = failed.Error ?? fallbackError
+                });
+                continue;
+            }
+
+            output.Add(new GraphBulkOperationResult { Id = conversationId, Ok = true });
+        }
+
+        return output;
+    }
+
+    private static List<string> NormalizeConversationIds(IEnumerable<string> conversationIds) {
+        var output = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var raw in conversationIds) {
+            if (string.IsNullOrWhiteSpace(raw)) {
+                continue;
+            }
+
+            var trimmed = raw.Trim();
+            if (trimmed.Length == 0 || !seen.Add(trimmed)) {
+                continue;
+            }
+
+            output.Add(trimmed);
+        }
+
+        return output;
     }
 
     private async Task UploadLargeAttachmentsAsync(
@@ -1426,6 +1559,9 @@ public sealed class GraphMailboxBrowser {
 
         /// <summary>Flagged state from Graph metadata.</summary>
         public bool? Flagged { get; set; }
+
+        /// <summary>Graph conversation id.</summary>
+        public string? NativeThreadId { get; set; }
     }
 
     /// <summary>

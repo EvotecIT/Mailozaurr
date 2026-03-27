@@ -165,7 +165,7 @@ public sealed class GmailMailboxBrowserTests {
     public async System.Threading.Tasks.Task GetMessageContentAsync_ReturnsMimeAndFlags() {
         var mime = "From: a@example.test\r\nTo: b@example.test\r\nSubject: Sample\r\nMessage-Id: <m1@example.test>\r\n\r\nhello";
         var raw = Convert.ToBase64String(Encoding.UTF8.GetBytes(mime)).Replace('+', '-').Replace('/', '_').TrimEnd('=');
-        var rawJson = "{\"id\":\"m1\",\"labelIds\":[\"UNREAD\",\"STARRED\"],\"raw\":\"" + raw + "\"}";
+        var rawJson = "{\"id\":\"m1\",\"threadId\":\"thr-1\",\"labelIds\":[\"UNREAD\",\"STARRED\"],\"raw\":\"" + raw + "\"}";
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(rawJson) });
         var browser = CreateBrowser(handler);
 
@@ -175,6 +175,7 @@ public sealed class GmailMailboxBrowserTests {
         Assert.Equal("Sample", result.Message.Subject);
         Assert.False(result.Seen);
         Assert.True(result.Flagged);
+        Assert.Equal("thr-1", result.NativeThreadId);
     }
 
     [Fact]
@@ -455,6 +456,56 @@ public sealed class GmailMailboxBrowserTests {
         Assert.Equal(2, handler.Requests.Count);
         Assert.Contains("/users/me/threads/t1", handler.Requests[0].RequestUri!.ToString());
         Assert.Contains("/users/me/threads/t2", handler.Requests[1].RequestUri!.ToString());
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task MoveThreadsAsync_UsesThreadModifyLabels() {
+        var labelsJson = "{\"labels\":[{\"id\":\"Label_1\",\"name\":\"Project\"}]}";
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(labelsJson) },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"id\":\"t1\"}") });
+        var browser = CreateBrowser(handler);
+
+        var results = await browser.MoveThreadsAsync(new[] { "t1" }, sourceFolder: "INBOX", targetFolder: "Project");
+
+        Assert.Single(results);
+        Assert.True(results[0].Ok, results[0].Error);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Contains("/users/me/labels", handler.Requests[0].RequestUri!.ToString());
+        Assert.Contains("/users/me/threads/t1/modify", handler.Requests[1].RequestUri!.ToString());
+        var body = await handler.Requests[1].Content!.ReadAsStringAsync();
+        Assert.Contains("\"addLabelIds\":[\"Label_1\"]", body, StringComparison.Ordinal);
+        Assert.Contains("\"removeLabelIds\":[\"INBOX\",\"TRASH\"]", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task SetThreadsSeenAsync_UsesThreadModifyLabels() {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"id\":\"t1\"}") });
+        var browser = CreateBrowser(handler);
+
+        var results = await browser.SetThreadsSeenAsync(new[] { "t1" }, seen: true);
+
+        Assert.Single(results);
+        Assert.True(results[0].Ok, results[0].Error);
+        Assert.Single(handler.Requests);
+        Assert.Contains("/users/me/threads/t1/modify", handler.Requests[0].RequestUri!.ToString());
+        var body = await handler.Requests[0].Content!.ReadAsStringAsync();
+        Assert.Contains("\"removeLabelIds\":[\"UNREAD\"]", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task SetThreadsFlaggedAsync_UsesThreadModifyLabels() {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"id\":\"t1\"}") });
+        var browser = CreateBrowser(handler);
+
+        var results = await browser.SetThreadsFlaggedAsync(new[] { "t1" }, flagged: false);
+
+        Assert.Single(results);
+        Assert.True(results[0].Ok, results[0].Error);
+        Assert.Single(handler.Requests);
+        Assert.Contains("/users/me/threads/t1/modify", handler.Requests[0].RequestUri!.ToString());
+        var body = await handler.Requests[0].Content!.ReadAsStringAsync();
+        Assert.Contains("\"removeLabelIds\":[\"STARRED\"]", body, StringComparison.Ordinal);
     }
 
     private static Dictionary<string, List<string>> ParseQueryParams(Uri uri) {
