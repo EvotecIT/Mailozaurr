@@ -9,7 +9,7 @@ namespace Mailozaurr;
 /// Processes pending messages by dispatching them through provider specific senders.
 /// </summary>
 public sealed class PendingMessageProcessor {
-    private static readonly TimeSpan MinimumLeaseDuration = TimeSpan.FromTicks(1);
+    private static readonly TimeSpan MinimumLeaseDuration = TimeSpan.FromSeconds(30);
     private readonly IPendingMessageRepository repository;
     private readonly PendingMessageSenderFactory senderFactory;
     private readonly Func<int, TimeSpan> retryDelaySelector;
@@ -31,7 +31,10 @@ public sealed class PendingMessageProcessor {
     /// <param name="logger">Optional logger used to record processing diagnostics.</param>
     /// <param name="observer">Optional observer used to emit telemetry about processing outcomes.</param>
     /// <param name="permanentFailureDetector">Optional delegate that classifies whether a failure should skip retries.</param>
-    /// <param name="processingLeaseDuration">Optional duration used to lease records while they are being processed to avoid concurrent handling.</param>
+    /// <param name="processingLeaseDuration">
+    /// Optional duration used to lease records while they are being processed to avoid concurrent handling.
+    /// <see cref="TimeSpan.Zero"/> uses a minimum safety lease of 30 seconds.
+    /// </param>
     public PendingMessageProcessor(
         IPendingMessageRepository repository,
         PendingMessageSenderFactory? senderFactory = null,
