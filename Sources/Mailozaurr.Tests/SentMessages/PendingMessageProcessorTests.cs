@@ -547,6 +547,28 @@ public sealed class PendingMessageProcessorTests {
     }
 
     [Fact]
+    public async Task ProcessAsync_UsesSafeMinimumLeaseWhenConfiguredLeaseIsZero() {
+        var currentTime = DateTimeOffset.Parse("2024-06-11T08:00:00Z");
+        var repository = new InMemoryPendingMessageRepository();
+        var record = CreateRecord(currentTime.AddMinutes(-1));
+        repository.Add(record);
+        var sender = new RecordingPendingMessageSender();
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            { EmailProvider.None, sender }
+        });
+        var processor = new PendingMessageProcessor(
+            repository,
+            factory,
+            clock: () => currentTime,
+            processingLeaseDuration: TimeSpan.Zero);
+
+        await processor.ProcessAsync();
+
+        var sent = Assert.Single(sender.SentRecords);
+        Assert.Equal(currentTime + TimeSpan.FromSeconds(30), sent.NextAttemptAt);
+    }
+
+    [Fact]
     public async Task ProcessAsync_RetriesUsingDelaySelectorPerAttempt() {
         var currentTime = DateTimeOffset.Parse("2024-06-12T07:30:00Z");
         var repository = new InMemoryPendingMessageRepository();

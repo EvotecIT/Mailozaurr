@@ -1,21 +1,15 @@
 $script:FilterSenderReferencedAssemblies = $null
 
-function Get-FilterSenderReferencedAssemblies {
+function global:Get-FilterSenderReferencedAssemblies {
     if ($null -eq $script:FilterSenderReferencedAssemblies) {
-        $sharedRoot = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.dotnet/shared/Microsoft.NETCore.App'
-        $runtimeVersion = Get-ChildItem -Path $sharedRoot -Directory | Sort-Object Name -Descending | Select-Object -First 1
-        if (-not $runtimeVersion) {
-            throw 'Unable to locate .NET runtime assemblies required for Add-Type.'
+        $referenceDirectory = Join-Path $PSHOME 'ref'
+        if (-not (Test-Path -Path $referenceDirectory)) {
+            throw 'Unable to locate PowerShell reference assemblies required for Add-Type.'
         }
 
-        $runtimePath = $runtimeVersion.FullName
         $script:FilterSenderReferencedAssemblies = @(
-            [Mailozaurr.PendingMessageRecord].Assembly.Location,
-            (Join-Path $runtimePath 'System.Private.CoreLib.dll'),
-            (Join-Path $runtimePath 'System.Runtime.dll'),
-            (Join-Path $runtimePath 'System.Collections.dll'),
-            (Join-Path $runtimePath 'System.Collections.Concurrent.dll')
-        )
+            [Mailozaurr.PendingMessageRecord].Assembly.Location
+        ) + @(Get-ChildItem -Path $referenceDirectory -Filter '*.dll' -File | ForEach-Object { $_.FullName })
     }
 
     return $script:FilterSenderReferencedAssemblies
