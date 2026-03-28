@@ -18,7 +18,7 @@ public sealed class GmailMailboxBrowser {
     private const string ListFields = "messages(id,threadId),nextPageToken,resultSizeEstimate";
     private const string MessageSummaryFields = "id,threadId,internalDate,labelIds,payload(headers,name,value,parts,filename,body/attachmentId,body/size,mimeType)";
     private const string ThreadFields = "id,messages(id,threadId,internalDate,labelIds,payload(headers,name,value,parts,filename,body/attachmentId,body/size,mimeType))";
-    private const string RawFields = "id,internalDate,labelIds,raw";
+    private const string RawFields = "id,threadId,internalDate,labelIds,raw";
     private readonly GmailApiClient _gmail;
     private readonly string _userId;
 
@@ -609,7 +609,8 @@ public sealed class GmailMailboxBrowser {
         return new GmailMailboxGetResult {
             Message = mimeMessage,
             Seen = !HasLabel(message.LabelIds, "UNREAD"),
-            Flagged = HasLabel(message.LabelIds, "STARRED")
+            Flagged = HasLabel(message.LabelIds, "STARRED"),
+            NativeThreadId = NormalizeOptional(message.ThreadId)
         };
     }
 
@@ -776,6 +777,44 @@ public sealed class GmailMailboxBrowser {
     }
 
     /// <summary>
+    /// Sets read/unread state on a single thread.
+    /// </summary>
+    public async Task SetThreadSeenAsync(
+        string threadId,
+        bool seen,
+        CancellationToken cancellationToken = default) {
+        if (string.IsNullOrWhiteSpace(threadId)) {
+            throw new ArgumentException("threadId is required.", nameof(threadId));
+        }
+
+        _ = await _gmail.ModifyThreadLabelsAsync(
+            _userId,
+            threadId.Trim(),
+            addLabelIds: seen ? Array.Empty<string>() : new[] { "UNREAD" },
+            removeLabelIds: seen ? new[] { "UNREAD" } : Array.Empty<string>(),
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sets flagged/unflagged state on a single thread.
+    /// </summary>
+    public async Task SetThreadFlaggedAsync(
+        string threadId,
+        bool flagged,
+        CancellationToken cancellationToken = default) {
+        if (string.IsNullOrWhiteSpace(threadId)) {
+            throw new ArgumentException("threadId is required.", nameof(threadId));
+        }
+
+        _ = await _gmail.ModifyThreadLabelsAsync(
+            _userId,
+            threadId.Trim(),
+            addLabelIds: flagged ? new[] { "STARRED" } : Array.Empty<string>(),
+            removeLabelIds: flagged ? Array.Empty<string>() : new[] { "STARRED" },
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Moves many messages to a target folder/label.
     /// </summary>
     public async Task<IReadOnlyList<GmailMailboxBulkOperationResult>> MoveMessagesAsync(
@@ -817,6 +856,66 @@ public sealed class GmailMailboxBrowser {
             addLabelIds: new[] { targetLabelId },
             removeLabelIds: remove,
             batchSize,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Moves a single thread to a target folder/label.
+    /// </summary>
+    public async Task MoveThreadAsync(
+        string threadId,
+        string? sourceFolder,
+        string targetFolder,
+        CancellationToken cancellationToken = default) {
+        if (string.IsNullOrWhiteSpace(threadId)) {
+            throw new ArgumentException("threadId is required.", nameof(threadId));
+        }
+        if (string.IsNullOrWhiteSpace(targetFolder)) {
+            throw new ArgumentException("targetFolder is required.", nameof(targetFolder));
+        }
+
+        var targetRaw = targetFolder.Trim();
+        if (targetRaw.Equals("Archive", StringComparison.OrdinalIgnoreCase)) {
+            await ArchiveThreadAsync(threadId, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var targetLabelId = NormalizeOptional(await ResolveLabelIdAsync(targetRaw, cancellationToken).ConfigureAwait(false));
+        if (targetLabelId == null) {
+            throw new InvalidOperationException("Unable to resolve Gmail target folder/label.");
+        }
+
+        if (targetLabelId.Equals("TRASH", StringComparison.OrdinalIgnoreCase)) {
+            await TrashThreadAsync(threadId, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var remove = new List<string>();
+        var sourceLabelId = NormalizeOptional(await ResolveLabelIdAsync(sourceFolder, cancellationToken).ConfigureAwait(false));
+        if (sourceLabelId != null) {
+            remove.Add(sourceLabelId);
+        }
+        remove.Add("TRASH");
+
+        _ = await _gmail.ModifyThreadLabelsAsync(
+            _userId,
+            threadId.Trim(),
+            addLabelIds: new[] { targetLabelId },
+            removeLabelIds: remove,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Moves many threads to a target folder/label.
+    /// </summary>
+    public async Task<IReadOnlyList<GmailMailboxBulkOperationResult>> MoveThreadsAsync(
+        IEnumerable<string> threadIds,
+        string? sourceFolder,
+        string targetFolder,
+        CancellationToken cancellationToken = default) {
+        return await ExecuteThreadActionAsync(
+            threadIds,
+            (threadId, token) => MoveThreadAsync(threadId, sourceFolder, targetFolder, token),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -975,6 +1074,32 @@ public sealed class GmailMailboxBrowser {
         IEnumerable<string> threadIds,
         CancellationToken cancellationToken = default) {
         return await ExecuteThreadActionAsync(threadIds, DeleteThreadAsync, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sets read/unread state on many threads.
+    /// </summary>
+    public async Task<IReadOnlyList<GmailMailboxBulkOperationResult>> SetThreadsSeenAsync(
+        IEnumerable<string> threadIds,
+        bool seen,
+        CancellationToken cancellationToken = default) {
+        return await ExecuteThreadActionAsync(
+            threadIds,
+            (threadId, token) => SetThreadSeenAsync(threadId, seen, token),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sets flagged/unflagged state on many threads.
+    /// </summary>
+    public async Task<IReadOnlyList<GmailMailboxBulkOperationResult>> SetThreadsFlaggedAsync(
+        IEnumerable<string> threadIds,
+        bool flagged,
+        CancellationToken cancellationToken = default) {
+        return await ExecuteThreadActionAsync(
+            threadIds,
+            (threadId, token) => SetThreadFlaggedAsync(threadId, flagged, token),
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1739,6 +1864,9 @@ public sealed class GmailMailboxBrowser {
 
         /// <summary>Flagged state from Gmail labels.</summary>
         public bool? Flagged { get; set; }
+
+        /// <summary>Gmail thread id.</summary>
+        public string? NativeThreadId { get; set; }
     }
 
     /// <summary>

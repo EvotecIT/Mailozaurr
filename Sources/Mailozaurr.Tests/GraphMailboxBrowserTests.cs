@@ -287,7 +287,7 @@ public class GraphMailboxBrowserTests {
 
     [Fact]
     public async System.Threading.Tasks.Task GetMessageContentAsync_ReturnsMimeAndFlags() {
-        var metaJson = "{\"id\":\"m1\",\"isRead\":true,\"flag\":{\"flagStatus\":\"flagged\"}}";
+        var metaJson = "{\"id\":\"m1\",\"isRead\":true,\"flag\":{\"flagStatus\":\"flagged\"},\"conversationId\":\"conv-1\"}";
         var mime = "From: a@example.test\r\nTo: b@example.test\r\nSubject: Sample\r\nMessage-Id: <m1@example.test>\r\n\r\nhello";
         var handler = new RecordingHandler(
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(metaJson) },
@@ -299,6 +299,7 @@ public class GraphMailboxBrowserTests {
 
         Assert.True(result.Seen);
         Assert.True(result.Flagged);
+        Assert.Equal("conv-1", result.NativeThreadId);
         Assert.Equal("Sample", result.Message.Subject);
         Assert.Equal(2, handler.Requests.Count);
         var metaUri = handler.Requests[0].RequestUri!.ToString();
@@ -306,6 +307,7 @@ public class GraphMailboxBrowserTests {
         Assert.Contains("$select=", metaUri);
         Assert.Contains("isRead", metaUri);
         Assert.Contains("flag", metaUri);
+        Assert.Contains("conversationId", metaUri);
         Assert.Contains("/me/messages/m1/$value", handler.Requests[1].RequestUri!.ToString());
     }
 
@@ -613,6 +615,47 @@ public class GraphMailboxBrowserTests {
         var body = await handler.Requests[1].Content!.ReadAsStringAsync();
         Assert.Contains("me/messages/m1", body, StringComparison.Ordinal);
         Assert.Contains("me/messages/m2", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task SetConversationsSeenAsync_ExpandsAndBatchesReadStateChanges() {
+        var listJson = "{\"value\":[{\"id\":\"m1\"},{\"id\":\"m2\"}]}";
+        var batchJson = "{\"responses\":[{\"id\":\"1\",\"status\":200},{\"id\":\"2\",\"status\":200}]}";
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(listJson) },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(batchJson) });
+        var client = CreateClient(handler);
+        var browser = new GraphMailboxBrowser(client);
+
+        var results = await browser.SetConversationsSeenAsync(new[] { "conv-1" }, seen: true);
+
+        Assert.Single(results);
+        Assert.True(results[0].Ok, results[0].Error);
+        Assert.Equal("conv-1", results[0].Id);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Contains("/me/messages?", handler.Requests[0].RequestUri!.ToString());
+        Assert.Contains("conversationId", handler.Requests[0].RequestUri!.ToString());
+        var body = await handler.Requests[1].Content!.ReadAsStringAsync();
+        Assert.Contains("me/messages/m1", body, StringComparison.Ordinal);
+        Assert.Contains("isRead", body, StringComparison.Ordinal);
+        Assert.Contains("true", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task SetConversationsFlaggedAsync_MapsConversationFailures() {
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.InternalServerError) { Content = new StringContent("boom") });
+        var client = CreateClient(handler);
+        var browser = new GraphMailboxBrowser(client);
+
+        var results = await browser.SetConversationsFlaggedAsync(new[] { "conv-1" }, flagged: true);
+
+        Assert.Single(results);
+        Assert.Equal("conv-1", results[0].Id);
+        Assert.False(results[0].Ok);
+        Assert.Contains("conversation list failed", results[0].Error ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(handler.Requests);
+        Assert.Contains("/me/messages?", handler.Requests[0].RequestUri!.ToString());
     }
 
     private static GraphApiClient CreateClient(HttpMessageHandler handler) {
