@@ -145,6 +145,14 @@ namespace Mailozaurr {
         /// Connects to O365 Graph and returns the Authorization header value ("Bearer ...").
         /// </summary>
         public static async Task<string> ConnectO365GraphAsync(GraphCredential credential, string tenantDomain, string resource = "https://manage.office.com", CancellationToken cancellationToken = default) {
+            var delegatedAccessToken = credential.AccessToken;
+            if (delegatedAccessToken != null && delegatedAccessToken.Trim().Length > 0) {
+                var accessToken = delegatedAccessToken.Trim();
+                return accessToken.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                    ? accessToken
+                    : $"Bearer {accessToken}";
+            }
+
             var key = $"{credential.ClientId}|{tenantDomain}|{credential.CertificatePath}|{credential.ClientSecret}|{resource}";
             if (TokenCache.TryGetValue(key, out var cached) && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
                 return $"{cached.TokenType} {cached.AccessToken}";

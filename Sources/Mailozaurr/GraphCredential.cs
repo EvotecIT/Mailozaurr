@@ -24,6 +24,11 @@ public class GraphCredential {
     public string? ClientSecret { get; set; }
 
     /// <summary>
+    /// Gets or sets an access token for delegated Microsoft Graph operations.
+    /// </summary>
+    public string? AccessToken { get; set; }
+
+    /// <summary>
     /// Gets or sets the path to a certificate used for authentication.
     /// </summary>
     public string? CertificatePath { get; set; }

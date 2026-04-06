@@ -308,6 +308,7 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
                 ClientId!,
                 DirectoryId!,
                 Scopes);
+            cred.AccessToken = oauth.AccessToken;
         } else if (ParameterSetName == "OnBehalfOf") {
             cred = new GraphCredential {
                 ClientId = ClientId!,
@@ -320,6 +321,7 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
                 ClientSecret!,
                 OnBehalfOfToken!,
                 Scopes);
+            cred.AccessToken = oauth.AccessToken;
         } else if (ParameterSetName == "OnBehalfOfSecureString") {
             cred = new GraphCredential {
                 ClientId = ClientId!,
@@ -332,6 +334,7 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
                 clientSecret,
                 onBehalfOfToken,
                 Scopes);
+            cred.AccessToken = oauth.AccessToken;
         } else if (ParameterSetName == "OnBehalfOfSecretManagement") {
             cred = new GraphCredential {
                 ClientId = ClientId!,
@@ -344,6 +347,7 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
                 clientSecret,
                 onBehalfOfToken,
                 Scopes);
+            cred.AccessToken = oauth.AccessToken;
         } else if (ParameterSetName == "PlainSecureString") {
             cred = new GraphCredential {
                 ClientId = ClientId!,
@@ -369,7 +373,7 @@ public sealed class CmdletConnectEmailGraph : AsyncPSCmdlet {
 
         bool connected = false;
         if (ParameterSetName == "DeviceCode" || ParameterSetName == "OnBehalfOf" || ParameterSetName == "OnBehalfOfSecureString" || ParameterSetName == "OnBehalfOfSecretManagement") {
-            connected = oauth != null;
+            connected = !string.IsNullOrWhiteSpace(cred.AccessToken);
         } else {
             try {
                 var token = await MicrosoftGraphUtils.ConnectO365GraphWithRetryAsync(
