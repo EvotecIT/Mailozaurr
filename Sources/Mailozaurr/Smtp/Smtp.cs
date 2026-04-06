@@ -25,9 +25,13 @@ namespace Mailozaurr;
 /// are serialized so that only one send executes at a time per instance.</para>
 /// </remarks>
 public class Smtp {
+    private static ClientSmtp CreateDefaultClient(ProtocolLogger? logger) => logger == null ? new ClientSmtp() : new ClientSmtp(logger);
 
     /// <summary>Factory used to create <see cref="ClientSmtp"/> instances.</summary>
-    public static Func<ProtocolLogger?, ClientSmtp> ClientFactory { get; set; } = logger => logger == null ? new ClientSmtp() : new ClientSmtp(logger);
+    public static Func<ProtocolLogger?, ClientSmtp> ClientFactory { get; set; } = CreateDefaultClient;
+
+    /// <summary>Restores the default SMTP client factory.</summary>
+    public static void ResetClientFactory() => ClientFactory = CreateDefaultClient;
     /// <summary>Configuration used for protocol logging.</summary>
     public LoggingConfigurator? Logging;
 
@@ -85,6 +89,12 @@ public class Smtp {
     /// Optional identity hint used to isolate SMTP connection pooling by credentials.
     /// </summary>
     public string? ConnectionPoolIdentity { get; set; }
+
+    /// <summary>
+    /// Optional per-instance override controlling whether this SMTP session should
+    /// use the shared connection pool.
+    /// </summary>
+    public bool? UseConnectionPool { get; set; }
 
     /// <summary>Subject of the message.</summary>
     public string Subject {
@@ -234,6 +244,8 @@ public class Smtp {
     private bool _skipCertificateValidation;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private string? _poolIdentity;
+
+    private bool IsConnectionPoolingEnabled => UseConnectionPool ?? SmtpConnectionPool.PoolingEnabled;
     /// <summary>Skip server certificate validation.</summary>
     public bool SkipCertificateValidation {
         get => _skipCertificateValidation;
@@ -372,7 +384,7 @@ public class Smtp {
             persistent = false;
         }
 
-        var info = new SmtpConnectionInfo(server, port, banner, software, smtp.Client.Capabilities, persistent);
+        var info = new SmtpConnectionInfo(server, port, banner, software, smtp.Client.GetCapabilitiesSnapshot(), persistent);
         smtp.Disconnect();
         smtp.Dispose();
         return info;
@@ -483,9 +495,9 @@ public class Smtp {
         }
         if (Client.IsConnected)
         {
-            if (SmtpConnectionPool.PoolingEnabled)
+            if (IsConnectionPoolingEnabled)
             {
-                SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client, oldPoolIdentity);
+                SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client, oldPoolIdentity, IsConnectionPoolingEnabled);
             }
             else
             {
@@ -495,7 +507,7 @@ public class Smtp {
         }
 
         var poolIdentity = GetConnectionPoolIdentity();
-        var pooled = SmtpConnectionPool.PoolingEnabled ? SmtpConnectionPool.TryRentClient(server, port, poolIdentity) : null;
+        var pooled = SmtpConnectionPool.TryRentClient(server, port, poolIdentity, IsConnectionPoolingEnabled);
         if (pooled != null)
         {
             Client = pooled;
@@ -587,9 +599,9 @@ public class Smtp {
         }
         if (Client.IsConnected)
         {
-            if (SmtpConnectionPool.PoolingEnabled)
+            if (IsConnectionPoolingEnabled)
             {
-                SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client, oldPoolIdentity);
+                SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client, oldPoolIdentity, IsConnectionPoolingEnabled);
             }
             else
             {
@@ -599,7 +611,7 @@ public class Smtp {
         }
 
         var poolIdentity = GetConnectionPoolIdentity();
-        var pooled = SmtpConnectionPool.PoolingEnabled ? SmtpConnectionPool.TryRentClient(server, port, poolIdentity) : null;
+        var pooled = SmtpConnectionPool.TryRentClient(server, port, poolIdentity, IsConnectionPoolingEnabled);
         if (pooled != null)
         {
             Client = pooled;
@@ -1436,9 +1448,9 @@ public class Smtp {
     /// </summary>
     public void Disconnect() {
         if (Client.IsConnected) {
-            if (SmtpConnectionPool.PoolingEnabled) {
+            if (IsConnectionPoolingEnabled) {
                 var identity = _poolIdentity ?? GetConnectionPoolIdentity();
-                SmtpConnectionPool.ReturnClient(Server, Port, Client, identity);
+                SmtpConnectionPool.ReturnClient(Server, Port, Client, identity, IsConnectionPoolingEnabled);
                 Client = ClientFactory(Logging?.ProtocolLogger);
             } else {
                 Client.Disconnect(true);
@@ -1451,15 +1463,18 @@ public class Smtp {
     /// Releases the SMTP connection and associated resources.
     /// </summary>
     public void Dispose() {
+        var clientToDispose = Client;
         if (Client.IsConnected) {
-            if (SmtpConnectionPool.PoolingEnabled) {
+            if (IsConnectionPoolingEnabled) {
                 var identity = _poolIdentity ?? GetConnectionPoolIdentity();
-                SmtpConnectionPool.ReturnClient(Server, Port, Client, identity);
+                SmtpConnectionPool.ReturnClient(Server, Port, Client, identity, IsConnectionPoolingEnabled);
+                Client = ClientFactory(Logging?.ProtocolLogger);
+                clientToDispose = Client;
             } else {
                 Client.Disconnect(true);
             }
         }
-        Client.Dispose();
+        clientToDispose.Dispose();
         Stopwatch.Stop();
     }
 

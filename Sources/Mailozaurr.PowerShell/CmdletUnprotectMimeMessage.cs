@@ -29,7 +29,9 @@ public sealed class CmdletUnprotectMimeMessage : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        MimeMessage? message = InputObject switch {
+        var input = InputObject is PSObject psObject ? psObject.BaseObject : InputObject;
+
+        MimeMessage? message = input switch {
             MimeMessage m => m,
             ImapMessageInfo info => info.Raw.Message,
             ImapEmailMessage imap => imap.Message,

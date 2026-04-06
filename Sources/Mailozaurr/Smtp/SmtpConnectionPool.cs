@@ -91,8 +91,11 @@ public static class SmtpConnectionPool {
         return $"{serverKey}:{port}:{identityKey}";
     }
 
-    internal static ClientSmtp? TryRentClient(string server, int port, string? identity = null) {
-        if (!PoolingEnabled) {
+    internal static ClientSmtp? TryRentClient(string server, int port, string? identity = null) =>
+        TryRentClient(server, port, identity, PoolingEnabled);
+
+    internal static ClientSmtp? TryRentClient(string server, int port, string? identity, bool poolingEnabled) {
+        if (!poolingEnabled) {
             return null;
         }
 
@@ -112,8 +115,11 @@ public static class SmtpConnectionPool {
         return null;
     }
 
-    internal static void ReturnClient(string server, int port, ClientSmtp client, string? identity = null) {
-        if (!PoolingEnabled) {
+    internal static void ReturnClient(string server, int port, ClientSmtp client, string? identity = null) =>
+        ReturnClient(server, port, client, identity, PoolingEnabled);
+
+    internal static void ReturnClient(string server, int port, ClientSmtp client, string? identity, bool poolingEnabled) {
+        if (!poolingEnabled) {
             client.Dispose();
             return;
         }

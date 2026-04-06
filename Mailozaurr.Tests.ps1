@@ -6,6 +6,10 @@ if (-not $PrimaryModule) {
 if ($PrimaryModule.Count -ne 1) {
     throw 'More than one PSD1 files detected. Failing tests.'
 }
+$developmentBuildPath = Join-Path $PSScriptRoot 'Sources\Mailozaurr.PowerShell\bin\Debug'
+if (-not $env:MAILOZAURR_DEVELOPMENT -and (Test-Path $developmentBuildPath)) {
+    $env:MAILOZAURR_DEVELOPMENT = '1'
+}
 $PSDInformation = Import-PowerShellDataFile -Path $PrimaryModule.FullName
 $RequiredModules = @(
     'Pester'

@@ -38,6 +38,31 @@ public sealed class ApplicationProfileBootstrapServiceTests {
     }
 
     [Fact]
+    public async Task SaveGraphProfileAsyncSupportsSecretReferences() {
+        var profileStore = new InMemoryProfileStore();
+        var secretStore = new InMemorySecretStore();
+        await secretStore.SetSecretAsync("shared-secrets", MailSecretNames.ClientSecret, "shared-client-secret");
+        var service = new MailProfileBootstrapService(
+            new MailProfileService(profileStore, secretStore),
+            new MailProfileSecretService(profileStore, secretStore),
+            secretStore);
+
+        var result = await service.SaveGraphProfileAsync(new GraphProfileBootstrapRequest {
+            ProfileId = "graph-work",
+            DisplayName = "Work Graph",
+            Mailbox = "shared@example.com",
+            ClientId = "client-id",
+            TenantId = "tenant-id",
+            ClientSecretReference = $"shared-secrets:{MailSecretNames.ClientSecret}"
+        });
+
+        var clientSecret = await secretStore.GetSecretAsync("graph-work", MailSecretNames.ClientSecret);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("shared-client-secret", clientSecret);
+    }
+
+    [Fact]
     public async Task SaveGraphProfileAsyncRequiresAuthenticationMaterial() {
         var profileStore = new InMemoryProfileStore();
         var secretStore = new InMemorySecretStore();

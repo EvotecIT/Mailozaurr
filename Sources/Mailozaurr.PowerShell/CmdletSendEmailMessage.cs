@@ -24,13 +24,13 @@ namespace Mailozaurr.PowerShell;
 /// <example>
 ///   <summary>Send an email using SendGrid API</summary>
 ///   <prefix>PS&gt; </prefix>
-///   <code>$cred = ConvertTo-SendGridCredential -ApiKey 'YOUR_SENDGRID_KEY'
+///   <code>$cred = ConvertTo-SendGridCredential -SecretName 'sendgrid-api-key' -VaultName 'MailSecrets'
 /// Send-EmailMessage -From 'john.doe@example.com' -To 'recipient@example.com' -Subject 'SendGrid Test' -Body 'Hello from SendGrid' -SendGrid -Credential $cred</code>
 /// </example>
 /// <example>
 ///   <summary>Send an email using Microsoft Graph API</summary>
 ///   <prefix>PS&gt; </prefix>
-///   <code>$cred = ConvertTo-GraphCredential -ClientID 'CLIENT_ID' -ClientSecret 'SECRET' -DirectoryID 'TENANT_ID'
+///   <code>$cred = ConvertTo-GraphCredential -ClientID 'CLIENT_ID' -SecretName 'graph-client-secret' -VaultName 'MailSecrets' -DirectoryID 'TENANT_ID'
 /// Send-EmailMessage -From @{ Name = 'John Doe'; Email = 'john.doe@example.com' } -To 'recipient@example.com' -Credential $cred -HTML '<b>Hello</b>' -Subject 'Graph API Email' -Graph</code>
 /// </example>
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>

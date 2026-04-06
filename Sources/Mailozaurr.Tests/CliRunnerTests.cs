@@ -181,6 +181,76 @@ public sealed class CliRunnerTests {
     }
 
     [Fact]
+    public async Task ProfileGraphBootstrapSupportsSecretValuesFromEnvironmentVariables() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        const string envName = "MAILOZAURR_TEST_GRAPH_SECRET";
+        Environment.SetEnvironmentVariable(envName, "env-client-secret");
+
+        try {
+            var exitCode = await CliRunner.RunAsync(
+                new[] {
+                    "profile", "graph-bootstrap",
+                    "--profile", "graph-env",
+                    "--name", "Graph Env",
+                    "--mailbox", "shared@example.com",
+                    "--client-id", "client-id",
+                    "--tenant-id", "tenant-id",
+                    "--client-secret-env", envName,
+                    "--json"
+                },
+                stdout,
+                stderr,
+                _ => fixture.CreateBuilder());
+
+            var clientSecret = await fixture.SecretStore.GetSecretAsync("graph-env", MailSecretNames.ClientSecret);
+
+            Assert.Equal(0, exitCode);
+            Assert.Equal("env-client-secret", clientSecret);
+        } finally {
+            Environment.SetEnvironmentVariable(envName, null);
+        }
+    }
+
+    [Fact]
+    public async Task ProfileGraphBootstrapSupportsSecretReferences() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        await fixture.ProfileStore.SaveAsync(new MailProfile {
+            Id = "shared-secrets",
+            DisplayName = "Shared Secrets",
+            Kind = MailProfileKind.Gmail,
+            Settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+                [MailProfileSettingsKeys.Mailbox] = "shared@example.com",
+                [MailProfileSettingsKeys.ClientId] = "shared-client"
+            }
+        });
+        await fixture.SecretStore.SetSecretAsync("shared-secrets", MailSecretNames.ClientSecret, "shared-client-secret");
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "profile", "graph-bootstrap",
+                "--profile", "graph-ref",
+                "--name", "Graph Ref",
+                "--mailbox", "shared@example.com",
+                "--client-id", "client-id",
+                "--tenant-id", "tenant-id",
+                "--client-secret-ref", $"shared-secrets:{MailSecretNames.ClientSecret}",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        var clientSecret = await fixture.SecretStore.GetSecretAsync("graph-ref", MailSecretNames.ClientSecret);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("shared-client-secret", clientSecret);
+    }
+
+    [Fact]
     public async Task ProfileGmailBootstrapSavesProfileAndSecretsThroughApplicationServices() {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
@@ -213,6 +283,61 @@ public sealed class CliRunnerTests {
         Assert.Equal("client-id", profile.Settings[MailProfileSettingsKeys.ClientId]);
         Assert.Equal("client-secret", clientSecret);
         Assert.Equal("refresh-token", refreshToken);
+    }
+
+    [Fact]
+    public async Task ProfileSetSecretSupportsReadingValueFromStandardInput() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        using var stdin = new StringReader("stdin-secret\r\n");
+        var fixture = CreateFixture();
+        await fixture.ProfileStore.SaveAsync(new MailProfile {
+            Id = "stdin-profile",
+            DisplayName = "stdin",
+            Kind = MailProfileKind.Imap
+        });
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "profile", "set-secret",
+                "--profile", "stdin-profile",
+                "--name", "password",
+                "--value-stdin",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder(),
+            stdin);
+
+        var secret = await fixture.SecretStore.GetSecretAsync("stdin-profile", "password");
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("stdin-secret", secret);
+    }
+
+    [Fact]
+    public async Task JsonErrorsAreWrittenAsStructuredPayloads() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "profile", "set-secret",
+                "--profile", "missing-value",
+                "--name", "password",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        using var document = JsonDocument.Parse(stderr.ToString());
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("InvalidOperationException", document.RootElement.GetProperty("Error").GetProperty("Type").GetString());
+        Assert.Contains("--value", document.RootElement.GetProperty("Error").GetProperty("Message").GetString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -272,6 +397,38 @@ public sealed class CliRunnerTests {
         Assert.Equal("gmail-refresh-token", refreshToken);
         Assert.NotNull(fixture.ProfileAuthService.LastGmailRequest);
         Assert.Equal("user@gmail.com", fixture.ProfileAuthService.LastGmailRequest!.GmailAccount);
+    }
+
+    [Fact]
+    public async Task ProfileGmailLoginSupportsClientSecretReference() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        await fixture.ProfileStore.SaveAsync(new MailProfile {
+            Id = "gmail-login-ref",
+            DisplayName = "Gmail Login Ref",
+            Kind = MailProfileKind.Gmail,
+            Settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+                [MailProfileSettingsKeys.Mailbox] = "user@gmail.com",
+                [MailProfileSettingsKeys.ClientId] = "client-id"
+            }
+        });
+        await fixture.SecretStore.SetSecretAsync("shared-secrets", MailSecretNames.ClientSecret, "client-secret-from-reference");
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "profile", "gmail-login",
+                "--profile", "gmail-login-ref",
+                "--client-secret-ref", $"shared-secrets:{MailSecretNames.ClientSecret}",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.ProfileAuthService.LastGmailRequest);
+        Assert.Equal("client-secret-from-reference", fixture.ProfileAuthService.LastGmailRequest!.ClientSecret);
     }
 
     [Fact]
@@ -461,6 +618,40 @@ public sealed class CliRunnerTests {
 
         Assert.Equal(0, exitCode);
         Assert.Equal("super-secret", secretValue);
+    }
+
+    [Fact]
+    public async Task ProfileSetSecretSupportsReferenceCopy() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        await fixture.ProfileStore.SaveAsync(new MailProfile {
+            Id = "shared-secrets",
+            DisplayName = "Shared Secrets",
+            Kind = MailProfileKind.Gmail,
+            Settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+                [MailProfileSettingsKeys.Mailbox] = "shared@example.com",
+                [MailProfileSettingsKeys.ClientId] = "shared-client"
+            }
+        });
+        await fixture.SecretStore.SetSecretAsync("shared-secrets", MailSecretNames.Password, "copied-secret");
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "profile", "set-secret",
+                "--profile", "work-imap",
+                "--name", MailSecretNames.Password,
+                "--value-ref", $"shared-secrets:{MailSecretNames.Password}",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        var secretValue = await fixture.SecretStore.GetSecretAsync("work-imap", MailSecretNames.Password);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("copied-secret", secretValue);
     }
 
     [Fact]
@@ -3013,6 +3204,11 @@ public sealed class CliRunnerTests {
             var profile = await _profileStore.GetByIdAsync(request.ProfileId, cancellationToken);
             Assert.NotNull(profile);
             var savedProfile = profile!;
+            var clientSecret = request.ClientSecret;
+            if (string.IsNullOrWhiteSpace(clientSecret) && !string.IsNullOrWhiteSpace(request.ClientSecretReference)) {
+                var (sourceProfileId, sourceSecretName) = ParseSecretReference(request.ClientSecretReference!, request.ProfileId);
+                clientSecret = await _secretStore.GetSecretAsync(sourceProfileId, sourceSecretName, cancellationToken);
+            }
             var account = request.GmailAccount
                 ?? (savedProfile.Settings.TryGetValue(MailProfileSettingsKeys.Mailbox, out var mailbox) ? mailbox : null)
                 ?? "user@gmail.com";
@@ -3020,7 +3216,7 @@ public sealed class CliRunnerTests {
                 ProfileId = request.ProfileId,
                 GmailAccount = account,
                 ClientId = request.ClientId ?? (savedProfile.Settings.TryGetValue(MailProfileSettingsKeys.ClientId, out var clientId) ? clientId : null),
-                ClientSecret = request.ClientSecret,
+                ClientSecret = clientSecret,
                 Scopes = request.Scopes
             };
             savedProfile.Settings[MailProfileSettingsKeys.Mailbox] = account;
@@ -3072,6 +3268,21 @@ public sealed class CliRunnerTests {
                     ProfileKind = profile.Kind
                 }
             };
+        }
+
+        private static (string ProfileId, string SecretName) ParseSecretReference(string secretReference, string defaultProfileId) {
+            var normalized = secretReference.Trim();
+            var colonIndex = normalized.IndexOf(':');
+            var slashIndex = normalized.IndexOf('/');
+            var separatorIndex = colonIndex >= 0 && slashIndex >= 0
+                ? Math.Min(colonIndex, slashIndex)
+                : Math.Max(colonIndex, slashIndex);
+
+            if (separatorIndex < 0) {
+                return (defaultProfileId, normalized);
+            }
+
+            return (normalized[..separatorIndex], normalized[(separatorIndex + 1)..]);
         }
     }
 

@@ -192,7 +192,7 @@ public static class MimeKitUtils {
         }
 
         var signatures = signed.Verify(ctx);
-        foreach (var sig in signatures) sig.Verify();
+        foreach (var sig in signatures) sig.Verify(true);
         return true;
     }
 }

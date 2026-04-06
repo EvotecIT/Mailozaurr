@@ -10,8 +10,7 @@ namespace Mailozaurr.PowerShell;
 /// <para type="description">The <c>Get-EmailGraphFolder</c> cmdlet retrieves mail folders for the specified user principal name using Microsoft Graph API. Provide a <see cref="GraphConnectionInfo"/> object created with <c>Connect-EmailGraph</c> or authenticate via <c>Connect-MgGraph</c>.</para>
 /// <example>
 ///   <summary>Get mail folders using application permissions</summary>
-///   <code>$cred = ConvertTo-GraphCredential -ClientId "id" -ClientSecret "secret" -DirectoryId "tenant"
-///   $graph = Connect-EmailGraph -Credential $cred
+///   <code>$graph = Connect-EmailGraph -ClientId "id" -DirectoryId "tenant" -ClientSecretSecretName "graph-client-secret" -ClientSecretVaultName "MailSecrets"
 ///   Get-EmailGraphFolder -UserPrincipalName "user@domain.com" -Connection $graph</code>
 /// </example>
 /// <example>

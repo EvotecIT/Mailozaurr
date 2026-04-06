@@ -1,8 +1,8 @@
 Import-Module $PSScriptRoot\..\Mailozaurr.psd1 -Force
 
 # Use Mailgun API
-$Key = Get-Content -Raw -Path "C:\Support\Important\Mailgun.txt"
-$Credential = ConvertTo-MailgunCredential -ApiKey $Key
+$Key = Read-Host 'Mailgun API key' -AsSecureString
+$Credential = ConvertTo-MailgunCredential -ApiKeySecureString $Key
 
 $sendEmailMessageSplat = @{
     From          = 'postmaster@sandbox814085ede3524b939d4b7f518ef9877a.mailgun.org'

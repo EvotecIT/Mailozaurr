@@ -31,12 +31,21 @@ public sealed class GraphProfileBootstrapRequest {
     /// <summary>Optional confidential-client secret to store securely.</summary>
     public string? ClientSecret { get; set; }
 
+    /// <summary>Optional secret reference for the client secret, in the form <c>&lt;profile-id&gt;:&lt;secret-name&gt;</c> or <c>&lt;secret-name&gt;</c>.</summary>
+    public string? ClientSecretReference { get; set; }
+
     /// <summary>Optional explicit access token to store securely.</summary>
     public string? AccessToken { get; set; }
+
+    /// <summary>Optional secret reference for the access token, in the form <c>&lt;profile-id&gt;:&lt;secret-name&gt;</c> or <c>&lt;secret-name&gt;</c>.</summary>
+    public string? AccessTokenReference { get; set; }
 
     /// <summary>Optional certificate path for certificate-based authentication.</summary>
     public string? CertificatePath { get; set; }
 
     /// <summary>Optional certificate password to store securely.</summary>
     public string? CertificatePassword { get; set; }
+
+    /// <summary>Optional secret reference for the certificate password, in the form <c>&lt;profile-id&gt;:&lt;secret-name&gt;</c> or <c>&lt;secret-name&gt;</c>.</summary>
+    public string? CertificatePasswordReference { get; set; }
 }

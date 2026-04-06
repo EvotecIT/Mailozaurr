@@ -80,6 +80,12 @@ public partial class ClientSmtp : SmtpClient {
     }
 
     /// <summary>
+    /// Returns the currently negotiated SMTP capabilities.
+    /// Overridable for tests that need to fake server features.
+    /// </summary>
+    public virtual SmtpCapabilities GetCapabilitiesSnapshot() => Capabilities;
+
+    /// <summary>
     /// Determines which delivery status notifications should be requested for the specified recipient.
     /// </summary>
     /// <param name="message">The message being sent.</param>

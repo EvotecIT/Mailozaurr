@@ -1,13 +1,16 @@
 Describe 'Pop3Connector disposal' {
     BeforeAll {
         $refs = @(
+            [Mailozaurr.Pop3Connector].Assembly.Location,
             [MailKit.Net.Pop3.Pop3Client].Assembly.Location,
             [MailKit.Security.SecureSocketOptions].Assembly.Location
         )
     }
 
     It 'Disposes client after failed connect' {
-        Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+        if (-not ('FailingPop3Client' -as [type])) {
+            Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+using Mailozaurr;
 using MailKit.Net.Pop3;
 using MailKit.Security;
 using System.Threading;
@@ -24,10 +27,17 @@ public class FailingPop3Client : Pop3Client {
         base.Dispose(disposing);
     }
 }
+public static class FailingPop3ClientFactory {
+    public static Pop3Client Client;
+    public static Pop3Client Create() => Client;
+    public static void Install() => Pop3Connector.ClientFactory = Create;
+}
 "@
+        }
 
         $fake = [FailingPop3Client]::new()
-        [Mailozaurr.Pop3Connector]::ClientFactory = { $fake }
+        [FailingPop3ClientFactory]::Client = $fake
+        [FailingPop3ClientFactory]::Install()
 
         try {
             [Mailozaurr.Pop3Connector]::ConnectAsync('h', 995, [MailKit.Security.SecureSocketOptions]::SslOnConnect, 1000, $false, $false, { param($c) [Task]::CompletedTask }, 0, 0, 1.0).GetAwaiter().GetResult()
@@ -36,11 +46,13 @@ public class FailingPop3Client : Pop3Client {
 
         $fake.Disposed | Should -BeTrue
 
-        [Mailozaurr.Pop3Connector]::ClientFactory = { [MailKit.Net.Pop3.Pop3Client]::new() }
+        [Mailozaurr.Pop3Connector]::ResetClientFactory()
     }
 
     It 'Disposes client even when DisconnectAsync throws' {
-        Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+        if (-not ('ThrowingDisconnectPop3Client' -as [type])) {
+            Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+using Mailozaurr;
 using MailKit.Net.Pop3;
 using MailKit.Security;
 using System.Threading;
@@ -62,10 +74,17 @@ public class ThrowingDisconnectPop3Client : Pop3Client {
         base.Dispose(disposing);
     }
 }
+public static class ThrowingDisconnectPop3ClientFactory {
+    public static Pop3Client Client;
+    public static Pop3Client Create() => Client;
+    public static void Install() => Pop3Connector.ClientFactory = Create;
+}
 "@
+        }
 
         $fake = [ThrowingDisconnectPop3Client]::new()
-        [Mailozaurr.Pop3Connector]::ClientFactory = { $fake }
+        [ThrowingDisconnectPop3ClientFactory]::Client = $fake
+        [ThrowingDisconnectPop3ClientFactory]::Install()
 
         try {
             [Mailozaurr.Pop3Connector]::ConnectAsync('h', 995, [MailKit.Security.SecureSocketOptions]::SslOnConnect, 1000, $false, $false, { param($c) [Task]::CompletedTask }, 0, 0, 1.0).GetAwaiter().GetResult()
@@ -75,7 +94,6 @@ public class ThrowingDisconnectPop3Client : Pop3Client {
         $fake.DisconnectCalled | Should -BeTrue
         $fake.Disposed | Should -BeTrue
 
-        [Mailozaurr.Pop3Connector]::ClientFactory = { [MailKit.Net.Pop3.Pop3Client]::new() }
+        [Mailozaurr.Pop3Connector]::ResetClientFactory()
     }
 }
-

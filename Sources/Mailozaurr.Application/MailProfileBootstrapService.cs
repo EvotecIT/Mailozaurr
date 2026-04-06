@@ -28,13 +28,41 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
         var mailbox = request.Mailbox.Trim();
         var defaultSender = string.IsNullOrWhiteSpace(request.DefaultSender) ? mailbox : request.DefaultSender!.Trim();
         var existing = await _profiles.GetProfileAsync(profileId, cancellationToken).ConfigureAwait(false);
+        string? clientSecret;
+        string? accessToken;
+        string? certificatePassword;
+        try {
+            clientSecret = await MailSecretReferenceResolver.ResolveAsync(
+                _secretStore,
+                profileId,
+                MailSecretNames.ClientSecret,
+                request.ClientSecret,
+                request.ClientSecretReference,
+                cancellationToken).ConfigureAwait(false);
+            accessToken = await MailSecretReferenceResolver.ResolveAsync(
+                _secretStore,
+                profileId,
+                MailSecretNames.AccessToken,
+                request.AccessToken,
+                request.AccessTokenReference,
+                cancellationToken).ConfigureAwait(false);
+            certificatePassword = await MailSecretReferenceResolver.ResolveAsync(
+                _secretStore,
+                profileId,
+                MailSecretNames.CertificatePassword,
+                request.CertificatePassword,
+                request.CertificatePasswordReference,
+                cancellationToken).ConfigureAwait(false);
+        } catch (InvalidOperationException ex) {
+            return OperationResult.Failure("secret_reference_invalid", ex.Message);
+        }
 
         var effectiveClientId = FirstNonEmpty(request.ClientId, existing?.Settings.TryGetValue(MailProfileSettingsKeys.ClientId, out var existingClientId) == true ? existingClientId : null);
         var effectiveTenantId = FirstNonEmpty(request.TenantId, existing?.Settings.TryGetValue(MailProfileSettingsKeys.TenantId, out var existingTenantId) == true ? existingTenantId : null);
         var effectiveCertificatePath = FirstNonEmpty(request.CertificatePath, existing?.Settings.TryGetValue(MailProfileSettingsKeys.CertificatePath, out var existingCertificatePath) == true ? existingCertificatePath : null);
-        var hasAccessToken = !string.IsNullOrWhiteSpace(request.AccessToken) ||
+        var hasAccessToken = !string.IsNullOrWhiteSpace(accessToken) ||
                              await HasStoredSecretAsync(profileId, MailSecretNames.AccessToken, cancellationToken).ConfigureAwait(false);
-        var hasClientSecret = !string.IsNullOrWhiteSpace(request.ClientSecret) ||
+        var hasClientSecret = !string.IsNullOrWhiteSpace(clientSecret) ||
                               await HasStoredSecretAsync(profileId, MailSecretNames.ClientSecret, cancellationToken).ConfigureAwait(false);
         var hasCertificate = !string.IsNullOrWhiteSpace(effectiveCertificatePath);
 
@@ -53,7 +81,7 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
                 "graph_auth_required",
                 "Graph profiles require either an access token or a client-id and tenant-id with a client secret or certificate path.");
         }
-        if (!string.IsNullOrWhiteSpace(request.CertificatePassword) && !hasCertificate) {
+        if (!string.IsNullOrWhiteSpace(certificatePassword) && !hasCertificate) {
             return OperationResult.Failure("certificate_path_required", "Certificate password requires a certificate path.");
         }
 
@@ -81,20 +109,20 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
             return saveResult;
         }
 
-        if (!string.IsNullOrWhiteSpace(request.ClientSecret)) {
-            var clientSecretResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.ClientSecret, request.ClientSecret!.Trim(), cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(clientSecret)) {
+            var clientSecretResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.ClientSecret, clientSecret!.Trim(), cancellationToken).ConfigureAwait(false);
             if (!clientSecretResult.Succeeded) {
                 return clientSecretResult;
             }
         }
-        if (!string.IsNullOrWhiteSpace(request.AccessToken)) {
-            var accessTokenResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.AccessToken, request.AccessToken!.Trim(), cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(accessToken)) {
+            var accessTokenResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.AccessToken, accessToken!.Trim(), cancellationToken).ConfigureAwait(false);
             if (!accessTokenResult.Succeeded) {
                 return accessTokenResult;
             }
         }
-        if (!string.IsNullOrWhiteSpace(request.CertificatePassword)) {
-            var certificatePasswordResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.CertificatePassword, request.CertificatePassword!.Trim(), cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(certificatePassword)) {
+            var certificatePasswordResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.CertificatePassword, certificatePassword!.Trim(), cancellationToken).ConfigureAwait(false);
             if (!certificatePasswordResult.Succeeded) {
                 return certificatePasswordResult;
             }
@@ -113,12 +141,40 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
         var displayName = request.DisplayName.Trim();
         var mailbox = string.IsNullOrWhiteSpace(request.Mailbox) ? "me" : request.Mailbox!.Trim();
         var existing = await _profiles.GetProfileAsync(profileId, cancellationToken).ConfigureAwait(false);
+        string? clientSecret;
+        string? refreshToken;
+        string? accessToken;
+        try {
+            clientSecret = await MailSecretReferenceResolver.ResolveAsync(
+                _secretStore,
+                profileId,
+                MailSecretNames.ClientSecret,
+                request.ClientSecret,
+                request.ClientSecretReference,
+                cancellationToken).ConfigureAwait(false);
+            refreshToken = await MailSecretReferenceResolver.ResolveAsync(
+                _secretStore,
+                profileId,
+                MailSecretNames.RefreshToken,
+                request.RefreshToken,
+                request.RefreshTokenReference,
+                cancellationToken).ConfigureAwait(false);
+            accessToken = await MailSecretReferenceResolver.ResolveAsync(
+                _secretStore,
+                profileId,
+                MailSecretNames.AccessToken,
+                request.AccessToken,
+                request.AccessTokenReference,
+                cancellationToken).ConfigureAwait(false);
+        } catch (InvalidOperationException ex) {
+            return OperationResult.Failure("secret_reference_invalid", ex.Message);
+        }
         var effectiveClientId = FirstNonEmpty(request.ClientId, existing?.Settings.TryGetValue(MailProfileSettingsKeys.ClientId, out var existingClientId) == true ? existingClientId : null);
-        var hasAccessToken = !string.IsNullOrWhiteSpace(request.AccessToken) ||
+        var hasAccessToken = !string.IsNullOrWhiteSpace(accessToken) ||
                              await HasStoredSecretAsync(profileId, MailSecretNames.AccessToken, cancellationToken).ConfigureAwait(false);
-        var hasRefreshToken = !string.IsNullOrWhiteSpace(request.RefreshToken) ||
+        var hasRefreshToken = !string.IsNullOrWhiteSpace(refreshToken) ||
                               await HasStoredSecretAsync(profileId, MailSecretNames.RefreshToken, cancellationToken).ConfigureAwait(false);
-        var hasClientSecret = !string.IsNullOrWhiteSpace(request.ClientSecret) ||
+        var hasClientSecret = !string.IsNullOrWhiteSpace(clientSecret) ||
                               await HasStoredSecretAsync(profileId, MailSecretNames.ClientSecret, cancellationToken).ConfigureAwait(false);
 
         if (profileId.Length == 0) {
@@ -159,20 +215,20 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
             return saveResult;
         }
 
-        if (!string.IsNullOrWhiteSpace(request.ClientSecret)) {
-            var clientSecretResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.ClientSecret, request.ClientSecret!.Trim(), cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(clientSecret)) {
+            var clientSecretResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.ClientSecret, clientSecret!.Trim(), cancellationToken).ConfigureAwait(false);
             if (!clientSecretResult.Succeeded) {
                 return clientSecretResult;
             }
         }
-        if (!string.IsNullOrWhiteSpace(request.RefreshToken)) {
-            var refreshTokenResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.RefreshToken, request.RefreshToken!.Trim(), cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(refreshToken)) {
+            var refreshTokenResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.RefreshToken, refreshToken!.Trim(), cancellationToken).ConfigureAwait(false);
             if (!refreshTokenResult.Succeeded) {
                 return refreshTokenResult;
             }
         }
-        if (!string.IsNullOrWhiteSpace(request.AccessToken)) {
-            var accessTokenResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.AccessToken, request.AccessToken!.Trim(), cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(accessToken)) {
+            var accessTokenResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.AccessToken, accessToken!.Trim(), cancellationToken).ConfigureAwait(false);
             if (!accessTokenResult.Succeeded) {
                 return accessTokenResult;
             }

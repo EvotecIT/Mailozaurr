@@ -79,11 +79,22 @@
 
     <ItemGroup>
         <!-- This is needed for XmlDoc2CmdletDoc to generate a PowerShell documentation file. -->
-        <PackageReference Include="MatejKafka.XmlDoc2CmdletDoc" Version="0.7.0">
+        <PackageReference Include="MatejKafka.XmlDoc2CmdletDoc" Version="0.7.0" GeneratePathProperty="true">
             <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <ExcludeAssets>build;buildTransitive</ExcludeAssets>
         </PackageReference>
     </ItemGroup>
+
+    <!-- XmlDoc2CmdletDoc help is only needed for the hostable PowerShell builds.
+    Skipping netstandard2.0 avoids duplicate standalone-build help generation and file locking. -->
+    <Target Name="XmlDoc2CmdletDoc"
+        BeforeTargets="PostBuildEvent"
+        Inputs="$(TargetPath)"
+        Outputs="$(TargetPath)-Help.xml"
+        Condition="'$(IsCrossTargetingBuild)' != 'true' and '$(TargetFramework)' != 'netstandard2.0'">
+        <Exec Command='dotnet --roll-forward Major "$(PkgMatejKafka_XmlDoc2CmdletDoc)\tools\MatejKafka.XmlDoc2CmdletDoc.dll" $(XmlDoc2CmdletDocArguments) "$(TargetPath)"'
+            IgnoreExitCode="true" />
+    </Target>
 
     <!-- Copy help documentation to publish output after publish -->
     <Target Name="CopyHelpDocumentationToPublishOutput" AfterTargets="Publish">

@@ -28,9 +28,18 @@ public sealed class GmailProfileBootstrapRequest {
     /// <summary>Optional Google OAuth client secret to store securely.</summary>
     public string? ClientSecret { get; set; }
 
+    /// <summary>Optional secret reference for the client secret, in the form <c>&lt;profile-id&gt;:&lt;secret-name&gt;</c> or <c>&lt;secret-name&gt;</c>.</summary>
+    public string? ClientSecretReference { get; set; }
+
     /// <summary>Optional refresh token to store securely.</summary>
     public string? RefreshToken { get; set; }
 
+    /// <summary>Optional secret reference for the refresh token, in the form <c>&lt;profile-id&gt;:&lt;secret-name&gt;</c> or <c>&lt;secret-name&gt;</c>.</summary>
+    public string? RefreshTokenReference { get; set; }
+
     /// <summary>Optional explicit access token to store securely.</summary>
     public string? AccessToken { get; set; }
+
+    /// <summary>Optional secret reference for the access token, in the form <c>&lt;profile-id&gt;:&lt;secret-name&gt;</c> or <c>&lt;secret-name&gt;</c>.</summary>
+    public string? AccessTokenReference { get; set; }
 }
