@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text.Json;
 using Mailozaurr.Application;
 using Mailozaurr.Cli.Mcp;
@@ -13,7 +14,8 @@ public static class CliRunner {
         string[] args,
         TextWriter output,
         TextWriter error,
-        Func<MailApplicationOptions, MailApplicationBuilder>? builderFactory = null) {
+        Func<MailApplicationOptions, MailApplicationBuilder>? builderFactory = null,
+        TextReader? input = null) {
         if (args == null) {
             throw new ArgumentNullException(nameof(args));
         }
@@ -25,6 +27,7 @@ public static class CliRunner {
         }
 
         var parseResult = CliArguments.Parse(args);
+        input ??= TextReader.Null;
         if (parseResult.ShowHelp || parseResult.Positionals.Count == 0) {
             WriteHelp(output);
             return 0;
@@ -53,9 +56,9 @@ public static class CliRunner {
             .Build();
 
         try {
-            return await ExecuteAsync(application, parseResult, output, error).ConfigureAwait(false);
+            return await ExecuteAsync(application, parseResult, output, error, input).ConfigureAwait(false);
         } catch (Exception ex) {
-            await error.WriteLineAsync(ex.Message).ConfigureAwait(false);
+            await WriteExceptionAsync(error, ex, parseResult.HasFlag("json")).ConfigureAwait(false);
             return 1;
         }
     }
@@ -64,10 +67,11 @@ public static class CliRunner {
         MailApplication application,
         CliArguments parseResult,
         TextWriter output,
-        TextWriter error) {
+        TextWriter error,
+        TextReader input) {
         var command = parseResult.Positionals[0];
         return command switch {
-            "profile" => await ExecuteProfileAsync(application, parseResult, output, error).ConfigureAwait(false),
+            "profile" => await ExecuteProfileAsync(application, parseResult, output, error, input).ConfigureAwait(false),
             "draft" => await ExecuteDraftAsync(application, parseResult, output, error).ConfigureAwait(false),
             "mail" => await ExecuteMailAsync(application, parseResult, output, error).ConfigureAwait(false),
             "mcp" => await ExecuteMcpAsync(application, parseResult, error).ConfigureAwait(false),
@@ -81,7 +85,8 @@ public static class CliRunner {
         MailApplication application,
         CliArguments parseResult,
         TextWriter output,
-        TextWriter error) {
+        TextWriter error,
+        TextReader input) {
         if (parseResult.Positionals.Count < 2) {
             await error.WriteLineAsync("Missing profile command. Use 'profile list', 'profile create', 'profile graph-bootstrap', 'profile gmail-bootstrap', 'profile graph-login', 'profile gmail-login', 'profile refresh-auth', 'profile auth-status', 'profile test', 'profile summary', 'profile capabilities', 'profile show', 'profile validate', 'profile doctor', 'profile delete', 'profile set-default', 'profile set-secret', or 'profile remove-secret'.").ConfigureAwait(false);
             return 1;
@@ -119,10 +124,13 @@ public static class CliRunner {
                     IsDefault = parseResult.HasFlag("is-default"),
                     ClientId = parseResult.GetOption("client-id"),
                     TenantId = parseResult.GetOption("tenant-id"),
-                    ClientSecret = parseResult.GetOption("client-secret"),
-                    AccessToken = parseResult.GetOption("access-token"),
+                    ClientSecret = await ResolveSensitiveOptionAsync(parseResult, "client-secret", input).ConfigureAwait(false),
+                    ClientSecretReference = parseResult.GetOption("client-secret-ref"),
+                    AccessToken = await ResolveSensitiveOptionAsync(parseResult, "access-token", input).ConfigureAwait(false),
+                    AccessTokenReference = parseResult.GetOption("access-token-ref"),
                     CertificatePath = parseResult.GetOption("certificate-path"),
-                    CertificatePassword = parseResult.GetOption("certificate-password")
+                    CertificatePassword = await ResolveSensitiveOptionAsync(parseResult, "certificate-password", input).ConfigureAwait(false),
+                    CertificatePasswordReference = parseResult.GetOption("certificate-password-ref")
                 }).ConfigureAwait(false);
                 await WriteItemAsync(output, graphBootstrapResult, json, value => value.Message ?? "Graph profile saved.").ConfigureAwait(false);
                 return graphBootstrapResult.Succeeded ? 0 : 1;
@@ -135,9 +143,12 @@ public static class CliRunner {
                     DefaultSender = parseResult.GetOption("default-sender"),
                     IsDefault = parseResult.HasFlag("is-default"),
                     ClientId = parseResult.GetOption("client-id"),
-                    ClientSecret = parseResult.GetOption("client-secret"),
-                    RefreshToken = parseResult.GetOption("refresh-token"),
-                    AccessToken = parseResult.GetOption("access-token")
+                    ClientSecret = await ResolveSensitiveOptionAsync(parseResult, "client-secret", input).ConfigureAwait(false),
+                    ClientSecretReference = parseResult.GetOption("client-secret-ref"),
+                    RefreshToken = await ResolveSensitiveOptionAsync(parseResult, "refresh-token", input).ConfigureAwait(false),
+                    RefreshTokenReference = parseResult.GetOption("refresh-token-ref"),
+                    AccessToken = await ResolveSensitiveOptionAsync(parseResult, "access-token", input).ConfigureAwait(false),
+                    AccessTokenReference = parseResult.GetOption("access-token-ref")
                 }).ConfigureAwait(false);
                 await WriteItemAsync(output, gmailBootstrapResult, json, value => value.Message ?? "Gmail profile saved.").ConfigureAwait(false);
                 return gmailBootstrapResult.Succeeded ? 0 : 1;
@@ -161,7 +172,8 @@ public static class CliRunner {
                     ProfileId = RequireOption(parseResult, "profile"),
                     GmailAccount = parseResult.GetOption("mailbox"),
                     ClientId = parseResult.GetOption("client-id"),
-                    ClientSecret = parseResult.GetOption("client-secret"),
+                    ClientSecret = await ResolveSensitiveOptionAsync(parseResult, "client-secret", input).ConfigureAwait(false),
+                    ClientSecretReference = parseResult.GetOption("client-secret-ref"),
                     Scopes = parseResult.GetOptionValues("scope")
                         .Where(value => !string.IsNullOrWhiteSpace(value))
                         .Select(value => value!)
@@ -247,10 +259,17 @@ public static class CliRunner {
                 await WriteItemAsync(output, setDefaultResult, json, value => value.Message ?? "Default profile updated.").ConfigureAwait(false);
                 return setDefaultResult.Succeeded ? 0 : 1;
             case "set-secret":
+                var secretValue = await ResolveSensitiveOptionAsync(parseResult, "value", input).ConfigureAwait(false);
+                var secretReference = parseResult.GetOption("value-ref");
+                if (secretValue == null && string.IsNullOrWhiteSpace(secretReference)) {
+                    throw new InvalidOperationException(
+                        "Missing required option '--value'. You can also use '--value-env <name>', '--value-stdin', or '--value-ref <profile-id:secret-name>'.");
+                }
                 var setSecretResult = await application.ProfileSecrets.SetSecretAsync(
                     RequireOption(parseResult, "profile"),
                     RequireOption(parseResult, "name"),
-                    RequireOption(parseResult, "value")).ConfigureAwait(false);
+                    secretValue,
+                    secretReference).ConfigureAwait(false);
                 await WriteItemAsync(output, setSecretResult, json, value => value.Message ?? "Secret saved.").ConfigureAwait(false);
                 return setSecretResult.Succeeded ? 0 : 1;
             case "remove-secret":
@@ -1253,16 +1272,74 @@ public static class CliRunner {
         }
     }
 
+    private static async Task<string?> ResolveSensitiveOptionAsync(
+        CliArguments parseResult,
+        string optionName,
+        TextReader input,
+        bool required = false) {
+        var directValue = parseResult.GetOption(optionName);
+        var envName = parseResult.GetOption($"{optionName}-env");
+        var stdinRequested = parseResult.HasFlag($"{optionName}-stdin");
+
+        var sourceCount = 0;
+        if (directValue != null) {
+            sourceCount++;
+        }
+        if (!string.IsNullOrWhiteSpace(envName)) {
+            sourceCount++;
+        }
+        if (stdinRequested) {
+            sourceCount++;
+        }
+
+        if (sourceCount > 1) {
+            throw new InvalidOperationException($"Option '--{optionName}' accepts only one secret source at a time.");
+        }
+
+        string? resolvedValue = directValue;
+        if (!string.IsNullOrWhiteSpace(envName)) {
+            resolvedValue = Environment.GetEnvironmentVariable(envName!);
+            if (resolvedValue == null) {
+                throw new InvalidOperationException($"Environment variable '{envName}' was not found for '--{optionName}-env'.");
+            }
+        } else if (stdinRequested) {
+            resolvedValue = await input.ReadToEndAsync().ConfigureAwait(false);
+            resolvedValue = resolvedValue.TrimEnd('\r', '\n');
+        }
+
+        if (required && resolvedValue == null) {
+            throw new InvalidOperationException(
+                $"Missing required option '--{optionName}'. You can also use '--{optionName}-env <name>' or '--{optionName}-stdin'.");
+        }
+
+        return resolvedValue;
+    }
+
+    private static async Task WriteExceptionAsync(TextWriter error, Exception exception, bool json) {
+        if (json) {
+            var payload = new CliErrorEnvelope {
+                Error = new CliError {
+                    Type = exception.GetType().Name,
+                    Message = exception.Message
+                }
+            };
+            await error.WriteLineAsync(JsonSerializer.Serialize(payload, JsonOptions)).ConfigureAwait(false);
+            return;
+        }
+
+        await error.WriteLineAsync(exception.Message).ConfigureAwait(false);
+    }
+
     private static void WriteHelp(TextWriter output) {
         output.WriteLine("Mailozaurr CLI");
         output.WriteLine();
         output.WriteLine("Commands:");
         output.WriteLine("  profile list [--summary] [--compact] [--kind <kind>] [--ready-only] [--can-read] [--can-send] [--default-only] [--sort <id|kind|readiness>] [--desc] [--json]");
         output.WriteLine("  profile create --profile <id> --kind <kind> --name <display-name> [--description <text>] [--default-sender <email>] [--default-mailbox <value>] [--is-default] [--setting <key=value>] [--json]");
-        output.WriteLine("  profile graph-bootstrap --profile <id> --name <display-name> --mailbox <address> [--description <text>] [--default-sender <email>] [--is-default] [--client-id <id>] [--tenant-id <id>] [--client-secret <secret>] [--access-token <token>] [--certificate-path <path>] [--certificate-password <secret>] [--json]");
-        output.WriteLine("  profile gmail-bootstrap --profile <id> --name <display-name> [--mailbox <address|me>] [--description <text>] [--default-sender <email>] [--is-default] [--client-id <id>] [--client-secret <secret>] [--refresh-token <token>] [--access-token <token>] [--json]");
+        output.WriteLine("  profile graph-bootstrap --profile <id> --name <display-name> --mailbox <address> [--description <text>] [--default-sender <email>] [--is-default] [--client-id <id>] [--tenant-id <id>] [--client-secret <secret>|--client-secret-env <name>|--client-secret-stdin|--client-secret-ref <profile-id:secret-name>] [--access-token <token>|--access-token-env <name>|--access-token-stdin|--access-token-ref <profile-id:secret-name>] [--certificate-path <path>] [--certificate-password <secret>|--certificate-password-env <name>|--certificate-password-stdin|--certificate-password-ref <profile-id:secret-name>] [--json]");
+        output.WriteLine("  profile gmail-bootstrap --profile <id> --name <display-name> [--mailbox <address|me>] [--description <text>] [--default-sender <email>] [--is-default] [--client-id <id>] [--client-secret <secret>|--client-secret-env <name>|--client-secret-stdin|--client-secret-ref <profile-id:secret-name>] [--refresh-token <token>|--refresh-token-env <name>|--refresh-token-stdin|--refresh-token-ref <profile-id:secret-name>] [--access-token <token>|--access-token-env <name>|--access-token-stdin|--access-token-ref <profile-id:secret-name>] [--json]");
         output.WriteLine("  profile graph-login --profile <id> [--login <upn>] [--mailbox <address>] [--client-id <id>] [--tenant-id <id>] [--redirect-uri <uri>] [--scope <value>] [--scope <value>] [--json]");
-        output.WriteLine("  profile gmail-login --profile <id> [--mailbox <address>] [--client-id <id>] [--client-secret <secret>] [--scope <value>] [--scope <value>] [--json]");
+        output.WriteLine("  profile gmail-login --profile <id> [--mailbox <address>] [--client-id <id>] [--client-secret <secret>|--client-secret-env <name>|--client-secret-stdin|--client-secret-ref <profile-id:secret-name>] [--scope <value>] [--scope <value>] [--json]");
         output.WriteLine("  profile refresh-auth --profile <id> [--json]");
         output.WriteLine("  profile auth-status --profile <id> [--json]");
         output.WriteLine("  profile test --profile <id> [--scope <auto|auth|mailbox|send>] [--json]");
@@ -1273,7 +1350,7 @@ public static class CliRunner {
         output.WriteLine("  profile doctor --profile <id> [--json]");
         output.WriteLine("  profile delete --profile <id> [--json]");
         output.WriteLine("  profile set-default --profile <id> [--json]");
-        output.WriteLine("  profile set-secret --profile <id> --name <secret-name> --value <secret-value> [--json]");
+        output.WriteLine("  profile set-secret --profile <id> --name <secret-name> [--value <secret-value>|--value-env <name>|--value-stdin|--value-ref <profile-id:secret-name>] [--json]");
         output.WriteLine("  profile remove-secret --profile <id> --name <secret-name> [--json]");
         output.WriteLine("  draft list [--compact] [--json]");
         output.WriteLine("  draft save --file <path> [--draft <id>] [--name <display-name>] [--json]");
@@ -1381,5 +1458,15 @@ public static class CliRunner {
         }
 
         throw new InvalidOperationException($"Unsupported profile overview sort '{rawSort}'.");
+    }
+
+    private sealed class CliErrorEnvelope {
+        public required CliError Error { get; init; }
+    }
+
+    private sealed class CliError {
+        public required string Type { get; init; }
+
+        public required string Message { get; init; }
     }
 }

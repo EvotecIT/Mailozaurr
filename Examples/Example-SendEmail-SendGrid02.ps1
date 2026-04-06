@@ -1,9 +1,9 @@
 ﻿Import-Module $PSScriptRoot\..\Mailozaurr.psd1 -Force
 
 # Use SendGrid Api
-$Key = Get-Content -Raw -Path "C:\Support\Important\SendGrid.txt"
+$Key = Read-Host 'SendGrid API key' -AsSecureString
 
-$Credential = ConvertTo-SendGridCredential -ApiKey $Key
+$Credential = ConvertTo-SendGridCredential -ApiKeySecureString $Key
 
 Send-EmailMessage -From 'przemyslaw.klys@evo.cool' `
     -To 'przemyslaw.klys@evotec.pl', 'evotectest@gmail.com' `

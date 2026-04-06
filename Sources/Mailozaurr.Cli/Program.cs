@@ -5,4 +5,5 @@ return await CliRunner.RunAsync(
     args,
     Console.Out,
     Console.Error,
-    builderFactory: options => new MailApplicationBuilder(options));
+    builderFactory: options => new MailApplicationBuilder(options),
+    input: Console.In);

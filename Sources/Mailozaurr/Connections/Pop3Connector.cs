@@ -10,10 +10,17 @@ namespace Mailozaurr;
 /// Provides helper methods for connecting to POP3 servers with retry logic.
 /// </summary>
 public static class Pop3Connector {
+    private static Pop3Client CreateDefaultClient() => new Pop3Client();
+
     /// <summary>
     /// Factory used to create <see cref="Pop3Client"/> instances.
     /// </summary>
-    public static Func<Pop3Client> ClientFactory { get; set; } = () => new Pop3Client();
+    public static Func<Pop3Client> ClientFactory { get; set; } = CreateDefaultClient;
+
+    /// <summary>
+    /// Restores the default POP3 client factory.
+    /// </summary>
+    public static void ResetClientFactory() => ClientFactory = CreateDefaultClient;
 
     /// <summary>
     /// Delegate used to delay between connection retries.

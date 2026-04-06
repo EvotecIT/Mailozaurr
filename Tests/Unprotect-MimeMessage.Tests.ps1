@@ -23,17 +23,13 @@ Describe 'Unprotect-MimeMessage' {
     }
 
     It 'Decrypts SMIME message' -Skip:(-not $IsWindows) {
-        $rsa = [System.Security.Cryptography.RSA]::Create(2048)
-        $req = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new('cn=test',$rsa,[System.Security.Cryptography.HashAlgorithmName]::SHA256,[System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
-        $cert = $req.CreateSelfSigned([System.DateTimeOffset]::Now.AddDays(-1),[System.DateTimeOffset]::Now.AddDays(1))
-        $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx))
+        $cert = [Mailozaurr.TemporarySmimeCertificate]::CreateSelfSigned('CN=test@example.com')
         $smtp = [Mailozaurr.Smtp]::new()
         $smtp.From = 'x@y.com'
         $smtp.To = @('z@a.com')
         $smtp.Subject = 'enc'
         $smtp.TextBody = 'data'
         $smtp.CreateMessage()
-        $smtp.Sign($cert) | Out-Null
         $smtp.Encrypt($cert) | Out-Null
         $msg = $smtp.Message
         $out = $msg | Unprotect-MimeMessage -Certificate $cert

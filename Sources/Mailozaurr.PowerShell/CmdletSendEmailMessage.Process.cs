@@ -52,7 +52,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             }
         }
 
-        SmtpConnectionPool.Configure(UseConnectionPool.IsPresent, ConnectionPoolSize);
+        if (UseConnectionPool.IsPresent) {
+            SmtpConnectionPool.SetMaxPoolSize(ConnectionPoolSize);
+        }
     }
     /// <summary>
     /// Process the record.
@@ -466,6 +468,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         smtpClient.RetryAlways = RetryAlways.IsPresent;
         smtpClient.MaxDelayMilliseconds = MaxDelayMilliseconds;
         smtpClient.JitterMilliseconds = JitterMilliseconds;
+        smtpClient.UseConnectionPool = UseConnectionPool.IsPresent;
         if (UseDefaultCredentials) {
             smtpClient.ConnectionPoolIdentity = "default";
         } else if (Credential != null) {

@@ -15,6 +15,10 @@ public class SmtpConnectionPoolTests {
             ConnectCalls++;
             _connected = true;
         }
+
+        public override void Disconnect(bool quit, CancellationToken cancellationToken = default) {
+            _connected = false;
+        }
     }
 
     private sealed class TrackingClient : ClientSmtp {
@@ -55,6 +59,55 @@ public class SmtpConnectionPoolTests {
         Smtp.ClientFactory = logger => new ClientSmtp();
         SmtpConnectionPool.ClearConnectionPool();
         SmtpConnectionPool.SetPoolingEnabled(false);
+    }
+
+    [Fact]
+    public void InstancePoolOverrideFalse_DoesNotUseGlobalPool() {
+        SmtpConnectionPool.SetPoolingEnabled(true);
+        SmtpConnectionPool.ClearConnectionPool();
+
+        var fake = new FakeClient();
+        Smtp.ClientFactory = _ => fake;
+
+        var smtp1 = new Smtp { UseConnectionPool = false };
+        smtp1.Connect("h", 25);
+        smtp1.Disconnect();
+
+        Smtp.ClientFactory = _ => new FakeClient();
+        var smtp2 = new Smtp { UseConnectionPool = false };
+        smtp2.Connect("h", 25);
+
+        Assert.NotSame(fake, smtp2.Client);
+        Assert.Equal(0, SmtpConnectionPool.CurrentPoolSize);
+
+        smtp2.Dispose();
+        Smtp.ClientFactory = _ => new ClientSmtp();
+        SmtpConnectionPool.ClearConnectionPool();
+        SmtpConnectionPool.SetPoolingEnabled(false);
+    }
+
+    [Fact]
+    public void InstancePoolOverrideTrue_UsesPoolWhenGlobalPoolingIsDisabled() {
+        SmtpConnectionPool.SetPoolingEnabled(false);
+        SmtpConnectionPool.ClearConnectionPool();
+
+        var fake = new FakeClient();
+        Smtp.ClientFactory = _ => fake;
+
+        var smtp1 = new Smtp { UseConnectionPool = true };
+        smtp1.Connect("h", 25);
+        smtp1.Disconnect();
+
+        var smtp2 = new Smtp { UseConnectionPool = true };
+        Smtp.ClientFactory = _ => new FakeClient();
+        smtp2.Connect("h", 25);
+
+        Assert.Same(fake, smtp2.Client);
+        Assert.Equal(1, fake.ConnectCalls);
+
+        smtp2.Dispose();
+        Smtp.ClientFactory = _ => new ClientSmtp();
+        SmtpConnectionPool.ClearConnectionPool();
     }
 
     [Fact]

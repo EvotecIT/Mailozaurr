@@ -43,6 +43,23 @@ public sealed class ApplicationSecretStoreTests {
         Assert.Null(loaded);
     }
 
+    [Fact]
+    public async Task UpdatingSecretReplacesFileWithoutLeavingTemporaryArtifacts() {
+        var filePath = CreateTemporaryFilePath();
+        var protector = new TestCredentialProtector();
+        var store = new FileMailSecretStore(filePath, protector);
+
+        await store.SetSecretAsync("work-imap", "password", "initial");
+        await store.SetSecretAsync("work-imap", "password", "updated");
+
+        var loaded = await store.GetSecretAsync("work-imap", "password");
+        var files = Directory.GetFiles(Path.GetDirectoryName(filePath)!);
+
+        Assert.Equal("updated", loaded);
+        Assert.Single(files);
+        Assert.Equal(filePath, files[0], StringComparer.OrdinalIgnoreCase);
+    }
+
     private static string CreateTemporaryFilePath() {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

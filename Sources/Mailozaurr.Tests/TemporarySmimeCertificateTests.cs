@@ -43,4 +43,49 @@ public class TemporarySmimeCertificateTests
         var encryptResult = smtp.Encrypt(cert);
         Assert.True(encryptResult.Status);
     }
+
+    [Fact]
+    public void Certificate_CanVerifySmimeSignature()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            return;
+        }
+
+        using X509Certificate2 cert = TemporarySmimeCertificate.CreateSelfSigned();
+        var smtp = new Smtp();
+        smtp.From = "a@b.com";
+        smtp.To = new object[] { "c@d.com" };
+        smtp.Subject = "test";
+        smtp.TextBody = "body";
+        smtp.CreateMessage();
+
+        var signResult = smtp.Sign(cert);
+
+        Assert.True(signResult.Status);
+        Assert.True(MimeKitUtils.VerifySmimeSignature(smtp.Message, cert));
+    }
+
+    [Fact]
+    public void Certificate_CanDecryptSmimeMessage()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            return;
+        }
+
+        using X509Certificate2 cert = TemporarySmimeCertificate.CreateSelfSigned();
+        var smtp = new Smtp();
+        smtp.From = "a@b.com";
+        smtp.To = new object[] { "c@d.com" };
+        smtp.Subject = "test";
+        smtp.TextBody = "body";
+        smtp.CreateMessage();
+
+        var encryptResult = smtp.Encrypt(cert);
+        var decrypted = MimeKitUtils.DecryptSmime(smtp.Message, cert);
+
+        Assert.True(encryptResult.Status);
+        Assert.Equal("body", decrypted.TextBody);
+    }
 }

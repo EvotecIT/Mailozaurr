@@ -16,7 +16,8 @@ namespace Mailozaurr.PowerShell;
 /// </example>
 /// <example>
 ///   <summary>Connect to Gmail POP3 using OAuth2</summary>
-///   <code>$cred = Connect-OAuthGoogle -GmailAccount "user@gmail.com" -ClientID "id" -ClientSecret "secret"
+///   <code>$clientSecret = Read-Host "Google client secret" -AsSecureString
+/// $cred = Connect-OAuthGoogle -GmailAccount "user@gmail.com" -ClientID "id" -ClientSecretSecureString $clientSecret
 /// Connect-POP3 -Server "pop.gmail.com" -Credential $cred -OAuth2</code>
 /// </example>
 /// <example>

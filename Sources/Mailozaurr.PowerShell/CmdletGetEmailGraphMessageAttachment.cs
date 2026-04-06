@@ -12,8 +12,8 @@ namespace Mailozaurr.PowerShell;
 /// <para type="description">The <c>Get-EmailGraphMessageAttachment</c> cmdlet retrieves attachments for the specified mail message ID and user principal name using Microsoft Graph API. Provide a <see cref="GraphConnectionInfo"/> object created with <c>Connect-EmailGraph</c> or authenticate via <c>Connect-MgGraph</c>.</para>
 /// <example>
 ///   <summary>Get attachments for a mail message</summary>
-///   <code>$cred = ConvertTo-GraphCredential -ClientId "id" -ClientSecret "secret" -DirectoryId "tenant"
-///   Get-EmailGraphMessageAttachment -UserPrincipalName "user@domain.com" -MessageId "AAMk..." -Credential $cred</code>
+///   <code>$graph = Connect-EmailGraph -ClientId "id" -DirectoryId "tenant" -ClientSecretSecretName "graph-client-secret" -ClientSecretVaultName "MailSecrets"
+///   Get-EmailGraphMessageAttachment -UserPrincipalName "user@domain.com" -MessageId "AAMk..." -Connection $graph</code>
 /// </example>
 /// <remarks>
 /// Use this cmdlet to enumerate attachments for mailbox management, reporting, or migration scenarios.

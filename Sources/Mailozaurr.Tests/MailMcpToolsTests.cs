@@ -175,6 +175,33 @@ public sealed class MailMcpToolsTests {
     }
 
     [Fact]
+    public async Task MailProfileGraphBootstrapSupportsSecretReferences() {
+        using var fixture = new TestFixture();
+        await fixture.ProfileStore.SaveAsync(new MailProfile {
+            Id = "shared-secrets",
+            DisplayName = "Shared Secrets",
+            Kind = MailProfileKind.Gmail,
+            Settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+                [MailProfileSettingsKeys.Mailbox] = "shared@example.com",
+                [MailProfileSettingsKeys.ClientId] = "shared-client"
+            }
+        });
+        await fixture.SecretStore.SetSecretAsync("shared-secrets", MailSecretNames.ClientSecret, "shared-client-secret");
+
+        var profile = await fixture.Tools.mail_profile_graph_bootstrap(
+            profileId: "graph-ref",
+            displayName: "Graph Ref",
+            mailbox: "shared@example.com",
+            clientId: "client-id",
+            tenantId: "tenant-id",
+            clientSecretReference: $"shared-secrets:{MailSecretNames.ClientSecret}");
+        var storedSecret = await fixture.SecretStore.GetSecretAsync("graph-ref", MailSecretNames.ClientSecret);
+
+        Assert.Equal("graph-ref", profile.Id);
+        Assert.Equal("shared-client-secret", storedSecret);
+    }
+
+    [Fact]
     public async Task MailProfileGmailBootstrapCreatesProfileAndStoresSecrets() {
         using var fixture = new TestFixture();
 
@@ -261,6 +288,29 @@ public sealed class MailMcpToolsTests {
         Assert.Equal("gmail-refresh-token", refreshToken);
         Assert.NotNull(fixture.ProfileAuthService.LastGmailRequest);
         Assert.Equal("user@gmail.com", fixture.ProfileAuthService.LastGmailRequest!.GmailAccount);
+    }
+
+    [Fact]
+    public async Task MailProfileGmailLoginSupportsSameProfileSecretReference() {
+        using var fixture = new TestFixture();
+        await fixture.ProfileStore.SaveAsync(new MailProfile {
+            Id = "gmail-login-ref",
+            DisplayName = "Gmail Login Ref",
+            Kind = MailProfileKind.Gmail,
+            Settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+                [MailProfileSettingsKeys.Mailbox] = "user@gmail.com",
+                [MailProfileSettingsKeys.ClientId] = "client-id"
+            }
+        });
+        await fixture.SecretStore.SetSecretAsync("gmail-login-ref", MailSecretNames.ClientSecret, "client-secret-from-store");
+
+        var result = await fixture.Tools.mail_profile_gmail_login(
+            "gmail-login-ref",
+            clientSecretReference: MailSecretNames.ClientSecret);
+
+        Assert.True(result.Succeeded);
+        Assert.NotNull(fixture.ProfileAuthService.LastGmailRequest);
+        Assert.Equal("client-secret-from-store", fixture.ProfileAuthService.LastGmailRequest!.ClientSecret);
     }
 
     [Fact]
@@ -420,6 +470,30 @@ public sealed class MailMcpToolsTests {
         Assert.Equal("secret-value", storedSecret);
         Assert.True(removeResult.Succeeded);
         Assert.Null(removedSecret);
+    }
+
+    [Fact]
+    public async Task MailProfileSecretSetSupportsReferenceCopy() {
+        using var fixture = new TestFixture();
+        await fixture.ProfileStore.SaveAsync(new MailProfile {
+            Id = "shared-secrets",
+            DisplayName = "Shared Secrets",
+            Kind = MailProfileKind.Gmail,
+            Settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+                [MailProfileSettingsKeys.Mailbox] = "shared@example.com",
+                [MailProfileSettingsKeys.ClientId] = "shared-client"
+            }
+        });
+        await fixture.SecretStore.SetSecretAsync("shared-secrets", MailSecretNames.RefreshToken, "copied-secret");
+
+        var setResult = await fixture.Tools.mail_profile_secret_set(
+            profileId: "gmail-work",
+            secretName: MailSecretNames.RefreshToken,
+            secretReference: $"shared-secrets:{MailSecretNames.RefreshToken}");
+        var storedSecret = await fixture.SecretStore.GetSecretAsync("gmail-work", MailSecretNames.RefreshToken);
+
+        Assert.True(setResult.Succeeded);
+        Assert.Equal("copied-secret", storedSecret);
     }
 
     [Fact]
@@ -2465,6 +2539,11 @@ public sealed class MailMcpToolsTests {
             var profile = await _profileStore.GetByIdAsync(request.ProfileId, cancellationToken);
             Assert.NotNull(profile);
             var savedProfile = profile!;
+            var clientSecret = request.ClientSecret;
+            if (string.IsNullOrWhiteSpace(clientSecret) && !string.IsNullOrWhiteSpace(request.ClientSecretReference)) {
+                var (sourceProfileId, sourceSecretName) = ParseSecretReference(request.ClientSecretReference!, request.ProfileId);
+                clientSecret = await _secretStore.GetSecretAsync(sourceProfileId, sourceSecretName, cancellationToken);
+            }
             var account = request.GmailAccount
                 ?? (savedProfile.Settings.TryGetValue(MailProfileSettingsKeys.Mailbox, out var mailbox) ? mailbox : null)
                 ?? "user@gmail.com";
@@ -2472,7 +2551,7 @@ public sealed class MailMcpToolsTests {
                 ProfileId = request.ProfileId,
                 GmailAccount = account,
                 ClientId = request.ClientId ?? (savedProfile.Settings.TryGetValue(MailProfileSettingsKeys.ClientId, out var clientId) ? clientId : null),
-                ClientSecret = request.ClientSecret,
+                ClientSecret = clientSecret,
                 Scopes = request.Scopes
             };
             savedProfile.Settings[MailProfileSettingsKeys.Mailbox] = account;
@@ -2522,6 +2601,21 @@ public sealed class MailMcpToolsTests {
                     ProfileKind = profile.Kind
                 }
             };
+        }
+
+        private static (string ProfileId, string SecretName) ParseSecretReference(string secretReference, string defaultProfileId) {
+            var normalized = secretReference.Trim();
+            var colonIndex = normalized.IndexOf(':');
+            var slashIndex = normalized.IndexOf('/');
+            var separatorIndex = colonIndex >= 0 && slashIndex >= 0
+                ? Math.Min(colonIndex, slashIndex)
+                : Math.Max(colonIndex, slashIndex);
+
+            if (separatorIndex < 0) {
+                return (defaultProfileId, normalized);
+            }
+
+            return (normalized[..separatorIndex], normalized[(separatorIndex + 1)..]);
         }
     }
 

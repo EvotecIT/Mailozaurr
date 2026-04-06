@@ -1,7 +1,6 @@
 Import-Module $PSScriptRoot\..\Mailozaurr.psd1 -Force
 
-$cred = ConvertTo-GraphCredential -ClientId 'id' -ClientSecret 'secret' -DirectoryId 'tenant'
-$graph = Connect-EmailGraph -Credential $cred
+$graph = Connect-EmailGraph -ClientId 'id' -DirectoryId 'tenant' -ClientSecretSecretName 'graph-client-secret' -ClientSecretVaultName 'MailSecrets'
 
 Get-GraphMailboxStatistics -UserPrincipalName 'user@example.com' -Connection $graph |
     Select-Object UserPrincipalName, MessageCount, MessagesWithAttachments, TotalAttachmentSize, TotalFolders, FolderStatistics |

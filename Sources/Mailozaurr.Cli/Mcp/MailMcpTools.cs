@@ -163,10 +163,13 @@ public sealed class MailMcpTools {
         [Description("When true, marks this profile as the default profile.")] bool isDefault = false,
         [Description("Optional Graph client/application identifier.")] string? clientId = null,
         [Description("Optional Graph tenant/directory identifier.")] string? tenantId = null,
-        [Description("Optional confidential client secret to store securely.")] string? clientSecret = null,
-        [Description("Optional explicit access token to store securely.")] string? accessToken = null,
+        [Description("Optional confidential client secret to store securely. Prefer using clientSecretReference for MCP hosts.")] string? clientSecret = null,
+        [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Graph client secret.")] string? clientSecretReference = null,
+        [Description("Optional explicit access token to store securely. Prefer using accessTokenReference for MCP hosts.")] string? accessToken = null,
+        [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Graph access token.")] string? accessTokenReference = null,
         [Description("Optional certificate path for certificate-based auth.")] string? certificatePath = null,
-        [Description("Optional certificate password to store securely.")] string? certificatePassword = null,
+        [Description("Optional certificate password to store securely. Prefer using certificatePasswordReference for MCP hosts.")] string? certificatePassword = null,
+        [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the certificate password.")] string? certificatePasswordReference = null,
         CancellationToken cancellationToken = default) {
         var result = await _application.ProfileBootstrap.SaveGraphProfileAsync(new GraphProfileBootstrapRequest {
             ProfileId = profileId,
@@ -178,9 +181,12 @@ public sealed class MailMcpTools {
             ClientId = clientId,
             TenantId = tenantId,
             ClientSecret = clientSecret,
+            ClientSecretReference = clientSecretReference,
             AccessToken = accessToken,
+            AccessTokenReference = accessTokenReference,
             CertificatePath = certificatePath,
-            CertificatePassword = certificatePassword
+            CertificatePassword = certificatePassword,
+            CertificatePasswordReference = certificatePasswordReference
         }, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded) {
             throw new InvalidOperationException(result.Message ?? $"Graph profile '{profileId}' could not be saved.");
@@ -199,9 +205,12 @@ public sealed class MailMcpTools {
         [Description("Optional default sender email address. Defaults to the mailbox when appropriate.")] string? defaultSender = null,
         [Description("When true, marks this profile as the default profile.")] bool isDefault = false,
         [Description("Optional Google OAuth client identifier.")] string? clientId = null,
-        [Description("Optional Google OAuth client secret to store securely.")] string? clientSecret = null,
-        [Description("Optional Google OAuth refresh token to store securely.")] string? refreshToken = null,
-        [Description("Optional explicit access token to store securely.")] string? accessToken = null,
+        [Description("Optional Google OAuth client secret to store securely. Prefer using clientSecretReference for MCP hosts.")] string? clientSecret = null,
+        [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Gmail client secret.")] string? clientSecretReference = null,
+        [Description("Optional Google OAuth refresh token to store securely. Prefer using refreshTokenReference for MCP hosts.")] string? refreshToken = null,
+        [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Gmail refresh token.")] string? refreshTokenReference = null,
+        [Description("Optional explicit access token to store securely. Prefer using accessTokenReference for MCP hosts.")] string? accessToken = null,
+        [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Gmail access token.")] string? accessTokenReference = null,
         CancellationToken cancellationToken = default) {
         var result = await _application.ProfileBootstrap.SaveGmailProfileAsync(new GmailProfileBootstrapRequest {
             ProfileId = profileId,
@@ -212,8 +221,11 @@ public sealed class MailMcpTools {
             IsDefault = isDefault,
             ClientId = clientId,
             ClientSecret = clientSecret,
+            ClientSecretReference = clientSecretReference,
             RefreshToken = refreshToken,
-            AccessToken = accessToken
+            RefreshTokenReference = refreshTokenReference,
+            AccessToken = accessToken,
+            AccessTokenReference = accessTokenReference
         }, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded) {
             throw new InvalidOperationException(result.Message ?? $"Gmail profile '{profileId}' could not be saved.");
@@ -249,7 +261,8 @@ public sealed class MailMcpTools {
         [Description("The saved Gmail profile identifier to authenticate.")] string profileId,
         [Description("Optional Gmail account override used for the login flow.")] string? mailbox = null,
         [Description("Optional OAuth client identifier override.")] string? clientId = null,
-        [Description("Optional OAuth client secret override.")] string? clientSecret = null,
+        [Description("Optional OAuth client secret override. Prefer using clientSecretReference for MCP hosts.")] string? clientSecret = null,
+        [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Gmail client secret override.")] string? clientSecretReference = null,
         [Description("Optional scopes override.")] string[]? scopes = null,
         CancellationToken cancellationToken = default) =>
         _application.ProfileAuth.LoginGmailAsync(new GmailProfileLoginRequest {
@@ -257,6 +270,7 @@ public sealed class MailMcpTools {
             GmailAccount = mailbox,
             ClientId = clientId,
             ClientSecret = clientSecret,
+            ClientSecretReference = clientSecretReference,
             Scopes = scopes
         }, cancellationToken);
 
@@ -303,9 +317,15 @@ public sealed class MailMcpTools {
     public Task<OperationResult> mail_profile_secret_set(
         [Description("The profile identifier that owns the secret.")] string profileId,
         [Description("The stable secret name, such as password, client-secret, or refresh-token.")] string secretName,
-        [Description("The secret value to store.")] string secretValue,
+        [Description("The secret value to store. Prefer using secretReference for MCP hosts when the secret already exists in the shared store.")] string? secretValue = null,
+        [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' to copy without re-exposing the secret value.")] string? secretReference = null,
         CancellationToken cancellationToken = default) =>
-        _application.ProfileSecrets.SetSecretAsync(profileId, secretName, secretValue, cancellationToken);
+        _application.ProfileSecrets.SetSecretAsync(
+            profileId,
+            secretName,
+            secretValue,
+            secretReference,
+            cancellationToken);
 
     [McpServerTool]
     [Description("Removes a secret associated with an existing Mailozaurr profile.")]

@@ -186,6 +186,35 @@ public class GraphBatchAndRetryTests {
     }
 
     [Fact]
+    public async Task ConnectO365GraphAsync_UsesProvidedAccessTokenWithoutHttpCall() {
+        var handler = new RetryHandler();
+        var field = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var client = (HttpClient)field.GetValue(null)!;
+        var handlerField = GetHandlerField();
+        var original = (HttpMessageHandler)handlerField.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var cache = (System.Collections.Concurrent.ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
+        cache.Clear();
+        OAuthCacheTestHelper.ResetOAuthTokenCache();
+        OAuthCacheTestHelper.DeleteOAuthCacheFile();
+        try {
+            var credential = new GraphCredential {
+                ClientId = "id",
+                DirectoryId = "tenant",
+                AccessToken = "delegated-token"
+            };
+
+            string token = await MicrosoftGraphUtils.ConnectO365GraphAsync(credential, "tenant");
+
+            Assert.Equal("Bearer delegated-token", token);
+            Assert.Equal(0, handler.CallCount);
+        } finally {
+            handlerField.SetValue(client, original);
+        }
+    }
+
+    [Fact]
     public async Task ConnectO365GraphWithRetryAsync_NoRetriesThrowsException() {
         var handler = new AlwaysFailHandler();
         var field = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;

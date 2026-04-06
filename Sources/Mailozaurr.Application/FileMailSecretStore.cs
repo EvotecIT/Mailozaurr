@@ -105,6 +105,7 @@ public sealed class FileMailSecretStore : IMailSecretStore {
         Directory.CreateDirectory(directory);
 
         var tempPath = Path.Combine(directory, Path.GetRandomFileName());
+        var backupPath = Path.Combine(directory, Path.GetRandomFileName());
         try {
             using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)) {
                 await JsonSerializer.SerializeAsync(stream, document, SerializerOptions, cancellationToken).ConfigureAwait(false);
@@ -112,7 +113,13 @@ public sealed class FileMailSecretStore : IMailSecretStore {
             }
 
             if (File.Exists(_filePath)) {
-                File.Delete(_filePath);
+                File.Replace(tempPath, _filePath, backupPath);
+                tempPath = string.Empty;
+                if (File.Exists(backupPath)) {
+                    File.Delete(backupPath);
+                }
+                backupPath = string.Empty;
+                return;
             }
 
             File.Move(tempPath, _filePath);
@@ -120,6 +127,9 @@ public sealed class FileMailSecretStore : IMailSecretStore {
         } finally {
             if (!string.IsNullOrEmpty(tempPath) && File.Exists(tempPath)) {
                 File.Delete(tempPath);
+            }
+            if (!string.IsNullOrEmpty(backupPath) && File.Exists(backupPath)) {
+                File.Delete(backupPath);
             }
         }
     }

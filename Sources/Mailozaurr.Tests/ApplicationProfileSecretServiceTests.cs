@@ -37,6 +37,38 @@ public sealed class ApplicationProfileSecretServiceTests {
         Assert.Equal("secret", stored);
     }
 
+    [Fact]
+    public async Task SetSecretAsyncSupportsReferenceCopyForExistingProfile() {
+        var profileStore = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
+        var secretStore = new FileMailSecretStore(CreateTemporaryFilePath("secrets.json"), new TestCredentialProtector());
+        var service = new MailProfileSecretService(profileStore, secretStore);
+
+        await profileStore.SaveAsync(new MailProfile {
+            Id = "work-imap",
+            DisplayName = "Work IMAP",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Server] = "imap.example.com"
+            }
+        });
+        await profileStore.SaveAsync(new MailProfile {
+            Id = "shared-secrets",
+            DisplayName = "Shared Secrets",
+            Kind = MailProfileKind.Gmail,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Mailbox] = "shared@example.com",
+                [MailProfileSettingsKeys.ClientId] = "client-id"
+            }
+        });
+        await secretStore.SetSecretAsync("shared-secrets", MailSecretNames.Password, "copied-secret");
+
+        var result = await service.SetSecretAsync("work-imap", MailSecretNames.Password, null, $"shared-secrets:{MailSecretNames.Password}");
+        var stored = await secretStore.GetSecretAsync("work-imap", MailSecretNames.Password);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("copied-secret", stored);
+    }
+
     private static string CreateTemporaryFilePath(string fileName) {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

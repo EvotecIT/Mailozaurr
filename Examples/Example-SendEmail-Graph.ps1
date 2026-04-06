@@ -8,9 +8,9 @@ $Body = EmailBody {
 # Credentials for Graph
 $ClientID = 'f8f134f3-78c7-48f4-a371-5d6eefa447cd'
 $DirectoryID = 'ceb371f6-8745-4876-a040-69f2d10a9d1a'
-$ClientSecret = Get-Content -Raw -Path "C:\Support\Important\Secretf8f134f3-78c7-48f4-a371-5d6eefa447cd.txt"
+$ClientSecret = Read-Host 'Graph client secret' -AsSecureString
 
-$Credential = ConvertTo-GraphCredential -ClientID $ClientID -ClientSecret $ClientSecret -DirectoryID $DirectoryID
+$Credential = ConvertTo-GraphCredential -ClientID $ClientID -ClientSecretSecureString $ClientSecret -DirectoryID $DirectoryID
 
 # Sending email
 Send-EmailMessage -From @{ Name = 'Przemysław Kłys'; Email = 'przemyslaw.klys@evotec.pl' } -To 'przemyslaw.klys@evotec.pl' `

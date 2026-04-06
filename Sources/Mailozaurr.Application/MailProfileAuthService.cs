@@ -102,6 +102,18 @@ public sealed class MailProfileAuthService : IMailProfileAuthService {
         }
 
         var profile = profileResult.Profile!;
+        string? requestClientSecret;
+        try {
+            requestClientSecret = await MailSecretReferenceResolver.ResolveAsync(
+                _secretStore,
+                profile.Id,
+                MailSecretNames.ClientSecret,
+                request.ClientSecret,
+                request.ClientSecretReference,
+                cancellationToken).ConfigureAwait(false);
+        } catch (InvalidOperationException ex) {
+            return Failure("secret_reference_invalid", ex.Message, profile.Id, MailProfileKind.Gmail);
+        }
         var gmailAccount = FirstNonEmpty(
             request.GmailAccount,
             profile.Settings.TryGetValue(MailProfileSettingsKeys.Mailbox, out var mailboxSetting) ? mailboxSetting : null,
@@ -110,7 +122,7 @@ public sealed class MailProfileAuthService : IMailProfileAuthService {
             request.ClientId,
             profile.Settings.TryGetValue(MailProfileSettingsKeys.ClientId, out var clientIdSetting) ? clientIdSetting : null);
         var clientSecret = FirstNonEmpty(
-            request.ClientSecret,
+            requestClientSecret,
             await TryReadSecretAsync(profile.Id, MailSecretNames.ClientSecret, cancellationToken).ConfigureAwait(false));
 
         if (string.IsNullOrWhiteSpace(gmailAccount)) {
@@ -128,6 +140,7 @@ public sealed class MailProfileAuthService : IMailProfileAuthService {
             GmailAccount = gmailAccount,
             ClientId = clientId,
             ClientSecret = clientSecret,
+            ClientSecretReference = null,
             Scopes = NormalizeScopes(request.Scopes, MailProfileAuthDefaults.GmailScopes)
         };
         var credential = await _loginGmailAsync(effectiveRequest, cancellationToken).ConfigureAwait(false);

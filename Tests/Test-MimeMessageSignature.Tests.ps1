@@ -11,7 +11,7 @@ Describe 'Test-MimeMessageSignature' {
         $pub = Join-Path $base 'Examples/PGPKeys/mimekit.gpg.pub'
         $sec = Join-Path $base 'Examples/PGPKeys/mimekit.gpg.sec'
         $smtp = [Mailozaurr.Smtp]::new()
-        $smtp.From = 'a@b.com'
+        $smtp.From = 'mimekit@example.com'
         $smtp.To = @('b@c.com')
         $smtp.Subject = 't'
         $smtp.TextBody = 'body'
@@ -23,10 +23,7 @@ Describe 'Test-MimeMessageSignature' {
     }
 
     It 'Verifies SMIME signature' -Skip:(-not $IsWindows) {
-        $rsa = [System.Security.Cryptography.RSA]::Create(2048)
-        $req = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new('cn=test',$rsa,[System.Security.Cryptography.HashAlgorithmName]::SHA256,[System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
-        $cert = $req.CreateSelfSigned([System.DateTimeOffset]::Now.AddDays(-1),[System.DateTimeOffset]::Now.AddDays(1))
-        $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx))
+        $cert = [Mailozaurr.TemporarySmimeCertificate]::CreateSelfSigned('CN=test@example.com')
         $smtp = [Mailozaurr.Smtp]::new()
         $smtp.From = 'x@y.com'
         $smtp.To = @('z@a.com')

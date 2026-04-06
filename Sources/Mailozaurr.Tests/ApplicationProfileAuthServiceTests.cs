@@ -124,6 +124,47 @@ public sealed class ApplicationProfileAuthServiceTests {
     }
 
     [Fact]
+    public async Task LoginGmailAsyncSupportsClientSecretReferences() {
+        var profileStore = new InMemoryProfileStore(new[] {
+            new MailProfile {
+                Id = "gmail-work",
+                DisplayName = "Work Gmail",
+                Kind = MailProfileKind.Gmail,
+                Settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+                    [MailProfileSettingsKeys.Mailbox] = "user@gmail.com",
+                    [MailProfileSettingsKeys.ClientId] = "client-id"
+                }
+            }
+        });
+        var secretStore = new InMemorySecretStore();
+        await secretStore.SetSecretAsync("shared-secrets", MailSecretNames.ClientSecret, "client-secret-from-reference");
+        GmailProfileLoginRequest? capturedRequest = null;
+        var service = new MailProfileAuthService(
+            new MailProfileService(profileStore, secretStore),
+            new MailProfileSecretService(profileStore, secretStore),
+            secretStore,
+            (request, _) => {
+                capturedRequest = request;
+                return Task.FromResult(new OAuthCredential {
+                    UserName = request.GmailAccount!,
+                    AccessToken = "gmail-access-token",
+                    RefreshToken = "gmail-refresh-token",
+                    ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
+                });
+            });
+
+        var result = await service.LoginGmailAsync(new GmailProfileLoginRequest {
+            ProfileId = "gmail-work",
+            ClientSecretReference = $"shared-secrets:{MailSecretNames.ClientSecret}"
+        });
+
+        Assert.True(result.Succeeded);
+        Assert.NotNull(capturedRequest);
+        Assert.Equal("client-secret-from-reference", capturedRequest!.ClientSecret);
+        Assert.Null(capturedRequest.ClientSecretReference);
+    }
+
+    [Fact]
     public async Task LoginGraphAsyncPersistsAccessTokenAndProfileSettings() {
         var profileStore = new InMemoryProfileStore(new[] {
             new MailProfile {

@@ -283,8 +283,9 @@ $imap = Connect-IMAP -Server 'imap.example.com' -UserName 'user@example.com' -Pa
 $cred = Get-Credential
 $pop3 = Connect-POP3 -Server 'pop.example.com' -Credential $cred
 
-# OAuth2 token
-$oauth = Connect-OAuthGoogle -ClientId 'id' -ClientSecret 'secret' -GmailAccount 'user@example.com' -Scope https://mail.google.com/
+# OAuth2 token with a SecureString client secret
+$googleClientSecret = Read-Host 'Google client secret' -AsSecureString
+$oauth = Connect-OAuthGoogle -ClientId 'id' -ClientSecretSecureString $googleClientSecret -GmailAccount 'user@example.com' -Scope https://mail.google.com/
 $imapOAuth = Connect-IMAP -Server 'imap.gmail.com' -Credential $oauth -OAuth2
 ```
 
@@ -300,7 +301,7 @@ Get-IMAPFolder -Client $client -Root
 Using OAuth tokens works the same:
 
 ```powershell
-$token = Connect-OAuthGoogle -ClientId 'id' -ClientSecret 'secret' -GmailAccount 'user@example.com' -Scope https://mail.google.com/
+$token = Connect-OAuthGoogle -ClientId 'id' -ClientSecretSecretName 'gmail-client-secret' -ClientSecretVaultName 'MailSecrets' -GmailAccount 'user@example.com' -Scope https://mail.google.com/
 $client = Connect-IMAP -Server 'imap.gmail.com' -Credential $token -OAuth2
 Get-IMAPFolder -Client $client -Root
 ```
@@ -388,7 +389,7 @@ PowerShell
 
 ```powershell
 # Graph send with conservative retry/backoff and concurrency
-$cred = ConvertTo-GraphCredential -ClientId $ClientId -ClientSecret $ClientSecret -DirectoryId $TenantId
+$cred = ConvertTo-GraphCredential -ClientId $ClientId -SecretName 'graph-client-secret' -VaultName 'MailSecrets' -DirectoryId $TenantId
 
 Send-EmailMessage -Graph -From 'sender@example.com' -To 'user@example.com' `
   -Credential $cred -HTML '<b>Hello</b>' -Subject 'Graph policy demo' `
@@ -533,7 +534,7 @@ The module supports two ways of calling Microsoft Graph. Use `-Graph` when you c
 **Example using `-Graph`**
 
 ```powershell
-$cred = ConvertTo-GraphCredential -ClientId $ClientId -ClientSecret $ClientSecret -DirectoryId $TenantId
+$cred = ConvertTo-GraphCredential -ClientId $ClientId -SecretName 'graph-client-secret' -VaultName 'MailSecrets' -DirectoryId $TenantId
 Connect-EmailGraph -Credential $cred
 Send-EmailMessage -From 'user@example.com' -To 'user@example.com' -Subject 'Graph Test' -Graph
 Disconnect-EmailGraph

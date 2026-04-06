@@ -16,17 +16,39 @@ public sealed class MailProfileSecretService : IMailProfileSecretService {
     }
 
     /// <inheritdoc />
-    public async Task<OperationResult> SetSecretAsync(string profileId, string secretName, string secretValue, CancellationToken cancellationToken = default) {
-        if (string.IsNullOrWhiteSpace(secretValue)) {
-            return OperationResult.Failure("secret_value_required", "Secret value is required.");
-        }
+    public Task<OperationResult> SetSecretAsync(string profileId, string secretName, string secretValue, CancellationToken cancellationToken = default) =>
+        SetSecretAsync(profileId, secretName, secretValue, null, cancellationToken);
 
+    /// <inheritdoc />
+    public async Task<OperationResult> SetSecretAsync(
+        string profileId,
+        string secretName,
+        string? secretValue,
+        string? secretReference,
+        CancellationToken cancellationToken = default) {
         var validationResult = await ValidateAsync(profileId, secretName, cancellationToken).ConfigureAwait(false);
         if (!validationResult.Succeeded) {
             return validationResult;
         }
 
-        await _secretStore.SetSecretAsync(profileId, secretName, secretValue, cancellationToken).ConfigureAwait(false);
+        string? resolvedSecret;
+        try {
+            resolvedSecret = await MailSecretReferenceResolver.ResolveAsync(
+                _secretStore,
+                profileId,
+                secretName,
+                secretValue,
+                secretReference,
+                cancellationToken).ConfigureAwait(false);
+        } catch (InvalidOperationException ex) {
+            return OperationResult.Failure("secret_reference_invalid", ex.Message);
+        }
+
+        if (string.IsNullOrWhiteSpace(resolvedSecret)) {
+            return OperationResult.Failure("secret_value_required", "Secret value is required.");
+        }
+
+        await _secretStore.SetSecretAsync(profileId, secretName, resolvedSecret!, cancellationToken).ConfigureAwait(false);
         return OperationResult.Success("Secret saved.");
     }
 

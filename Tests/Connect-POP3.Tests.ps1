@@ -1,10 +1,13 @@
 Describe 'Connect-POP3 SSL Options' {
     It 'Forwards provided enum to Pop3Connector' {
         $refs = @(
+            [Mailozaurr.Pop3Connector].Assembly.Location,
             [MailKit.Net.Pop3.Pop3Client].Assembly.Location,
             [MailKit.Security.SecureSocketOptions].Assembly.Location
         )
-        Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+        if (-not ('FakePop3Client' -as [type])) {
+            Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+using Mailozaurr;
 using MailKit.Net.Pop3;
 using MailKit.Security;
 using System.Threading;
@@ -15,29 +18,37 @@ public class FakePop3Client : Pop3Client {
         Passed = options;
         return Task.CompletedTask;
     }
-    public override Task AuthenticateAsync(string userName, string password, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public override bool IsConnected => true;
     public override bool IsAuthenticated => true;
 }
+public static class FakePop3ClientFactory {
+    public static Pop3Client Client;
+    public static Pop3Client Create() => Client;
+    public static void Install() => Pop3Connector.ClientFactory = Create;
+}
 "@
+        }
 
         $fake = [FakePop3Client]::new()
-        [Mailozaurr.Pop3Connector]::ClientFactory = { $fake }
+        [FakePop3ClientFactory]::Client = $fake
+        [FakePop3ClientFactory]::Install()
 
-        $cred = [System.Management.Automation.PSCredential]::new('u',(ConvertTo-SecureString 'p' -AsPlainText -Force))
-        Connect-POP3 -Server 'h' -Credential $cred -Port 995 -Options SslOnConnect | Out-Null
+        Connect-POP3 -Server 'h' -UserName 'u' -Password 'p' -Port 995 -Options SslOnConnect | Out-Null
 
         $fake.Passed | Should -Be ([MailKit.Security.SecureSocketOptions]::SslOnConnect)
 
-        [Mailozaurr.Pop3Connector]::ClientFactory = { [MailKit.Net.Pop3.Pop3Client]::new() }
+        [Mailozaurr.Pop3Connector]::ResetClientFactory()
     }
 
     It 'Uses StartTls when EnableExplicit set and Auto option' {
         $refs = @(
+            [Mailozaurr.Pop3Connector].Assembly.Location,
             [MailKit.Net.Pop3.Pop3Client].Assembly.Location,
             [MailKit.Security.SecureSocketOptions].Assembly.Location
         )
-        Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+        if (-not ('FakePop3Client' -as [type])) {
+            Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+using Mailozaurr;
 using MailKit.Net.Pop3;
 using MailKit.Security;
 using System.Threading;
@@ -48,20 +59,25 @@ public class FakePop3Client : Pop3Client {
         Passed = options;
         return Task.CompletedTask;
     }
-    public override Task AuthenticateAsync(string userName, string password, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public override bool IsConnected => true;
     public override bool IsAuthenticated => true;
 }
+public static class FakePop3ClientFactory {
+    public static Pop3Client Client;
+    public static Pop3Client Create() => Client;
+    public static void Install() => Pop3Connector.ClientFactory = Create;
+}
 "@
+        }
 
         $fake = [FakePop3Client]::new()
-        [Mailozaurr.Pop3Connector]::ClientFactory = { $fake }
+        [FakePop3ClientFactory]::Client = $fake
+        [FakePop3ClientFactory]::Install()
 
-        $cred = [System.Management.Automation.PSCredential]::new('u',(ConvertTo-SecureString 'p' -AsPlainText -Force))
-        Connect-POP3 -Server 'h' -Credential $cred -Port 995 -EnableExplicit | Out-Null
+        Connect-POP3 -Server 'h' -UserName 'u' -Password 'p' -Port 995 -EnableExplicit | Out-Null
 
         $fake.Passed | Should -Be ([MailKit.Security.SecureSocketOptions]::StartTls)
 
-        [Mailozaurr.Pop3Connector]::ClientFactory = { [MailKit.Net.Pop3.Pop3Client]::new() }
+        [Mailozaurr.Pop3Connector]::ResetClientFactory()
     }
 }
