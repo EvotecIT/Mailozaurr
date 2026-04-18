@@ -154,7 +154,7 @@ public sealed class ApplicationProfileBootstrapServiceTests {
 
         Assert.False(result.Succeeded);
         Assert.Equal("profile_not_ready", result.Code);
-        Assert.Contains(result.Errors, error => error.Contains("Gmail profiles need an access token", StringComparison.Ordinal));
+        Assert.Contains(result.Errors, error => error.IndexOf("Gmail profiles need an access token", StringComparison.Ordinal) >= 0);
     }
 
     private sealed class InMemoryProfileStore : IMailProfileStore {

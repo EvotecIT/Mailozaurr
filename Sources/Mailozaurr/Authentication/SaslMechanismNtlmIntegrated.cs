@@ -1,6 +1,7 @@
 ﻿using NSspi;
 using NSspi.Contexts;
 using NSspi.Credentials;
+using System;
 
 namespace Mailozaurr {
     /// <summary>
@@ -40,7 +41,7 @@ namespace Mailozaurr {
         /// <exception cref="InvalidOperationException">
         /// The SASL mechanism is already authenticated.
         /// </exception>
-        protected override byte[] Challenge(byte[] token, int startIndex, int length, CancellationToken cancellationToken) {
+        protected override byte[] Challenge(byte[]? token, int startIndex, int length, CancellationToken cancellationToken) {
             cancellationToken.ThrowIfCancellationRequested();
 
             if (IsAuthenticated) {
@@ -55,7 +56,7 @@ namespace Mailozaurr {
                 sspiContext.Init(null, out serverResponse);
                 state = LoginState.Challenge;
             } else {
-                sspiContext.Init(token, out serverResponse);
+                sspiContext.Init(token ?? Array.Empty<byte>(), out serverResponse);
                 IsAuthenticated = true;
             }
 

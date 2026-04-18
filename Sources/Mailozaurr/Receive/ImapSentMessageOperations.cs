@@ -255,7 +255,7 @@ public static class ImapSentMessageOperations {
             var normalizedMessageId = NormalizeMessageIdToken(messageIdToken);
             if (!string.IsNullOrWhiteSpace(normalizedMessageId)) {
                 uids = await folder.SearchAsync(
-                    SearchQuery.HeaderContains("Message-Id", normalizedMessageId),
+                    SearchQuery.HeaderContains("Message-Id", normalizedMessageId!),
                     cancellationToken).ConfigureAwait(false);
             }
         }

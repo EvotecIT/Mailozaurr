@@ -89,7 +89,12 @@ public static class FolderOperations {
         }
         var src = client.GetCachedFolder(folder, FolderAccess.ReadWrite);
         try {
-            await src.RenameAsync(src.ParentFolder, newName, cancellationToken).ConfigureAwait(false);
+            var parent = src.ParentFolder;
+            if (parent is null) {
+                throw new InvalidOperationException($"Cannot rename folder '{folder}' because its parent folder could not be resolved.");
+            }
+
+            await src.RenameAsync(parent, newName, cancellationToken).ConfigureAwait(false);
         } finally {
             if (src.IsOpen)
                 await src.CloseAsync(false, cancellationToken).ConfigureAwait(false);

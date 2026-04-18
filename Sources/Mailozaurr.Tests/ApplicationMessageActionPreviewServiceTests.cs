@@ -93,7 +93,7 @@ public sealed class ApplicationMessageActionPreviewServiceTests {
         Assert.Equal(
             MessageActionConfirmationTokens.CreateMoveToken("work-imap", "shared@example.com", null, new[] { "msg-1", "MSG-1", "msg-2" }, "archive-folder"),
             preview.ConfirmationToken);
-        Assert.Contains(preview.Warnings, warning => warning.Contains("Ignored 1 duplicate or empty", StringComparison.Ordinal));
+        Assert.Contains(preview.Warnings, warning => warning.IndexOf("Ignored 1 duplicate or empty", StringComparison.Ordinal) >= 0);
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public sealed class ApplicationMessageActionPreviewServiceTests {
         Assert.Equal(
             MessageActionConfirmationTokens.CreateDeleteToken("work-imap", null, null, new[] { "msg-1", "MSG-1", "msg-2" }),
             preview.ConfirmationToken);
-        Assert.Contains(preview.Warnings, warning => warning.Contains("Ignored 1 duplicate or empty", StringComparison.Ordinal));
+        Assert.Contains(preview.Warnings, warning => warning.IndexOf("Ignored 1 duplicate or empty", StringComparison.Ordinal) >= 0);
     }
 
     [Fact]
@@ -197,7 +197,7 @@ public sealed class ApplicationMessageActionPreviewServiceTests {
         Assert.Equal(4, preview.IncludedActionCount);
         Assert.Equal(4, preview.SucceededActionCount);
         Assert.Equal(0, preview.FailedActionCount);
-        Assert.Contains(preview.Warnings, warning => warning.Contains("Ignored 1 duplicate or empty", StringComparison.Ordinal));
+        Assert.Contains(preview.Warnings, warning => warning.IndexOf("Ignored 1 duplicate or empty", StringComparison.Ordinal) >= 0);
 
         var archive = Assert.Single(preview.Actions, action => action.Action == "archive");
         Assert.Equal("archive-folder", archive.Destination!.EffectiveFolderId);

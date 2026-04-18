@@ -80,10 +80,10 @@ public sealed class SmtpPendingMessageSender : IPendingMessageSender {
         client.CheckCertificateRevocation = checkRevocation;
 
         try {
-            await client.ConnectAsync(record.Server, port, secureSocketOptions, ct).ConfigureAwait(false);
+            await client.ConnectAsync(record.Server!, port, secureSocketOptions, ct).ConfigureAwait(false);
             if (!string.IsNullOrEmpty(record.UserName)) {
                 var password = DecodePassword(record.Password);
-                await client.AuthenticateAsync(record.UserName, password, ct).ConfigureAwait(false);
+                await client.AuthenticateAsync(record.UserName!, password, ct).ConfigureAwait(false);
             }
             await client.SendAsync(message, ct).ConfigureAwait(false);
         } finally {

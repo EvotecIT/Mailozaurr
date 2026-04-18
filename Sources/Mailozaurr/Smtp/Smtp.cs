@@ -261,7 +261,7 @@ public class Smtp {
 
     /// <summary>Domain name to use in the SMTP HELO.</summary>
     public string LocalDomain {
-        get => Client.LocalDomain;
+        get => Client.LocalDomain ?? string.Empty;
         set {
             if (value != "") Client.LocalDomain = value;
         }
@@ -278,7 +278,7 @@ public class Smtp {
     }
 
     /// <summary>Custom certificate validation callback.</summary>
-    public RemoteCertificateValidationCallback ServerCertificateValidationCallback {
+    public RemoteCertificateValidationCallback? ServerCertificateValidationCallback {
         get => Client.ServerCertificateValidationCallback;
         set => Client.ServerCertificateValidationCallback = value;
     }

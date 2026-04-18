@@ -175,7 +175,8 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
 
     private static async Task DefaultProbeImapMailboxAsync(ImapClient client, CancellationToken cancellationToken) {
         await DefaultProbeImapAsync(client, cancellationToken).ConfigureAwait(false);
-        await client.Inbox.OpenAsync(FolderAccess.ReadOnly, cancellationToken).ConfigureAwait(false);
+        var inbox = client.Inbox ?? throw new InvalidOperationException("IMAP client does not expose an inbox folder.");
+        await inbox.OpenAsync(FolderAccess.ReadOnly, cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task DefaultProbeGraphAsync(GraphSession session, CancellationToken cancellationToken) {

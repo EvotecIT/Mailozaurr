@@ -20,11 +20,13 @@ public static class ImapClientFolderCache {
     /// <returns>The opened folder.</returns>
     public static IMailFolder GetCachedFolder(this ImapClient client, string? folder, FolderAccess access) {
         var map = Cache.GetOrCreateValue(client);
-        var name = string.IsNullOrWhiteSpace(folder) ? client.Inbox.FullName : folder!;
+        var inbox = client.Inbox ?? throw new InvalidOperationException("The IMAP client does not expose an inbox folder.");
+        var inboxName = inbox.FullName ?? inbox.Name ?? "INBOX";
+        var name = string.IsNullOrWhiteSpace(folder) ? inboxName : folder!;
 
         if (!map.TryGetValue(name, out var mailFolder)) {
-            if (name.Equals(client.Inbox.FullName, System.StringComparison.OrdinalIgnoreCase)) {
-                mailFolder = client.Inbox;
+            if (name.Equals(inboxName, System.StringComparison.OrdinalIgnoreCase)) {
+                mailFolder = inbox;
             } else {
                 try {
                     mailFolder = client.GetFolder(name);

@@ -57,10 +57,10 @@ public static class MailboxSearcher {
         SearchQuery search = SearchQuery.All;
         var sinceUtc = NormalizeToUtc(since);
         var beforeUtc = NormalizeToUtc(before);
-        if (!string.IsNullOrWhiteSpace(subject)) search = search.And(SearchQuery.SubjectContains(subject));
-        if (!string.IsNullOrWhiteSpace(fromContains)) search = search.And(SearchQuery.FromContains(fromContains));
-        if (!string.IsNullOrWhiteSpace(toContains)) search = search.And(SearchQuery.ToContains(toContains));
-        if (!string.IsNullOrWhiteSpace(bodyContains)) search = search.And(SearchQuery.BodyContains(bodyContains));
+        if (!string.IsNullOrWhiteSpace(subject)) search = search.And(SearchQuery.SubjectContains(subject!));
+        if (!string.IsNullOrWhiteSpace(fromContains)) search = search.And(SearchQuery.FromContains(fromContains!));
+        if (!string.IsNullOrWhiteSpace(toContains)) search = search.And(SearchQuery.ToContains(toContains!));
+        if (!string.IsNullOrWhiteSpace(bodyContains)) search = search.And(SearchQuery.BodyContains(bodyContains!));
         if (sinceUtc.HasValue) search = search.And(SearchQuery.DeliveredAfter(sinceUtc.Value));
         if (beforeUtc.HasValue) search = search.And(SearchQuery.DeliveredBefore(beforeUtc.Value));
         if (additionalQueries != null) {
@@ -71,10 +71,10 @@ public static class MailboxSearcher {
           if (!string.IsNullOrWhiteSpace(queryString)) {
               try {
                   var parsed = ParseQuery(queryString);
-                  if (!string.IsNullOrWhiteSpace(parsed.Subject)) search = search.And(SearchQuery.SubjectContains(parsed.Subject));
-                  if (!string.IsNullOrWhiteSpace(parsed.FromContains)) search = search.And(SearchQuery.FromContains(parsed.FromContains));
-                  if (!string.IsNullOrWhiteSpace(parsed.ToContains)) search = search.And(SearchQuery.ToContains(parsed.ToContains));
-                  if (!string.IsNullOrWhiteSpace(parsed.BodyContains)) search = search.And(SearchQuery.BodyContains(parsed.BodyContains));
+                  if (!string.IsNullOrWhiteSpace(parsed.Subject)) search = search.And(SearchQuery.SubjectContains(parsed.Subject!));
+                  if (!string.IsNullOrWhiteSpace(parsed.FromContains)) search = search.And(SearchQuery.FromContains(parsed.FromContains!));
+                  if (!string.IsNullOrWhiteSpace(parsed.ToContains)) search = search.And(SearchQuery.ToContains(parsed.ToContains!));
+                  if (!string.IsNullOrWhiteSpace(parsed.BodyContains)) search = search.And(SearchQuery.BodyContains(parsed.BodyContains!));
                   var parsedSince = NormalizeToUtc(parsed.Since);
                   var parsedBefore = NormalizeToUtc(parsed.Before);
                   if (parsedSince.HasValue) search = search.And(SearchQuery.DeliveredAfter(parsedSince.Value));
@@ -934,7 +934,7 @@ public static class MailboxSearcher {
         SearchQuery search = SearchQuery.SubjectContains("report domain");
         var hasAtt = typeof(SearchQuery).GetProperty("HasAttachment", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)?.GetValue(null) as SearchQuery;
         search = search.And(hasAtt ?? SearchQuery.HeaderContains("Content-Disposition", "attachment"));
-        if (!string.IsNullOrWhiteSpace(domain)) search = search.And(SearchQuery.SubjectContains(domain));
+        if (!string.IsNullOrWhiteSpace(domain)) search = search.And(SearchQuery.SubjectContains(domain!));
         var sinceUtc = NormalizeToUtc(since);
         var beforeUtc = NormalizeToUtc(before);
         if (sinceUtc.HasValue) search = search.And(SearchQuery.DeliveredAfter(sinceUtc.Value));
