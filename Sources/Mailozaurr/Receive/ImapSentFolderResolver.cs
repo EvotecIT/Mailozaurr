@@ -266,7 +266,10 @@ public static class ImapSentFolderResolver {
                 await CollectFoldersInfoAsync(root, output, cancellationToken).ConfigureAwait(false);
             }
         } else {
-            await CollectFoldersInfoAsync(client.Inbox, output, cancellationToken).ConfigureAwait(false);
+            var inbox = client.Inbox;
+            if (inbox != null) {
+                await CollectFoldersInfoAsync(inbox, output, cancellationToken).ConfigureAwait(false);
+            }
         }
         return output;
     }

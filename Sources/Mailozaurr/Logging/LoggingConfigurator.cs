@@ -79,20 +79,25 @@ public class LoggingConfigurator : IDisposable {
         ProtocolLogger? protocolLogger = null;
         if (!string.IsNullOrWhiteSpace(logPath) || logConsole || logObject) {
             if (!string.IsNullOrWhiteSpace(logPath)) {
+                var protocolLogPath = logPath!;
                 try {
-                    var directory = Path.GetDirectoryName(logPath);
+                    var directory = Path.GetDirectoryName(protocolLogPath);
                     if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory)) {
                         Directory.CreateDirectory(directory);
                     }
                 } catch (Exception ex) {
-                    LoggingMessages.Logger.WriteWarning("Couldn't create directory for protocol logs at '{0}': {1}. Using console output instead.", logPath!, ex.Message);
-                    logPath = null;
+                    LoggingMessages.Logger.WriteWarning("Couldn't create directory for protocol logs at '{0}': {1}. Using console output instead.", protocolLogPath, ex.Message);
+                    protocolLogPath = string.Empty;
                 }
-                try {
-                    protocolLogger = new ProtocolLogger(logPath, logOverwrite);
-                } catch (IOException ex) {
-                    LoggingMessages.Logger.WriteWarning($"Couldn't create protocol logger with {logPath}: {ex.Message}. Using console output instead.");
+                if (protocolLogPath.Length == 0) {
                     protocolLogger = new ProtocolLogger(Console.OpenStandardOutput());
+                } else {
+                    try {
+                        protocolLogger = new ProtocolLogger(protocolLogPath, logOverwrite);
+                    } catch (IOException ex) {
+                        LoggingMessages.Logger.WriteWarning($"Couldn't create protocol logger with {protocolLogPath}: {ex.Message}. Using console output instead.");
+                        protocolLogger = new ProtocolLogger(Console.OpenStandardOutput());
+                    }
                 }
             } else if (logConsole) {
                 protocolLogger = new ProtocolLogger(Console.OpenStandardOutput());
@@ -105,15 +110,15 @@ public class LoggingConfigurator : IDisposable {
             protocolLogger.RedactSecrets = !logSecrets;
 
             if (!string.IsNullOrWhiteSpace(logTimestampsFormat)) {
-                protocolLogger.TimestampFormat = logTimestampsFormat;
+                protocolLogger.TimestampFormat = logTimestampsFormat!;
             }
 
             if (!string.IsNullOrWhiteSpace(logServerPrefix)) {
-                protocolLogger.ServerPrefix = logServerPrefix;
+                protocolLogger.ServerPrefix = logServerPrefix!;
             }
 
             if (!string.IsNullOrWhiteSpace(logClientPrefix)) {
-                protocolLogger.ClientPrefix = logClientPrefix;
+                protocolLogger.ClientPrefix = logClientPrefix!;
             }
         }
         ProtocolLogger = protocolLogger;

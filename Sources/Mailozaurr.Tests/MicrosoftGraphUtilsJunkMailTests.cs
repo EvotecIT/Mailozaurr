@@ -97,7 +97,7 @@ public sealed class MicrosoftGraphUtilsJunkMailTests {
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
             var uri = request.RequestUri!;
-            if (uri.AbsoluteUri.Contains("oauth2", StringComparison.Ordinal)) {
+            if (uri.AbsoluteUri.IndexOf("oauth2", StringComparison.Ordinal) >= 0) {
                 var json = "{\"access_token\":\"token\",\"token_type\":\"Bearer\"}";
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
                     Content = new StringContent(json)

@@ -210,7 +210,7 @@ public class SmtpSendPipelineTests {
         folder.SetupGet(f => f.FullName).Returns("Sent");
         folder.Setup(f => f.SearchAsync(It.IsAny<SearchQuery>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<UniqueId> { new(101) });
-        folder.Setup(f => f.GetMessageAsync(It.IsAny<UniqueId>(), It.IsAny<CancellationToken>()))
+        folder.Setup(f => f.GetMessageAsync(It.IsAny<UniqueId>(), It.IsAny<CancellationToken>(), It.IsAny<ITransferProgress>()))
             .ReturnsAsync(matched);
 
         var result = await SmtpSendPipeline.TryFindExistingSentCopyAsync(
@@ -233,7 +233,7 @@ public class SmtpSendPipelineTests {
         folder.SetupSequence(f => f.SearchAsync(It.IsAny<SearchQuery>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<UniqueId>())
             .ReturnsAsync(new List<UniqueId> { new(202) });
-        folder.Setup(f => f.GetMessageAsync(It.IsAny<UniqueId>(), It.IsAny<CancellationToken>()))
+        folder.Setup(f => f.GetMessageAsync(It.IsAny<UniqueId>(), It.IsAny<CancellationToken>(), It.IsAny<ITransferProgress>()))
             .ReturnsAsync(matched);
 
         var result = await SmtpSendPipeline.TryFindExistingSentCopyAsync(

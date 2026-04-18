@@ -372,7 +372,7 @@ public class SearchDmarcReportsTests {
                 return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) };
             }
 
-            if (uri.AbsolutePath.Contains("/messages/", StringComparison.Ordinal) && uri.AbsolutePath.EndsWith("/$value", StringComparison.Ordinal)) {
+            if (uri.AbsolutePath.IndexOf("/messages/", StringComparison.Ordinal) >= 0 && uri.AbsolutePath.EndsWith("/$value", StringComparison.Ordinal)) {
                 MimeStarted.TrySetResult(null);
                 try {
                     await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken).ConfigureAwait(false);

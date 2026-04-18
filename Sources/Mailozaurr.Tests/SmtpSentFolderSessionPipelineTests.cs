@@ -21,7 +21,7 @@ public class SmtpSentFolderSessionPipelineTests {
         folder.SetupGet(f => f.FullName).Returns("Sent");
         folder.Setup(f => f.SearchAsync(It.IsAny<SearchQuery>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<UniqueId> { new(42) });
-        folder.Setup(f => f.GetMessageAsync(It.IsAny<UniqueId>(), It.IsAny<CancellationToken>()))
+        folder.Setup(f => f.GetMessageAsync(It.IsAny<UniqueId>(), It.IsAny<CancellationToken>(), It.IsAny<ITransferProgress>()))
             .ReturnsAsync(matched);
 
         var result = await SmtpSentFolderSessionPipeline.TryFindExistingSentCopyAsync(

@@ -91,13 +91,13 @@ public static class MessageFetcher {
         SearchQuery query = SearchQuery.All;
         if (!all) {
             if (!string.IsNullOrWhiteSpace(subject)) {
-                query = query.And(SearchQuery.SubjectContains(subject));
+                query = query.And(SearchQuery.SubjectContains(subject!));
             }
             if (!string.IsNullOrWhiteSpace(fromContains)) {
-                query = query.And(SearchQuery.FromContains(fromContains));
+                query = query.And(SearchQuery.FromContains(fromContains!));
             }
             if (!string.IsNullOrWhiteSpace(toContains)) {
-                query = query.And(SearchQuery.ToContains(toContains));
+                query = query.And(SearchQuery.ToContains(toContains!));
             }
             if (since.HasValue) {
                 query = query.And(SearchQuery.DeliveredAfter(since.Value));

@@ -66,7 +66,7 @@ public sealed class GmailMailReadHandler : IMailReadHandler {
 
         bool MatchesFilter(GmailMailboxBrowser.GmailMailboxFolderSummary folder) {
             if (query.RootOnly) {
-                return !folder.Name.Contains("/", StringComparison.Ordinal);
+                return folder.Name.IndexOf("/", StringComparison.Ordinal) < 0;
             }
             if (string.IsNullOrWhiteSpace(query.ParentFolderId)) {
                 return true;

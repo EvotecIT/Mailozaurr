@@ -974,7 +974,7 @@ public sealed class ApplicationMessageActionPlanRegistryServiceTests {
         Assert.False(preview.Succeeded);
         Assert.Equal("action_plan_profile_not_found", preview.Code);
         Assert.False(preview.TargetProfileExists);
-        Assert.Contains(preview.Errors, error => error.Contains("missing-profile", StringComparison.Ordinal));
+        Assert.Contains(preview.Errors, error => error.IndexOf("missing-profile", StringComparison.Ordinal) >= 0);
         Assert.Single(preview.Plans);
     }
 

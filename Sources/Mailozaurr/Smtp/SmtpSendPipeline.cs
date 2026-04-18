@@ -183,11 +183,11 @@ public static class SmtpSendPipeline {
         }
 
         try {
-            var uids = await sentFolder.SearchAsync(SearchQuery.HeaderContains(idempotencyHeaderName, idempotencyKey), cancellationToken).ConfigureAwait(false);
+            var uids = await sentFolder.SearchAsync(SearchQuery.HeaderContains(idempotencyHeaderName!, idempotencyKey!), cancellationToken).ConfigureAwait(false);
             if (uids.Count == 0) {
                 var token = NormalizeMessageIdToken(idempotentMessageId);
                 if (!string.IsNullOrWhiteSpace(token)) {
-                    uids = await sentFolder.SearchAsync(SearchQuery.HeaderContains("Message-Id", token), cancellationToken).ConfigureAwait(false);
+                    uids = await sentFolder.SearchAsync(SearchQuery.HeaderContains("Message-Id", token!), cancellationToken).ConfigureAwait(false);
                 }
             }
 
