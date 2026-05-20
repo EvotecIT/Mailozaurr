@@ -58,8 +58,12 @@ public class EmailMessageConversionTests {
         var msgPath = Path.Combine(msgDir, "sample.msg");
 
         var outputDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
-        Assert.Throws<NotImplementedException>(() => EmailMessage.ConvertMsgToEml(new[] { msgPath }, outputDir, true).ToList());
+        var results = EmailMessage.ConvertMsgToEml(new[] { msgPath }, outputDir, true).ToList();
+
+        Assert.Single(results);
+        Assert.True(results[0].Status);
         Assert.True(Directory.Exists(outputDir));
+        Assert.True(File.Exists(Path.Combine(outputDir, "sample.eml")));
 
 
         Directory.Delete(tmpDir, true);

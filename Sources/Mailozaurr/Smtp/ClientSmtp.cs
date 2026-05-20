@@ -258,7 +258,8 @@ public partial class ClientSmtp : SmtpClient {
                     Content = new MimeContent(ms),
                     FileName = img.ContentId,
                     ContentId = img.ContentId,
-                    ContentDisposition = new ContentDisposition(ContentDisposition.Inline)
+                    ContentDisposition = new ContentDisposition(ContentDisposition.Inline),
+                    ContentTransferEncoding = ContentEncoding.Base64
                 };
                 bodyBuilder.LinkedResources.Add(part);
             }

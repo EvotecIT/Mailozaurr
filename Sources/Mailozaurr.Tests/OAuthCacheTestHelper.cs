@@ -32,4 +32,19 @@ internal static class OAuthCacheTestHelper {
             }
         }
     }
+
+    internal static string ReadOAuthCacheFileText() {
+        var path = GetOAuthCacheFilePath();
+        for (var attempt = 0; ; attempt++) {
+            try {
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var reader = new StreamReader(stream);
+                return reader.ReadToEnd();
+            } catch (IOException) when (attempt < 4) {
+                Thread.Sleep(25 * (attempt + 1));
+            } catch (UnauthorizedAccessException) when (attempt < 4) {
+                Thread.Sleep(25 * (attempt + 1));
+            }
+        }
+    }
 }
