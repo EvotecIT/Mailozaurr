@@ -135,6 +135,22 @@ public class GraphBatchAndRetryTests {
         }
     }
 
+    private class TokenResponseHandler : HttpMessageHandler {
+        private readonly string _json;
+        public int CallCount;
+
+        public TokenResponseHandler(string json) {
+            _json = json;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            CallCount++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
+                Content = new StringContent(_json)
+            });
+        }
+    }
+
     private class AlwaysFailHandler : HttpMessageHandler {
         public int CallCount;
 
@@ -254,6 +270,35 @@ public class GraphBatchAndRetryTests {
             string token = await MicrosoftGraphUtils.ConnectO365GraphAsync(credential, "tenant", "https://graph.microsoft.com");
             Assert.Equal("Bearer token", token);
             Assert.Equal(2, handler.CallCount);
+        } finally {
+            handlerField.SetValue(client, original);
+        }
+    }
+
+    [Fact]
+    public async Task ConnectO365GraphAsync_ParsesStringExpiresIn() {
+        var handler = new TokenResponseHandler("{\"access_token\":\"token\",\"token_type\":\"Bearer\",\"expires_in\":\"1200\"}");
+        var field = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var client = (HttpClient)field.GetValue(null)!;
+        var handlerField = GetHandlerField();
+        var original = (HttpMessageHandler)handlerField.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        var cacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var cache = (System.Collections.Concurrent.ConcurrentDictionary<string, GraphAuthorization>)cacheField.GetValue(null)!;
+        cache.Clear();
+        OAuthCacheTestHelper.ResetOAuthTokenCache();
+        OAuthCacheTestHelper.DeleteOAuthCacheFile();
+        try {
+            var before = DateTimeOffset.UtcNow;
+            var credential = new GraphCredential { ClientId = "id", ClientSecret = "secret", DirectoryId = "tenant" };
+
+            string token = await MicrosoftGraphUtils.ConnectO365GraphAsync(credential, "tenant", "https://graph.microsoft.com");
+
+            Assert.Equal("Bearer token", token);
+            Assert.Equal(1, handler.CallCount);
+            var key = "id|tenant||secret|https://graph.microsoft.com";
+            Assert.True(cache.TryGetValue(key, out var authorization));
+            Assert.InRange(authorization.ExpiresOn, before.AddSeconds(1100), DateTimeOffset.UtcNow.AddSeconds(1300));
         } finally {
             handlerField.SetValue(client, original);
         }

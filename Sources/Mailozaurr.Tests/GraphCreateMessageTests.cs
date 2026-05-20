@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using MimeKit;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -39,6 +40,33 @@ public class GraphCreateMessageTests
         };
         graph.CreateMessage();
         Assert.Contains("X-Test", graph.MessageJson, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void GraphMimePreparation_IncludesOnlyCustomGraphHeaders() {
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse("from@example.com"));
+        message.To.Add(MailboxAddress.Parse("to@example.com"));
+        message.Subject = "subject";
+        message.Body = new TextPart("plain") { Text = "body" };
+        message.MessageId = "message@example.com";
+        message.InReplyTo = "<previous@example.com>";
+        message.References.Add("<root@example.com>");
+        message.Headers.Add("X-Correlation-Id", "abc");
+        message.Headers.Add("List-Unsubscribe", "<mailto:unsubscribe@example.com>");
+
+        var graphMessage = GraphMimePreparation.ConvertToGraphMessage(
+            message,
+            idempotencyHeaderName: "X-Correlation-Id");
+
+        Assert.NotNull(graphMessage.InternetMessageHeaders);
+        var headers = graphMessage.InternetMessageHeaders!;
+        var correlation = Assert.Single(headers, header => string.Equals(header.Name, "X-Correlation-Id", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("abc", correlation.Value);
+        Assert.DoesNotContain(headers, header => string.Equals(header.Name, "Message-Id", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(headers, header => string.Equals(header.Name, "In-Reply-To", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(headers, header => string.Equals(header.Name, "References", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(headers, header => string.Equals(header.Name, "List-Unsubscribe", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
