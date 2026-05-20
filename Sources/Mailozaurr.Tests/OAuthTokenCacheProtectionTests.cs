@@ -32,7 +32,7 @@ public sealed class OAuthTokenCacheProtectionTests {
         var path = OAuthCacheTestHelper.GetOAuthCacheFilePath();
         Assert.True(File.Exists(path));
 
-        var json = File.ReadAllText(path);
+        var json = OAuthCacheTestHelper.ReadOAuthCacheFileText();
         Assert.DoesNotContain("access-token-value", json, StringComparison.Ordinal);
         Assert.DoesNotContain("refresh-token-value", json, StringComparison.Ordinal);
         Assert.DoesNotContain("client-secret-value", json, StringComparison.Ordinal);
@@ -136,7 +136,7 @@ public sealed class OAuthTokenCacheProtectionTests {
         Assert.Equal(credential.UserName, loaded!.UserName);
         Assert.Equal(credential.AccessToken, loaded.AccessToken);
 
-        var json = File.ReadAllText(path);
+        var json = OAuthCacheTestHelper.ReadOAuthCacheFileText();
         Assert.DoesNotContain("{broken", json, StringComparison.Ordinal);
     }
 

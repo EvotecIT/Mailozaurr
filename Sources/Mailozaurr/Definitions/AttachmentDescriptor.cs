@@ -66,6 +66,7 @@ public abstract class AttachmentDescriptor
         {
             Content = new MimeContent(stream),
             FileName = FileName,
+            ContentTransferEncoding = TransferEncoding.GetValueOrDefault(ContentEncoding.Base64),
         };
 
         var disposition = ContentDisposition ?? new ContentDisposition(
@@ -91,11 +92,6 @@ public abstract class AttachmentDescriptor
         if (!string.IsNullOrWhiteSpace(ContentDescription))
         {
             part.ContentDescription = ContentDescription;
-        }
-
-        if (TransferEncoding.HasValue)
-        {
-            part.ContentTransferEncoding = TransferEncoding.Value;
         }
 
         if (Headers != null)

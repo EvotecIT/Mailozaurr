@@ -96,4 +96,74 @@ public class SmtpAttachmentTests
         content.DecodeTo(extracted);
         Assert.Equal(data, extracted.ToArray());
     }
+
+    [Fact]
+    public void CreateMessage_BinaryAttachment_UsesBase64EncodingToAvoidBareLineFeeds()
+    {
+        var data = new byte[] { 0x50, 0x4b, 0x03, 0x04, 0x0a, 0xff, 0x00, 0x0a, 0x7f };
+        var descriptor = new ByteArrayAttachmentDescriptor(data, "document.docx")
+        {
+            ContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        };
+
+        var smtp = new Smtp
+        {
+            From = "a@b.com",
+            To = new object[] { "c@d.com" },
+            Subject = "test",
+            TextBody = "body",
+            Attachments = new List<AttachmentDescriptor> { descriptor },
+        };
+
+        smtp.CreateMessage();
+
+        var multipart = Assert.IsType<Multipart>(smtp.Message.Body);
+        var part = Assert.Single(multipart.OfType<MimePart>(), p => p.IsAttachment);
+        Assert.Equal(ContentEncoding.Base64, part.ContentTransferEncoding);
+
+        var options = FormatOptions.Default.Clone();
+        options.NewLineFormat = NewLineFormat.Dos;
+        using var serialized = new MemoryStream();
+        smtp.Message.WriteTo(options, serialized);
+
+        Assert.False(ContainsBareLineFeed(serialized.ToArray()));
+    }
+
+    [Fact]
+    public void CreateMessage_ExplicitTransferEncoding_IsRespected()
+    {
+        var descriptor = new ByteArrayAttachmentDescriptor(Encoding.UTF8.GetBytes("hello world"), "greeting.txt")
+        {
+            ContentType = "text/plain",
+            TransferEncoding = ContentEncoding.QuotedPrintable,
+        };
+
+        var smtp = new Smtp
+        {
+            From = "a@b.com",
+            To = new object[] { "c@d.com" },
+            Subject = "test",
+            TextBody = "body",
+            Attachments = new List<AttachmentDescriptor> { descriptor },
+        };
+
+        smtp.CreateMessage();
+
+        var multipart = Assert.IsType<Multipart>(smtp.Message.Body);
+        var part = Assert.Single(multipart.OfType<MimePart>(), p => p.IsAttachment);
+        Assert.Equal(ContentEncoding.QuotedPrintable, part.ContentTransferEncoding);
+    }
+
+    private static bool ContainsBareLineFeed(byte[] bytes)
+    {
+        for (var index = 0; index < bytes.Length; index++)
+        {
+            if (bytes[index] == 0x0a && (index == 0 || bytes[index - 1] != 0x0d))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
