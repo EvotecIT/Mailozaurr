@@ -252,3 +252,32 @@ jobs:
           files: '**/coverage.cobertura.xml'
           fail_ci_if_error: false
 
+  test-module-alc:
+    name: 'PowerShell ALC packaging'
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install PowerShell modules
+        shell: pwsh
+        run: |
+          Install-Module -Name PSPublishModule -Repository PSGallery -Force -Scope CurrentUser -AllowClobber
+          Install-Module -Name Pester -Repository PSGallery -Force -Scope CurrentUser -SkipPublisherCheck -AllowClobber
+
+      - name: Build packaged module
+        shell: pwsh
+        env:
+          RefreshPSD1Only: 'false'
+          SignModule: 'false'
+        run: ./Build/Build-Module.ps1
+
+      - name: Run AssemblyLoadContext packaging regression
+        shell: pwsh
+        run: Invoke-Pester -Path ./Tests/AssemblyLoadContext.Tests.ps1 -Output Detailed

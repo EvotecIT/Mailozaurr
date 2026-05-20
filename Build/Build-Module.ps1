@@ -78,7 +78,7 @@ Build-Module -ModuleName 'Mailozaurr' {
 
     $newConfigurationBuildSplat = @{
         Enable                            = $true
-        SignModule                        = $true
+        SignModule                        = if ([string]::IsNullOrWhiteSpace($Env:SignModule)) { $true } else { [bool]::Parse($Env:SignModule) }
         MergeModuleOnBuild                = $true
         MergeFunctionsFromApprovedModules = $true
         CertificateThumbprint             = '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703'
@@ -89,12 +89,30 @@ Build-Module -ModuleName 'Mailozaurr' {
         NETConfiguration                  = 'Release'
         NETFramework                      = 'net8.0', 'net472'
         NETHandleAssemblyWithSameName     = $true
+        NETAssemblyLoadContext            = $true
+        NETAssemblyTypeAcceleratorMode    = 'Assembly'
+        NETAssemblyTypeAcceleratorAssemblies = @(
+            'Mailozaurr'
+            'Mailozaurr.Msg'
+        )
+        NETAssemblyTypeAccelerators       = @(
+            'MailKit.Net.Pop3.Pop3Client'
+            'MailKit.Search.SearchQuery'
+            'MailKit.Security.SecureSocketOptions'
+            'MailKit.UniqueId'
+            'MimeKit.BodyBuilder'
+            'MimeKit.MailboxAddress'
+            'MimeKit.MimeContent'
+            'MimeKit.MimeMessage'
+            'MimeKit.MimePart'
+            'MimeKit.TextPart'
+        )
         #NETMergeLibraryDebugging          = $true
         DotSourceLibraries                = $true
         DotSourceClasses                  = $true
         DeleteTargetModuleBeforeBuild     = $true
         NETBinaryModuleDocumenation       = $true
-        RefreshPSD1Only                   = $true
+        RefreshPSD1Only                   = if ([string]::IsNullOrWhiteSpace($Env:RefreshPSD1Only)) { $true } else { [bool]::Parse($Env:RefreshPSD1Only) }
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat #-DotSourceLibraries -DotSourceClasses -MergeModuleOnBuild -Enable -SignModule -DeleteTargetModuleBeforeBuild -CertificateThumbprint '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703' -MergeFunctionsFromApprovedModules
