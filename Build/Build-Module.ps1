@@ -4,7 +4,7 @@ Import-Module PSPublishModule -Force
 Build-Module -ModuleName 'Mailozaurr' {
     # Usual defaults as per standard module
     $Manifest = [ordered] @{
-        ModuleVersion        = '2.0.1'
+        ModuleVersion        = '2.1.X'
         # Supported PSEditions
         CompatiblePSEditions = @('Desktop', 'Core')
         # ID used to uniquely identify this module
@@ -26,7 +26,7 @@ Build-Module -ModuleName 'Mailozaurr' {
 
         ProjectUri           = 'https://github.com/EvotecIT/MailoZaurr'
 
-        PreReleaseTag        = 'Preview4'
+        #PreReleaseTag        = 'Preview5'
     }
     New-ConfigurationManifest @Manifest
 
@@ -77,25 +77,25 @@ Build-Module -ModuleName 'Mailozaurr' {
 
 
     $newConfigurationBuildSplat = @{
-        Enable                            = $true
-        SignModule                        = if ([string]::IsNullOrWhiteSpace($Env:SignModule)) { $true } else { [bool]::Parse($Env:SignModule) }
-        MergeModuleOnBuild                = $true
-        MergeFunctionsFromApprovedModules = $true
-        CertificateThumbprint             = '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703'
-        ResolveBinaryConflicts            = $true
-        ResolveBinaryConflictsName        = 'Mailozaurr.PowerShell'
-        NETProjectPath                    = "$PSScriptRoot\..\Sources\Mailozaurr.PowerShell"
-        NETProjectName                    = 'Mailozaurr.PowerShell'
-        NETConfiguration                  = 'Release'
-        NETFramework                      = 'net8.0', 'net472'
-        NETHandleAssemblyWithSameName     = $true
-        NETAssemblyLoadContext            = $true
-        NETAssemblyTypeAcceleratorMode    = 'Assembly'
+        Enable                               = $true
+        SignModule                           = if ([string]::IsNullOrWhiteSpace($Env:SignModule)) { $true } else { [bool]::Parse($Env:SignModule) }
+        MergeModuleOnBuild                   = $true
+        MergeFunctionsFromApprovedModules    = $true
+        CertificateThumbprint                = '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703'
+        ResolveBinaryConflicts               = $true
+        ResolveBinaryConflictsName           = 'Mailozaurr.PowerShell'
+        NETProjectPath                       = "$PSScriptRoot\..\Sources\Mailozaurr.PowerShell"
+        NETProjectName                       = 'Mailozaurr.PowerShell'
+        NETConfiguration                     = 'Release'
+        NETFramework                         = 'net8.0', 'net472'
+        NETHandleAssemblyWithSameName        = $true
+        NETAssemblyLoadContext               = $true
+        NETAssemblyTypeAcceleratorMode       = 'Assembly'
         NETAssemblyTypeAcceleratorAssemblies = @(
             'Mailozaurr'
             'Mailozaurr.Msg'
         )
-        NETAssemblyTypeAccelerators       = @(
+        NETAssemblyTypeAccelerators          = @(
             'MailKit.Net.Pop3.Pop3Client'
             'MailKit.Search.SearchQuery'
             'MailKit.Security.SecureSocketOptions'
@@ -108,11 +108,11 @@ Build-Module -ModuleName 'Mailozaurr' {
             'MimeKit.TextPart'
         )
         #NETMergeLibraryDebugging          = $true
-        DotSourceLibraries                = $true
-        DotSourceClasses                  = $true
-        DeleteTargetModuleBeforeBuild     = $true
-        NETBinaryModuleDocumenation       = $true
-        RefreshPSD1Only                   = if ([string]::IsNullOrWhiteSpace($Env:RefreshPSD1Only)) { $true } else { [bool]::Parse($Env:RefreshPSD1Only) }
+        DotSourceLibraries                   = $true
+        DotSourceClasses                     = $true
+        DeleteTargetModuleBeforeBuild        = $true
+        NETBinaryModuleDocumenation          = $true
+        RefreshPSD1Only                      = if ([string]::IsNullOrWhiteSpace($Env:RefreshPSD1Only)) { $true } else { [bool]::Parse($Env:RefreshPSD1Only) }
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat #-DotSourceLibraries -DotSourceClasses -MergeModuleOnBuild -Enable -SignModule -DeleteTargetModuleBeforeBuild -CertificateThumbprint '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703' -MergeFunctionsFromApprovedModules
