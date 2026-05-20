@@ -234,7 +234,12 @@ namespace Mailozaurr {
                 var tokenType = token.RootElement.GetProperty("token_type").GetString();
                 var expiresOn = DateTimeOffset.UtcNow.AddHours(1);
                 if (token.RootElement.TryGetProperty("expires_in", out var expIn)) {
-                    expiresOn = DateTimeOffset.UtcNow.AddSeconds(expIn.GetInt32());
+                    if (expIn.ValueKind == System.Text.Json.JsonValueKind.Number && expIn.TryGetInt32(out var expiresInSeconds)) {
+                        expiresOn = DateTimeOffset.UtcNow.AddSeconds(expiresInSeconds);
+                    } else if (expIn.ValueKind == System.Text.Json.JsonValueKind.String &&
+                               int.TryParse(expIn.GetString(), out var expiresInStringSeconds)) {
+                        expiresOn = DateTimeOffset.UtcNow.AddSeconds(expiresInStringSeconds);
+                    }
                 }
                 if (token.RootElement.TryGetProperty("expires_on", out var expOn)) {
                     if (long.TryParse(expOn.GetString(), out var expSeconds)) {

@@ -93,15 +93,13 @@ public static class GraphMimePreparation {
         var bodyContent = string.IsNullOrWhiteSpace(html) ? (text ?? string.Empty) : html!;
 
         var headers = new List<GraphInternetMessageHeader>();
-        AddHeader(headers, "Message-Id", message.MessageId);
-        AddHeader(headers, "In-Reply-To", message.InReplyTo);
-        if (message.References != null && message.References.Count > 0) {
-            AddHeader(headers, "References", string.Join(" ", message.References));
-        }
+        AddCustomHeaders(headers, message.Headers);
 
         if (idempotencyHeaderName != null) {
             var trimmedIdempotencyHeaderName = idempotencyHeaderName.Trim();
-            if (trimmedIdempotencyHeaderName.Length > 0) {
+            if (trimmedIdempotencyHeaderName.Length > 0 &&
+                trimmedIdempotencyHeaderName.StartsWith("x-", StringComparison.OrdinalIgnoreCase) &&
+                !ContainsHeader(headers, trimmedIdempotencyHeaderName)) {
                 AddHeader(headers, trimmedIdempotencyHeaderName, message.Headers[trimmedIdempotencyHeaderName]);
             }
         }
@@ -151,6 +149,32 @@ public static class GraphMimePreparation {
             Name = name,
             Value = trimmed
         });
+    }
+
+    private static void AddCustomHeaders(List<GraphInternetMessageHeader> headers, HeaderList headerList) {
+        if (headerList == null) {
+            return;
+        }
+
+        foreach (var header in headerList) {
+            if (header == null ||
+                string.IsNullOrWhiteSpace(header.Field) ||
+                !header.Field.StartsWith("x-", StringComparison.OrdinalIgnoreCase)) {
+                continue;
+            }
+
+            AddHeader(headers, header.Field, header.Value);
+        }
+    }
+
+    private static bool ContainsHeader(List<GraphInternetMessageHeader> headers, string name) {
+        foreach (var header in headers) {
+            if (string.Equals(header.Name, name, StringComparison.OrdinalIgnoreCase)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
 
