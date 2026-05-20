@@ -8,11 +8,6 @@ namespace Mailozaurr.Application;
 public sealed class FileMailMessageActionPlanBatchStore : IMailMessageActionPlanBatchStore {
     private readonly string _filePath;
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private static readonly JsonSerializerOptions SerializerOptions = new() {
-        PropertyNameCaseInsensitive = true,
-        WriteIndented = true
-    };
-
     /// <summary>
     /// Creates a new store using the provided options.
     /// </summary>
@@ -114,7 +109,7 @@ public sealed class FileMailMessageActionPlanBatchStore : IMailMessageActionPlan
         }
 
         using (var stream = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
-            var document = await JsonSerializer.DeserializeAsync<MailMessageActionPlanBatchStoreDocument>(stream, SerializerOptions, cancellationToken).ConfigureAwait(false);
+            var document = await JsonSerializer.DeserializeAsync(stream, ApplicationJsonContext.Default.MailMessageActionPlanBatchStoreDocument, cancellationToken).ConfigureAwait(false);
             return document ?? new MailMessageActionPlanBatchStoreDocument();
         }
     }
@@ -130,7 +125,7 @@ public sealed class FileMailMessageActionPlanBatchStore : IMailMessageActionPlan
         var tempPath = Path.Combine(directory, Path.GetRandomFileName());
         try {
             using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)) {
-                await JsonSerializer.SerializeAsync(stream, document, SerializerOptions, cancellationToken).ConfigureAwait(false);
+                await JsonSerializer.SerializeAsync(stream, document, ApplicationJsonContext.Default.MailMessageActionPlanBatchStoreDocument, cancellationToken).ConfigureAwait(false);
                 await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
             }
 
@@ -208,9 +203,4 @@ public sealed class FileMailMessageActionPlanBatchStore : IMailMessageActionPlan
         Warnings = plan.Warnings.ToList()
     };
 
-    private sealed class MailMessageActionPlanBatchStoreDocument {
-        public int Version { get; set; } = 1;
-
-        public List<MailMessageActionPlanBatch> Batches { get; set; } = new();
-    }
 }

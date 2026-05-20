@@ -6,11 +6,6 @@ namespace Mailozaurr.Application;
 /// Imports and exports drafts as JSON documents.
 /// </summary>
 public sealed class JsonMailDraftExchangeService : IMailDraftExchangeService {
-    private static readonly JsonSerializerOptions SerializerOptions = new() {
-        PropertyNameCaseInsensitive = true,
-        WriteIndented = true
-    };
-
     /// <inheritdoc />
     public async Task<MailDraft> LoadAsync(string path, CancellationToken cancellationToken = default) {
         if (string.IsNullOrWhiteSpace(path)) {
@@ -19,7 +14,7 @@ public sealed class JsonMailDraftExchangeService : IMailDraftExchangeService {
 
         var fullPath = Path.GetFullPath(path);
         using var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var draft = await JsonSerializer.DeserializeAsync<MailDraft>(stream, SerializerOptions, cancellationToken).ConfigureAwait(false);
+        var draft = await JsonSerializer.DeserializeAsync(stream, ApplicationJsonContext.Default.MailDraft, cancellationToken).ConfigureAwait(false);
         if (draft == null) {
             throw new InvalidDataException($"Draft file '{fullPath}' did not contain a valid draft document.");
         }
@@ -43,7 +38,7 @@ public sealed class JsonMailDraftExchangeService : IMailDraftExchangeService {
         }
 
         using var stream = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.None);
-        await JsonSerializer.SerializeAsync(stream, draft, SerializerOptions, cancellationToken).ConfigureAwait(false);
+        await JsonSerializer.SerializeAsync(stream, draft, ApplicationJsonContext.Default.MailDraft, cancellationToken).ConfigureAwait(false);
         await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 }

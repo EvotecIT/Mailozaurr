@@ -9,11 +9,6 @@ public sealed class FileMailSecretStore : IMailSecretStore {
     private readonly string _filePath;
     private readonly ICredentialProtector _protector;
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private static readonly JsonSerializerOptions SerializerOptions = new() {
-        PropertyNameCaseInsensitive = true,
-        WriteIndented = true
-    };
-
     /// <summary>
     /// Creates a new store using the default credential protector.
     /// </summary>
@@ -91,7 +86,7 @@ public sealed class FileMailSecretStore : IMailSecretStore {
         }
 
         using (var stream = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
-            var document = await JsonSerializer.DeserializeAsync<MailSecretStoreDocument>(stream, SerializerOptions, cancellationToken).ConfigureAwait(false);
+            var document = await JsonSerializer.DeserializeAsync(stream, ApplicationJsonContext.Default.MailSecretStoreDocument, cancellationToken).ConfigureAwait(false);
             return document ?? new MailSecretStoreDocument();
         }
     }
@@ -108,7 +103,7 @@ public sealed class FileMailSecretStore : IMailSecretStore {
         var backupPath = Path.Combine(directory, Path.GetRandomFileName());
         try {
             using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)) {
-                await JsonSerializer.SerializeAsync(stream, document, SerializerOptions, cancellationToken).ConfigureAwait(false);
+                await JsonSerializer.SerializeAsync(stream, document, ApplicationJsonContext.Default.MailSecretStoreDocument, cancellationToken).ConfigureAwait(false);
                 await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
             }
 
@@ -142,9 +137,4 @@ public sealed class FileMailSecretStore : IMailSecretStore {
         }
     }
 
-    private sealed class MailSecretStoreDocument {
-        public int Version { get; set; } = 1;
-
-        public Dictionary<string, string> Secrets { get; set; } = new(StringComparer.OrdinalIgnoreCase);
-    }
 }

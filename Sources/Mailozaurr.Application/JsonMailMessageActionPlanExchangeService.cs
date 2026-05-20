@@ -6,11 +6,6 @@ namespace Mailozaurr.Application;
 /// Imports and exports normalized message action plans as JSON documents.
 /// </summary>
 public sealed class JsonMailMessageActionPlanExchangeService : IMailMessageActionPlanExchangeService {
-    private static readonly JsonSerializerOptions SerializerOptions = new() {
-        PropertyNameCaseInsensitive = true,
-        WriteIndented = true
-    };
-
     /// <inheritdoc />
     public async Task<MessageActionExecutionPlan> LoadAsync(string path, CancellationToken cancellationToken = default) {
         if (string.IsNullOrWhiteSpace(path)) {
@@ -19,7 +14,7 @@ public sealed class JsonMailMessageActionPlanExchangeService : IMailMessageActio
 
         var fullPath = Path.GetFullPath(path);
         using var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var plan = await JsonSerializer.DeserializeAsync<MessageActionExecutionPlan>(stream, SerializerOptions, cancellationToken).ConfigureAwait(false);
+        var plan = await JsonSerializer.DeserializeAsync(stream, ApplicationJsonContext.Default.MessageActionExecutionPlan, cancellationToken).ConfigureAwait(false);
         if (plan == null) {
             throw new InvalidDataException($"Action plan file '{fullPath}' did not contain a valid action plan document.");
         }
@@ -43,7 +38,7 @@ public sealed class JsonMailMessageActionPlanExchangeService : IMailMessageActio
         }
 
         using var stream = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.None);
-        await JsonSerializer.SerializeAsync(stream, plan, SerializerOptions, cancellationToken).ConfigureAwait(false);
+        await JsonSerializer.SerializeAsync(stream, plan, ApplicationJsonContext.Default.MessageActionExecutionPlan, cancellationToken).ConfigureAwait(false);
         await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -55,7 +50,7 @@ public sealed class JsonMailMessageActionPlanExchangeService : IMailMessageActio
 
         var fullPath = Path.GetFullPath(path);
         using var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var plans = await JsonSerializer.DeserializeAsync<List<MessageActionExecutionPlan>>(stream, SerializerOptions, cancellationToken).ConfigureAwait(false);
+        var plans = await JsonSerializer.DeserializeAsync(stream, ApplicationJsonContext.Default.MessageActionExecutionPlanList, cancellationToken).ConfigureAwait(false);
         if (plans == null) {
             throw new InvalidDataException($"Action plan batch file '{fullPath}' did not contain a valid action plan array.");
         }
@@ -79,7 +74,7 @@ public sealed class JsonMailMessageActionPlanExchangeService : IMailMessageActio
         }
 
         using var stream = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.None);
-        await JsonSerializer.SerializeAsync(stream, plans, SerializerOptions, cancellationToken).ConfigureAwait(false);
+        await JsonSerializer.SerializeAsync(stream, plans, ApplicationJsonContext.Default.MessageActionExecutionPlanList, cancellationToken).ConfigureAwait(false);
         await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 }
