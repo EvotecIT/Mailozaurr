@@ -275,6 +275,7 @@ jobs:
         shell: pwsh
         env:
           RefreshPSD1Only: 'false'
+          SignModule: 'false'
         run: ./Build/Build-Module.ps1
 
       - name: Run AssemblyLoadContext packaging regression

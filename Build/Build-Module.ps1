@@ -78,7 +78,7 @@ Build-Module -ModuleName 'Mailozaurr' {
 
     $newConfigurationBuildSplat = @{
         Enable                            = $true
-        SignModule                        = $true
+        SignModule                        = if ([string]::IsNullOrWhiteSpace($Env:SignModule)) { $true } else { [bool]::Parse($Env:SignModule) }
         MergeModuleOnBuild                = $true
         MergeFunctionsFromApprovedModules = $true
         CertificateThumbprint             = '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703'
