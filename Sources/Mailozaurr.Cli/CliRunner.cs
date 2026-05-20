@@ -1,15 +1,12 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using Mailozaurr.Application;
 using Mailozaurr.Cli.Mcp;
 
 namespace Mailozaurr.Cli;
 
 public static class CliRunner {
-    private static readonly JsonSerializerOptions JsonOptions = new() {
-        WriteIndented = true
-    };
-
     public static async Task<int> RunAsync(
         string[] args,
         TextWriter output,
@@ -1250,7 +1247,7 @@ public static class CliRunner {
         bool json,
         Func<T, string> formatter) {
         if (json) {
-            await output.WriteLineAsync(JsonSerializer.Serialize(value, JsonOptions)).ConfigureAwait(false);
+            await output.WriteLineAsync(SerializeJson(value)).ConfigureAwait(false);
             return;
         }
 
@@ -1263,7 +1260,7 @@ public static class CliRunner {
         bool json,
         Func<T, string> formatter) {
         if (json) {
-            await output.WriteLineAsync(JsonSerializer.Serialize(values, JsonOptions)).ConfigureAwait(false);
+            await output.WriteLineAsync(SerializeJson<IReadOnlyList<T>>(values)).ConfigureAwait(false);
             return;
         }
 
@@ -1323,11 +1320,17 @@ public static class CliRunner {
                     Message = exception.Message
                 }
             };
-            await error.WriteLineAsync(JsonSerializer.Serialize(payload, JsonOptions)).ConfigureAwait(false);
+            await error.WriteLineAsync(SerializeJson(payload)).ConfigureAwait(false);
             return;
         }
 
         await error.WriteLineAsync(exception.Message).ConfigureAwait(false);
+    }
+
+    private static string SerializeJson<T>(T value) {
+        var typeInfo = CliJsonContext.Default.GetTypeInfo(typeof(T)) ??
+            throw new InvalidOperationException($"JSON output for '{typeof(T).FullName}' is not registered.");
+        return JsonSerializer.Serialize(value, (JsonTypeInfo)typeInfo);
     }
 
     private static void WriteHelp(TextWriter output) {
@@ -1460,13 +1463,4 @@ public static class CliRunner {
         throw new InvalidOperationException($"Unsupported profile overview sort '{rawSort}'.");
     }
 
-    private sealed class CliErrorEnvelope {
-        public required CliError Error { get; init; }
-    }
-
-    private sealed class CliError {
-        public required string Type { get; init; }
-
-        public required string Message { get; init; }
-    }
 }

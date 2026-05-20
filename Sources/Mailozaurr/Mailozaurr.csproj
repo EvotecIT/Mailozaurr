@@ -23,6 +23,10 @@
             Windows;MacOS;Linux;Mail;Email;MX;SPF;DMARC;DKIM;GraphApi;SendGrid;Graph;IMAP;POP3</PackageTags>
     </PropertyGroup>
 
+    <PropertyGroup Condition=" '$(TargetFramework)' == 'net8.0' ">
+        <IsAotCompatible>true</IsAotCompatible>
+    </PropertyGroup>
+
     <!-- Include referenced assemblies alongside output -->
     <PropertyGroup>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>

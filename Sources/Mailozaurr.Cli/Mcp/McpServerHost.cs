@@ -13,7 +13,7 @@ internal static class McpServerHost {
         builder.Services
             .AddMcpServer()
             .WithStdioServerTransport()
-            .WithToolsFromAssembly(typeof(MailMcpTools).Assembly);
+            .WithTools<MailMcpTools>();
 
         using var host = builder.Build();
         await host.RunAsync(cancellationToken).ConfigureAwait(false);

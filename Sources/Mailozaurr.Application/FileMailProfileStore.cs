@@ -8,11 +8,6 @@ namespace Mailozaurr.Application;
 public sealed class FileMailProfileStore : IMailProfileStore {
     private readonly string _filePath;
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private static readonly JsonSerializerOptions SerializerOptions = new() {
-        PropertyNameCaseInsensitive = true,
-        WriteIndented = true
-    };
-
     /// <summary>
     /// Creates a new store using the provided options.
     /// </summary>
@@ -109,7 +104,7 @@ public sealed class FileMailProfileStore : IMailProfileStore {
         }
 
         using (var stream = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
-            var document = await JsonSerializer.DeserializeAsync<MailProfileStoreDocument>(stream, SerializerOptions, cancellationToken).ConfigureAwait(false);
+            var document = await JsonSerializer.DeserializeAsync(stream, ApplicationJsonContext.Default.MailProfileStoreDocument, cancellationToken).ConfigureAwait(false);
             return document ?? new MailProfileStoreDocument();
         }
     }
@@ -125,7 +120,7 @@ public sealed class FileMailProfileStore : IMailProfileStore {
         var tempPath = Path.Combine(directory, Path.GetRandomFileName());
         try {
             using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)) {
-                await JsonSerializer.SerializeAsync(stream, document, SerializerOptions, cancellationToken).ConfigureAwait(false);
+                await JsonSerializer.SerializeAsync(stream, document, ApplicationJsonContext.Default.MailProfileStoreDocument, cancellationToken).ConfigureAwait(false);
                 await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
             }
 
@@ -173,9 +168,4 @@ public sealed class FileMailProfileStore : IMailProfileStore {
             : new ProfileCapabilities(profile.Capabilities.Kind, profile.Capabilities.Capabilities)
     };
 
-    private sealed class MailProfileStoreDocument {
-        public int Version { get; set; } = 1;
-
-        public List<MailProfile> Profiles { get; set; } = new();
-    }
 }

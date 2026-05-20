@@ -12,6 +12,10 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 
+    <PropertyGroup Condition=" '$(TargetFramework)' == 'net8.0' ">
+        <IsAotCompatible>true</IsAotCompatible>
+    </PropertyGroup>
+
     <ItemGroup>
         <ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
     </ItemGroup>
