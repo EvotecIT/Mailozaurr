@@ -1,4 +1,4 @@
-# to speed up development you can opt into direct build output instead of the Lib folder
+﻿# to speed up development you can opt into direct build output instead of the Lib folder
 $Development = @('1', 'true', 'yes') -contains "$env:MAILOZAURR_DEVELOPMENT".ToLowerInvariant()
 $DevelopmentPath = "$PSScriptRoot\Sources\Mailozaurr.PowerShell\bin\Debug"
 $DevelopmentFolderCore = 'net8.0'
