@@ -13,20 +13,23 @@ public sealed class CmdletRemoveIMAPMessageAttachment : PSCmdlet {
     /// MIME message to process.
     /// </summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true)]
+    [Alias("Message")]
     [ValidateNotNull]
-    public MimeMessage? Message { get; set; }
+    public object? InputObject { get; set; }
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        if (Message == null) {
+        var message = PowerShellMimeMessageResolver.Resolve(InputObject);
+        if (message == null) {
+            WriteObject(InputObject);
             return;
         }
         if (!ShouldProcess("MimeMessage", "Removing attachments")) {
-            WriteObject(Message);
+            WriteObject(message);
             return;
         }
-        RemoveMimeAttachments(Message.Body);
-        WriteObject(Message);
+        RemoveMimeAttachments(message.Body);
+        WriteObject(message);
     }
 
     private static void RemoveMimeAttachments(MimeEntity? entity) {

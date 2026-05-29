@@ -95,18 +95,6 @@ Build-Module -ModuleName 'Mailozaurr' {
             'Mailozaurr'
             'Mailozaurr.Msg'
         )
-        NETAssemblyTypeAccelerators          = @(
-            'MailKit.Net.Pop3.Pop3Client'
-            'MailKit.Search.SearchQuery'
-            'MailKit.Security.SecureSocketOptions'
-            'MailKit.UniqueId'
-            'MimeKit.BodyBuilder'
-            'MimeKit.MailboxAddress'
-            'MimeKit.MimeContent'
-            'MimeKit.MimeMessage'
-            'MimeKit.MimePart'
-            'MimeKit.TextPart'
-        )
         #NETMergeLibraryDebugging          = $true
         DotSourceLibraries                   = $true
         DotSourceClasses                     = $true
