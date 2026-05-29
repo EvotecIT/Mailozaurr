@@ -113,18 +113,14 @@ public static class OAuthHelpers {
         } else {
             account = accounts.FirstOrDefault();
         }
-        try {
-            if (account != null) {
+        if (account != null) {
+            try {
                 result = await app.AcquireTokenSilent(scopes, account).ExecuteAsync();
-            } else {
-                throw new MsalUiRequiredException("", "no_account");
+            } catch (MsalUiRequiredException) {
+                result = await AcquireO365TokenInteractivePromptAsync(app, login, scopes).ConfigureAwait(false);
             }
-        } catch (MsalUiRequiredException) {
-            var builder = app.AcquireTokenInteractive(scopes);
-            if (!string.IsNullOrWhiteSpace(login)) {
-                builder = builder.WithLoginHint(login);
-            }
-            result = await builder.ExecuteAsync();
+        } else {
+            result = await AcquireO365TokenInteractivePromptAsync(app, login, scopes).ConfigureAwait(false);
         }
         var cred = new OAuthCredential {
             UserName = result.Account.Username,
@@ -134,6 +130,18 @@ public static class OAuthHelpers {
         };
         await PersistO365CredentialAsync(cred, clientId, tenantId, redirectUri, scopes).ConfigureAwait(false);
         return cred;
+    }
+
+    private static Task<AuthenticationResult> AcquireO365TokenInteractivePromptAsync(
+        IPublicClientApplication app,
+        string? login,
+        IEnumerable<string> scopes) {
+        var builder = app.AcquireTokenInteractive(scopes);
+        if (!string.IsNullOrWhiteSpace(login)) {
+            builder = builder.WithLoginHint(login);
+        }
+
+        return builder.ExecuteAsync();
     }
 
     /// <summary>
