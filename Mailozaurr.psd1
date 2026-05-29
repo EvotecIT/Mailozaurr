@@ -8,7 +8,7 @@
     Description          = 'Mailozaurr is a PowerShell module that aims to provide SMTP, POP3, IMAP and few other ways to interact with Email. Underneath it uses MimeKit and MailKit and EmailValidation libraries written by Jeffrey Stedfast.'
     FunctionsToExport    = @()
     GUID                 = '2b0ea9f1-3ff1-4300-b939-106d5da608fa'
-    ModuleVersion        = '2.1.0'
+    ModuleVersion        = '2.1.1'
     PowerShellVersion    = '5.1'
     PrivateData          = @{
         PSData = @{
