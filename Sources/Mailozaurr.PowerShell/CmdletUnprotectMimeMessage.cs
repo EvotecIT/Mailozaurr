@@ -29,17 +29,7 @@ public sealed class CmdletUnprotectMimeMessage : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        var input = InputObject is PSObject psObject ? psObject.BaseObject : InputObject;
-
-        MimeMessage? message = input switch {
-            MimeMessage m => m,
-            ImapMessageInfo info => info.Raw.Message,
-            ImapEmailMessage imap => imap.Message,
-            Pop3MessageInfo pinfo => pinfo.Raw.Message,
-            Pop3EmailMessage pop => pop.Message,
-            GraphEmailMessage g => g.Message,
-            _ => null
-        };
+        var message = PowerShellMimeMessageResolver.Resolve(InputObject);
 
         if (message == null) {
             WriteObject(InputObject);

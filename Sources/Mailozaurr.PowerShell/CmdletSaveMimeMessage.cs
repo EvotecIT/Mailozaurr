@@ -20,15 +20,7 @@ public sealed class CmdletSaveMimeMessage : PSCmdlet {
     /// <inheritdoc />
     protected override void ProcessRecord() {
         if (InputObject == null || string.IsNullOrEmpty(Path)) return;
-        MimeMessage? message = InputObject switch {
-            MimeMessage m => m,
-            ImapMessageInfo info => info.Raw.Message,
-            ImapEmailMessage imap => imap.Message,
-            Pop3MessageInfo pinfo => pinfo.Raw.Message,
-            Pop3EmailMessage pop => pop.Message,
-            GraphEmailMessage g => g.Message,
-            _ => null
-        };
+        var message = PowerShellMimeMessageResolver.Resolve(InputObject);
         if (message == null) return;
 
         var resolved = System.IO.Path.GetFullPath(Path);

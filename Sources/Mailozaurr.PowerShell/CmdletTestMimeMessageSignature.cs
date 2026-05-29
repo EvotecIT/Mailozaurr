@@ -12,8 +12,9 @@ namespace Mailozaurr.PowerShell;
 public sealed class CmdletTestMimeMessageSignature : PSCmdlet {
     /// <summary>Message to verify.</summary>
     [Parameter(Mandatory = true, ValueFromPipeline = true)]
+    [Alias("Message")]
     [ValidateNotNull]
-    public MimeMessage? Message { get; set; }
+    public object? InputObject { get; set; }
 
     /// <summary>Public key for PGP signature verification.</summary>
     [Parameter(ParameterSetName = "Pgp")]
@@ -25,12 +26,13 @@ public sealed class CmdletTestMimeMessageSignature : PSCmdlet {
 
     /// <inheritdoc />
     protected override void ProcessRecord() {
-        if (Message == null) { WriteObject(false); return; }
+        var message = PowerShellMimeMessageResolver.Resolve(InputObject);
+        if (message == null) { WriteObject(false); return; }
 
-        var enc = MimeKitUtils.GetEncryption(Message);
+        var enc = MimeKitUtils.GetEncryption(message);
         bool result = enc switch {
-            EmailEncryption.PgpSigned => MimeKitUtils.VerifyPgpSignature(Message, PublicKeyPath!),
-            EmailEncryption.SmimeSigned => MimeKitUtils.VerifySmimeSignature(Message, Certificate!),
+            EmailEncryption.PgpSigned => MimeKitUtils.VerifyPgpSignature(message, PublicKeyPath!),
+            EmailEncryption.SmimeSigned => MimeKitUtils.VerifySmimeSignature(message, Certificate!),
             _ => false
         };
         WriteObject(result);

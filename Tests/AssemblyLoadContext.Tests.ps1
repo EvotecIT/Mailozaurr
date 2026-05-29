@@ -24,9 +24,10 @@ Import-Module Mailozaurr -Force
 `$commandAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$commandAssembly)
 `$smtpAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext([Mailozaurr.Smtp].Assembly)
 `$msgAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext([Mailozaurr.EmailMessage].Assembly)
-`$mimeAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext([MimeKit.MimeMessage].Assembly)
-`$mailKitAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext([MailKit.UniqueId].Assembly)
-`$message = [MimeKit.MimeMessage]::new()
+`$message = New-MimeMessage -From 'Sender <sender@example.com>' -To 'Recipient <recipient@example.com>' -Subject 'ALC' -TextBody 'Body'
+`$query = New-IMAPSearchQuery -FromContains 'sender@example.com'
+`$mimeAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$message.GetType().Assembly)
+`$mailKitAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$query.GetType().Assembly)
 `$smtp = [Mailozaurr.Smtp]::new()
 
 [pscustomobject]@{
@@ -45,9 +46,9 @@ Import-Module Mailozaurr -Force
     MimeMessageType = `$message.GetType().FullName
     MimeMessageALC = `$mimeAlc.Name
     MimeMessageALCIsDefault = [object]::ReferenceEquals(`$mimeAlc, [System.Runtime.Loader.AssemblyLoadContext]::Default)
-    MailKitUniqueIdType = [MailKit.UniqueId].FullName
-    MailKitUniqueIdALC = `$mailKitAlc.Name
-    MailKitUniqueIdALCIsDefault = [object]::ReferenceEquals(`$mailKitAlc, [System.Runtime.Loader.AssemblyLoadContext]::Default)
+    SearchQueryType = `$query.GetType().FullName
+    SearchQueryALC = `$mailKitAlc.Name
+    SearchQueryALCIsDefault = [object]::ReferenceEquals(`$mailKitAlc, [System.Runtime.Loader.AssemblyLoadContext]::Default)
     SmtpCreated = `$null -ne `$smtp
 } | ConvertTo-Json -Compress
 "@
@@ -74,9 +75,9 @@ Import-Module Mailozaurr -Force
         $result.MimeMessageType | Should -Be 'MimeKit.MimeMessage'
         $result.MimeMessageALC | Should -Be 'Mailozaurr'
         $result.MimeMessageALCIsDefault | Should -BeFalse
-        $result.MailKitUniqueIdType | Should -Be 'MailKit.UniqueId'
-        $result.MailKitUniqueIdALC | Should -Be 'Mailozaurr'
-        $result.MailKitUniqueIdALCIsDefault | Should -BeFalse
+        $result.SearchQueryType | Should -BeLike 'MailKit.Search.*SearchQuery'
+        $result.SearchQueryALC | Should -Be 'Mailozaurr'
+        $result.SearchQueryALCIsDefault | Should -BeFalse
         $result.SmtpCreated | Should -BeTrue
     }
 }
