@@ -343,7 +343,11 @@ namespace Mailozaurr;
 
             // First pass: compute total size without loading file contents.
             foreach (var item in Attachments) {
-                if (item is string path) {
+                if (item is GraphAttachment ga) {
+                    ConvertedAttachments.Add(ga);
+                    var size = EstimateAttachmentSize(ga);
+                    inMemoryTotalBytes += size;
+                } else if (TryGetAttachmentPath(item, out var path)) {
                     if (!File.Exists(path)) {
                         LogMissingAttachmentWarning(path);
                         continue;
@@ -356,10 +360,6 @@ namespace Mailozaurr;
                     } catch (Exception ex) {
                         LogCollector.LogError($"Send-EmailMessage - Failed to read attachment '{path}': {ex.Message}");
                     }
-                } else if (item is GraphAttachment ga) {
-                    ConvertedAttachments.Add(ga);
-                    var size = EstimateAttachmentSize(ga);
-                    inMemoryTotalBytes += size;
                 }
             }
 
@@ -376,6 +376,31 @@ namespace Mailozaurr;
 
             if (_inlineAttachmentSizeBytes > GraphPayloadLimitBytes) {
                 LogCollector.LogWarning("Send-EmailMessage - Large in-memory attachments detected. Consider using file paths for large attachments to enable upload sessions.");
+            }
+        }
+    }
+
+    private static bool TryGetAttachmentPath(object? item, out string path) {
+        path = item switch {
+            string value => value,
+            FileInfo fileInfo => fileInfo.FullName,
+            _ => item?.ToString() ?? string.Empty
+        };
+
+        return !string.IsNullOrWhiteSpace(path);
+    }
+
+    private IEnumerable<string> EnumerateAttachmentPaths() {
+        if (Attachments == null || Attachments.Length == 0) {
+            yield break;
+        }
+
+        foreach (var item in Attachments) {
+            if (item is GraphAttachment) {
+                continue;
+            }
+            if (TryGetAttachmentPath(item, out var path)) {
+                yield return path;
             }
         }
     }
@@ -953,9 +978,7 @@ namespace Mailozaurr;
         /// <param name="cancellationToken">Token used to cancel the operation.</param>
         /// <returns>The upload session URL.</returns>
         public async Task<string> CreateUploadSession(GraphMessage draftMessage, string attachmentItemJson, CancellationToken cancellationToken = default) {
-        var uploadSessionUrl = MicrosoftGraphUtils.BuildGraphUri(
-            GraphEndpoint.V1,
-            $"/users('{SentFrom}')/messages/{draftMessage.Id}/attachments/createUploadSession");
+        var uploadSessionUrl = GraphDraftMessageUris.CreateUploadSession(SentFrom, draftMessage.Id!);
         using var request = new HttpRequestMessage(HttpMethod.Post, uploadSessionUrl) {
             Content = new StringContent(attachmentItemJson, Encoding.UTF8, "application/json")
         };
@@ -1042,13 +1065,11 @@ namespace Mailozaurr;
         /// <param name="draftMessage">The draft message to attach the files to.</param>
         /// <param name="cancellationToken">Token used to cancel the operation.</param>
         public async Task UploadAttachmentsAsync(GraphMessage draftMessage, CancellationToken cancellationToken = default) {
-        if (Attachments != null && Attachments.Length > 0) {
-            foreach (var path in Attachments.OfType<string>()) {
-                try {
-                    await UploadAttachmentWithRetryAsync(draftMessage, path, cancellationToken);
-                } catch (FileNotFoundException) {
-                    // Already logged by CreateGraphAttachment.
-                }
+        foreach (var path in EnumerateAttachmentPaths()) {
+            try {
+                await UploadAttachmentWithRetryAsync(draftMessage, path, cancellationToken);
+            } catch (FileNotFoundException) {
+                // Already logged by CreateGraphAttachment.
             }
         }
     }
@@ -1058,14 +1079,12 @@ namespace Mailozaurr;
         /// </summary>
         /// <param name="cancellationToken">Token used to cancel the operation.</param>
         public async Task PrepareAttachments(CancellationToken cancellationToken = default) {
-        if (Attachments != null && Attachments.Length > 0) {
-            foreach (var path in Attachments.OfType<string>()) {
-                try {
-                    var attachmentItemJson = await CreateGraphAttachment(path, cancellationToken);
-                    AttachmentsPlaceHolders.Add(attachmentItemJson);
-                } catch (FileNotFoundException) {
-                    // Already logged by CreateGraphAttachment.
-                }
+        foreach (var path in EnumerateAttachmentPaths()) {
+            try {
+                var attachmentItemJson = await CreateGraphAttachment(path, cancellationToken);
+                AttachmentsPlaceHolders.Add(attachmentItemJson);
+            } catch (FileNotFoundException) {
+                // Already logged by CreateGraphAttachment.
             }
         }
     }

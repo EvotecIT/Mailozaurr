@@ -406,19 +406,28 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         }
         if (graph.IsLargerAttachment) {
             var json = graph.CreateDraftForMg();
-            var draftMessageId = InvokeMgGraphRequestPOST1($"v1.0/users/{graph.From}/mailfolders/drafts/messages", EmailAction.SendDraftMessage, json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+            var draftMessageId = InvokeMgGraphRequestPOST1($"v1.0/users/{graph.SentFrom}/mailfolders/drafts/messages", EmailAction.SendDraftMessage, json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+            if (draftMessageId == string.Empty) {
+                LogEmitter.EmitLogs(graph.LogCollector, this);
+                return;
+            }
             await graph.PrepareAttachments();
             foreach (var attachment in graph.AttachmentsPlaceHolders) {
-                var uploadUrl = InvokeMgGraphRequestPOST(attachment.Json, EmailAction.Send, attachment.Json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+                var uploadSessionUri = GraphDraftMessageUris.CreateUploadSession(graph.SentFrom, draftMessageId);
+                var uploadUrl = InvokeMgGraphRequestPOST(uploadSessionUri, EmailAction.SendAttachment, attachment.Json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
                 if (uploadUrl != string.Empty) {
-                    await InvokeMgGraphRequestPUT(uploadUrl, EmailAction.SendAttachment, attachment, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+                    var uploaded = await InvokeMgGraphRequestPUT(uploadUrl, EmailAction.SendAttachment, attachment, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+                    if (!uploaded) {
+                        LogEmitter.EmitLogs(graph.LogCollector, this);
+                        return;
+                    }
                 } else {
-                    graph.LogCollector.LogVerbose("PlaceHolders not working?");
+                    graph.LogCollector.LogWarning($"Send-EmailMessage - Unable to create Graph upload session for attachment '{attachment.FileName}'. Draft message was not sent.");
+                    LogEmitter.EmitLogs(graph.LogCollector, this);
+                    return;
                 }
             }
-            var sendUri = MicrosoftGraphUtils.BuildGraphUri(
-                GraphEndpoint.V1,
-                $"/users('{graph.SentFrom}')/messages/{draftMessageId}/send");
+            var sendUri = GraphDraftMessageUris.Send(graph.SentFrom, draftMessageId);
             InvokeMgGraphRequest(sendUri, EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
             LogEmitter.EmitLogs(graph.LogCollector, this);
         } else {
@@ -616,7 +625,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         }
     }
 
-    private async Task InvokeMgGraphRequestPUT(string uri, EmailAction action, GraphAttachmentPlaceHolder attachment, string sentFrom, string sentTo, TimeSpan elapsed) {
+    private async Task<bool> InvokeMgGraphRequestPUT(string uri, EmailAction action, GraphAttachmentPlaceHolder attachment, string sentFrom, string sentTo, TimeSpan elapsed) {
         foreach (var body in attachment.Content) {
             var parameters = new Hashtable {
                 { "Method", "PUT" },
@@ -647,9 +656,12 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
                         };
                         WriteObject(result);
                     }
+                    return false;
                 }
             }
         }
+
+        return true;
     }
 
 
@@ -667,15 +679,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             try {
                 var results = powerShell.Invoke();
                 if (results.Count > 0) {
-                    // Assuming the first result contains the property you're interested in
-                    var result = results[0];
-                    if (result.BaseObject is IDictionary dictionary) {
-                        var uploadUrl = dictionary["uploadUrl"]?.ToString();
-                        if (!string.IsNullOrEmpty(uploadUrl)) {
-                            return uploadUrl!;
-                        }
-                        // Handle the case where the property is not present
-                        throw new InvalidOperationException("The result does not contain an 'uploadUrl' property.");
+                    if (TryGetPowerShellResultValue(results[0], "uploadUrl", out var uploadUrl)) {
+                        return uploadUrl;
                     }
                     throw new InvalidOperationException("The result does not contain an 'uploadUrl' property.");
                 } else {
@@ -712,15 +717,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
             try {
                 var results = powerShell.Invoke();
                 if (results.Count > 0) {
-                    // Assuming the first result contains the property you're interested in
-                    var result = results[0];
-                    if (result.BaseObject is IDictionary dictionary) {
-                        var id = dictionary["id"]?.ToString();
-                        if (!string.IsNullOrEmpty(id)) {
-                            return id!;
-                        }
-                        // Handle the case where the property is not present
-                        throw new InvalidOperationException("The result does not contain an 'id' property.");
+                    if (TryGetPowerShellResultValue(results[0], "id", out var id)) {
+                        return id;
                     }
                     throw new InvalidOperationException("The result does not contain an 'id' property.");
                 } else {
@@ -742,6 +740,17 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         }
 
         return "";
+    }
+
+    private static bool TryGetPowerShellResultValue(PSObject result, string propertyName, out string value) {
+        value = string.Empty;
+        if (result.BaseObject is IDictionary dictionary) {
+            value = dictionary[propertyName]?.ToString() ?? string.Empty;
+        } else {
+            value = result.Properties[propertyName]?.Value?.ToString() ?? string.Empty;
+        }
+
+        return !string.IsNullOrEmpty(value);
     }
 
     private static List<AttachmentDescriptor>? ConvertToAttachmentDescriptors(object[]? attachments) {

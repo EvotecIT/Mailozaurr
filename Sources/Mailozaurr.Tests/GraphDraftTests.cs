@@ -49,6 +49,28 @@ public class GraphDraftTests
     }
 
     [Fact]
+    public async Task PrepareAttachments_FileInfo_CreatePlaceholders()
+    {
+        string tmp = Path.GetTempFileName();
+        File.WriteAllBytes(tmp, new byte[4_100_000]);
+        using var graph = new Graph { Attachments = new object[] { new FileInfo(tmp) } };
+
+        try
+        {
+            graph.CreateAttachments();
+            await graph.PrepareAttachments();
+        }
+        finally
+        {
+            File.Delete(tmp);
+        }
+
+        Assert.True(graph.IsLargerAttachment);
+        var placeholder = Assert.Single(graph.AttachmentsPlaceHolders);
+        Assert.Equal(Path.GetFileName(tmp), placeholder.FileName);
+    }
+
+    [Fact]
     public async Task CreateGraphAttachment_MissingFile_ThrowsAndLogsWarning()
     {
         string missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
@@ -126,5 +148,21 @@ public class GraphDraftTests
 
         string json = graph.CreateDraftForMg();
         Assert.Contains("\"importance\":\"low\"", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void DraftMessageUris_BuildUploadSessionUri()
+    {
+        string uri = GraphDraftMessageUris.CreateUploadSession("from@example.com", "draft-id");
+
+        Assert.Equal("https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/attachments/createUploadSession", uri);
+    }
+
+    [Fact]
+    public void DraftMessageUris_BuildSendUri()
+    {
+        string uri = GraphDraftMessageUris.Send("from@example.com", "draft-id");
+
+        Assert.Equal("https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/send", uri);
     }
 }
