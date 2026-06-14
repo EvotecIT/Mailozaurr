@@ -90,11 +90,6 @@ Build-Module -ModuleName 'Mailozaurr' {
         NETFramework                         = 'net8.0', 'net472'
         NETHandleAssemblyWithSameName        = $true
         NETAssemblyLoadContext               = $true
-        NETAssemblyTypeAcceleratorMode       = 'Assembly'
-        NETAssemblyTypeAcceleratorAssemblies = @(
-            'Mailozaurr'
-            'Mailozaurr.Msg'
-        )
         #NETMergeLibraryDebugging          = $true
         DotSourceLibraries                   = $true
         DotSourceClasses                     = $true

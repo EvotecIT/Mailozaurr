@@ -1,5 +1,5 @@
 Describe 'Packaged AssemblyLoadContext isolation' {
-    It 'loads binary cmdlets and selected public types from the module ALC' {
+    It 'loads binary cmdlets and dependencies from the module ALC without type accelerators' {
         $packagedModuleRoot = Join-Path $PSScriptRoot '..\Artefacts\Modules'
         $packagedModule = Join-Path $packagedModuleRoot 'Mailozaurr'
         $packagedLoader = Join-Path $packagedModule 'Lib\Core\Mailozaurr.ModuleLoadContext.dll'
@@ -22,13 +22,19 @@ Import-Module Mailozaurr -Force
 `$command = Get-Command Send-EmailMessage -Module Mailozaurr -ErrorAction Stop
 `$commandAssembly = `$command.ImplementingType.Assembly
 `$commandAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$commandAssembly)
-`$smtpAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext([Mailozaurr.Smtp].Assembly)
-`$msgAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext([Mailozaurr.EmailMessage].Assembly)
+`$smtpType = `$commandAlc.Assemblies | ForEach-Object { `$_.GetType('Mailozaurr.Smtp', `$false, `$false) } | Where-Object { `$_ } | Select-Object -First 1
+`$emailProviderType = `$commandAlc.Assemblies | ForEach-Object { `$_.GetType('Mailozaurr.EmailProvider', `$false, `$false) } | Where-Object { `$_ } | Select-Object -First 1
+`$smtpAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$smtpType.Assembly)
 `$message = New-MimeMessage -From 'Sender <sender@example.com>' -To 'Recipient <recipient@example.com>' -Subject 'ALC' -TextBody 'Body'
 `$query = New-IMAPSearchQuery -FromContains 'sender@example.com'
 `$mimeAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$message.GetType().Assembly)
 `$mailKitAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$query.GetType().Assembly)
-`$smtp = [Mailozaurr.Smtp]::new()
+`$smtpTypeVisibleByName = `$true
+try {
+    `$null = [type]'Mailozaurr.Smtp'
+} catch {
+    `$smtpTypeVisibleByName = `$false
+}
 
 [pscustomobject]@{
     CommandName = `$command.Name
@@ -36,20 +42,18 @@ Import-Module Mailozaurr -Force
     CommandAssemblyPath = `$commandAssembly.Location
     CommandALC = `$commandAlc.Name
     CommandALCIsDefault = [object]::ReferenceEquals(`$commandAlc, [System.Runtime.Loader.AssemblyLoadContext]::Default)
-    SmtpType = [Mailozaurr.Smtp].FullName
+    SmtpType = `$smtpType.FullName
+    SmtpTypeVisibleByName = `$smtpTypeVisibleByName
     SmtpALC = `$smtpAlc.Name
     SmtpALCIsDefault = [object]::ReferenceEquals(`$smtpAlc, [System.Runtime.Loader.AssemblyLoadContext]::Default)
-    EmailProviderType = [Mailozaurr.EmailProvider].FullName
-    EmailMessageType = [Mailozaurr.EmailMessage].FullName
-    EmailMessageALC = `$msgAlc.Name
-    EmailMessageALCIsDefault = [object]::ReferenceEquals(`$msgAlc, [System.Runtime.Loader.AssemblyLoadContext]::Default)
+    EmailProviderType = `$emailProviderType.FullName
     MimeMessageType = `$message.GetType().FullName
     MimeMessageALC = `$mimeAlc.Name
     MimeMessageALCIsDefault = [object]::ReferenceEquals(`$mimeAlc, [System.Runtime.Loader.AssemblyLoadContext]::Default)
     SearchQueryType = `$query.GetType().FullName
     SearchQueryALC = `$mailKitAlc.Name
     SearchQueryALCIsDefault = [object]::ReferenceEquals(`$mailKitAlc, [System.Runtime.Loader.AssemblyLoadContext]::Default)
-    SmtpCreated = `$null -ne `$smtp
+    SmtpResolved = `$null -ne `$smtpType
 } | ConvertTo-Json -Compress
 "@
         $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
@@ -66,18 +70,16 @@ Import-Module Mailozaurr -Force
         $result.CommandALC | Should -Be 'Mailozaurr'
         $result.CommandALCIsDefault | Should -BeFalse
         $result.SmtpType | Should -Be 'Mailozaurr.Smtp'
+        $result.SmtpTypeVisibleByName | Should -BeFalse
         $result.SmtpALC | Should -Be 'Mailozaurr'
         $result.SmtpALCIsDefault | Should -BeFalse
         $result.EmailProviderType | Should -Be 'Mailozaurr.EmailProvider'
-        $result.EmailMessageType | Should -Be 'Mailozaurr.EmailMessage'
-        $result.EmailMessageALC | Should -Be 'Mailozaurr'
-        $result.EmailMessageALCIsDefault | Should -BeFalse
         $result.MimeMessageType | Should -Be 'MimeKit.MimeMessage'
         $result.MimeMessageALC | Should -Be 'Mailozaurr'
         $result.MimeMessageALCIsDefault | Should -BeFalse
         $result.SearchQueryType | Should -BeLike 'MailKit.Search.*SearchQuery'
         $result.SearchQueryALC | Should -Be 'Mailozaurr'
         $result.SearchQueryALCIsDefault | Should -BeFalse
-        $result.SmtpCreated | Should -BeTrue
+        $result.SmtpResolved | Should -BeTrue
     }
 }

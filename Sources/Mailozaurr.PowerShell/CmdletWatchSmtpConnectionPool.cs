@@ -8,10 +8,11 @@ namespace Mailozaurr.PowerShell;
 /// <para type="description">The <c>Watch-SmtpConnectionPool</c> cmdlet registers a handler
 /// that executes a provided script block whenever the SMTP connection pool
 /// changes. The handler is returned so it can be removed when no longer
-/// needed.</para>
+/// needed with <c>Unregister-SmtpConnectionPoolWatcher</c>.</para>
 /// <example>
 ///   <summary>Watch pool changes</summary>
-///   <code>Watch-SmtpConnectionPool -Action { param($s) $s.CurrentPoolSize }</code>
+///   <code>$watcher = Watch-SmtpConnectionPool -Action { param($s) $s.CurrentPoolSize }
+/// Unregister-SmtpConnectionPoolWatcher -Watcher $watcher</code>
 /// </example>
 /// </summary>
 [Cmdlet("Watch", "SmtpConnectionPool")]

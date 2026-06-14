@@ -25,4 +25,4 @@ Clear-SmtpConnectionPool
 $snapshot = Get-SmtpConnectionPool
 Write-Host "Current pool size: $($snapshot.CurrentPoolSize)"
 
-[Mailozaurr.SmtpConnectionPool]::remove_PoolSizeChanged($watcher)
+Unregister-SmtpConnectionPoolWatcher -Watcher $watcher

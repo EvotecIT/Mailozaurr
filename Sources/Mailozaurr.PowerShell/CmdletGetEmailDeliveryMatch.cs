@@ -22,9 +22,16 @@ public sealed class CmdletGetEmailDeliveryMatch : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Resolver used to correlate NDRs with sent messages.</para>
     /// </summary>
-    [Parameter(Mandatory = true)]
+    [Parameter]
     [ValidateNotNull]
     public SendLogResolver? Resolver { get; set; }
+
+    /// <summary>
+    /// <para type="description">Path to the sent-message log used to correlate NDRs. Used when Resolver is not supplied.</para>
+    /// </summary>
+    [Parameter]
+    [ValidateNotNullOrEmpty]
+    public string? SentLogPath { get; set; }
 
     /// <summary>
     /// <para type="description">Only reports for recipients containing this value are returned.</para>
@@ -71,9 +78,14 @@ public sealed class CmdletGetEmailDeliveryMatch : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        if (Resolver == null) {
+        var resolver = Resolver;
+        if (resolver == null && !string.IsNullOrWhiteSpace(SentLogPath)) {
+            resolver = new SendLogResolver(new FileSentMessageRepository(SentLogPath!));
+        }
+
+        if (resolver == null) {
             ThrowTerminatingError(new ErrorRecord(
-                new InvalidOperationException("Get-EmailDeliveryMatch - Resolver is required."),
+                new InvalidOperationException("Get-EmailDeliveryMatch - Resolver or SentLogPath is required."),
                 "ResolverMissing",
                 ErrorCategory.InvalidArgument,
                 null));
@@ -85,7 +97,7 @@ public sealed class CmdletGetEmailDeliveryMatch : AsyncPSCmdlet {
             case EmailProtocol.Imap: {
                     var conn = DefaultSessions.ImapSession;
                     if (conn != null && conn.Data != null) {
-                        var service = new ImapNonDeliveryReportService(conn.Data, Resolver, Folder);
+                        var service = new ImapNonDeliveryReportService(conn.Data, resolver!, Folder);
                         var results = await service.SearchAsync(Since, Before, Recipient, MessageId, max, CancelToken);
                         foreach (var result in results) {
                             WriteObject(result);
@@ -103,7 +115,7 @@ public sealed class CmdletGetEmailDeliveryMatch : AsyncPSCmdlet {
             case EmailProtocol.Pop3: {
                     var conn = DefaultSessions.Pop3Session;
                     if (conn != null && conn.Data != null) {
-                        var service = new Pop3NonDeliveryReportService(conn.Data, Resolver);
+                        var service = new Pop3NonDeliveryReportService(conn.Data, resolver!);
                         var results = await service.SearchAsync(Since, Before, Recipient, MessageId, max, CancelToken);
                         foreach (var result in results) {
                             WriteObject(result);
@@ -121,7 +133,7 @@ public sealed class CmdletGetEmailDeliveryMatch : AsyncPSCmdlet {
             case EmailProtocol.Graph: {
                     var conn = DefaultSessions.GraphSession;
                     if (conn != null && conn.Credential != null && !string.IsNullOrWhiteSpace(UserPrincipalName)) {
-                        var service = new GraphNonDeliveryReportService(conn.Credential, UserPrincipalName!, Resolver);
+                        var service = new GraphNonDeliveryReportService(conn.Credential, UserPrincipalName!, resolver!);
                         var results = await service.SearchAsync(Since, Before, Recipient, MessageId, max, CancelToken);
                         foreach (var result in results) {
                             WriteObject(result);

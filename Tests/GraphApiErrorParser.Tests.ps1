@@ -12,8 +12,8 @@ Content-Type: application/json; odata.metadata=minimal; odata.streaming=true; IE
 
 {"error":{"code":"ErrorInvalidUser","message":"The requested user 'przemyslaw.klys@company.pl' is invalid."}}
 '@
-        $parsed = [Mailozaurr.GraphApiErrorParser]::Parse($sample)
-        $parsed.Method | Should -Be ([Mailozaurr.GraphHttpMethod]::POST)
+        $parsed = $sample | ConvertFrom-GraphApiError
+        $parsed.Method.ToString() | Should -Be 'POST'
         $parsed.Headers.RequestId | Should -Be '2ff18766-1395-4fb9-abd1-162774d4b063'
         $parsed.Headers.Diagnostic.ServerInfo.DataCenter | Should -Be 'Poland Central'
         $parsed.Error.Code | Should -Be 'ErrorInvalidUser'
@@ -21,7 +21,7 @@ Content-Type: application/json; odata.metadata=minimal; odata.streaming=true; IE
 
     It 'returns raw message for invalid input' {
         $sample = 'not a graph error'
-        $parsed = [Mailozaurr.GraphApiErrorParser]::Parse($sample)
+        $parsed = $sample | ConvertFrom-GraphApiError
         $parsed.Raw | Should -Be $sample
         $parsed.Error | Should -Be $null
     }

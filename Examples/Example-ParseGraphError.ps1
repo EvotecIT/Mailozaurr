@@ -10,6 +10,6 @@ Content-Type: application/json; odata.metadata=minimal; odata.streaming=true; IE
 {"error":{"code":"ErrorInvalidUser","message":"The requested user 'przemyslaw.klys@company.pl' is invalid."}}
 '
 
-$parsed = [Mailozaurr.GraphApiErrorParser]::Parse($sample)
+$parsed = $sample | ConvertFrom-GraphApiError
 $parsed.Headers.Diagnostic.ServerInfo
 $parsed.Error
