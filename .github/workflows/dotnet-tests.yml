@@ -183,17 +183,14 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Install Mono for .NET Framework tests
-        run: brew install mono
-
       - name: Restore dependencies
-        run: dotnet restore Sources/Mailozaurr.sln
+        run: dotnet restore Sources/Mailozaurr.Tests/Mailozaurr.Tests.csproj
 
-      - name: Build solution
-        run: dotnet build Sources/Mailozaurr.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+      - name: Build .NET 8 tests
+        run: dotnet build Sources/Mailozaurr.Tests/Mailozaurr.Tests.csproj --framework net8.0 --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Run tests
-        run: dotnet test Sources/Mailozaurr.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
+        run: dotnet test Sources/Mailozaurr.Tests/Mailozaurr.Tests.csproj --framework net8.0 --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
 
       - name: Summarize failing tests
         if: failure() && env.SUMMARIZE_FAILURES == 'true'
