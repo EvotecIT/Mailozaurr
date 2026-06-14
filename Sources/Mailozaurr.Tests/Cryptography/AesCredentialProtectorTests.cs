@@ -70,6 +70,19 @@ public sealed class AesCredentialProtectorTests {
     }
 
     [Fact]
+    public void UnprotectWithFallback_AuthenticatedTamper_Throws() {
+        using var scope = new KeyDirectoryScope();
+        var protector = new AesCredentialProtector();
+        var cipher = protector.Protect("secret");
+        var payload = Convert.FromBase64String(cipher);
+
+        payload[payload.Length - 1] ^= 0x1;
+        var tampered = Convert.ToBase64String(payload);
+
+        Assert.Throws<CryptographicException>(() => CredentialProtection.UnprotectWithFallback(protector, tampered));
+    }
+
+    [Fact]
     public void Unprotect_LegacyPayload_RemainsCompatible() {
         using var scope = new KeyDirectoryScope();
         var protector = new AesCredentialProtector();

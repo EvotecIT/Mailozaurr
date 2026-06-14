@@ -70,13 +70,14 @@ public static class CredentialProtection {
             return string.Empty;
         }
 
+        var isAuthenticatedPayload = IsAuthenticatedPayload(protectedData!);
         try {
             return protector.Unprotect(protectedData!);
         } catch (FormatException) {
             // Fall back to legacy behaviour below.
-        } catch (CryptographicException) {
+        } catch (CryptographicException) when (!isAuthenticatedPayload) {
             // Fall back to legacy behaviour below.
-        } catch (ArgumentException) {
+        } catch (ArgumentException) when (!isAuthenticatedPayload) {
             // Fall back to legacy behaviour below.
         }
 
@@ -85,6 +86,19 @@ public static class CredentialProtection {
             return Encoding.UTF8.GetString(raw);
         } catch {
             return string.Empty;
+        }
+    }
+
+    private static bool IsAuthenticatedPayload(string protectedData) {
+        try {
+            var payload = Convert.FromBase64String(protectedData);
+            return payload.Length >= 4
+                && payload[0] == (byte)'M'
+                && payload[1] == (byte)'Z'
+                && payload[2] == (byte)'C'
+                && payload[3] == 2;
+        } catch (FormatException) {
+            return false;
         }
     }
 
