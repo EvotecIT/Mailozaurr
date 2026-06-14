@@ -358,7 +358,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
     public int GraphMaxConcurrency { get; set; } = 0;
 
     /// <summary>
-    /// <para>Enables SMTP fallback when Graph ultimately fails. Configure fallback with <c>Set-MailozaurrSmtpFallback</c>.</para>
+    /// <para>Enables SMTP fallback when Graph ultimately fails. Requires a configured factory via [Mailozaurr.MailozaurrOptions]::SmtpFallbackFactory.</para>
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "Graph")]
     public SwitchParameter EnableSmtpFallback { get; set; }

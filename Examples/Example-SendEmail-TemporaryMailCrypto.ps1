@@ -10,6 +10,19 @@ Send-EmailMessage -From 'sender@example.com' -To 'recipient@example.com' `
     -PrivateKeyPath $keys.PrivateKeyPath -PrivateKeyPassword $keys.PassPhrase `
     -SignOrEncrypt PgpSignAndEncrypt -WhatIf -Verbose
 
+# Optionally verify the encrypted message
+$smtp = [Mailozaurr.Smtp]::new()
+$smtp.From = 'sender@example.com'
+$smtp.To   = @('sender@example.com')
+$smtp.Subject = 'Test message'
+$smtp.TextBody = 'Secret text'
+$smtp.CreateMessage()
+$null = $smtp.PgpEncrypt($keys.PublicKeyPath)
+$path = Join-Path $env:TEMP 'test.eml'
+$smtp.Message.WriteTo($path)
+$decrypted = $keys.DecryptToString($path)
+Write-Verbose "Decrypted body: $decrypted"
+
 # Dispose without deleting
 $keys.Dispose()
 

@@ -8,9 +8,15 @@ $msg = New-MimeMessage -From 'Sender <sender@example.com>' -To 'Recipient <recip
 $msg = Remove-IMAPMessageAttachment -Message $msg
 Send-EmailMessage -From 'sender@example.com' -To 'recipient@example.com' -Subject $msg.Subject -Body 'Forwarding without attachments' -Server 'smtp.example.com' -Port 25 -Message $msg -WhatIf
 
-# For Graph messages, pipe an existing draft or retrieved Graph message object
-# through Remove-GraphMessageAttachment before forwarding it with your preferred method.
-# $graphMsg = $graphMsg | Remove-GraphMessageAttachment
+# For Graph messages
+$file = Join-Path $PSScriptRoot 'sample2.txt'
+'content2' | Set-Content -Path $file
+$graphMsg = [Mailozaurr.GraphMessage]::new()
+$graphMsg.Subject = 'Graph sample'
+$graphMsg.Body = [Mailozaurr.GraphContent]::new()
+$graphMsg.Attachments = @([Mailozaurr.GraphAttachment]::FromFile($file))
+$graphMsg = Remove-GraphMessageAttachment -Message $graphMsg
+# Forward $graphMsg using your preferred method
 
 # For POP3 messages (after retrieval)
 $popMsg = New-MimeMessage -TextBody 'Forwarding without attachments' -AttachmentPath $path

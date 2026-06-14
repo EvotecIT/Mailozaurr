@@ -4,10 +4,6 @@ Describe 'Get-EmailDeliveryMatch' {
         $resolver = [Mailozaurr.SendLogResolver]::new($repo)
         { Get-EmailDeliveryMatch -Protocol Imap -Resolver $resolver } | Should -Throw
     }
-    It 'Accepts sent log path without requiring callers to construct resolver types' {
-        $path = [IO.Path]::GetTempFileName()
-        { Get-EmailDeliveryMatch -Protocol Imap -SentLogPath $path } | Should -Throw -ExpectedMessage '*not provided or not connected*'
-    }
     It 'Throws when POP3 connection missing' {
         $repo = [Mailozaurr.FileSentMessageRepository]::new([IO.Path]::GetTempFileName())
         $resolver = [Mailozaurr.SendLogResolver]::new($repo)
