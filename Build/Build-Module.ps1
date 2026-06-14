@@ -101,6 +101,7 @@ Build-Module -ModuleName 'Mailozaurr' {
             'Mailozaurr.GraphContent'
             'Mailozaurr.GraphHttpMethod'
             'Mailozaurr.GraphMessage'
+            'Mailozaurr.GraphSendPolicy'
             'Mailozaurr.HtmlUtils'
             'Mailozaurr.MailozaurrOptions'
             'Mailozaurr.SendLogResolver'

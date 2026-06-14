@@ -48,6 +48,7 @@ try {
     EmailEncryptionType = [Mailozaurr.EmailEncryption].FullName
     EmailProviderType = [Mailozaurr.EmailProvider].FullName
     GraphHttpMethodType = [Mailozaurr.GraphHttpMethod].FullName
+    GraphSendPolicyType = [Mailozaurr.GraphSendPolicy].FullName
     EmailMessageType = [Mailozaurr.EmailMessage].FullName
     EmailMessageALC = `$msgAlc.Name
     EmailMessageALCIsDefault = [object]::ReferenceEquals(`$msgAlc, [System.Runtime.Loader.AssemblyLoadContext]::Default)
@@ -80,6 +81,7 @@ try {
         $result.EmailEncryptionType | Should -Be 'Mailozaurr.EmailEncryption'
         $result.EmailProviderType | Should -Be 'Mailozaurr.EmailProvider'
         $result.GraphHttpMethodType | Should -Be 'Mailozaurr.GraphHttpMethod'
+        $result.GraphSendPolicyType | Should -Be 'Mailozaurr.GraphSendPolicy'
         $result.EmailMessageType | Should -Be 'Mailozaurr.EmailMessage'
         $result.EmailMessageALC | Should -Be 'Mailozaurr'
         $result.EmailMessageALCIsDefault | Should -BeFalse

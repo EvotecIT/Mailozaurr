@@ -12,6 +12,7 @@ internal sealed class AesCredentialProtector : ICredentialProtector {
     private const int IvSizeBytes = 16;
     private const int MacSizeBytes = 32;
     private static readonly byte[] PayloadPrefix = { (byte)'M', (byte)'Z', (byte)'C', 2 };
+    private static readonly object KeyFileSyncRoot = new();
 
     private readonly byte[] key;
 
@@ -170,6 +171,12 @@ internal sealed class AesCredentialProtector : ICredentialProtector {
     };
 
     private static byte[] LoadOrCreateKey() {
+        lock (KeyFileSyncRoot) {
+            return LoadOrCreateKeyCore();
+        }
+    }
+
+    private static byte[] LoadOrCreateKeyCore() {
         var directory = CredentialProtectionPaths.ResolveKeyDirectory();
         Directory.CreateDirectory(directory);
         var keyPath = Path.Combine(directory, KeyFileName);
