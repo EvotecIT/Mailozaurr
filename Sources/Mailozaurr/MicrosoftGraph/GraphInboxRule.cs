@@ -9,8 +9,7 @@ namespace Mailozaurr;
 /// Only a subset of rule properties are implemented to keep the
 /// wrapper light-weight.
 /// </remarks>
-public class GraphInboxRule
-{
+public class GraphInboxRule {
     /// <summary>The rule identifier.</summary>
     [JsonPropertyName("id")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

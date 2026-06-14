@@ -1,6 +1,6 @@
+using Mailozaurr;
 using System.Management.Automation;
 using System.Threading.Tasks;
-using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
 
@@ -9,8 +9,7 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.New, "GraphEvent", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 [OutputType(typeof(GraphEvent))]
-public sealed class CmdletNewGraphEvent : AsyncPSCmdlet
-{
+public sealed class CmdletNewGraphEvent : AsyncPSCmdlet {
     /// <summary>
     /// User principal name owning the calendar.
     /// </summary>

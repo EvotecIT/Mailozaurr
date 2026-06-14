@@ -16,4 +16,3 @@ public class SendGridClientDisposeTests {
         await Assert.ThrowsAsync<ObjectDisposedException>(() => client.SendEmailAsync());
     }
 }
-

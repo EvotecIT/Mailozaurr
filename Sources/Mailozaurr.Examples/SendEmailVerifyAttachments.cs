@@ -1,12 +1,9 @@
 using Mailozaurr;
 using Mailozaurr.Definitions;
 
-public static class SendEmailVerifyAttachments
-{
-    public static void Run()
-    {
-        var smtp = new Smtp
-        {
+public static class SendEmailVerifyAttachments {
+    public static void Run() {
+        var smtp = new Smtp {
             From = "sender@example.com",
             To = new[] { "recipient@example.com" },
             Subject = "Verify attachments demo",

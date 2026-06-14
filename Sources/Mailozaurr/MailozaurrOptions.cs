@@ -3,10 +3,8 @@ namespace Mailozaurr;
 /// <summary>
 /// Global options for Mailozaurr behavior.
 /// </summary>
-public static class MailozaurrOptions
-{
-    static MailozaurrOptions()
-    {
+public static class MailozaurrOptions {
+    static MailozaurrOptions() {
         // Internal default for PowerShell and other hosts that rebuild or do not execute psm1 init.
         // Can be overridden at runtime by assigning DefaultGraphPolicy.
         DefaultGraphPolicy = GraphSendPolicy.Default;

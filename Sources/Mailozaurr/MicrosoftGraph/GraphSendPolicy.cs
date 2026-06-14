@@ -3,8 +3,7 @@ namespace Mailozaurr;
 /// <summary>
 /// Policy controlling how Graph send operations are throttled and retried.
 /// </summary>
-public sealed class GraphSendPolicy
-{
+public sealed class GraphSendPolicy {
     /// <summary>Maximum number of concurrent Graph HTTP requests. Applies globally.</summary>
     public int MaxConcurrency { get; set; } = 2;
 
@@ -29,4 +28,3 @@ public sealed class GraphSendPolicy
     /// <summary>Returns a conservative default policy suitable for most workloads.</summary>
     public static GraphSendPolicy Default => new GraphSendPolicy();
 }
-

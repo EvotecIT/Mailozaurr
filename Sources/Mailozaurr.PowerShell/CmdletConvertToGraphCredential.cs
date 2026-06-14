@@ -23,7 +23,7 @@ using System.Security;
 /// </summary>
 [Cmdlet(VerbsData.ConvertTo, "GraphCredential", DefaultParameterSetName = "ClearText")]
 [OutputType(typeof(PSCredential))]
-public class CmdletConvertToGraphCredential: PSCmdlet {
+public class CmdletConvertToGraphCredential : PSCmdlet {
     /// <summary>
     /// <para type="description">Specifies the client ID for Microsoft Graph authentication.</para>
     /// </summary>

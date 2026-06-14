@@ -25,4 +25,3 @@ internal sealed class NoopPendingMessageSender : IPendingMessageSender {
     public Task SendAsync(PendingMessageRecord record, CancellationToken ct) => Task.CompletedTask;
 
 }
-

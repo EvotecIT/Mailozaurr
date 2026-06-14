@@ -4,11 +4,9 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class GraphUploadSessionParsingTests
-{
+public class GraphUploadSessionParsingTests {
     [Fact]
-    public void ParseUploadSessionResult_WithoutUploadUrl_Throws()
-    {
+    public void ParseUploadSessionResult_WithoutUploadUrl_Throws() {
         MethodInfo? method = typeof(Graph).GetMethod(
             "ParseUploadSessionResult",
             BindingFlags.NonPublic | BindingFlags.Static);

@@ -1,12 +1,12 @@
+using MsgReader.Mime;
+using MsgReader.Mime.Header;
+using MsgReader.Outlook;
 using System.Collections.Specialized;
 using System.IO;
 using System.Linq;
 using System.Text;
-using MsgReader.Mime;
-using MsgReader.Mime.Header;
-using MsgReader.Outlook;
-using OutlookMessage = MsgReader.Outlook.Storage.Message;
 using OutlookAttachment = MsgReader.Outlook.Storage.Attachment;
+using OutlookMessage = MsgReader.Outlook.Storage.Message;
 
 namespace Mailozaurr;
 

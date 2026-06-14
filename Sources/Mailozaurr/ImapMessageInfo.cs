@@ -1,7 +1,7 @@
-using System;
-using System.Linq;
 using MailKit;
 using MimeKit;
+using System;
+using System.Linq;
 
 namespace Mailozaurr;
 

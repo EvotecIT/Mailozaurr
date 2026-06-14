@@ -1,22 +1,21 @@
-using System;
-using System.IO;
-using System.Linq;
+using MimeKit;
+using MimeKit.Cryptography;
 using Org.BouncyCastle.Bcpg;
 using Org.BouncyCastle.Bcpg.OpenPgp;
-using Org.BouncyCastle.Security;
 using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Generators;
 using Org.BouncyCastle.Crypto.Parameters;
-using MimeKit;
-using MimeKit.Cryptography;
+using Org.BouncyCastle.Security;
+using System;
+using System.IO;
+using System.Linq;
 
 namespace Mailozaurr;
 
 /// <summary>
 /// Provides helper methods for generating temporary PGP key pairs.
 /// </summary>
-public sealed class TemporaryPgpKeyPair : IDisposable
-{
+public sealed class TemporaryPgpKeyPair : IDisposable {
     /// <summary>Path to the generated public key file.</summary>
     public string PublicKeyPath { get; }
     /// <summary>Path to the generated private key file.</summary>
@@ -28,8 +27,7 @@ public sealed class TemporaryPgpKeyPair : IDisposable
     private readonly bool _removeDirectory;
     private readonly bool _deleteOnDispose;
 
-    private TemporaryPgpKeyPair(string tempDirectory, bool removeDirectory, string passPhrase, bool deleteOnDispose)
-    {
+    private TemporaryPgpKeyPair(string tempDirectory, bool removeDirectory, string passPhrase, bool deleteOnDispose) {
         _tempDirectory = tempDirectory;
         _removeDirectory = removeDirectory;
         _deleteOnDispose = deleteOnDispose;
@@ -47,8 +45,7 @@ public sealed class TemporaryPgpKeyPair : IDisposable
     /// <param name="outputDirectory">Optional output directory; if null, a random temp directory is used.</param>
     /// <param name="deleteOnDispose">When true, deletes the generated files on dispose.</param>
     /// <returns>Instance representing the created key pair.</returns>
-    public static TemporaryPgpKeyPair Create(string identity = "Mailozaurr Test", string passPhrase = "", int keySize = 2048, string? outputDirectory = null, bool deleteOnDispose = true)
-    {
+    public static TemporaryPgpKeyPair Create(string identity = "Mailozaurr Test", string passPhrase = "", int keySize = 2048, string? outputDirectory = null, bool deleteOnDispose = true) {
         string directory = outputDirectory ?? Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         bool removeDir = outputDirectory is null;
         Directory.CreateDirectory(directory);
@@ -66,8 +63,7 @@ public sealed class TemporaryPgpKeyPair : IDisposable
         return pair;
     }
 
-    private static PgpKeyRingGenerator GenerateKeyRingGenerator(string identity, char[] passPhrase, int keySize)
-    {
+    private static PgpKeyRingGenerator GenerateKeyRingGenerator(string identity, char[] passPhrase, int keySize) {
         var random = new SecureRandom();
         var keyGen = new RsaKeyPairGenerator();
         keyGen.Init(new RsaKeyGenerationParameters(Org.BouncyCastle.Math.BigInteger.ValueOf(0x10001), random, keySize, 12));
@@ -90,54 +86,34 @@ public sealed class TemporaryPgpKeyPair : IDisposable
     }
 
     /// <inheritdoc />
-    public void Dispose()
-    {
-        if (_deleteOnDispose)
-        {
-            if (File.Exists(PublicKeyPath))
-            {
-                try
-                {
+    public void Dispose() {
+        if (_deleteOnDispose) {
+            if (File.Exists(PublicKeyPath)) {
+                try {
                     File.Delete(PublicKeyPath);
-                }
-                catch (IOException ex)
-                {
+                } catch (IOException ex) {
                     LoggingMessages.Logger.WriteWarning($"Failed to delete public key: {ex.Message}");
-                }
-                catch (UnauthorizedAccessException ex)
-                {
+                } catch (UnauthorizedAccessException ex) {
                     LoggingMessages.Logger.WriteWarning($"Failed to delete public key due to unauthorized access: {ex.Message}");
                 }
             }
 
-            if (File.Exists(PrivateKeyPath))
-            {
-                try
-                {
+            if (File.Exists(PrivateKeyPath)) {
+                try {
                     File.Delete(PrivateKeyPath);
-                }
-                catch (IOException ex)
-                {
+                } catch (IOException ex) {
                     LoggingMessages.Logger.WriteWarning($"Failed to delete private key: {ex.Message}");
-                }
-                catch (UnauthorizedAccessException ex)
-                {
+                } catch (UnauthorizedAccessException ex) {
                     LoggingMessages.Logger.WriteWarning($"Failed to delete private key due to unauthorized access: {ex.Message}");
                 }
             }
 
-            if (_removeDirectory && Directory.Exists(_tempDirectory))
-            {
-                try
-                {
+            if (_removeDirectory && Directory.Exists(_tempDirectory)) {
+                try {
                     Directory.Delete(_tempDirectory, true);
-                }
-                catch (IOException ex)
-                {
+                } catch (IOException ex) {
                     LoggingMessages.Logger.WriteWarning($"Failed to delete temporary directory: {ex.Message}");
-                }
-                catch (UnauthorizedAccessException ex)
-                {
+                } catch (UnauthorizedAccessException ex) {
                     LoggingMessages.Logger.WriteWarning($"Failed to delete temporary directory due to unauthorized access: {ex.Message}");
                 }
             }
@@ -149,18 +125,15 @@ public sealed class TemporaryPgpKeyPair : IDisposable
     /// </summary>
     /// <param name="messagePath">Path to the encrypted message file.</param>
     /// <returns>Decrypted message body text.</returns>
-    public string DecryptToString(string messagePath)
-    {
+    public string DecryptToString(string messagePath) {
         MimeMessage message = MimeMessage.Load(messagePath);
         using var ctx = new EphemeralOpenPgpContext(PassPhrase);
         using (var sec = File.OpenRead(PrivateKeyPath))
             ctx.Import(new PgpSecretKeyRingBundle(new ArmoredInputStream(sec)));
 
-        if (message.Body is MultipartEncrypted encrypted)
-        {
+        if (message.Body is MultipartEncrypted encrypted) {
             var decrypted = encrypted.Decrypt(ctx);
-            if (decrypted is TextPart text)
-            {
+            if (decrypted is TextPart text) {
                 return text.Text ?? string.Empty;
             }
         }

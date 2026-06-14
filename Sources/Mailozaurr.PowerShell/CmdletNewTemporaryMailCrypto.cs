@@ -9,8 +9,7 @@ using System.Security.Cryptography.X509Certificates;
 [Cmdlet(VerbsCommon.New, "TemporaryMailCrypto")]
 [OutputType(typeof(TemporaryPgpKeyPair))]
 [OutputType(typeof(X509Certificate2))]
-public sealed class CmdletNewTemporaryMailCrypto : PSCmdlet
-{
+public sealed class CmdletNewTemporaryMailCrypto : PSCmdlet {
     /// <summary>Generate a PGP key pair.</summary>
     [Parameter(Mandatory = true, ParameterSetName = "Pgp")]
     public SwitchParameter Pgp { get; set; }
@@ -50,14 +49,10 @@ public sealed class CmdletNewTemporaryMailCrypto : PSCmdlet
     public int ValidDays { get; set; } = 1;
 
     /// <inheritdoc />
-    protected override void ProcessRecord()
-    {
-        if (ParameterSetName == "Pgp")
-        {
+    protected override void ProcessRecord() {
+        if (ParameterSetName == "Pgp") {
             WriteObject(TemporaryPgpKeyPair.Create(Identity, PassPhrase, KeySize, OutputPath == string.Empty ? null : OutputPath, !NoDispose.IsPresent));
-        }
-        else
-        {
+        } else {
             WriteObject(TemporarySmimeCertificate.CreateSelfSigned(SubjectName, ValidDays, OutputPath == string.Empty ? null : OutputPath));
         }
     }

@@ -1,12 +1,12 @@
+using MailKit;
+using MimeKit;
 using System.IO;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
-using MailKit;
-using System.Runtime.CompilerServices;
-using MimeKit;
 
 namespace Mailozaurr.Tests;
 

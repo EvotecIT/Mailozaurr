@@ -1,17 +1,17 @@
-using System;
-using System.Collections.Generic;
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
-using System.IO;
-using System.Runtime.InteropServices;
-using Org.BouncyCastle.Asn1.X509;
 using Org.BouncyCastle.Asn1;
+using Org.BouncyCastle.Asn1.X509;
+using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Crypto.Operators;
+using Org.BouncyCastle.Pkcs;
 using Org.BouncyCastle.Security;
 using Org.BouncyCastle.X509;
 using Org.BouncyCastle.X509.Extension;
-using Org.BouncyCastle.Pkcs;
-using Org.BouncyCastle.Crypto;
-using Org.BouncyCastle.Crypto.Operators;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 
 namespace Mailozaurr;
 
@@ -31,8 +31,7 @@ public static class TemporarySmimeCertificate {
         throw new NotSupportedException("Temporary S/MIME certificates require .NET Framework 4.7.2 or later.");
 #elif NETFRAMEWORK
         // On .NET Framework, only use CertificateRequest on non-Windows platforms if available
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && Type.GetType("System.Security.Cryptography.X509Certificates.CertificateRequest") != null)
-        {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && Type.GetType("System.Security.Cryptography.X509Certificates.CertificateRequest") != null) {
             return CreateWithCertificateRequest(subjectName, validDays, outputPath);
         }
 
@@ -52,8 +51,7 @@ public static class TemporarySmimeCertificate {
     }
 
 #if !NETSTANDARD2_0
-    private static X509Certificate2 CreateWithCertificateRequest(string subjectName, int validDays, string? outputPath)
-    {
+    private static X509Certificate2 CreateWithCertificateRequest(string subjectName, int validDays, string? outputPath) {
         using RSA rsa = RSA.Create();
         rsa.KeySize = 2048;
         var req = new CertificateRequest(subjectName, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -70,12 +68,11 @@ public static class TemporarySmimeCertificate {
         ekuOids.Add(new Oid("1.3.6.1.5.5.7.3.2")); // Client Authentication
         ekuOids.Add(new Oid("1.3.6.1.5.5.7.3.4")); // Email Protection
         req.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(ekuOids, true));
-                var notBefore = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var notBefore = DateTimeOffset.UtcNow.AddMinutes(-5);
         var notAfter = notBefore.AddDays(validDays);
         X509Certificate2 cert = req.CreateSelfSigned(notBefore, notAfter);
 
-        if (outputPath != null)
-        {
+        if (outputPath != null) {
             File.WriteAllBytes(outputPath, cert.Export(X509ContentType.Pfx));
         }
 

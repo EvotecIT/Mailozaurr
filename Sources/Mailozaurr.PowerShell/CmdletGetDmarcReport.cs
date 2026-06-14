@@ -1,7 +1,7 @@
+using Mailozaurr.DmarcReports;
 using System;
 using System.Management.Automation;
 using System.Threading.Tasks;
-using Mailozaurr.DmarcReports;
 
 namespace Mailozaurr.PowerShell;
 
@@ -80,94 +80,94 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
         int max = Count > 0 ? Count : int.MaxValue;
         switch (Protocol) {
             case EmailProtocol.Imap: {
-                var conn = DefaultSessions.ImapSession;
-                if (conn != null && conn.Data != null) {
-                    var reports = await MailboxSearcher.SearchDmarcReportsAsync(
-                        conn.Data,
-                        Folder,
-                        Since,
-                        Before,
-                        Domain,
-                        max,
-                        parallelDownloadLimit: ParallelDownloadLimit,
-                        cancellationToken: CancelToken);
-                    foreach (var report in reports) WriteObject(report);
-                } else {
-                    ThrowTerminatingError(new ErrorRecord(
-                        new InvalidOperationException("Get-DmarcReport - IMAP client not provided or not connected."),
-                        "ClientNotConnected",
-                        ErrorCategory.InvalidOperation,
-                        null));
+                    var conn = DefaultSessions.ImapSession;
+                    if (conn != null && conn.Data != null) {
+                        var reports = await MailboxSearcher.SearchDmarcReportsAsync(
+                            conn.Data,
+                            Folder,
+                            Since,
+                            Before,
+                            Domain,
+                            max,
+                            parallelDownloadLimit: ParallelDownloadLimit,
+                            cancellationToken: CancelToken);
+                        foreach (var report in reports) WriteObject(report);
+                    } else {
+                        ThrowTerminatingError(new ErrorRecord(
+                            new InvalidOperationException("Get-DmarcReport - IMAP client not provided or not connected."),
+                            "ClientNotConnected",
+                            ErrorCategory.InvalidOperation,
+                            null));
+                    }
+                    break;
                 }
-                break;
-            }
             case EmailProtocol.Pop3: {
-                var conn = DefaultSessions.Pop3Session;
-                if (conn != null && conn.Data != null) {
-                    var reports = await MailboxSearcher.SearchDmarcReportsAsync(
-                        conn.Data,
-                        Since,
-                        Before,
-                        Domain,
-                        max,
-                        parallelDownloadLimit: ParallelDownloadLimit,
-                        cancellationToken: CancelToken);
-                    foreach (var report in reports) WriteObject(report);
-                } else {
-                    ThrowTerminatingError(new ErrorRecord(
-                        new InvalidOperationException("Get-DmarcReport - POP3 client not provided or not connected."),
-                        "ClientNotConnected",
-                        ErrorCategory.InvalidOperation,
-                        null));
+                    var conn = DefaultSessions.Pop3Session;
+                    if (conn != null && conn.Data != null) {
+                        var reports = await MailboxSearcher.SearchDmarcReportsAsync(
+                            conn.Data,
+                            Since,
+                            Before,
+                            Domain,
+                            max,
+                            parallelDownloadLimit: ParallelDownloadLimit,
+                            cancellationToken: CancelToken);
+                        foreach (var report in reports) WriteObject(report);
+                    } else {
+                        ThrowTerminatingError(new ErrorRecord(
+                            new InvalidOperationException("Get-DmarcReport - POP3 client not provided or not connected."),
+                            "ClientNotConnected",
+                            ErrorCategory.InvalidOperation,
+                            null));
+                    }
+                    break;
                 }
-                break;
-            }
             case EmailProtocol.Graph: {
-                var conn = DefaultSessions.GraphSession;
-                if (conn != null && conn.Credential != null && !string.IsNullOrWhiteSpace(UserPrincipalName)) {
-                    var reports = await MailboxSearcher.SearchDmarcReportsAsync(
-                        conn.Credential,
-                        UserPrincipalName!,
-                        Since,
-                        Before,
-                        Domain,
-                        max,
-                        parallelDownloadLimit: ParallelDownloadLimit,
-                        cancellationToken: CancelToken);
-                    foreach (var report in reports) WriteObject(report);
-                } else {
-                    ThrowTerminatingError(new ErrorRecord(
-                        new InvalidOperationException("Get-DmarcReport - Graph connection or UserPrincipalName missing."),
-                        "ClientNotConnected",
-                        ErrorCategory.InvalidOperation,
-                        null));
+                    var conn = DefaultSessions.GraphSession;
+                    if (conn != null && conn.Credential != null && !string.IsNullOrWhiteSpace(UserPrincipalName)) {
+                        var reports = await MailboxSearcher.SearchDmarcReportsAsync(
+                            conn.Credential,
+                            UserPrincipalName!,
+                            Since,
+                            Before,
+                            Domain,
+                            max,
+                            parallelDownloadLimit: ParallelDownloadLimit,
+                            cancellationToken: CancelToken);
+                        foreach (var report in reports) WriteObject(report);
+                    } else {
+                        ThrowTerminatingError(new ErrorRecord(
+                            new InvalidOperationException("Get-DmarcReport - Graph connection or UserPrincipalName missing."),
+                            "ClientNotConnected",
+                            ErrorCategory.InvalidOperation,
+                            null));
+                    }
+                    break;
                 }
-                break;
-            }
             case EmailProtocol.GmailApi: {
-                if (Credential != null && !string.IsNullOrWhiteSpace(GmailAccount)) {
-                    var net = Credential.GetNetworkCredential();
-                    var oauth = new OAuthCredential { UserName = net.UserName, AccessToken = net.Password, ExpiresOn = DateTimeOffset.MaxValue };
-                    var client = new GmailApiClient(oauth);
-                    var reports = await MailboxSearcher.SearchDmarcReportsAsync(
-                        client,
-                        GmailAccount!,
-                        Since,
-                        Before,
-                        Domain,
-                        max,
-                        parallelDownloadLimit: ParallelDownloadLimit,
-                        cancellationToken: CancelToken);
-                    foreach (var report in reports) WriteObject(report);
-                } else {
-                    ThrowTerminatingError(new ErrorRecord(
-                        new InvalidOperationException("Get-DmarcReport - Gmail account or Credential missing."),
-                        "ClientNotConnected",
-                        ErrorCategory.InvalidOperation,
-                        null));
+                    if (Credential != null && !string.IsNullOrWhiteSpace(GmailAccount)) {
+                        var net = Credential.GetNetworkCredential();
+                        var oauth = new OAuthCredential { UserName = net.UserName, AccessToken = net.Password, ExpiresOn = DateTimeOffset.MaxValue };
+                        var client = new GmailApiClient(oauth);
+                        var reports = await MailboxSearcher.SearchDmarcReportsAsync(
+                            client,
+                            GmailAccount!,
+                            Since,
+                            Before,
+                            Domain,
+                            max,
+                            parallelDownloadLimit: ParallelDownloadLimit,
+                            cancellationToken: CancelToken);
+                        foreach (var report in reports) WriteObject(report);
+                    } else {
+                        ThrowTerminatingError(new ErrorRecord(
+                            new InvalidOperationException("Get-DmarcReport - Gmail account or Credential missing."),
+                            "ClientNotConnected",
+                            ErrorCategory.InvalidOperation,
+                            null));
+                    }
+                    break;
                 }
-                break;
-            }
         }
     }
 }

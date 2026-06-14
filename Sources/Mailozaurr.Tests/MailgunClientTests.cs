@@ -1,83 +1,69 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using System.IO;
-using System.Linq;
 using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class MailgunClientTests
-{
-    private class DummyCredentials : ICredentials
-    {
+public class MailgunClientTests {
+    private class DummyCredentials : ICredentials {
         public NetworkCredential GetCredential(Uri uri, string authType) => new NetworkCredential();
     }
 
-    private sealed class TrackingHandler : HttpMessageHandler
-    {
+    private sealed class TrackingHandler : HttpMessageHandler {
         private readonly HttpStatusCode _statusCode;
         private readonly string _content;
         public bool ResponseDisposed { get; private set; }
 
-        public TrackingHandler(HttpStatusCode statusCode, string content = "")
-        {
+        public TrackingHandler(HttpStatusCode statusCode, string content = "") {
             _statusCode = statusCode;
             _content = content;
         }
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            var response = new HttpResponseMessage(_statusCode)
-            {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            var response = new HttpResponseMessage(_statusCode) {
                 Content = new TrackingContent(_content, () => ResponseDisposed = true)
             };
             return Task.FromResult(response);
         }
 
-        private sealed class TrackingContent : StringContent
-        {
+        private sealed class TrackingContent : StringContent {
             private readonly Action _onDispose;
 
-            public TrackingContent(string content, Action onDispose) : base(content)
-            {
+            public TrackingContent(string content, Action onDispose) : base(content) {
                 _onDispose = onDispose;
             }
 
-            protected override void Dispose(bool disposing)
-            {
+            protected override void Dispose(bool disposing) {
                 base.Dispose(disposing);
                 _onDispose();
             }
         }
     }
 
-    private sealed class DisposingHandler : HttpMessageHandler
-    {
+    private sealed class DisposingHandler : HttpMessageHandler {
         public bool Disposed { get; private set; }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
 
-        protected override void Dispose(bool disposing)
-        {
+        protected override void Dispose(bool disposing) {
             base.Dispose(disposing);
             Disposed = true;
         }
     }
 
-    private sealed class DerivedMailgunClient : MailgunClient
-    {
+    private sealed class DerivedMailgunClient : MailgunClient {
         public bool Disposed { get; private set; }
 
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
+        protected override void Dispose(bool disposing) {
+            if (disposing) {
                 Disposed = true;
             }
             base.Dispose(disposing);
@@ -85,8 +71,7 @@ public class MailgunClientTests
     }
 
     [Fact]
-    public void EmailDomain_InvalidAddress_ThrowsArgumentException()
-    {
+    public void EmailDomain_InvalidAddress_ThrowsArgumentException() {
         using var client = new MailgunClient { From = "invalid" };
         PropertyInfo? prop = typeof(MailgunClient).GetProperty("EmailDomain", BindingFlags.NonPublic | BindingFlags.Instance);
         var ex = Assert.Throws<TargetInvocationException>(() => prop!.GetValue(client));
@@ -95,10 +80,8 @@ public class MailgunClientTests
     }
 
     [Fact]
-    public async Task CreateContentAsync_WithHeaders_IncludesHeaders()
-    {
-        using var client = new MailgunClient
-        {
+    public async Task CreateContentAsync_WithHeaders_IncludesHeaders() {
+        using var client = new MailgunClient {
             From = "sender@example.com",
             To = new List<object> { "to@example.com" },
             Headers = new Dictionary<string, string> { ["X-Test"] = "123" }
@@ -113,13 +96,10 @@ public class MailgunClientTests
     }
 
     [Fact]
-    public async Task CreateContentAsync_DuplicateAttachmentPaths_SkipsDuplicates()
-    {
+    public async Task CreateContentAsync_DuplicateAttachmentPaths_SkipsDuplicates() {
         var file = Path.GetTempFileName();
-        try
-        {
-            using var client = new MailgunClient
-            {
+        try {
+            using var client = new MailgunClient {
                 From = "sender@example.com",
                 To = new List<object> { "to@example.com" },
                 Attachment = new[] { file, file }
@@ -129,21 +109,16 @@ public class MailgunClientTests
             using var content = await task;
             var parts = content.Count(c => c.Headers.ContentDisposition?.Name?.Trim('"') == "attachment");
             Assert.Equal(1, parts);
-        }
-        finally
-        {
+        } finally {
             File.Delete(file);
         }
     }
 
     [Fact]
-    public async Task CreateContentAsync_DuplicateInlineAttachmentPaths_SkipsDuplicates()
-    {
+    public async Task CreateContentAsync_DuplicateInlineAttachmentPaths_SkipsDuplicates() {
         var file = Path.GetTempFileName();
-        try
-        {
-            using var client = new MailgunClient
-            {
+        try {
+            using var client = new MailgunClient {
                 From = "sender@example.com",
                 To = new List<object> { "to@example.com" },
                 InlineAttachment = new[] { file, file }
@@ -153,22 +128,17 @@ public class MailgunClientTests
             using var content = await task;
             var parts = content.Count(c => c.Headers.ContentDisposition?.Name?.Trim('"') == "inline");
             Assert.Equal(1, parts);
-        }
-        finally
-        {
+        } finally {
             File.Delete(file);
         }
     }
 
     [Fact]
-    public async Task CreateContentAsync_AttachmentAndInlineDuplicatePaths_SkipsDuplicates()
-    {
+    public async Task CreateContentAsync_AttachmentAndInlineDuplicatePaths_SkipsDuplicates() {
         var file1 = Path.GetTempFileName();
         var file2 = Path.GetTempFileName();
-        try
-        {
-            using var client = new MailgunClient
-            {
+        try {
+            using var client = new MailgunClient {
                 From = "sender@example.com",
                 To = new List<object> { "to@example.com" },
                 Attachment = new[] { file1 },
@@ -181,26 +151,21 @@ public class MailgunClientTests
             var inlines = content.Count(c => c.Headers.ContentDisposition?.Name?.Trim('"') == "inline");
             Assert.Equal(1, attachments);
             Assert.Equal(1, inlines);
-        }
-        finally
-        {
+        } finally {
             File.Delete(file1);
             File.Delete(file2);
         }
     }
 
     [Fact]
-    public async Task CreateContentAsync_UsesStreamContentForFiles()
-    {
+    public async Task CreateContentAsync_UsesStreamContentForFiles() {
         var attachment = Path.GetTempFileName();
         var inline = Path.GetTempFileName();
-        try
-        {
+        try {
             File.WriteAllBytes(attachment, new byte[1024]);
             File.WriteAllBytes(inline, new byte[1024]);
 
-            using var client = new MailgunClient
-            {
+            using var client = new MailgunClient {
                 From = "sender@example.com",
                 To = new List<object> { "to@example.com" },
                 Attachment = new[] { attachment },
@@ -229,19 +194,15 @@ public class MailgunClientTests
             Assert.IsType<FileStream>(inlineStream);
             Assert.Equal(new FileInfo(attachment).Length, attachmentContent.Headers.ContentLength);
             Assert.Equal(new FileInfo(inline).Length, inlineContent.Headers.ContentLength);
-        }
-        finally
-        {
+        } finally {
             File.Delete(attachment);
             File.Delete(inline);
         }
     }
 
     [Fact]
-    public async Task SendEmailAsync_InvalidCredentials_ThrowsInvalidOperationException()
-    {
-        using var client = new MailgunClient
-        {
+    public async Task SendEmailAsync_InvalidCredentials_ThrowsInvalidOperationException() {
+        using var client = new MailgunClient {
             From = "sender@example.com",
             To = new List<object> { "to@example.com" },
             Credentials = new DummyCredentials()
@@ -251,8 +212,7 @@ public class MailgunClientTests
     }
 
     [Fact]
-    public async Task SendEmailAsync_DisposesResponse_OnSuccess()
-    {
+    public async Task SendEmailAsync_DisposesResponse_OnSuccess() {
         var handler = new TrackingHandler(HttpStatusCode.OK);
         using var client = CreateClient(handler);
         var result = await client.SendEmailAsync();
@@ -261,8 +221,7 @@ public class MailgunClientTests
     }
 
     [Fact]
-    public async Task SendEmailAsync_DisposesResponse_OnFailure()
-    {
+    public async Task SendEmailAsync_DisposesResponse_OnFailure() {
         var handler = new TrackingHandler(HttpStatusCode.BadRequest, "bad");
         using var client = CreateClient(handler);
         var result = await client.SendEmailAsync();
@@ -271,12 +230,10 @@ public class MailgunClientTests
     }
 
     [Fact]
-    public void Dispose_DerivedType_DisposesHttpClient()
-    {
+    public void Dispose_DerivedType_DisposesHttpClient() {
         var handler = new DisposingHandler();
         var httpClient = new HttpClient(handler);
-        var client = new DerivedMailgunClient
-        {
+        var client = new DerivedMailgunClient {
             From = "sender@example.com",
             To = new List<object> { "to@example.com" },
             Credentials = new NetworkCredential(string.Empty, "key")
@@ -291,10 +248,8 @@ public class MailgunClientTests
     }
 
     [Fact]
-    public async Task SendEmailAsync_AfterDispose_ThrowsObjectDisposedException()
-    {
-        var client = new MailgunClient
-        {
+    public async Task SendEmailAsync_AfterDispose_ThrowsObjectDisposedException() {
+        var client = new MailgunClient {
             From = "sender@example.com",
             To = new List<object> { "to@example.com" },
             Credentials = new NetworkCredential(string.Empty, "key")
@@ -305,11 +260,9 @@ public class MailgunClientTests
         await Assert.ThrowsAsync<ObjectDisposedException>(() => client.SendEmailAsync());
     }
 
-    private static MailgunClient CreateClient(HttpMessageHandler handler)
-    {
+    private static MailgunClient CreateClient(HttpMessageHandler handler) {
         var httpClient = new HttpClient(handler);
-        var client = new MailgunClient
-        {
+        var client = new MailgunClient {
             From = "sender@example.com",
             To = new List<object> { "to@example.com" },
             Credentials = new NetworkCredential(string.Empty, "key")

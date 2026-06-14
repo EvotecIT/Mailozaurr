@@ -5,8 +5,7 @@ namespace Mailozaurr;
 /// <summary>
 /// Represents actions that an inbox rule performs.
 /// </summary>
-public class GraphInboxRuleActions
-{
+public class GraphInboxRuleActions {
     /// <summary>
     /// Folder path the message should be moved to.
     /// </summary>

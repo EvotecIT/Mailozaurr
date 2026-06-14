@@ -1,6 +1,6 @@
-using System.Threading.Tasks;
 using MailKit.Net.Imap;
 using MailKit.Security;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Mailozaurr.Tests;

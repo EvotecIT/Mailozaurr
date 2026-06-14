@@ -1,8 +1,8 @@
-using System;
-using System.Collections.Generic;
-using MimeKit;
 using MailKit;
 using Mailozaurr;
+using MimeKit;
+using System;
+using System.Collections.Generic;
 using Xunit;
 
 namespace Mailozaurr.Tests;

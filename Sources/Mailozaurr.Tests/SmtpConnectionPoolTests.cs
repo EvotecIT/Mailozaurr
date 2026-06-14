@@ -1,5 +1,5 @@
-using System;
 using MailKit.Security;
+using System;
 using System.Threading;
 using Xunit;
 

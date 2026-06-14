@@ -1,25 +1,22 @@
 using Mailozaurr;
 using System.Collections.Generic;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class TemporaryPgpKeyPairTests
-{
+public class TemporaryPgpKeyPairTests {
     [Fact]
-    public void Create_ReturnsFiles()
-    {
+    public void Create_ReturnsFiles() {
         using var keys = TemporaryPgpKeyPair.Create("a@b.com");
         Assert.True(File.Exists(keys.PublicKeyPath));
         Assert.True(File.Exists(keys.PrivateKeyPath));
     }
 
-    [Fact(Skip = "PGP sign and encrypt requires additional configuration in CI" )]
-    public void KeyPair_CanSignAndEncryptMessage()
-    {
+    [Fact(Skip = "PGP sign and encrypt requires additional configuration in CI")]
+    public void KeyPair_CanSignAndEncryptMessage() {
         using var keys = TemporaryPgpKeyPair.Create("a@b.com");
         var smtp = new Smtp();
         smtp.From = "a@b.com";
@@ -32,8 +29,7 @@ public class TemporaryPgpKeyPairTests
     }
 
     [Fact]
-    public void KeyPair_CanDecryptEncryptedMessage()
-    {
+    public void KeyPair_CanDecryptEncryptedMessage() {
         using var keys = TemporaryPgpKeyPair.Create("a@b.com");
         var smtp = new Smtp();
         smtp.From = "a@b.com";
@@ -51,13 +47,11 @@ public class TemporaryPgpKeyPairTests
     }
 
     [Fact]
-    public void Dispose_RemovesGeneratedFiles()
-    {
+    public void Dispose_RemovesGeneratedFiles() {
         string pub;
         string priv;
         string dir;
-        using (var keys = TemporaryPgpKeyPair.Create("a@b.com"))
-        {
+        using (var keys = TemporaryPgpKeyPair.Create("a@b.com")) {
             pub = keys.PublicKeyPath;
             priv = keys.PrivateKeyPath;
             dir = Path.GetDirectoryName(pub)!;
@@ -71,25 +65,19 @@ public class TemporaryPgpKeyPairTests
     }
 
     [Fact]
-    public void Dispose_WhenDeletionFails_LogsWarnings()
-    {
+    public void Dispose_WhenDeletionFails_LogsWarnings() {
         var pair = TemporaryPgpKeyPair.Create("a@b.com");
         string originalDir = Path.GetDirectoryName(pair.PublicKeyPath)!;
 
         string protectedFile;
         string protectedDir;
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
             protectedFile = Path.Combine(Environment.SystemDirectory, "kernel32.dll");
             protectedDir = Path.Combine(Environment.SystemDirectory, "drivers");
-        }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
+        } else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
             protectedFile = "/System/Library/CoreServices/SystemVersion.plist";
             protectedDir = "/System/Library";
-        }
-        else
-        {
+        } else {
             protectedFile = "/proc/version";
             protectedDir = "/proc/self/fd";
         }

@@ -13,23 +13,19 @@ namespace Mailozaurr.Tests;
 /// <summary>
 /// Tests for the SES client asynchronous email sending logic.
 /// </summary>
-public class SesClientSendEmailAsyncTests
-{
-    private static byte[] HmacSha256(byte[] key, string data)
-    {
+public class SesClientSendEmailAsyncTests {
+    private static byte[] HmacSha256(byte[] key, string data) {
         using HMACSHA256 hmac = new(key);
         return hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
     }
 
-    private static string Sha256Hex(string data)
-    {
+    private static string Sha256Hex(string data) {
         using SHA256 sha = SHA256.Create();
         byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(data));
         return BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
     }
 
-    private static string ExpectedAuthorization(string accessKey, string secretKey, string region, string amzDate, string body)
-    {
+    private static string ExpectedAuthorization(string accessKey, string secretKey, string region, string amzDate, string body) {
         string service = "ses";
         string dateStamp = amzDate.Substring(0, 8);
         string canonicalHeaders = $"content-type:application/x-www-form-urlencoded\nhost:email.{region}.amazonaws.com\nx-amz-date:{amzDate}\n";
@@ -47,10 +43,8 @@ public class SesClientSendEmailAsyncTests
         return $"AWS4-HMAC-SHA256 Credential={accessKey}/{credentialScope}, SignedHeaders={signedHeaders}, Signature={signature}";
     }
 
-    private static SesClient CreateClient(HttpMessageHandler handler)
-    {
-        return new SesClient(handler)
-        {
+    private static SesClient CreateClient(HttpMessageHandler handler) {
+        return new SesClient(handler) {
             Credentials = new NetworkCredential("AKID", "SECRET"),
             From = "sender@example.com",
             To = new List<object> { "to@example.com" },
@@ -62,8 +56,7 @@ public class SesClientSendEmailAsyncTests
     }
 
     [Fact]
-    public async Task SendEmailAsync_ComputesSignature()
-    {
+    public async Task SendEmailAsync_ComputesSignature() {
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") });
         using var client = CreateClient(handler);
         client.WebhookUrl = null;
@@ -80,8 +73,7 @@ public class SesClientSendEmailAsyncTests
     }
 
     [Fact]
-    public async Task SendEmailAsync_WithToken_Succeeds()
-    {
+    public async Task SendEmailAsync_WithToken_Succeeds() {
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") });
         using var client = CreateClient(handler);
         client.WebhookUrl = null;
@@ -94,8 +86,7 @@ public class SesClientSendEmailAsyncTests
     }
 
     [Fact]
-    public async Task SendEmailAsync_RetriesFailedRequest()
-    {
+    public async Task SendEmailAsync_RetriesFailedRequest() {
         var handler = new RecordingHandler(
             new HttpResponseMessage(HttpStatusCode.InternalServerError) { Content = new StringContent("fail") },
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") });
@@ -110,8 +101,7 @@ public class SesClientSendEmailAsyncTests
     }
 
     [Fact]
-    public async Task SendEmailAsync_PostsWebhook_OnSuccess()
-    {
+    public async Task SendEmailAsync_PostsWebhook_OnSuccess() {
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") });
         using var client = CreateClient(handler);
         client.WebhookUrl = "http://localhost";
@@ -123,8 +113,7 @@ public class SesClientSendEmailAsyncTests
     }
 
     [Fact]
-    public async Task SendEmailAsync_PostsWebhook_OnFailure()
-    {
+    public async Task SendEmailAsync_PostsWebhook_OnFailure() {
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent("bad") });
         using var client = CreateClient(handler);
         client.WebhookUrl = "http://localhost";

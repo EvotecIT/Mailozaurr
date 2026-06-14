@@ -45,4 +45,3 @@ public class SmtpValidationTests {
         Assert.Null(error);
     }
 }
-

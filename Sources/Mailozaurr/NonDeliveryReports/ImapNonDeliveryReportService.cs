@@ -1,8 +1,8 @@
+using MailKit.Net.Imap;
 using Mailozaurr;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using MailKit.Net.Imap;
 
 namespace Mailozaurr.NonDeliveryReports;
 

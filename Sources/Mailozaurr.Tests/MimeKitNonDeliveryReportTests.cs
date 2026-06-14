@@ -1,9 +1,9 @@
 using Mailozaurr;
 using Mailozaurr.NonDeliveryReports;
 using MimeKit;
+using System;
 using System.IO;
 using System.Text;
-using System;
 using Xunit;
 
 namespace Mailozaurr.Tests;

@@ -1,6 +1,6 @@
+using Mailozaurr;
 using System;
 using System.Management.Automation;
-using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
 
@@ -9,8 +9,7 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.New, "GraphEventBuilder")]
 [OutputType(typeof(GraphEventBuilder))]
-public sealed class CmdletNewGraphEventBuilder : PSCmdlet
-{
+public sealed class CmdletNewGraphEventBuilder : PSCmdlet {
     /// <summary>
     /// Subject of the new event.
     /// </summary>
@@ -62,8 +61,7 @@ public sealed class CmdletNewGraphEventBuilder : PSCmdlet
     /// <summary>
     /// Builds the <see cref="GraphEventBuilder"/> object from provided parameters.
     /// </summary>
-    protected override void ProcessRecord()
-    {
+    protected override void ProcessRecord() {
         var builder = new GraphEventBuilder();
         if (!string.IsNullOrEmpty(Subject))
             builder.Subject(Subject!);
@@ -73,10 +71,8 @@ public sealed class CmdletNewGraphEventBuilder : PSCmdlet
             builder.End(End.Value, EndTimeZone);
         if (!string.IsNullOrEmpty(Body))
             builder.Body(Body!, BodyType);
-        if (Attendees != null)
-        {
-            foreach (var addr in Attendees)
-            {
+        if (Attendees != null) {
+            foreach (var addr in Attendees) {
                 builder.Attendee(addr, addr);
             }
         }

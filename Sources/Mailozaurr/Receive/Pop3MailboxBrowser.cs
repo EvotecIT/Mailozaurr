@@ -1,11 +1,11 @@
+using MailKit.Net.Pop3;
+using MimeKit;
+using MimeKit.Utils;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
-using MailKit.Net.Pop3;
-using MimeKit;
-using MimeKit.Utils;
 
 namespace Mailozaurr;
 

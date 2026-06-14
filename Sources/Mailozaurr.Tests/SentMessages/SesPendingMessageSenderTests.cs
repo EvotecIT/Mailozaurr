@@ -1,7 +1,7 @@
+using MimeKit;
 using System.Net;
 using System.Net.Http;
 using System.Text;
-using MimeKit;
 
 namespace Mailozaurr.Tests.SentMessages;
 

@@ -6,8 +6,7 @@ namespace Mailozaurr;
 /// <summary>
 /// Exception thrown when Gmail API authentication fails.
 /// </summary>
-public class GmailAuthenticationException : Exception
-{
+public class GmailAuthenticationException : Exception {
     /// <summary>
     /// HTTP status code returned by the Gmail API.
     /// </summary>
@@ -24,8 +23,7 @@ public class GmailAuthenticationException : Exception
     /// <param name="statusCode">The HTTP status code.</param>
     /// <param name="responseContent">Raw response content from the server.</param>
     public GmailAuthenticationException(HttpStatusCode statusCode, string responseContent)
-        : base($"Gmail API authentication failed with status {(int)statusCode} ({statusCode}).")
-    {
+        : base($"Gmail API authentication failed with status {(int)statusCode} ({statusCode}).") {
         StatusCode = statusCode;
         ResponseContent = responseContent;
     }

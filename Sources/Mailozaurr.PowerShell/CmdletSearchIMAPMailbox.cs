@@ -1,7 +1,7 @@
-using System;
-using System.Management.Automation;
 using MailKit.Search;
 using Mailozaurr;
+using System;
+using System.Management.Automation;
 using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;

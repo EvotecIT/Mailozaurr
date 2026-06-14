@@ -1,10 +1,10 @@
+using MailKit;
+using MailKit.Search;
+using MimeKit;
 using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using MailKit;
-using MailKit.Search;
-using MimeKit;
 
 namespace Mailozaurr;
 

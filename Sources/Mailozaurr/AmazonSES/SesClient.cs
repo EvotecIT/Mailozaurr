@@ -1,8 +1,8 @@
+using Mailozaurr.Definitions;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Mailozaurr.Definitions;
 
 namespace Mailozaurr;
 
@@ -90,10 +90,8 @@ public class SesClient : IDisposable {
     /// <summary>
     /// Gets a comma separated list of recipient email addresses.
     /// </summary>
-    public string SentTo
-    {
-        get
-        {
+    public string SentTo {
+        get {
             HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
             List<string> addresses = new();
             if (To != null) addresses.AddRange(Helpers.UniqueAddresses(To, seen).Select(Helpers.GetEmailAddress));
@@ -120,8 +118,7 @@ public class SesClient : IDisposable {
         _client = new HttpClient(handler);
     }
 
-    private MimeMessage BuildMessage()
-    {
+    private MimeMessage BuildMessage() {
         Smtp smtp = new();
         smtp.From = From;
         smtp.To = To;
@@ -138,21 +135,18 @@ public class SesClient : IDisposable {
         return smtp.Message;
     }
 
-    private static byte[] HmacSha256(byte[] key, string data)
-    {
+    private static byte[] HmacSha256(byte[] key, string data) {
         using HMACSHA256 hmac = new(key);
         return hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
     }
 
-    private static string Sha256Hex(string data)
-    {
+    private static string Sha256Hex(string data) {
         using SHA256 sha = SHA256.Create();
         byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(data));
         return BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
     }
 
-    private HttpRequestMessage CreateRequest(string content, DateTime utcNow)
-    {
+    private HttpRequestMessage CreateRequest(string content, DateTime utcNow) {
         NetworkCredential net = Credentials as NetworkCredential ?? throw new InvalidCastException("Credentials must be NetworkCredential");
         string accessKey = net.UserName;
         string secretKey = net.Password;
@@ -181,60 +175,48 @@ public class SesClient : IDisposable {
         return request;
     }
 
-    private async Task QueuePendingMessageAsync(MimeMessage? message, string? mimeMessageBase64, CancellationToken cancellationToken)
-    {
-        if (PendingMessageRepository == null)
-        {
+    private async Task QueuePendingMessageAsync(MimeMessage? message, string? mimeMessageBase64, CancellationToken cancellationToken) {
+        if (PendingMessageRepository == null) {
             return;
         }
 
-        if (Credentials is not NetworkCredential net)
-        {
+        if (Credentials is not NetworkCredential net) {
             LogCollector.LogWarning("Send-EmailMessage - Unable to queue SES message because credentials are not network credentials.");
             return;
         }
 
-        if (string.IsNullOrEmpty(net.UserName) || string.IsNullOrEmpty(net.Password))
-        {
+        if (string.IsNullOrEmpty(net.UserName) || string.IsNullOrEmpty(net.Password)) {
             return;
         }
 
         var base64 = mimeMessageBase64;
         string messageId;
-        if (message != null)
-        {
-            if (string.IsNullOrEmpty(message.MessageId))
-            {
+        if (message != null) {
+            if (string.IsNullOrEmpty(message.MessageId)) {
                 message.MessageId = MimeKit.Utils.MimeUtils.GenerateMessageId();
             }
 
-            if (string.IsNullOrEmpty(base64))
-            {
+            if (string.IsNullOrEmpty(base64)) {
                 using var stream = new MemoryStream();
                 await message.WriteToAsync(stream, cancellationToken).ConfigureAwait(false);
                 base64 = Convert.ToBase64String(stream.ToArray());
             }
 
             messageId = message.MessageId!;
-        }
-        else
-        {
-            if (string.IsNullOrEmpty(base64))
-            {
+        } else {
+            if (string.IsNullOrEmpty(base64)) {
                 return;
             }
 
             messageId = Guid.NewGuid().ToString("N");
         }
 
-        if (string.IsNullOrEmpty(base64))
-        {
+        if (string.IsNullOrEmpty(base64)) {
             return;
         }
 
         var now = DateTimeOffset.UtcNow;
-        var record = new PendingMessageRecord
-        {
+        var record = new PendingMessageRecord {
             MessageId = messageId,
             MimeMessage = base64!,
             Timestamp = now,
@@ -250,32 +232,24 @@ public class SesClient : IDisposable {
         record.ProviderData.Remove(SesPendingMessageSender.SecretAccessKeyBase64Key);
         record.ProviderData[SesPendingMessageSender.RegionKey] = Region;
 
-        try
-        {
+        try {
             await PendingMessageRepository.SaveAsync(record, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
-        }
-        catch (Exception ex)
-        {
+        } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Failed to persist SES pending message: {ex.Message}");
         }
     }
 
-    private async Task<SmtpResult> SendSesRequestAsync(string body, CancellationToken cancellationToken, MimeMessage? message = null, string? mimeMessageBase64 = null)
-    {
+    private async Task<SmtpResult> SendSesRequestAsync(string body, CancellationToken cancellationToken, MimeMessage? message = null, string? mimeMessageBase64 = null) {
         if (DryRun) {
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping SES send.");
             return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
         }
         int attempts = 0;
         Exception? lastException = null;
-        do
-        {
-            try
-            {
+        do {
+            try {
                 using HttpRequestMessage request = CreateRequest(body, DateTime.UtcNow);
                 HttpResponseMessage response = await _client.SendAsync(request, cancellationToken);
 #if NET5_0_OR_GREATER
@@ -283,8 +257,7 @@ public class SesClient : IDisposable {
 #else
                 string respContent = await response.Content.ReadAsStringAsync();
 #endif
-                if (response.IsSuccessStatusCode)
-                {
+                if (response.IsSuccessStatusCode) {
                     SmtpResult ok = new(true, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, response.StatusCode.ToString());
                     await Helpers.PostWebhookAsync(WebhookUrl, ok, cancellationToken, _client);
                     return ok;
@@ -292,18 +265,14 @@ public class SesClient : IDisposable {
 
                 lastException = new HttpRequestException(respContent);
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SES: {respContent}");
-            }
-            catch (HttpRequestException ex)
-            {
+            } catch (HttpRequestException ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SES: {ex.Message}");
             }
 
-            if ((!Helpers.IsTransient(lastException) && !RetryAlways) || attempts >= RetryCount)
-            {
+            if ((!Helpers.IsTransient(lastException) && !RetryAlways) || attempts >= RetryCount) {
                 await QueuePendingMessageAsync(message, mimeMessageBase64, cancellationToken).ConfigureAwait(false);
-                if (ErrorAction == ActionPreference.Stop && lastException != null)
-                {
+                if (ErrorAction == ActionPreference.Stop && lastException != null) {
                     throw lastException;
                 }
                 SmtpResult fail = new(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, lastException?.Message);
@@ -318,8 +287,7 @@ public class SesClient : IDisposable {
             if (JitterMilliseconds > 0 && delay > 0) {
                 delay += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
             }
-            if (delay > 0)
-            {
+            if (delay > 0) {
                 await Task.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken);
             }
             attempts++;
@@ -340,8 +308,7 @@ public class SesClient : IDisposable {
     /// <summary>
     /// Sends the email using Amazon SES.
     /// </summary>
-    public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken)
-    {
+    public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken) {
         MimeMessage message = BuildMessage();
         using MemoryStream stream = new();
         await message.WriteToAsync(stream, cancellationToken);
@@ -358,21 +325,17 @@ public class SesClient : IDisposable {
     /// <summary>
     /// Sends a templated email using Amazon SES.
     /// </summary>
-    public async Task<SmtpResult> SendTemplatedEmailAsync(CancellationToken cancellationToken)
-    {
+    public async Task<SmtpResult> SendTemplatedEmailAsync(CancellationToken cancellationToken) {
         StringBuilder sb = new("Action=SendTemplatedEmail&Version=2010-12-01");
         if (!string.IsNullOrEmpty(TemplateName)) sb.Append("&Template=").Append(Uri.EscapeDataString(TemplateName));
         sb.Append("&Source=").Append(Uri.EscapeDataString(SentFrom));
-        if (To != null)
-        {
+        if (To != null) {
             for (int i = 0; i < To.Count; i++) sb.Append("&Destination.ToAddresses.member.").Append(i + 1).Append("=").Append(Uri.EscapeDataString(Helpers.GetEmailAddress(To[i])));
         }
-        if (Cc != null)
-        {
+        if (Cc != null) {
             for (int i = 0; i < Cc.Count; i++) sb.Append("&Destination.CcAddresses.member.").Append(i + 1).Append("=").Append(Uri.EscapeDataString(Helpers.GetEmailAddress(Cc[i])));
         }
-        if (Bcc != null)
-        {
+        if (Bcc != null) {
             for (int i = 0; i < Bcc.Count; i++) sb.Append("&Destination.BccAddresses.member.").Append(i + 1).Append("=").Append(Uri.EscapeDataString(Helpers.GetEmailAddress(Bcc[i])));
         }
         if (ReplyTo != null) sb.Append("&ReplyToAddresses.member.1=").Append(Uri.EscapeDataString(Helpers.GetEmailAddress(ReplyTo)));

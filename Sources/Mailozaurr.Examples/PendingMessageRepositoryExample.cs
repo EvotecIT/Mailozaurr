@@ -1,7 +1,7 @@
+using Mailozaurr;
 using MimeKit;
 using System.IO;
 using System.Threading.Tasks;
-using Mailozaurr;
 
 /// <summary>
 /// Example demonstrating how to persist and retrieve pending messages.

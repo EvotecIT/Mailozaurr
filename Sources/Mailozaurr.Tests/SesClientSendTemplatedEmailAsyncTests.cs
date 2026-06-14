@@ -97,4 +97,3 @@ public class SesClientSendTemplatedEmailAsyncTests {
         Assert.Contains("TemplateData=" + Uri.EscapeDataString(expectedJson), body);
     }
 }
-

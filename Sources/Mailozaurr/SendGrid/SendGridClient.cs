@@ -1,5 +1,5 @@
-﻿using System.Threading;
-using Mailozaurr.Definitions;
+﻿using Mailozaurr.Definitions;
+using System.Threading;
 
 namespace Mailozaurr;
 

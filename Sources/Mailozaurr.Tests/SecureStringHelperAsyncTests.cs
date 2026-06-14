@@ -1,29 +1,23 @@
 using System;
-using System.Security;
 using System.Runtime.InteropServices;
+using System.Security;
 using System.Threading.Tasks;
 using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class SecureStringHelperAsyncTests
-{
-    private static string ToPlainString(SecureString s)
-    {
+public class SecureStringHelperAsyncTests {
+    private static string ToPlainString(SecureString s) {
         IntPtr ptr = Marshal.SecureStringToCoTaskMemUnicode(s);
-        try
-        {
+        try {
             return Marshal.PtrToStringUni(ptr)!;
-        }
-        finally
-        {
+        } finally {
             Marshal.ZeroFreeCoTaskMemUnicode(ptr);
         }
     }
 
     [Fact]
-    public async Task EncryptDecryptAsync_RoundTrip()
-    {
+    public async Task EncryptDecryptAsync_RoundTrip() {
         using SecureString input = SecureStringHelper.FromPlainTextString("secret");
         byte[] key = new byte[32];
         new Random().NextBytes(key);

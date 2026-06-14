@@ -1,6 +1,6 @@
-using System.Management.Automation;
 using Mailozaurr;
 using System.Collections.Generic;
+using System.Management.Automation;
 using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;

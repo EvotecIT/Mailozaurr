@@ -1,5 +1,5 @@
-using System.Management.Automation;
 using MimeKit;
+using System.Management.Automation;
 
 namespace Mailozaurr.PowerShell;
 
@@ -44,4 +44,3 @@ public sealed class CmdletGetEmailGraphMessageMime : AsyncPSCmdlet {
         WriteObject(new GraphEmailMessage(id!, mime));
     }
 }
-

@@ -10,6 +10,8 @@ internal sealed class AesCredentialProtector : ICredentialProtector {
     private const string KeyFileName = "credential.key";
     private const int KeySizeBytes = 32;
     private const int IvSizeBytes = 16;
+    private const int MacSizeBytes = 32;
+    private static readonly byte[] PayloadPrefix = { (byte)'M', (byte)'Z', (byte)'C', 2 };
 
     private readonly byte[] key;
 
@@ -23,17 +25,26 @@ internal sealed class AesCredentialProtector : ICredentialProtector {
         }
 
         var plaintextBytes = Encoding.UTF8.GetBytes(plainText);
+        var keys = DeriveKeys();
 
         using var aes = Aes.Create();
-        aes.Key = key;
+        aes.Key = keys.EncryptionKey;
         aes.GenerateIV();
 
         using var encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
         var cipherBytes = encryptor.TransformFinalBlock(plaintextBytes, 0, plaintextBytes.Length);
 
-        var payload = new byte[aes.IV.Length + cipherBytes.Length];
-        Buffer.BlockCopy(aes.IV, 0, payload, 0, aes.IV.Length);
-        Buffer.BlockCopy(cipherBytes, 0, payload, aes.IV.Length, cipherBytes.Length);
+        var payloadWithoutMac = new byte[PayloadPrefix.Length + aes.IV.Length + cipherBytes.Length];
+        Buffer.BlockCopy(PayloadPrefix, 0, payloadWithoutMac, 0, PayloadPrefix.Length);
+        Buffer.BlockCopy(aes.IV, 0, payloadWithoutMac, PayloadPrefix.Length, aes.IV.Length);
+        Buffer.BlockCopy(cipherBytes, 0, payloadWithoutMac, PayloadPrefix.Length + aes.IV.Length, cipherBytes.Length);
+
+        using var hmac = new HMACSHA256(keys.AuthenticationKey);
+        var mac = hmac.ComputeHash(payloadWithoutMac);
+
+        var payload = new byte[payloadWithoutMac.Length + mac.Length];
+        Buffer.BlockCopy(payloadWithoutMac, 0, payload, 0, payloadWithoutMac.Length);
+        Buffer.BlockCopy(mac, 0, payload, payloadWithoutMac.Length, mac.Length);
 
         return Convert.ToBase64String(payload);
     }
@@ -44,6 +55,40 @@ internal sealed class AesCredentialProtector : ICredentialProtector {
         }
 
         var payload = Convert.FromBase64String(protectedData);
+        if (IsAuthenticatedPayload(payload)) {
+            return UnprotectAuthenticated(payload);
+        }
+
+        return UnprotectLegacy(payload);
+    }
+
+    private string UnprotectAuthenticated(byte[] payload) {
+        if (payload.Length < PayloadPrefix.Length + IvSizeBytes + MacSizeBytes) {
+            throw new CryptographicException("Protected payload is too short.");
+        }
+
+        var keys = DeriveKeys();
+        var payloadLengthWithoutMac = payload.Length - MacSizeBytes;
+        var storedMac = new byte[MacSizeBytes];
+        Buffer.BlockCopy(payload, payloadLengthWithoutMac, storedMac, 0, storedMac.Length);
+
+        using var hmac = new HMACSHA256(keys.AuthenticationKey);
+        var computedMac = hmac.ComputeHash(payload, 0, payloadLengthWithoutMac);
+        if (!FixedTimeEquals(storedMac, computedMac)) {
+            throw new CryptographicException("Protected payload authentication failed.");
+        }
+
+        var iv = new byte[IvSizeBytes];
+        Buffer.BlockCopy(payload, PayloadPrefix.Length, iv, 0, IvSizeBytes);
+        var cipherOffset = PayloadPrefix.Length + IvSizeBytes;
+        var cipherLength = payloadLengthWithoutMac - cipherOffset;
+        var cipherBytes = new byte[cipherLength];
+        Buffer.BlockCopy(payload, cipherOffset, cipherBytes, 0, cipherBytes.Length);
+
+        return Decrypt(keys.EncryptionKey, iv, cipherBytes);
+    }
+
+    private string UnprotectLegacy(byte[] payload) {
         if (payload.Length < IvSizeBytes) {
             throw new CryptographicException("Protected payload is too short.");
         }
@@ -53,14 +98,66 @@ internal sealed class AesCredentialProtector : ICredentialProtector {
         var cipherBytes = new byte[payload.Length - IvSizeBytes];
         Buffer.BlockCopy(payload, IvSizeBytes, cipherBytes, 0, cipherBytes.Length);
 
+        return Decrypt(key, iv, cipherBytes);
+    }
+
+    private string Decrypt(byte[] encryptionKey, byte[] iv, byte[] cipherBytes) {
         using var aes = Aes.Create();
-        aes.Key = key;
+        aes.Key = encryptionKey;
         aes.IV = iv;
 
         using var decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
         var plaintextBytes = decryptor.TransformFinalBlock(cipherBytes, 0, cipherBytes.Length);
 
         return Encoding.UTF8.GetString(plaintextBytes);
+    }
+
+    private CredentialProtectionKeys DeriveKeys() {
+        using var hmac = new HMACSHA512(key);
+        var material = hmac.ComputeHash(Encoding.UTF8.GetBytes("Mailozaurr credential protection v2"));
+        var encryptionKey = new byte[KeySizeBytes];
+        var authenticationKey = new byte[KeySizeBytes];
+        Buffer.BlockCopy(material, 0, encryptionKey, 0, encryptionKey.Length);
+        Buffer.BlockCopy(material, encryptionKey.Length, authenticationKey, 0, authenticationKey.Length);
+        return new CredentialProtectionKeys(encryptionKey, authenticationKey);
+    }
+
+    private static bool IsAuthenticatedPayload(byte[] payload) {
+        if (payload.Length < PayloadPrefix.Length) {
+            return false;
+        }
+
+        for (var i = 0; i < PayloadPrefix.Length; i++) {
+            if (payload[i] != PayloadPrefix[i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool FixedTimeEquals(byte[] left, byte[] right) {
+        if (left.Length != right.Length) {
+            return false;
+        }
+
+        var diff = 0;
+        for (var i = 0; i < left.Length; i++) {
+            diff |= left[i] ^ right[i];
+        }
+
+        return diff == 0;
+    }
+
+    private sealed class CredentialProtectionKeys {
+        public CredentialProtectionKeys(byte[] encryptionKey, byte[] authenticationKey) {
+            EncryptionKey = encryptionKey;
+            AuthenticationKey = authenticationKey;
+        }
+
+        public byte[] EncryptionKey { get; }
+
+        public byte[] AuthenticationKey { get; }
     }
 
     private static readonly TimeSpan[] RetryDelays = new[] {

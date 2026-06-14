@@ -1,5 +1,5 @@
-using System.Reflection;
 using System.Net.Http;
+using System.Reflection;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -478,7 +478,7 @@ public class GmailApiClientTests {
 
     [Fact]
     public async System.Threading.Tasks.Task ModifyThreadLabelsAsync_SendsModifyRequest() {
-        var json = "{\"id\":\"t1\",\"messages\":[{\"id\":\"m1\"}]}"; 
+        var json = "{\"id\":\"t1\",\"messages\":[{\"id\":\"m1\"}]}";
         var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });
         var client = new GmailApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
         var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -782,7 +782,7 @@ public class GmailApiClientTests {
         field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") });
         await Assert.ThrowsAsync<System.IO.InvalidDataException>(() => client.GetThreadAsync("me", "id"));
     }
-     
+
     [Fact]
     public void Dispose_DisposesHttpClient() {
         var cred = new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue };

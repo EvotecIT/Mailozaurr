@@ -1,6 +1,6 @@
+using Mailozaurr.PowerShell;
 using System.Management.Automation;
 using System.Threading.Tasks;
-using Mailozaurr.PowerShell;
 
 namespace Mailozaurr.PowerShell;
 
@@ -134,4 +134,5 @@ public sealed class CmdletGetPOP3Message : AsyncPSCmdlet {
                 ErrorCategory.InvalidOperation,
                 null));
         }
-    }}
+    }
+}

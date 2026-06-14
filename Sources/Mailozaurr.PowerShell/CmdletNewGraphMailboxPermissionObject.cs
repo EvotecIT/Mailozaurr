@@ -1,5 +1,5 @@
-using System.Management.Automation;
 using Mailozaurr;
+using System.Management.Automation;
 
 namespace Mailozaurr.PowerShell;
 

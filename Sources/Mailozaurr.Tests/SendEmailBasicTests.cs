@@ -1,24 +1,22 @@
-using Xunit;
-using Mailozaurr.Definitions;
 using Mailozaurr;
+using Mailozaurr.Definitions;
+using MimeKit;
+using System.IO;
+using System.Management.Automation;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using System.IO;
-using System.Management.Automation;
-using MimeKit;
+using Xunit;
 
 namespace Mailozaurr.Tests {
     public class SendEmailBasicTests {
-        private class FakeSmtpClient : ClientSmtp
-        {
+        private class FakeSmtpClient : ClientSmtp {
             public bool SendCalled;
             public MimeMessage? LastMessage;
 
-            public override Task<string> SendAsync(MimeMessage message, System.Threading.CancellationToken cancellationToken = default, MailKit.ITransferProgress? progress = null)
-            {
+            public override Task<string> SendAsync(MimeMessage message, System.Threading.CancellationToken cancellationToken = default, MailKit.ITransferProgress? progress = null) {
                 SendCalled = true;
                 LastMessage = message;
                 return Task.FromResult(string.Empty);
@@ -343,4 +341,5 @@ namespace Mailozaurr.Tests {
 
             Assert.Equal(1, attachCount);
         }
-    }}
+    }
+}

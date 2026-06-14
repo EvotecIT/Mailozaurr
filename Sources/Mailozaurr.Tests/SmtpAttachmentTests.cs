@@ -1,21 +1,18 @@
+using Mailozaurr.Definitions;
+using MimeKit;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using MimeKit;
 using Xunit;
-using Mailozaurr.Definitions;
 
 namespace Mailozaurr.Tests;
 
-public class SmtpAttachmentTests
-{
+public class SmtpAttachmentTests {
     [Fact]
-    public void CreateMessage_MissingAttachment_SkipsAttachment()
-    {
+    public void CreateMessage_MissingAttachment_SkipsAttachment() {
         var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         if (File.Exists(path)) File.Delete(path);
-        var smtp = new Smtp
-        {
+        var smtp = new Smtp {
             From = "a@b.com",
             To = new object[] { "c@d.com" },
             Subject = "test",
@@ -26,21 +23,18 @@ public class SmtpAttachmentTests
         smtp.CreateMessage();
 
         Assert.IsNotType<Multipart>(smtp.Message.Body);
-}
+    }
 
     [Fact]
-    public void CreateMessage_StreamAttachmentDescriptor_AddsAttachment()
-    {
+    public void CreateMessage_StreamAttachmentDescriptor_AddsAttachment() {
         var data = Encoding.UTF8.GetBytes("hello world");
         using var source = new MemoryStream(data);
-        var descriptor = new StreamAttachmentDescriptor(source, "greeting.txt")
-        {
+        var descriptor = new StreamAttachmentDescriptor(source, "greeting.txt") {
             ContentType = "text/plain",
             Headers = new Dictionary<string, string> { { "X-Test", "Stream" } },
         };
 
-        var smtp = new Smtp
-        {
+        var smtp = new Smtp {
             From = "a@b.com",
             To = new object[] { "c@d.com" },
             Subject = "test",
@@ -66,16 +60,13 @@ public class SmtpAttachmentTests
     }
 
     [Fact]
-    public void CreateMessage_ByteArrayAttachmentDescriptor_AddsAttachment()
-    {
+    public void CreateMessage_ByteArrayAttachmentDescriptor_AddsAttachment() {
         var data = new byte[] { 1, 2, 3, 4, 5 };
-        var descriptor = new ByteArrayAttachmentDescriptor(data, "data.bin")
-        {
+        var descriptor = new ByteArrayAttachmentDescriptor(data, "data.bin") {
             ContentType = "application/octet-stream",
         };
 
-        var smtp = new Smtp
-        {
+        var smtp = new Smtp {
             From = "a@b.com",
             To = new object[] { "c@d.com" },
             Subject = "test",
@@ -98,16 +89,13 @@ public class SmtpAttachmentTests
     }
 
     [Fact]
-    public void CreateMessage_BinaryAttachment_UsesBase64EncodingToAvoidBareLineFeeds()
-    {
+    public void CreateMessage_BinaryAttachment_UsesBase64EncodingToAvoidBareLineFeeds() {
         var data = new byte[] { 0x50, 0x4b, 0x03, 0x04, 0x0a, 0xff, 0x00, 0x0a, 0x7f };
-        var descriptor = new ByteArrayAttachmentDescriptor(data, "document.docx")
-        {
+        var descriptor = new ByteArrayAttachmentDescriptor(data, "document.docx") {
             ContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         };
 
-        var smtp = new Smtp
-        {
+        var smtp = new Smtp {
             From = "a@b.com",
             To = new object[] { "c@d.com" },
             Subject = "test",
@@ -130,16 +118,13 @@ public class SmtpAttachmentTests
     }
 
     [Fact]
-    public void CreateMessage_ExplicitTransferEncoding_IsRespected()
-    {
-        var descriptor = new ByteArrayAttachmentDescriptor(Encoding.UTF8.GetBytes("hello world"), "greeting.txt")
-        {
+    public void CreateMessage_ExplicitTransferEncoding_IsRespected() {
+        var descriptor = new ByteArrayAttachmentDescriptor(Encoding.UTF8.GetBytes("hello world"), "greeting.txt") {
             ContentType = "text/plain",
             TransferEncoding = ContentEncoding.QuotedPrintable,
         };
 
-        var smtp = new Smtp
-        {
+        var smtp = new Smtp {
             From = "a@b.com",
             To = new object[] { "c@d.com" },
             Subject = "test",
@@ -154,12 +139,9 @@ public class SmtpAttachmentTests
         Assert.Equal(ContentEncoding.QuotedPrintable, part.ContentTransferEncoding);
     }
 
-    private static bool ContainsBareLineFeed(byte[] bytes)
-    {
-        for (var index = 0; index < bytes.Length; index++)
-        {
-            if (bytes[index] == 0x0a && (index == 0 || bytes[index - 1] != 0x0d))
-            {
+    private static bool ContainsBareLineFeed(byte[] bytes) {
+        for (var index = 0; index < bytes.Length; index++) {
+            if (bytes[index] == 0x0a && (index == 0 || bytes[index - 1] != 0x0d)) {
                 return true;
             }
         }

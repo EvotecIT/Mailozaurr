@@ -34,4 +34,3 @@ public sealed class GraphMailFolder {
     [JsonPropertyName("unreadItemCount")]
     public int? UnreadItemCount { get; set; }
 }
-

@@ -1,6 +1,6 @@
+using MimeKit;
 using System;
 using System.IO;
-using MimeKit;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -8,13 +8,10 @@ namespace Mailozaurr.Tests;
 /// <summary>
 /// Tests creation of Graph API messages.
 /// </summary>
-public class GraphCreateMessageTests
-{
+public class GraphCreateMessageTests {
     [Fact]
-    public void CreateMessage_WithValidData_BuildsJson()
-    {
-        using var graph = new Graph
-        {
+    public void CreateMessage_WithValidData_BuildsJson() {
+        using var graph = new Graph {
             From = "from@example.com",
             To = new object[] { "to@example.com" },
             Subject = "subject",
@@ -27,10 +24,8 @@ public class GraphCreateMessageTests
     }
 
     [Fact]
-    public void CreateMessage_WithHeaders_IncludesHeaders()
-    {
-        using var graph = new Graph
-        {
+    public void CreateMessage_WithHeaders_IncludesHeaders() {
+        using var graph = new Graph {
             From = "from@example.com",
             To = new object[] { "to@example.com" },
             Subject = "subject",
@@ -70,10 +65,8 @@ public class GraphCreateMessageTests
     }
 
     [Fact]
-    public void CreateMessage_WithoutExplicitContentType_DefaultsToHtml()
-    {
-        using var graph = new Graph
-        {
+    public void CreateMessage_WithoutExplicitContentType_DefaultsToHtml() {
+        using var graph = new Graph {
             From = "from@example.com",
             To = new object[] { "to@example.com" },
             Subject = "subject",
@@ -86,18 +79,15 @@ public class GraphCreateMessageTests
     }
 
     [Fact]
-    public void ContentType_SetToInvalidValue_ThrowsArgumentException()
-    {
+    public void ContentType_SetToInvalidValue_ThrowsArgumentException() {
         using var graph = new Graph();
 
         Assert.Throws<ArgumentException>(() => graph.ContentType = "Markdown");
     }
 
     [Fact]
-    public void CreateAttachments_WithMissingFile_SkipsAttachment()
-    {
-        using var graph = new Graph
-        {
+    public void CreateAttachments_WithMissingFile_SkipsAttachment() {
+        using var graph = new Graph {
             Attachments = new object[] { "missing.file" }
         };
         graph.CreateAttachments();
@@ -106,12 +96,10 @@ public class GraphCreateMessageTests
     }
 
     [Fact]
-    public void CreateMessage_WithLargeAttachment_DoesNotIncludeAttachment()
-    {
+    public void CreateMessage_WithLargeAttachment_DoesNotIncludeAttachment() {
         string tmp = Path.GetTempFileName();
         File.WriteAllBytes(tmp, new byte[4000001]);
-        using var graph = new Graph
-        {
+        using var graph = new Graph {
             From = "from@example.com",
             To = new object[] { "to@example.com" },
             Subject = "subject",
@@ -127,10 +115,8 @@ public class GraphCreateMessageTests
     }
 
     [Fact]
-    public void CreateMessage_WithoutFrom_ThrowsInvalidOperationException()
-    {
-        using var graph = new Graph
-        {
+    public void CreateMessage_WithoutFrom_ThrowsInvalidOperationException() {
+        using var graph = new Graph {
             To = new object[] { "to@example.com" },
             Subject = "subject",
             HTML = "body",

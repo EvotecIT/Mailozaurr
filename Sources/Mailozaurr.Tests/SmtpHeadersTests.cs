@@ -1,14 +1,12 @@
+using MimeKit;
 using System.Collections.Generic;
 using Xunit;
-using MimeKit;
 
 namespace Mailozaurr.Tests;
 
-public class SmtpHeadersTests
-{
+public class SmtpHeadersTests {
     [Fact]
-    public void CreateMessage_WithHeaders_AddsHeaders()
-    {
+    public void CreateMessage_WithHeaders_AddsHeaders() {
         var smtp = new Smtp();
         smtp.From = "a@b.com";
         smtp.To = new object[] { "c@d.com" };
@@ -20,16 +18,13 @@ public class SmtpHeadersTests
     }
 
     [Fact]
-    public void CreateMessage_WithMultipleHeaders_AddsAllHeaders()
-    {
-        var smtp = new Smtp
-        {
+    public void CreateMessage_WithMultipleHeaders_AddsAllHeaders() {
+        var smtp = new Smtp {
             From = "a@b.com",
             To = new object[] { "c@d.com" },
             Subject = "test",
             TextBody = "body",
-            Headers = new Dictionary<string, string>
-            {
+            Headers = new Dictionary<string, string> {
                 ["X-One"] = "1",
                 ["X-Two"] = "2"
             }

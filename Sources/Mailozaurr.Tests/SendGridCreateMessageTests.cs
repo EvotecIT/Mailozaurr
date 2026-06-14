@@ -1,20 +1,17 @@
+using Mailozaurr.Definitions;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Reflection;
 using Xunit;
-using Mailozaurr.Definitions;
 
 namespace Mailozaurr.Tests;
 
-public class SendGridCreateMessageTests
-{
+public class SendGridCreateMessageTests {
     [Fact]
-    public void CreateMessage_WithValidData_BuildsJson()
-    {
-        var client = new SendGridClient
-        {
+    public void CreateMessage_WithValidData_BuildsJson() {
+        var client = new SendGridClient {
             From = "from@example.com",
             To = new List<object> { "to@example.com" },
             Subject = "subject",
@@ -31,10 +28,8 @@ public class SendGridCreateMessageTests
     }
 
     [Fact]
-    public void CreateMessage_InvalidAddress_ThrowsArgumentException()
-    {
-        var client = new SendGridClient
-        {
+    public void CreateMessage_InvalidAddress_ThrowsArgumentException() {
+        var client = new SendGridClient {
             From = "from@example.com",
             To = new List<object> { new Dictionary<string, object> { { "Name", "Test" } } },
             Subject = "subject",
@@ -46,10 +41,8 @@ public class SendGridCreateMessageTests
     }
 
     [Fact]
-    public void CreateMessage_WithHeaders_IncludesHeaders()
-    {
-        var client = new SendGridClient
-        {
+    public void CreateMessage_WithHeaders_IncludesHeaders() {
+        var client = new SendGridClient {
             From = "from@example.com",
             To = new List<object> { "to@example.com" },
             Subject = "subject",
@@ -65,12 +58,10 @@ public class SendGridCreateMessageTests
     }
 
     [Fact]
-    public void CreateMessage_DuplicateAttachments_IncludedOnce()
-    {
+    public void CreateMessage_DuplicateAttachments_IncludedOnce() {
         var tmp = Path.GetTempFileName();
         File.WriteAllText(tmp, "data");
-        var client = new SendGridClient
-        {
+        var client = new SendGridClient {
             From = "from@example.com",
             To = new List<object> { "to@example.com" },
             Subject = "subject",
@@ -95,10 +86,8 @@ public class SendGridCreateMessageTests
     [Theory]
     [InlineData("", "<b>body</b>", "text/html")]
     [InlineData("text", "", "text/plain")]
-    public void CreateMessage_WithoutBody_OmitsCorrespondingContent(string text, string html, string expectedType)
-    {
-        var client = new SendGridClient
-        {
+    public void CreateMessage_WithoutBody_OmitsCorrespondingContent(string text, string html, string expectedType) {
+        var client = new SendGridClient {
             From = "from@example.com",
             To = new List<object> { "to@example.com" },
             Subject = "subject",

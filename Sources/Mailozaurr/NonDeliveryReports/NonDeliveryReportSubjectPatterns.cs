@@ -15,4 +15,3 @@ internal static class NonDeliveryReportSubjectPatterns {
         "Your message couldn't be delivered",
     };
 }
-

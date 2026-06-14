@@ -11,4 +11,3 @@ public sealed class GmailLabel {
     /// <summary>Label type (for example "system" or "user").</summary>
     public string? Type { get; set; }
 }
-

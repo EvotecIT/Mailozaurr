@@ -43,7 +43,7 @@ internal static class LogFileLineReader {
                     break;
                 }
 
-                buffer.Add((byte) value);
+                buffer.Add((byte)value);
             }
 
             if (endOfFile && buffer.Count == 0) {

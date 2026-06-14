@@ -1,20 +1,18 @@
+using Mailozaurr.Definitions;
+using MimeKit;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Collections.Generic;
-using MimeKit;
 using Xunit;
-using Mailozaurr.Definitions;
 
 namespace Mailozaurr.Tests;
 
 /// <summary>
 /// Verifies handling of inline attachments for SMTP messages.
 /// </summary>
-public class SmtpInlineAttachmentTests
-{
+public class SmtpInlineAttachmentTests {
     [Fact]
-    public void CreateMessage_WithInlineAttachment_AddsLinkedResource()
-    {
+    public void CreateMessage_WithInlineAttachment_AddsLinkedResource() {
         var tmp = Path.GetTempFileName();
         File.WriteAllText(tmp, "data");
         var smtp = new Smtp();
@@ -31,10 +29,8 @@ public class SmtpInlineAttachmentTests
     }
 
     [Fact]
-    public void CreateMessage_NullInlineAttachments_DoesNotThrow()
-    {
-        var smtp = new Smtp
-        {
+    public void CreateMessage_NullInlineAttachments_DoesNotThrow() {
+        var smtp = new Smtp {
             From = "a@b.com",
             To = new object[] { "c@d.com" },
             Subject = "test",
@@ -48,12 +44,10 @@ public class SmtpInlineAttachmentTests
     }
 
     [Fact]
-    public void CreateMessage_MissingInlineAttachment_SkipsResource()
-    {
+    public void CreateMessage_MissingInlineAttachment_SkipsResource() {
         var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         if (File.Exists(path)) File.Delete(path);
-        var smtp = new Smtp
-        {
+        var smtp = new Smtp {
             From = "a@b.com",
             To = new object[] { "c@d.com" },
             Subject = "test",

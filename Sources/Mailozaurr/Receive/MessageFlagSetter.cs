@@ -1,9 +1,9 @@
-using System.Runtime.CompilerServices;
-using System.Collections.Concurrent;
 using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Net.Pop3;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 

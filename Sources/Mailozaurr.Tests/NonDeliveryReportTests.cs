@@ -1,7 +1,7 @@
 using Mailozaurr.NonDeliveryReports;
+using MimeKit.Utils;
 using System;
 using System.Collections.Generic;
-using MimeKit.Utils;
 using Xunit;
 
 namespace Mailozaurr.Tests;

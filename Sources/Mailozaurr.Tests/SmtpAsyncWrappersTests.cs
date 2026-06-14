@@ -1,3 +1,5 @@
+using MailKit.Security;
+using Mailozaurr.Definitions;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -6,16 +8,12 @@ using System.Net;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using MailKit.Security;
-using Mailozaurr.Definitions;
 using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class SmtpAsyncWrappersTests
-{
-    private class FakeConnectClient : ClientSmtp
-    {
+public class SmtpAsyncWrappersTests {
+    private class FakeConnectClient : ClientSmtp {
         public bool ConnectCalled;
         public bool ThrowOnConnect;
         public bool ThrowOnAuthenticate;
@@ -24,8 +22,7 @@ public class SmtpAsyncWrappersTests
         public SecureSocketOptions? LastSecureSocketOptions;
         public CancellationToken LastConnectCancellationToken;
         public string? AuthMechanism;
-        public override async Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default)
-        {
+        public override async Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default) {
             LastConnectCancellationToken = cancellationToken;
             if (ThrowOnConnect) {
                 throw new InvalidOperationException("connect failed");
@@ -50,27 +47,23 @@ public class SmtpAsyncWrappersTests
         }
     }
 
-    private static void SetClient(Smtp smtp, ClientSmtp client)
-    {
+    private static void SetClient(Smtp smtp, ClientSmtp client) {
         var field = typeof(Smtp).GetField("<Client>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!;
         field.SetValue(smtp, client);
     }
 
-    private static void SetCredential(Smtp smtp, NetworkCredential credential)
-    {
+    private static void SetCredential(Smtp smtp, NetworkCredential credential) {
         var field = typeof(Smtp).GetField("<Credential>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!;
         field.SetValue(smtp, credential);
     }
 
-    private static string? GetPoolIdentity(Smtp smtp)
-    {
+    private static string? GetPoolIdentity(Smtp smtp) {
         var field = typeof(Smtp).GetField("_poolIdentity", BindingFlags.Instance | BindingFlags.NonPublic)!;
         return field.GetValue(smtp) as string;
     }
 
     [Fact]
-    public async Task ConnectAsync_InvokesClientConnectAsync()
-    {
+    public async Task ConnectAsync_InvokesClientConnectAsync() {
         var smtp = new Smtp();
         var fake = new FakeConnectClient();
         SetClient(smtp, fake);
@@ -82,8 +75,7 @@ public class SmtpAsyncWrappersTests
     }
 
     [Fact]
-    public void ConnectAsync_PreservesLegacyFourArgumentOverload()
-    {
+    public void ConnectAsync_PreservesLegacyFourArgumentOverload() {
         var method = typeof(Smtp).GetMethod(
             nameof(Smtp.ConnectAsync),
             new[] { typeof(string), typeof(int), typeof(SecureSocketOptions), typeof(bool) });
@@ -93,8 +85,7 @@ public class SmtpAsyncWrappersTests
     }
 
     [Fact]
-    public async Task ConnectAndAuthenticateAsync_ReturnsSuccessForOAuthAuthentication()
-    {
+    public async Task ConnectAndAuthenticateAsync_ReturnsSuccessForOAuthAuthentication() {
         var smtp = new Smtp();
         var fake = new FakeConnectClient();
         SetClient(smtp, fake);
@@ -114,8 +105,7 @@ public class SmtpAsyncWrappersTests
     }
 
     [Fact]
-    public async Task ConnectAndAuthenticateAsync_MapsConnectFailure()
-    {
+    public async Task ConnectAndAuthenticateAsync_MapsConnectFailure() {
         var smtp = new Smtp();
         var fake = new FakeConnectClient { ThrowOnConnect = true };
         SetClient(smtp, fake);
@@ -133,8 +123,7 @@ public class SmtpAsyncWrappersTests
     }
 
     [Fact]
-    public async Task ConnectAndAuthenticateAsync_MapsValidationFailureAsNonTransient()
-    {
+    public async Task ConnectAndAuthenticateAsync_MapsValidationFailureAsNonTransient() {
         var smtp = new Smtp();
         var fake = new FakeConnectClient();
         SetClient(smtp, fake);
@@ -153,8 +142,7 @@ public class SmtpAsyncWrappersTests
     }
 
     [Fact]
-    public async Task ConnectAndAuthenticateAsync_MapsAuthenticationFailure()
-    {
+    public async Task ConnectAndAuthenticateAsync_MapsAuthenticationFailure() {
         var smtp = new Smtp();
         var fake = new FakeConnectClient { ThrowOnAuthenticate = true };
         SetClient(smtp, fake);
@@ -172,8 +160,7 @@ public class SmtpAsyncWrappersTests
     }
 
     [Fact]
-    public async Task ConnectAndAuthenticateAsync_ReThrowsAuthFailureWhenErrorActionStop()
-    {
+    public async Task ConnectAndAuthenticateAsync_ReThrowsAuthFailureWhenErrorActionStop() {
         var smtp = new Smtp {
             ErrorAction = ActionPreference.Stop
         };
@@ -189,8 +176,7 @@ public class SmtpAsyncWrappersTests
     }
 
     [Fact]
-    public async Task ConnectAndAuthenticateAsync_DryRunSkipsAuthentication()
-    {
+    public async Task ConnectAndAuthenticateAsync_DryRunSkipsAuthentication() {
         var smtp = new Smtp {
             DryRun = true
         };
@@ -210,8 +196,7 @@ public class SmtpAsyncWrappersTests
     }
 
     [Fact]
-    public async Task ConnectAndAuthenticateAsync_ThrowsWhenAlreadyCanceled()
-    {
+    public async Task ConnectAndAuthenticateAsync_ThrowsWhenAlreadyCanceled() {
         var smtp = new Smtp();
         var fake = new FakeConnectClient();
         SetClient(smtp, fake);
@@ -232,8 +217,7 @@ public class SmtpAsyncWrappersTests
     }
 
     [Fact]
-    public async Task ConnectAndAuthenticateAsync_PropagatesCancellationIntoConnect()
-    {
+    public async Task ConnectAndAuthenticateAsync_PropagatesCancellationIntoConnect() {
         var smtp = new Smtp();
         var fake = new FakeConnectClient {
             BlockConnectUntilCanceled = true
@@ -259,8 +243,7 @@ public class SmtpAsyncWrappersTests
     }
 
     [Fact]
-    public async Task ConnectAndAuthenticateAsync_UsesRequestedUsernameForPoolIdentityWhenCredentialWasStale()
-    {
+    public async Task ConnectAndAuthenticateAsync_UsesRequestedUsernameForPoolIdentityWhenCredentialWasStale() {
         var smtp = new Smtp();
         var fake = new FakeConnectClient();
         SetClient(smtp, fake);
@@ -282,15 +265,12 @@ public class SmtpAsyncWrappersTests
     }
 
     [Fact]
-    public async Task CreateMessageAsync_AutoEmbedImagesAddsInlineAttachment()
-    {
+    public async Task CreateMessageAsync_AutoEmbedImagesAddsInlineAttachment() {
         var tempFile = Path.GetTempFileName();
-        try
-        {
+        try {
             File.WriteAllText(tempFile, "data");
 
-            var smtp = new Smtp
-            {
+            var smtp = new Smtp {
                 AutoEmbedImages = true,
                 HtmlBody = $"<img src=\"{tempFile}\">",
                 From = "sender@example.com",
@@ -305,26 +285,20 @@ public class SmtpAsyncWrappersTests
             Assert.Contains(inlineAttachments.OfType<FileAttachmentDescriptor>(), a => string.Equals(a.FilePath, tempFile, StringComparison.OrdinalIgnoreCase));
             Assert.Contains($"cid:{Path.GetFileName(tempFile)}", smtp.HtmlBody);
             Assert.Contains($"cid:{Path.GetFileName(tempFile)}", smtp.Message.HtmlBody);
-        }
-        finally
-        {
-            if (File.Exists(tempFile))
-            {
+        } finally {
+            if (File.Exists(tempFile)) {
                 File.Delete(tempFile);
             }
         }
     }
 
     [Fact]
-    public async Task CreateMessageAsync_CancellationTokenPreventsClientInvocation()
-    {
+    public async Task CreateMessageAsync_CancellationTokenPreventsClientInvocation() {
         var tempFile = Path.GetTempFileName();
-        try
-        {
+        try {
             File.WriteAllText(tempFile, "data");
 
-            var smtp = new Smtp
-            {
+            var smtp = new Smtp {
                 AutoEmbedImages = true,
                 HtmlBody = $"<img src=\"{tempFile}\">"
             };
@@ -339,11 +313,8 @@ public class SmtpAsyncWrappersTests
             Assert.Equal(originalHtml, smtp.HtmlBody);
             var inlineAttachments = smtp.InlineAttachments ?? new List<AttachmentDescriptor>();
             Assert.DoesNotContain(inlineAttachments.OfType<FileAttachmentDescriptor>(), a => string.Equals(a.FilePath, tempFile, StringComparison.OrdinalIgnoreCase));
-        }
-        finally
-        {
-            if (File.Exists(tempFile))
-            {
+        } finally {
+            if (File.Exists(tempFile)) {
                 File.Delete(tempFile);
             }
         }

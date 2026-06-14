@@ -1,8 +1,8 @@
-using System.Net.Security;
-using System.Text;
 using MailKit;
 using MailKit.Security;
 using MimeKit;
+using System.Net.Security;
+using System.Text;
 
 namespace Mailozaurr.Tests.SentMessages;
 

@@ -3,11 +3,9 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class SmtpSignTests
-{
+public class SmtpSignTests {
     [Fact]
-    public void Sign_MissingCertificate_ReturnsFailedResult()
-    {
+    public void Sign_MissingCertificate_ReturnsFailedResult() {
         var smtp = new Smtp();
         smtp.From = "a@b.com";
         smtp.To = new object[] { "c@d.com" };

@@ -1,27 +1,23 @@
+using MailKit.Security;
 using System.Reflection;
 using System.Threading.Tasks;
-using MailKit.Security;
 using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class SmtpSslOptionTests
-{
-    private class FakeClient : ClientSmtp
-    {
+public class SmtpSslOptionTests {
+    private class FakeClient : ClientSmtp {
         public SecureSocketOptions? Options;
         public override void Connect(string host, int port, SecureSocketOptions options, System.Threading.CancellationToken cancellationToken = default)
             => Options = options;
-        public override Task ConnectAsync(string host, int port, SecureSocketOptions options, System.Threading.CancellationToken cancellationToken = default)
-        {
+        public override Task ConnectAsync(string host, int port, SecureSocketOptions options, System.Threading.CancellationToken cancellationToken = default) {
             Options = options;
             return Task.CompletedTask;
         }
     }
 
     [Fact]
-    public void Connect_WithUseSslAndExplicitOption_DoesNotOverride()
-    {
+    public void Connect_WithUseSslAndExplicitOption_DoesNotOverride() {
         var smtp = new Smtp();
         var fake = new FakeClient();
         typeof(Smtp).GetField("<Client>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(smtp, fake);
@@ -32,8 +28,7 @@ public class SmtpSslOptionTests
     }
 
     [Fact]
-    public async Task ConnectAsync_WithUseSslAndExplicitOption_DoesNotOverride()
-    {
+    public async Task ConnectAsync_WithUseSslAndExplicitOption_DoesNotOverride() {
         var smtp = new Smtp();
         var fake = new FakeClient();
         typeof(Smtp).GetField("<Client>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(smtp, fake);

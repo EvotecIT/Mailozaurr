@@ -1,7 +1,7 @@
+using MailKit.Net.Imap;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using MailKit.Net.Imap;
 
 namespace Mailozaurr;
 

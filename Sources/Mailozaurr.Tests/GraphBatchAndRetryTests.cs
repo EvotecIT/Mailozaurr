@@ -154,8 +154,7 @@ public class GraphBatchAndRetryTests {
     private class AlwaysFailHandler : HttpMessageHandler {
         public int CallCount;
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
             CallCount++;
             var json = "{\"error\":\"fail\"}";
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError) { Content = new StringContent(json) });

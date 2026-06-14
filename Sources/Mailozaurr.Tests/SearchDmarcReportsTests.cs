@@ -1,6 +1,7 @@
+using MailKit;
+using MailKit.Net.Pop3;
 using Mailozaurr;
 using Mailozaurr.DmarcReports;
-using MailKit;
 using MimeKit;
 using System;
 using System.Collections.Generic;
@@ -12,7 +13,6 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using MailKit.Net.Pop3;
 using Xunit;
 
 namespace Mailozaurr.Tests;

@@ -1,28 +1,23 @@
+using MailKit;
+using MimeKit;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using MailKit;
-using MimeKit;
 using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class SmtpConcurrencyTests
-{
-    private class CountingClient : ClientSmtp
-    {
+public class SmtpConcurrencyTests {
+    private class CountingClient : ClientSmtp {
         private int _active;
         public int Max;
 
-        public override async Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null)
-        {
+        public override async Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
             var current = Interlocked.Increment(ref _active);
             int initialMax;
-            do
-            {
+            do {
                 initialMax = Max;
-                if (current <= initialMax)
-                {
+                if (current <= initialMax) {
                     break;
                 }
             }
@@ -35,8 +30,7 @@ public class SmtpConcurrencyTests
     }
 
     [Fact]
-    public async Task SendAsync_SerializesConcurrentCalls()
-    {
+    public async Task SendAsync_SerializesConcurrentCalls() {
         var smtp = new Smtp();
         var fake = new CountingClient();
         var field = typeof(Smtp).GetField("<Client>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -60,4 +54,3 @@ public class SmtpConcurrencyTests
         Assert.Equal(1, fake.Max);
     }
 }
-

@@ -12,4 +12,3 @@ public sealed class GraphMailMessageFlag {
     [JsonPropertyName("flagStatus")]
     public string? FlagStatus { get; set; }
 }
-

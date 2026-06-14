@@ -5,14 +5,11 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class TemporarySmimeCertificateTests
-{
+public class TemporarySmimeCertificateTests {
     [Fact]
-    public void CreateSelfSigned_ReturnsUsableCertificate()
-    {
+    public void CreateSelfSigned_ReturnsUsableCertificate() {
         // Skip test on macOS due to certificate compatibility issues
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
             return;
         }
 
@@ -22,11 +19,9 @@ public class TemporarySmimeCertificateTests
     }
 
     [Fact]
-    public void Certificate_CanSignAndEncryptMessage()
-    {
+    public void Certificate_CanSignAndEncryptMessage() {
         // Skip test on macOS due to certificate compatibility issues
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
             return;
         }
 
@@ -45,10 +40,8 @@ public class TemporarySmimeCertificateTests
     }
 
     [Fact]
-    public void Certificate_CanVerifySmimeSignature()
-    {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
+    public void Certificate_CanVerifySmimeSignature() {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
             return;
         }
 
@@ -67,10 +60,8 @@ public class TemporarySmimeCertificateTests
     }
 
     [Fact]
-    public void Certificate_CanDecryptSmimeMessage()
-    {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
+    public void Certificate_CanDecryptSmimeMessage() {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
             return;
         }
 

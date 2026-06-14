@@ -1,6 +1,6 @@
+using Mailozaurr;
 using System.Linq;
 using System.Management.Automation;
-using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
 
@@ -9,8 +9,7 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.New, "GraphInboxRuleBuilder")]
 [OutputType(typeof(GraphInboxRuleBuilder))]
-public sealed class CmdletNewGraphInboxRuleBuilder : PSCmdlet
-{
+public sealed class CmdletNewGraphInboxRuleBuilder : PSCmdlet {
     /// <summary>
     /// Display name for the inbox rule.
     /// </summary>
@@ -92,8 +91,7 @@ public sealed class CmdletNewGraphInboxRuleBuilder : PSCmdlet
     /// <summary>
     /// Builds the <see cref="GraphInboxRule"/> based on provided parameters.
     /// </summary>
-    protected override void ProcessRecord()
-    {
+    protected override void ProcessRecord() {
         var builder = new GraphInboxRuleBuilder()
             .DisplayName(DisplayName)
             .Sequence(Sequence)

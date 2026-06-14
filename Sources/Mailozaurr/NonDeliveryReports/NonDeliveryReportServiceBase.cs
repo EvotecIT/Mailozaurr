@@ -39,8 +39,7 @@ public abstract class NonDeliveryReportServiceBase : INonDeliveryReportService {
         IList<NonDeliveryReport> reports;
         try {
             reports = await SearchInternalAsync(since, before, recipientContains, messageId, maxResults, cancellationToken).ConfigureAwait(false);
-        }
-        finally {
+        } finally {
             gate.Release();
         }
         var results = new List<NonDeliveryReportResult>(reports.Count);

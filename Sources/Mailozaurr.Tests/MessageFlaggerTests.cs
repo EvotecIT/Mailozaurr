@@ -1,6 +1,6 @@
-using System.Threading.Tasks;
-using MailKit.Net.Pop3;
 using MailKit;
+using MailKit.Net.Pop3;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Mailozaurr.Tests;

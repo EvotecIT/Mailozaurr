@@ -8,4 +8,3 @@ namespace Mailozaurr.Tests;
 /// </summary>
 [CollectionDefinition("GraphCollection", DisableParallelization = true)]
 public class GraphTestCollection { }
-

@@ -48,4 +48,3 @@ public enum EmailActionEncryption {
     /// </summary>
     PGPSignAndEncrypt,
 }
-

@@ -1,5 +1,5 @@
-using MailKit.Net.Imap;
 using MailKit;
+using MailKit.Net.Imap;
 using Mailozaurr;
 
 namespace Mailozaurr.Application;
@@ -254,15 +254,15 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
         string message,
         MailProfileConnectionTestScope requestedScope,
         MailProfileConnectionTestScope executedScope) => new() {
-        Succeeded = true,
-        Message = message,
-        ProfileId = profile.Id,
-        ProfileKind = profile.Kind,
-        Probe = probe,
-        Target = target,
-        RequestedScope = requestedScope,
-        ExecutedScope = executedScope
-    };
+            Succeeded = true,
+            Message = message,
+            ProfileId = profile.Id,
+            ProfileKind = profile.Kind,
+            Probe = probe,
+            Target = target,
+            RequestedScope = requestedScope,
+            ExecutedScope = executedScope
+        };
 
     private static MailProfileConnectionTestResult Failure(
         string code,
@@ -271,12 +271,12 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
         MailProfileKind kind,
         MailProfileConnectionTestScope requestedScope,
         MailProfileConnectionTestScope executedScope) => new() {
-        Succeeded = false,
-        Code = code,
-        Message = message,
-        ProfileId = string.IsNullOrWhiteSpace(profileId) ? null : profileId,
-        ProfileKind = kind,
-        RequestedScope = requestedScope,
-        ExecutedScope = executedScope
-    };
+            Succeeded = false,
+            Code = code,
+            Message = message,
+            ProfileId = string.IsNullOrWhiteSpace(profileId) ? null : profileId,
+            ProfileKind = kind,
+            RequestedScope = requestedScope,
+            ExecutedScope = executedScope
+        };
 }

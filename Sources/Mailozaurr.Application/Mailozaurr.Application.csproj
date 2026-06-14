@@ -10,6 +10,7 @@
         <LangVersion>latest</LangVersion>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <IsPackable>false</IsPackable>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(TargetFramework)' == 'net8.0' ">
@@ -21,7 +22,7 @@
     </ItemGroup>
 
     <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' ">
-        <PackageReference Include="System.Text.Json" Version="10.0.8" />
+        <PackageReference Include="System.Text.Json" Version="10.0.9" />
     </ItemGroup>
 
     <ItemGroup>

@@ -1,7 +1,7 @@
+using Mailozaurr;
 using System.Collections.Generic;
 using System.Linq;
 using System.Management.Automation;
-using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
 
@@ -10,8 +10,7 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.New, "GraphInboxRuleObject")]
 [OutputType(typeof(GraphInboxRule))]
-public sealed class CmdletNewGraphInboxRuleObject : PSCmdlet
-{
+public sealed class CmdletNewGraphInboxRuleObject : PSCmdlet {
     /// <summary>
     /// Display name for the inbox rule.
     /// </summary>
@@ -99,25 +98,20 @@ public sealed class CmdletNewGraphInboxRuleObject : PSCmdlet
     /// <summary>
     /// Creates a <see cref="GraphInboxRule"/> instance from the supplied parameters.
     /// </summary>
-    protected override void ProcessRecord()
-    {
-        if (ParameterSetName == "Builder")
-        {
+    protected override void ProcessRecord() {
+        if (ParameterSetName == "Builder") {
             WriteObject(Builder!.Build());
             return;
         }
 
-        var rule = new GraphInboxRule
-        {
+        var rule = new GraphInboxRule {
             DisplayName = DisplayName,
             Sequence = Sequence,
             IsEnabled = Enabled.IsPresent
         };
 
-        if (SenderContains != null || RecipientContains != null || SubjectContains != null || BodyContains != null || Importance != null)
-        {
-            rule.Conditions = new GraphInboxRulePredicates
-            {
+        if (SenderContains != null || RecipientContains != null || SubjectContains != null || BodyContains != null || Importance != null) {
+            rule.Conditions = new GraphInboxRulePredicates {
                 SenderContains = SenderContains != null ? new List<string>(SenderContains) : null,
                 RecipientContains = RecipientContains != null ? new List<string>(RecipientContains) : null,
                 SubjectContains = SubjectContains != null ? new List<string>(SubjectContains) : null,
@@ -126,10 +120,8 @@ public sealed class CmdletNewGraphInboxRuleObject : PSCmdlet
             };
         }
 
-        if (!string.IsNullOrEmpty(MoveToFolder) || !string.IsNullOrEmpty(CopyToFolder) || Delete.IsPresent || ForwardTo != null || StopProcessing.IsPresent)
-        {
-            rule.Actions = new GraphInboxRuleActions
-            {
+        if (!string.IsNullOrEmpty(MoveToFolder) || !string.IsNullOrEmpty(CopyToFolder) || Delete.IsPresent || ForwardTo != null || StopProcessing.IsPresent) {
+            rule.Actions = new GraphInboxRuleActions {
                 MoveToFolder = MoveToFolder,
                 CopyToFolder = CopyToFolder,
                 Delete = Delete.IsPresent ? true : null,

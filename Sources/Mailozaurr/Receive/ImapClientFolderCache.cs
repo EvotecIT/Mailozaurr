@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
-using System.Runtime.CompilerServices;
 using MailKit;
 using MailKit.Net.Imap;
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 
 namespace Mailozaurr;
 

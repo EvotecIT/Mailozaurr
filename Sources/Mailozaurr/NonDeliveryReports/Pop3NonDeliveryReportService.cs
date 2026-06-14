@@ -1,8 +1,8 @@
+using MailKit.Net.Pop3;
 using Mailozaurr;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using MailKit.Net.Pop3;
 
 namespace Mailozaurr.NonDeliveryReports;
 

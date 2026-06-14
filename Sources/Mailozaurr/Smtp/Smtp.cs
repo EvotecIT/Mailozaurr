@@ -1,4 +1,6 @@
-﻿using System.Diagnostics;
+using Mailozaurr.Definitions;
+using Org.BouncyCastle.Bcpg.OpenPgp;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Security;
@@ -7,10 +9,8 @@ using System.Security;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
-using Org.BouncyCastle.Bcpg.OpenPgp;
-using System.Threading.Tasks;
 using System.Threading;
-using Mailozaurr.Definitions;
+using System.Threading.Tasks;
 
 namespace Mailozaurr;
 
@@ -24,7 +24,7 @@ namespace Mailozaurr;
 /// <see cref="Send"/> or <see cref="SendAsync(System.Threading.CancellationToken)"/>
 /// are serialized so that only one send executes at a time per instance.</para>
 /// </remarks>
-public class Smtp {
+public partial class Smtp {
     private static ClientSmtp CreateDefaultClient(ProtocolLogger? logger) => logger == null ? new ClientSmtp() : new ClientSmtp(logger);
 
     /// <summary>Factory used to create <see cref="ClientSmtp"/> instances.</summary>
@@ -341,8 +341,7 @@ public class Smtp {
     /// <param name="port">Port number.</param>
     /// <param name="secureSocketOptions">Controls SSL/TLS usage.</param>
     /// <param name="useSsl">Compatibility flag overriding <paramref name="secureSocketOptions"/> when set.</param>
-    public static SmtpConnectionInfo TestConnection(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false)
-    {
+    public static SmtpConnectionInfo TestConnection(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false) {
         var logging = new LoggingConfigurator();
         logging.ConfigureLogging(null, false, true, false, false);
 
@@ -352,35 +351,28 @@ public class Smtp {
         string? banner = null;
         string? software = null;
 
-        if (logging.LogStream != null)
-        {
+        if (logging.LogStream != null) {
             logging.LogStream.Position = 0;
             using var reader = new StreamReader(logging.LogStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 1024, leaveOpen: true);
             var line = reader.ReadLine();
-            if (!string.IsNullOrWhiteSpace(line))
-            {
+            if (!string.IsNullOrWhiteSpace(line)) {
                 var trimmed = line.Trim();
-                if (trimmed.StartsWith("<--", StringComparison.Ordinal))
-                {
+                if (trimmed.StartsWith("<--", StringComparison.Ordinal)) {
                     trimmed = trimmed.Substring(3).Trim();
                 }
                 banner = trimmed;
                 var parts = trimmed.Split(new[] { ' ' }, 3, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length >= 3)
-                {
+                if (parts.Length >= 3) {
                     software = parts[2];
                 }
             }
         }
 
         var persistent = false;
-        try
-        {
+        try {
             smtp.Client.NoOp();
             persistent = smtp.Client.IsConnected;
-        }
-        catch
-        {
+        } catch {
             persistent = false;
         }
 
@@ -471,8 +463,7 @@ public class Smtp {
         var oldPoolIdentity = _poolIdentity ?? GetConnectionPoolIdentity();
         Server = server;
         Port = port;
-        if (!SmtpValidation.TryValidateServer(server, port, out var validationError))
-        {
+        if (!SmtpValidation.TryValidateServer(server, port, out var validationError)) {
             string message = validationError ?? "Invalid SMTP server settings.";
             LogWarning($"Send-EmailMessage - {message}");
             if (ErrorAction == ActionPreference.Stop) {
@@ -493,14 +484,10 @@ public class Smtp {
             LogVerbose($"Send-EmailMessage - DryRun enabled, skipping connect to {server} on port {port} using SSL: {effectiveOptions}");
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "Connection skipped (WhatIf)");
         }
-        if (Client.IsConnected)
-        {
-            if (IsConnectionPoolingEnabled)
-            {
+        if (Client.IsConnected) {
+            if (IsConnectionPoolingEnabled) {
                 SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client, oldPoolIdentity, IsConnectionPoolingEnabled);
-            }
-            else
-            {
+            } else {
                 Client.Disconnect(true);
             }
             Client = ClientFactory(Logging?.ProtocolLogger);
@@ -508,13 +495,11 @@ public class Smtp {
 
         var poolIdentity = GetConnectionPoolIdentity();
         var pooled = SmtpConnectionPool.TryRentClient(server, port, poolIdentity, IsConnectionPoolingEnabled);
-        if (pooled != null)
-        {
+        if (pooled != null) {
             Client = pooled;
         }
         try {
-            if (!Client.IsConnected)
-            {
+            if (!Client.IsConnected) {
                 Client.Connect(server, port, effectiveOptions);
             }
             _poolIdentity = poolIdentity;
@@ -575,8 +560,7 @@ public class Smtp {
         var oldPoolIdentity = _poolIdentity ?? GetConnectionPoolIdentity();
         Server = server;
         Port = port;
-        if (!SmtpValidation.TryValidateServer(server, port, out var validationError))
-        {
+        if (!SmtpValidation.TryValidateServer(server, port, out var validationError)) {
             string message = validationError ?? "Invalid SMTP server settings.";
             LogWarning($"Send-EmailMessage - {message}");
             if (ErrorAction == ActionPreference.Stop) {
@@ -597,14 +581,10 @@ public class Smtp {
             LogVerbose($"Send-EmailMessage - DryRun enabled, skipping connect to {server} on port {port} using SSL: {effectiveOptions}");
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "Connection skipped (WhatIf)");
         }
-        if (Client.IsConnected)
-        {
-            if (IsConnectionPoolingEnabled)
-            {
+        if (Client.IsConnected) {
+            if (IsConnectionPoolingEnabled) {
                 SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client, oldPoolIdentity, IsConnectionPoolingEnabled);
-            }
-            else
-            {
+            } else {
                 Client.Disconnect(true);
             }
             Client = ClientFactory(Logging?.ProtocolLogger);
@@ -612,13 +592,11 @@ public class Smtp {
 
         var poolIdentity = GetConnectionPoolIdentity();
         var pooled = SmtpConnectionPool.TryRentClient(server, port, poolIdentity, IsConnectionPoolingEnabled);
-        if (pooled != null)
-        {
+        if (pooled != null) {
             Client = pooled;
         }
         try {
-            if (!Client.IsConnected)
-            {
+            if (!Client.IsConnected) {
                 await Client.ConnectAsync(server, port, effectiveOptions, cancellationToken).ConfigureAwait(false);
             }
             _poolIdentity = poolIdentity;
@@ -731,10 +709,8 @@ public class Smtp {
             LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "Authentication skipped (WhatIf)");
         }
-        if (Credentials is NetworkCredential networkCredential)
-        {
-            if (!SmtpValidation.TryValidateCredentials(networkCredential.UserName, networkCredential.Password, out var validationError))
-            {
+        if (Credentials is NetworkCredential networkCredential) {
+            if (!SmtpValidation.TryValidateCredentials(networkCredential.UserName, networkCredential.Password, out var validationError)) {
                 string message = validationError ?? "Invalid SMTP credentials.";
                 LogWarning($"Send-EmailMessage - {message}");
                 if (ErrorAction == ActionPreference.Stop) {
@@ -873,8 +849,7 @@ public class Smtp {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         Credential = new NetworkCredential(username, password);
         try {
-            if (!SmtpValidation.TryValidateCredentials(username, password, out var validationError))
-            {
+            if (!SmtpValidation.TryValidateCredentials(username, password, out var validationError)) {
                 string message = validationError ?? "Invalid SMTP credentials.";
                 LogWarning($"Send-EmailMessage - {message}");
                 if (ErrorAction == ActionPreference.Stop) {
@@ -913,537 +888,6 @@ public class Smtp {
     }
 
     /// <summary>
-    /// Send the email message.
-    /// </summary>
-    /// <remarks>
-    /// Concurrent calls are serialized so that only one send executes at a time for a
-    /// given instance.
-    /// </remarks>
-    /// <returns></returns>
-    public SmtpResult Send() {
-        _sendLock.Wait();
-        try {
-            return SendCoreAsync().GetAwaiter().GetResult();
-        } finally {
-            _sendLock.Release();
-        }
-    }
-
-    /// <summary>
-    /// Send the email message asynchronously.
-    /// </summary>
-    /// <remarks>
-    /// Concurrent calls are serialized so that only one send executes at a time for a
-    /// given instance.
-    /// </remarks>
-    /// <returns></returns>
-    public async Task<SmtpResult> SendAsync(CancellationToken cancellationToken = default) {
-        await _sendLock.WaitAsync(cancellationToken);
-        try {
-            return await SendCoreAsync(cancellationToken);
-        } finally {
-            _sendLock.Release();
-        }
-    }
-
-    /// <summary>
-    /// Attempts to send all messages stored in <see cref="PendingMessageRepository"/>.
-    /// </summary>
-    /// <remarks>
-    /// Messages are removed from the repository only when sending succeeds. On
-    /// success the message is also logged via <see cref="SentMessageRepository"/>,
-    /// if configured.
-    /// </remarks>
-    public async Task ProcessPendingMessagesAsync(CancellationToken cancellationToken = default) {
-        if (PendingMessageRepository == null) {
-            return;
-        }
-
-        await foreach (var record in PendingMessageRepository.GetAllAsync(cancellationToken)) {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (DryRun) {
-                LogVerbose($"ProcessPendingMessages - DryRun enabled, skipping {record.MessageId}");
-                continue;
-            }
-            if (string.IsNullOrWhiteSpace(record.MimeMessage) || string.IsNullOrEmpty(record.MessageId)) {
-                continue;
-            }
-            if (record.NextAttemptAt > DateTimeOffset.UtcNow) {
-                continue;
-            }
-
-            if (record.Provider != EmailProvider.None) {
-                continue;
-            }
-
-            MimeMessage message;
-            try {
-                var bytes = Convert.FromBase64String(record.MimeMessage);
-                using var ms = new MemoryStream(bytes);
-                message = await MimeMessage.LoadAsync(ms, cancellationToken);
-            } catch (Exception ex) {
-                LogWarning($"ProcessPendingMessages - Failed to parse {record.MessageId}: {ex.Message}");
-                continue;
-            }
-
-            var originalSkipValidation = SkipCertificateValidation;
-            var originalCheckRevocation = CheckCertificateRevocation;
-            var originalTimeout = Timeout;
-            var originalSecureOptions = _activeSecureSocketOptions;
-            var originalUseSsl = _activeUseSsl;
-            var originalPoolIdentity = ConnectionPoolIdentity;
-            var secureSocketOptions = _activeSecureSocketOptions;
-            var useSsl = _activeUseSsl;
-            if (record.ProviderData != null && record.ProviderData.Count > 0) {
-                if (record.ProviderData.TryGetValue(ProviderDataSecureSocketOptionsKey, out var secureValue)
-                    && Enum.TryParse(secureValue, out SecureSocketOptions parsedSecure)) {
-                    secureSocketOptions = parsedSecure;
-                }
-                if (record.ProviderData.TryGetValue(ProviderDataUseSslKey, out var useSslValue)
-                    && bool.TryParse(useSslValue, out var parsedUseSsl)) {
-                    useSsl = parsedUseSsl;
-                }
-                if (record.ProviderData.TryGetValue(ProviderDataSkipCertificateValidationKey, out var skipValue)
-                    && bool.TryParse(skipValue, out var parsedSkip)) {
-                    SkipCertificateValidation = parsedSkip;
-                }
-                if (record.ProviderData.TryGetValue(ProviderDataCheckCertificateRevocationKey, out var revocationValue)
-                    && bool.TryParse(revocationValue, out var parsedRevocation)) {
-                    CheckCertificateRevocation = parsedRevocation;
-                }
-                if (record.ProviderData.TryGetValue(ProviderDataTimeoutKey, out var timeoutValue)
-                    && int.TryParse(timeoutValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var timeout)) {
-                    Timeout = timeout;
-                }
-            }
-            if (!string.IsNullOrWhiteSpace(record.UserName)) {
-                ConnectionPoolIdentity = record.UserName;
-            }
-
-            try {
-                var server = record.Server ?? Server;
-                var port = record.Port ?? Port;
-                if (!string.IsNullOrWhiteSpace(server)) {
-                    Connect(server, port, secureSocketOptions, useSsl);
-                    if (!string.IsNullOrEmpty(record.UserName)) {
-                        var pwd = CredentialProtection.UnprotectWithFallback(record.Password);
-                        var cred = Helpers.ConvertFromPlainText(record.UserName!, pwd);
-                        Authenticate(cred);
-                    }
-                }
-
-                await Client.SendAsync(message, cancellationToken);
-                LogVerbose($"Send-EmailMessage - Sent email to {message.To}");
-                if (SentMessageRepository != null) {
-                    var sentRecord = new SentMessageRecord {
-                        MessageId = message.MessageId ?? record.MessageId,
-                        Recipients = SentMessageRecipients.Serialize(message.To),
-                        Subject = message.Subject ?? string.Empty,
-                        Timestamp = DateTimeOffset.UtcNow
-                    };
-                    await SentMessageRepository.SaveAsync(sentRecord, cancellationToken);
-                }
-                await PendingMessageRepository.RemoveAsync(record.MessageId!, cancellationToken);
-            } catch (Exception ex) {
-                LogWarning($"ProcessPendingMessages - Error sending {record.MessageId}: {ex.Message}");
-                var attempt = record.IncrementAttemptCount();
-                var delay = CalculateRetryDelay(attempt - 1);
-                record.NextAttemptAt = delay > TimeSpan.Zero
-                    ? DateTimeOffset.UtcNow.Add(delay)
-                    : DateTimeOffset.UtcNow;
-                await PendingMessageRepository.SaveAsync(record, cancellationToken);
-            } finally {
-                Disconnect();
-                SkipCertificateValidation = originalSkipValidation;
-                CheckCertificateRevocation = originalCheckRevocation;
-                Timeout = originalTimeout;
-                _activeSecureSocketOptions = originalSecureOptions;
-                _activeUseSsl = originalUseSsl;
-                ConnectionPoolIdentity = originalPoolIdentity;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Logs a verbose message using LogCollector if available, otherwise uses LoggingMessages.Logger.
-    /// </summary>
-    private void LogVerbose(string message) {
-        if (LogCollector != null) {
-            LogCollector.LogVerbose(message);
-        } else {
-            LoggingMessages.Logger.WriteVerbose(message);
-        }
-    }
-
-    /// <summary>
-    /// Logs a warning message using LogCollector if available, otherwise uses LoggingMessages.Logger.
-    /// </summary>
-    private void LogWarning(string message) {
-        if (LogCollector != null) {
-            LogCollector.LogWarning(message);
-        } else {
-            LoggingMessages.Logger.WriteWarning(message);
-        }
-    }
-
-    private Dictionary<string, string> CreateProviderDataSnapshot() {
-        var data = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
-            [ProviderDataSecureSocketOptionsKey] = _activeSecureSocketOptions.ToString(),
-            [ProviderDataUseSslKey] = _activeUseSsl.ToString(CultureInfo.InvariantCulture),
-            [ProviderDataSkipCertificateValidationKey] = _skipCertificateValidation.ToString(CultureInfo.InvariantCulture),
-            [ProviderDataCheckCertificateRevocationKey] = Client.CheckCertificateRevocation.ToString(CultureInfo.InvariantCulture),
-            [ProviderDataTimeoutKey] = Client.Timeout.ToString(CultureInfo.InvariantCulture)
-        };
-
-        return data;
-    }
-
-    private string GetConnectionPoolIdentity() {
-        var userName = ConnectionPoolIdentity;
-        var domain = string.Empty;
-        if (string.IsNullOrWhiteSpace(userName)) {
-            userName = Credential?.UserName;
-            domain = Credential?.Domain ?? string.Empty;
-        }
-        if (!string.IsNullOrWhiteSpace(domain)) {
-            userName = string.IsNullOrWhiteSpace(userName) ? domain : $"{domain}\\{userName}";
-        }
-        if (string.IsNullOrWhiteSpace(userName)) {
-            userName = "anonymous";
-        }
-        return $"{userName}|{_activeSecureSocketOptions}|{_activeUseSsl}";
-    }
-
-    private TimeSpan CalculateRetryDelay(int attempt) {
-        if (attempt < 0) attempt = 0;
-        var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempt));
-        if (MaxDelayMilliseconds > 0 && delayMilliseconds > MaxDelayMilliseconds) {
-            delayMilliseconds = MaxDelayMilliseconds;
-        }
-        if (JitterMilliseconds > 0 && delayMilliseconds > 0) {
-            delayMilliseconds += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
-        }
-        return delayMilliseconds > 0
-            ? TimeSpan.FromMilliseconds(delayMilliseconds)
-            : TimeSpan.Zero;
-    }
-
-    private string EnsureMessageId() {
-        var id = Message.MessageId;
-        if (string.IsNullOrEmpty(id)) {
-            Message.MessageId = id = MimeKit.Utils.MimeUtils.GenerateMessageId();
-        }
-        return id!;
-    }
-
-    private async Task SaveSentMessageAsync(string messageId, CancellationToken cancellationToken) {
-        if (SentMessageRepository == null) {
-            return;
-        }
-
-        var record = new SentMessageRecord {
-            MessageId = messageId,
-            Recipients = SentMessageRecipients.Serialize(Message?.To),
-            Subject = Subject,
-            Timestamp = DateTimeOffset.UtcNow
-        };
-        await SentMessageRepository.SaveAsync(record, cancellationToken);
-    }
-
-    private async Task RemovePendingMessageAsync(string? messageId, CancellationToken cancellationToken) {
-        if (PendingMessageRepository == null || string.IsNullOrEmpty(messageId)) {
-            return;
-        }
-
-        var safeMessageId = messageId!;
-        await PendingMessageRepository.RemoveAsync(safeMessageId, cancellationToken);
-    }
-
-    private async Task EnqueuePendingMessageAsync(string messageId, ICredentialProtector credentialProtector, CancellationToken cancellationToken) {
-        if (PendingMessageRepository == null) {
-            return;
-        }
-
-        using var ms = new MemoryStream();
-        await Message.WriteToAsync(ms, cancellationToken);
-        var record = new PendingMessageRecord {
-            MessageId = messageId,
-            MimeMessage = Convert.ToBase64String(ms.ToArray()),
-            Timestamp = DateTimeOffset.UtcNow,
-            NextAttemptAt = DateTimeOffset.UtcNow,
-            Provider = EmailProvider.None,
-            Server = Server,
-            Port = Port,
-            UserName = Credential?.UserName,
-            Password = string.IsNullOrEmpty(Credential?.Password)
-                ? null
-                : credentialProtector.Protect(Credential!.Password),
-            ProviderData = CreateProviderDataSnapshot()
-        };
-        await PendingMessageRepository.SaveAsync(record, cancellationToken);
-    }
-
-    private async Task<SmtpResult?> EnsureMessageReadyAsync(CancellationToken cancellationToken)
-    {
-        var message = Message;
-        bool messageHasContent = message != null && MessageHasContent(message);
-        bool hasPayload = HasPropertyPayload();
-        bool hasHeaderPayload = (message != null && message.Headers != null && message.Headers.Count > 0) ||
-                                (Headers != null && Headers.Count > 0);
-
-        bool shouldAutoCreate = AutoCreateMessage && !messageHasContent && hasPayload;
-        if (shouldAutoCreate)
-        {
-            PreserveCustomHeaders(message);
-            await CreateMessageAsync(cancellationToken).ConfigureAwait(false);
-            message = Message;
-            messageHasContent = message != null && MessageHasContent(message);
-        }
-
-        bool hasSender = message != null && MessageHasSender(message);
-        bool hasMaterial = hasPayload || messageHasContent || hasHeaderPayload;
-        if (!hasSender && hasMaterial)
-        {
-            string messageText = "SMTP message has no sender. Call CreateMessage/CreateMessageAsync after setting From/To/Subject, or enable AutoCreateMessage.";
-            LogWarning($"Send-EmailMessage - {messageText}");
-            if (ErrorAction == ActionPreference.Stop)
-            {
-                throw new InvalidOperationException(messageText);
-            }
-
-            var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText)
-            {
-                MessageId = Message?.MessageId
-            };
-            await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
-            return failResult;
-        }
-
-        return null;
-    }
-
-    private bool HasPropertyPayload()
-    {
-        if (HasAddressValue(From) || HasAddressValue(ReplyTo))
-        {
-            return true;
-        }
-
-        if (HasRecipientValues(To) || HasRecipientValues(Cc) || HasRecipientValues(Bcc))
-        {
-            return true;
-        }
-
-        if (!string.IsNullOrWhiteSpace(Subject) ||
-            !string.IsNullOrWhiteSpace(HtmlBody) ||
-            !string.IsNullOrWhiteSpace(TextBody))
-        {
-            return true;
-        }
-
-        if (Attachments != null && Attachments.Count > 0)
-        {
-            return true;
-        }
-
-        if (InlineAttachments != null && InlineAttachments.Count > 0)
-        {
-            return true;
-        }
-
-        if (Headers != null && Headers.Count > 0)
-        {
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool MessageHasSender(MimeMessage message)
-    {
-        if (message == null)
-        {
-            return false;
-        }
-
-        if (message.From.Count > 0)
-        {
-            return true;
-        }
-
-        return message.Sender != null;
-    }
-
-    private static bool MessageHasContent(MimeMessage message)
-    {
-        if (message == null)
-        {
-            return false;
-        }
-
-        if (message.From.Count > 0 || message.To.Count > 0 || message.Cc.Count > 0 || message.Bcc.Count > 0 ||
-            message.ReplyTo.Count > 0 || message.Sender != null)
-        {
-            return true;
-        }
-
-        if (!string.IsNullOrWhiteSpace(message.Subject))
-        {
-            return true;
-        }
-
-        return message.Body != null;
-    }
-
-    private void PreserveCustomHeaders(MimeMessage? message)
-    {
-        if (message == null || message.Headers == null || message.Headers.Count == 0)
-        {
-            return;
-        }
-
-        Dictionary<string, string>? merged = null;
-        if (Headers is Dictionary<string, string> headerDict)
-        {
-            merged = headerDict;
-        }
-        else if (Headers != null && Headers.Count > 0)
-        {
-            merged = new Dictionary<string, string>(Headers, StringComparer.OrdinalIgnoreCase);
-        }
-
-        foreach (var header in message.Headers)
-        {
-            if (header.Id != MimeKit.HeaderId.Unknown)
-            {
-                continue;
-            }
-
-            if (string.IsNullOrWhiteSpace(header.Field))
-            {
-                continue;
-            }
-
-            merged ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            if (!merged.ContainsKey(header.Field))
-            {
-                merged[header.Field] = header.Value ?? string.Empty;
-            }
-        }
-
-        if (merged != null && !ReferenceEquals(merged, Headers))
-        {
-            Headers = merged;
-        }
-    }
-
-    private static bool HasAddressValue(object? value)
-    {
-        if (value == null)
-        {
-            return false;
-        }
-
-        if (value is string text)
-        {
-            return !string.IsNullOrWhiteSpace(text);
-        }
-
-        return true;
-    }
-
-    private static bool HasRecipientValues(IEnumerable<object>? recipients)
-    {
-        if (recipients == null)
-        {
-            return false;
-        }
-
-        foreach (var recipient in recipients)
-        {
-            if (recipient == null)
-            {
-                continue;
-            }
-
-            if (recipient is string text)
-            {
-                if (!string.IsNullOrWhiteSpace(text))
-                {
-                    return true;
-                }
-
-                continue;
-            }
-
-            return true;
-        }
-
-        return false;
-    }
-
-    private async Task<SmtpResult> SendCoreAsync(CancellationToken cancellationToken = default) {
-        if (DryRun) {
-            LogVerbose("Send-EmailMessage - DryRun enabled, skipping send.");
-            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)") {
-                MessageId = Message?.MessageId
-            };
-        }
-        int attempts = 0;
-        Exception? lastException = null;
-        var credentialProtector = CredentialProtection.Default;
-        var readinessResult = await EnsureMessageReadyAsync(cancellationToken).ConfigureAwait(false);
-        if (readinessResult != null)
-        {
-            return readinessResult;
-        }
-
-        do {
-            try {
-                await Client.SendAsync(Message, cancellationToken);
-                LogVerbose($"Send-EmailMessage - Sent email to {SentTo}");
-                await SaveSentMessageAsync(Message.MessageId ?? string.Empty, cancellationToken);
-                await RemovePendingMessageAsync(Message.MessageId, cancellationToken);
-                var result = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging) {
-                    MessageId = Message.MessageId
-                };
-                await Helpers.PostWebhookAsync(WebhookUrl, result, cancellationToken);
-                return result;
-            } catch (Exception ex) {
-                lastException = ex;
-                LogWarning($"Send-EmailMessage - Error during sending: {ex.Message}");
-                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
-                    if (ErrorAction == ActionPreference.Stop) {
-                        throw;
-                    }
-                    var id = EnsureMessageId();
-                    await EnqueuePendingMessageAsync(id, credentialProtector, cancellationToken);
-                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message) {
-                        MessageId = id
-                    };
-                    await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
-                    return failResult;
-                }
-
-                var delay = CalculateRetryDelay(attempts);
-                if (delay > TimeSpan.Zero) {
-                    await Task.Delay(delay, cancellationToken);
-                }
-            }
-            attempts++;
-        } while (attempts <= RetryCount);
-
-        var finalId = EnsureMessageId();
-        await EnqueuePendingMessageAsync(finalId, credentialProtector, cancellationToken);
-        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", lastException?.Message) {
-            MessageId = finalId
-        };
-        await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken);
-        return finalResult;
-    }
-
-
-    /// <summary>
     /// Disconnects from the SMTP server.
     /// </summary>
     public void Disconnect() {
@@ -1476,541 +920,5 @@ public class Smtp {
         }
         clientToDispose.Dispose();
         Stopwatch.Stop();
-    }
-
-    /// <summary>
-    /// S/MIME encrypt the message using a PFX certificate file.
-    /// </summary>
-    /// <param name="pfxFilePath">Path to the PFX file.</param>
-    /// <param name="password">Certificate password.</param>
-    /// <param name="isSecureString">Indicates if the password is protected.</param>
-    /// <returns></returns>
-    public SmtpResult Encrypt(string pfxFilePath, string password, bool isSecureString) {
-        password = ConvertSecureStringToPlainString(password, isSecureString);
-        try {
-            using var certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
-            return Encrypt(certificate);
-        } finally {
-            if (isSecureString) {
-                using var securePwd = SecureStringHelper.FromPlainTextString(password);
-                password = SecureStringHelper.Protect(securePwd);
-            } else {
-                password = new string('\0', password.Length);
-            }
-        }
-    }
-
-    /// <summary>
-    /// S/MIME encrypt the message using a certificate from the store.
-    /// </summary>
-    /// <param name="certificateThumbprint">Certificate thumbprint.</param>
-    /// <returns></returns>
-    public SmtpResult Encrypt(string certificateThumbprint) {
-        // Load the certificate from the Windows Certificate Store
-        using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
-        store.Open(OpenFlags.ReadOnly);
-
-        X509Certificate2Collection certificates = store.Certificates.Find(X509FindType.FindByThumbprint, certificateThumbprint, false);
-
-        if (certificates.Count > 0) {
-            // Use the certificate directly from the store to encrypt the email
-            return Encrypt(certificates[0]);
-        } else {
-            if (ErrorAction == ActionPreference.Stop) {
-                throw new Exception("Certificate not found in the store.");
-            }
-            return new SmtpResult(false, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", "Certificate not found in the store.");
-        }
-    }
-
-    /// <summary>
-    /// S/MIME encrypt the message using the specified certificate instance.
-    /// </summary>
-    /// <param name="certificate">Certificate to encrypt with.</param>
-    /// <returns></returns>
-    public SmtpResult Encrypt(X509Certificate2 certificate) {
-        MimeMessage message = Message;
-        var body = message.Body;
-        if (body is null) {
-            const string messageText = "Message body is empty.";
-            if (ErrorAction == ActionPreference.Stop) {
-                throw new InvalidOperationException(messageText);
-            }
-            return new SmtpResult(false, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
-        }
-        // encrypt our message body using a temporary S/MIME context to avoid SQLite dependency
-        using (var ctx = new TemporarySecureMimeContext()) {
-            try {
-                // Create a CmsRecipientCollection and add the CmsRecipient to it
-                var recipients = new CmsRecipientCollection();
-                recipients.Add(new CmsRecipient(certificate));
-
-                // Encrypt the message body with the certificate
-                message.Body = ApplicationPkcs7Mime.Encrypt(ctx, recipients, body!);
-            } catch (Exception ex) {
-                LogWarning($"Send-EmailMessage - Error during encryption: {ex.Message}");
-                LogWarning($"Send-EmailMessage - Possible issue: Certificate? ({certificate.Thumbprint} was used).");
-                if (ErrorAction == ActionPreference.Stop) {
-                    throw;
-                }
-                return new SmtpResult(false, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
-            }
-        }
-
-        Message = message;
-        return new SmtpResult(true, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
-    }
-
-    /// <summary>
-    /// S/MIME sign the message using the specified certificate.
-    /// </summary>
-    /// <param name="certificate">Certificate used for signing.</param>
-    /// <returns></returns>
-    public SmtpResult Sign(X509Certificate2 certificate) {
-        MimeMessage message = Message;
-        var body = message.Body;
-        if (body is null) {
-            const string messageText = "Message body is empty.";
-            if (ErrorAction == ActionPreference.Stop) {
-                throw new InvalidOperationException(messageText);
-            }
-            return new SmtpResult(false, EmailAction.SMimeSignature, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
-        }
-        // digitally sign our message body using a temporary S/MIME context
-        // TemporarySecureMimeContext avoids the SQLite dependency of DefaultSecureMimeContext
-        using (var ctx = new TemporarySecureMimeContext()) {
-            try {
-                var signer = new CmsSigner(certificate) {
-                    DigestAlgorithm = DigestAlgorithm.Sha1
-                };
-                message.Body = MultipartSigned.Create(ctx, signer, body!);
-            } catch (Exception ex) {
-                LogWarning($"Send-EmailMessage - Error during signing: {ex.Message}");
-                LogWarning($"Send-EmailMessage - Possible issue: Certificate? ({certificate.Thumbprint} was used).");
-                if (ErrorAction == ActionPreference.Stop) {
-                    throw;
-                }
-                return new SmtpResult(false, EmailAction.SMimeSignature, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
-            }
-        }
-        Message = message;
-        return new SmtpResult(true, EmailAction.SMimeSignature, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
-    }
-
-    /// <summary>
-    /// S/MIME sign the message using a PFX certificate file.
-    /// </summary>
-    /// <param name="pfxFilePath">Path to the PFX file.</param>
-    /// <param name="password">Certificate password.</param>
-    /// <param name="isSecureString">Indicates if the password is protected.</param>
-    /// <returns></returns>
-    public SmtpResult Sign(string pfxFilePath, string password, bool isSecureString) {
-        password = ConvertSecureStringToPlainString(password, isSecureString);
-        try {
-            using var certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
-            return Sign(certificate);
-        } finally {
-            if (isSecureString) {
-                using var securePwd = SecureStringHelper.FromPlainTextString(password);
-                password = SecureStringHelper.Protect(securePwd);
-            } else {
-                password = new string('\0', password.Length);
-            }
-        }
-    }
-
-    /// <summary>
-    /// S/MIME sign the message using a certificate from the store.
-    /// </summary>
-    /// <param name="certificateThumbprint">Certificate thumbprint.</param>
-    /// <returns></returns>
-    public SmtpResult Sign(string certificateThumbprint) {
-        // Load the certificate from the Windows Certificate Store
-        using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
-        store.Open(OpenFlags.ReadOnly);
-
-        X509Certificate2Collection certificates = store.Certificates.Find(X509FindType.FindByThumbprint, certificateThumbprint, false);
-
-        if (certificates.Count > 0) {
-            // Use the certificate directly from the store to sign the email
-            return Sign(certificates[0]);
-        }
-
-        var messageText = "Certificate not found in the store.";
-        LogWarning($"Send-EmailMessage - {messageText}");
-        LogWarning($"Send-EmailMessage - Possible issue: Thumbprint '{certificateThumbprint}' is invalid or the certificate is missing.");
-
-        if (ErrorAction == ActionPreference.Stop) {
-            throw new Exception(messageText);
-        }
-
-        return new SmtpResult(false, EmailAction.SMimeSignature, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
-    }
-
-    /// <summary>
-    /// PKCS#7 sign the message using a PFX certificate file.
-    /// </summary>
-    /// <param name="pfxFilePath">Path to the PFX file.</param>
-    /// <param name="password">Certificate password.</param>
-    /// <param name="isSecureString">Indicates if the password is protected.</param>
-    /// <returns></returns>
-    public SmtpResult Pkcs7Sign(string pfxFilePath, string password, bool isSecureString) {
-        password = ConvertSecureStringToPlainString(password, isSecureString);
-        try {
-            using var certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
-            return Pkcs7Sign(certificate);
-        } finally {
-            if (isSecureString) {
-                using var securePwd = SecureStringHelper.FromPlainTextString(password);
-                password = SecureStringHelper.Protect(securePwd);
-            } else {
-                password = new string('\0', password.Length);
-            }
-        }
-    }
-
-    /// <summary>
-    /// PKCS#7 sign the message using a certificate from the store.
-    /// </summary>
-    /// <param name="certificateThumbprint">Certificate thumbprint.</param>
-    /// <returns></returns>
-    public SmtpResult Pkcs7Sign(string certificateThumbprint) {
-        // Load the certificate from the Windows Certificate Store
-        using var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
-        store.Open(OpenFlags.ReadOnly);
-
-        X509Certificate2Collection certificates = store.Certificates.Find(X509FindType.FindByThumbprint, certificateThumbprint, false);
-
-        if (certificates.Count > 0) {
-            // Use the certificate directly from the store to sign the email
-            return Pkcs7Sign(certificates[0]);
-        } else {
-            if (ErrorAction == ActionPreference.Stop) {
-                throw new Exception("Certificate not found in the store.");
-            }
-            return new SmtpResult(false, EmailAction.SMimeSignaturePKCS7, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", "Certificate not found in the store.");
-        }
-    }
-
-    /// <summary>
-    /// PKCS#7 sign the message using the specified certificate.
-    /// </summary>
-    /// <param name="certificate">Certificate used for signing.</param>
-    /// <returns></returns>
-    public SmtpResult Pkcs7Sign(X509Certificate2 certificate) {
-        try {
-            MimeMessage message = Message;
-            var body = message.Body;
-            if (body is null) {
-                const string messageText = "Message body is empty.";
-                if (ErrorAction == ActionPreference.Stop) {
-                    throw new InvalidOperationException(messageText);
-                }
-                return new SmtpResult(false, EmailAction.SMimeSignaturePKCS7, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
-            }
-            // digitally sign our message body using a temporary S/MIME context to avoid SQLite dependency
-            using (var ctx = new TemporarySecureMimeContext()) {
-                // Create a signer with the certificate
-                var signer = new CmsSigner(certificate) {
-                    DigestAlgorithm = DigestAlgorithm.Sha256
-                };
-
-                // Sign the message body with the signer
-                message.Body = ApplicationPkcs7Mime.Sign(ctx, signer, body!);
-            }
-
-            Message = message;
-            return new SmtpResult(true, EmailAction.SMimeSignaturePKCS7, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
-        } catch (Exception ex) {
-            LogWarning($"Send-EmailMessage - Error: {ex.Message}");
-            LogWarning($"Send-EmailMessage - Possible issue: Certificate? ({certificate.Thumbprint} was used).");
-            if (ErrorAction == ActionPreference.Stop) {
-                throw;
-            }
-            return new SmtpResult(false, EmailAction.SMimeSignaturePKCS7, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
-        }
-    }
-
-    /// <summary>
-    /// S/MIME Sign and encrypt the email using the provided certificate thumbprint.
-    /// </summary>
-    /// <param name="certificateThumbprint"></param>
-    /// <returns></returns>
-    public SmtpResult SignAndEncrypt(string certificateThumbprint) {
-        // Sign the email
-        SmtpResult signResult = Sign(certificateThumbprint);
-        if (!signResult.Status) {
-            return signResult;
-        }
-
-        // Encrypt the signed email
-        SmtpResult encryptResult = Encrypt(certificateThumbprint);
-        if (!encryptResult.Status) {
-            return encryptResult;
-        }
-
-        return new SmtpResult(true, EmailAction.SMimeSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
-    }
-
-    /// <summary>
-    /// S/MIME Sign and encrypt the email using the provided PFX file and password.
-    /// </summary>
-    /// <param name="pfxFilePath"></param>
-    /// <param name="password"></param>
-    /// <param name="isSecureString"></param>
-    /// <returns></returns>
-    public SmtpResult SignAndEncrypt(string pfxFilePath, string password, bool isSecureString) {
-        // Sign the email
-        SmtpResult signResult = Sign(pfxFilePath, password, isSecureString);
-        if (!signResult.Status) {
-            return signResult;
-        }
-
-        // Encrypt the signed email
-        SmtpResult encryptResult = Encrypt(pfxFilePath, password, isSecureString);
-        if (!encryptResult.Status) {
-            return encryptResult;
-        }
-
-        return new SmtpResult(true, EmailAction.SMimeSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
-    }
-
-    /// <summary>
-    /// Performs the specified S/MIME action using the provided certificate.
-    /// </summary>
-    /// <param name="emailActionEncryption">The operation to perform.</param>
-    /// <param name="certificate">Certificate instance.</param>
-    public SmtpResult Encrypt(EmailActionEncryption emailActionEncryption, X509Certificate2 certificate) {
-        return emailActionEncryption switch {
-            EmailActionEncryption.SMIMESign => Sign(certificate),
-            EmailActionEncryption.SMIMESignPkcs7 => Pkcs7Sign(certificate),
-            EmailActionEncryption.SMIMEEncrypt => Encrypt(certificate),
-            EmailActionEncryption.SMIMESignAndEncrypt => SignAndEncrypt(certificate),
-            _ => new SmtpResult(true, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", "EmailActionEncryption None")
-        };
-    }
-
-    /// <summary>
-    /// S/MIME Sign and encrypt the email using the provided certificate.
-    /// </summary>
-    /// <param name="certificate">Certificate to use.</param>
-    public SmtpResult SignAndEncrypt(X509Certificate2 certificate) {
-        SmtpResult signResult = Sign(certificate);
-        if (!signResult.Status) {
-            return signResult;
-        }
-
-        SmtpResult encryptResult = Encrypt(certificate);
-        if (!encryptResult.Status) {
-            return encryptResult;
-        }
-
-        return new SmtpResult(true, EmailAction.SMimeSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
-    }
-
-    /// <summary>
-    /// Encrypts the current message using the specified OpenPGP public key.
-    /// </summary>
-    /// <param name="publicKeyPath">Path to the recipient public key.</param>
-    /// <returns>The result of the encryption operation.</returns>
-    public SmtpResult PgpEncrypt(string publicKeyPath) {
-        if (!File.Exists(publicKeyPath)) {
-            string messageText = $"Public key file not found: {publicKeyPath}";
-            LogWarning($"Send-EmailMessage - {messageText}");
-            LogWarning($"Send-EmailMessage - Possible issue: Path '{publicKeyPath}' is invalid. Verify the file exists and the path is correct.");
-            return new SmtpResult(false, EmailAction.PgpEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
-        }
-
-        MimeMessage message = Message;
-        var body = message.Body;
-        if (body is null) {
-            const string messageText = "Message body is empty.";
-            if (ErrorAction == ActionPreference.Stop) {
-                throw new InvalidOperationException(messageText);
-            }
-            return new SmtpResult(false, EmailAction.PgpEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
-        }
-        using (var ctx = new EphemeralOpenPgpContext()) {
-            using (var pub = File.OpenRead(publicKeyPath))
-                ctx.Import(pub);
-            var recipients = message.To.Mailboxes.Concat(message.Cc.Mailboxes).Concat(message.Bcc.Mailboxes).ToList();
-            try {
-                var keys = ctx.GetPublicKeys(recipients);
-                message.Body = MultipartEncrypted.Encrypt(ctx, keys, body!);
-            } catch (Exception ex) {
-                if (ErrorAction == ActionPreference.Stop) throw;
-                return new SmtpResult(false, EmailAction.PgpEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
-            }
-            Message = message;
-            return new SmtpResult(true, EmailAction.PgpEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
-        }
-    }
-
-    /// <summary>
-    /// Signs the current message using OpenPGP keys.
-    /// </summary>
-    /// <param name="publicKeyPath">Path to the public key.</param>
-    /// <param name="privateKeyPath">Path to the private key.</param>
-    /// <param name="password">Password protecting the private key.</param>
-    /// <param name="isSecureString">Whether the password is protected.</param>
-    /// <returns>The result of the signing operation.</returns>
-    public SmtpResult PgpSign(string publicKeyPath, string privateKeyPath, string password, bool isSecureString) {
-        password = ConvertSecureStringToPlainString(password, isSecureString);
-        try {
-            MimeMessage message = Message;
-            var body = message.Body;
-            if (body is null) {
-                const string messageText = "Message body is empty.";
-                if (ErrorAction == ActionPreference.Stop) {
-                    throw new InvalidOperationException(messageText);
-                }
-                return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
-            }
-            using (var ctx = new EphemeralOpenPgpContext(password)) {
-                if (!File.Exists(publicKeyPath)) {
-                    string messageText = $"Public key file not found: {publicKeyPath}";
-                    LogWarning($"Send-EmailMessage - {messageText}");
-                    LogWarning($"Send-EmailMessage - Possible issue: Path '{publicKeyPath}' is invalid. Verify the file exists and the path is correct.");
-                    return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
-                }
-                if (!File.Exists(privateKeyPath)) {
-                    string messageText = $"Private key file not found: {privateKeyPath}";
-                    LogWarning($"Send-EmailMessage - {messageText}");
-                    LogWarning($"Send-EmailMessage - Possible issue: Path '{privateKeyPath}' is invalid. Verify the file exists and the path is correct.");
-                    return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
-                }
-
-                using (var pub = File.OpenRead(publicKeyPath))
-                    ctx.Import(pub);
-                using (var sec = File.OpenRead(privateKeyPath))
-                    ctx.Import(new PgpSecretKeyRingBundle(new Org.BouncyCastle.Bcpg.ArmoredInputStream(sec)));
-                try {
-                    var signer = message.From.Mailboxes.First();
-                    var signingKey = ctx.GetSigningKey(signer);
-                    message.Body = MultipartSigned.Create(ctx, signingKey, DigestAlgorithm.Sha256, body!);
-                    var signed = (MultipartSigned)message.Body;
-                    var sigs = signed.Verify(ctx);
-                    foreach (var sig in sigs)
-                        sig.Verify();
-                } catch (Exception ex) {
-                    if (ErrorAction == ActionPreference.Stop) throw;
-                    return new SmtpResult(false, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
-                }
-                Message = message;
-                return new SmtpResult(true, EmailAction.PgpSign, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
-            }
-        } finally {
-            if (isSecureString) {
-                using var securePwd = SecureStringHelper.FromPlainTextString(password);
-                password = SecureStringHelper.Protect(securePwd);
-            } else {
-                password = new string('\0', password.Length);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Signs and encrypts the current message using OpenPGP keys.
-    /// </summary>
-    /// <param name="publicKeyPath">Path to the public key.</param>
-    /// <param name="privateKeyPath">Path to the private key.</param>
-    /// <param name="password">Password protecting the private key.</param>
-    /// <param name="isSecureString">Whether the password is protected.</param>
-    /// <returns>The result of the sign and encrypt operation.</returns>
-    public SmtpResult PgpSignAndEncrypt(string publicKeyPath, string privateKeyPath, string password, bool isSecureString) {
-        password = ConvertSecureStringToPlainString(password, isSecureString);
-        try {
-            MimeMessage message = Message;
-            var body = message.Body;
-            if (body is null) {
-                const string messageText = "Message body is empty.";
-                if (ErrorAction == ActionPreference.Stop) {
-                    throw new InvalidOperationException(messageText);
-                }
-                return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
-            }
-            using (var ctx = new EphemeralOpenPgpContext(password)) {
-                if (!File.Exists(publicKeyPath)) {
-                    string messageText = $"Public key file not found: {publicKeyPath}";
-                    LogWarning($"Send-EmailMessage - {messageText}");
-                    LogWarning($"Send-EmailMessage - Possible issue: Path '{publicKeyPath}' is invalid. Verify the file exists and the path is correct.");
-                    return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
-                }
-                if (!File.Exists(privateKeyPath)) {
-                    string messageText = $"Private key file not found: {privateKeyPath}";
-                    LogWarning($"Send-EmailMessage - {messageText}");
-                    LogWarning($"Send-EmailMessage - Possible issue: Path '{privateKeyPath}' is invalid. Verify the file exists and the path is correct.");
-                    return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", messageText);
-                }
-
-                using (var pub = File.OpenRead(publicKeyPath))
-                    ctx.Import(pub);
-                using (var sec = File.OpenRead(privateKeyPath))
-                    ctx.Import(new PgpSecretKeyRingBundle(new Org.BouncyCastle.Bcpg.ArmoredInputStream(sec)));
-                var recipients = message.To.Mailboxes.Concat(message.Cc.Mailboxes).Concat(message.Bcc.Mailboxes).ToList();
-                try {
-                    var signingKey = ctx.GetSigningKey(message.From.Mailboxes.First());
-                    var encKeys = ctx.GetPublicKeys(recipients);
-                    message.Body = MultipartEncrypted.SignAndEncrypt(ctx, signingKey, DigestAlgorithm.Sha256, EncryptionAlgorithm.Cast5, encKeys, body!);
-                } catch (Exception ex) {
-                    if (ErrorAction == ActionPreference.Stop) throw;
-                    return new SmtpResult(false, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message);
-                }
-                Message = message;
-                return new SmtpResult(true, EmailAction.PgpSignAndEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
-            }
-        } finally {
-            if (isSecureString) {
-                using var securePwd = SecureStringHelper.FromPlainTextString(password);
-                password = SecureStringHelper.Protect(securePwd);
-            } else {
-                password = new string('\0', password.Length);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Performs the specified S/MIME action using a PFX certificate file.
-    /// </summary>
-    /// <param name="emailActionEncryption">The operation to perform.</param>
-    /// <param name="pfxFilePath">Path to the PFX file.</param>
-    /// <param name="password">Certificate password.</param>
-    /// <param name="isSecureString">Indicates if the password is protected.</param>
-    /// <returns></returns>
-    public SmtpResult Encrypt(EmailActionEncryption emailActionEncryption, string pfxFilePath, string password, bool isSecureString) {
-        switch (emailActionEncryption) {
-            case EmailActionEncryption.SMIMESign:
-                return Sign(pfxFilePath, password, isSecureString);
-            case EmailActionEncryption.SMIMESignPkcs7:
-                return Pkcs7Sign(pfxFilePath, password, isSecureString);
-            case EmailActionEncryption.SMIMEEncrypt:
-                return Encrypt(pfxFilePath, password, isSecureString);
-            case EmailActionEncryption.SMIMESignAndEncrypt:
-                return SignAndEncrypt(pfxFilePath, password, isSecureString);
-            default:
-                // user did not specify an encryption type, we skip things
-                return new SmtpResult(true, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", "EmailActionEncryption None");
-        }
-    }
-    /// <summary>
-    /// Performs the specified S/MIME action using a certificate from the store.
-    /// </summary>
-    /// <param name="emailActionEncryption">The operation to perform.</param>
-    /// <param name="certificateThumbprint">Certificate thumbprint.</param>
-    /// <returns></returns>
-    public SmtpResult Encrypt(EmailActionEncryption emailActionEncryption, string certificateThumbprint) {
-        switch (emailActionEncryption) {
-            case EmailActionEncryption.SMIMESign:
-                return Sign(certificateThumbprint);
-            case EmailActionEncryption.SMIMESignPkcs7:
-                return Pkcs7Sign(certificateThumbprint);
-            case EmailActionEncryption.SMIMEEncrypt:
-                return Encrypt(certificateThumbprint);
-            case EmailActionEncryption.SMIMESignAndEncrypt:
-                return SignAndEncrypt(certificateThumbprint);
-            default:
-                // user did not specify an encryption type, we skip things
-                return new SmtpResult(true, EmailAction.SMimeEncrypt, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", "EmailActionEncryption None");
-        }
     }
 }

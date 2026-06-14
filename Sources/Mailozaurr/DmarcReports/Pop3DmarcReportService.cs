@@ -1,7 +1,7 @@
+using MailKit.Net.Pop3;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using MailKit.Net.Pop3;
 
 namespace Mailozaurr.DmarcReports;
 

@@ -1,8 +1,8 @@
+using Mailozaurr;
+using Mailozaurr.NonDeliveryReports;
 using System;
 using System.Management.Automation;
 using System.Threading.Tasks;
-using Mailozaurr;
-using Mailozaurr.NonDeliveryReports;
 
 namespace Mailozaurr.PowerShell;
 
@@ -12,8 +12,7 @@ namespace Mailozaurr.PowerShell;
 /// </summary>
 [Cmdlet(VerbsCommon.Get, "EmailDeliveryMatch")]
 [OutputType(typeof(NonDeliveryReportResult))]
-public sealed class CmdletGetEmailDeliveryMatch : AsyncPSCmdlet
-{
+public sealed class CmdletGetEmailDeliveryMatch : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Mail protocol to use.</para>
     /// </summary>
@@ -71,10 +70,8 @@ public sealed class CmdletGetEmailDeliveryMatch : AsyncPSCmdlet
     public string? UserPrincipalName { get; set; }
 
     /// <inheritdoc />
-    protected override async Task ProcessRecordAsync()
-    {
-        if (Resolver == null)
-        {
+    protected override async Task ProcessRecordAsync() {
+        if (Resolver == null) {
             ThrowTerminatingError(new ErrorRecord(
                 new InvalidOperationException("Get-EmailDeliveryMatch - Resolver is required."),
                 "ResolverMissing",
@@ -84,77 +81,61 @@ public sealed class CmdletGetEmailDeliveryMatch : AsyncPSCmdlet
         }
 
         int max = Count > 0 ? Count : int.MaxValue;
-        switch (Protocol)
-        {
-            case EmailProtocol.Imap:
-            {
-                var conn = DefaultSessions.ImapSession;
-                if (conn != null && conn.Data != null)
-                {
-                    var service = new ImapNonDeliveryReportService(conn.Data, Resolver, Folder);
-                    var results = await service.SearchAsync(Since, Before, Recipient, MessageId, max, CancelToken);
-                    foreach (var result in results)
-                    {
-                        WriteObject(result);
+        switch (Protocol) {
+            case EmailProtocol.Imap: {
+                    var conn = DefaultSessions.ImapSession;
+                    if (conn != null && conn.Data != null) {
+                        var service = new ImapNonDeliveryReportService(conn.Data, Resolver, Folder);
+                        var results = await service.SearchAsync(Since, Before, Recipient, MessageId, max, CancelToken);
+                        foreach (var result in results) {
+                            WriteObject(result);
+                        }
+                    } else {
+                        ThrowTerminatingError(new ErrorRecord(
+                            new InvalidOperationException("Get-EmailDeliveryMatch - IMAP client not provided or not connected."),
+                            "ClientNotConnected",
+                            ErrorCategory.InvalidOperation,
+                            null));
                     }
-                }
-                else
-                {
-                    ThrowTerminatingError(new ErrorRecord(
-                        new InvalidOperationException("Get-EmailDeliveryMatch - IMAP client not provided or not connected."),
-                        "ClientNotConnected",
-                        ErrorCategory.InvalidOperation,
-                        null));
-                }
 
-                break;
-            }
-            case EmailProtocol.Pop3:
-            {
-                var conn = DefaultSessions.Pop3Session;
-                if (conn != null && conn.Data != null)
-                {
-                    var service = new Pop3NonDeliveryReportService(conn.Data, Resolver);
-                    var results = await service.SearchAsync(Since, Before, Recipient, MessageId, max, CancelToken);
-                    foreach (var result in results)
-                    {
-                        WriteObject(result);
+                    break;
+                }
+            case EmailProtocol.Pop3: {
+                    var conn = DefaultSessions.Pop3Session;
+                    if (conn != null && conn.Data != null) {
+                        var service = new Pop3NonDeliveryReportService(conn.Data, Resolver);
+                        var results = await service.SearchAsync(Since, Before, Recipient, MessageId, max, CancelToken);
+                        foreach (var result in results) {
+                            WriteObject(result);
+                        }
+                    } else {
+                        ThrowTerminatingError(new ErrorRecord(
+                            new InvalidOperationException("Get-EmailDeliveryMatch - POP3 client not provided or not connected."),
+                            "ClientNotConnected",
+                            ErrorCategory.InvalidOperation,
+                            null));
                     }
-                }
-                else
-                {
-                    ThrowTerminatingError(new ErrorRecord(
-                        new InvalidOperationException("Get-EmailDeliveryMatch - POP3 client not provided or not connected."),
-                        "ClientNotConnected",
-                        ErrorCategory.InvalidOperation,
-                        null));
-                }
 
-                break;
-            }
-            case EmailProtocol.Graph:
-            {
-                var conn = DefaultSessions.GraphSession;
-                if (conn != null && conn.Credential != null && !string.IsNullOrWhiteSpace(UserPrincipalName))
-                {
-                    var service = new GraphNonDeliveryReportService(conn.Credential, UserPrincipalName!, Resolver);
-                    var results = await service.SearchAsync(Since, Before, Recipient, MessageId, max, CancelToken);
-                    foreach (var result in results)
-                    {
-                        WriteObject(result);
+                    break;
+                }
+            case EmailProtocol.Graph: {
+                    var conn = DefaultSessions.GraphSession;
+                    if (conn != null && conn.Credential != null && !string.IsNullOrWhiteSpace(UserPrincipalName)) {
+                        var service = new GraphNonDeliveryReportService(conn.Credential, UserPrincipalName!, Resolver);
+                        var results = await service.SearchAsync(Since, Before, Recipient, MessageId, max, CancelToken);
+                        foreach (var result in results) {
+                            WriteObject(result);
+                        }
+                    } else {
+                        ThrowTerminatingError(new ErrorRecord(
+                            new InvalidOperationException("Get-EmailDeliveryMatch - Graph connection or UserPrincipalName missing."),
+                            "ClientNotConnected",
+                            ErrorCategory.InvalidOperation,
+                            null));
                     }
-                }
-                else
-                {
-                    ThrowTerminatingError(new ErrorRecord(
-                        new InvalidOperationException("Get-EmailDeliveryMatch - Graph connection or UserPrincipalName missing."),
-                        "ClientNotConnected",
-                        ErrorCategory.InvalidOperation,
-                        null));
-                }
 
-                break;
-            }
+                    break;
+                }
         }
     }
 }

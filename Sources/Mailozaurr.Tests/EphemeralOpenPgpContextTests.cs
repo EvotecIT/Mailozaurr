@@ -8,17 +8,14 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class EphemeralOpenPgpContextTests
-{
+public class EphemeralOpenPgpContextTests {
     [Fact]
-    public async Task CreateTempDirectories_AreUniqueAcrossThreads()
-    {
+    public async Task CreateTempDirectories_AreUniqueAcrossThreads() {
         const int count = 20;
         var bag = new ConcurrentBag<string>();
         var field = typeof(EphemeralOpenPgpContext).GetField("_tempDirectory", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
-        var tasks = Enumerable.Range(0, count).Select(_ => Task.Run(() =>
-        {
+        var tasks = Enumerable.Range(0, count).Select(_ => Task.Run(() => {
             using var ctx = new EphemeralOpenPgpContext();
             var dir = (string)field.GetValue(ctx)!;
             bag.Add(dir);
@@ -27,15 +24,13 @@ public class EphemeralOpenPgpContextTests
         await Task.WhenAll(tasks);
 
         Assert.Equal(count, bag.Distinct(StringComparer.Ordinal).Count());
-        foreach (var dir in bag)
-        {
+        foreach (var dir in bag) {
             Assert.False(Directory.Exists(dir));
         }
     }
 
     [Fact]
-    public void Dispose_DoesNotThrow_WhenDirectoryAlreadyDeleted()
-    {
+    public void Dispose_DoesNotThrow_WhenDirectoryAlreadyDeleted() {
         var field = typeof(EphemeralOpenPgpContext).GetField("_tempDirectory", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var ctx = new EphemeralOpenPgpContext();
         var dir = (string)field.GetValue(ctx)!;

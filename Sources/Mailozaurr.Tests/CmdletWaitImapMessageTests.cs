@@ -1,16 +1,14 @@
 using MailKit.Net.Imap;
+using Mailozaurr.PowerShell;
 using System;
 using System.Reflection;
 using Xunit;
-using Mailozaurr.PowerShell;
 
 namespace Mailozaurr.Tests;
 
-public class CmdletWaitImapMessageTests
-{
+public class CmdletWaitImapMessageTests {
     [Fact]
-    public void EndProcessing_DisposesListenerAndDetachesEvents()
-    {
+    public void EndProcessing_DisposesListenerAndDetachesEvents() {
         var cmd = new CmdletWaitIMAPMessage();
         var listener = new ImapIdleListener(new ImapClient());
         var field = typeof(CmdletWaitIMAPMessage).GetField("_listener", BindingFlags.NonPublic | BindingFlags.Instance)!;
