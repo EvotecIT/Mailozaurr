@@ -7,9 +7,9 @@ Get-POP3Message -Client $client -All |
     ForEach-Object {
         Write-Host "Message $($_.Index) encryption: $($_.Encryption)"
         $decrypted = $_
-        if ($_.Encryption.ToString() -eq 'PgpEncrypted') {
+        if ($_.Encryption -eq 'PgpEncrypted') {
             $decrypted = $_ | Unprotect-MimeMessage -PrivateKeyPath 'C:\Keys\private.asc' -PrivateKeyPassword 'passphrase'
-        } elseif ($_.Encryption.ToString() -eq 'SmimeEncrypted') {
+        } elseif ($_.Encryption -eq 'SmimeEncrypted') {
             $cert = Get-PfxCertificate -FilePath 'C:\Keys\email.pfx' -Password (ConvertTo-SecureString 'pfx-pass' -AsPlainText -Force)
             $decrypted = $_ | Unprotect-MimeMessage -Certificate $cert
         }
