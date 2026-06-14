@@ -5,8 +5,7 @@ namespace Mailozaurr;
 /// <summary>
 /// Represents details about an SMTP server retrieved when testing connectivity.
 /// </summary>
-public sealed class SmtpConnectionInfo
-{
+public sealed class SmtpConnectionInfo {
     /// <summary>Server that was tested.</summary>
     public string Server { get; }
     /// <summary>Port used during the test.</summary>
@@ -23,8 +22,7 @@ public sealed class SmtpConnectionInfo
     /// <summary>
     /// Initializes a new instance of the <see cref="SmtpConnectionInfo"/> class.
     /// </summary>
-    public SmtpConnectionInfo(string server, int port, string? banner, string? software, SmtpCapabilities capabilities, bool persistent)
-    {
+    public SmtpConnectionInfo(string server, int port, string? banner, string? software, SmtpCapabilities capabilities, bool persistent) {
         Server = server;
         Port = port;
         Banner = banner;

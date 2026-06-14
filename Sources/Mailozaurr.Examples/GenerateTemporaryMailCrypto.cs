@@ -1,14 +1,12 @@
-using System;
 using Mailozaurr;
+using System;
 
 /// <summary>
 /// Example showing how to create temporary cryptographic material.
 /// </summary>
-public static class GenerateTemporaryMailCrypto
-{
+public static class GenerateTemporaryMailCrypto {
     /// <summary>Runs the example.</summary>
-    public static void Run()
-    {
+    public static void Run() {
         using var keys = TemporaryPgpKeyPair.Create(outputDirectory: "pgp", deleteOnDispose: false);
         Console.WriteLine($"PGP public key: {keys.PublicKeyPath}");
         using var cert = TemporarySmimeCertificate.CreateSelfSigned(outputPath: "cert.pfx");

@@ -1,11 +1,11 @@
-using System;
-using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
 using MailKit.Net.Imap;
 using MailKit.Net.Pop3;
 using MailKit.Net.Smtp;
 using MailKit.Security;
+using System;
+using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Mailozaurr;
 

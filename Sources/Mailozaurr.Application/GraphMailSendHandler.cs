@@ -1,7 +1,7 @@
-using System.Globalization;
-using System.IO;
 using MimeKit;
 using MimeKit.Utils;
+using System.Globalization;
+using System.IO;
 
 namespace Mailozaurr.Application;
 

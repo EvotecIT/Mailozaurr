@@ -1,5 +1,7 @@
-using System.Collections.Generic;
+using Mailozaurr;
+using MimeKit;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -7,23 +9,18 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using MimeKit;
 using Xunit;
-using Mailozaurr;
 
 namespace Mailozaurr.Tests;
 
-public class ClientSmtpTests
-{
+public class ClientSmtpTests {
     [Fact]
-    public void Ctor_DefaultsPriorityToNormal()
-    {
+    public void Ctor_DefaultsPriorityToNormal() {
         var client = new ClientSmtp();
         Assert.Equal(MessagePriority.Normal, client.Priority);
     }
     [Fact]
-    public void ConvertToMailboxAddress_InvalidType_IncludesValueInException()
-    {
+    public void ConvertToMailboxAddress_InvalidType_IncludesValueInException() {
         var client = new ClientSmtp();
         MethodInfo? method = typeof(ClientSmtp).GetMethod(
             "ConvertToMailboxAddress",
@@ -36,43 +33,30 @@ public class ClientSmtpTests
     }
 
     [Fact]
-    public void ConvertStringToMailboxAddresses_InvalidInput_LogsWarning()
-    {
+    public void ConvertStringToMailboxAddresses_InvalidInput_Throws() {
         var client = new ClientSmtp();
         MethodInfo? method = typeof(ClientSmtp).GetMethod(
             "ConvertStringToMailboxAddresses",
             BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.NotNull(method);
-        var messages = new List<string>();
-        void Handler(object? _, LogEventArgs e) => messages.Add(e.Message);
-        LoggingMessages.Logger.OnWarningMessage += Handler;
-
         var enumerable = (IEnumerable<MailboxAddress>)method!.Invoke(client, new object[] { "invalid@" })!;
-        var result = enumerable.ToList();
-
-        LoggingMessages.Logger.OnWarningMessage -= Handler;
-        Assert.Empty(result);
-        Assert.Contains(messages, static m => m.Contains("invalid@"));
+        var ex = Assert.Throws<FormatException>(() => enumerable.ToList());
+        Assert.Contains("invalid@", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task CreateMessage_SyncAndAsyncProduceEquivalentMessages()
-    {
+    public async Task CreateMessage_SyncAndAsyncProduceEquivalentMessages() {
         const string url = "https://example.com/img.png";
         var html = $"<img src=\"{url}\">";
         var imageContent = new byte[] { 1, 2, 3 };
         var handler = new RecordingHandler(
-            new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new ByteArrayContent(imageContent)
-                {
+            new HttpResponseMessage(HttpStatusCode.OK) {
+                Content = new ByteArrayContent(imageContent) {
                     Headers = { ContentType = new MediaTypeHeaderValue("image/png") }
                 }
             },
-            new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new ByteArrayContent(imageContent)
-                {
+            new HttpResponseMessage(HttpStatusCode.OK) {
+                Content = new ByteArrayContent(imageContent) {
                     Headers = { ContentType = new MediaTypeHeaderValue("image/png") }
                 }
             });
@@ -83,8 +67,7 @@ public class ClientSmtpTests
         var original = (HttpMessageHandler)handlerField!.GetValue(client)!;
         handlerField.SetValue(client, handler);
 
-        try
-        {
+        try {
             var syncClient = CreateClientForTest(html);
             syncClient.CreateMessage();
 
@@ -99,21 +82,17 @@ public class ClientSmtpTests
             var asyncInline = GetInlineAttachments(asyncClient.Message).OrderBy(p => p.ContentId).ToList();
 
             Assert.Equal(syncInline.Count, asyncInline.Count);
-            for (var i = 0; i < syncInline.Count; i++)
-            {
+            for (var i = 0; i < syncInline.Count; i++) {
                 Assert.Equal(syncInline[i].ContentId, asyncInline[i].ContentId);
                 Assert.Equal(syncInline[i].MediaType, asyncInline[i].MediaType);
             }
-        }
-        finally
-        {
+        } finally {
             handlerField.SetValue(client, original);
         }
     }
 
     [Fact]
-    public async Task CreateMessage_CancellationPropagatesToBothOverloads()
-    {
+    public async Task CreateMessage_CancellationPropagatesToBothOverloads() {
         const string url = "https://example.com/slow.png";
         var html = $"<img src=\"{url}\">";
         var client = HtmlUtils.HttpClient;
@@ -121,12 +100,10 @@ public class ClientSmtpTests
             ?? typeof(HttpMessageInvoker).GetField("handler", BindingFlags.Instance | BindingFlags.NonPublic);
         var original = (HttpMessageHandler)handlerField!.GetValue(client)!;
 
-        try
-        {
+        try {
             handlerField.SetValue(client, new DelayedHandler());
             var asyncClient = CreateClientForTest(html);
-            using (var asyncCts = new CancellationTokenSource())
-            {
+            using (var asyncCts = new CancellationTokenSource()) {
                 var asyncOperation = asyncClient.CreateMessageAsync(asyncCts.Token);
                 asyncCts.CancelAfter(TimeSpan.FromMilliseconds(100));
                 await Assert.ThrowsAsync<OperationCanceledException>(async () => await asyncOperation);
@@ -138,17 +115,13 @@ public class ClientSmtpTests
             var syncTask = Task.Run(() => syncClient.CreateMessage(syncCts.Token));
             syncCts.CancelAfter(TimeSpan.FromMilliseconds(100));
             await Assert.ThrowsAsync<OperationCanceledException>(async () => await syncTask);
-        }
-        finally
-        {
+        } finally {
             handlerField.SetValue(client, original);
         }
     }
 
-    private static ClientSmtp CreateClientForTest(string html)
-    {
-        return new ClientSmtp
-        {
+    private static ClientSmtp CreateClientForTest(string html) {
+        return new ClientSmtp {
             AutoEmbedRemoteImages = true,
             HtmlBody = html,
             Subject = "Hello",
@@ -157,13 +130,10 @@ public class ClientSmtpTests
         };
     }
 
-    private static List<InlineAttachmentInfo> GetInlineAttachments(MimeMessage message)
-    {
+    private static List<InlineAttachmentInfo> GetInlineAttachments(MimeMessage message) {
         var attachments = new List<InlineAttachmentInfo>();
-        foreach (var part in message.BodyParts.OfType<MimePart>())
-        {
-            if (!string.Equals(part.ContentDisposition?.Disposition, ContentDisposition.Inline, StringComparison.OrdinalIgnoreCase))
-            {
+        foreach (var part in message.BodyParts.OfType<MimePart>()) {
+            if (!string.Equals(part.ContentDisposition?.Disposition, ContentDisposition.Inline, StringComparison.OrdinalIgnoreCase)) {
                 continue;
             }
 
@@ -173,10 +143,8 @@ public class ClientSmtpTests
         return attachments;
     }
 
-    private sealed class InlineAttachmentInfo
-    {
-        public InlineAttachmentInfo(string contentId, string mediaType)
-        {
+    private sealed class InlineAttachmentInfo {
+        public InlineAttachmentInfo(string contentId, string mediaType) {
             ContentId = contentId;
             MediaType = mediaType;
         }
@@ -186,15 +154,11 @@ public class ClientSmtpTests
         public string MediaType { get; }
     }
 
-    private sealed class DelayedHandler : HttpMessageHandler
-    {
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
+    private sealed class DelayedHandler : HttpMessageHandler {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
             await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
-            return new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new ByteArrayContent(new byte[] { 1, 2, 3 })
-                {
+            return new HttpResponseMessage(HttpStatusCode.OK) {
+                Content = new ByteArrayContent(new byte[] { 1, 2, 3 }) {
                     Headers = { ContentType = new MediaTypeHeaderValue("image/png") }
                 }
             };

@@ -1,6 +1,6 @@
+using MailKit.Search;
 using System;
 using System.Collections.Generic;
-using MailKit.Search;
 
 namespace Mailozaurr;
 

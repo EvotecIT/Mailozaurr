@@ -1,8 +1,8 @@
-using System.Threading;
-using System.Threading.Tasks;
 using MailKit;
 using MailKit.Net.Imap;
 using Moq;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Mailozaurr.Tests;

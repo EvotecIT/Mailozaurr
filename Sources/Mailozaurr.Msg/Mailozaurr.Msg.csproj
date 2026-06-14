@@ -25,8 +25,8 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
-        <PackageReference Include="MsgKit" Version="3.0.4" />
-        <PackageReference Include="MsgReader" Version="6.0.11" />
+        <PackageReference Include="MsgKit" Version="3.0.5" />
+        <PackageReference Include="MsgReader" Version="6.0.12" />
         <PackageReference Include="OpenMcdf" Version="3.1.4" />
     </ItemGroup>
 

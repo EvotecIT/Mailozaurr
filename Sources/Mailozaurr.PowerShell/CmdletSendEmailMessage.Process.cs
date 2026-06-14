@@ -1,16 +1,15 @@
-using System;
-using System.Management.Automation;
-using System.IO;
-using System.Security.Cryptography.X509Certificates;
-using System.Threading.Tasks;
-using System.Threading;
 using Mailozaurr;
 using Mailozaurr.Definitions;
+using System;
+using System.IO;
+using System.Management.Automation;
+using System.Security.Cryptography.X509Certificates;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
 
-public sealed partial class CmdletSendEmailMessage : PSCmdlet
-{
+public sealed partial class CmdletSendEmailMessage : PSCmdlet {
     private ActionPreference errorAction;
     private InternalLogger? _logger;
     private InternalLogger? _previousLogger;
@@ -30,7 +29,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
 
         _onVerbose = (_, e) => _logCollector!.LogVerbose(e.FullMessage);
         _onWarning = (_, e) => _logCollector!.LogWarning(e.FullMessage);
-        _onError =  (_, e) => _logCollector!.LogError(e.FullMessage);
+        _onError = (_, e) => _logCollector!.LogError(e.FullMessage);
         _onInformation = (_, e) => _logCollector!.LogInformation(e.FullMessage);
 
         _logger.OnVerboseMessage += _onVerbose;
@@ -440,12 +439,12 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
     private void ProcessSmtp(string fromEmail, string fromName) {
         // Create a LogCollector to capture logs from async operations
         var logCollector = new LogCollector();
-        
+
         Smtp smtpClient = new Smtp(LogPath ?? string.Empty, LogConsole, LogObject, LogTimestamps, LogSecrets, LogTimeStampsFormat, LogServerPrefix, LogClientPrefix, LogOverwrite);
-        
+
         // Attach the LogCollector to the SMTP client's logger
         smtpClient.LogCollector = logCollector;
-        
+
         if (!string.IsNullOrWhiteSpace(SentLogPath)) {
             smtpClient.SentMessageRepository = new FileSentMessageRepository(SentLogPath!);
         }
@@ -502,10 +501,10 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
 
         var useSslFlag = UseSsl.IsPresent && !this.MyInvocation.BoundParameters.ContainsKey(nameof(SecureSocketOptions));
         var status = smtpClient.Connect(Server ?? string.Empty, Port, SecureSocketOptions, useSslFlag);
-        
+
         // Emit logs after Connect operation
         LogEmitter.EmitLogs(logCollector, this);
-        
+
         if (!status.Status) {
             if (!Suppress) {
                 WriteObject(status);
@@ -568,10 +567,10 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
         }
 
         status = smtpClient.Send();
-        
+
         // Emit logs after Send operation
         LogEmitter.EmitLogs(logCollector, this);
-        
+
         if (!Suppress) {
             WriteObject(status);
         }
@@ -817,8 +816,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet
     /// <summary>
     /// Cleans up logging resources after the cmdlet finishes executing.
     /// </summary>
-    protected override void EndProcessing()
-    {
+    protected override void EndProcessing() {
         if (_logger != null) {
             if (_onVerbose != null) _logger.OnVerboseMessage -= _onVerbose;
             if (_onWarning != null) _logger.OnWarningMessage -= _onWarning;

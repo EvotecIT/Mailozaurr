@@ -4,11 +4,9 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class GraphAuthenticateTests
-{
+public class GraphAuthenticateTests {
     [Fact]
-    public void Authenticate_WithNonNetworkCredential_Throws()
-    {
+    public void Authenticate_WithNonNetworkCredential_Throws() {
         using var graph = new Graph();
         ICredentials credentials = new DummyCredentials();
 
@@ -21,8 +19,7 @@ public class GraphAuthenticateTests
     [InlineData("client")]
     [InlineData("client@")]
     [InlineData("@tenant")]
-    public void Authenticate_WithMalformedUserName_Throws(string username)
-    {
+    public void Authenticate_WithMalformedUserName_Throws(string username) {
         using var graph = new Graph();
         var credential = new NetworkCredential(username, "secret");
 
@@ -30,8 +27,7 @@ public class GraphAuthenticateTests
         Assert.Contains("clientid@directoryid", exception.Message);
     }
 
-    private sealed class DummyCredentials : ICredentials
-    {
+    private sealed class DummyCredentials : ICredentials {
         public NetworkCredential? GetCredential(Uri uri, string authType) => null;
     }
 }

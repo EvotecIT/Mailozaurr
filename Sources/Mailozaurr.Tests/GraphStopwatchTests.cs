@@ -7,25 +7,20 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class GraphStopwatchTests
-{
-    private static void SetHttpClient(Graph graph, HttpMessageHandler handler)
-    {
+public class GraphStopwatchTests {
+    private static void SetHttpClient(Graph graph, HttpMessageHandler handler) {
         var field = typeof(Graph).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
         field.SetValue(graph, new HttpClient(handler));
     }
 
-    private static HttpResponseMessage CreateJsonResponse(string content)
-    {
-        return new HttpResponseMessage(HttpStatusCode.OK)
-        {
+    private static HttpResponseMessage CreateJsonResponse(string content) {
+        return new HttpResponseMessage(HttpStatusCode.OK) {
             Content = new StringContent(content)
         };
     }
 
     [Fact]
-    public async Task ConnectO365GraphAsync_SuccessiveCallsHaveIndependentDurations()
-    {
+    public async Task ConnectO365GraphAsync_SuccessiveCallsHaveIndependentDurations() {
         var interCallDelay = TimeSpan.FromSeconds(1);
         var maxExpectedDuration = TimeSpan.FromMilliseconds(800);
         var responsePayload = "{\"access_token\":\"token\",\"token_type\":\"Bearer\"}";
@@ -53,8 +48,7 @@ public class GraphStopwatchTests
     }
 
     [Fact]
-    public async Task SendMessageAsync_SuccessiveCallsHaveIndependentDurations()
-    {
+    public async Task SendMessageAsync_SuccessiveCallsHaveIndependentDurations() {
         var interCallDelay = TimeSpan.FromSeconds(1);
         var maxExpectedDuration = TimeSpan.FromMilliseconds(800);
         var handler = new RecordingHandler(

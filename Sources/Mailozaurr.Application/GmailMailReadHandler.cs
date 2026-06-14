@@ -1,5 +1,5 @@
-using System.Globalization;
 using MimeKit;
+using System.Globalization;
 
 namespace Mailozaurr.Application;
 
@@ -210,19 +210,19 @@ public sealed class GmailMailReadHandler : IMailReadHandler {
         string folderId,
         GmailMailboxBrowser.GmailMailboxMessageSummary message,
         MimeMessage? mimeMessage = null) => new() {
-        ProfileId = profileId,
-        Id = message.NativeId,
-        ThreadId = message.NativeThreadId,
-        FolderId = folderId,
-        Subject = message.Subject ?? mimeMessage?.Subject,
-        Preview = mimeMessage?.TextBody,
-        From = MapRecipients(message.From, mimeMessage?.From.Mailboxes),
-        To = MapRecipients(message.To, mimeMessage?.To.Mailboxes),
-        ReceivedAt = message.DateUtc,
-        SentAt = mimeMessage?.Date,
-        IsRead = message.Seen,
-        HasAttachments = message.HasAttachments
-    };
+            ProfileId = profileId,
+            Id = message.NativeId,
+            ThreadId = message.NativeThreadId,
+            FolderId = folderId,
+            Subject = message.Subject ?? mimeMessage?.Subject,
+            Preview = mimeMessage?.TextBody,
+            From = MapRecipients(message.From, mimeMessage?.From.Mailboxes),
+            To = MapRecipients(message.To, mimeMessage?.To.Mailboxes),
+            ReceivedAt = message.DateUtc,
+            SentAt = mimeMessage?.Date,
+            IsRead = message.Seen,
+            HasAttachments = message.HasAttachments
+        };
 
     private static List<MessageRecipient> MapRecipients(string? raw, IEnumerable<MailboxAddress>? fallback) {
         if (!string.IsNullOrWhiteSpace(raw)) {

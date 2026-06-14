@@ -1,10 +1,10 @@
+using MailKit;
+using MailKit.Search;
+using Mailozaurr.PowerShell;
+using MimeKit;
 using System.Collections.Generic;
 using System.Management.Automation;
 using System.Threading.Tasks;
-using MailKit;
-using MailKit.Search;
-using MimeKit;
-using Mailozaurr.PowerShell;
 
 namespace Mailozaurr.PowerShell;
 
@@ -168,4 +168,5 @@ public sealed class CmdletGetIMAPMessage : AsyncPSCmdlet {
                 ErrorCategory.InvalidOperation,
                 null));
         }
-    }}
+    }
+}

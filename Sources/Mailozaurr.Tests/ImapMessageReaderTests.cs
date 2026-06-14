@@ -1,19 +1,17 @@
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using MailKit;
 using MailKit.Net.Imap;
 using MimeKit;
 using Moq;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public sealed class ImapMessageReaderTests
-{
+public sealed class ImapMessageReaderTests {
     [Fact]
-    public async Task ReadAsync_UsesResolvedFolderAndTruncatesBodies()
-    {
+    public async Task ReadAsync_UsesResolvedFolderAndTruncatesBodies() {
         var uid = new UniqueId(42);
         var message = new MimeMessage();
         message.From.Add(MailboxAddress.Parse("sender@example.com"));
@@ -68,8 +66,7 @@ public sealed class ImapMessageReaderTests
     }
 
     [Fact]
-    public async Task ReadAsync_UsesInboxWhenFolderOmitted()
-    {
+    public async Task ReadAsync_UsesInboxWhenFolderOmitted() {
         var uid = new UniqueId(7);
         var message = new MimeMessage();
         message.Body = new TextPart("plain") { Text = "body" };

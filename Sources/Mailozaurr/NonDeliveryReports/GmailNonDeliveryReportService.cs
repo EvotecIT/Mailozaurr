@@ -33,4 +33,3 @@ public sealed class GmailNonDeliveryReportService : NonDeliveryReportServiceBase
         CancellationToken cancellationToken) =>
         MailboxSearcher.SearchNonDeliveryReportsAsync(client, userId, since, before, recipientContains, messageId, maxResults, cancellationToken: cancellationToken);
 }
-

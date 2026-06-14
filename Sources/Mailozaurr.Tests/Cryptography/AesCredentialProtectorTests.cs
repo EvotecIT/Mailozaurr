@@ -1,11 +1,13 @@
+using Mailozaurr;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
-using Mailozaurr;
 
 namespace Mailozaurr.Tests.Cryptography;
 
@@ -54,12 +56,64 @@ public sealed class AesCredentialProtectorTests {
         }
     }
 
+    [Fact]
+    public void ProtectedPayload_IsAuthenticated() {
+        using var scope = new KeyDirectoryScope();
+        var protector = new AesCredentialProtector();
+        var cipher = protector.Protect("secret");
+        var payload = Convert.FromBase64String(cipher);
+
+        payload[payload.Length - 1] ^= 0x1;
+        var tampered = Convert.ToBase64String(payload);
+
+        Assert.Throws<CryptographicException>(() => protector.Unprotect(tampered));
+    }
+
+    [Fact]
+    public void UnprotectWithFallback_AuthenticatedTamper_Throws() {
+        using var scope = new KeyDirectoryScope();
+        var protector = new AesCredentialProtector();
+        var cipher = protector.Protect("secret");
+        var payload = Convert.FromBase64String(cipher);
+
+        payload[payload.Length - 1] ^= 0x1;
+        var tampered = Convert.ToBase64String(payload);
+
+        Assert.Throws<CryptographicException>(() => CredentialProtection.UnprotectWithFallback(protector, tampered));
+    }
+
+    [Fact]
+    public void Unprotect_LegacyPayload_RemainsCompatible() {
+        using var scope = new KeyDirectoryScope();
+        var protector = new AesCredentialProtector();
+        var key = GetKeyMaterial(protector);
+        var legacyPayload = CreateLegacyPayload(key, "legacy-secret");
+
+        var roundtrip = protector.Unprotect(legacyPayload);
+
+        Assert.Equal("legacy-secret", roundtrip);
+    }
+
     private static byte[] GetKeyMaterial(AesCredentialProtector protector) {
         var field = typeof(AesCredentialProtector).GetField("key", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(field);
         var value = field!.GetValue(protector) as byte[];
         Assert.NotNull(value);
         return ((byte[])value!).ToArray();
+    }
+
+    private static string CreateLegacyPayload(byte[] key, string secret) {
+        var plaintextBytes = Encoding.UTF8.GetBytes(secret);
+        using var aes = Aes.Create();
+        aes.Key = key;
+        aes.GenerateIV();
+        using var encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
+        var cipherBytes = encryptor.TransformFinalBlock(plaintextBytes, 0, plaintextBytes.Length);
+
+        var payload = new byte[aes.IV.Length + cipherBytes.Length];
+        Buffer.BlockCopy(aes.IV, 0, payload, 0, aes.IV.Length);
+        Buffer.BlockCopy(cipherBytes, 0, payload, aes.IV.Length, cipherBytes.Length);
+        return Convert.ToBase64String(payload);
     }
 
     private sealed class KeyDirectoryScope : IDisposable {

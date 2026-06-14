@@ -1,8 +1,8 @@
+using MailKit;
+using MailKit.Net.Imap;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using MailKit;
-using MailKit.Net.Imap;
 
 namespace Mailozaurr.PowerShell;
 

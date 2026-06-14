@@ -3,11 +3,9 @@ using System.Reflection;
 
 namespace Mailozaurr.Tests;
 
-public class SendGridConvertToEmailObjectTests
-{
+public class SendGridConvertToEmailObjectTests {
     [Fact]
-    public void ConvertToEmailObject_String_ReturnsEmail()
-    {
+    public void ConvertToEmailObject_String_ReturnsEmail() {
         var client = new SendGridClient();
         MethodInfo? method = typeof(SendGridClient).GetMethod("ConvertToEmailObject", BindingFlags.NonPublic | BindingFlags.Instance);
         var result = method?.Invoke(client, new object?[] { "user@example.com" }) as SendGridEmailAddress;
@@ -17,12 +15,10 @@ public class SendGridConvertToEmailObjectTests
     }
 
     [Fact]
-    public void ConvertToEmailObject_Dictionary_ReturnsEmail()
-    {
+    public void ConvertToEmailObject_Dictionary_ReturnsEmail() {
         var client = new SendGridClient();
         MethodInfo? method = typeof(SendGridClient).GetMethod("ConvertToEmailObject", BindingFlags.NonPublic | BindingFlags.Instance);
-        var input = new Dictionary<string, object>
-        {
+        var input = new Dictionary<string, object> {
             ["Email"] = "dict@example.com",
             ["Name"] = "Dict"
         };
@@ -33,8 +29,7 @@ public class SendGridConvertToEmailObjectTests
     }
 
     [Fact]
-    public void ConvertToEmailObject_SendGridEmailAddress_ReturnsSameInstance()
-    {
+    public void ConvertToEmailObject_SendGridEmailAddress_ReturnsSameInstance() {
         var client = new SendGridClient();
         MethodInfo? method = typeof(SendGridClient).GetMethod("ConvertToEmailObject", BindingFlags.NonPublic | BindingFlags.Instance);
         var address = new SendGridEmailAddress { Email = "sg@example.com", Name = "SG" };
@@ -42,4 +37,3 @@ public class SendGridConvertToEmailObjectTests
         Assert.Same(address, result);
     }
 }
-

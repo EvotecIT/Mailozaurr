@@ -1,8 +1,8 @@
+using MailKit.Security;
 using System;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using MailKit.Security;
 
 namespace Mailozaurr;
 

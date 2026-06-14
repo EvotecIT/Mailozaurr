@@ -1,9 +1,9 @@
 namespace Mailozaurr.PowerShell;
 
-using System.Security;
-using System.Net;
-using System.Management.Automation;
 using System.Collections.ObjectModel;
+using System.Management.Automation;
+using System.Net;
+using System.Security;
 
 /// <summary>
 /// Helper class for converting strings to SecureString.

@@ -1,27 +1,23 @@
+using MailKit;
+using MimeKit;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using MailKit;
-using MimeKit;
 using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class SmtpSendAsyncTests
-{
-    private class FakeClient : ClientSmtp
-    {
+public class SmtpSendAsyncTests {
+    private class FakeClient : ClientSmtp {
         public bool Called;
-        public override Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null)
-        {
+        public override Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
             Called = true;
             return Task.FromResult(string.Empty);
         }
     }
 
     [Fact]
-    public async Task SendAsync_InvokesClientSendAsync()
-    {
+    public async Task SendAsync_InvokesClientSendAsync() {
         var smtp = new Smtp();
         var fake = new FakeClient();
         var field = typeof(Smtp).GetField("<Client>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -40,8 +36,7 @@ public class SmtpSendAsyncTests
     }
 
     [Fact]
-    public async Task SendAsync_DryRun_SkipsClientSendAsync()
-    {
+    public async Task SendAsync_DryRun_SkipsClientSendAsync() {
         var smtp = new Smtp();
         var fake = new FakeClient();
         var field = typeof(Smtp).GetField("<Client>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!;

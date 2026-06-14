@@ -1,15 +1,10 @@
 using Mailozaurr;
-
-using MimeKit;
 using Mailozaurr.Definitions;
+using MimeKit;
 
-public static class SendEmailAttachments
+public static class SendEmailAttachments {
 
-{
-
-    public static void Run()
-
-    {
+    public static void Run() {
 
         var smtp = new Smtp();
 
@@ -23,9 +18,7 @@ public static class SendEmailAttachments
 
         smtp.Attachments = new List<AttachmentDescriptor> { new FileAttachmentDescriptor("C:\\Temp\\report.pdf") };
 
-        var part = new MimePart("text/plain")
-
-        {
+        var part = new MimePart("text/plain") {
 
             Content = new MimeContent(new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes("Hello from memory"))),
 
@@ -46,4 +39,3 @@ public static class SendEmailAttachments
     }
 
 }
-

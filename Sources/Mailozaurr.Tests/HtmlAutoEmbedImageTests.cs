@@ -1,3 +1,4 @@
+using MimeKit;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -5,7 +6,6 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Threading;
-using MimeKit;
 using Xunit;
 
 namespace Mailozaurr.Tests;

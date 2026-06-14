@@ -1,6 +1,6 @@
+using Mailozaurr;
 using System.Management.Automation;
 using System.Threading.Tasks;
-using Mailozaurr;
 
 namespace Mailozaurr.PowerShell;
 

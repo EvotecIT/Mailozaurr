@@ -1,6 +1,6 @@
+using Mailozaurr.Application;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Mailozaurr.Application;
 
 namespace Mailozaurr.Cli.Mcp;
 

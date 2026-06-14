@@ -10,11 +10,9 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class GraphUploadRangeTests
-{
+public class GraphUploadRangeTests {
     [Fact]
-    public void PrepareByteArrayContentForUpload_ComputesRangesCorrectly()
-    {
+    public void PrepareByteArrayContentForUpload_ComputesRangesCorrectly() {
         string tmp = Path.GetTempFileName();
         File.WriteAllBytes(tmp, Enumerable.Range(0, 25).Select(b => (byte)b).ToArray());
         using Graph graph = new Graph();
@@ -32,8 +30,7 @@ public class GraphUploadRangeTests
     }
 
     [Fact]
-    public async Task PrepareByteArrayContentForUpload_CreatesIndependentBuffers()
-    {
+    public async Task PrepareByteArrayContentForUpload_CreatesIndependentBuffers() {
         string tmp = Path.GetTempFileName();
         byte[] allBytes = Enumerable.Range(0, 25).Select(b => (byte)b).ToArray();
         File.WriteAllBytes(tmp, allBytes);
@@ -56,8 +53,7 @@ public class GraphUploadRangeTests
     }
 
     [Fact]
-    public void PrepareByteArrayContentForUpload_ClampsChunkSizeToMax()
-    {
+    public void PrepareByteArrayContentForUpload_ClampsChunkSizeToMax() {
         string tmp = Path.GetTempFileName();
         var fileSize = Graph.MaxChunkSize + 10;
         var bytes = new byte[fileSize];

@@ -7,15 +7,12 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class GraphDraftTests
-{
+public class GraphDraftTests {
     [Fact]
-    public void CreateDraft_LargeAttachments_ExcludesAttachments()
-    {
+    public void CreateDraft_LargeAttachments_ExcludesAttachments() {
         string tmp = Path.GetTempFileName();
         File.WriteAllBytes(tmp, new byte[4_100_000]);
-        using var graph = new Graph
-        {
+        using var graph = new Graph {
             From = "from@example.com",
             To = new object[] { "to@example.com" },
             Subject = "sub",
@@ -32,8 +29,7 @@ public class GraphDraftTests
     }
 
     [Fact]
-    public async Task PrepareAttachments_LargeFiles_CreatePlaceholders()
-    {
+    public async Task PrepareAttachments_LargeFiles_CreatePlaceholders() {
         string tmp1 = Path.GetTempFileName();
         string tmp2 = Path.GetTempFileName();
         File.WriteAllBytes(tmp1, new byte[3_000_000]);
@@ -49,19 +45,15 @@ public class GraphDraftTests
     }
 
     [Fact]
-    public async Task PrepareAttachments_FileInfo_CreatePlaceholders()
-    {
+    public async Task PrepareAttachments_FileInfo_CreatePlaceholders() {
         string tmp = Path.GetTempFileName();
         File.WriteAllBytes(tmp, new byte[4_100_000]);
         using var graph = new Graph { Attachments = new object[] { new FileInfo(tmp) } };
 
-        try
-        {
+        try {
             graph.CreateAttachments();
             await graph.PrepareAttachments();
-        }
-        finally
-        {
+        } finally {
             File.Delete(tmp);
         }
 
@@ -71,8 +63,7 @@ public class GraphDraftTests
     }
 
     [Fact]
-    public async Task CreateGraphAttachment_MissingFile_ThrowsAndLogsWarning()
-    {
+    public async Task CreateGraphAttachment_MissingFile_ThrowsAndLogsWarning() {
         string missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
         using var graph = new Graph();
 
@@ -85,27 +76,22 @@ public class GraphDraftTests
     }
 
     [Fact]
-    public async Task CreateGraphAttachment_Canceled_ThrowsOperationCanceledException()
-    {
+    public async Task CreateGraphAttachment_Canceled_ThrowsOperationCanceledException() {
         string tmp = Path.GetTempFileName();
         File.WriteAllBytes(tmp, new byte[1024]);
         using var graph = new Graph();
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        try
-        {
+        try {
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => graph.CreateGraphAttachment(tmp, cts.Token));
-        }
-        finally
-        {
+        } finally {
             File.Delete(tmp);
         }
     }
 
     [Fact]
-    public async Task PrepareAttachments_MissingFile_SkipsPlaceholderAndLogs()
-    {
+    public async Task PrepareAttachments_MissingFile_SkipsPlaceholderAndLogs() {
         string missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
         using var graph = new Graph { Attachments = new object[] { missing } };
 
@@ -117,10 +103,8 @@ public class GraphDraftTests
     }
 
     [Fact]
-    public void CreateDraft_SetsImportanceFromPriority()
-    {
-        using var graph = new Graph
-        {
+    public void CreateDraft_SetsImportanceFromPriority() {
+        using var graph = new Graph {
             From = "from@example.com",
             To = new object[] { "to@example.com" },
             Subject = "sub",
@@ -134,10 +118,8 @@ public class GraphDraftTests
     }
 
     [Fact]
-    public void CreateDraftForMg_SetsImportanceFromPriority()
-    {
-        using var graph = new Graph
-        {
+    public void CreateDraftForMg_SetsImportanceFromPriority() {
+        using var graph = new Graph {
             From = "from@example.com",
             To = new object[] { "to@example.com" },
             Subject = "sub",
@@ -151,16 +133,14 @@ public class GraphDraftTests
     }
 
     [Fact]
-    public void DraftMessageUris_BuildUploadSessionUri()
-    {
+    public void DraftMessageUris_BuildUploadSessionUri() {
         string uri = GraphDraftMessageUris.CreateUploadSession("from@example.com", "draft-id");
 
         Assert.Equal("https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/attachments/createUploadSession", uri);
     }
 
     [Fact]
-    public void DraftMessageUris_BuildSendUri()
-    {
+    public void DraftMessageUris_BuildSendUri() {
         string uri = GraphDraftMessageUris.Send("from@example.com", "draft-id");
 
         Assert.Equal("https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/send", uri);

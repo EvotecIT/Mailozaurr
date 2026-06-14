@@ -6,8 +6,7 @@ using MimeKit.Utils;
 /// <summary>
 /// Base descriptor describing an attachment that can be added to outbound messages.
 /// </summary>
-public abstract class AttachmentDescriptor
-{
+public abstract class AttachmentDescriptor {
     /// <summary>
     /// Gets or sets the file name used for the attachment.
     /// </summary>
@@ -53,8 +52,7 @@ public abstract class AttachmentDescriptor
     /// </summary>
     /// <param name="inline">When set to <c>true</c>, the descriptor will be treated as an inline resource.</param>
     /// <returns>The created <see cref="MimeEntity"/>.</returns>
-    internal virtual MimeEntity CreateMimeEntity(bool inline)
-    {
+    internal virtual MimeEntity CreateMimeEntity(bool inline) {
         var stream = CreateContentStream();
         var mediaType = !string.IsNullOrWhiteSpace(ContentType)
             ? ContentType
@@ -62,8 +60,7 @@ public abstract class AttachmentDescriptor
                 ? MimeTypes.GetMimeType(FileName!)
                 : "application/octet-stream";
 
-        var part = new MimePart(mediaType ?? "application/octet-stream")
-        {
+        var part = new MimePart(mediaType ?? "application/octet-stream") {
             Content = new MimeContent(stream),
             FileName = FileName,
             ContentTransferEncoding = TransferEncoding.GetValueOrDefault(ContentEncoding.Base64),
@@ -74,32 +71,25 @@ public abstract class AttachmentDescriptor
         part.ContentDisposition = disposition;
 
         var contentId = ContentId;
-        if (inline)
-        {
-            if (string.IsNullOrWhiteSpace(contentId))
-            {
+        if (inline) {
+            if (string.IsNullOrWhiteSpace(contentId)) {
                 contentId = !string.IsNullOrWhiteSpace(FileName)
                     ? FileName
                     : MimeUtils.GenerateMessageId();
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(contentId))
-        {
+        if (!string.IsNullOrWhiteSpace(contentId)) {
             part.ContentId = contentId;
         }
 
-        if (!string.IsNullOrWhiteSpace(ContentDescription))
-        {
+        if (!string.IsNullOrWhiteSpace(ContentDescription)) {
             part.ContentDescription = ContentDescription;
         }
 
-        if (Headers != null)
-        {
-            foreach (var header in Headers)
-            {
-                if (!string.IsNullOrWhiteSpace(header.Key) && header.Value is not null)
-                {
+        if (Headers != null) {
+            foreach (var header in Headers) {
+                if (!string.IsNullOrWhiteSpace(header.Key) && header.Value is not null) {
                     part.Headers[header.Key] = header.Value;
                 }
             }
@@ -118,8 +108,7 @@ public abstract class AttachmentDescriptor
     /// Returns the attachment content as a byte array.
     /// </summary>
     /// <returns>Attachment content represented as a byte array.</returns>
-    internal virtual byte[] GetContentBytes()
-    {
+    internal virtual byte[] GetContentBytes() {
         using var stream = CreateContentStream();
         using var memory = new MemoryStream();
         stream.CopyTo(memory);
@@ -130,16 +119,13 @@ public abstract class AttachmentDescriptor
 /// <summary>
 /// Descriptor that sources attachment content from a file on disk.
 /// </summary>
-public sealed class FileAttachmentDescriptor : AttachmentDescriptor
-{
+public sealed class FileAttachmentDescriptor : AttachmentDescriptor {
     /// <summary>
     /// Initializes a new instance of the <see cref="FileAttachmentDescriptor"/> class.
     /// </summary>
     /// <param name="filePath">Path to the file providing the attachment content.</param>
-    public FileAttachmentDescriptor(string filePath)
-    {
-        if (string.IsNullOrWhiteSpace(filePath))
-        {
+    public FileAttachmentDescriptor(string filePath) {
+        if (string.IsNullOrWhiteSpace(filePath)) {
             throw new ArgumentException("File path must be provided.", nameof(filePath));
         }
 
@@ -155,8 +141,7 @@ public sealed class FileAttachmentDescriptor : AttachmentDescriptor
     internal override string? SourcePath => FilePath;
 
     /// <inheritdoc />
-    protected override Stream CreateContentStream()
-    {
+    protected override Stream CreateContentStream() {
         var data = File.ReadAllBytes(FilePath);
         return new MemoryStream(data, writable: false);
     }
@@ -165,8 +150,7 @@ public sealed class FileAttachmentDescriptor : AttachmentDescriptor
 /// <summary>
 /// Descriptor that sources attachment content from a <see cref="Stream"/>.
 /// </summary>
-public sealed class StreamAttachmentDescriptor : AttachmentDescriptor
-{
+public sealed class StreamAttachmentDescriptor : AttachmentDescriptor {
     private readonly Stream _stream;
     private readonly bool _leaveStreamOpen;
 
@@ -176,16 +160,13 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor
     /// <param name="stream">Readable stream that provides the attachment content.</param>
     /// <param name="fileName">File name to associate with the attachment.</param>
     /// <param name="leaveStreamOpen">Whether the provided stream should remain open after being read.</param>
-    public StreamAttachmentDescriptor(Stream stream, string fileName, bool leaveStreamOpen = true)
-    {
+    public StreamAttachmentDescriptor(Stream stream, string fileName, bool leaveStreamOpen = true) {
         _stream = stream ?? throw new ArgumentNullException(nameof(stream));
-        if (!stream.CanRead)
-        {
+        if (!stream.CanRead) {
             throw new ArgumentException("Stream must be readable.", nameof(stream));
         }
 
-        if (string.IsNullOrWhiteSpace(fileName))
-        {
+        if (string.IsNullOrWhiteSpace(fileName)) {
             throw new ArgumentException("File name must be provided.", nameof(fileName));
         }
 
@@ -194,10 +175,8 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor
     }
 
     /// <inheritdoc />
-    protected override Stream CreateContentStream()
-    {
-        if (_stream.CanSeek)
-        {
+    protected override Stream CreateContentStream() {
+        if (_stream.CanSeek) {
             _stream.Position = 0;
         }
 
@@ -205,20 +184,15 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor
         _stream.CopyTo(memory);
         memory.Position = 0;
 
-        if (_stream.CanSeek)
-        {
-            try
-            {
+        if (_stream.CanSeek) {
+            try {
                 _stream.Position = 0;
-            }
-            catch (ObjectDisposedException)
-            {
+            } catch (ObjectDisposedException) {
                 // Ignore - stream may have been disposed externally.
             }
         }
 
-        if (!_leaveStreamOpen)
-        {
+        if (!_leaveStreamOpen) {
             _stream.Dispose();
         }
 
@@ -229,8 +203,7 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor
 /// <summary>
 /// Descriptor that sources attachment content from a byte array.
 /// </summary>
-public sealed class ByteArrayAttachmentDescriptor : AttachmentDescriptor
-{
+public sealed class ByteArrayAttachmentDescriptor : AttachmentDescriptor {
     private readonly byte[] _buffer;
     private readonly bool _cloneBuffer;
 
@@ -240,11 +213,9 @@ public sealed class ByteArrayAttachmentDescriptor : AttachmentDescriptor
     /// <param name="buffer">Byte array containing the attachment data.</param>
     /// <param name="fileName">File name to associate with the attachment.</param>
     /// <param name="cloneBuffer">If <c>true</c>, the buffer will be cloned to prevent external mutations.</param>
-    public ByteArrayAttachmentDescriptor(byte[] buffer, string fileName, bool cloneBuffer = true)
-    {
+    public ByteArrayAttachmentDescriptor(byte[] buffer, string fileName, bool cloneBuffer = true) {
         buffer = buffer ?? throw new ArgumentNullException(nameof(buffer));
-        if (string.IsNullOrWhiteSpace(fileName))
-        {
+        if (string.IsNullOrWhiteSpace(fileName)) {
             throw new ArgumentException("File name must be provided.", nameof(fileName));
         }
 
@@ -254,8 +225,7 @@ public sealed class ByteArrayAttachmentDescriptor : AttachmentDescriptor
     }
 
     /// <inheritdoc />
-    protected override Stream CreateContentStream()
-    {
+    protected override Stream CreateContentStream() {
         var data = _cloneBuffer ? (byte[])_buffer.Clone() : _buffer;
         return new MemoryStream(data, writable: false);
     }
@@ -264,66 +234,49 @@ public sealed class ByteArrayAttachmentDescriptor : AttachmentDescriptor
 /// <summary>
 /// Descriptor that wraps an existing <see cref="MimeEntity"/> instance.
 /// </summary>
-public sealed class MimeEntityAttachmentDescriptor : AttachmentDescriptor
-{
+public sealed class MimeEntityAttachmentDescriptor : AttachmentDescriptor {
     private readonly MimeEntity _entity;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MimeEntityAttachmentDescriptor"/> class.
     /// </summary>
     /// <param name="entity">The MIME entity to attach.</param>
-    public MimeEntityAttachmentDescriptor(MimeEntity entity)
-    {
+    public MimeEntityAttachmentDescriptor(MimeEntity entity) {
         _entity = entity ?? throw new ArgumentNullException(nameof(entity));
     }
 
-    internal override MimeEntity CreateMimeEntity(bool inline)
-    {
-        if (_entity is MimePart part)
-        {
-            if (!string.IsNullOrWhiteSpace(FileName))
-            {
+    internal override MimeEntity CreateMimeEntity(bool inline) {
+        if (_entity is MimePart part) {
+            if (!string.IsNullOrWhiteSpace(FileName)) {
                 part.FileName = FileName;
             }
 
-            if (ContentDisposition != null)
-            {
+            if (ContentDisposition != null) {
                 part.ContentDisposition = ContentDisposition;
-            }
-            else if (inline && part.ContentDisposition == null)
-            {
+            } else if (inline && part.ContentDisposition == null) {
                 part.ContentDisposition = new ContentDisposition(ContentDisposition.Inline);
             }
 
-            if (!string.IsNullOrWhiteSpace(ContentDescription))
-            {
+            if (!string.IsNullOrWhiteSpace(ContentDescription)) {
                 part.ContentDescription = ContentDescription;
             }
 
-            if (TransferEncoding.HasValue)
-            {
+            if (TransferEncoding.HasValue) {
                 part.ContentTransferEncoding = TransferEncoding.Value;
             }
 
-            if (Headers != null)
-            {
-                foreach (var header in Headers)
-                {
-                    if (!string.IsNullOrWhiteSpace(header.Key) && header.Value is not null)
-                    {
+            if (Headers != null) {
+                foreach (var header in Headers) {
+                    if (!string.IsNullOrWhiteSpace(header.Key) && header.Value is not null) {
                         part.Headers[header.Key] = header.Value;
                     }
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(part.ContentId))
-            {
-                if (!string.IsNullOrWhiteSpace(ContentId))
-                {
+            if (string.IsNullOrWhiteSpace(part.ContentId)) {
+                if (!string.IsNullOrWhiteSpace(ContentId)) {
                     part.ContentId = ContentId;
-                }
-                else if (inline)
-                {
+                } else if (inline) {
                     part.ContentId = MimeUtils.GenerateMessageId();
                 }
             }

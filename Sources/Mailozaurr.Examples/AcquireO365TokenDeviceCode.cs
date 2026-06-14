@@ -21,7 +21,7 @@ public static class AcquireO365TokenDeviceCode {
                     Console.WriteLine(result.Message);
                     return Task.CompletedTask;
                 });
-            Console.WriteLine($"Token acquired for {cred.UserName}: {cred.AccessToken.Substring(0,5)}...");
+            Console.WriteLine($"Token acquired for {cred.UserName}: {cred.AccessToken.Substring(0, 5)}...");
         } catch (Exception ex) {
             Console.WriteLine($"AcquireO365TokenDeviceCode Example Error: {ex.Message}");
         }

@@ -1,5 +1,5 @@
-using Mailozaurr;
 using MailKit.Security;
+using Mailozaurr;
 using System;
 
 /// <summary>

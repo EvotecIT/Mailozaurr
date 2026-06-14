@@ -1,12 +1,12 @@
+using MailKit;
+using MailKit.Net.Imap;
+using MimeKit;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using MailKit;
-using MailKit.Net.Imap;
-using MimeKit;
 
 namespace Mailozaurr;
 
@@ -45,22 +45,18 @@ public sealed record ImapMessageReadResult(
 /// <summary>
 /// Reads a single IMAP message with reusable folder resolution and truncation semantics.
 /// </summary>
-public static class ImapMessageReader
-{
+public static class ImapMessageReader {
     /// <summary>
     /// Reads and projects a single IMAP message by UID.
     /// </summary>
     public static async Task<ImapMessageReadResult> ReadAsync(
         ImapClient client,
         ImapMessageReadRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        if (client == null)
-        {
+        CancellationToken cancellationToken = default) {
+        if (client == null) {
             throw new ArgumentNullException(nameof(client));
         }
-        if (request == null)
-        {
+        if (request == null) {
             throw new ArgumentNullException(nameof(request));
         }
 
@@ -93,17 +89,14 @@ public static class ImapMessageReader
             Attachments: attachments);
     }
 
-    private static string? TruncateUtf8(string? value, long maxBytes, out bool truncated)
-    {
+    private static string? TruncateUtf8(string? value, long maxBytes, out bool truncated) {
         truncated = false;
-        if (string.IsNullOrEmpty(value))
-        {
+        if (string.IsNullOrEmpty(value)) {
             return value;
         }
 
         var bytes = Encoding.UTF8.GetBytes(value);
-        if (bytes.LongLength <= maxBytes)
-        {
+        if (bytes.LongLength <= maxBytes) {
             return value;
         }
 

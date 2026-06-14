@@ -1,7 +1,7 @@
+using Microsoft.Identity.Client;
 using System;
 using System.IO;
 using System.Threading;
-using Microsoft.Identity.Client;
 
 namespace Mailozaurr;
 

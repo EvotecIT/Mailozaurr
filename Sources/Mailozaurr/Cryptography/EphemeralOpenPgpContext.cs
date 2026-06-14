@@ -1,7 +1,7 @@
+using MimeKit.Cryptography;
+using Org.BouncyCastle.Bcpg.OpenPgp;
 using System;
 using System.IO;
-using Org.BouncyCastle.Bcpg.OpenPgp;
-using MimeKit.Cryptography;
 
 namespace Mailozaurr;
 

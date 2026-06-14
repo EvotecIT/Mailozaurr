@@ -1,5 +1,5 @@
-using System.Text.Json;
 using Mailozaurr.Application;
+using System.Text.Json;
 
 namespace Mailozaurr.Tests;
 

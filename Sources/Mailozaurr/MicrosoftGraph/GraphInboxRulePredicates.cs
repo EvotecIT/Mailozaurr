@@ -5,8 +5,7 @@ namespace Mailozaurr;
 /// <summary>
 /// Represents predicate options for inbox rules.
 /// </summary>
-public class GraphInboxRulePredicates
-{
+public class GraphInboxRulePredicates {
     /// <summary>
     /// Gets or sets a list of strings that must appear in the sender address.
     /// </summary>

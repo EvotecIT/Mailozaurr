@@ -1,9 +1,9 @@
-using System.Management.Automation;
-using MailKit.Net.Imap;
-using System.Threading.Tasks;
-using System.Linq;
 using MailKit;
+using MailKit.Net.Imap;
 using Mailozaurr;
+using System.Linq;
+using System.Management.Automation;
+using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;
 

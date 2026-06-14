@@ -178,4 +178,3 @@ public class InternalLoggerPowerShell : IDisposable {
         GC.SuppressFinalize(this);
     }
 }
-

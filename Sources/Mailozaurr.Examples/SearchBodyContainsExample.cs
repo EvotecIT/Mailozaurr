@@ -1,9 +1,9 @@
 using MailKit.Net.Imap;
 using MailKit.Net.Pop3;
 using MailKit.Security;
+using Mailozaurr;
 using System;
 using System.Threading.Tasks;
-using Mailozaurr;
 
 /// <summary>
 /// Example demonstrating how to search message bodies.

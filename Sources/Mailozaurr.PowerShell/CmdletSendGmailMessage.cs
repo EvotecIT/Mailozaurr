@@ -1,11 +1,11 @@
+using Mailozaurr;
+using Mailozaurr.Definitions;
+using MimeKit;
 using System;
 using System.Collections;
 using System.Linq;
 using System.Management.Automation;
 using System.Threading.Tasks;
-using MimeKit;
-using Mailozaurr;
-using Mailozaurr.Definitions;
 
 namespace Mailozaurr.PowerShell;
 
@@ -106,23 +106,18 @@ public sealed class CmdletSendGmailMessage : AsyncPSCmdlet {
             smtp.Dispose();
         }
     }
-    private static List<AttachmentDescriptor>? ConvertAttachments(object[]? attachments)
-    {
-        if (attachments == null)
-        {
+    private static List<AttachmentDescriptor>? ConvertAttachments(object[]? attachments) {
+        if (attachments == null) {
             return null;
         }
 
         var result = new List<AttachmentDescriptor>();
-        foreach (var entry in attachments)
-        {
-            if (entry == null)
-            {
+        foreach (var entry in attachments) {
+            if (entry == null) {
                 continue;
             }
 
-            switch (entry)
-            {
+            switch (entry) {
                 case AttachmentDescriptor descriptor:
                     result.Add(descriptor);
                     break;

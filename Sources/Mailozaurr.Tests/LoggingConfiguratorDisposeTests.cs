@@ -3,11 +3,9 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class LoggingConfiguratorDisposeTests
-{
+public class LoggingConfiguratorDisposeTests {
     [Fact]
-    public void Dispose_ReleasesResources()
-    {
+    public void Dispose_ReleasesResources() {
         var configurator = new LoggingConfigurator();
         configurator.ConfigureLogging(string.Empty, false, true, false, false);
 

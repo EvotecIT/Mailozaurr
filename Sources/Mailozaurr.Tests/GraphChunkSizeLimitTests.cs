@@ -9,19 +9,16 @@ using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class GraphChunkSizeLimitTests
-{
+public class GraphChunkSizeLimitTests {
     [Fact]
-    public void ChunkSize_SetAboveLimit_IsCapped()
-    {
+    public void ChunkSize_SetAboveLimit_IsCapped() {
         using Graph graph = new();
         graph.ChunkSize = Graph.MaxChunkSize * 2;
         Assert.Equal(Graph.MaxChunkSize, graph.ChunkSize);
     }
 
     [Fact]
-    public async Task PrepareByteArrayContentForUpload_EnforcesMaxChunkSize()
-    {
+    public async Task PrepareByteArrayContentForUpload_EnforcesMaxChunkSize() {
         string tmp = Path.GetTempFileName();
         int fileSize = Graph.MaxChunkSize + 1024;
         File.WriteAllBytes(tmp, new byte[fileSize]);

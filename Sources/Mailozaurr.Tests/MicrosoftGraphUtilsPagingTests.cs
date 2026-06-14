@@ -1,3 +1,4 @@
+using Mailozaurr;
 using System;
 using System.Collections.Concurrent;
 using System.Net;
@@ -5,7 +6,6 @@ using System.Net.Http;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Mailozaurr;
 using Xunit;
 
 namespace Mailozaurr.Tests;

@@ -1,5 +1,5 @@
-using System;
 using Mailozaurr;
+using System;
 
 /// <summary>
 /// Example demonstrating how to sign and encrypt email using PGP.

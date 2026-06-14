@@ -1,17 +1,14 @@
-using System.Reflection;
-using System.Collections.Generic;
 using MimeKit;
+using System.Collections.Generic;
+using System.Reflection;
 using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class SesClientTests
-{
+public class SesClientTests {
     [Fact]
-    public void BuildMessage_WithValidData_ReturnsMimeMessage()
-    {
-        using var client = new SesClient
-        {
+    public void BuildMessage_WithValidData_ReturnsMimeMessage() {
+        using var client = new SesClient {
             From = "sender@example.com",
             To = new List<object> { "to@example.com" },
             Subject = "subject",
@@ -25,10 +22,8 @@ public class SesClientTests
     }
 
     [Fact]
-    public void BuildMessage_WithHeaders_AddsHeaders()
-    {
-        using var client = new SesClient
-        {
+    public void BuildMessage_WithHeaders_AddsHeaders() {
+        using var client = new SesClient {
             From = "sender@example.com",
             To = new List<object> { "to@example.com" },
             Subject = "subject",

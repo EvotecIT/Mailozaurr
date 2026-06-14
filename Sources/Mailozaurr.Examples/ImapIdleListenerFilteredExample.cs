@@ -1,6 +1,6 @@
 using MailKit.Net.Imap;
-using MailKit.Security;
 using MailKit.Search;
+using MailKit.Security;
 using System;
 using System.Threading.Tasks;
 

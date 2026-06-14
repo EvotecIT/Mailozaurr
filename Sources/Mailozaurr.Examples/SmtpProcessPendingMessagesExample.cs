@@ -19,4 +19,3 @@ public static class SmtpProcessPendingMessagesExample {
         await smtp.ProcessPendingMessagesAsync();
     }
 }
-

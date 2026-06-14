@@ -1,5 +1,5 @@
-using System.Text.Json.Serialization;
 using Mailozaurr.Application;
+using System.Text.Json.Serialization;
 
 namespace Mailozaurr.Cli;
 

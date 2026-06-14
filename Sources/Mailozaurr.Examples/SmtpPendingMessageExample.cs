@@ -20,4 +20,3 @@ public static class SmtpPendingMessageExample {
         Console.WriteLine($"Queued message id: {result.MessageId}");
     }
 }
-

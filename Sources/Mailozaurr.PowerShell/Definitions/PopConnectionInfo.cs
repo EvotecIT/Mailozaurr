@@ -1,8 +1,8 @@
+using MailKit;
+using MailKit.Net.Pop3;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using MailKit;
-using MailKit.Net.Pop3;
 
 namespace Mailozaurr.PowerShell;
 

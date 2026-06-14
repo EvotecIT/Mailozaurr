@@ -1,12 +1,12 @@
+using MailKit;
+using MailKit.Net.Imap;
+using MailKit.Search;
+using Mailozaurr;
 using System;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using MailKit;
-using MailKit.Net.Imap;
-using MailKit.Search;
 using Xunit;
-using Mailozaurr;
 
 namespace Mailozaurr.Tests;
 

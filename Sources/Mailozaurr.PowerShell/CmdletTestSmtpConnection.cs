@@ -1,7 +1,7 @@
+using MailKit.Net.Smtp;
+using MailKit.Security;
 using System.Management.Automation;
 using System.Threading.Tasks;
-using MailKit.Security;
-using MailKit.Net.Smtp;
 
 namespace Mailozaurr.PowerShell;
 

@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/Sources"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "Europe/Warsaw"
+    open-pull-requests-limit: 10
+    groups:
+      dotnet-platform:
+        patterns:
+          - "Microsoft.*"
+          - "System.*"
+      mail-stack:
+        patterns:
+          - "BouncyCastle.Cryptography"
+          - "MailKit"
+          - "MimeKit"
+      test-packages:
+        patterns:
+          - "coverlet.*"
+          - "Microsoft.NET.Test.Sdk"
+          - "Moq"
+          - "PowerShellStandard.Library"
+          - "xunit*"

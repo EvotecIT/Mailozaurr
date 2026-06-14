@@ -1,7 +1,7 @@
+using Mailozaurr;
 using System.Collections.Generic;
 using System.Management.Automation;
 using System.Management.Automation.Runspaces;
-using Mailozaurr;
 using System.Threading.Tasks;
 
 namespace Mailozaurr.PowerShell;

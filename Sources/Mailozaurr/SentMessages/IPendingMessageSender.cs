@@ -19,4 +19,3 @@ public interface IPendingMessageSender {
     Task SendAsync(PendingMessageRecord record, CancellationToken ct);
 
 }
-

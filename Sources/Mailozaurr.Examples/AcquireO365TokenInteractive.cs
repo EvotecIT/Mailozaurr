@@ -29,7 +29,7 @@ public static class AcquireO365TokenInteractive {
                 tenantId,
                 redirectUri,
                 scopes);
-            Console.WriteLine($"Token acquired for {cred.UserName}: {cred.AccessToken.Substring(0,5)}...");
+            Console.WriteLine($"Token acquired for {cred.UserName}: {cred.AccessToken.Substring(0, 5)}...");
         } catch (Exception ex) {
             Console.WriteLine($"AcquireO365TokenInteractive Example Error: {ex.Message}");
         }

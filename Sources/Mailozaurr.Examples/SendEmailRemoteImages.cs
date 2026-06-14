@@ -3,10 +3,8 @@ using Mailozaurr;
 /// <summary>
 /// Example showing how to embed remote images automatically.
 /// </summary>
-public static class SendEmailRemoteImages
-{
-    public static void Run()
-    {
+public static class SendEmailRemoteImages {
+    public static void Run() {
         var smtp = new Smtp { AutoEmbedRemoteImages = true };
         smtp.From = "sender@example.com";
         smtp.To = new[] { "recipient@example.com" };

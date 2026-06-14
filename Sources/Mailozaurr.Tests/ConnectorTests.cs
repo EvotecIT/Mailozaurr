@@ -1,19 +1,17 @@
+using MailKit.Net.Imap;
+using MailKit.Net.Pop3;
+using MailKit.Security;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using MailKit.Net.Imap;
-using MailKit.Net.Pop3;
-using MailKit.Security;
 using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class ConnectorTests
-{
-    private class FakeImapClient : ImapClient
-    {
+public class ConnectorTests {
+    private class FakeImapClient : ImapClient {
         public int FailuresBeforeSuccess { get; set; }
         public int ConnectCalls { get; private set; }
         public string? LastHost { get; private set; }
@@ -27,21 +25,18 @@ public class ConnectorTests
         public override bool IsConnected => _connected;
         public override int Timeout { get => _timeout; set => _timeout = value; }
         public bool Disposed { get; private set; }
-        public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default)
-        {
+        public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default) {
             ConnectCalls++;
             LastHost = host;
             LastPort = port;
             LastSecureSocketOptions = options;
-            if (ConnectCalls <= FailuresBeforeSuccess)
-            {
+            if (ConnectCalls <= FailuresBeforeSuccess) {
                 throw new HttpRequestException("fail");
             }
             _connected = true;
             return Task.CompletedTask;
         }
-        public override Task DisconnectAsync(bool quit, CancellationToken cancellationToken = default)
-        {
+        public override Task DisconnectAsync(bool quit, CancellationToken cancellationToken = default) {
             _connected = false;
             return Task.CompletedTask;
         }
@@ -50,15 +45,13 @@ public class ConnectorTests
             Authenticated = true;
             return Task.CompletedTask;
         }
-        protected override void Dispose(bool disposing)
-        {
+        protected override void Dispose(bool disposing) {
             Disposed = true;
             base.Dispose(disposing);
         }
     }
 
-    private class FakePop3Client : Pop3Client
-    {
+    private class FakePop3Client : Pop3Client {
         public int FailuresBeforeSuccess { get; set; }
         public int ConnectCalls { get; private set; }
         public new bool Authenticated { get; set; }
@@ -68,43 +61,36 @@ public class ConnectorTests
         public override bool IsConnected => _connected;
         public override int Timeout { get => _timeout; set => _timeout = value; }
         public bool Disposed { get; private set; }
-        public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default)
-        {
+        public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default) {
             ConnectCalls++;
-            if (ConnectCalls <= FailuresBeforeSuccess)
-            {
+            if (ConnectCalls <= FailuresBeforeSuccess) {
                 throw new HttpRequestException("fail");
             }
             _connected = true;
             return Task.CompletedTask;
         }
-        public override Task DisconnectAsync(bool quit, CancellationToken cancellationToken = default)
-        {
+        public override Task DisconnectAsync(bool quit, CancellationToken cancellationToken = default) {
             _connected = false;
             return Task.CompletedTask;
         }
-        protected override void Dispose(bool disposing)
-        {
+        protected override void Dispose(bool disposing) {
             Disposed = true;
             base.Dispose(disposing);
         }
     }
 
-    private class FakeImapDisconnectFailClient : FakeImapClient
-    {
+    private class FakeImapDisconnectFailClient : FakeImapClient {
         public override Task DisconnectAsync(bool quit, CancellationToken cancellationToken = default)
             => Task.FromException(new InvalidOperationException("disconnect"));
     }
 
-    private class FakePop3DisconnectFailClient : FakePop3Client
-    {
+    private class FakePop3DisconnectFailClient : FakePop3Client {
         public override Task DisconnectAsync(bool quit, CancellationToken cancellationToken = default)
             => Task.FromException(new InvalidOperationException("disconnect"));
     }
 
     [Fact]
-    public async Task ImapConnector_RetriesUntilSuccess()
-    {
+    public async Task ImapConnector_RetriesUntilSuccess() {
         var fake = new FakeImapClient { FailuresBeforeSuccess = 2 };
         var delays = new List<int>();
         ImapConnector.ClientFactory = () => fake;
@@ -121,8 +107,7 @@ public class ConnectorTests
     }
 
     [Fact]
-    public async Task ImapConnector_ThrowsAfterRetries()
-    {
+    public async Task ImapConnector_ThrowsAfterRetries() {
         var fake = new FakeImapClient { FailuresBeforeSuccess = 5 };
         var delays = new List<int>();
         ImapConnector.ClientFactory = () => fake;
@@ -138,8 +123,7 @@ public class ConnectorTests
     }
 
     [Fact]
-    public async Task ImapConnector_RequestOverload_UsesRequestSettings()
-    {
+    public async Task ImapConnector_RequestOverload_UsesRequestSettings() {
         var fake = new FakeImapClient();
         ImapConnector.ClientFactory = () => fake;
         var request = new ImapConnectionRequest(
@@ -186,8 +170,7 @@ public class ConnectorTests
     }
 
     [Fact]
-    public async Task ImapConnector_RequestOverload_ValidatesArguments()
-    {
+    public async Task ImapConnector_RequestOverload_ValidatesArguments() {
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
             ImapConnector.ConnectAsync(
                 null!,
@@ -200,8 +183,7 @@ public class ConnectorTests
     }
 
     [Fact]
-    public async Task Pop3Connector_RetriesUntilSuccess()
-    {
+    public async Task Pop3Connector_RetriesUntilSuccess() {
         var fake = new FakePop3Client { FailuresBeforeSuccess = 1 };
         var delays = new List<int>();
         Pop3Connector.ClientFactory = () => fake;
@@ -218,8 +200,7 @@ public class ConnectorTests
     }
 
     [Fact]
-    public async Task Pop3Connector_ThrowsAfterRetries()
-    {
+    public async Task Pop3Connector_ThrowsAfterRetries() {
         var fake = new FakePop3Client { FailuresBeforeSuccess = 4 };
         var delays = new List<int>();
         Pop3Connector.ClientFactory = () => fake;
@@ -235,8 +216,7 @@ public class ConnectorTests
     }
 
     [Fact]
-    public async Task ImapConnector_NoRetriesThrowsOriginalException()
-    {
+    public async Task ImapConnector_NoRetriesThrowsOriginalException() {
         var fake = new FakeImapClient { FailuresBeforeSuccess = 1 };
         ImapConnector.ClientFactory = () => fake;
         await Assert.ThrowsAsync<HttpRequestException>(() => ImapConnector.ConnectAsync(
@@ -248,8 +228,7 @@ public class ConnectorTests
     }
 
     [Fact]
-    public async Task Pop3Connector_NoRetriesThrowsOriginalException()
-    {
+    public async Task Pop3Connector_NoRetriesThrowsOriginalException() {
         var fake = new FakePop3Client { FailuresBeforeSuccess = 1 };
         Pop3Connector.ClientFactory = () => fake;
         await Assert.ThrowsAsync<HttpRequestException>(() => Pop3Connector.ConnectAsync(
@@ -261,8 +240,7 @@ public class ConnectorTests
     }
 
     [Fact]
-    public async Task ImapConnector_CancellationStopsRetries()
-    {
+    public async Task ImapConnector_CancellationStopsRetries() {
         var fake = new FakeImapClient { FailuresBeforeSuccess = 5 };
         var cts = new CancellationTokenSource();
         ImapConnector.ClientFactory = () => fake;
@@ -277,8 +255,7 @@ public class ConnectorTests
     }
 
     [Fact]
-    public async Task Pop3Connector_CancellationStopsRetries()
-    {
+    public async Task Pop3Connector_CancellationStopsRetries() {
         var fake = new FakePop3Client { FailuresBeforeSuccess = 5 };
         var cts = new CancellationTokenSource();
         Pop3Connector.ClientFactory = () => fake;
@@ -293,8 +270,7 @@ public class ConnectorTests
     }
 
     [Fact]
-    public async Task ImapConnector_LogsDisconnectException()
-    {
+    public async Task ImapConnector_LogsDisconnectException() {
         var fake = new FakeImapDisconnectFailClient();
         ImapConnector.ClientFactory = () => fake;
         var messages = new List<string>();
@@ -312,16 +288,13 @@ public class ConnectorTests
     }
 
     [Fact]
-    public async Task ImapConnector_DisposesClientBeforeRetry()
-    {
+    public async Task ImapConnector_DisposesClientBeforeRetry() {
         var first = new FakeImapClient { FailuresBeforeSuccess = 1 };
         var second = new FakeImapClient();
         var call = 0;
-        ImapConnector.ClientFactory = () =>
-        {
+        ImapConnector.ClientFactory = () => {
             call++;
-            if (call == 2)
-            {
+            if (call == 2) {
                 Assert.True(first.Disposed);
                 return second;
             }
@@ -336,8 +309,7 @@ public class ConnectorTests
     }
 
     [Fact]
-    public async Task ImapConnector_DisposesClientAfterFinalFailure()
-    {
+    public async Task ImapConnector_DisposesClientAfterFinalFailure() {
         var fake = new FakeImapClient { FailuresBeforeSuccess = 1 };
         ImapConnector.ClientFactory = () => fake;
         await Assert.ThrowsAsync<HttpRequestException>(() => ImapConnector.ConnectAsync(
@@ -349,8 +321,7 @@ public class ConnectorTests
     }
 
     [Fact]
-    public async Task Pop3Connector_LogsDisconnectException()
-    {
+    public async Task Pop3Connector_LogsDisconnectException() {
         var fake = new FakePop3DisconnectFailClient();
         Pop3Connector.ClientFactory = () => fake;
         var messages = new List<string>();
@@ -368,16 +339,13 @@ public class ConnectorTests
     }
 
     [Fact]
-    public async Task Pop3Connector_DisposesClientBeforeRetry()
-    {
+    public async Task Pop3Connector_DisposesClientBeforeRetry() {
         var first = new FakePop3Client { FailuresBeforeSuccess = 1 };
         var second = new FakePop3Client();
         var call = 0;
-        Pop3Connector.ClientFactory = () =>
-        {
+        Pop3Connector.ClientFactory = () => {
             call++;
-            if (call == 2)
-            {
+            if (call == 2) {
                 Assert.True(first.Disposed);
                 return second;
             }
@@ -392,8 +360,7 @@ public class ConnectorTests
     }
 
     [Fact]
-    public async Task Pop3Connector_DisposesClientAfterFinalFailure()
-    {
+    public async Task Pop3Connector_DisposesClientAfterFinalFailure() {
         var fake = new FakePop3Client { FailuresBeforeSuccess = 1 };
         Pop3Connector.ClientFactory = () => fake;
         await Assert.ThrowsAsync<HttpRequestException>(() => Pop3Connector.ConnectAsync(

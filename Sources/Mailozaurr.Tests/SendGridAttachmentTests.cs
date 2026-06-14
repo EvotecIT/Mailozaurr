@@ -1,19 +1,16 @@
+using MimeKit;
 using System;
 using System.IO;
 using System.Text;
-using MimeKit;
 using Xunit;
 
 namespace Mailozaurr.Tests;
 
-public class SendGridAttachmentTests
-{
+public class SendGridAttachmentTests {
     [Fact]
-    public void Constructor_FromFilePath_ReadsFileAndSetsMetadata()
-    {
+    public void Constructor_FromFilePath_ReadsFileAndSetsMetadata() {
         var path = Path.GetTempFileName();
-        try
-        {
+        try {
             File.WriteAllText(path, "hello");
             var attachment = new SendGridAttachment(path);
 
@@ -22,16 +19,13 @@ public class SendGridAttachmentTests
             Assert.Equal(MimeTypes.GetMimeType(path), attachment.Type);
             Assert.Equal("attachment", attachment.Disposition);
             Assert.Null(attachment.ContentId);
-        }
-        finally
-        {
+        } finally {
             File.Delete(path);
         }
     }
 
     [Fact]
-    public void Constructor_FromBytes_UsesProvidedMetadata()
-    {
+    public void Constructor_FromBytes_UsesProvidedMetadata() {
         var data = Encoding.UTF8.GetBytes("inline");
         var attachment = new SendGridAttachment("inline.txt", data, "text/plain", "inline", "cid123");
 

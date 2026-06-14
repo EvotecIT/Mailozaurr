@@ -1,6 +1,6 @@
-using System;
 using MailKit.Search;
 using Mailozaurr;
+using System;
 using Xunit;
 
 namespace Mailozaurr.Tests;

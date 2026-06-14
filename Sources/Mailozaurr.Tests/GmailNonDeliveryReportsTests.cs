@@ -61,4 +61,3 @@ public class GmailNonDeliveryReportsTests {
         Assert.Equal("id1", reports[0].OriginalMessageId);
     }
 }
-

@@ -16,4 +16,3 @@ public class GraphUploadSessionResult {
     [JsonPropertyName("uploadUrl")]
     public string UploadUrl { get; set; } = string.Empty;
 }
-

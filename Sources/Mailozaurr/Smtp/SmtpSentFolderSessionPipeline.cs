@@ -1,9 +1,9 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using MailKit;
 using MailKit.Net.Imap;
 using MimeKit;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Mailozaurr;
 

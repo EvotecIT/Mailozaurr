@@ -1,10 +1,10 @@
+using Mailozaurr.PowerShell;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
-using Mailozaurr.PowerShell;
 using Xunit;
 
 namespace Mailozaurr.Tests;

@@ -21,7 +21,7 @@ public static class AcquireGoogleTokenInteractive {
                 clientId,
                 clientSecret,
                 scopes);
-            Console.WriteLine($"Token acquired for {cred.UserName}: {cred.AccessToken.Substring(0,5)}...");
+            Console.WriteLine($"Token acquired for {cred.UserName}: {cred.AccessToken.Substring(0, 5)}...");
         } catch (Exception ex) {
             Console.WriteLine($"AcquireGoogleTokenInteractive Example Error: {ex.Message}");
         }

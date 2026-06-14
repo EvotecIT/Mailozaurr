@@ -1,5 +1,5 @@
-using System.Globalization;
 using MimeKit;
+using System.Globalization;
 
 namespace Mailozaurr.Application;
 
@@ -277,19 +277,19 @@ public sealed class GraphMailReadHandler : IMailReadHandler {
         string folderId,
         GraphMailMessage message,
         MimeMessage? mimeMessage = null) => new() {
-        ProfileId = profileId,
-        Id = message.Id,
-        ThreadId = message.ConversationId,
-        FolderId = folderId,
-        Subject = string.IsNullOrWhiteSpace(message.Subject) ? mimeMessage?.Subject : message.Subject,
-        Preview = mimeMessage?.TextBody,
-        From = MapRecipients(message.From, mimeMessage?.From.Mailboxes),
-        To = MapRecipients(message.ToRecipients, mimeMessage?.To.Mailboxes),
-        ReceivedAt = message.ReceivedDateTime ?? mimeMessage?.Date,
-        SentAt = mimeMessage?.Date,
-        IsRead = message.IsRead,
-        HasAttachments = message.HasAttachments ?? mimeMessage?.Attachments.Any() ?? false
-    };
+            ProfileId = profileId,
+            Id = message.Id,
+            ThreadId = message.ConversationId,
+            FolderId = folderId,
+            Subject = string.IsNullOrWhiteSpace(message.Subject) ? mimeMessage?.Subject : message.Subject,
+            Preview = mimeMessage?.TextBody,
+            From = MapRecipients(message.From, mimeMessage?.From.Mailboxes),
+            To = MapRecipients(message.ToRecipients, mimeMessage?.To.Mailboxes),
+            ReceivedAt = message.ReceivedDateTime ?? mimeMessage?.Date,
+            SentAt = mimeMessage?.Date,
+            IsRead = message.IsRead,
+            HasAttachments = message.HasAttachments ?? mimeMessage?.Attachments.Any() ?? false
+        };
 
     private static List<MessageRecipient> MapRecipients(GraphEmailAddress? sender, IEnumerable<MailboxAddress>? fallback) {
         if (sender?.Email != null && !string.IsNullOrWhiteSpace(sender.Email.Address)) {

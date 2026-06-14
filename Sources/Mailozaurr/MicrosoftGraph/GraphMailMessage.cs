@@ -48,4 +48,3 @@ public sealed class GraphMailMessage {
     [JsonPropertyName("conversationId")]
     public string? ConversationId { get; set; }
 }
-

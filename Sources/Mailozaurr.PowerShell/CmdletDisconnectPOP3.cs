@@ -1,6 +1,6 @@
+using MailKit.Net.Pop3;
 using System.Management.Automation;
 using System.Threading.Tasks;
-using MailKit.Net.Pop3;
 
 namespace Mailozaurr.PowerShell;
 

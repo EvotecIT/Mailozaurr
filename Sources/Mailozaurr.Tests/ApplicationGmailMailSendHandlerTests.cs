@@ -1,5 +1,5 @@
-using System.Net.Http;
 using Mailozaurr.Application;
+using System.Net.Http;
 
 namespace Mailozaurr.Tests;
 
