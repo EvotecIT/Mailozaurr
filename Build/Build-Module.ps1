@@ -90,10 +90,23 @@ Build-Module -ModuleName 'Mailozaurr' {
         NETFramework                         = 'net8.0', 'net472'
         NETHandleAssemblyWithSameName        = $true
         NETAssemblyLoadContext               = $true
-        NETAssemblyTypeAcceleratorMode       = 'Assembly'
-        NETAssemblyTypeAcceleratorAssemblies = @(
-            'Mailozaurr'
-            'Mailozaurr.Msg'
+        NETAssemblyTypeAcceleratorMode       = 'AllowList'
+        NETAssemblyTypeAccelerators          = @(
+            'Mailozaurr.EmailEncryption'
+            'Mailozaurr.EmailMessage'
+            'Mailozaurr.EmailProvider'
+            'Mailozaurr.FileSentMessageRepository'
+            'Mailozaurr.GraphApiErrorParser'
+            'Mailozaurr.GraphAttachment'
+            'Mailozaurr.GraphContent'
+            'Mailozaurr.GraphHttpMethod'
+            'Mailozaurr.GraphMessage'
+            'Mailozaurr.GraphSendPolicy'
+            'Mailozaurr.HtmlUtils'
+            'Mailozaurr.MailozaurrOptions'
+            'Mailozaurr.SendLogResolver'
+            'Mailozaurr.Smtp'
+            'Mailozaurr.SmtpConnectionPool'
         )
         #NETMergeLibraryDebugging          = $true
         DotSourceLibraries                   = $true

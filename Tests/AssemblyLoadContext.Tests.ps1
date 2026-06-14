@@ -1,5 +1,5 @@
 Describe 'Packaged AssemblyLoadContext isolation' {
-    It 'loads binary cmdlets and selected public types from the module ALC' {
+    It 'loads binary cmdlets and allowlisted public types from the module ALC' {
         $packagedModuleRoot = Join-Path $PSScriptRoot '..\Artefacts\Modules'
         $packagedModule = Join-Path $packagedModuleRoot 'Mailozaurr'
         $packagedLoader = Join-Path $packagedModule 'Lib\Core\Mailozaurr.ModuleLoadContext.dll'
@@ -29,6 +29,12 @@ Import-Module Mailozaurr -Force
 `$mimeAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$message.GetType().Assembly)
 `$mailKitAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$query.GetType().Assembly)
 `$smtp = [Mailozaurr.Smtp]::new()
+`$unlistedTypeVisibleByName = `$true
+try {
+    `$null = [type]'Mailozaurr.MicrosoftGraphUtils'
+} catch {
+    `$unlistedTypeVisibleByName = `$false
+}
 
 [pscustomobject]@{
     CommandName = `$command.Name
@@ -39,7 +45,10 @@ Import-Module Mailozaurr -Force
     SmtpType = [Mailozaurr.Smtp].FullName
     SmtpALC = `$smtpAlc.Name
     SmtpALCIsDefault = [object]::ReferenceEquals(`$smtpAlc, [System.Runtime.Loader.AssemblyLoadContext]::Default)
+    EmailEncryptionType = [Mailozaurr.EmailEncryption].FullName
     EmailProviderType = [Mailozaurr.EmailProvider].FullName
+    GraphHttpMethodType = [Mailozaurr.GraphHttpMethod].FullName
+    GraphSendPolicyType = [Mailozaurr.GraphSendPolicy].FullName
     EmailMessageType = [Mailozaurr.EmailMessage].FullName
     EmailMessageALC = `$msgAlc.Name
     EmailMessageALCIsDefault = [object]::ReferenceEquals(`$msgAlc, [System.Runtime.Loader.AssemblyLoadContext]::Default)
@@ -50,6 +59,7 @@ Import-Module Mailozaurr -Force
     SearchQueryALC = `$mailKitAlc.Name
     SearchQueryALCIsDefault = [object]::ReferenceEquals(`$mailKitAlc, [System.Runtime.Loader.AssemblyLoadContext]::Default)
     SmtpCreated = `$null -ne `$smtp
+    UnlistedTypeVisibleByName = `$unlistedTypeVisibleByName
 } | ConvertTo-Json -Compress
 "@
         $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
@@ -68,7 +78,10 @@ Import-Module Mailozaurr -Force
         $result.SmtpType | Should -Be 'Mailozaurr.Smtp'
         $result.SmtpALC | Should -Be 'Mailozaurr'
         $result.SmtpALCIsDefault | Should -BeFalse
+        $result.EmailEncryptionType | Should -Be 'Mailozaurr.EmailEncryption'
         $result.EmailProviderType | Should -Be 'Mailozaurr.EmailProvider'
+        $result.GraphHttpMethodType | Should -Be 'Mailozaurr.GraphHttpMethod'
+        $result.GraphSendPolicyType | Should -Be 'Mailozaurr.GraphSendPolicy'
         $result.EmailMessageType | Should -Be 'Mailozaurr.EmailMessage'
         $result.EmailMessageALC | Should -Be 'Mailozaurr'
         $result.EmailMessageALCIsDefault | Should -BeFalse
@@ -79,5 +92,6 @@ Import-Module Mailozaurr -Force
         $result.SearchQueryALC | Should -Be 'Mailozaurr'
         $result.SearchQueryALCIsDefault | Should -BeFalse
         $result.SmtpCreated | Should -BeTrue
+        $result.UnlistedTypeVisibleByName | Should -BeFalse
     }
 }

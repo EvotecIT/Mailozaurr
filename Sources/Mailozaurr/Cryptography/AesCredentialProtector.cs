@@ -12,6 +12,7 @@ internal sealed class AesCredentialProtector : ICredentialProtector {
     private const int IvSizeBytes = 16;
     private const int MacSizeBytes = 32;
     private static readonly byte[] PayloadPrefix = { (byte)'M', (byte)'Z', (byte)'C', 2 };
+    private static readonly object KeyFileSyncRoot = new();
 
     private readonly byte[] key;
 
@@ -170,6 +171,12 @@ internal sealed class AesCredentialProtector : ICredentialProtector {
     };
 
     private static byte[] LoadOrCreateKey() {
+        lock (KeyFileSyncRoot) {
+            return LoadOrCreateKeyCore();
+        }
+    }
+
+    private static byte[] LoadOrCreateKeyCore() {
         var directory = CredentialProtectionPaths.ResolveKeyDirectory();
         Directory.CreateDirectory(directory);
         var keyPath = Path.Combine(directory, KeyFileName);
@@ -261,10 +268,16 @@ internal sealed class AesCredentialProtector : ICredentialProtector {
             rng.GetBytes(key);
         }
 
+        var directory = Path.GetDirectoryName(keyPath) ?? ".";
+        var tempPath = Path.Combine(directory, $"{KeyFileName}.{Guid.NewGuid():N}.tmp");
+
         try {
-            using var stream = new FileStream(keyPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-            stream.Write(key, 0, key.Length);
-            stream.Flush(true);
+            using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)) {
+                stream.Write(key, 0, key.Length);
+                stream.Flush(true);
+            }
+
+            File.Move(tempPath, keyPath);
             return true;
         } catch (IOException ex) {
             if (IsSharingViolation(ex) || File.Exists(keyPath)) {
@@ -278,6 +291,18 @@ internal sealed class AesCredentialProtector : ICredentialProtector {
             }
 
             throw;
+        } finally {
+            TryDeleteTempKeyFile(tempPath);
+        }
+    }
+
+    private static void TryDeleteTempKeyFile(string tempPath) {
+        try {
+            if (File.Exists(tempPath)) {
+                File.Delete(tempPath);
+            }
+        } catch {
+            // Best-effort cleanup only; the final key file is the source of truth.
         }
     }
 
