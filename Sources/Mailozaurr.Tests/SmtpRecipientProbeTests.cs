@@ -99,6 +99,72 @@ public class SmtpRecipientProbeTests {
     }
 
     [Fact]
+    public async Task TestRecipient_FallsBackToHeloWhenEhloIsRejected() {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        try {
+            listener.Start();
+            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            var commands = new List<string>();
+
+            var serverTask = Task.Run(async () => {
+                using var client = await listener.AcceptTcpClientAsync();
+                using var stream = client.GetStream();
+                using var reader = new StreamReader(stream, Encoding.ASCII, detectEncodingFromByteOrderMarks: false, bufferSize: 1024, leaveOpen: false);
+                using var writer = new StreamWriter(stream, Encoding.ASCII, bufferSize: 1024, leaveOpen: false) {
+                    AutoFlush = true,
+                    NewLine = "\r\n"
+                };
+
+                await writer.WriteLineAsync("220 local.test SMTP");
+                while (true) {
+                    var command = await reader.ReadLineAsync();
+                    if (command == null) {
+                        break;
+                    }
+
+                    commands.Add(command);
+                    if (command.StartsWith("EHLO ", StringComparison.OrdinalIgnoreCase)) {
+                        await writer.WriteLineAsync("500 5.5.1 EHLO not supported");
+                    } else if (command.StartsWith("HELO ", StringComparison.OrdinalIgnoreCase)) {
+                        await writer.WriteLineAsync("250 local.test");
+                    } else if (command.StartsWith("MAIL FROM:", StringComparison.OrdinalIgnoreCase)) {
+                        await writer.WriteLineAsync("250 2.1.0 Sender OK");
+                    } else if (command.StartsWith("RCPT TO:", StringComparison.OrdinalIgnoreCase)) {
+                        await writer.WriteLineAsync("250 2.1.5 Recipient OK");
+                    } else if (command.Equals("RSET", StringComparison.OrdinalIgnoreCase)) {
+                        await writer.WriteLineAsync("250 2.0.0 Reset OK");
+                    } else if (command.Equals("QUIT", StringComparison.OrdinalIgnoreCase)) {
+                        await writer.WriteLineAsync("221 2.0.0 Bye");
+                        break;
+                    } else if (command.Equals("DATA", StringComparison.OrdinalIgnoreCase)) {
+                        await writer.WriteLineAsync("554 DATA is not expected in recipient probe");
+                    }
+                }
+            });
+
+            var result = Smtp.TestRecipient(
+                "127.0.0.1",
+                port,
+                "recipient@example.com",
+                "sender@example.com",
+                "probe.local",
+                SecureSocketOptions.None);
+
+            await serverTask;
+
+            Assert.True(result.Accepted);
+            Assert.Equal(250, result.MailFromStatusCode);
+            Assert.Equal(250, result.RecipientStatusCode);
+            Assert.False(result.StartTlsUsed);
+            Assert.Contains(commands, command => command.StartsWith("EHLO probe.local", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(commands, command => command.StartsWith("HELO probe.local", StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(commands, command => command.Equals("DATA", StringComparison.OrdinalIgnoreCase));
+        } finally {
+            listener.Stop();
+        }
+    }
+
+    [Fact]
     public async Task SendValidationMessage_SendsDataAndReturnsCorrelationFields() {
         var listener = new TcpListener(IPAddress.Loopback, 0);
         try {

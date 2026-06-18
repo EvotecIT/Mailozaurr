@@ -84,10 +84,11 @@ public partial class Smtp {
             };
 
             banner = ReadSmtpResponse(reader);
-            WriteSmtpCommand(writer, "EHLO " + heloHost);
-            var ehloResponse = ReadSmtpResponse(reader);
+            if (!TryGreetSmtpServer(writer, reader, heloHost, out var greetingResponse)) {
+                return new SmtpRecipientProbeInfo(server, port, heloHost, sender, recipient, banner, false, null, null, null, null, false, greetingResponse);
+            }
 
-            if (!startTlsUsed && ShouldUseStartTls(effectiveOptions, ehloResponse)) {
+            if (!startTlsUsed && ShouldUseStartTls(effectiveOptions, greetingResponse)) {
                 WriteSmtpCommand(writer, "STARTTLS");
                 var startTlsResponse = ReadSmtpResponse(reader);
                 var startTlsCode = ParseSmtpStatusCode(startTlsResponse);
@@ -103,8 +104,10 @@ public partial class Smtp {
                     NewLine = "\r\n"
                 };
 
-                WriteSmtpCommand(tlsWriter, "EHLO " + heloHost);
-                _ = ReadSmtpResponse(tlsReader);
+                if (!TryGreetSmtpServer(tlsWriter, tlsReader, heloHost, out var tlsGreetingResponse)) {
+                    return new SmtpRecipientProbeInfo(server, port, heloHost, sender, recipient, banner, true, null, null, null, null, false, tlsGreetingResponse);
+                }
+
                 return ProbeRecipientEnvelope(server, port, heloHost, sender, recipient, banner, startTlsUsed, tlsReader, tlsWriter);
             }
 
@@ -116,6 +119,19 @@ public partial class Smtp {
         } catch (Exception ex) {
             return new SmtpRecipientProbeInfo(server, port, heloHost, sender, recipient, banner, startTlsUsed, ParseSmtpStatusCode(mailFromResponse), mailFromResponse, ParseSmtpStatusCode(recipientResponse), recipientResponse, false, ex.Message);
         }
+    }
+
+    private static bool TryGreetSmtpServer(StreamWriter writer, StreamReader reader, string heloHost, out string? response) {
+        WriteSmtpCommand(writer, "EHLO " + heloHost);
+        response = ReadSmtpResponse(reader);
+        var statusCode = ParseSmtpStatusCode(response);
+        if (statusCode is >= 500 and < 600) {
+            WriteSmtpCommand(writer, "HELO " + heloHost);
+            response = ReadSmtpResponse(reader);
+            statusCode = ParseSmtpStatusCode(response);
+        }
+
+        return statusCode is >= 200 and < 400;
     }
 
     private static SmtpRecipientProbeInfo ProbeRecipientEnvelope(
