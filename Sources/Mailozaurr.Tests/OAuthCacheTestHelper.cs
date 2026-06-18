@@ -6,14 +6,20 @@ using System.Threading;
 namespace Mailozaurr.Tests;
 
 internal static class OAuthCacheTestHelper {
+    private const string OAuthCachePathEnvironmentVariable = "MAILOZAURR_OAUTH_CACHE_PATH";
+
+    static OAuthCacheTestHelper() {
+        Environment.SetEnvironmentVariable(OAuthCachePathEnvironmentVariable, GetTestCacheFilePath());
+    }
+
     internal static void ResetOAuthTokenCache() {
         var field = typeof(OAuthTokenCache).GetField("_cache", BindingFlags.Static | BindingFlags.NonPublic);
         field?.SetValue(null, null);
     }
 
     internal static string GetOAuthCacheFilePath() {
-        var pathField = typeof(OAuthTokenCache).GetField("CacheFilePath", BindingFlags.Static | BindingFlags.NonPublic);
-        return (string)pathField!.GetValue(null)!;
+        var pathProperty = typeof(OAuthTokenCache).GetProperty("CacheFilePath", BindingFlags.Static | BindingFlags.NonPublic);
+        return (string)pathProperty!.GetValue(null)!;
     }
 
     internal static void DeleteOAuthCacheFile() {
@@ -46,5 +52,14 @@ internal static class OAuthCacheTestHelper {
                 Thread.Sleep(25 * (attempt + 1));
             }
         }
+    }
+
+    private static string GetTestCacheFilePath() {
+        var targetName = new DirectoryInfo(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)).Name;
+        return Path.Combine(
+            Path.GetTempPath(),
+            "Mailozaurr.Tests",
+            targetName,
+            "oauth_cache.json");
     }
 }
