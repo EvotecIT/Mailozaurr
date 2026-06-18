@@ -342,6 +342,50 @@ public partial class Smtp {
     /// <param name="secureSocketOptions">Controls SSL/TLS usage.</param>
     /// <param name="useSsl">Compatibility flag overriding <paramref name="secureSocketOptions"/> when set.</param>
     public static SmtpConnectionInfo TestConnection(string server, int port, SecureSocketOptions secureSocketOptions = SecureSocketOptions.Auto, bool useSsl = false) {
+        return TestConnection(server, port, secureSocketOptions, useSsl, null, "probe@example.com", "localhost");
+    }
+
+    /// <summary>
+    /// Connects to the specified SMTP server and optionally tests recipient acceptance before DATA.
+    /// </summary>
+    /// <param name="server">SMTP server name.</param>
+    /// <param name="port">Port number.</param>
+    /// <param name="secureSocketOptions">Controls SSL/TLS usage.</param>
+    /// <param name="useSsl">Compatibility flag overriding <paramref name="secureSocketOptions"/> when set.</param>
+    /// <param name="recipient">Optional recipient address used in RCPT TO.</param>
+    /// <param name="sender">Envelope sender address used in MAIL FROM when <paramref name="recipient"/> is supplied.</param>
+    /// <param name="heloHost">EHLO/HELO name sent during the recipient probe.</param>
+    public static SmtpConnectionInfo TestConnection(
+        string server,
+        int port,
+        SecureSocketOptions secureSocketOptions,
+        bool useSsl,
+        string? recipient,
+        string sender = "probe@example.com",
+        string heloHost = "localhost") {
+        return TestConnection(server, port, secureSocketOptions, useSsl, recipient, sender, heloHost, null);
+    }
+
+    /// <summary>
+    /// Connects to the specified SMTP server and optionally tests recipient acceptance or sends a validation message.
+    /// </summary>
+    /// <param name="server">SMTP server name.</param>
+    /// <param name="port">Port number.</param>
+    /// <param name="secureSocketOptions">Controls SSL/TLS usage.</param>
+    /// <param name="useSsl">Compatibility flag overriding <paramref name="secureSocketOptions"/> when set.</param>
+    /// <param name="recipient">Optional recipient address used in RCPT TO.</param>
+    /// <param name="sender">Envelope sender address used in MAIL FROM when <paramref name="recipient"/> is supplied.</param>
+    /// <param name="heloHost">EHLO/HELO name sent during the recipient probe.</param>
+    /// <param name="validationMessage">Optional validation message request.</param>
+    public static SmtpConnectionInfo TestConnection(
+        string server,
+        int port,
+        SecureSocketOptions secureSocketOptions,
+        bool useSsl,
+        string? recipient,
+        string sender,
+        string heloHost,
+        SmtpValidationMessageRequest? validationMessage) {
         var logging = new LoggingConfigurator();
         logging.ConfigureLogging(null, false, true, false, false);
 
@@ -376,10 +420,21 @@ public partial class Smtp {
             persistent = false;
         }
 
-        var info = new SmtpConnectionInfo(server, port, banner, software, smtp.Client.GetCapabilitiesSnapshot(), persistent);
+        var capabilities = smtp.Client.GetCapabilitiesSnapshot();
         smtp.Disconnect();
         smtp.Dispose();
-        return info;
+
+        SmtpRecipientProbeInfo? recipientProbe = null;
+        if (!string.IsNullOrWhiteSpace(recipient)) {
+            recipientProbe = TestRecipient(server, port, recipient!, sender, heloHost, secureSocketOptions, useSsl);
+        }
+
+        SmtpValidationMessageInfo? validationMessageInfo = null;
+        if (validationMessage != null) {
+            validationMessageInfo = SendValidationMessage(server, port, validationMessage, secureSocketOptions, useSsl);
+        }
+
+        return new SmtpConnectionInfo(server, port, banner, software, capabilities, persistent, recipientProbe, validationMessageInfo);
     }
 
     /// <summary>
