@@ -10,23 +10,55 @@ using System.Security;
 /// </summary>
 public static class CredentialHelpers {
     /// <summary>
-    /// Converts a string to a SecureString.
+    /// Converts a plain text string to a SecureString.
     /// </summary>
     /// <param name="s"></param>
     /// <returns></returns>
     public static SecureString ToSecureString(string? s) {
         if (string.IsNullOrWhiteSpace(s))
             return new SecureString();
-        // Try to convert from encrypted string, fallback to plain text
-        try {
-            return new NetworkCredential("", s).SecurePassword;
-        } catch (ArgumentException ex) {
-            LoggingMessages.Logger?.WriteWarning($"Failed to convert to SecureString: {ex.Message}");
-            var ss = new SecureString();
-            foreach (char c in s!) ss.AppendChar(c);
-            ss.MakeReadOnly();
-            return ss;
+
+        return new NetworkCredential("", s).SecurePassword;
+    }
+
+    /// <summary>
+    /// Converts a string produced by ConvertFrom-SecureString back to a SecureString.
+    /// </summary>
+    /// <param name="encryptedString"></param>
+    /// <returns></returns>
+    public static SecureString ToSecureStringFromEncryptedString(string? encryptedString) {
+        if (string.IsNullOrWhiteSpace(encryptedString)) {
+            return new SecureString();
         }
+
+        using var powerShell = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
+        powerShell
+            .AddCommand("ConvertTo-SecureString")
+            .AddParameter("String", encryptedString!)
+            .AddParameter("ErrorAction", ActionPreference.Stop);
+
+        Collection<PSObject> results;
+        try {
+            results = powerShell.Invoke();
+        } catch (RuntimeException ex) {
+            throw new PSInvalidOperationException(
+                "ClientSecretEncrypted must be a string produced by ConvertFrom-SecureString for the current user and machine.",
+                ex);
+        }
+
+        if (powerShell.HadErrors) {
+            var firstError = powerShell.Streams.Error.FirstOrDefault();
+            throw new PSInvalidOperationException(
+                firstError?.Exception?.Message ?? "ClientSecretEncrypted could not be converted from its encrypted form.",
+                firstError?.Exception);
+        }
+
+        var value = results.FirstOrDefault()?.BaseObject;
+        if (value is SecureString secureString) {
+            return secureString;
+        }
+
+        throw new PSInvalidOperationException("ClientSecretEncrypted could not be converted from its encrypted form.");
     }
 
     /// <summary>

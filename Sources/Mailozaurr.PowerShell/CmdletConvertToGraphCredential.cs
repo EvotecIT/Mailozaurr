@@ -83,7 +83,7 @@ public class CmdletConvertToGraphCredential : PSCmdlet {
     /// </summary>
     protected override void ProcessRecord() {
         SecureString secret = this.ParameterSetName == "Encrypted"
-            ? CredentialHelpers.ToSecureString(ClientSecretEncrypted)
+            ? CredentialHelpers.ToSecureStringFromEncryptedString(ClientSecretEncrypted)
             : this.ParameterSetName == "SecureString"
                 ? ClientSecretSecureString!
                 : this.ParameterSetName == "SecretManagement"

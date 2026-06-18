@@ -13,10 +13,8 @@ namespace Mailozaurr;
 internal static class OAuthTokenCache {
     private static readonly object LockObj = new();
     private const int IoRetryCount = 5;
-    private static readonly string CacheFilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Mailozaurr",
-        "oauth_cache.json");
+    private const string CachePathEnvironmentVariable = "MAILOZAURR_OAUTH_CACHE_PATH";
+    private static string CacheFilePath => ResolveCacheFilePath();
 
     private static Dictionary<string, OAuthCredential>? _cache;
 
@@ -214,4 +212,16 @@ internal static class OAuthTokenCache {
 
     private static TimeSpan GetRetryDelay(int attempt) =>
         TimeSpan.FromMilliseconds(25 * (attempt + 1));
+
+    private static string ResolveCacheFilePath() {
+        var overriddenPath = Environment.GetEnvironmentVariable(CachePathEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(overriddenPath)) {
+            return overriddenPath.Trim();
+        }
+
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Mailozaurr",
+            "oauth_cache.json");
+    }
 }

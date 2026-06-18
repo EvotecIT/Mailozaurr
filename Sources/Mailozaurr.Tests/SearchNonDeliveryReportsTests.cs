@@ -365,7 +365,7 @@ public class SearchNonDeliveryReportsTests {
         var original = (HttpMessageHandler)handlerField.GetValue(client)!;
         handlerField.SetValue(client, handler);
         try {
-            var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", AccessToken = "token" };
+            var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", ClientSecret = "secret" };
 
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
                 MailboxSearcher.SearchNonDeliveryReportsAsync(
@@ -499,10 +499,10 @@ public class SearchNonDeliveryReportsTests {
     }
 
     private sealed class CancelDuringGraphListHandler : HttpMessageHandler {
-        private readonly CancellationTokenSource _cancellationTokenSource;
+        private readonly CancellationTokenSource _source;
 
-        public CancelDuringGraphListHandler(CancellationTokenSource cancellationTokenSource) {
-            _cancellationTokenSource = cancellationTokenSource;
+        public CancelDuringGraphListHandler(CancellationTokenSource source) {
+            _source = source;
         }
 
         public bool ListRequestCanceled { get; private set; }
@@ -516,14 +516,14 @@ public class SearchNonDeliveryReportsTests {
 
             if (uri.AbsolutePath.EndsWith("/messages", StringComparison.Ordinal)) {
                 try {
-                    _cancellationTokenSource.Cancel();
+                    _source.Cancel();
                     await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
                 } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                     ListRequestCanceled = true;
                     throw;
                 }
 
-                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"value\":[]}") };
+                throw new InvalidOperationException("Graph list request did not observe the supplied cancellation token.");
             }
 
             return new HttpResponseMessage(HttpStatusCode.NotFound);

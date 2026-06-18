@@ -9,6 +9,21 @@ Describe 'ConvertTo-GraphCredential cmdlet' {
         $credential.GetNetworkCredential().Password | Should -Be 'graph-secret'
     }
 
+    It 'accepts ClientSecretEncrypted produced by ConvertFrom-SecureString' {
+        $secret = ConvertTo-SecureString 'graph-secret' -AsPlainText -Force | ConvertFrom-SecureString
+
+        $credential = ConvertTo-GraphCredential -ClientId 'client' -ClientSecretEncrypted $secret -DirectoryId 'tenant'
+
+        $credential | Should -BeOfType ([pscredential])
+        $credential.UserName | Should -Be 'client@tenant'
+        $credential.GetNetworkCredential().Password | Should -Be 'graph-secret'
+    }
+
+    It 'rejects plain text passed to ClientSecretEncrypted' {
+        { ConvertTo-GraphCredential -ClientId 'client' -ClientSecretEncrypted 'graph-secret' -DirectoryId 'tenant' -ErrorAction Stop } |
+            Should -Throw
+    }
+
     It 'accepts SecretName and resolves the client secret via Get-Secret' {
         function Get-Secret {
             param(
