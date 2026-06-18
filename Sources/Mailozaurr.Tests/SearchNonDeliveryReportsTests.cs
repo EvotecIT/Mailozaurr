@@ -357,15 +357,15 @@ public class SearchNonDeliveryReportsTests {
 
     [Fact]
     public async Task SearchNonDeliveryReportsAsync_Graph_PropagatesCancellationToMessageListing() {
-        var handler = new CancelDuringGraphListHandler();
+        using var cts = new CancellationTokenSource();
+        var handler = new CancelDuringGraphListHandler(cts);
         var field = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
         var client = (HttpClient)field.GetValue(null)!;
         var handlerField = GetHandlerField();
         var original = (HttpMessageHandler)handlerField.GetValue(client)!;
         handlerField.SetValue(client, handler);
         try {
-            var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", ClientSecret = "secret" };
-            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+            var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", AccessToken = "token" };
 
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
                 MailboxSearcher.SearchNonDeliveryReportsAsync(
@@ -499,6 +499,12 @@ public class SearchNonDeliveryReportsTests {
     }
 
     private sealed class CancelDuringGraphListHandler : HttpMessageHandler {
+        private readonly CancellationTokenSource _cancellationTokenSource;
+
+        public CancelDuringGraphListHandler(CancellationTokenSource cancellationTokenSource) {
+            _cancellationTokenSource = cancellationTokenSource;
+        }
+
         public bool ListRequestCanceled { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
@@ -510,7 +516,8 @@ public class SearchNonDeliveryReportsTests {
 
             if (uri.AbsolutePath.EndsWith("/messages", StringComparison.Ordinal)) {
                 try {
-                    await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken).ConfigureAwait(false);
+                    _cancellationTokenSource.Cancel();
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
                 } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                     ListRequestCanceled = true;
                     throw;

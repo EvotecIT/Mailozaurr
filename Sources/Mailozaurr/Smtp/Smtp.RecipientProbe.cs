@@ -40,6 +40,13 @@ public partial class Smtp {
             heloHost = "localhost";
         }
 
+        var commandValueError = ValidateSmtpCommandValue(nameof(heloHost), heloHost)
+            ?? ValidateSmtpCommandValue(nameof(sender), sender)
+            ?? ValidateSmtpCommandValue(nameof(recipient), recipient);
+        if (commandValueError != null) {
+            return new SmtpRecipientProbeInfo(server, port, heloHost, sender, recipient, null, false, null, null, null, null, false, commandValueError);
+        }
+
         string? banner = null;
         string? mailFromResponse = null;
         string? recipientResponse = null;
@@ -49,7 +56,14 @@ public partial class Smtp {
             using var tcpClient = new TcpClient();
             tcpClient.ReceiveTimeout = RecipientProbeTimeoutMilliseconds;
             tcpClient.SendTimeout = RecipientProbeTimeoutMilliseconds;
-            tcpClient.Connect(server, port);
+            var connectTask = tcpClient.ConnectAsync(server, port);
+            if (!connectTask.Wait(RecipientProbeTimeoutMilliseconds)) {
+                return new SmtpRecipientProbeInfo(server, port, heloHost, sender, recipient, null, false, null, null, null, null, false, "Connection timed out after " + RecipientProbeTimeoutMilliseconds + " ms.");
+            }
+
+            if (connectTask.IsFaulted) {
+                throw connectTask.Exception?.GetBaseException() ?? new SocketException();
+            }
 
             Stream stream = tcpClient.GetStream();
             var effectiveOptions = secureSocketOptions;
@@ -155,6 +169,16 @@ public partial class Smtp {
 
     private static void WriteSmtpCommand(StreamWriter writer, string command) {
         writer.WriteLine(command);
+    }
+
+    private static string? ValidateSmtpCommandValue(string name, string value) {
+        foreach (var character in value) {
+            if (character == '\r' || character == '\n') {
+                return name + " must not contain CR or LF characters.";
+            }
+        }
+
+        return null;
     }
 
     private static string? ReadSmtpResponse(StreamReader reader) {

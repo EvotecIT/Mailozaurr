@@ -16,6 +16,23 @@ public class SmtpRecipientProbeTests {
         Assert.Equal(expectedHost, host);
     }
 
+    [Theory]
+    [InlineData("recipient@example.com\r\nDATA", "sender@example.com", "probe.local", "recipient must not contain CR or LF characters.")]
+    [InlineData("recipient@example.com", "sender@example.com\r\nDATA", "probe.local", "sender must not contain CR or LF characters.")]
+    [InlineData("recipient@example.com", "sender@example.com", "probe.local\r\nDATA", "heloHost must not contain CR or LF characters.")]
+    public void TestRecipient_RejectsCommandInjectionInput(string recipient, string sender, string heloHost, string expectedError) {
+        var result = Smtp.TestRecipient(
+            "127.0.0.1",
+            25,
+            recipient,
+            sender,
+            heloHost,
+            SecureSocketOptions.None);
+
+        Assert.False(result.Accepted);
+        Assert.Equal(expectedError, result.Error);
+    }
+
     [Fact]
     public async Task TestRecipient_StopsBeforeDataAndReportsAccepted() {
         var listener = new TcpListener(IPAddress.Loopback, 0);

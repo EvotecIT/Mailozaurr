@@ -260,6 +260,10 @@ jobs:
       - name: Install PowerShell modules
         shell: pwsh
         run: |
+          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+            Register-PSRepository -Default
+          }
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
           Install-Module -Name PSPublishModule -Repository PSGallery -Force -Scope CurrentUser -AllowClobber
           Install-Module -Name Pester -Repository PSGallery -Force -Scope CurrentUser -SkipPublisherCheck -AllowClobber
 
