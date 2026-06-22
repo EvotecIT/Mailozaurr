@@ -70,6 +70,11 @@ public sealed partial class ApplicationMessageActionPlanRegistryServiceTests {
                 UniqueMessageCount = request.MessageIds.Distinct(StringComparer.Ordinal).Count(),
                 MessageIds = request.MessageIds.ToList(),
                 RequestedDestinationFolderId = request.DestinationFolderId,
+                ConfirmationToken = string.IsNullOrWhiteSpace(request.ConfirmationToken)
+                    ? $"generated-{request.Action}"
+                    : request.ConfirmationToken,
+                ConfirmationProvided = !string.IsNullOrWhiteSpace(request.ConfirmationToken),
+                ConfirmationValidated = !string.IsNullOrWhiteSpace(request.ConfirmationToken),
                 DesiredState = request.Action switch {
                     "mark-read" => true,
                     "mark-unread" => false,

@@ -109,8 +109,7 @@ public sealed class MailMessageActionPlanRegistryService : IMailMessageActionPla
                 MailboxId = preview.MailboxId,
                 FolderId = preview.FolderId,
                 MessageIds = preview.MessageIds.ToList(),
-                DestinationFolderId = ResolveDestinationFolderId(action, preview.RequestedDestinationFolderId),
-                ConfirmationToken = action.ConfirmationToken
+                DestinationFolderId = ResolveDestinationFolderId(action, preview.RequestedDestinationFolderId)
             }, cancellationToken).ConfigureAwait(false);
 
             if (plan.Succeeded) {

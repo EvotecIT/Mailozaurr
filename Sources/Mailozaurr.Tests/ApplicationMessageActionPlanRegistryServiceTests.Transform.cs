@@ -95,8 +95,8 @@ public sealed partial class ApplicationMessageActionPlanRegistryServiceTests {
         Assert.Equal(new[] { "mark-read", "move" }, stored.Plans.Select(plan => plan.Action));
         Assert.Equal("Archive", stored.Plans.Single(plan => plan.Action == "move").RequestedDestinationFolderId);
         Assert.Equal(new[] { "msg-1" }, stored.Plans[0].MessageIds);
-        Assert.Equal("token-read", planService.Requests[0].ConfirmationToken);
-        Assert.Equal("token-move", planService.Requests[1].ConfirmationToken);
+        Assert.Null(planService.Requests[0].ConfirmationToken);
+        Assert.Null(planService.Requests[1].ConfirmationToken);
     }
 
     [Fact]
@@ -170,12 +170,14 @@ public sealed partial class ApplicationMessageActionPlanRegistryServiceTests {
         Assert.Equal(2, planService.Requests.Count);
         Assert.Equal(new[] { "flag", "move" }, planService.Requests.Select(request => request.Action));
         Assert.All(planService.Requests, request => Assert.Equal(new[] { "msg-1", "msg-2" }, request.MessageIds));
-        Assert.Equal("token-flag", planService.Requests[0].ConfirmationToken);
-        Assert.Equal("token-move", planService.Requests[1].ConfirmationToken);
+        Assert.Null(planService.Requests[0].ConfirmationToken);
+        Assert.Null(planService.Requests[1].ConfirmationToken);
         Assert.Equal("Projects/2026", planService.Requests[1].DestinationFolderId);
         Assert.NotNull(stored);
         Assert.Equal("Built from preview", stored!.Description);
         Assert.Equal(2, stored.Plans.Count);
+        Assert.All(stored.Plans, plan => Assert.False(plan.ConfirmationProvided));
+        Assert.All(stored.Plans, plan => Assert.False(plan.ConfirmationValidated));
     }
 
     [Fact]

@@ -271,7 +271,6 @@ public sealed class MailApplicationBuilder {
         var draftExchangeService = _draftExchangeService ?? new JsonMailDraftExchangeService();
         var draftMimeMessageFactory = _draftMimeMessageFactory ?? new DraftMimeMessageFactory();
         var pendingMessageRepository = _pendingMessageRepository ?? new FilePendingMessageRepository(_options.PendingMessageStore);
-        var pendingMessageDeadLetterRepository = _pendingMessageDeadLetterRepository ?? new FilePendingMessageDeadLetterRepository(_options.PendingMessageStore);
 
         var readHandlers = new List<IMailReadHandler>(_readHandlers);
         if (_options.EnableImapReadHandler && !readHandlers.Any(handler => handler.Kind == MailProfileKind.Imap)) {
@@ -315,7 +314,7 @@ public sealed class MailApplicationBuilder {
         var messageActionBatchService = _messageActionBatchService ?? new MailMessageActionBatchService(messageActionPlanService);
         var messageActionPlanRegistryService = _messageActionPlanRegistryService ?? new MailMessageActionPlanRegistryService(messageActionPlanBatchStore, messageActionPlanExchangeService, messageActionPreviewService, messageActionPlanService, messageActionBatchService, profileStore);
         var sendService = _sendService ?? new RoutedMailSendService(profileStore, sendHandlers);
-        var queueService = _queueService ?? new PendingMailQueueService(pendingMessageRepository, pendingMessageDeadLetterRepository);
+        var queueService = _queueService ?? new PendingMailQueueService(pendingMessageRepository, ResolvePendingMessageDeadLetterRepository());
 
         return new MailApplication(
             profileStore,
@@ -342,5 +341,17 @@ public sealed class MailApplicationBuilder {
             readHandlers.AsReadOnly(),
             messageActionHandlers.AsReadOnly(),
             sendHandlers.AsReadOnly());
+    }
+
+    private IPendingMessageDeadLetterRepository ResolvePendingMessageDeadLetterRepository() {
+        if (_pendingMessageDeadLetterRepository != null) {
+            return _pendingMessageDeadLetterRepository;
+        }
+
+        if (_pendingMessageRepository != null) {
+            throw new InvalidOperationException("UsePendingMessageDeadLetterRepository must be configured when UsePendingMessageRepository overrides the default pending-message repository.");
+        }
+
+        return new FilePendingMessageDeadLetterRepository(_options.PendingMessageStore);
     }
 }
