@@ -128,6 +128,16 @@ public sealed class MailMessageActionPlanService : IMailMessageActionPlanService
                 FailedCount = plan.UniqueMessageCount
             });
         }
+        if (!plan.ConfirmationProvided || !plan.ConfirmationValidated) {
+            return Task.FromResult(new MessageActionResult {
+                Succeeded = false,
+                Code = "confirmation_token_required",
+                Message = "A validated confirmation token is required before executing this action plan.",
+                ProfileId = plan.ProfileId,
+                RequestedCount = plan.RequestedCount,
+                FailedCount = plan.UniqueMessageCount
+            });
+        }
 
         return plan.ExecutionKind switch {
             "SetReadState" => _messageActionService.SetReadStateAsync(new SetReadStateRequest {
@@ -231,7 +241,7 @@ public sealed class MailMessageActionPlanService : IMailMessageActionPlanService
             plan.Succeeded = false;
             plan.Code = previewCode;
             plan.Message = previewMessage;
-            plan.ConfirmationValidated = !plan.ConfirmationProvided;
+            plan.ConfirmationValidated = false;
             plan.Summary = BuildPlanSummary(plan);
             return plan;
         }
@@ -251,7 +261,7 @@ public sealed class MailMessageActionPlanService : IMailMessageActionPlanService
 
         plan.Succeeded = true;
         plan.Code = null;
-        plan.ConfirmationValidated = !plan.ConfirmationProvided || string.Equals(providedConfirmationToken, plan.ConfirmationToken, StringComparison.Ordinal);
+        plan.ConfirmationValidated = plan.ConfirmationProvided && string.Equals(providedConfirmationToken?.Trim(), plan.ConfirmationToken, StringComparison.Ordinal);
         plan.Message = $"Execution plan ready for '{plan.Action}' on {plan.UniqueMessageCount} message(s).";
         plan.Summary = BuildPlanSummary(plan);
         return plan;

@@ -285,7 +285,7 @@ public sealed partial class ApplicationMessageActionPlanRegistryServiceTests {
             Assert.Equal("target@example.com", plan.MailboxId);
             Assert.Equal("Projects", plan.FolderId);
             Assert.False(plan.ConfirmationProvided);
-            Assert.True(plan.ConfirmationValidated);
+            Assert.False(plan.ConfirmationValidated);
             Assert.False(string.IsNullOrWhiteSpace(plan.ConfirmationToken));
         });
 

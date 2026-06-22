@@ -61,8 +61,12 @@ public sealed class PendingMessageProcessorTests {
 
     private sealed class InMemoryDeadLetterRepository : IPendingMessageDeadLetterRepository {
         private readonly ConcurrentDictionary<string, PendingMessageDeadLetterRecord> records = new(StringComparer.OrdinalIgnoreCase);
+        private int saveCount;
+
+        public int SaveCount => saveCount;
 
         public Task SaveAsync(PendingMessageDeadLetterRecord record, CancellationToken cancellationToken = default) {
+            Interlocked.Increment(ref saveCount);
             records[record.Message.MessageId] = record;
             return Task.CompletedTask;
         }
@@ -442,6 +446,29 @@ public sealed class PendingMessageProcessorTests {
     }
 
     [Fact]
+    public async Task ProcessAsync_DoesNotDoubleDeadLetterExhaustedRecordWhenTwoProcessorsRace() {
+        var currentTime = DateTimeOffset.Parse("2024-06-07T11:30:00Z");
+        var repository = new CoordinatedPendingMessageRepository(currentTime.AddMinutes(-1), attemptCount: 5);
+        var deadLetters = new InMemoryDeadLetterRepository();
+        var observer = new RecordingObserver();
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            { EmailProvider.None, new RecordingPendingMessageSender() }
+        });
+        var first = new PendingMessageProcessor(repository, factory, clock: () => currentTime, maxRetryAttempts: 5, observer: observer, deadLetterRepository: deadLetters);
+        var second = new PendingMessageProcessor(repository, factory, clock: () => currentTime, maxRetryAttempts: 5, observer: observer, deadLetterRepository: deadLetters);
+
+        var firstTask = first.ProcessAsync();
+        var secondTask = second.ProcessAsync();
+
+        repository.ReleaseEnumerations();
+        await Task.WhenAll(firstTask, secondTask);
+
+        Assert.Equal(1, deadLetters.SaveCount);
+        Assert.Single(observer.Dropped);
+        Assert.Contains(observer.Skipped, skipped => skipped.Reason == PendingMessageSkipReason.LeaseNotAcquired);
+    }
+
+    [Fact]
     public async Task ProcessAsync_RemovesRecordAfterFinalFailedAttempt() {
         var currentTime = DateTimeOffset.Parse("2024-06-08T14:45:00Z");
         var repository = new InMemoryPendingMessageRepository();
@@ -702,8 +729,9 @@ public sealed class PendingMessageProcessorTests {
         private readonly TaskCompletionSource<bool> secondSnapshotCaptured = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<bool> releaseEnumerators = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        internal CoordinatedPendingMessageRepository(DateTimeOffset nextAttemptAt) {
+        internal CoordinatedPendingMessageRepository(DateTimeOffset nextAttemptAt, int attemptCount = 0) {
             record = CreateRecord(nextAttemptAt, "coordinated-message");
+            record.AttemptCount = attemptCount;
         }
 
         public Task SaveAsync(PendingMessageRecord updatedRecord, CancellationToken cancellationToken = default) {

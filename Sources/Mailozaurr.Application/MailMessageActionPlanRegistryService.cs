@@ -504,7 +504,7 @@ public sealed class MailMessageActionPlanRegistryService : IMailMessageActionPla
         }
 
         cloned.ConfirmationProvided = false;
-        cloned.ConfirmationValidated = true;
+        cloned.ConfirmationValidated = false;
         cloned.ConfirmationToken = CreateConfirmationToken(cloned);
         cloned.Summary = BuildStoredPlanSummary(cloned);
         return cloned;

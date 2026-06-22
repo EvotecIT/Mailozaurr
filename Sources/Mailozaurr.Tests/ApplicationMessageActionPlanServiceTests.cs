@@ -87,12 +87,20 @@ public sealed class ApplicationMessageActionPlanServiceTests {
         var previewService = new MailMessageActionPreviewService(profileStore, new FakeFolderAliasService());
         var actionService = new CapturingMessageActionService();
         var planningService = new MailMessageActionPlanService(previewService, actionService);
+        var preview = await previewService.PreviewReadStateAsync(new SetReadStateRequest {
+            ProfileId = "work-imap",
+            MailboxId = "shared@example.com",
+            FolderId = "Inbox",
+            MessageIds = { "msg-1", "MSG-1" },
+            IsRead = false
+        });
         var plan = await planningService.CreatePlanAsync(new MessageActionExecutionPlanRequest {
             Action = "mark-unread",
             ProfileId = "work-imap",
             MailboxId = "shared@example.com",
             FolderId = "Inbox",
-            MessageIds = { "msg-1", "MSG-1" }
+            MessageIds = { "msg-1", "MSG-1" },
+            ConfirmationToken = preview.ConfirmationToken
         });
 
         var result = await planningService.ExecuteAsync(plan);
@@ -107,6 +115,38 @@ public sealed class ApplicationMessageActionPlanServiceTests {
         Assert.Equal(plan.ConfirmationToken, actionService.LastReadStateRequest.ConfirmationToken);
     }
 
+    [Fact]
+    public async Task ExecutePlanRejectsGeneratedPlanWithoutValidatedConfirmation() {
+        var profileStore = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
+        await profileStore.SaveAsync(new MailProfile {
+            Id = "work-imap",
+            DisplayName = "Work IMAP",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+                [MailProfileSettingsKeys.Server] = "imap.example.com"
+            }
+        });
+
+        var previewService = new MailMessageActionPreviewService(profileStore, new FakeFolderAliasService());
+        var actionService = new CapturingMessageActionService();
+        var planningService = new MailMessageActionPlanService(previewService, actionService);
+        var plan = await planningService.CreatePlanAsync(new MessageActionExecutionPlanRequest {
+            Action = "delete",
+            ProfileId = "work-imap",
+            FolderId = "Inbox",
+            MessageIds = { "msg-1" }
+        });
+
+        var result = await planningService.ExecuteAsync(plan);
+
+        Assert.True(plan.Succeeded);
+        Assert.False(plan.ConfirmationProvided);
+        Assert.False(plan.ConfirmationValidated);
+        Assert.False(result.Succeeded);
+        Assert.Equal("confirmation_token_required", result.Code);
+        Assert.Null(actionService.LastDeleteRequest);
+    }
+
     private static string CreateTemporaryFilePath(string fileName) {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -115,6 +155,7 @@ public sealed class ApplicationMessageActionPlanServiceTests {
 
     private sealed class CapturingMessageActionService : IMailMessageActionService {
         public SetReadStateRequest? LastReadStateRequest { get; private set; }
+        public DeleteMessagesRequest? LastDeleteRequest { get; private set; }
 
         public Task<MessageActionResult> SetReadStateAsync(SetReadStateRequest request, CancellationToken cancellationToken = default) {
             LastReadStateRequest = request;
@@ -142,13 +183,15 @@ public sealed class ApplicationMessageActionPlanServiceTests {
                 SucceededCount = request.MessageIds.Count
             });
 
-        public Task<MessageActionResult> DeleteAsync(DeleteMessagesRequest request, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new MessageActionResult {
+        public Task<MessageActionResult> DeleteAsync(DeleteMessagesRequest request, CancellationToken cancellationToken = default) {
+            LastDeleteRequest = request;
+            return Task.FromResult(new MessageActionResult {
                 Succeeded = true,
                 ProfileId = request.ProfileId,
                 RequestedCount = request.MessageIds.Count,
                 SucceededCount = request.MessageIds.Count
             });
+        }
     }
 
     private sealed class FakeFolderAliasService : IMailFolderAliasService {

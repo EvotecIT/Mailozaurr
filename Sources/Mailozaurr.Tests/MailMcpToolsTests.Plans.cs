@@ -509,6 +509,12 @@ public sealed partial class MailMcpToolsTests {
     [Fact]
     public async Task MailActionExecuteUsesSharedBatchService() {
         using var fixture = new TestFixture();
+        var confirmationToken = MessageActionConfirmationTokens.CreateMoveToken(
+            "gmail-work",
+            "primary",
+            "Inbox",
+            new[] { "message-1", "MESSAGE-1" },
+            "Projects/2026");
 
         var result = await fixture.Tools.mail_action_execute(
             action: "move",
@@ -516,7 +522,8 @@ public sealed partial class MailMcpToolsTests {
             messageIds: new[] { "message-1", "MESSAGE-1" },
             destinationFolderId: "Projects/2026",
             mailboxId: "primary",
-            folderId: "Inbox");
+            folderId: "Inbox",
+            confirmationToken: confirmationToken);
 
         Assert.True(result.Succeeded);
         Assert.Equal(1, result.RequestedPlanCount);
@@ -541,6 +548,9 @@ public sealed partial class MailMcpToolsTests {
                 RequestedCount = 1,
                 UniqueMessageCount = 1,
                 DesiredState = true,
+                ConfirmationToken = MessageActionConfirmationTokens.CreateReadStateToken("gmail-work", "primary", "Inbox", new[] { "message-1" }, true),
+                ConfirmationProvided = true,
+                ConfirmationValidated = true,
                 MessageIds = { "message-1" }
             },
             new MessageActionExecutionPlan {
@@ -553,6 +563,9 @@ public sealed partial class MailMcpToolsTests {
                 RequestedCount = 1,
                 UniqueMessageCount = 1,
                 RequestedDestinationFolderId = "Projects/2026",
+                ConfirmationToken = MessageActionConfirmationTokens.CreateMoveToken("gmail-work", "primary", "Inbox", new[] { "message-2" }, "Projects/2026"),
+                ConfirmationProvided = true,
+                ConfirmationValidated = true,
                 MessageIds = { "message-2" }
             }
         });

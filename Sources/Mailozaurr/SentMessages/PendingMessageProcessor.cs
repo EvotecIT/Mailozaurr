@@ -94,9 +94,16 @@ public sealed class PendingMessageProcessor {
             }
 
             if (record.AttemptCount >= maxRetryAttempts) {
-                logger?.WriteWarning($"Removing message {record.MessageId} after reaching the retry limit ({record.AttemptCount}).");
-                observer.MessageDropped(record, record.AttemptCount, PendingMessageDropReason.RetryLimitReached, null);
-                await DeadLetterAndRemoveAsync(record, record.AttemptCount, PendingMessageDropReason.RetryLimitReached, null, cancellationToken).ConfigureAwait(false);
+                var exhaustedLease = await AcquireProcessingLeaseAsync(record, now, cancellationToken).ConfigureAwait(false);
+                if (exhaustedLease == null) {
+                    logger?.WriteVerbose($"Skipping message {record.MessageId} because another processor already acquired the processing lease.");
+                    observer.MessageSkipped(record, PendingMessageSkipReason.LeaseNotAcquired);
+                    continue;
+                }
+
+                logger?.WriteWarning($"Removing message {exhaustedLease.MessageId} after reaching the retry limit ({exhaustedLease.AttemptCount}).");
+                observer.MessageDropped(exhaustedLease, exhaustedLease.AttemptCount, PendingMessageDropReason.RetryLimitReached, null);
+                await DeadLetterAndRemoveAsync(exhaustedLease, exhaustedLease.AttemptCount, PendingMessageDropReason.RetryLimitReached, null, cancellationToken).ConfigureAwait(false);
                 continue;
             }
 
