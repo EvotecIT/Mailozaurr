@@ -25,13 +25,12 @@ public sealed class PendingMessageSenderFactoryTests {
     }
 
     [Fact]
-    public void GetSender_ReturnsNoopWhenProviderUnknown() {
+    public void GetSender_ThrowsWhenProviderUnknown() {
         var factory = new PendingMessageSenderFactory();
         var record = new PendingMessageRecord { Provider = (EmailProvider)int.MaxValue };
 
-        var result = factory.GetSender(record);
-
-        Assert.Same(NoopPendingMessageSender.Instance, result);
+        var exception = Assert.Throws<NotSupportedException>(() => factory.GetSender(record));
+        Assert.Contains("No pending-message sender is registered", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -69,11 +68,10 @@ public sealed class PendingMessageSenderFactoryTests {
     }
 
     [Fact]
-    public void Resolve_ReturnsFallbackForUnknownProvider() {
+    public void Resolve_ThrowsForUnknownProvider() {
         var factory = new PendingMessageSenderFactory();
 
-        var result = factory.Resolve((EmailProvider)int.MaxValue);
-
-        Assert.Same(NoopPendingMessageSender.Instance, result);
+        var exception = Assert.Throws<NotSupportedException>(() => factory.Resolve((EmailProvider)int.MaxValue));
+        Assert.Contains("No pending-message sender is registered", exception.Message, StringComparison.Ordinal);
     }
 }

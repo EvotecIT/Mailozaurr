@@ -58,7 +58,7 @@ public static class CredentialProtection {
     /// <see cref="ICredentialProtector"/> on non-Windows platforms.
     /// </summary>
     /// <param name="protectedData">Base64 encoded protected payload.</param>
-    /// <returns>The decrypted secret or an empty string when decoding fails.</returns>
+    /// <returns>The decrypted secret, or an empty string when <paramref name="protectedData"/> is empty.</returns>
     internal static string UnprotectWithFallback(string? protectedData) => UnprotectWithFallback(Default, protectedData);
 
     internal static string UnprotectWithFallback(ICredentialProtector protector, string? protectedData) {
@@ -84,8 +84,8 @@ public static class CredentialProtection {
         try {
             var raw = Convert.FromBase64String(protectedData);
             return Encoding.UTF8.GetString(raw);
-        } catch {
-            return string.Empty;
+        } catch (Exception ex) when (ex is FormatException or ArgumentException) {
+            throw new CredentialProtectionException("Protected credential data could not be decoded.", ex);
         }
     }
 

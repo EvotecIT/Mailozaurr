@@ -197,11 +197,15 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
                 await write.FlushAsync(cancellationToken).ConfigureAwait(false);
             }
 
+            var backup = filePath + ".bak";
             if (File.Exists(filePath)) {
-                File.Delete(filePath);
+                File.Replace(temp, filePath, backup);
+                if (File.Exists(backup)) {
+                    File.Delete(backup);
+                }
+            } else {
+                File.Move(temp, filePath);
             }
-
-            File.Move(temp, filePath);
 
             index.Clear();
             foreach (var pair in newIndex) {

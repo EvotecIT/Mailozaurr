@@ -78,7 +78,7 @@ public static partial class CliRunner {
         TextWriter output,
         TextWriter error) {
         if (parseResult.Positionals.Count < 2) {
-            await error.WriteLineAsync("Missing queue command. Use 'queue list', 'queue get', 'queue remove', or 'queue process'.").ConfigureAwait(false);
+            await error.WriteLineAsync("Missing queue command. Use 'queue list', 'queue get', 'queue remove', 'queue process', 'queue dead-letter-list', 'queue dead-letter-get', or 'queue dead-letter-remove'.").ConfigureAwait(false);
             return 1;
         }
 
@@ -117,6 +117,24 @@ public static partial class CliRunner {
                 var removeResult = await application.Queue.RemoveAsync(RequireOption(parseResult, "message-id")).ConfigureAwait(false);
                 await WriteItemAsync(output, removeResult, json, value => value.Message ?? "Queued message removed.").ConfigureAwait(false);
                 return removeResult.Succeeded ? 0 : 1;
+            case "dead-letter-list":
+                var deadLetters = await application.Queue.ListDeadLettersAsync().ConfigureAwait(false);
+                await WriteSequenceAsync(output, deadLetters, json, message =>
+                    $"{message.MessageId} [{message.Provider}] reason={message.DeadLetterReason} error={message.ErrorMessage ?? "(none)"}").ConfigureAwait(false);
+                return 0;
+            case "dead-letter-get":
+                var deadLetter = await application.Queue.GetDeadLetterAsync(RequireOption(parseResult, "message-id")).ConfigureAwait(false);
+                if (deadLetter == null) {
+                    await error.WriteLineAsync("Dead-lettered message was not found.").ConfigureAwait(false);
+                    return 1;
+                }
+                await WriteItemAsync(output, deadLetter, json, message =>
+                    $"{message.MessageId} [{message.Provider}] reason={message.DeadLetterReason}").ConfigureAwait(false);
+                return 0;
+            case "dead-letter-remove":
+                var removeDeadLetterResult = await application.Queue.RemoveDeadLetterAsync(RequireOption(parseResult, "message-id")).ConfigureAwait(false);
+                await WriteItemAsync(output, removeDeadLetterResult, json, value => value.Message ?? "Dead-lettered message removed.").ConfigureAwait(false);
+                return removeDeadLetterResult.Succeeded ? 0 : 1;
             case "process":
                 var processResult = await application.Queue.ProcessAsync().ConfigureAwait(false);
                 await WriteItemAsync(output, processResult, json, value =>

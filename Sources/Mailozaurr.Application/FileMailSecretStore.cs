@@ -91,43 +91,14 @@ public sealed class FileMailSecretStore : IMailSecretStore {
         }
     }
 
-    private async Task SaveDocumentAsync(MailSecretStoreDocument document, CancellationToken cancellationToken) {
-        var directory = Path.GetDirectoryName(_filePath);
-        if (string.IsNullOrWhiteSpace(directory)) {
-            throw new InvalidOperationException("Secret store path is invalid.");
-        }
-
-        Directory.CreateDirectory(directory);
-
-        var tempPath = Path.Combine(directory, Path.GetRandomFileName());
-        var backupPath = Path.Combine(directory, Path.GetRandomFileName());
-        try {
-            using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)) {
-                await JsonSerializer.SerializeAsync(stream, document, ApplicationJsonContext.Default.MailSecretStoreDocument, cancellationToken).ConfigureAwait(false);
-                await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            if (File.Exists(_filePath)) {
-                File.Replace(tempPath, _filePath, backupPath);
-                tempPath = string.Empty;
-                if (File.Exists(backupPath)) {
-                    File.Delete(backupPath);
-                }
-                backupPath = string.Empty;
-                return;
-            }
-
-            File.Move(tempPath, _filePath);
-            tempPath = string.Empty;
-        } finally {
-            if (!string.IsNullOrEmpty(tempPath) && File.Exists(tempPath)) {
-                File.Delete(tempPath);
-            }
-            if (!string.IsNullOrEmpty(backupPath) && File.Exists(backupPath)) {
-                File.Delete(backupPath);
-            }
-        }
-    }
+    private Task SaveDocumentAsync(MailSecretStoreDocument document, CancellationToken cancellationToken) =>
+        AtomicFileWriter.WriteAsync(
+            _filePath,
+            "Secret store path is invalid.",
+            async (stream, token) => {
+                await JsonSerializer.SerializeAsync(stream, document, ApplicationJsonContext.Default.MailSecretStoreDocument, token).ConfigureAwait(false);
+            },
+            cancellationToken);
 
     private static string CreateKey(string profileId, string secretName) => $"{profileId.Trim()}::{secretName.Trim()}";
 

@@ -153,7 +153,7 @@ public sealed class RoutedMailMessageActionService : IMailMessageActionService {
 
     private static MessageActionResult? ValidateMoveConfirmation(MoveMessagesRequest request) {
         if (string.IsNullOrWhiteSpace(request.ConfirmationToken)) {
-            return null;
+            return MissingConfirmation("move");
         }
 
         var expectedToken = MessageActionConfirmationTokens.CreateMoveToken(
@@ -177,7 +177,7 @@ public sealed class RoutedMailMessageActionService : IMailMessageActionService {
 
     private static MessageActionResult? ValidateDeleteConfirmation(DeleteMessagesRequest request) {
         if (string.IsNullOrWhiteSpace(request.ConfirmationToken)) {
-            return null;
+            return MissingConfirmation("delete");
         }
 
         var expectedToken = MessageActionConfirmationTokens.CreateDeleteToken(
@@ -200,7 +200,7 @@ public sealed class RoutedMailMessageActionService : IMailMessageActionService {
 
     private static MessageActionResult? ValidateReadStateConfirmation(SetReadStateRequest request) {
         if (string.IsNullOrWhiteSpace(request.ConfirmationToken)) {
-            return null;
+            return MissingConfirmation("read-state");
         }
 
         var expectedToken = MessageActionConfirmationTokens.CreateReadStateToken(
@@ -224,7 +224,7 @@ public sealed class RoutedMailMessageActionService : IMailMessageActionService {
 
     private static MessageActionResult? ValidateFlaggedStateConfirmation(SetFlaggedStateRequest request) {
         if (string.IsNullOrWhiteSpace(request.ConfirmationToken)) {
-            return null;
+            return MissingConfirmation("flagged-state");
         }
 
         var expectedToken = MessageActionConfirmationTokens.CreateFlaggedStateToken(
@@ -251,4 +251,10 @@ public sealed class RoutedMailMessageActionService : IMailMessageActionService {
             throw new NotSupportedException($"Profile '{profile.Id}' does not support '{capability}'.");
         }
     }
+
+    private static MessageActionResult MissingConfirmation(string action) => new() {
+        Succeeded = false,
+        Code = "confirmation_token_required",
+        Message = $"A confirmation token is required for this {action} action. Preview the action first and pass the generated token."
+    };
 }

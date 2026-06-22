@@ -73,6 +73,37 @@ public sealed partial class CliRunnerTests {
             });
         }
 
+        public Task<IReadOnlyList<QueuedMessageSummary>> ListDeadLettersAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<QueuedMessageSummary>>(new[] {
+                new QueuedMessageSummary {
+                    MessageId = "dead-1",
+                    Provider = "Gmail",
+                    ProfileKind = MailProfileKind.Gmail,
+                    QueuedAt = DateTimeOffset.UtcNow.AddHours(-1),
+                    NextAttemptAt = DateTimeOffset.UtcNow,
+                    AttemptCount = 3,
+                    IsDeadLetter = true,
+                    DeadLetterReason = "PermanentFailure",
+                    ErrorMessage = "Authentication failed."
+                }
+            });
+
+        public Task<QueuedMessageSummary?> GetDeadLetterAsync(string messageId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<QueuedMessageSummary?>(new QueuedMessageSummary {
+                MessageId = messageId,
+                Provider = "Gmail",
+                ProfileKind = MailProfileKind.Gmail,
+                QueuedAt = DateTimeOffset.UtcNow.AddHours(-1),
+                NextAttemptAt = DateTimeOffset.UtcNow,
+                AttemptCount = 3,
+                IsDeadLetter = true,
+                DeadLetterReason = "PermanentFailure",
+                ErrorMessage = "Authentication failed."
+            });
+
+        public Task<OperationResult> RemoveDeadLetterAsync(string messageId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(OperationResult.Success("Dead-lettered message removed."));
+
         public Task<OperationResult> RemoveAsync(string messageId, CancellationToken cancellationToken = default) {
             LastRemoveMessageId = messageId;
             return Task.FromResult(OperationResult.Success("Queued message removed."));

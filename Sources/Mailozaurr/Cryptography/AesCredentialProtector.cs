@@ -179,6 +179,7 @@ internal sealed class AesCredentialProtector : ICredentialProtector {
     private static byte[] LoadOrCreateKeyCore() {
         var directory = CredentialProtectionPaths.ResolveKeyDirectory();
         Directory.CreateDirectory(directory);
+        UnixFilePermissions.RestrictDirectory(directory);
         var keyPath = Path.Combine(directory, KeyFileName);
 
         var requiresCleanup = false;
@@ -198,6 +199,7 @@ internal sealed class AesCredentialProtector : ICredentialProtector {
             }
 
             if (TryReadExistingKey(keyPath, out var existingKey, out var invalidLength)) {
+                UnixFilePermissions.RestrictFile(keyPath);
                 return existingKey;
             }
 
@@ -277,7 +279,9 @@ internal sealed class AesCredentialProtector : ICredentialProtector {
                 stream.Flush(true);
             }
 
+            UnixFilePermissions.RestrictFile(tempPath);
             File.Move(tempPath, keyPath);
+            UnixFilePermissions.RestrictFile(keyPath);
             return true;
         } catch (IOException ex) {
             if (IsSharingViolation(ex) || File.Exists(keyPath)) {

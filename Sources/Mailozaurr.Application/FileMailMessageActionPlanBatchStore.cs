@@ -114,33 +114,14 @@ public sealed class FileMailMessageActionPlanBatchStore : IMailMessageActionPlan
         }
     }
 
-    private async Task SaveDocumentAsync(MailMessageActionPlanBatchStoreDocument document, CancellationToken cancellationToken) {
-        var directory = Path.GetDirectoryName(_filePath);
-        if (string.IsNullOrWhiteSpace(directory)) {
-            throw new InvalidOperationException("Action plan batch store path is invalid.");
-        }
-
-        Directory.CreateDirectory(directory);
-
-        var tempPath = Path.Combine(directory, Path.GetRandomFileName());
-        try {
-            using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)) {
-                await JsonSerializer.SerializeAsync(stream, document, ApplicationJsonContext.Default.MailMessageActionPlanBatchStoreDocument, cancellationToken).ConfigureAwait(false);
-                await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            if (File.Exists(_filePath)) {
-                File.Delete(_filePath);
-            }
-
-            File.Move(tempPath, _filePath);
-            tempPath = string.Empty;
-        } finally {
-            if (!string.IsNullOrEmpty(tempPath) && File.Exists(tempPath)) {
-                File.Delete(tempPath);
-            }
-        }
-    }
+    private Task SaveDocumentAsync(MailMessageActionPlanBatchStoreDocument document, CancellationToken cancellationToken) =>
+        AtomicFileWriter.WriteAsync(
+            _filePath,
+            "Action plan batch store path is invalid.",
+            async (stream, token) => {
+                await JsonSerializer.SerializeAsync(stream, document, ApplicationJsonContext.Default.MailMessageActionPlanBatchStoreDocument, token).ConfigureAwait(false);
+            },
+            cancellationToken);
 
     private static void ValidateBatch(MailMessageActionPlanBatch? batch) {
         if (batch == null) {

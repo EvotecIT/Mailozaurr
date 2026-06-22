@@ -32,6 +32,7 @@ public sealed class MailApplicationBuilder {
     private IMailQueueService? _queueService;
     private IDraftMimeMessageFactory? _draftMimeMessageFactory;
     private IPendingMessageRepository? _pendingMessageRepository;
+    private IPendingMessageDeadLetterRepository? _pendingMessageDeadLetterRepository;
     private IImapSessionFactory? _imapSessionFactory;
     private IGraphSessionFactory? _graphSessionFactory;
     private IGmailSessionFactory? _gmailSessionFactory;
@@ -200,6 +201,12 @@ public sealed class MailApplicationBuilder {
         return this;
     }
 
+    /// <summary>Uses an explicit pending-message dead-letter repository.</summary>
+    public MailApplicationBuilder UsePendingMessageDeadLetterRepository(IPendingMessageDeadLetterRepository pendingMessageDeadLetterRepository) {
+        _pendingMessageDeadLetterRepository = pendingMessageDeadLetterRepository ?? throw new ArgumentNullException(nameof(pendingMessageDeadLetterRepository));
+        return this;
+    }
+
     /// <summary>Uses an explicit IMAP session factory.</summary>
     public MailApplicationBuilder UseImapSessionFactory(IImapSessionFactory imapSessionFactory) {
         _imapSessionFactory = imapSessionFactory ?? throw new ArgumentNullException(nameof(imapSessionFactory));
@@ -264,6 +271,7 @@ public sealed class MailApplicationBuilder {
         var draftExchangeService = _draftExchangeService ?? new JsonMailDraftExchangeService();
         var draftMimeMessageFactory = _draftMimeMessageFactory ?? new DraftMimeMessageFactory();
         var pendingMessageRepository = _pendingMessageRepository ?? new FilePendingMessageRepository(_options.PendingMessageStore);
+        var pendingMessageDeadLetterRepository = _pendingMessageDeadLetterRepository ?? new FilePendingMessageDeadLetterRepository(_options.PendingMessageStore);
 
         var readHandlers = new List<IMailReadHandler>(_readHandlers);
         if (_options.EnableImapReadHandler && !readHandlers.Any(handler => handler.Kind == MailProfileKind.Imap)) {
@@ -307,7 +315,7 @@ public sealed class MailApplicationBuilder {
         var messageActionBatchService = _messageActionBatchService ?? new MailMessageActionBatchService(messageActionPlanService);
         var messageActionPlanRegistryService = _messageActionPlanRegistryService ?? new MailMessageActionPlanRegistryService(messageActionPlanBatchStore, messageActionPlanExchangeService, messageActionPreviewService, messageActionPlanService, messageActionBatchService, profileStore);
         var sendService = _sendService ?? new RoutedMailSendService(profileStore, sendHandlers);
-        var queueService = _queueService ?? new PendingMailQueueService(pendingMessageRepository);
+        var queueService = _queueService ?? new PendingMailQueueService(pendingMessageRepository, pendingMessageDeadLetterRepository);
 
         return new MailApplication(
             profileStore,

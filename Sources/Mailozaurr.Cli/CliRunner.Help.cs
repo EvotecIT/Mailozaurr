@@ -86,6 +86,9 @@ public static partial class CliRunner {
         output.WriteLine("  queue get --message-id <id> [--compact] [--json]");
         output.WriteLine("  queue remove --message-id <id> [--json]");
         output.WriteLine("  queue process [--json]");
+        output.WriteLine("  queue dead-letter-list [--json]");
+        output.WriteLine("  queue dead-letter-get --message-id <id> [--json]");
+        output.WriteLine("  queue dead-letter-remove --message-id <id> [--json]");
         output.WriteLine();
         output.WriteLine("Global options:");
         output.WriteLine("  --profiles-dir <path>");

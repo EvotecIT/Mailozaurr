@@ -114,33 +114,14 @@ public sealed class FileMailDraftStore : IMailDraftStore {
         }
     }
 
-    private async Task SaveDocumentAsync(MailDraftStoreDocument document, CancellationToken cancellationToken) {
-        var directory = Path.GetDirectoryName(_filePath);
-        if (string.IsNullOrWhiteSpace(directory)) {
-            throw new InvalidOperationException("Draft store path is invalid.");
-        }
-
-        Directory.CreateDirectory(directory);
-
-        var tempPath = Path.Combine(directory, Path.GetRandomFileName());
-        try {
-            using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)) {
-                await JsonSerializer.SerializeAsync(stream, document, ApplicationJsonContext.Default.MailDraftStoreDocument, cancellationToken).ConfigureAwait(false);
-                await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            if (File.Exists(_filePath)) {
-                File.Delete(_filePath);
-            }
-
-            File.Move(tempPath, _filePath);
-            tempPath = string.Empty;
-        } finally {
-            if (!string.IsNullOrEmpty(tempPath) && File.Exists(tempPath)) {
-                File.Delete(tempPath);
-            }
-        }
-    }
+    private Task SaveDocumentAsync(MailDraftStoreDocument document, CancellationToken cancellationToken) =>
+        AtomicFileWriter.WriteAsync(
+            _filePath,
+            "Draft store path is invalid.",
+            async (stream, token) => {
+                await JsonSerializer.SerializeAsync(stream, document, ApplicationJsonContext.Default.MailDraftStoreDocument, token).ConfigureAwait(false);
+            },
+            cancellationToken);
 
     private static void ValidateDraft(MailDraft? draft) {
         if (draft == null) {

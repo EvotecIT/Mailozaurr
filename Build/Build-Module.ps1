@@ -1,6 +1,47 @@
 ﻿# Install-Module PSPublishModule -Force
 Import-Module PSPublishModule -Force
 
+function Sync-MailozaurrBuiltModuleToSource {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ProjectRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string] $BuiltModulePath
+    )
+
+    $resolvedProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
+    if (-not (Test-Path -LiteralPath $BuiltModulePath)) {
+        throw "Built module path '$BuiltModulePath' does not exist."
+    }
+
+    $itemsToSync = @(
+        'Lib'
+        'Mailozaurr.Libraries.ps1'
+        'Mailozaurr.psd1'
+        'Mailozaurr.psm1'
+    )
+
+    foreach ($item in $itemsToSync) {
+        $source = Join-Path -Path $BuiltModulePath -ChildPath $item
+        if (-not (Test-Path -LiteralPath $source)) {
+            continue
+        }
+
+        $target = Join-Path -Path $resolvedProjectRoot -ChildPath $item
+        $resolvedTargetParent = (Resolve-Path -LiteralPath (Split-Path -Path $target -Parent)).Path
+        if (-not $resolvedTargetParent.StartsWith($resolvedProjectRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Refusing to sync '$item' outside project root '$resolvedProjectRoot'."
+        }
+
+        if (Test-Path -LiteralPath $target) {
+            Remove-Item -LiteralPath $target -Recurse -Force
+        }
+
+        Copy-Item -LiteralPath $source -Destination $target -Recurse -Force
+    }
+}
+
 Build-Module -ModuleName 'Mailozaurr' {
     # Usual defaults as per standard module
     $Manifest = [ordered] @{
@@ -113,7 +154,7 @@ Build-Module -ModuleName 'Mailozaurr' {
         DotSourceClasses                     = $true
         DeleteTargetModuleBeforeBuild        = $true
         NETBinaryModuleDocumenation          = $true
-        RefreshPSD1Only                      = if ([string]::IsNullOrWhiteSpace($Env:RefreshPSD1Only)) { $true } else { [bool]::Parse($Env:RefreshPSD1Only) }
+        RefreshPSD1Only                      = if ([string]::IsNullOrWhiteSpace($Env:RefreshPSD1Only)) { $false } else { [bool]::Parse($Env:RefreshPSD1Only) }
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat #-DotSourceLibraries -DotSourceClasses -MergeModuleOnBuild -Enable -SignModule -DeleteTargetModuleBeforeBuild -CertificateThumbprint '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703' -MergeFunctionsFromApprovedModules
@@ -126,4 +167,9 @@ Build-Module -ModuleName 'Mailozaurr' {
     # global options for publishing to github/psgallery
     #New-ConfigurationPublish -Type PowerShellGallery -FilePath 'C:\Support\Important\PowerShellGalleryAPI.txt' -Enabled:$true
     #New-ConfigurationPublish -Type GitHub -FilePath 'C:\Support\Important\GitHubAPI.txt' -UserName 'EvotecIT' -Enabled:$true -GenerateReleaseNotes -OverwriteTagName '{ModuleName}-v{ModuleVersionWithPreRelease}'
-} -ExitCode
+}
+
+$refreshPsd1Only = if ([string]::IsNullOrWhiteSpace($Env:RefreshPSD1Only)) { $false } else { [bool]::Parse($Env:RefreshPSD1Only) }
+if (-not $refreshPsd1Only) {
+    Sync-MailozaurrBuiltModuleToSource -ProjectRoot (Join-Path $PSScriptRoot '..') -BuiltModulePath (Join-Path $PSScriptRoot '..\Artefacts\Modules\Mailozaurr')
+}

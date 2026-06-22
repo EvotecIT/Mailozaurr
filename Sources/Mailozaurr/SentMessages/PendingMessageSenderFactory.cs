@@ -8,18 +8,19 @@ namespace Mailozaurr;
 /// </summary>
 public sealed class PendingMessageSenderFactory {
     private readonly IReadOnlyDictionary<EmailProvider, IPendingMessageSender> senders;
-    private readonly IPendingMessageSender fallbackSender;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PendingMessageSenderFactory"/> class.
     /// </summary>
     /// <param name="senders">Known provider specific senders.</param>
-    /// <param name="fallbackSender">The sender used when no provider specific sender is registered.</param>
+    /// <param name="fallbackSender">Unsupported compatibility parameter. Unknown providers now fail visibly.</param>
     public PendingMessageSenderFactory(
         IEnumerable<KeyValuePair<EmailProvider, IPendingMessageSender>>? senders = null,
         IPendingMessageSender? fallbackSender = null) {
         this.senders = CreateMap(senders);
-        this.fallbackSender = fallbackSender ?? NoopPendingMessageSender.Instance;
+        if (fallbackSender != null) {
+            throw new ArgumentException("Fallback senders are not supported for queued delivery because unknown providers must fail visibly.", nameof(fallbackSender));
+        }
     }
 
     /// <summary>
@@ -40,13 +41,13 @@ public sealed class PendingMessageSenderFactory {
     /// Resolves the sender registered for <paramref name="provider"/>.
     /// </summary>
     /// <param name="provider">The provider whose sender should be returned.</param>
-    /// <returns>The sender registered for the provider or a fallback instance.</returns>
+    /// <returns>The sender registered for the provider.</returns>
     public IPendingMessageSender Resolve(EmailProvider provider) {
         if (senders.TryGetValue(provider, out var sender)) {
             return sender;
         }
 
-        return fallbackSender;
+        throw new NotSupportedException($"No pending-message sender is registered for provider '{provider}'.");
     }
 
     private static IReadOnlyDictionary<EmailProvider, IPendingMessageSender> CreateMap(

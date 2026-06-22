@@ -63,6 +63,31 @@ public sealed class ApplicationProfileStoreTests {
         Assert.False(removed);
     }
 
+    [Fact]
+    public async Task UpdatingProfileReplacesFileWithoutLeavingTemporaryArtifacts() {
+        var filePath = CreateTemporaryFilePath();
+        var store = new FileMailProfileStore(filePath);
+
+        await store.SaveAsync(new MailProfile {
+            Id = "work-imap",
+            DisplayName = "Initial",
+            Kind = MailProfileKind.Imap
+        });
+        await store.SaveAsync(new MailProfile {
+            Id = "work-imap",
+            DisplayName = "Updated",
+            Kind = MailProfileKind.Imap
+        });
+
+        var loaded = await store.GetByIdAsync("work-imap");
+        var files = Directory.GetFiles(Path.GetDirectoryName(filePath)!);
+
+        Assert.NotNull(loaded);
+        Assert.Equal("Updated", loaded!.DisplayName);
+        Assert.Single(files);
+        Assert.Equal(filePath, files[0], StringComparer.OrdinalIgnoreCase);
+    }
+
     private static string CreateTemporaryFilePath() {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
