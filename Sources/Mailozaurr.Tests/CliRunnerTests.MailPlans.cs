@@ -366,6 +366,28 @@ public sealed partial class CliRunnerTests {
     }
 
     [Fact]
+    public async Task MailExecuteStoredPlanBatchPassesConfirmationTokensToSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "execute-plan-batch-stored",
+                "--batch", "cleanup",
+                "--confirm-token", "token-1",
+                "--confirm-token", "token-2",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal(new[] { "token-1", "token-2" }, fixture.MessageActionPlanRegistryService.LastExecutionConfirmationTokens);
+    }
+
+    [Fact]
     public async Task MailAddPlanToBatchUsesSharedRegistryService() {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();

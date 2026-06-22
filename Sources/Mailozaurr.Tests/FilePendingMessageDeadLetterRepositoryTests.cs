@@ -44,6 +44,38 @@ public sealed class FilePendingMessageDeadLetterRepositoryTests {
         }
     }
 
+    [Fact]
+    public async Task OptionsDeriveDeadLetterFileNameFromPendingFileNamingScheme() {
+        var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        var options = new PendingMessageRepositoryOptions {
+            DirectoryPath = directory,
+            FileNamingScheme = () => "tenant-a.log"
+        };
+
+        try {
+            var repository = new FilePendingMessageDeadLetterRepository(options);
+
+            await repository.SaveAsync(new PendingMessageDeadLetterRecord {
+                Message = new PendingMessageRecord {
+                    MessageId = "tenant-a-message",
+                    Provider = EmailProvider.Gmail,
+                    Timestamp = DateTimeOffset.UtcNow
+                },
+                Reason = PendingMessageDropReason.PermanentFailure,
+                Attempt = 1,
+                DeadLetteredAt = DateTimeOffset.UtcNow,
+                ErrorMessage = "Permanent failure."
+            });
+
+            Assert.True(File.Exists(Path.Combine(directory, "tenant-a.dead-letter.log")));
+            Assert.False(File.Exists(Path.Combine(directory, "dead-letter.log")));
+        } finally {
+            if (Directory.Exists(directory)) {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
     private static async Task<List<PendingMessageDeadLetterRecord>> ReadAllAsync(IPendingMessageDeadLetterRepository repository) {
         var records = new List<PendingMessageDeadLetterRecord>();
         await foreach (var record in repository.GetAllAsync()) {

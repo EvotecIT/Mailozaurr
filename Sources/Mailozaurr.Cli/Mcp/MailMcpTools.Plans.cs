@@ -345,8 +345,9 @@ public sealed partial class MailMcpTools {
     public Task<MessageActionBatchExecutionResult> mail_action_batch_store_execute(
         [Description("The persisted batch identifier to execute.")] string batchId,
         [Description("When true, continues after failures. When false, later plans are skipped after the first failure.")] bool continueOnError = true,
+        [Description("Optional confirmation tokens returned by matching plan previews or transform previews. Provide one token for each protected plan that should execute.")] string[]? confirmationTokens = null,
         CancellationToken cancellationToken = default) =>
-        _application.MessageActionPlanRegistry.ExecuteAsync(batchId, continueOnError, cancellationToken);
+        _application.MessageActionPlanRegistry.ExecuteAsync(batchId, continueOnError, cancellationToken, confirmationTokens);
 
     [McpServerTool]
     [Description("Creates a normalized action plan and exports it to a file through the shared Mailozaurr plan-exchange service.")]

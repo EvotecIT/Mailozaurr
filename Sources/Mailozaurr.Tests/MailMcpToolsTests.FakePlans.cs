@@ -107,6 +107,8 @@ public sealed partial class MailMcpToolsTests {
 
         public string? LastExecutedBatchId { get; private set; }
 
+        public IReadOnlyList<string>? LastExecutionConfirmationTokens { get; private set; }
+
         public string? LastRemovedBatchId { get; private set; }
 
         public int? LastRemovedIndex { get; private set; }
@@ -258,8 +260,13 @@ public sealed partial class MailMcpToolsTests {
         public Task<OperationResult> DeleteAsync(string batchId, CancellationToken cancellationToken = default) =>
             Task.FromResult(OperationResult.Success($"Action plan batch '{batchId}' deleted."));
 
-        public Task<MessageActionBatchExecutionResult> ExecuteAsync(string batchId, bool continueOnError = true, CancellationToken cancellationToken = default) {
+        public Task<MessageActionBatchExecutionResult> ExecuteAsync(
+            string batchId,
+            bool continueOnError = true,
+            CancellationToken cancellationToken = default,
+            IReadOnlyList<string>? confirmationTokens = null) {
             LastExecutedBatchId = batchId;
+            LastExecutionConfirmationTokens = confirmationTokens?.ToArray();
             return Task.FromResult(new MessageActionBatchExecutionResult {
                 Succeeded = true,
                 RequestedPlanCount = 1,

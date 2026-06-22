@@ -390,6 +390,18 @@ public sealed partial class MailMcpToolsTests {
     }
 
     [Fact]
+    public async Task MailActionBatchStoreExecutePassesConfirmationTokensToSharedRegistryService() {
+        using var fixture = new TestFixture();
+
+        var result = await fixture.Tools.mail_action_batch_store_execute(
+            "cleanup",
+            confirmationTokens: new[] { "token-1", "token-2" });
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(new[] { "token-1", "token-2" }, fixture.PlanRegistryService.LastExecutionConfirmationTokens);
+    }
+
+    [Fact]
     public async Task MailActionBatchStoreAppendPlanUsesSharedRegistryService() {
         using var fixture = new TestFixture();
 

@@ -12,6 +12,9 @@ namespace Mailozaurr;
 /// Stores terminal pending-message failures in a newline-delimited JSON file.
 /// </summary>
 public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDeadLetterRepository {
+    private const string DefaultPendingFileName = "pending.log";
+    private const string DefaultDeadLetterFileName = "dead-letter.log";
+
     private readonly string filePath;
     private readonly SemaphoreSlim gate = new(1, 1);
     private static readonly byte[] NewlineBytes = Encoding.UTF8.GetBytes(Environment.NewLine);
@@ -29,7 +32,36 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
     private static string GetFilePath(PendingMessageRepositoryOptions? options) {
         options ??= new PendingMessageRepositoryOptions();
         var directory = string.IsNullOrWhiteSpace(options.DirectoryPath) ? Path.GetTempPath() : options.DirectoryPath;
-        return Path.Combine(directory, "dead-letter.log");
+        string name;
+        try {
+            name = options.FileNamingScheme?.Invoke() ?? DefaultPendingFileName;
+        } catch (Exception ex) {
+            throw new InvalidOperationException("FileNamingScheme failed to provide a file name", ex);
+        }
+
+        return Path.Combine(directory, CreateDeadLetterFileName(name));
+    }
+
+    private static string CreateDeadLetterFileName(string? pendingFileName) {
+        if (string.IsNullOrWhiteSpace(pendingFileName)) {
+            return DefaultDeadLetterFileName;
+        }
+
+        var fileName = Path.GetFileName(pendingFileName);
+        if (string.IsNullOrWhiteSpace(fileName) ||
+            string.Equals(fileName, DefaultPendingFileName, StringComparison.OrdinalIgnoreCase)) {
+            return DefaultDeadLetterFileName;
+        }
+
+        var extension = Path.GetExtension(fileName);
+        var baseName = Path.GetFileNameWithoutExtension(fileName);
+        if (string.IsNullOrWhiteSpace(baseName)) {
+            return DefaultDeadLetterFileName;
+        }
+
+        return string.IsNullOrEmpty(extension)
+            ? $"{baseName}.dead-letter.log"
+            : $"{baseName}.dead-letter{extension}";
     }
 
     /// <inheritdoc />

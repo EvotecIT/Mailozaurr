@@ -17,11 +17,13 @@ public sealed class MailMessageActionBatchService : IMailMessageActionBatchServi
     public async Task<MessageActionBatchExecutionResult> ExecuteAsync(
         IReadOnlyList<MessageActionExecutionPlan> plans,
         bool continueOnError = true,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<string>? confirmationTokens = null) {
         if (plans == null) {
             throw new ArgumentNullException(nameof(plans));
         }
 
+        var normalizedConfirmationTokens = NormalizeConfirmationTokens(confirmationTokens);
         var result = new MessageActionBatchExecutionResult {
             RequestedPlanCount = plans.Count
         };
@@ -46,7 +48,8 @@ public sealed class MailMessageActionBatchService : IMailMessageActionBatchServi
                 continue;
             }
 
-            var execution = await _planService.ExecuteAsync(plan, cancellationToken).ConfigureAwait(false);
+            var executablePlan = PreparePlanForExecution(plan, normalizedConfirmationTokens);
+            var execution = await _planService.ExecuteAsync(executablePlan, cancellationToken).ConfigureAwait(false);
             result.AttemptedPlanCount++;
             if (execution.Succeeded) {
                 result.SucceededPlanCount++;
@@ -56,10 +59,10 @@ public sealed class MailMessageActionBatchService : IMailMessageActionBatchServi
 
             result.Results.Add(new MessageActionBatchExecutionItemResult {
                 Index = index,
-                Action = plan.Action,
-                ExecutionKind = plan.ExecutionKind,
-                ProfileId = plan.ProfileId,
-                RequestedCount = plan.RequestedCount,
+                Action = executablePlan.Action,
+                ExecutionKind = executablePlan.ExecutionKind,
+                ProfileId = executablePlan.ProfileId,
+                RequestedCount = executablePlan.RequestedCount,
                 Succeeded = execution.Succeeded,
                 Code = execution.Code,
                 Message = execution.Message,
@@ -80,6 +83,73 @@ public sealed class MailMessageActionBatchService : IMailMessageActionBatchServi
             : $"Executed {result.AttemptedPlanCount} action plan(s): {result.SucceededPlanCount} succeeded, {result.FailedPlanCount} failed, {result.SkippedPlanCount} skipped.";
         return result;
     }
+
+    private static HashSet<string> NormalizeConfirmationTokens(IReadOnlyList<string>? confirmationTokens) {
+        var normalized = new HashSet<string>(StringComparer.Ordinal);
+        if (confirmationTokens == null || confirmationTokens.Count == 0) {
+            return normalized;
+        }
+
+        foreach (var token in confirmationTokens) {
+            if (!string.IsNullOrWhiteSpace(token)) {
+                normalized.Add(token.Trim());
+            }
+        }
+
+        return normalized;
+    }
+
+    private static MessageActionExecutionPlan PreparePlanForExecution(MessageActionExecutionPlan plan, HashSet<string> confirmationTokens) {
+        var confirmationToken = plan.ConfirmationToken;
+        if (confirmationTokens.Count == 0 ||
+            string.IsNullOrWhiteSpace(confirmationToken) ||
+            plan.ConfirmationValidated ||
+            !confirmationTokens.Contains(confirmationToken!)) {
+            return plan;
+        }
+
+        var executablePlan = ClonePlan(plan);
+        executablePlan.ConfirmationProvided = true;
+        executablePlan.ConfirmationValidated = true;
+        return executablePlan;
+    }
+
+    private static MessageActionExecutionPlan ClonePlan(MessageActionExecutionPlan plan) => new() {
+        Succeeded = plan.Succeeded,
+        Code = plan.Code,
+        Message = plan.Message,
+        Name = plan.Name,
+        Summary = plan.Summary,
+        Action = plan.Action,
+        ExecutionKind = plan.ExecutionKind,
+        ProfileId = plan.ProfileId,
+        MailboxId = plan.MailboxId,
+        FolderId = plan.FolderId,
+        RequestedCount = plan.RequestedCount,
+        UniqueMessageCount = plan.UniqueMessageCount,
+        MessageIds = plan.MessageIds.ToList(),
+        RequestedDestinationFolderId = plan.RequestedDestinationFolderId,
+        Destination = plan.Destination == null
+            ? null
+            : new MailFolderTargetResolution {
+                ProfileId = plan.Destination.ProfileId,
+                MailboxId = plan.Destination.MailboxId,
+                RequestedValue = plan.Destination.RequestedValue,
+                IsAlias = plan.Destination.IsAlias,
+                Alias = plan.Destination.Alias,
+                IsSupported = plan.Destination.IsSupported,
+                IsResolved = plan.Destination.IsResolved,
+                EffectiveFolderId = plan.Destination.EffectiveFolderId,
+                FolderDisplayName = plan.Destination.FolderDisplayName,
+                FolderPath = plan.Destination.FolderPath,
+                Summary = plan.Destination.Summary
+            },
+        DesiredState = plan.DesiredState,
+        ConfirmationToken = plan.ConfirmationToken,
+        ConfirmationProvided = plan.ConfirmationProvided,
+        ConfirmationValidated = plan.ConfirmationValidated,
+        Warnings = plan.Warnings.ToList()
+    };
 
     private static void AddSkippedItems(MessageActionBatchExecutionResult result, IReadOnlyList<MessageActionExecutionPlan> plans, int startIndex) {
         for (var index = startIndex; index < plans.Count; index++) {

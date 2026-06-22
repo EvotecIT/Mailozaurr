@@ -8,5 +8,6 @@ public interface IMailMessageActionBatchService {
     Task<MessageActionBatchExecutionResult> ExecuteAsync(
         IReadOnlyList<MessageActionExecutionPlan> plans,
         bool continueOnError = true,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<string>? confirmationTokens = null);
 }

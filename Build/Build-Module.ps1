@@ -96,6 +96,10 @@ function Update-MailozaurrBootstrapperDevelopmentFallback {
         "                `$LibDirectory = [IO.Path]::Combine(`$PSScriptRoot, 'Lib', `$LibFolder)",
         "                `$LibDirectory = `$PowerForgeLibDirectory")
 
+    $content = $content.Replace(
+        "} catch {$newline    if (`$ErrorActionPreference -eq 'Stop') {$newline        throw$newline    } else {$newline        Write-Warning -Message `"Importing module `$Library failed. Fix errors before continuing. Error: `$(`$_.Exception.Message)`"$newline    }$newline}$newline",
+        "} catch {$newline    throw$newline}$newline")
+
     $content = (($content -split "\r?\n") | ForEach-Object { $_.TrimEnd() }) -join $newline
     Set-Content -LiteralPath $bootstrapperPath -Value $content -NoNewline
 }

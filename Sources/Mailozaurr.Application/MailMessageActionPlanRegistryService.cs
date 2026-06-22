@@ -396,7 +396,11 @@ public sealed class MailMessageActionPlanRegistryService : IMailMessageActionPla
     }
 
     /// <inheritdoc />
-    public async Task<MessageActionBatchExecutionResult> ExecuteAsync(string batchId, bool continueOnError = true, CancellationToken cancellationToken = default) {
+    public async Task<MessageActionBatchExecutionResult> ExecuteAsync(
+        string batchId,
+        bool continueOnError = true,
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<string>? confirmationTokens = null) {
         if (string.IsNullOrWhiteSpace(batchId)) {
             throw new ArgumentException("Batch id is required.", nameof(batchId));
         }
@@ -410,7 +414,7 @@ public sealed class MailMessageActionPlanRegistryService : IMailMessageActionPla
             };
         }
 
-        return await _batchService.ExecuteAsync(batch.Plans, continueOnError, cancellationToken).ConfigureAwait(false);
+        return await _batchService.ExecuteAsync(batch.Plans, continueOnError, cancellationToken, confirmationTokens).ConfigureAwait(false);
     }
 
     private async Task<OperationResult> ValidateAsync(MailMessageActionPlanBatch? batch, CancellationToken cancellationToken) {

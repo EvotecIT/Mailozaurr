@@ -65,6 +65,31 @@ public sealed class ApplicationMessageActionBatchServiceTests {
         Assert.Contains(result.Results, item => item.Code == "skipped_after_failure" && item.Index == 2);
     }
 
+    [Fact]
+    public async Task ExecuteAppliesMatchingConfirmationTokenWithoutMutatingStoredPlan() {
+        var planService = new FakePlanService(plan => Task.FromResult(new MessageActionResult {
+            Succeeded = plan.ConfirmationProvided && plan.ConfirmationValidated,
+            ProfileId = plan.ProfileId,
+            RequestedCount = plan.UniqueMessageCount,
+            SucceededCount = plan.ConfirmationProvided && plan.ConfirmationValidated ? plan.UniqueMessageCount : 0,
+            FailedCount = plan.ConfirmationProvided && plan.ConfirmationValidated ? 0 : plan.UniqueMessageCount
+        }));
+        var batchService = new MailMessageActionBatchService(planService);
+        var plan = CreatePlan("delete", "Delete", "work-imap", "msg-2");
+        plan.ConfirmationToken = "delete-work-imap-msg-2";
+
+        var result = await batchService.ExecuteAsync(
+            new[] { plan },
+            confirmationTokens: new[] { "delete-work-imap-msg-2" });
+
+        Assert.True(result.Succeeded);
+        Assert.Single(planService.ExecutedPlans);
+        Assert.True(planService.ExecutedPlans[0].ConfirmationProvided);
+        Assert.True(planService.ExecutedPlans[0].ConfirmationValidated);
+        Assert.False(plan.ConfirmationProvided);
+        Assert.False(plan.ConfirmationValidated);
+    }
+
     private static MessageActionExecutionPlan CreatePlan(string action, string executionKind, string profileId, string messageId) =>
         new() {
             Succeeded = true,
