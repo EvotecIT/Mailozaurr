@@ -24,9 +24,7 @@ jobs:
         shell: pwsh
 
       - name: Refresh module manifest
-        env:
-          RefreshPSD1Only: 'true'
-        run: ./Build/Build-Module.ps1
+        run: ./Build/Build-Module.ps1 -ConfigurationGateMode Manifest
         shell: pwsh
 
       - name: Commit refreshed PSD1

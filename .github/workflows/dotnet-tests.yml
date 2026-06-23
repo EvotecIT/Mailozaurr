@@ -269,10 +269,7 @@ jobs:
 
       - name: Build packaged module
         shell: pwsh
-        env:
-          RefreshPSD1Only: 'false'
-          SignModule: 'false'
-        run: ./Build/Build-Module.ps1
+        run: ./Build/Build-Module.ps1 -ConfigurationGateMode Build
 
       - name: Run AssemblyLoadContext packaging regression
         shell: pwsh
