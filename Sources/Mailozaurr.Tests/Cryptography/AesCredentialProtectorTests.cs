@@ -83,6 +83,35 @@ public sealed class AesCredentialProtectorTests {
     }
 
     [Fact]
+    public void UnprotectWithFallback_InvalidNonEmptyPayload_ThrowsExplicitCredentialError() {
+        using var scope = new KeyDirectoryScope();
+        var protector = new AesCredentialProtector();
+
+        var exception = Assert.Throws<CredentialProtectionException>(() => CredentialProtection.UnprotectWithFallback(protector, "not-base64"));
+
+        Assert.Contains("could not be decoded", exception.Message, StringComparison.Ordinal);
+    }
+
+#if NET8_0_OR_GREATER
+    [Fact]
+    public void KeyMaterial_UsesPrivateUnixPermissions() {
+        if (OperatingSystem.IsWindows()) {
+            return;
+        }
+
+        using var scope = new KeyDirectoryScope();
+        var protector = new AesCredentialProtector();
+        _ = protector.Protect("secret");
+
+        var keyDirectory = CredentialProtectionPaths.ResolveKeyDirectory();
+        var keyPath = Path.Combine(keyDirectory, "credential.key");
+
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(keyDirectory));
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(keyPath));
+    }
+#endif
+
+    [Fact]
     public void Unprotect_LegacyPayload_RemainsCompatible() {
         using var scope = new KeyDirectoryScope();
         var protector = new AesCredentialProtector();

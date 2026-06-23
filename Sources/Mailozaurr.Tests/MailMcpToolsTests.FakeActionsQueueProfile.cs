@@ -119,6 +119,15 @@ public sealed partial class MailMcpToolsTests {
         public Task<OperationResult> RemoveAsync(string messageId, CancellationToken cancellationToken = default) =>
             Task.FromResult(OperationResult.Success("Queued message removed."));
 
+        public Task<IReadOnlyList<QueuedMessageSummary>> ListDeadLettersAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<QueuedMessageSummary>>(Array.Empty<QueuedMessageSummary>());
+
+        public Task<QueuedMessageSummary?> GetDeadLetterAsync(string messageId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<QueuedMessageSummary?>(null);
+
+        public Task<OperationResult> RemoveDeadLetterAsync(string messageId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(OperationResult.Success("Dead-lettered message removed."));
+
         public Task<QueueProcessResult> ProcessAsync(CancellationToken cancellationToken = default) {
             ProcessCalled = true;
             return Task.FromResult(new QueueProcessResult {

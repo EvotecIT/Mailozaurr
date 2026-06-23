@@ -194,7 +194,11 @@ public static partial class CliRunner {
             case "execute-plan-batch-stored":
                 var storedBatchExecutionResult = await application.MessageActionPlanRegistry.ExecuteAsync(
                     RequireOption(parseResult, "batch"),
-                    continueOnError: !parseResult.HasFlag("stop-on-error")).ConfigureAwait(false);
+                    continueOnError: !parseResult.HasFlag("stop-on-error"),
+                    confirmationTokens: parseResult.GetOptionValues("confirm-token")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToArray()).ConfigureAwait(false);
                 await WriteItemAsync(output, storedBatchExecutionResult, json, value => value.Message ?? "Stored action plan batch executed.").ConfigureAwait(false);
                 return storedBatchExecutionResult.Succeeded ? 0 : 1;
             case "preview-move":

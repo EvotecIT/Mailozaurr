@@ -248,11 +248,36 @@ public sealed class ApplicationRoutingServicesTests {
         var result = await service.SetReadStateAsync(new SetReadStateRequest {
             ProfileId = "work-imap",
             MessageIds = { "1", "2" },
-            IsRead = true
+            IsRead = true,
+            ConfirmationToken = MessageActionConfirmationTokens.CreateReadStateToken("work-imap", null, null, new[] { "1", "2" }, true)
         });
 
         Assert.True(result.Succeeded);
         Assert.Equal(1, handler.SetReadStateCalls);
+    }
+
+    [Fact]
+    public async Task RoutedMessageActionServiceRejectsMissingReadStateConfirmationToken() {
+        var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
+        await store.SaveAsync(new MailProfile {
+            Id = "work-imap",
+            DisplayName = "Work IMAP",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string> { [MailProfileSettingsKeys.Server] = "imap.example.com" }
+        });
+
+        var handler = new FakeMessageActionHandler(MailProfileKind.Imap);
+        var service = new RoutedMailMessageActionService(store, new[] { handler });
+
+        var result = await service.SetReadStateAsync(new SetReadStateRequest {
+            ProfileId = "work-imap",
+            MessageIds = { "1", "2" },
+            IsRead = true
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("confirmation_token_required", result.Code);
+        Assert.Equal(0, handler.SetReadStateCalls);
     }
 
     [Fact]
@@ -298,7 +323,8 @@ public sealed class ApplicationRoutingServicesTests {
         var result = await service.SetFlaggedStateAsync(new SetFlaggedStateRequest {
             ProfileId = "work-imap",
             MessageIds = { "1", "2" },
-            IsFlagged = true
+            IsFlagged = true,
+            ConfirmationToken = MessageActionConfirmationTokens.CreateFlaggedStateToken("work-imap", null, null, new[] { "1", "2" }, true)
         });
 
         Assert.True(result.Succeeded);
@@ -348,7 +374,8 @@ public sealed class ApplicationRoutingServicesTests {
         var result = await service.MoveAsync(new MoveMessagesRequest {
             ProfileId = "work-imap",
             MessageIds = { "1", "2" },
-            DestinationFolderId = "archive"
+            DestinationFolderId = "archive",
+            ConfirmationToken = MessageActionConfirmationTokens.CreateMoveToken("work-imap", null, null, new[] { "1", "2" }, MailFolderAliases.Archive)
         });
 
         Assert.True(result.Succeeded);
@@ -374,7 +401,8 @@ public sealed class ApplicationRoutingServicesTests {
             ProfileId = "work-imap",
             MailboxId = "shared@example.com",
             MessageIds = { "1", "2" },
-            DestinationFolderId = MailFolderAliases.Archive
+            DestinationFolderId = MailFolderAliases.Archive,
+            ConfirmationToken = MessageActionConfirmationTokens.CreateMoveToken("work-imap", "shared@example.com", null, new[] { "1", "2" }, "archive-folder")
         });
 
         Assert.True(result.Succeeded);

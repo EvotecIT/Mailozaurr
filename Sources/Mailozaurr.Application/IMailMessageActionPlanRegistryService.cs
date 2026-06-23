@@ -86,5 +86,9 @@ public interface IMailMessageActionPlanRegistryService {
     Task<OperationResult> ExportAsync(string batchId, string path, CancellationToken cancellationToken = default);
 
     /// <summary>Executes a persisted plan batch through the shared batch executor.</summary>
-    Task<MessageActionBatchExecutionResult> ExecuteAsync(string batchId, bool continueOnError = true, CancellationToken cancellationToken = default);
+    Task<MessageActionBatchExecutionResult> ExecuteAsync(
+        string batchId,
+        bool continueOnError = true,
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<string>? confirmationTokens = null);
 }

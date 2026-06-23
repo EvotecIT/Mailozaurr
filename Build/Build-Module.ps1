@@ -1,6 +1,109 @@
 ﻿# Install-Module PSPublishModule -Force
 Import-Module PSPublishModule -Force
 
+function Sync-MailozaurrBuiltModuleToSource {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ProjectRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string] $BuiltModulePath
+    )
+
+    $resolvedProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
+    if (-not (Test-Path -LiteralPath $BuiltModulePath)) {
+        throw "Built module path '$BuiltModulePath' does not exist."
+    }
+
+    $itemsToSync = @(
+        'Lib'
+        'Mailozaurr.Libraries.ps1'
+        'Mailozaurr.psd1'
+        'Mailozaurr.psm1'
+    )
+
+    foreach ($item in $itemsToSync) {
+        $source = Join-Path -Path $BuiltModulePath -ChildPath $item
+        if (-not (Test-Path -LiteralPath $source)) {
+            continue
+        }
+
+        $target = Join-Path -Path $resolvedProjectRoot -ChildPath $item
+        $resolvedTargetParent = (Resolve-Path -LiteralPath (Split-Path -Path $target -Parent)).Path
+        if (-not $resolvedTargetParent.StartsWith($resolvedProjectRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Refusing to sync '$item' outside project root '$resolvedProjectRoot'."
+        }
+
+        if (Test-Path -LiteralPath $target) {
+            Remove-Item -LiteralPath $target -Recurse -Force
+        }
+
+        Copy-Item -LiteralPath $source -Destination $target -Recurse -Force
+    }
+}
+
+function Update-MailozaurrBootstrapperDevelopmentFallback {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ProjectRoot
+    )
+
+    $bootstrapperPath = Join-Path -Path $ProjectRoot -ChildPath 'Mailozaurr.psm1'
+    if (-not (Test-Path -LiteralPath $bootstrapperPath)) {
+        return
+    }
+
+    $content = Get-Content -LiteralPath $bootstrapperPath -Raw
+    $newline = if ($content.Contains("`r`n")) { "`r`n" } else { "`n" }
+
+    if (-not $content.Contains('$DevelopmentMode = $false')) {
+        $content = $content.Replace(
+            "`$AssemblyFolders = Get-ChildItem -LiteralPath `$LibRoot -Directory -ErrorAction SilentlyContinue$newline",
+            "`$AssemblyFolders = Get-ChildItem -LiteralPath `$LibRoot -Directory -ErrorAction SilentlyContinue$newline`$DevelopmentMode = `$false$newline`$DevelopmentLibRoot = `$null$newline")
+    }
+
+    if (-not $content.Contains('MAILOZAURR_DEVELOPMENT')) {
+        $content = $content.Replace(
+            "} else {$newline    Write-Error -Message 'No assemblies found'$newline    return$newline}$newline",
+            "} else {$newline    if (`$env:MAILOZAURR_DEVELOPMENT) {$newline        `$DevelopmentFramework = if (`$PSEdition -eq 'Core') { 'net8.0' } else { 'net472' }$newline        `$DevelopmentLibRoot = [IO.Path]::Combine(`$PSScriptRoot, 'Sources', 'Mailozaurr.PowerShell', 'bin', 'Debug', `$DevelopmentFramework)$newline        `$DevelopmentAssemblyPath = [IO.Path]::Combine(`$DevelopmentLibRoot, `$Library)$newline        if (Test-Path -LiteralPath `$DevelopmentAssemblyPath) {$newline            `$DevelopmentMode = `$true$newline            `$Framework = `$DevelopmentFramework$newline            `$FrameworkNet = `$DevelopmentFramework$newline        } else {$newline            Write-Error -Message `"No packaged assemblies found and development assembly '`$DevelopmentAssemblyPath' was not found`"$newline            return$newline        }$newline    } else {$newline        Write-Error -Message 'No assemblies found'$newline        return$newline    }$newline}$newline")
+    }
+
+    if (-not $content.Contains('$PowerForgeLibDirectory = if ($DevelopmentMode)')) {
+        $content = $content.Replace(
+            "    `$ModuleAssemblyPath = [IO.Path]::Combine(`$PSScriptRoot, 'Lib', `$LibFolder, `$Library)$newline",
+            "    `$ModuleAssemblyPath = if (`$DevelopmentMode) {$newline        [IO.Path]::Combine(`$DevelopmentLibRoot, `$Library)$newline    } else {$newline        [IO.Path]::Combine(`$PSScriptRoot, 'Lib', `$LibFolder, `$Library)$newline    }$newline    `$PowerForgeLibDirectory = if (`$DevelopmentMode) {$newline        `$DevelopmentLibRoot$newline    } else {$newline        [IO.Path]::Combine(`$PSScriptRoot, 'Lib', `$LibFolder)$newline    }$newline")
+    }
+
+    $content = $content.Replace(
+        "        `$LoaderAssemblyPath = [IO.Path]::Combine(`$PSScriptRoot, 'Lib', `$LibFolder, 'Mailozaurr.ModuleLoadContext.dll')",
+        "        `$LoaderAssemblyPath = [IO.Path]::Combine(`$PowerForgeLibDirectory, 'Mailozaurr.ModuleLoadContext.dll')")
+
+    if (-not $content.Contains('$DevelopmentMode -and -not (Test-Path -LiteralPath $LoaderAssemblyPath)')) {
+        $content = $content.Replace(
+            "        if (-not ('Mailozaurr.ModuleLoadContext.ModuleAssemblyLoadContext' -as [type])) {",
+            "        if (`$DevelopmentMode -and -not (Test-Path -LiteralPath `$LoaderAssemblyPath)) {$newline            & `$ImportModule `$ModuleAssemblyPath -ErrorAction Stop$newline        } else {$newline            if (-not ('Mailozaurr.ModuleLoadContext.ModuleAssemblyLoadContext' -as [type])) {")
+
+        $content = $content.Replace(
+            "    } elseif (-not (`$Class -as [type])) {",
+            "        }$newline    } elseif (-not (`$Class -as [type])) {")
+    }
+
+    $content = $content.Replace(
+        "                    `$AssemblyPath = [IO.Path]::Combine(`$PSScriptRoot, 'Lib', `$LibFolder, `$AssemblyName + '.dll')",
+        "                    `$AssemblyPath = [IO.Path]::Combine(`$PowerForgeLibDirectory, `$AssemblyName + '.dll')")
+
+    $content = $content.Replace(
+        "                `$LibDirectory = [IO.Path]::Combine(`$PSScriptRoot, 'Lib', `$LibFolder)",
+        "                `$LibDirectory = `$PowerForgeLibDirectory")
+
+    $content = $content.Replace(
+        "} catch {$newline    if (`$ErrorActionPreference -eq 'Stop') {$newline        throw$newline    } else {$newline        Write-Warning -Message `"Importing module `$Library failed. Fix errors before continuing. Error: `$(`$_.Exception.Message)`"$newline    }$newline}$newline",
+        "} catch {$newline    throw$newline}$newline")
+
+    $content = (($content -split "\r?\n") | ForEach-Object { $_.TrimEnd() }) -join $newline
+    Set-Content -LiteralPath $bootstrapperPath -Value $content -NoNewline
+}
+
 Build-Module -ModuleName 'Mailozaurr' {
     # Usual defaults as per standard module
     $Manifest = [ordered] @{
@@ -113,7 +216,7 @@ Build-Module -ModuleName 'Mailozaurr' {
         DotSourceClasses                     = $true
         DeleteTargetModuleBeforeBuild        = $true
         NETBinaryModuleDocumenation          = $true
-        RefreshPSD1Only                      = if ([string]::IsNullOrWhiteSpace($Env:RefreshPSD1Only)) { $true } else { [bool]::Parse($Env:RefreshPSD1Only) }
+        RefreshPSD1Only                      = if ([string]::IsNullOrWhiteSpace($Env:RefreshPSD1Only)) { $false } else { [bool]::Parse($Env:RefreshPSD1Only) }
     }
 
     New-ConfigurationBuild @newConfigurationBuildSplat #-DotSourceLibraries -DotSourceClasses -MergeModuleOnBuild -Enable -SignModule -DeleteTargetModuleBeforeBuild -CertificateThumbprint '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703' -MergeFunctionsFromApprovedModules
@@ -127,3 +230,10 @@ Build-Module -ModuleName 'Mailozaurr' {
     #New-ConfigurationPublish -Type PowerShellGallery -FilePath 'C:\Support\Important\PowerShellGalleryAPI.txt' -Enabled:$true
     #New-ConfigurationPublish -Type GitHub -FilePath 'C:\Support\Important\GitHubAPI.txt' -UserName 'EvotecIT' -Enabled:$true -GenerateReleaseNotes -OverwriteTagName '{ModuleName}-v{ModuleVersionWithPreRelease}'
 } -ExitCode
+
+$refreshPsd1Only = if ([string]::IsNullOrWhiteSpace($Env:RefreshPSD1Only)) { $false } else { [bool]::Parse($Env:RefreshPSD1Only) }
+if (-not $refreshPsd1Only) {
+    $projectRoot = Join-Path $PSScriptRoot '..'
+    Sync-MailozaurrBuiltModuleToSource -ProjectRoot $projectRoot -BuiltModulePath (Join-Path $PSScriptRoot '..\Artefacts\Modules\Mailozaurr')
+    Update-MailozaurrBootstrapperDevelopmentFallback -ProjectRoot $projectRoot
+}

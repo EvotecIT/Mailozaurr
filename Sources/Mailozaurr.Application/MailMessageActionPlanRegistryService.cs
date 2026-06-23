@@ -109,8 +109,7 @@ public sealed class MailMessageActionPlanRegistryService : IMailMessageActionPla
                 MailboxId = preview.MailboxId,
                 FolderId = preview.FolderId,
                 MessageIds = preview.MessageIds.ToList(),
-                DestinationFolderId = ResolveDestinationFolderId(action, preview.RequestedDestinationFolderId),
-                ConfirmationToken = action.ConfirmationToken
+                DestinationFolderId = ResolveDestinationFolderId(action, preview.RequestedDestinationFolderId)
             }, cancellationToken).ConfigureAwait(false);
 
             if (plan.Succeeded) {
@@ -397,7 +396,11 @@ public sealed class MailMessageActionPlanRegistryService : IMailMessageActionPla
     }
 
     /// <inheritdoc />
-    public async Task<MessageActionBatchExecutionResult> ExecuteAsync(string batchId, bool continueOnError = true, CancellationToken cancellationToken = default) {
+    public async Task<MessageActionBatchExecutionResult> ExecuteAsync(
+        string batchId,
+        bool continueOnError = true,
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<string>? confirmationTokens = null) {
         if (string.IsNullOrWhiteSpace(batchId)) {
             throw new ArgumentException("Batch id is required.", nameof(batchId));
         }
@@ -411,7 +414,7 @@ public sealed class MailMessageActionPlanRegistryService : IMailMessageActionPla
             };
         }
 
-        return await _batchService.ExecuteAsync(batch.Plans, continueOnError, cancellationToken).ConfigureAwait(false);
+        return await _batchService.ExecuteAsync(batch.Plans, continueOnError, cancellationToken, confirmationTokens).ConfigureAwait(false);
     }
 
     private async Task<OperationResult> ValidateAsync(MailMessageActionPlanBatch? batch, CancellationToken cancellationToken) {
@@ -504,7 +507,7 @@ public sealed class MailMessageActionPlanRegistryService : IMailMessageActionPla
         }
 
         cloned.ConfirmationProvided = false;
-        cloned.ConfirmationValidated = true;
+        cloned.ConfirmationValidated = false;
         cloned.ConfirmationToken = CreateConfirmationToken(cloned);
         cloned.Summary = BuildStoredPlanSummary(cloned);
         return cloned;

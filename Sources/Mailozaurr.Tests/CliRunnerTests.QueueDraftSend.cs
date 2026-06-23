@@ -89,6 +89,23 @@ public sealed partial class CliRunnerTests {
     }
 
     [Fact]
+    public async Task QueueDeadLetterListUsesApplicationQueueService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "queue", "dead-letter-list", "--json" },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("\"MessageId\": \"dead-1\"", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"IsDeadLetter\": true", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task DraftSaveUsesApplicationDraftService() {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();

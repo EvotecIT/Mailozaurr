@@ -96,6 +96,45 @@ public sealed class ApplicationBuilderTests {
         Assert.Contains(app.SendHandlers, handler => handler.Kind == MailProfileKind.Graph);
     }
 
+    [Fact]
+    public void BuildRejectsCustomPendingRepositoryWithoutMatchingDeadLetterRepository() {
+        var builder = new MailApplicationBuilder(new MailApplicationOptions {
+            EnableImapReadHandler = false,
+            EnableGraphReadHandler = false,
+            EnableGraphSendHandler = false,
+            EnableGmailReadHandler = false,
+            EnableGmailSendHandler = false,
+            EnableSmtpSendHandler = false,
+            ProfileStore = new MailProfileStoreOptions { DirectoryPath = CreateTemporaryDirectory() },
+            SecretStore = new MailSecretStoreOptions { DirectoryPath = CreateTemporaryDirectory() }
+        });
+        builder.UsePendingMessageRepository(new FakePendingMessageRepository());
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Build());
+
+        Assert.Contains(nameof(MailApplicationBuilder.UsePendingMessageDeadLetterRepository), exception.Message);
+    }
+
+    [Fact]
+    public void BuildUsesCustomPendingRepositoriesTogether() {
+        var builder = new MailApplicationBuilder(new MailApplicationOptions {
+            EnableImapReadHandler = false,
+            EnableGraphReadHandler = false,
+            EnableGraphSendHandler = false,
+            EnableGmailReadHandler = false,
+            EnableGmailSendHandler = false,
+            EnableSmtpSendHandler = false,
+            ProfileStore = new MailProfileStoreOptions { DirectoryPath = CreateTemporaryDirectory() },
+            SecretStore = new MailSecretStoreOptions { DirectoryPath = CreateTemporaryDirectory() }
+        });
+        builder.UsePendingMessageRepository(new FakePendingMessageRepository());
+        builder.UsePendingMessageDeadLetterRepository(new FakePendingMessageDeadLetterRepository());
+
+        var app = builder.Build();
+
+        Assert.NotNull(app.Queue);
+    }
+
     private static string CreateTemporaryDirectory() {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -179,5 +218,40 @@ public sealed class ApplicationBuilderTests {
 
         public Task<MessageActionResult> DeleteAsync(MailProfile profile, DeleteMessagesRequest request, CancellationToken cancellationToken = default) =>
             Task.FromResult(new MessageActionResult { Succeeded = true, ProfileId = profile.Id });
+    }
+
+    private sealed class FakePendingMessageRepository : IPendingMessageRepository {
+        public Task SaveAsync(PendingMessageRecord record, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<PendingMessageRecord?> TryAcquireLeaseAsync(
+            string messageId,
+            DateTimeOffset dueBeforeOrAt,
+            DateTimeOffset leaseUntil,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public IAsyncEnumerable<PendingMessageRecord> GetAllAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task RemoveAsync(string messageId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class FakePendingMessageDeadLetterRepository : IPendingMessageDeadLetterRepository {
+        public Task SaveAsync(PendingMessageDeadLetterRecord record, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<PendingMessageDeadLetterRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public IAsyncEnumerable<PendingMessageDeadLetterRecord> GetAllAsync(CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task RemoveAsync(string messageId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }

@@ -59,6 +59,38 @@ public sealed class PendingMessageProcessorTests {
         public bool Contains(string messageId) => records.ContainsKey(messageId);
     }
 
+    private sealed class InMemoryDeadLetterRepository : IPendingMessageDeadLetterRepository {
+        private readonly ConcurrentDictionary<string, PendingMessageDeadLetterRecord> records = new(StringComparer.OrdinalIgnoreCase);
+        private int saveCount;
+
+        public int SaveCount => saveCount;
+
+        public Task SaveAsync(PendingMessageDeadLetterRecord record, CancellationToken cancellationToken = default) {
+            Interlocked.Increment(ref saveCount);
+            records[record.Message.MessageId] = record;
+            return Task.CompletedTask;
+        }
+
+        public Task<PendingMessageDeadLetterRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) {
+            records.TryGetValue(messageId, out var record);
+            return Task.FromResult<PendingMessageDeadLetterRecord?>(record);
+        }
+
+        public async IAsyncEnumerable<PendingMessageDeadLetterRecord> GetAllAsync(
+            [EnumeratorCancellation] CancellationToken cancellationToken = default) {
+            foreach (var record in records.Values) {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return record;
+                await Task.Yield();
+            }
+        }
+
+        public Task RemoveAsync(string messageId, CancellationToken cancellationToken = default) {
+            records.TryRemove(messageId, out _);
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class RecordingPendingMessageSender : IPendingMessageSender {
         public List<PendingMessageRecord> SentRecords { get; } = new();
         public bool ShouldThrow { get; set; }
@@ -339,14 +371,19 @@ public sealed class PendingMessageProcessorTests {
             ExceptionToThrow = new InvalidOperationException("Permanent failure")
         };
         var observer = new RecordingObserver();
+        var deadLetters = new InMemoryDeadLetterRepository();
         var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
             { EmailProvider.None, sender }
         });
-        var processor = new PendingMessageProcessor(repository, factory, clock: () => currentTime, observer: observer);
+        var processor = new PendingMessageProcessor(repository, factory, clock: () => currentTime, observer: observer, deadLetterRepository: deadLetters);
 
         await processor.ProcessAsync();
 
         Assert.False(repository.Contains(record.MessageId));
+        var deadLetter = await deadLetters.GetByMessageIdAsync(record.MessageId);
+        Assert.NotNull(deadLetter);
+        Assert.Equal(PendingMessageDropReason.PermanentFailure, deadLetter!.Reason);
+        Assert.Equal("Permanent failure", deadLetter.ErrorMessage);
         Assert.Single(sender.SentRecords);
         var failure = Assert.Single(observer.Failed);
         Assert.False(failure.WillRetry);
@@ -389,19 +426,46 @@ public sealed class PendingMessageProcessorTests {
         repository.Add(record);
         var sender = new RecordingPendingMessageSender();
         var observer = new RecordingObserver();
+        var deadLetters = new InMemoryDeadLetterRepository();
         var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
             { EmailProvider.None, sender }
         });
-        var processor = new PendingMessageProcessor(repository, factory, clock: () => currentTime, maxRetryAttempts: 5, observer: observer);
+        var processor = new PendingMessageProcessor(repository, factory, clock: () => currentTime, maxRetryAttempts: 5, observer: observer, deadLetterRepository: deadLetters);
 
         await processor.ProcessAsync();
 
         Assert.False(repository.Contains(record.MessageId));
+        var deadLetter = await deadLetters.GetByMessageIdAsync(record.MessageId);
+        Assert.NotNull(deadLetter);
+        Assert.Equal(PendingMessageDropReason.RetryLimitReached, deadLetter!.Reason);
         Assert.Empty(sender.SentRecords);
         Assert.Equal(5, record.AttemptCount);
         Assert.Single(observer.Dropped);
         Assert.Equal(PendingMessageDropReason.RetryLimitReached, observer.Dropped[0].Reason);
         Assert.Equal(5, observer.Dropped[0].Attempt);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_DoesNotDoubleDeadLetterExhaustedRecordWhenTwoProcessorsRace() {
+        var currentTime = DateTimeOffset.Parse("2024-06-07T11:30:00Z");
+        var repository = new CoordinatedPendingMessageRepository(currentTime.AddMinutes(-1), attemptCount: 5);
+        var deadLetters = new InMemoryDeadLetterRepository();
+        var observer = new RecordingObserver();
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            { EmailProvider.None, new RecordingPendingMessageSender() }
+        });
+        var first = new PendingMessageProcessor(repository, factory, clock: () => currentTime, maxRetryAttempts: 5, observer: observer, deadLetterRepository: deadLetters);
+        var second = new PendingMessageProcessor(repository, factory, clock: () => currentTime, maxRetryAttempts: 5, observer: observer, deadLetterRepository: deadLetters);
+
+        var firstTask = first.ProcessAsync();
+        var secondTask = second.ProcessAsync();
+
+        repository.ReleaseEnumerations();
+        await Task.WhenAll(firstTask, secondTask);
+
+        Assert.Equal(1, deadLetters.SaveCount);
+        Assert.Single(observer.Dropped);
+        Assert.Contains(observer.Skipped, skipped => skipped.Reason == PendingMessageSkipReason.LeaseNotAcquired);
     }
 
     [Fact]
@@ -665,8 +729,9 @@ public sealed class PendingMessageProcessorTests {
         private readonly TaskCompletionSource<bool> secondSnapshotCaptured = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<bool> releaseEnumerators = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        internal CoordinatedPendingMessageRepository(DateTimeOffset nextAttemptAt) {
+        internal CoordinatedPendingMessageRepository(DateTimeOffset nextAttemptAt, int attemptCount = 0) {
             record = CreateRecord(nextAttemptAt, "coordinated-message");
+            record.AttemptCount = attemptCount;
         }
 
         public Task SaveAsync(PendingMessageRecord updatedRecord, CancellationToken cancellationToken = default) {

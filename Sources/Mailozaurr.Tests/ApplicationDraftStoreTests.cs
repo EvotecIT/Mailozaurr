@@ -30,6 +30,37 @@ public sealed class ApplicationDraftStoreTests {
         Assert.NotEqual(default, saved.UpdatedAt);
     }
 
+    [Fact]
+    public async Task UpdatingDraftReplacesFileWithoutLeavingTemporaryArtifacts() {
+        var filePath = CreateTemporaryFilePath("drafts.json");
+        var store = new FileMailDraftStore(filePath);
+
+        await store.SaveAsync(new MailDraft {
+            Id = "report-draft",
+            Name = "Initial",
+            Message = new DraftMessage {
+                ProfileId = "work-gmail",
+                Subject = "Initial"
+            }
+        });
+        await store.SaveAsync(new MailDraft {
+            Id = "report-draft",
+            Name = "Updated",
+            Message = new DraftMessage {
+                ProfileId = "work-gmail",
+                Subject = "Updated"
+            }
+        });
+
+        var saved = await store.GetByIdAsync("report-draft");
+        var files = Directory.GetFiles(Path.GetDirectoryName(filePath)!);
+
+        Assert.NotNull(saved);
+        Assert.Equal("Updated", saved!.Name);
+        Assert.Single(files);
+        Assert.Equal(filePath, files[0], StringComparer.OrdinalIgnoreCase);
+    }
+
     private static string CreateTemporaryFilePath(string fileName) {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

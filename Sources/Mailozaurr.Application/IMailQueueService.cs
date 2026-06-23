@@ -25,6 +25,21 @@ public interface IMailQueueService {
     Task<QueuedMessageCompact?> GetCompactAsync(string messageId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Lists queued messages that reached a terminal failure state.
+    /// </summary>
+    Task<IReadOnlyList<QueuedMessageSummary>> ListDeadLettersAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets a terminally failed queued message.
+    /// </summary>
+    Task<QueuedMessageSummary?> GetDeadLetterAsync(string messageId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes a terminally failed queued message.
+    /// </summary>
+    Task<OperationResult> RemoveDeadLetterAsync(string messageId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Removes a queued message.
     /// </summary>
     Task<OperationResult> RemoveAsync(string messageId, CancellationToken cancellationToken = default);

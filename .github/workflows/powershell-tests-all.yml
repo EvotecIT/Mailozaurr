@@ -26,7 +26,7 @@ jobs:
       - name: Refresh module manifest
         env:
           RefreshPSD1Only: 'true'
-        run: ./Build/Manage-Mailozaurr.ps1
+        run: ./Build/Build-Module.ps1
         shell: pwsh
 
       - name: Commit refreshed PSD1
@@ -206,4 +206,3 @@ jobs:
       - name: Run PowerShell tests
         shell: pwsh
         run: ./Mailozaurr.Tests.ps1
-

@@ -8,6 +8,7 @@ namespace Mailozaurr;
 [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(SmtpResult))]
 [JsonSerializable(typeof(PendingMessageRecord))]
+[JsonSerializable(typeof(PendingMessageDeadLetterRecord))]
 [JsonSerializable(typeof(PendingMessageLogEnvelope))]
 [JsonSerializable(typeof(SentMessageRecord))]
 [JsonSerializable(typeof(OAuthCredential))]

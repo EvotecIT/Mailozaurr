@@ -17,6 +17,7 @@ public sealed class PendingMessageProcessor {
     private readonly int maxRetryAttempts;
     private readonly InternalLogger? logger;
     private readonly IPendingMessageProcessorObserver observer;
+    private readonly IPendingMessageDeadLetterRepository? deadLetterRepository;
     private readonly Func<Exception, bool> permanentFailureDetector;
     private readonly TimeSpan processingLeaseDuration;
 
@@ -30,6 +31,7 @@ public sealed class PendingMessageProcessor {
     /// <param name="maxRetryAttempts">Maximum number of delivery attempts performed before giving up on a message.</param>
     /// <param name="logger">Optional logger used to record processing diagnostics.</param>
     /// <param name="observer">Optional observer used to emit telemetry about processing outcomes.</param>
+    /// <param name="deadLetterRepository">Optional repository used to retain terminal failures for inspection.</param>
     /// <param name="permanentFailureDetector">Optional delegate that classifies whether a failure should skip retries.</param>
     /// <param name="processingLeaseDuration">
     /// Optional duration used to lease records while they are being processed to avoid concurrent handling.
@@ -43,6 +45,7 @@ public sealed class PendingMessageProcessor {
         int maxRetryAttempts = 5,
         InternalLogger? logger = null,
         IPendingMessageProcessorObserver? observer = null,
+        IPendingMessageDeadLetterRepository? deadLetterRepository = null,
         Func<Exception, bool>? permanentFailureDetector = null,
         TimeSpan? processingLeaseDuration = null) {
         this.repository = repository ?? throw new ArgumentNullException(nameof(repository));
@@ -56,6 +59,7 @@ public sealed class PendingMessageProcessor {
         this.maxRetryAttempts = maxRetryAttempts;
         this.logger = logger;
         this.observer = observer ?? NullPendingMessageProcessorObserver.Instance;
+        this.deadLetterRepository = deadLetterRepository;
         this.permanentFailureDetector = permanentFailureDetector ?? DefaultPermanentFailureDetector;
         processingLeaseDuration ??= TimeSpan.FromMinutes(1);
         if (processingLeaseDuration < TimeSpan.Zero) {
@@ -90,9 +94,16 @@ public sealed class PendingMessageProcessor {
             }
 
             if (record.AttemptCount >= maxRetryAttempts) {
-                logger?.WriteWarning($"Removing message {record.MessageId} after reaching the retry limit ({record.AttemptCount}).");
-                observer.MessageDropped(record, record.AttemptCount, PendingMessageDropReason.RetryLimitReached, null);
-                await repository.RemoveAsync(record.MessageId, cancellationToken).ConfigureAwait(false);
+                var exhaustedLease = await AcquireProcessingLeaseAsync(record, now, cancellationToken).ConfigureAwait(false);
+                if (exhaustedLease == null) {
+                    logger?.WriteVerbose($"Skipping message {record.MessageId} because another processor already acquired the processing lease.");
+                    observer.MessageSkipped(record, PendingMessageSkipReason.LeaseNotAcquired);
+                    continue;
+                }
+
+                logger?.WriteWarning($"Removing message {exhaustedLease.MessageId} after reaching the retry limit ({exhaustedLease.AttemptCount}).");
+                observer.MessageDropped(exhaustedLease, exhaustedLease.AttemptCount, PendingMessageDropReason.RetryLimitReached, null);
+                await DeadLetterAndRemoveAsync(exhaustedLease, exhaustedLease.AttemptCount, PendingMessageDropReason.RetryLimitReached, null, cancellationToken).ConfigureAwait(false);
                 continue;
             }
 
@@ -141,7 +152,7 @@ public sealed class PendingMessageProcessor {
                 if (!willRetry) {
                     logger?.WriteWarning($"Dropping message {leasedRecord.MessageId} due to {(permanentFailure ? "permanent failure" : "exceeding retry attempts")}: {ex.Message}");
                     observer.MessageDropped(leasedRecord, attempt, permanentFailure ? PendingMessageDropReason.PermanentFailure : PendingMessageDropReason.RetryLimitReached, ex);
-                    await repository.RemoveAsync(leasedRecord.MessageId, cancellationToken).ConfigureAwait(false);
+                    await DeadLetterAndRemoveAsync(leasedRecord, attempt, permanentFailure ? PendingMessageDropReason.PermanentFailure : PendingMessageDropReason.RetryLimitReached, ex, cancellationToken).ConfigureAwait(false);
                     continue;
                 }
 
@@ -158,6 +169,26 @@ public sealed class PendingMessageProcessor {
         var leaseDuration = processingLeaseDuration > TimeSpan.Zero ? processingLeaseDuration : MinimumLeaseDuration;
         var leaseUntil = ApplyDelay(now, leaseDuration);
         return await repository.TryAcquireLeaseAsync(record.MessageId, now, leaseUntil, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task DeadLetterAndRemoveAsync(
+        PendingMessageRecord record,
+        int attempt,
+        PendingMessageDropReason reason,
+        Exception? exception,
+        CancellationToken cancellationToken) {
+        if (deadLetterRepository != null) {
+            await deadLetterRepository.SaveAsync(new PendingMessageDeadLetterRecord {
+                Message = record.Clone(),
+                Reason = reason,
+                Attempt = attempt,
+                DeadLetteredAt = clock(),
+                ExceptionType = exception?.GetType().FullName,
+                ErrorMessage = exception?.Message
+            }, cancellationToken).ConfigureAwait(false);
+        }
+
+        await repository.RemoveAsync(record.MessageId, cancellationToken).ConfigureAwait(false);
     }
 
     private static TimeSpan DefaultRetryDelaySelector(int attempt) {

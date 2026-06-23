@@ -25,6 +25,15 @@ public sealed class QueuedMessageCompact {
     /// <summary>Whether provider-specific metadata is present.</summary>
     public bool HasProviderData { get; set; }
 
+    /// <summary>Whether this projection came from dead-letter storage.</summary>
+    public bool IsDeadLetter { get; set; }
+
+    /// <summary>Terminal drop reason when this is a dead-letter record.</summary>
+    public string? DeadLetterReason { get; set; }
+
+    /// <summary>Terminal error message when this is a dead-letter record.</summary>
+    public string? ErrorMessage { get; set; }
+
     /// <summary>Short human-readable summary line.</summary>
     public string Summary { get; set; } = string.Empty;
 }

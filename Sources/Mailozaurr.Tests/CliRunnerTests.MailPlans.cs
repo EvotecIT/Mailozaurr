@@ -40,6 +40,12 @@ public sealed partial class CliRunnerTests {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
         var fixture = CreateFixture();
+        var confirmationToken = MessageActionConfirmationTokens.CreateMoveToken(
+            "work-imap",
+            "shared@example.com",
+            "Inbox",
+            new[] { "msg-42", "MSG-42" },
+            "projects/2026");
 
         var exitCode = await CliRunner.RunAsync(
             new[] {
@@ -51,6 +57,7 @@ public sealed partial class CliRunnerTests {
                 "--message-id", "msg-42",
                 "--message-id", "MSG-42",
                 "--target-folder", "projects/2026",
+                "--confirm-token", confirmationToken,
                 "--json"
             },
             stdout,
@@ -134,6 +141,9 @@ public sealed partial class CliRunnerTests {
             RequestedCount = 1,
             UniqueMessageCount = 1,
             RequestedDestinationFolderId = "projects/2026",
+            ConfirmationToken = MessageActionConfirmationTokens.CreateMoveToken("work-imap", "shared@example.com", "Inbox", new[] { "msg-42" }, "projects/2026"),
+            ConfirmationProvided = true,
+            ConfirmationValidated = true,
             MessageIds = { "msg-42" }
         };
 
@@ -356,6 +366,28 @@ public sealed partial class CliRunnerTests {
     }
 
     [Fact]
+    public async Task MailExecuteStoredPlanBatchPassesConfirmationTokensToSharedRegistryService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "execute-plan-batch-stored",
+                "--batch", "cleanup",
+                "--confirm-token", "token-1",
+                "--confirm-token", "token-2",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal(new[] { "token-1", "token-2" }, fixture.MessageActionPlanRegistryService.LastExecutionConfirmationTokens);
+    }
+
+    [Fact]
     public async Task MailAddPlanToBatchUsesSharedRegistryService() {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
@@ -539,6 +571,9 @@ public sealed partial class CliRunnerTests {
                 FolderId = "Inbox",
                 RequestedCount = 1,
                 UniqueMessageCount = 1,
+                ConfirmationToken = MessageActionConfirmationTokens.CreateReadStateToken("work-imap", "shared@example.com", "Inbox", new[] { "msg-1" }, true),
+                ConfirmationProvided = true,
+                ConfirmationValidated = true,
                 DesiredState = true,
                 MessageIds = { "msg-1" }
             },
@@ -552,6 +587,9 @@ public sealed partial class CliRunnerTests {
                 RequestedCount = 1,
                 UniqueMessageCount = 1,
                 RequestedDestinationFolderId = "projects/2026",
+                ConfirmationToken = MessageActionConfirmationTokens.CreateMoveToken("work-imap", "shared@example.com", "Inbox", new[] { "msg-2" }, "projects/2026"),
+                ConfirmationProvided = true,
+                ConfirmationValidated = true,
                 MessageIds = { "msg-2" }
             }
         };

@@ -52,7 +52,7 @@ public static partial class CliRunner {
         output.WriteLine("  mail replace-plan-file-in-batch --batch <id> --index <n> --path <file> [--json]");
         output.WriteLine("  mail remove-plan-from-batch --batch <id> --index <n> [--json]");
         output.WriteLine("  mail delete-plan-batch --batch <id> [--json]");
-        output.WriteLine("  mail execute-plan-batch-stored --batch <id> [--stop-on-error] [--json]");
+        output.WriteLine("  mail execute-plan-batch-stored --batch <id> [--confirm-token <token>] [--stop-on-error] [--json]");
         output.WriteLine("  mail plan-action --action <mark-read|mark-unread|flag|unflag|archive|trash|move|delete> --profile <id> --message-id <id> [--message-id <id>] [--target-folder <id>] [--mailbox <id>] [--folder <name>] [--confirm-token <token>] [--json]");
         output.WriteLine("  mail export-plan --action <mark-read|mark-unread|flag|unflag|archive|trash|move|delete> --profile <id> --message-id <id> [--message-id <id>] --path <file> [--target-folder <id>] [--mailbox <id>] [--folder <name>] [--confirm-token <token>] [--json]");
         output.WriteLine("  mail show-plan --path <file> [--json]");
@@ -86,6 +86,9 @@ public static partial class CliRunner {
         output.WriteLine("  queue get --message-id <id> [--compact] [--json]");
         output.WriteLine("  queue remove --message-id <id> [--json]");
         output.WriteLine("  queue process [--json]");
+        output.WriteLine("  queue dead-letter-list [--json]");
+        output.WriteLine("  queue dead-letter-get --message-id <id> [--json]");
+        output.WriteLine("  queue dead-letter-remove --message-id <id> [--json]");
         output.WriteLine();
         output.WriteLine("Global options:");
         output.WriteLine("  --profiles-dir <path>");

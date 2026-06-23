@@ -109,33 +109,14 @@ public sealed class FileMailProfileStore : IMailProfileStore {
         }
     }
 
-    private async Task SaveDocumentAsync(MailProfileStoreDocument document, CancellationToken cancellationToken) {
-        var directory = Path.GetDirectoryName(_filePath);
-        if (string.IsNullOrWhiteSpace(directory)) {
-            throw new InvalidOperationException("Profile store path is invalid.");
-        }
-
-        Directory.CreateDirectory(directory);
-
-        var tempPath = Path.Combine(directory, Path.GetRandomFileName());
-        try {
-            using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)) {
-                await JsonSerializer.SerializeAsync(stream, document, ApplicationJsonContext.Default.MailProfileStoreDocument, cancellationToken).ConfigureAwait(false);
-                await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            if (File.Exists(_filePath)) {
-                File.Delete(_filePath);
-            }
-
-            File.Move(tempPath, _filePath);
-            tempPath = string.Empty;
-        } finally {
-            if (!string.IsNullOrEmpty(tempPath) && File.Exists(tempPath)) {
-                File.Delete(tempPath);
-            }
-        }
-    }
+    private Task SaveDocumentAsync(MailProfileStoreDocument document, CancellationToken cancellationToken) =>
+        AtomicFileWriter.WriteAsync(
+            _filePath,
+            "Profile store path is invalid.",
+            async (stream, token) => {
+                await JsonSerializer.SerializeAsync(stream, document, ApplicationJsonContext.Default.MailProfileStoreDocument, token).ConfigureAwait(false);
+            },
+            cancellationToken);
 
     private static void ValidateProfile(MailProfile? profile) {
         if (profile == null) {

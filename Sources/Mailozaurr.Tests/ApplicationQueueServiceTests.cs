@@ -64,7 +64,8 @@ public sealed class ApplicationQueueServiceTests {
 
         var service = new PendingMailQueueService(
             repository,
-            (pendingRepository, observer, cancellationToken) => {
+            processAsync:
+            (pendingRepository, deadLetters, observer, cancellationToken) => {
                 observer.MessageAttemptStarted(record, 1);
                 observer.MessageSent(record, 1, TimeSpan.FromSeconds(1));
                 return Task.CompletedTask;
@@ -76,6 +77,40 @@ public sealed class ApplicationQueueServiceTests {
         Assert.Equal(1, result.AttemptedCount);
         Assert.Equal(1, result.SentCount);
         Assert.Equal(0, result.FailedCount);
+    }
+
+    [Fact]
+    public async Task DeadLetterOperationsExposeTerminalFailures() {
+        var repository = new FilePendingMessageRepository(new PendingMessageRepositoryOptions {
+            DirectoryPath = CreateTemporaryDirectory()
+        });
+        var deadLetters = new FilePendingMessageDeadLetterRepository(Path.Combine(CreateTemporaryDirectory(), "dead-letter.log"));
+        await deadLetters.SaveAsync(new PendingMessageDeadLetterRecord {
+            Message = new PendingMessageRecord {
+                MessageId = "dead-1",
+                Provider = EmailProvider.Gmail,
+                Timestamp = DateTimeOffset.UtcNow.AddMinutes(-30),
+                AttemptCount = 3
+            },
+            Reason = PendingMessageDropReason.PermanentFailure,
+            Attempt = 3,
+            DeadLetteredAt = DateTimeOffset.UtcNow,
+            ErrorMessage = "Authentication failed."
+        });
+
+        var service = new PendingMailQueueService(repository, deadLetters);
+
+        var list = await service.ListDeadLettersAsync();
+        var get = await service.GetDeadLetterAsync("dead-1");
+        var remove = await service.RemoveDeadLetterAsync("dead-1");
+
+        Assert.Single(list);
+        Assert.NotNull(get);
+        Assert.True(get!.IsDeadLetter);
+        Assert.Equal("PermanentFailure", get.DeadLetterReason);
+        Assert.Equal("Authentication failed.", get.ErrorMessage);
+        Assert.True(remove.Succeeded);
+        Assert.Empty(await service.ListDeadLettersAsync());
     }
 
     private static string CreateTemporaryDirectory() {
