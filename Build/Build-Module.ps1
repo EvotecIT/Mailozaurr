@@ -1,8 +1,8 @@
-param(
+﻿param(
     [ValidateSet('Manifest', 'Build', 'Publish')]
     [string] $ConfigurationGateMode = 'Build',
 
-    [bool] $SignModule = $false,
+    [bool] $SignModule = $true,
 
     [string] $PowerShellGalleryApiKeyPath = 'C:\Support\Important\PowerShellGalleryAPI.txt',
 
@@ -130,8 +130,8 @@ Build-Module -ModuleName 'Mailozaurr' {
     New-ConfigurationProjectBuild -Name 'Mailozaurr' -ConfigPath 'Build\project.build.json' -Enabled:$false -BuildBeforeModule -UseAsReleaseVersionSource -ProvideLocalNuGetFeed -PublishNuget -PublishGitHub
     New-ConfigurationRelease -StageRoot 'Artefacts\UploadReady' -VersionSource ProjectBuild -PrimaryProject 'Mailozaurr' -BuildOrder 'Packages', 'Module' -PublishOrder 'NuGet', 'PowerShellGallery', 'GitHub'
 
-    New-ConfigurationArtefact -Type Unpacked -Enable -Path 'Artefacts' -ModulesPath 'Artefacts\Modules'
-    New-ConfigurationArtefact -Type Packed -Enable -Path 'Releases' -IncludeTagName
+    New-ConfigurationArtefact -Type Unpacked -Enable -Path 'Artefacts\Unpacked' -ModulesPath 'Artefacts\Unpacked\Modules'
+    New-ConfigurationArtefact -Type Packed -Enable -Path 'Artefacts\Packed' -ModulesPath 'Artefacts\Packed\Modules' -IncludeTagName
 
     #New-ConfigurationTest -TestsPath "$PSScriptRoot\..\Tests" -Enable
 
