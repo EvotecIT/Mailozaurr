@@ -2,7 +2,7 @@ param(
     [ValidateSet('Manifest', 'Build', 'Publish')]
     [string] $ConfigurationGateMode = 'Build',
 
-    [switch] $SignModule,
+    [bool] $SignModule = $false,
 
     [string] $PowerShellGalleryApiKeyPath = 'C:\Support\Important\PowerShellGalleryAPI.txt',
 
@@ -88,7 +88,7 @@ Build-Module -ModuleName 'Mailozaurr' {
 
     $newConfigurationBuildSplat = @{
         Enable                            = $true
-        SignModule                        = $SignModule.IsPresent
+        SignModule                        = $SignModule
         MergeModuleOnBuild                = $true
         MergeFunctionsFromApprovedModules = $true
         CertificateThumbprint             = '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703'
@@ -127,33 +127,16 @@ Build-Module -ModuleName 'Mailozaurr' {
 
     New-ConfigurationBuild @newConfigurationBuildSplat #-DotSourceLibraries -DotSourceClasses -MergeModuleOnBuild -Enable -SignModule -DeleteTargetModuleBeforeBuild -CertificateThumbprint '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703' -MergeFunctionsFromApprovedModules
 
-    $projectBuildOptions = @{
-        Manifest = $null
-        Build    = @{ CertificateThumbprint = $null }
-        Publish  = $null
-    }[$ConfigurationGateMode]
-
-    New-ConfigurationProjectBuild -Name 'Mailozaurr' -ConfigPath 'Build\project.build.json' -Enabled:$false -BuildBeforeModule -UseAsReleaseVersionSource -ProvideLocalNuGetFeed -PublishNuget -PublishGitHub -Options $projectBuildOptions
+    New-ConfigurationProjectBuild -Name 'Mailozaurr' -ConfigPath 'Build\project.build.json' -Enabled:$false -BuildBeforeModule -UseAsReleaseVersionSource -ProvideLocalNuGetFeed -PublishNuget -PublishGitHub
     New-ConfigurationRelease -StageRoot 'Artefacts\UploadReady' -VersionSource ProjectBuild -PrimaryProject 'Mailozaurr' -BuildOrder 'Packages', 'Module' -PublishOrder 'NuGet', 'PowerShellGallery', 'GitHub'
 
-    New-ConfigurationArtefact -Type Unpacked -Enable -Path 'Artefacts' -ModulesPath 'Artefacts\Modules' -RequiredModulesPath 'Artefacts\Modules'
+    New-ConfigurationArtefact -Type Unpacked -Enable -Path 'Artefacts' -ModulesPath 'Artefacts\Modules'
     New-ConfigurationArtefact -Type Packed -Enable -Path 'Releases' -IncludeTagName
 
     #New-ConfigurationTest -TestsPath "$PSScriptRoot\..\Tests" -Enable
 
-    $publishCredential = @{
-        Manifest = @{ ApiKey = 'NotUsedForNonPublishGate' }
-        Build    = @{ ApiKey = 'NotUsedForNonPublishGate' }
-        Publish  = @{ FilePath = $PowerShellGalleryApiKeyPath }
-    }[$ConfigurationGateMode]
-    $githubCredential = @{
-        Manifest = @{ ApiKey = 'NotUsedForNonPublishGate' }
-        Build    = @{ ApiKey = 'NotUsedForNonPublishGate' }
-        Publish  = @{ FilePath = $GitHubApiKeyPath }
-    }[$ConfigurationGateMode]
-
-    New-ConfigurationPublish -Type PowerShellGallery @publishCredential -Enabled:$false -UseAsDependencyVersionSource
-    New-ConfigurationPublish -Type GitHub @githubCredential -UserName 'EvotecIT' -Enabled:$false -RepositoryName 'Mailozaurr' -GenerateReleaseNotes -OverwriteTagName '{ModuleName}-v{ModuleVersionWithPreRelease}'
+    New-ConfigurationPublish -Type PowerShellGallery -FilePath $PowerShellGalleryApiKeyPath -Enabled:$false -UseAsDependencyVersionSource
+    New-ConfigurationPublish -Type GitHub -FilePath $GitHubApiKeyPath -UserName 'EvotecIT' -Enabled:$false -RepositoryName 'Mailozaurr' -GenerateReleaseNotes -OverwriteTagName '{ModuleName}-v{ModuleVersionWithPreRelease}'
 
     New-ConfigurationGate -Mode $ConfigurationGateMode
 } -ExitCode
