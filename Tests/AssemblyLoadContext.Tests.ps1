@@ -1,14 +1,16 @@
 Describe 'Packaged AssemblyLoadContext isolation' {
     It 'loads binary cmdlets and allowlisted public types from the module ALC' {
-        $packagedModuleRoot = Join-Path $PSScriptRoot '..\Artefacts\Modules'
-        $packagedModule = Join-Path $packagedModuleRoot 'Mailozaurr'
-        $packagedLoader = Join-Path $packagedModule 'Lib\Core\Mailozaurr.ModuleLoadContext.dll'
         if ($PSVersionTable.PSEdition -ne 'Core') {
             Set-ItResult -Skipped -Because 'module-scoped AssemblyLoadContext is PowerShell Core-only'
             return
         }
 
-        Test-Path -LiteralPath $packagedLoader | Should -BeTrue -Because 'Build\Build-Module.ps1 must create the packaged ALC loader before this regression runs'
+        $artefactsRoot = Join-Path $PSScriptRoot '..\Artefacts'
+        $packagedLoader = Get-ChildItem -LiteralPath $artefactsRoot -Filter 'Mailozaurr.ModuleLoadContext.dll' -Recurse -File | Select-Object -First 1
+        $packagedLoader | Should -Not -BeNullOrEmpty -Because 'Build\Build-Module.ps1 must create the packaged ALC loader before this regression runs'
+        $packagedModule = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $packagedLoader.FullName))
+        $packagedModuleRoot = Split-Path -Parent $packagedModule
+        $expectedCommandAssemblyPath = (Resolve-Path -LiteralPath (Join-Path $packagedModule 'Lib\Core\Mailozaurr.PowerShell.dll')).ProviderPath
 
         $moduleRootLiteral = $packagedModuleRoot.Replace("'", "''")
         $script = @"
@@ -72,7 +74,7 @@ try {
 
         $result.CommandName | Should -Be 'Send-EmailMessage'
         $result.CommandAssembly | Should -Be 'Mailozaurr.PowerShell'
-        ($result.CommandAssemblyPath -replace '\\', '/') | Should -BeLike '*/Artefacts/Modules/Mailozaurr/Lib/Core/Mailozaurr.PowerShell.dll'
+        ($result.CommandAssemblyPath -replace '\\', '/') | Should -Be ($expectedCommandAssemblyPath -replace '\\', '/')
         $result.CommandALC | Should -Be 'Mailozaurr'
         $result.CommandALCIsDefault | Should -BeFalse
         $result.SmtpType | Should -Be 'Mailozaurr.Smtp'
