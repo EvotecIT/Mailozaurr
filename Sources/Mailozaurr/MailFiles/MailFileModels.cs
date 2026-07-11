@@ -97,7 +97,7 @@ public sealed class MailFileAttachment {
 }
 
 /// <summary>Represents a mail file with compatibility fields and rich owner models.</summary>
-public sealed class MailFileMessage {
+public sealed partial class MailFileMessage {
     /// <summary>Mail file format.</summary>
     public MailFileFormat Format { get; set; }
     /// <summary>Full file path.</summary>
@@ -152,6 +152,15 @@ public sealed class MailFileMessage {
     public IReadOnlyDictionary<string, string>? Headers { get; set; }
     /// <summary>Structured OfficeIMO read diagnostics.</summary>
     public IReadOnlyList<EmailDiagnostic> Diagnostics { get; set; } = Array.Empty<EmailDiagnostic>();
+    /// <summary>True when the OfficeIMO reader produced at least one error diagnostic.</summary>
+    public bool HasErrors {
+        get {
+            foreach (EmailDiagnostic diagnostic in Diagnostics) {
+                if (diagnostic.Severity == EmailDiagnosticSeverity.Error) return true;
+            }
+            return false;
+        }
+    }
     /// <summary>Complete owner document, including typed Outlook items and retained MAPI values.</summary>
     public EmailDocument OfficeDocument { get; set; } = new EmailDocument();
     /// <summary>Native MimeKit message for EML input. MSG callers can use <see cref="ToMimeMessage"/>.</summary>

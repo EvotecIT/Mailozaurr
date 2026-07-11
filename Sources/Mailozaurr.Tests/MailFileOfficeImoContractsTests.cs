@@ -112,6 +112,29 @@ public sealed class MailFileOfficeImoContractsTests {
     }
 
     [Fact]
+    public async Task MailFileMessageIsTheSimpleLoadAndSaveEntryPoint() {
+        string directory = CreateTempDirectory();
+        try {
+            string emlPath = WriteEml(directory, "simple.eml", "Simple Mailozaurr API", "Simple body");
+            string msgPath = Path.Combine(directory, "simple.msg");
+            string roundTripPath = Path.Combine(directory, "simple-roundtrip.eml");
+
+            MailFileMessage message = MailFileMessage.Load(emlPath);
+            await message.SaveAsync(msgPath);
+            MailFileMessage converted = await MailFileMessage.LoadAsync(msgPath);
+            converted.Save(roundTripPath);
+
+            Assert.Equal("Simple Mailozaurr API", message.Subject);
+            Assert.False(message.HasErrors);
+            Assert.Equal(MailFileFormat.Msg, converted.Format);
+            Assert.False(converted.HasErrors);
+            Assert.Equal("Simple Mailozaurr API", MimeMessage.Load(roundTripPath).Subject);
+        } finally {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
     public async Task ConversionObservesFilesCreatedAfterFileInfoWasInspected() {
         string directory = CreateTempDirectory();
         try {

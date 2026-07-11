@@ -22,6 +22,7 @@ Describe 'Packaged AssemblyLoadContext isolation' {
 Import-Module Mailozaurr -Force
 
 `$command = Get-Command Send-EmailMessage -Module Mailozaurr -ErrorAction Stop
+`$exportCommand = Get-Command Export-MailFile -Module Mailozaurr -ErrorAction Stop
 `$commandAssembly = `$command.ImplementingType.Assembly
 `$commandAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$commandAssembly)
 `$smtpAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext([Mailozaurr.Smtp].Assembly)
@@ -40,6 +41,8 @@ try {
 
 [pscustomobject]@{
     CommandName = `$command.Name
+    ExportCommandName = `$exportCommand.Name
+    ExportCommandAssembly = `$exportCommand.ImplementingType.Assembly.GetName().Name
     CommandAssembly = `$commandAssembly.GetName().Name
     CommandAssemblyPath = `$commandAssembly.Location
     CommandALC = `$commandAlc.Name
@@ -73,6 +76,8 @@ try {
         $result = $json | ConvertFrom-Json
 
         $result.CommandName | Should -Be 'Send-EmailMessage'
+        $result.ExportCommandName | Should -Be 'Export-MailFile'
+        $result.ExportCommandAssembly | Should -Be 'Mailozaurr.PowerShell'
         $result.CommandAssembly | Should -Be 'Mailozaurr.PowerShell'
         ($result.CommandAssemblyPath -replace '\\', '/') | Should -Be ($expectedCommandAssemblyPath -replace '\\', '/')
         $result.CommandALC | Should -Be 'Mailozaurr'

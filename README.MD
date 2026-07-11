@@ -65,7 +65,7 @@ Mailozaurr keeps MIME, transport, S/MIME, PGP, DKIM, and ARC workflows in MimeKi
 PowerShell callers can import either file type through the same command:
 
 ```powershell
-$mail = Import-MailFile -InputPath './message.msg' -IncludeHeaders
+$mail = Import-MailFile './message.msg'
 
 $mail.Subject
 $mail.OutlookItemKind
@@ -73,16 +73,34 @@ $mail.OfficeDocument.Contact
 $mail.Diagnostics
 ```
 
-Use `-ExcludeAttachments` when only message metadata is needed, or `-ExcludeAttachmentContent` to retain attachment names and sizes without loading their decoded bytes. EML input also exposes its native `MimeMessage`; MSG input can produce one with `$mail.ToMimeMessage()` when it needs to enter a Mailozaurr cryptography or transport workflow.
+Exporting uses the destination extension, so the same pipeline converts in either direction:
 
-The existing conversion commands remain available:
+```powershell
+Import-MailFile './message.msg' | Export-MailFile './message.eml'
+Import-MailFile './message.eml' | Export-MailFile './message.msg'
+```
+
+Add `-Force` to replace an existing destination or `-PassThru` to return its `FileInfo`. Use `-IncludeHeaders` when merged headers are needed, `-ExcludeAttachments` for message metadata only, or `-ExcludeAttachmentContent` to retain attachment names and sizes without loading decoded bytes. EML input also exposes its native `MimeMessage`; MSG input can produce one with `$mail.ToMimeMessage()` when it needs to enter a Mailozaurr cryptography or transport workflow.
+
+The direction-specific conversion commands remain available for scripts that write batches to an output folder:
 
 ```powershell
 ConvertFrom-EmlToMsg -InputPath './message.eml' -OutputFolder './converted'
 ConvertFrom-MsgToEml -InputPath './message.msg' -OutputFolder './converted'
 ```
 
-The same `MailFileReader`, `EmailMessage`, and async conversion APIs are available from the main `Mailozaurr` .NET package. A separate `Mailozaurr.Msg` package is no longer required.
+The .NET API follows the same load/save shape:
+
+```csharp
+using Mailozaurr;
+
+MailFileMessage mail = MailFileMessage.Load("message.msg");
+Console.WriteLine(mail.Subject);
+
+await mail.SaveAsync("message.eml");
+```
+
+`MailFileMessage.Load` and `Import-MailFile` fail clearly on error diagnostics. Use `MailFileReader` when custom projection options or recovery from a partially readable artifact are needed; check `message.HasErrors` and `message.Diagnostics` before accepting it. The older `EmailMessage` conversion methods remain available for compatibility and batch conversion. A separate `Mailozaurr.Msg` package is no longer required.
 
 ## Architecture notes
 

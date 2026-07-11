@@ -12,6 +12,8 @@ Describe 'Import-Module' {
 
     It 'exports representative commands after import' {
         (Get-Command Get-SmtpConnectionPool -ErrorAction Stop).ModuleName | Should -Be 'Mailozaurr'
+        (Get-Command Export-MailFile -ErrorAction Stop).ModuleName | Should -Be 'Mailozaurr'
+        (Get-Command Import-MailFile -ErrorAction Stop).ModuleName | Should -Be 'Mailozaurr'
         (Get-Command Send-EmailMessage -ErrorAction Stop).ModuleName | Should -Be 'Mailozaurr'
     }
 }
