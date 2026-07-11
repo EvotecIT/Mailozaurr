@@ -66,9 +66,11 @@ public sealed class CmdletExportMailFile : PSCmdlet {
             return;
         }
 
+        bool hasErrors = false;
         foreach (EmailDiagnostic diagnostic in result.Diagnostics) {
             string message = $"{diagnostic.Code}: {diagnostic.Message}";
             if (diagnostic.Severity == EmailDiagnosticSeverity.Error) {
+                hasErrors = true;
                 WriteError(new ErrorRecord(new InvalidDataException(message), diagnostic.Code,
                     ErrorCategory.InvalidData, outputPath));
             } else if (diagnostic.Severity == EmailDiagnosticSeverity.Warning) {
@@ -77,6 +79,6 @@ public sealed class CmdletExportMailFile : PSCmdlet {
                 WriteVerbose(message);
             }
         }
-        if (PassThru.IsPresent) WriteObject(new FileInfo(outputPath));
+        if (!hasErrors && PassThru.IsPresent) WriteObject(new FileInfo(outputPath));
     }
 }
