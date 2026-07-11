@@ -1,4 +1,5 @@
 using MimeKit;
+using MimeKit.Cryptography;
 using OfficeIMO.Email;
 using System.Reflection;
 
@@ -105,6 +106,60 @@ public sealed class MailFileOfficeImoContractsTests {
             Assert.Equal(EmailFileFormat.OutlookMsg, imported.OfficeDocument.Format);
             Assert.True(toEml.Status, toEml.Error);
             Assert.Equal("Async owner", MimeMessage.Load(roundTripPath).Subject);
+        } finally {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public async Task ConversionObservesFilesCreatedAfterFileInfoWasInspected() {
+        string directory = CreateTempDirectory();
+        try {
+            string emlPath = Path.Combine(directory, "stale.eml");
+            string msgPath = Path.Combine(directory, "stale.msg");
+            string roundTripPath = Path.Combine(directory, "stale-roundtrip.eml");
+            var emlFile = new FileInfo(emlPath);
+            var msgFile = new FileInfo(msgPath);
+            var roundTripFile = new FileInfo(roundTripPath);
+            Assert.False(emlFile.Exists);
+            Assert.False(msgFile.Exists);
+            Assert.False(roundTripFile.Exists);
+
+            WriteEml(directory, "stale.eml", "Fresh metadata", "Fresh body");
+
+            EmlConversionResult toMsg = await EmailMessage.ConvertEmlToMsgAsync(emlFile, msgFile, true);
+            MsgConversionResult toEml = await EmailMessage.ConvertMsgToEmlAsync(msgFile, roundTripFile, true);
+
+            Assert.True(toMsg.Status, toMsg.Error);
+            Assert.True(toEml.Status, toEml.Error);
+            Assert.Equal("Fresh metadata", MimeMessage.Load(roundTripPath).Subject);
+        } finally {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public void SignedEmlProjectsVerifiedSignatureCompatibilityFields() {
+        string directory = CreateTempDirectory();
+        try {
+            string path = Path.Combine(directory, "signed.eml");
+            using var certificate = TemporarySmimeCertificate.CreateSelfSigned("CN=Mail File Signer");
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress("Signer", "signer@example.com"));
+            message.To.Add(new MailboxAddress("Recipient", "recipient@example.com"));
+            message.Subject = "Signed owner";
+            message.Body = new TextPart("plain") { Text = "Signed body" };
+            using (var context = new TemporarySecureMimeContext()) {
+                var signer = new CmsSigner(certificate) { DigestAlgorithm = DigestAlgorithm.Sha256 };
+                message.Body = MultipartSigned.Create(context, signer, message.Body);
+            }
+            message.WriteTo(path);
+
+            MailFileMessage result = MailFileReader.Read(path);
+
+            Assert.True(result.SignatureIsValid);
+            Assert.Contains("Mail File Signer", result.SignedBy, StringComparison.OrdinalIgnoreCase);
+            Assert.NotNull(result.SignedOn);
         } finally {
             Directory.Delete(directory, true);
         }

@@ -88,6 +88,7 @@ public static class MailFileReader {
             ? document.Attachments.Select(attachment =>
                 ProjectAttachment(attachment, options.IncludeAttachmentContent)).ToArray()
             : Array.Empty<MailFileAttachment>();
+        MailFileSignatureInfo signature = MailFileSignatureProjection.Evaluate(document, mimeMessage);
 
         return new MailFileMessage {
             Format = format,
@@ -112,6 +113,9 @@ public static class MailFileReader {
             OutlookItemKind = document.OutlookItemKind,
             Categories = document.MessageMetadata.Categories.ToArray(),
             ProtectionKind = document.Protection.Kind,
+            SignatureIsValid = signature.IsValid,
+            SignedBy = signature.SignedBy,
+            SignedOn = signature.SignedOn,
             Headers = options.IncludeHeaders ? MergeHeaders(document.Headers) : null,
             Diagnostics = result.Diagnostics,
             OfficeDocument = document,
@@ -179,7 +183,7 @@ public static class MailFileReader {
 
     private static void ValidateFile(FileInfo fileInfo) {
         if (fileInfo == null) throw new ArgumentNullException(nameof(fileInfo));
-        if (!fileInfo.Exists) throw new FileNotFoundException("Mail file not found.", fileInfo.FullName);
+        if (!File.Exists(fileInfo.FullName)) throw new FileNotFoundException("Mail file not found.", fileInfo.FullName);
     }
 
     private static MailFileFormat ResolveFormat(FileInfo fileInfo) {

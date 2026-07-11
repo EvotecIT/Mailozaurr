@@ -15,7 +15,7 @@ public static class EmailMessage {
 
     /// <summary>Converts one EML file to MSG format.</summary>
     public static EmlConversionResult ConvertEmlToMsg(FileInfo emlFile, FileInfo msgFile, bool force) {
-        if (!emlFile.Exists) return MissingEml(emlFile, msgFile);
+        if (!File.Exists(emlFile.FullName)) return MissingEml(emlFile, msgFile);
         LoggingMessages.Logger.WriteVerbose("Processing EML file: {0}", emlFile);
         EnsureOutputDirectory(msgFile);
         string tempFile = CreateTempOutputPath(msgFile);
@@ -41,7 +41,7 @@ public static class EmailMessage {
     /// <summary>Asynchronously converts one EML file to MSG format.</summary>
     public static async Task<EmlConversionResult> ConvertEmlToMsgAsync(FileInfo emlFile, FileInfo msgFile,
         bool force, CancellationToken cancellationToken = default) {
-        if (!emlFile.Exists) return MissingEml(emlFile, msgFile);
+        if (!File.Exists(emlFile.FullName)) return MissingEml(emlFile, msgFile);
         LoggingMessages.Logger.WriteVerbose("Processing EML file: {0}", emlFile);
         EnsureOutputDirectory(msgFile);
         string tempFile = CreateTempOutputPath(msgFile);
@@ -78,7 +78,7 @@ public static class EmailMessage {
 
     /// <summary>Converts one MSG file to EML format.</summary>
     public static MsgConversionResult ConvertMsgToEml(FileInfo msgFile, FileInfo emlFile, bool force) {
-        if (!msgFile.Exists) return MissingMsg(msgFile, emlFile);
+        if (!File.Exists(msgFile.FullName)) return MissingMsg(msgFile, emlFile);
         LoggingMessages.Logger.WriteVerbose("Processing MSG file: {0}", msgFile);
         EnsureOutputDirectory(emlFile);
         string tempFile = CreateTempOutputPath(emlFile);
@@ -105,7 +105,7 @@ public static class EmailMessage {
     /// <summary>Asynchronously converts one MSG file to EML format.</summary>
     public static async Task<MsgConversionResult> ConvertMsgToEmlAsync(FileInfo msgFile, FileInfo emlFile,
         bool force, CancellationToken cancellationToken = default) {
-        if (!msgFile.Exists) return MissingMsg(msgFile, emlFile);
+        if (!File.Exists(msgFile.FullName)) return MissingMsg(msgFile, emlFile);
         LoggingMessages.Logger.WriteVerbose("Processing MSG file: {0}", msgFile);
         EnsureOutputDirectory(emlFile);
         string tempFile = CreateTempOutputPath(emlFile);

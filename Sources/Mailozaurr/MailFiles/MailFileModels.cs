@@ -142,11 +142,11 @@ public sealed class MailFileMessage {
     public IReadOnlyList<string> Categories { get; set; } = Array.Empty<string>();
     /// <summary>Protected-message classification.</summary>
     public EmailProtectionKind ProtectionKind { get; set; }
-    /// <summary>Indicates whether a signature is valid after explicit host-side verification.</summary>
+    /// <summary>Indicates whether the embedded S/MIME signature passed signature-only validation; null when absent or unverifiable.</summary>
     public bool? SignatureIsValid { get; set; }
-    /// <summary>Signer identity, if supplied by a host-side verifier.</summary>
+    /// <summary>Signer identity projected from the embedded S/MIME certificate.</summary>
     public string? SignedBy { get; set; }
-    /// <summary>Signature timestamp, if supplied by a host-side verifier.</summary>
+    /// <summary>Creation timestamp reported by the embedded S/MIME signature.</summary>
     public DateTimeOffset? SignedOn { get; set; }
     /// <summary>Raw headers merged into a single dictionary.</summary>
     public IReadOnlyDictionary<string, string>? Headers { get; set; }
