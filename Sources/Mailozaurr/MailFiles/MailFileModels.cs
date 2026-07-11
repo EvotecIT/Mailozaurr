@@ -14,19 +14,19 @@ public enum MailFileFormat {
 /// <summary>Recipient classification.</summary>
 public enum MailFileRecipientType {
     /// <summary>Unknown or unspecified recipient type.</summary>
-    Unknown,
+    Unknown = 0,
     /// <summary>Primary recipient.</summary>
-    To,
+    To = 1,
     /// <summary>Carbon copy recipient.</summary>
-    Cc,
+    Cc = 2,
     /// <summary>Blind carbon copy recipient.</summary>
-    Bcc,
-    /// <summary>Reply-to recipient.</summary>
-    ReplyTo,
+    Bcc = 3,
     /// <summary>Resource recipient.</summary>
-    Resource,
+    Resource = 4,
     /// <summary>Room recipient.</summary>
-    Room
+    Room = 5,
+    /// <summary>Reply-to recipient.</summary>
+    ReplyTo = 6
 }
 
 /// <summary>Represents an address from a mail file.</summary>

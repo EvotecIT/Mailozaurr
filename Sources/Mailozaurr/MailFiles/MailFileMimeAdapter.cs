@@ -37,6 +37,8 @@ public static class MailFileMimeAdapter {
             using var stream = new MemoryStream(payload.Content, writable: false);
             entity = MimeEntity.Load(contentType, stream);
             return true;
+        } catch (ParseException) {
+            return false;
         } catch (FormatException) {
             return false;
         } catch (IOException) {

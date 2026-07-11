@@ -18,6 +18,18 @@ public sealed class MailFileOfficeImoContractsTests {
         Assert.DoesNotContain("MsgReader", references);
         Assert.DoesNotContain("OpenMcdf", references);
         Assert.DoesNotContain("RtfPipe", references);
+        Assert.DoesNotContain("OfficeIMO.Shared", references);
+    }
+
+    [Fact]
+    public void CompatibilityRecipientValuesRemainStable() {
+        Assert.Equal(0, (int)MailFileRecipientType.Unknown);
+        Assert.Equal(1, (int)MailFileRecipientType.To);
+        Assert.Equal(2, (int)MailFileRecipientType.Cc);
+        Assert.Equal(3, (int)MailFileRecipientType.Bcc);
+        Assert.Equal(4, (int)MailFileRecipientType.Resource);
+        Assert.Equal(5, (int)MailFileRecipientType.Room);
+        Assert.Equal(6, (int)MailFileRecipientType.ReplyTo);
     }
 
     [Fact]
@@ -124,6 +136,34 @@ public sealed class MailFileOfficeImoContractsTests {
             Assert.NotNull(entity);
             Assert.Equal("application/pkcs7-mime", entity!.ContentType.MimeType);
             entity.Dispose();
+        } finally {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public void MalformedProtectedContentTypeReturnsFalse() {
+        string directory = CreateTempDirectory();
+        try {
+            string path = Path.Combine(directory, "malformed-protected.msg");
+            var document = new EmailDocument {
+                Format = EmailFileFormat.OutlookMsg,
+                MessageClass = "IPM.Note.SMIME",
+                Subject = "Malformed protected metadata"
+            };
+            document.Attachments.Add(new EmailAttachment {
+                FileName = "smime.p7m",
+                ContentType = "not-a-content-type",
+                Content = new byte[] { 1, 2, 3 },
+                Length = 3
+            });
+            new EmailDocumentWriter().Write(document, path, EmailFileFormat.OutlookMsg);
+
+            MailFileMessage result = MailFileReader.Read(path);
+
+            Assert.Equal(EmailProtectionKind.SmimeOpaque, result.ProtectionKind);
+            Assert.False(result.TryGetProtectedMimeEntity(out MimeEntity? entity));
+            Assert.Null(entity);
         } finally {
             Directory.Delete(directory, true);
         }
