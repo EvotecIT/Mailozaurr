@@ -3,8 +3,7 @@
   "RootPath": "..",
   "ExpectedVersion": null,
   "ExpectedVersionMap": {
-    "Mailozaurr": "2.0.X",
-    "Mailozaurr.Msg": "2.0.X"
+    "Mailozaurr": "2.0.X"
   },
   "ExpectedVersionMapAsInclude": true,
   "ExpectedVersionMapUseWildcards": false,
@@ -38,4 +37,3 @@
   "GitHubTagTemplate": "{Repo}-v{UtcTimestamp}",
   "GitHubReleaseName": "{Repo} {UtcDateTime}"
 }
-

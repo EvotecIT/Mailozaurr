@@ -31,22 +31,45 @@ public sealed class CmdletImportMailFile : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? InputPath { get; set; }
 
+    /// <summary>Includes the merged source headers in the compatibility projection.</summary>
+    [Parameter]
+    public SwitchParameter IncludeHeaders { get; set; }
+
+    /// <summary>Omits attachments from the compatibility projection.</summary>
+    [Parameter]
+    public SwitchParameter ExcludeAttachments { get; set; }
+
+    /// <summary>Retains attachment metadata while omitting decoded attachment bytes.</summary>
+    [Parameter]
+    public SwitchParameter ExcludeAttachmentContent { get; set; }
+
     /// <summary>
     /// Imports the specified mail file and returns its contents as a message object.
     /// </summary>
-    protected override Task ProcessRecordAsync() {
+    protected override async Task ProcessRecordAsync() {
         var inputPath = InputPath;
         if (string.IsNullOrWhiteSpace(inputPath)) {
             WriteWarning("Import-MailFile - File path is empty.");
-            return Task.CompletedTask;
+            return;
         }
 
-        if (MailFileReader.TryRead(inputPath!, out var message, out var error)) {
+        var options = new MailFileReaderOptions {
+            IncludeAttachments = !ExcludeAttachments.IsPresent,
+            IncludeAttachmentContent = !ExcludeAttachmentContent.IsPresent,
+            IncludeHeaders = IncludeHeaders.IsPresent
+        };
+        try {
+            MailFileMessage message = await MailFileReader.ReadAsync(inputPath!, options, CancelToken)
+                .ConfigureAwait(false);
             WriteObject(message);
-        } else {
-            WriteWarning($"Import-MailFile - {error}");
+        } catch (OperationCanceledException) when (CancelToken.IsCancellationRequested) {
+            throw;
+        } catch (NotSupportedException) {
+            WriteWarning($"Import-MailFile - File {inputPath} is not a .msg or .eml file.");
+        } catch (FileNotFoundException) {
+            WriteWarning($"Import-MailFile - File {inputPath} doesn't exist.");
+        } catch (Exception ex) {
+            WriteWarning($"Import-MailFile - File {inputPath} is not a .msg or .eml file or another error occurred. Error: {ex.Message}");
         }
-
-        return Task.CompletedTask;
     }
 }

@@ -45,8 +45,7 @@ In V2, some functionality was moved to dedicated projects:
 
 - [MailKit](https://github.com/jstedfast/MailKit) - licensed MIT
 - [MimeKit](https://github.com/jstedfast/MimeKit) - licensed MIT
-- [MsgKit](https://github.com/Sicos1977/MsgKit) - licensed MIT
-- [MsgReader](https://github.com/Sicos1977/MSGReader) - licensed MIT
+- [OfficeIMO.Email](https://github.com/EvotecIT/OfficeIMO) - licensed MIT
 
 For OAuth2 support, Mailozaurr also bundles:
 
@@ -58,6 +57,32 @@ For OAuth2 support, Mailozaurr also bundles:
 Additional dependency:
 
 - [System.DataSQLite](https://system.data.sqlite.org/)
+
+## EML and Outlook MSG files
+
+Mailozaurr keeps MIME, transport, S/MIME, PGP, DKIM, and ARC workflows in MimeKit and MailKit. OfficeIMO.Email owns local email artifacts: Outlook MSG, typed Outlook appointments, contacts, tasks, journals and notes, TNEF, RTF-backed bodies, embedded items, and retained MAPI properties.
+
+PowerShell callers can import either file type through the same command:
+
+```powershell
+$mail = Import-MailFile -InputPath './message.msg' -IncludeHeaders
+
+$mail.Subject
+$mail.OutlookItemKind
+$mail.OfficeDocument.Contact
+$mail.Diagnostics
+```
+
+Use `-ExcludeAttachments` when only message metadata is needed, or `-ExcludeAttachmentContent` to retain attachment names and sizes without loading their decoded bytes. EML input also exposes its native `MimeMessage`; MSG input can produce one with `$mail.ToMimeMessage()` when it needs to enter a Mailozaurr cryptography or transport workflow.
+
+The existing conversion commands remain available:
+
+```powershell
+ConvertFrom-EmlToMsg -InputPath './message.eml' -OutputFolder './converted'
+ConvertFrom-MsgToEml -InputPath './message.msg' -OutputFolder './converted'
+```
+
+The same `MailFileReader`, `EmailMessage`, and async conversion APIs are available from the main `Mailozaurr` .NET package. A separate `Mailozaurr.Msg` package is no longer required.
 
 ## Architecture notes
 
