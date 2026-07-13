@@ -80,7 +80,7 @@ public sealed class ApplicationSmtpMailSendHandlerTests {
             },
             new SendMessageRequest {
                 ProfileId = "work-smtp",
-                PreferQueue = true,
+                QueueOnFailure = true,
                 Message = new DraftMessage {
                     Subject = "Hello SMTP",
                     TextBody = "hello",

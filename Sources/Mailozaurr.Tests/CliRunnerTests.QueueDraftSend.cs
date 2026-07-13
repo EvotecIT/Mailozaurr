@@ -233,7 +233,6 @@ public sealed partial class CliRunnerTests {
             new[] {
                 "send",
                 "--draft", "draft-1",
-                "--send-now",
                 "--json"
             },
             stdout,
@@ -244,6 +243,7 @@ public sealed partial class CliRunnerTests {
         Assert.Equal("draft-1", fixture.DraftService.LastRequestedDraftId);
         Assert.NotNull(fixture.SendService.LastRequest);
         Assert.Equal("work-imap", fixture.SendService.LastRequest!.ProfileId);
+        Assert.False(fixture.SendService.LastRequest.QueueOnFailure);
         Assert.Equal("saved@example.com", fixture.SendService.LastRequest.Message.To[0].Address);
     }
 
@@ -258,7 +258,7 @@ public sealed partial class CliRunnerTests {
             new[] {
                 "send",
                 "--file", importPath,
-                "--send-now",
+                "--queue-on-failure",
                 "--json"
             },
             stdout,
@@ -269,8 +269,7 @@ public sealed partial class CliRunnerTests {
         Assert.Equal(importPath, fixture.DraftExchangeService.LastLoadedPath);
         Assert.NotNull(fixture.SendService.LastRequest);
         Assert.Equal("work-imap", fixture.SendService.LastRequest!.ProfileId);
-        Assert.True(fixture.SendService.LastRequest.RequireImmediateSend);
-        Assert.False(fixture.SendService.LastRequest.PreferQueue);
+        Assert.True(fixture.SendService.LastRequest.QueueOnFailure);
         Assert.Equal("imported@example.com", fixture.SendService.LastRequest.Message.To[0].Address);
         Assert.Equal("Imported subject", fixture.SendService.LastRequest.Message.Subject);
     }
@@ -295,7 +294,6 @@ public sealed partial class CliRunnerTests {
                 "--html", "<b>HTML body</b>",
                 "--header", "X-Test=value",
                 "--attachment", "C:\\Temp\\report.pdf",
-                "--send-now",
                 "--json"
             },
             stdout,
@@ -305,8 +303,7 @@ public sealed partial class CliRunnerTests {
         Assert.Equal(0, exitCode);
         Assert.NotNull(fixture.SendService.LastRequest);
         Assert.Equal("work-imap", fixture.SendService.LastRequest!.ProfileId);
-        Assert.True(fixture.SendService.LastRequest.RequireImmediateSend);
-        Assert.False(fixture.SendService.LastRequest.PreferQueue);
+        Assert.False(fixture.SendService.LastRequest.QueueOnFailure);
         Assert.Equal("sender@example.com", fixture.SendService.LastRequest.Message.From!.Address);
         Assert.Equal(2, fixture.SendService.LastRequest.Message.To.Count);
         Assert.Equal("alice@example.com", fixture.SendService.LastRequest.Message.To[0].Address);

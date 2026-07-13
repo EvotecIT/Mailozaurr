@@ -5,7 +5,7 @@ using System.ComponentModel;
 namespace Mailozaurr.Cli.Mcp;
 
 public sealed partial class MailMcpTools {
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Searches messages in a mailbox using normalized Mailozaurr filters.")]
     public Task<IReadOnlyList<MessageSummary>> mail_search(
         [Description("The profile identifier to query.")] string profileId,
@@ -30,7 +30,7 @@ public sealed partial class MailMcpTools {
             Limit = limit
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Searches messages in a mailbox using a lightweight Mailozaurr message projection.")]
     public Task<IReadOnlyList<MessageSummaryCompact>> mail_search_compact(
         [Description("The profile identifier to query.")] string profileId,
@@ -55,7 +55,7 @@ public sealed partial class MailMcpTools {
             Limit = limit
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Gets a detailed message view for a specific message identifier.")]
     public async Task<MessageDetail> mail_get(
         [Description("The profile identifier to query.")] string profileId,
@@ -75,7 +75,7 @@ public sealed partial class MailMcpTools {
         return message ?? throw new InvalidOperationException($"Message '{messageId}' was not found.");
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Gets a lightweight detailed message view for a specific message identifier.")]
     public async Task<MessageDetailCompact> mail_get_compact(
         [Description("The profile identifier to query.")] string profileId,
@@ -95,7 +95,7 @@ public sealed partial class MailMcpTools {
         return message ?? throw new InvalidOperationException($"Message '{messageId}' was not found.");
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Gets detailed message views for multiple specific message identifiers.")]
     public Task<IReadOnlyList<MessageDetail>> mail_get_many(
         [Description("The profile identifier to query.")] string profileId,
@@ -112,7 +112,7 @@ public sealed partial class MailMcpTools {
             IncludeRawContent = includeRawContent
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Gets lightweight detailed message views for multiple specific message identifiers.")]
     public Task<IReadOnlyList<MessageDetailCompact>> mail_get_many_compact(
         [Description("The profile identifier to query.")] string profileId,
@@ -129,7 +129,7 @@ public sealed partial class MailMcpTools {
             IncludeRawContent = includeRawContent
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Builds a dry-run preview for changing messages to read or unread, including normalized message ids and a reusable confirmation token.")]
     public Task<MessageStateChangePreview> mail_mark_read_preview(
         [Description("The profile identifier to query.")] string profileId,
@@ -165,7 +165,7 @@ public sealed partial class MailMcpTools {
             ConfirmationToken = confirmationToken
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Builds a dry-run preview for flagging or unflagging messages, including normalized message ids and a reusable confirmation token.")]
     public Task<MessageStateChangePreview> mail_flag_preview(
         [Description("The profile identifier to query.")] string profileId,
@@ -273,7 +273,7 @@ public sealed partial class MailMcpTools {
             ConfirmationToken = confirmationToken
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Lists attachment metadata for a specific message without returning the full message body.")]
     public Task<IReadOnlyList<AttachmentSummary>> mail_attachments_list(
         [Description("The profile identifier to query.")] string profileId,
@@ -360,7 +360,7 @@ public sealed partial class MailMcpTools {
         }, cancellationToken);
 
     [McpServerTool]
-    [Description("Sends or queues a message using a configured Mailozaurr profile. Queueing is the default unless sendNow is true.")]
+    [Description("Sends a message using a configured Mailozaurr profile, optionally queueing it after a send failure.")]
     public Task<SendResult> mail_send(
         [Description("The profile identifier to use for sending.")] string profileId,
         [Description("Primary recipient email addresses.")] string[] to,
@@ -372,12 +372,11 @@ public sealed partial class MailMcpTools {
         [Description("Optional Reply-To recipient email addresses.")] string[]? replyTo = null,
         [Description("Optional From email address override.")] string? from = null,
         [Description("Optional attachment file paths on the server filesystem.")] string[]? attachmentPaths = null,
-        [Description("When true, sends immediately instead of preferring the queue.")] bool sendNow = false,
+        [Description("When true, persists a failed send in the retry queue.")] bool queueOnFailure = false,
         CancellationToken cancellationToken = default) =>
         _application.Send.SendAsync(new SendMessageRequest {
             ProfileId = profileId,
-            PreferQueue = !sendNow,
-            RequireImmediateSend = sendNow,
+            QueueOnFailure = queueOnFailure,
             Message = BuildDraftMessage(profileId, to, subject, textBody, htmlBody, cc, bcc, replyTo, from, attachmentPaths)
         }, cancellationToken);
 }

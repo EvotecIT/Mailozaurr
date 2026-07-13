@@ -9,6 +9,7 @@ namespace Mailozaurr.Application;
 /// </summary>
 public sealed class GmailSessionFactory : IGmailSessionFactory {
     private static readonly Uri GoogleTokenEndpoint = new("https://oauth2.googleapis.com/token");
+    private static readonly HttpClient GoogleTokenClient = new();
     private readonly IMailSecretStore _secretStore;
     private readonly Func<GmailRefreshRequest, CancellationToken, Task<OAuthCredential>> _refreshCredentialAsync;
     private readonly Func<GmailSessionRequest, CancellationToken, Task<GmailSession>> _connectAsync;
@@ -114,14 +115,13 @@ public sealed class GmailSessionFactory : IGmailSessionFactory {
     private static async Task<OAuthCredential> DefaultRefreshCredentialAsync(
         GmailRefreshRequest request,
         CancellationToken cancellationToken) {
-        using var client = new HttpClient();
         using var content = new FormUrlEncodedContent(new Dictionary<string, string> {
             ["client_id"] = request.ClientId,
             ["client_secret"] = request.ClientSecret,
             ["refresh_token"] = request.RefreshToken,
             ["grant_type"] = "refresh_token"
         });
-        using var response = await client.PostAsync(GoogleTokenEndpoint, content, cancellationToken).ConfigureAwait(false);
+        using var response = await GoogleTokenClient.PostAsync(GoogleTokenEndpoint, content, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 #else

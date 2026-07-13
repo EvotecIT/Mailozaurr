@@ -96,62 +96,88 @@ public sealed class MailFileAttachment {
     public EmailDocument? EmbeddedDocument { get; set; }
 }
 
-/// <summary>Represents a mail file with compatibility fields and rich owner models.</summary>
+/// <summary>Represents a mail file backed by one mutable OfficeIMO document.</summary>
 public sealed partial class MailFileMessage {
+    private readonly bool _includeAttachments;
+    private readonly bool _includeAttachmentContent;
+    private readonly bool _includeHeaders;
+
+    internal MailFileMessage(string filePath, MailFileFormat format, EmailDocument officeDocument,
+        IReadOnlyList<EmailDiagnostic> diagnostics, MailFileSignatureInfo signature,
+        MailFileReaderOptions options) {
+        FilePath = filePath ?? throw new ArgumentNullException(nameof(filePath));
+        Format = format;
+        OfficeDocument = officeDocument ?? throw new ArgumentNullException(nameof(officeDocument));
+        Diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+        SignatureIsValid = signature.IsValid;
+        SignedBy = signature.SignedBy;
+        SignedOn = signature.SignedOn;
+        _includeAttachments = options.IncludeAttachments;
+        _includeAttachmentContent = options.IncludeAttachmentContent;
+        _includeHeaders = options.IncludeHeaders;
+    }
+
     /// <summary>Mail file format.</summary>
-    public MailFileFormat Format { get; set; }
+    public MailFileFormat Format { get; }
     /// <summary>Full file path.</summary>
-    public string FilePath { get; set; } = string.Empty;
+    public string FilePath { get; }
     /// <summary>Message subject.</summary>
-    public string? Subject { get; set; }
+    public string? Subject => OfficeDocument.Subject;
     /// <summary>Sender address.</summary>
-    public MailFileAddress? From { get; set; }
+    public MailFileAddress? From => MailFileCompatibilityProjection.ProjectAddress(OfficeDocument.From);
     /// <summary>Actual sender when distinct from the represented author.</summary>
-    public MailFileAddress? Sender { get; set; }
+    public MailFileAddress? Sender => MailFileCompatibilityProjection.ProjectAddress(OfficeDocument.Sender);
     /// <summary>To recipients.</summary>
-    public IReadOnlyList<MailFileAddress> To { get; set; } = Array.Empty<MailFileAddress>();
+    public IReadOnlyList<MailFileAddress> To =>
+        MailFileCompatibilityProjection.ProjectAddresses(OfficeDocument, MailFileRecipientType.To);
     /// <summary>Cc recipients.</summary>
-    public IReadOnlyList<MailFileAddress> Cc { get; set; } = Array.Empty<MailFileAddress>();
+    public IReadOnlyList<MailFileAddress> Cc =>
+        MailFileCompatibilityProjection.ProjectAddresses(OfficeDocument, MailFileRecipientType.Cc);
     /// <summary>Bcc recipients.</summary>
-    public IReadOnlyList<MailFileAddress> Bcc { get; set; } = Array.Empty<MailFileAddress>();
+    public IReadOnlyList<MailFileAddress> Bcc =>
+        MailFileCompatibilityProjection.ProjectAddresses(OfficeDocument, MailFileRecipientType.Bcc);
     /// <summary>All recipients with types.</summary>
-    public IReadOnlyList<MailFileRecipient> Recipients { get; set; } = Array.Empty<MailFileRecipient>();
+    public IReadOnlyList<MailFileRecipient> Recipients =>
+        MailFileCompatibilityProjection.ProjectRecipients(OfficeDocument);
     /// <summary>Sent date.</summary>
-    public DateTimeOffset? SentOn { get; set; }
+    public DateTimeOffset? SentOn => OfficeDocument.Date;
     /// <summary>Received date.</summary>
-    public DateTimeOffset? ReceivedOn { get; set; }
+    public DateTimeOffset? ReceivedOn => OfficeDocument.ReceivedDate;
     /// <summary>Creation date.</summary>
-    public DateTimeOffset? CreatedOn { get; set; }
+    public DateTimeOffset? CreatedOn => OfficeDocument.MessageMetadata.CreatedDate;
     /// <summary>Last modification date.</summary>
-    public DateTimeOffset? ModifiedOn { get; set; }
+    public DateTimeOffset? ModifiedOn => OfficeDocument.MessageMetadata.ModifiedDate;
     /// <summary>Plain text body.</summary>
-    public string? BodyText { get; set; }
+    public string? BodyText => OfficeDocument.Body.Text;
     /// <summary>HTML body.</summary>
-    public string? BodyHtml { get; set; }
+    public string? BodyHtml => OfficeDocument.Body.Html;
     /// <summary>RTF body when present.</summary>
-    public string? BodyRtf { get; set; }
+    public string? BodyRtf => OfficeDocument.Body.Rtf;
     /// <summary>Attachments list.</summary>
-    public IReadOnlyList<MailFileAttachment> Attachments { get; set; } = Array.Empty<MailFileAttachment>();
+    public IReadOnlyList<MailFileAttachment> Attachments => MailFileCompatibilityProjection.ProjectAttachments(
+        OfficeDocument, _includeAttachments, _includeAttachmentContent);
     /// <summary>Message id value.</summary>
-    public string? MessageId { get; set; }
+    public string? MessageId => OfficeDocument.MessageId;
     /// <summary>Outlook message class.</summary>
-    public string? MessageClass { get; set; }
+    public string? MessageClass => OfficeDocument.MessageClass;
     /// <summary>Typed Outlook item classification.</summary>
-    public OutlookItemKind OutlookItemKind { get; set; }
+    public OutlookItemKind OutlookItemKind => OfficeDocument.OutlookItemKind;
     /// <summary>Outlook categories.</summary>
-    public IReadOnlyList<string> Categories { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<string> Categories => OfficeDocument.MessageMetadata.Categories.ToArray();
     /// <summary>Protected-message classification.</summary>
-    public EmailProtectionKind ProtectionKind { get; set; }
+    public EmailProtectionKind ProtectionKind => OfficeDocument.Protection.Kind;
     /// <summary>Indicates whether the embedded S/MIME signature passed signature-only validation; null when absent or unverifiable.</summary>
-    public bool? SignatureIsValid { get; set; }
+    public bool? SignatureIsValid { get; }
     /// <summary>Signer identity projected from the embedded S/MIME certificate.</summary>
-    public string? SignedBy { get; set; }
+    public string? SignedBy { get; }
     /// <summary>Creation timestamp reported by the embedded S/MIME signature.</summary>
-    public DateTimeOffset? SignedOn { get; set; }
+    public DateTimeOffset? SignedOn { get; }
     /// <summary>Raw headers merged into a single dictionary.</summary>
-    public IReadOnlyDictionary<string, string>? Headers { get; set; }
+    public IReadOnlyDictionary<string, string>? Headers => _includeHeaders
+        ? MailFileCompatibilityProjection.ProjectHeaders(OfficeDocument)
+        : null;
     /// <summary>Structured OfficeIMO read diagnostics.</summary>
-    public IReadOnlyList<EmailDiagnostic> Diagnostics { get; set; } = Array.Empty<EmailDiagnostic>();
+    public IReadOnlyList<EmailDiagnostic> Diagnostics { get; }
     /// <summary>True when the OfficeIMO reader produced at least one error diagnostic.</summary>
     public bool HasErrors {
         get {
@@ -162,12 +188,14 @@ public sealed partial class MailFileMessage {
         }
     }
     /// <summary>Complete owner document, including typed Outlook items and retained MAPI values.</summary>
-    public EmailDocument OfficeDocument { get; set; } = new EmailDocument();
-    /// <summary>Native MimeKit message for EML input. MSG callers can use <see cref="ToMimeMessage"/>.</summary>
-    public MimeMessage? MimeMessage { get; set; }
+    public EmailDocument OfficeDocument { get; }
 
-    /// <summary>Returns the native MimeKit message, generating it from the OfficeIMO owner document when needed.</summary>
-    public MimeMessage ToMimeMessage() => MimeMessage ?? MailFileMimeAdapter.ToMimeMessage(OfficeDocument);
+    /// <summary>Creates a MimeKit message from the current OfficeIMO owner document.</summary>
+    public MimeMessage ToMimeMessage() => MailFileMimeAdapter.ToMimeMessage(OfficeDocument);
+
+    /// <summary>Asynchronously creates a MimeKit message from the current OfficeIMO owner document.</summary>
+    public Task<MimeMessage> ToMimeMessageAsync(CancellationToken cancellationToken = default) =>
+        MailFileMimeAdapter.ToMimeMessageAsync(OfficeDocument, cancellationToken);
 
     /// <summary>Attempts to expose the protected MSG payload as a MimeKit entity.</summary>
     public bool TryGetProtectedMimeEntity(out MimeEntity? entity) =>

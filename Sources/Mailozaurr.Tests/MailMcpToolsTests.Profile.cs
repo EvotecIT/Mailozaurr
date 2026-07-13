@@ -155,6 +155,8 @@ public sealed partial class MailMcpToolsTests {
     [Fact]
     public async Task MailProfileGraphBootstrapCreatesProfileAndStoresSecrets() {
         using var fixture = new TestFixture();
+        await fixture.SecretStore.SetSecretAsync(
+            "bootstrap-secrets", MailSecretNames.ClientSecret, "client-secret");
 
         var profile = await fixture.Tools.mail_profile_graph_bootstrap(
             profileId: "graph-work",
@@ -162,7 +164,7 @@ public sealed partial class MailMcpToolsTests {
             mailbox: "shared@example.com",
             clientId: "client-id",
             tenantId: "tenant-id",
-            clientSecret: "client-secret");
+            clientSecretReference: $"bootstrap-secrets:{MailSecretNames.ClientSecret}");
         var storedSecret = await fixture.SecretStore.GetSecretAsync("graph-work", MailSecretNames.ClientSecret);
 
         Assert.Equal("graph-work", profile.Id);
@@ -204,14 +206,18 @@ public sealed partial class MailMcpToolsTests {
     [Fact]
     public async Task MailProfileGmailBootstrapCreatesProfileAndStoresSecrets() {
         using var fixture = new TestFixture();
+        await fixture.SecretStore.SetSecretAsync(
+            "bootstrap-secrets", MailSecretNames.ClientSecret, "client-secret");
+        await fixture.SecretStore.SetSecretAsync(
+            "bootstrap-secrets", MailSecretNames.RefreshToken, "refresh-token");
 
         var profile = await fixture.Tools.mail_profile_gmail_bootstrap(
             profileId: "gmail-work",
             displayName: "Work Gmail",
             mailbox: "me@example.com",
             clientId: "client-id",
-            clientSecret: "client-secret",
-            refreshToken: "refresh-token");
+            clientSecretReference: $"bootstrap-secrets:{MailSecretNames.ClientSecret}",
+            refreshTokenReference: $"bootstrap-secrets:{MailSecretNames.RefreshToken}");
         var clientSecret = await fixture.SecretStore.GetSecretAsync("gmail-work", MailSecretNames.ClientSecret);
         var refreshToken = await fixture.SecretStore.GetSecretAsync("gmail-work", MailSecretNames.RefreshToken);
 
@@ -458,10 +464,12 @@ public sealed partial class MailMcpToolsTests {
     }
 
     [Fact]
-    public async Task MailProfileSecretSetAndRemoveUseSharedSecretStore() {
+    public async Task MailProfileSecretCopyAndRemoveUseSharedSecretStore() {
         using var fixture = new TestFixture();
+        await fixture.SecretStore.SetSecretAsync("source", "refresh-token", "secret-value");
 
-        var setResult = await fixture.Tools.mail_profile_secret_set("gmail-work", "refresh-token", "secret-value");
+        var setResult = await fixture.Tools.mail_profile_secret_copy(
+            "gmail-work", "refresh-token", "source:refresh-token");
         var storedSecret = await fixture.SecretStore.GetSecretAsync("gmail-work", "refresh-token");
         var removeResult = await fixture.Tools.mail_profile_secret_remove("gmail-work", "refresh-token");
         var removedSecret = await fixture.SecretStore.GetSecretAsync("gmail-work", "refresh-token");
@@ -473,7 +481,7 @@ public sealed partial class MailMcpToolsTests {
     }
 
     [Fact]
-    public async Task MailProfileSecretSetSupportsReferenceCopy() {
+    public async Task MailProfileSecretCopySupportsReferenceCopy() {
         using var fixture = new TestFixture();
         await fixture.ProfileStore.SaveAsync(new MailProfile {
             Id = "shared-secrets",
@@ -486,7 +494,7 @@ public sealed partial class MailMcpToolsTests {
         });
         await fixture.SecretStore.SetSecretAsync("shared-secrets", MailSecretNames.RefreshToken, "copied-secret");
 
-        var setResult = await fixture.Tools.mail_profile_secret_set(
+        var setResult = await fixture.Tools.mail_profile_secret_copy(
             profileId: "gmail-work",
             secretName: MailSecretNames.RefreshToken,
             secretReference: $"shared-secrets:{MailSecretNames.RefreshToken}");

@@ -150,10 +150,10 @@ public static partial class CliRunner {
             throw new InvalidOperationException("Options '--draft' and '--file' cannot be used together.");
         }
 
-        var sendNow = parseResult.HasFlag("send-now");
+        var queueOnFailure = parseResult.HasFlag("queue-on-failure");
         if (!string.IsNullOrWhiteSpace(draftFilePath)) {
             var importedDraft = await application.DraftExchange.LoadAsync(draftFilePath!).ConfigureAwait(false);
-            return CreateSendRequestFromDraft(importedDraft.Message, sendNow);
+            return CreateSendRequestFromDraft(importedDraft.Message, queueOnFailure);
         }
 
         if (!string.IsNullOrWhiteSpace(existingDraftId)) {
@@ -162,7 +162,7 @@ public static partial class CliRunner {
                 throw new InvalidOperationException($"Draft '{existingDraftId}' was not found.");
             }
 
-            return CreateSendRequestFromDraft(existingDraft.Message, sendNow);
+            return CreateSendRequestFromDraft(existingDraft.Message, queueOnFailure);
         }
 
         var profileId = RequireOption(parseResult, "profile");
@@ -171,8 +171,7 @@ public static partial class CliRunner {
         return new SendMessageRequest {
             ProfileId = profileId,
             Message = draft,
-            PreferQueue = !sendNow,
-            RequireImmediateSend = sendNow
+            QueueOnFailure = queueOnFailure
         };
     }
 
@@ -206,12 +205,11 @@ public static partial class CliRunner {
         };
     }
 
-    private static SendMessageRequest CreateSendRequestFromDraft(DraftMessage draft, bool sendNow) =>
+    private static SendMessageRequest CreateSendRequestFromDraft(DraftMessage draft, bool queueOnFailure) =>
         new() {
             ProfileId = draft.ProfileId,
             Message = CloneDraftMessage(draft),
-            PreferQueue = !sendNow,
-            RequireImmediateSend = sendNow
+            QueueOnFailure = queueOnFailure
         };
 
     private static MessageRecipient ToRecipient(string value) => new() {
@@ -323,14 +321,10 @@ public static partial class CliRunner {
         string optionName,
         TextReader input,
         bool required = false) {
-        var directValue = parseResult.GetOption(optionName);
         var envName = parseResult.GetOption($"{optionName}-env");
         var stdinRequested = parseResult.HasFlag($"{optionName}-stdin");
 
         var sourceCount = 0;
-        if (directValue != null) {
-            sourceCount++;
-        }
         if (!string.IsNullOrWhiteSpace(envName)) {
             sourceCount++;
         }
@@ -342,7 +336,7 @@ public static partial class CliRunner {
             throw new InvalidOperationException($"Option '--{optionName}' accepts only one secret source at a time.");
         }
 
-        string? resolvedValue = directValue;
+        string? resolvedValue = null;
         if (!string.IsNullOrWhiteSpace(envName)) {
             resolvedValue = Environment.GetEnvironmentVariable(envName!);
             if (resolvedValue == null) {
@@ -355,10 +349,21 @@ public static partial class CliRunner {
 
         if (required && resolvedValue == null) {
             throw new InvalidOperationException(
-                $"Missing required option '--{optionName}'. You can also use '--{optionName}-env <name>' or '--{optionName}-stdin'.");
+                $"Missing required secret source. Use '--{optionName}-env <name>' or '--{optionName}-stdin'.");
         }
 
         return resolvedValue;
+    }
+
+    private static void ValidateSingleStdinSecretSource(CliArguments parseResult, params string[] optionNames) {
+        var stdinOptions = optionNames
+            .Where(optionName => parseResult.HasFlag($"{optionName}-stdin"))
+            .Select(optionName => $"--{optionName}-stdin")
+            .ToArray();
+        if (stdinOptions.Length > 1) {
+            throw new InvalidOperationException(
+                $"Standard input can supply only one secret per command. Requested: {string.Join(", ", stdinOptions)}.");
+        }
     }
 
     private static async Task WriteExceptionAsync(TextWriter error, Exception exception, bool json) {

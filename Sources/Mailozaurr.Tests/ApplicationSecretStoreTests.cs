@@ -60,6 +60,19 @@ public sealed class ApplicationSecretStoreTests {
         Assert.Equal(filePath, files[0], StringComparer.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task ReloadedSecretKeysRemainCaseInsensitive() {
+        var filePath = CreateTemporaryFilePath();
+        var protector = new TestCredentialProtector();
+        await new FileMailSecretStore(filePath, protector)
+            .SetSecretAsync("Work-Imap", "Password", "super-secret");
+
+        var loaded = await new FileMailSecretStore(filePath, protector)
+            .GetSecretAsync("work-imap", "password");
+
+        Assert.Equal("super-secret", loaded);
+    }
+
     private static string CreateTemporaryFilePath() {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

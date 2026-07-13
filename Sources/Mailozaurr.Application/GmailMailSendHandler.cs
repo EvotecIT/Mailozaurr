@@ -42,7 +42,7 @@ public sealed class GmailMailSendHandler : IMailSendHandler {
 
         using var session = await _sessionFactory.ConnectAsync(profile, cancellationToken).ConfigureAwait(false);
         var message = await _draftMimeMessageFactory.CreateAsync(profile, request.Message, cancellationToken).ConfigureAwait(false);
-        var queueEnabled = _pendingMessageRepository != null && request.PreferQueue && !request.RequireImmediateSend;
+        var queueEnabled = _pendingMessageRepository != null && request.QueueOnFailure;
         session.Client.PendingMessageRepository = queueEnabled ? _pendingMessageRepository : null;
 
         try {

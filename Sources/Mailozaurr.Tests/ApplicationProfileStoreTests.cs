@@ -88,6 +88,22 @@ public sealed class ApplicationProfileStoreTests {
         Assert.Equal(filePath, files[0], StringComparer.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task SeparateStoreInstancesDoNotLoseConcurrentProfileWrites() {
+        var filePath = CreateTemporaryFilePath();
+
+        await Task.WhenAll(Enumerable.Range(0, 24).Select(index =>
+            new FileMailProfileStore(filePath).SaveAsync(new MailProfile {
+                Id = $"profile-{index}",
+                DisplayName = $"Profile {index}",
+                Kind = MailProfileKind.Imap
+            })));
+
+        var profiles = await new FileMailProfileStore(filePath).GetAllAsync();
+        Assert.Equal(24, profiles.Count);
+        Assert.Equal(24, profiles.Select(profile => profile.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+    }
+
     private static string CreateTemporaryFilePath() {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

@@ -303,7 +303,7 @@ public sealed partial class MailMcpToolsTests {
     }
 
     [Fact]
-    public async Task MailSendBuildsQueueFirstSendRequest() {
+    public async Task MailSendBuildsExplicitQueueOnFailureRequest() {
         using var fixture = new TestFixture();
 
         var result = await fixture.Tools.mail_send(
@@ -312,13 +312,13 @@ public sealed partial class MailMcpToolsTests {
             subject: "Status update",
             textBody: "Queued body",
             cc: new[] { "bob@example.com" },
-            attachmentPaths: new[] { "C:\\Temp\\status.txt" });
+            attachmentPaths: new[] { "C:\\Temp\\status.txt" },
+            queueOnFailure: true);
 
         Assert.True(result.Succeeded);
         Assert.NotNull(fixture.SendService.LastRequest);
         Assert.Equal("gmail-work", fixture.SendService.LastRequest!.ProfileId);
-        Assert.True(fixture.SendService.LastRequest.PreferQueue);
-        Assert.False(fixture.SendService.LastRequest.RequireImmediateSend);
+        Assert.True(fixture.SendService.LastRequest.QueueOnFailure);
         Assert.Equal("alice@example.com", fixture.SendService.LastRequest.Message.To[0].Address);
         Assert.Equal("bob@example.com", fixture.SendService.LastRequest.Message.Cc[0].Address);
         Assert.Equal("C:\\Temp\\status.txt", fixture.SendService.LastRequest.Message.Attachments[0].Path);
@@ -412,13 +412,12 @@ public sealed partial class MailMcpToolsTests {
             subject: "Weekly update",
             textBody: "Draft body");
 
-        var result = await fixture.Tools.mail_draft_send("draft-1", sendNow: true);
+        var result = await fixture.Tools.mail_draft_send("draft-1", queueOnFailure: true);
 
         Assert.True(result.Succeeded);
         Assert.NotNull(fixture.SendService.LastRequest);
         Assert.Equal("gmail-work", fixture.SendService.LastRequest!.ProfileId);
-        Assert.True(fixture.SendService.LastRequest.RequireImmediateSend);
-        Assert.False(fixture.SendService.LastRequest.PreferQueue);
+        Assert.True(fixture.SendService.LastRequest.QueueOnFailure);
         Assert.Equal("alice@example.com", fixture.SendService.LastRequest.Message.To[0].Address);
         Assert.Equal("Weekly update", fixture.SendService.LastRequest.Message.Subject);
     }

@@ -1,13 +1,10 @@
-using System.Text.Json;
-
 namespace Mailozaurr.Application;
 
 /// <summary>
 /// Stores reusable drafts in a JSON document on disk.
 /// </summary>
 public sealed class FileMailDraftStore : IMailDraftStore {
-    private readonly string _filePath;
-    private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly JsonFileDocumentStore<MailDraftStoreDocument> _store;
     /// <summary>
     /// Creates a new store using the provided options.
     /// </summary>
@@ -19,47 +16,39 @@ public sealed class FileMailDraftStore : IMailDraftStore {
     /// Creates a new store using the specified file path.
     /// </summary>
     public FileMailDraftStore(string filePath) {
-        _filePath = Path.GetFullPath(filePath ?? throw new ArgumentNullException(nameof(filePath)));
+        _store = new JsonFileDocumentStore<MailDraftStoreDocument>(
+            filePath,
+            "Draft store path is invalid.",
+            ApplicationJsonContext.Default.MailDraftStoreDocument,
+            static () => new MailDraftStoreDocument());
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<MailDraft>> GetAllAsync(CancellationToken cancellationToken = default) {
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try {
-            var document = await LoadDocumentAsync(cancellationToken).ConfigureAwait(false);
-            return document.Drafts
+    public Task<IReadOnlyList<MailDraft>> GetAllAsync(CancellationToken cancellationToken = default) =>
+        _store.ReadAsync<IReadOnlyList<MailDraft>>(document => document.Drafts
                 .Select(CloneDraft)
                 .OrderBy(draft => draft.Name, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(draft => draft.Id, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-        } finally {
-            _gate.Release();
-        }
-    }
+                .ToArray(), cancellationToken);
 
     /// <inheritdoc />
-    public async Task<MailDraft?> GetByIdAsync(string draftId, CancellationToken cancellationToken = default) {
+    public Task<MailDraft?> GetByIdAsync(string draftId, CancellationToken cancellationToken = default) {
         if (string.IsNullOrWhiteSpace(draftId)) {
             throw new ArgumentException("Draft id is required.", nameof(draftId));
         }
 
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try {
-            var document = await LoadDocumentAsync(cancellationToken).ConfigureAwait(false);
-            var draft = document.Drafts.FirstOrDefault(existing => string.Equals(existing.Id, draftId, StringComparison.OrdinalIgnoreCase));
+        return _store.ReadAsync(document => {
+            MailDraft? draft = document.Drafts.FirstOrDefault(existing =>
+                string.Equals(existing.Id, draftId, StringComparison.OrdinalIgnoreCase));
             return draft == null ? null : CloneDraft(draft);
-        } finally {
-            _gate.Release();
-        }
+        }, cancellationToken);
     }
 
     /// <inheritdoc />
     public async Task SaveAsync(MailDraft draft, CancellationToken cancellationToken = default) {
         ValidateDraft(draft);
 
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try {
-            var document = await LoadDocumentAsync(cancellationToken).ConfigureAwait(false);
+        await _store.UpdateAsync(document => {
             var index = document.Drafts.FindIndex(existing => string.Equals(existing.Id, draft.Id, StringComparison.OrdinalIgnoreCase));
             var draftToStore = CloneDraft(draft);
             if (draftToStore.CreatedAt == default) {
@@ -75,53 +64,18 @@ public sealed class FileMailDraftStore : IMailDraftStore {
             } else {
                 document.Drafts.Add(draftToStore);
             }
-
-            await SaveDocumentAsync(document, cancellationToken).ConfigureAwait(false);
-        } finally {
-            _gate.Release();
-        }
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task<bool> RemoveAsync(string draftId, CancellationToken cancellationToken = default) {
+    public Task<bool> RemoveAsync(string draftId, CancellationToken cancellationToken = default) {
         if (string.IsNullOrWhiteSpace(draftId)) {
             throw new ArgumentException("Draft id is required.", nameof(draftId));
         }
 
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try {
-            var document = await LoadDocumentAsync(cancellationToken).ConfigureAwait(false);
-            var removed = document.Drafts.RemoveAll(existing => string.Equals(existing.Id, draftId, StringComparison.OrdinalIgnoreCase)) > 0;
-            if (!removed) {
-                return false;
-            }
-
-            await SaveDocumentAsync(document, cancellationToken).ConfigureAwait(false);
-            return true;
-        } finally {
-            _gate.Release();
-        }
+        return _store.RemoveAsync(document => document.Drafts.RemoveAll(existing =>
+            string.Equals(existing.Id, draftId, StringComparison.OrdinalIgnoreCase)) > 0, cancellationToken);
     }
-
-    private async Task<MailDraftStoreDocument> LoadDocumentAsync(CancellationToken cancellationToken) {
-        if (!File.Exists(_filePath)) {
-            return new MailDraftStoreDocument();
-        }
-
-        using (var stream = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
-            var document = await JsonSerializer.DeserializeAsync(stream, ApplicationJsonContext.Default.MailDraftStoreDocument, cancellationToken).ConfigureAwait(false);
-            return document ?? new MailDraftStoreDocument();
-        }
-    }
-
-    private Task SaveDocumentAsync(MailDraftStoreDocument document, CancellationToken cancellationToken) =>
-        AtomicFileWriter.WriteAsync(
-            _filePath,
-            "Draft store path is invalid.",
-            async (stream, token) => {
-                await JsonSerializer.SerializeAsync(stream, document, ApplicationJsonContext.Default.MailDraftStoreDocument, token).ConfigureAwait(false);
-            },
-            cancellationToken);
 
     private static void ValidateDraft(MailDraft? draft) {
         if (draft == null) {

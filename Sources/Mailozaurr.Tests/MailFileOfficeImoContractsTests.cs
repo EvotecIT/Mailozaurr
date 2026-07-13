@@ -34,7 +34,7 @@ public sealed class MailFileOfficeImoContractsTests {
     }
 
     [Fact]
-    public void EmlImportExposesMimeKitAndOfficeImoOwnerModels() {
+    public void EmlImportExposesOfficeImoOwnerAndCurrentMimeProjection() {
         string directory = CreateTempDirectory();
         try {
             string path = WriteEml(directory, "owner.eml", "Owner models", "Hello owner");
@@ -44,8 +44,8 @@ public sealed class MailFileOfficeImoContractsTests {
 
             Assert.Equal(EmailFileFormat.Eml, result.OfficeDocument.Format);
             Assert.Equal("Owner models", result.OfficeDocument.Subject);
-            Assert.NotNull(result.MimeMessage);
-            Assert.Equal("Owner models", result.MimeMessage!.Subject);
+            using MimeMessage projected = result.ToMimeMessage();
+            Assert.Equal("Owner models", projected.Subject);
             Assert.Equal("Hello owner", result.BodyText!.Trim());
             Assert.NotNull(result.Headers);
             Assert.DoesNotContain(result.Diagnostics,
@@ -80,8 +80,8 @@ public sealed class MailFileOfficeImoContractsTests {
             Assert.Equal("IPM.Contact", result.MessageClass);
             Assert.Equal("Ada", result.OfficeDocument.Contact!.GivenName);
             Assert.Equal("ada@example.com", result.OfficeDocument.Contact.Email1.Address);
-            Assert.Null(result.MimeMessage);
-            Assert.Equal("Ada Lovelace", result.ToMimeMessage().Subject);
+            using MimeMessage projected = result.ToMimeMessage();
+            Assert.Equal("Ada Lovelace", projected.Subject);
         } finally {
             Directory.Delete(directory, true);
         }
@@ -135,6 +135,34 @@ public sealed class MailFileOfficeImoContractsTests {
     }
 
     [Fact]
+    public void CompatibilityProjectionConversionAndSaveUseTheCurrentOfficeDocument() {
+        string directory = CreateTempDirectory();
+        try {
+            string sourcePath = WriteEml(directory, "mutable.eml", "Original subject", "Original body");
+            string savedPath = Path.Combine(directory, "mutable-saved.eml");
+            MailFileMessage message = MailFileMessage.Load(sourcePath,
+                new MailFileReaderOptions { IncludeHeaders = true });
+
+            message.OfficeDocument.Subject = "Updated subject";
+            message.OfficeDocument.Body.Text = "Updated body";
+
+            Assert.Equal("Updated subject", message.Subject);
+            Assert.Equal("Updated body", message.BodyText);
+            using (MimeMessage projected = message.ToMimeMessage()) {
+                Assert.Equal("Updated subject", projected.Subject);
+                Assert.Equal("Updated body", projected.TextBody);
+            }
+
+            message.Save(savedPath);
+            using MimeMessage saved = MimeMessage.Load(savedPath);
+            Assert.Equal("Updated subject", saved.Subject);
+            Assert.Equal("Updated body", saved.TextBody);
+        } finally {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
     public async Task ConversionObservesFilesCreatedAfterFileInfoWasInspected() {
         string directory = CreateTempDirectory();
         try {
@@ -178,7 +206,13 @@ public sealed class MailFileOfficeImoContractsTests {
             }
             message.WriteTo(path);
 
-            MailFileMessage result = MailFileReader.Read(path);
+            MailFileMessage unverified = MailFileReader.Read(path);
+            Assert.Null(unverified.SignatureIsValid);
+            Assert.Null(unverified.SignedBy);
+            Assert.Null(unverified.SignedOn);
+
+            MailFileMessage result = MailFileReader.Read(path,
+                new MailFileReaderOptions { VerifySignature = true });
 
             Assert.True(result.SignatureIsValid);
             Assert.Contains("Mail File Signer", result.SignedBy, StringComparison.OrdinalIgnoreCase);

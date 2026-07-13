@@ -125,6 +125,8 @@ If you want practical profile setup and usage guidance for CLI and MCP, see [Con
 
 The repository now includes a cross-platform `mailozaurr` executable and an MCP server hosted by that same executable.
 
+The CLI and application packages are built by the repository release pipeline. Until those packages are published, run the CLI from a checkout as shown below.
+
 To see the current command surface from source:
 
 ```powershell
@@ -157,7 +159,11 @@ Create a profile and inspect it:
 mailozaurr profile create --profile work-imap --kind imap --name "Work IMAP" `
   --setting server=imap.example.com --setting port=993 --json
 
-mailozaurr profile set-secret --profile work-imap --name password --value "secret" --json
+$env:MAILOZAURR_IMAP_PASSWORD = '<password>'
+mailozaurr profile set-secret --profile work-imap --name password `
+  --value-env MAILOZAURR_IMAP_PASSWORD --json
+Remove-Item Env:MAILOZAURR_IMAP_PASSWORD
+
 mailozaurr profile summary --profile work-imap --json
 mailozaurr profile test --profile work-imap --scope mailbox --json
 ```
@@ -182,6 +188,8 @@ mailozaurr send --draft weekly-update --json
 mailozaurr queue list --compact --json
 mailozaurr queue process --json
 ```
+
+Send commands attempt immediate delivery by default. Add `--queue-on-failure` when a failed immediate attempt should be persisted for later processing.
 
 Preview and execute mailbox actions:
 

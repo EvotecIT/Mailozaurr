@@ -420,7 +420,7 @@ public sealed class ProviderPendingMessageTests {
             new FakeGraphSessionFactory(),
             pendingMessageRepository: repository,
             sendAsync: (session, profile, request, message, cancellationToken) =>
-                Task.FromResult(new GraphMessage { Id = "sent-now" }));
+                throw new HttpRequestException("temporary graph failure"));
 
         var queued = await handler.SendAsync(
             new Application.MailProfile {
@@ -435,6 +435,7 @@ public sealed class ProviderPendingMessageTests {
             },
             new Application.SendMessageRequest {
                 ProfileId = "graph-profile",
+                QueueOnFailure = true,
                 Message = new Application.DraftMessage {
                     Subject = "graph-queued",
                     TextBody = "body",

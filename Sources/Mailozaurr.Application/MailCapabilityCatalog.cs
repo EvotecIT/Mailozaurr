@@ -15,13 +15,7 @@ public static class MailCapabilityCatalog {
                 | MailCapability.SaveAttachments
                 | MailCapability.MarkMessages
                 | MailCapability.MoveMessages
-                | MailCapability.DeleteMessages
-                | MailCapability.WaitForMessages,
-            MailProfileKind.Pop3 => MailCapability.SearchMessages
-                | MailCapability.ReadMessages
-                | MailCapability.SaveAttachments
-                | MailCapability.DeleteMessages
-                | MailCapability.WaitForMessages,
+                | MailCapability.DeleteMessages,
             MailProfileKind.Graph => MailCapability.ListFolders
                 | MailCapability.SearchMessages
                 | MailCapability.ReadMessages
@@ -29,11 +23,7 @@ public static class MailCapabilityCatalog {
                 | MailCapability.MarkMessages
                 | MailCapability.MoveMessages
                 | MailCapability.DeleteMessages
-                | MailCapability.SendMessages
-                | MailCapability.WaitForMessages
-                | MailCapability.ManageRules
-                | MailCapability.ManageEvents
-                | MailCapability.ManagePermissions,
+                | MailCapability.SendMessages,
             MailProfileKind.Gmail => MailCapability.ListFolders
                 | MailCapability.SearchMessages
                 | MailCapability.ReadMessages
@@ -41,16 +31,33 @@ public static class MailCapabilityCatalog {
                 | MailCapability.MarkMessages
                 | MailCapability.MoveMessages
                 | MailCapability.DeleteMessages
-                | MailCapability.SendMessages
-                | MailCapability.UseThreads
-                | MailCapability.UseLabels,
+                | MailCapability.SendMessages,
             MailProfileKind.Smtp => MailCapability.SendMessages,
-            MailProfileKind.SendGrid => MailCapability.SendMessages,
-            MailProfileKind.Mailgun => MailCapability.SendMessages,
-            MailProfileKind.Ses => MailCapability.SendMessages,
             _ => MailCapability.None,
         };
 
         return new ProfileCapabilities(kind, capabilities);
+    }
+
+    internal static IReadOnlyDictionary<MailProfileKind, MailCapability> ForRegisteredHandlers(
+        IEnumerable<IMailReadHandler> readHandlers,
+        IEnumerable<IMailMessageActionHandler> messageActionHandlers,
+        IEnumerable<IMailSendHandler> sendHandlers) {
+        var result = new Dictionary<MailProfileKind, MailCapability>();
+        Add(result, readHandlers.Select(handler => handler.Kind),
+            MailCapability.ListFolders | MailCapability.SearchMessages |
+            MailCapability.ReadMessages | MailCapability.SaveAttachments);
+        Add(result, messageActionHandlers.Select(handler => handler.Kind),
+            MailCapability.MarkMessages | MailCapability.MoveMessages | MailCapability.DeleteMessages);
+        Add(result, sendHandlers.Select(handler => handler.Kind), MailCapability.SendMessages);
+        return result;
+    }
+
+    private static void Add(IDictionary<MailProfileKind, MailCapability> destination,
+        IEnumerable<MailProfileKind> kinds, MailCapability capabilities) {
+        foreach (MailProfileKind kind in kinds.Distinct()) {
+            destination.TryGetValue(kind, out MailCapability existing);
+            destination[kind] = existing | capabilities;
+        }
     }
 }

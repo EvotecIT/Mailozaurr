@@ -75,7 +75,7 @@ public sealed class ApplicationGmailMailSendHandlerTests {
             },
             new SendMessageRequest {
                 ProfileId = "personal-gmail",
-                PreferQueue = true,
+                QueueOnFailure = true,
                 Message = new DraftMessage {
                     Subject = "Hello Gmail",
                     TextBody = "hello",

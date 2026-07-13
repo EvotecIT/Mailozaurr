@@ -41,6 +41,7 @@ public static partial class CliRunner {
                 await WriteItemAsync(output, createResult, json, value => value.Message ?? "Profile saved.").ConfigureAwait(false);
                 return createResult.Succeeded ? 0 : 1;
             case "graph-bootstrap":
+                ValidateSingleStdinSecretSource(parseResult, "client-secret", "access-token", "certificate-password");
                 var graphBootstrapResult = await application.ProfileBootstrap.SaveGraphProfileAsync(new GraphProfileBootstrapRequest {
                     ProfileId = RequireOption(parseResult, "profile"),
                     DisplayName = RequireOption(parseResult, "name"),
@@ -61,6 +62,7 @@ public static partial class CliRunner {
                 await WriteItemAsync(output, graphBootstrapResult, json, value => value.Message ?? "Graph profile saved.").ConfigureAwait(false);
                 return graphBootstrapResult.Succeeded ? 0 : 1;
             case "gmail-bootstrap":
+                ValidateSingleStdinSecretSource(parseResult, "client-secret", "refresh-token", "access-token");
                 var gmailBootstrapResult = await application.ProfileBootstrap.SaveGmailProfileAsync(new GmailProfileBootstrapRequest {
                     ProfileId = RequireOption(parseResult, "profile"),
                     DisplayName = RequireOption(parseResult, "name"),
@@ -189,7 +191,7 @@ public static partial class CliRunner {
                 var secretReference = parseResult.GetOption("value-ref");
                 if (secretValue == null && string.IsNullOrWhiteSpace(secretReference)) {
                     throw new InvalidOperationException(
-                        "Missing required option '--value'. You can also use '--value-env <name>', '--value-stdin', or '--value-ref <profile-id:secret-name>'.");
+                        "Missing required secret source. Use '--value-env <name>', '--value-stdin', or '--value-ref <profile-id:secret-name>'.");
                 }
                 var setSecretResult = await application.ProfileSecrets.SetSecretAsync(
                     RequireOption(parseResult, "profile"),

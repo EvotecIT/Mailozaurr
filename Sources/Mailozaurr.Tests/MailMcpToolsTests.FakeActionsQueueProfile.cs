@@ -12,9 +12,8 @@ public sealed partial class MailMcpToolsTests {
             LastRequest = request;
             return Task.FromResult(new SendResult {
                 Succeeded = true,
-                Queued = request.PreferQueue,
-                QueueMessageId = request.PreferQueue ? "queued-1" : null,
-                ProviderMessageId = request.RequireImmediateSend ? "provider-1" : null,
+                Queued = false,
+                ProviderMessageId = "provider-1",
                 ProfileId = request.ProfileId,
                 ProfileKind = MailProfileKind.Gmail,
                 Message = "Send handled."

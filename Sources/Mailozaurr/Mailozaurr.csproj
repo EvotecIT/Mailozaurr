@@ -3,7 +3,7 @@
     <PropertyGroup>
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
-        <VersionPrefix>2.0.12</VersionPrefix>
+        <VersionPrefix>2.0.13</VersionPrefix>
         <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
         <AssemblyName>Mailozaurr</AssemblyName>
         <Copyright>(c) 2011 - 2024 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
@@ -45,7 +45,6 @@
     </ItemGroup>
 
     <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
-        <PackageReference Include="System.Data.SQLite" Version="2.0.3" />
         <PackageReference Include="System.Text.Json" Version="10.0.9" />
     </ItemGroup>
     <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' ">

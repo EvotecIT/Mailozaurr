@@ -13,6 +13,8 @@ public sealed class MailFileReaderOptions {
     public bool IncludeHeaders { get; set; }
     /// <summary>Optional immutable OfficeIMO bounded-reader policy.</summary>
     public EmailReaderOptions? OfficeReaderOptions { get; set; }
-    /// <summary>Optional MimeKit parser policy used for EML input.</summary>
+    /// <summary>Verifies S/MIME signatures through MimeKit when true. This performs an additional EML parse.</summary>
+    public bool VerifySignature { get; set; }
+    /// <summary>Optional MimeKit parser policy used when S/MIME signature verification is enabled.</summary>
     public ParserOptions? MimeParserOptions { get; set; }
 }

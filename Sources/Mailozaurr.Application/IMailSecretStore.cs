@@ -13,3 +13,14 @@ public interface IMailSecretStore {
     /// <summary>Removes a secret value.</summary>
     Task<bool> RemoveSecretAsync(string profileId, string secretName, CancellationToken cancellationToken = default);
 }
+
+/// <summary>Removes every secret associated with a profile, including custom secret names.</summary>
+public interface IMailProfileSecretCleanup {
+    /// <summary>Returns all secret names and values owned by the profile.</summary>
+    Task<IReadOnlyDictionary<string, string>> GetProfileSecretsAsync(
+        string profileId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Removes all secrets owned by the profile.</summary>
+    Task RemoveProfileSecretsAsync(string profileId, CancellationToken cancellationToken = default);
+}

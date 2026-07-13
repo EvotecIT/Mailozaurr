@@ -4,15 +4,25 @@ namespace Mailozaurr.Application;
 /// Default implementation of profile lifecycle operations.
 /// </summary>
 public sealed class MailProfileService : IMailProfileService {
+    private static readonly string[] KnownSecretNames = {
+        MailSecretNames.Password,
+        MailSecretNames.ClientSecret,
+        MailSecretNames.AccessToken,
+        MailSecretNames.RefreshToken,
+        MailSecretNames.CertificatePassword
+    };
     private readonly IMailProfileStore _profileStore;
     private readonly IMailSecretStore? _secretStore;
+    private readonly IReadOnlyDictionary<MailProfileKind, MailCapability>? _availableCapabilities;
 
     /// <summary>
     /// Creates a new profile service.
     /// </summary>
-    public MailProfileService(IMailProfileStore profileStore, IMailSecretStore? secretStore = null) {
+    public MailProfileService(IMailProfileStore profileStore, IMailSecretStore? secretStore = null,
+        IReadOnlyDictionary<MailProfileKind, MailCapability>? availableCapabilities = null) {
         _profileStore = profileStore ?? throw new ArgumentNullException(nameof(profileStore));
         _secretStore = secretStore;
+        _availableCapabilities = availableCapabilities;
     }
 
     /// <inheritdoc />
@@ -61,13 +71,34 @@ public sealed class MailProfileService : IMailProfileService {
 
     /// <inheritdoc />
     public async Task<OperationResult> DeleteAsync(string profileId, CancellationToken cancellationToken = default) {
+        var profile = await _profileStore.GetByIdAsync(profileId, cancellationToken).ConfigureAwait(false);
+        if (profile == null) {
+            return OperationResult.Failure("profile_not_found", "Profile was not found.");
+        }
+
+        IReadOnlyDictionary<string, string> secretSnapshot = await CaptureSecretsAsync(
+            profileId, cancellationToken).ConfigureAwait(false);
         var removed = await _profileStore.RemoveAsync(profileId, cancellationToken).ConfigureAwait(false);
         if (!removed) {
             return OperationResult.Failure("profile_not_found", "Profile was not found.");
         }
 
-        if (_secretStore != null) {
-            await RemoveKnownSecretsAsync(profileId, cancellationToken).ConfigureAwait(false);
+        try {
+            if (_secretStore is IMailProfileSecretCleanup cleanup) {
+                await cleanup.RemoveProfileSecretsAsync(profileId, cancellationToken).ConfigureAwait(false);
+            } else if (_secretStore != null) {
+                await RemoveKnownSecretsAsync(profileId, cancellationToken).ConfigureAwait(false);
+            }
+        } catch (Exception deleteException) {
+            try {
+                await _profileStore.SaveAsync(profile, CancellationToken.None).ConfigureAwait(false);
+                await RestoreSecretsAsync(profileId, secretSnapshot, CancellationToken.None).ConfigureAwait(false);
+            } catch (Exception rollbackException) {
+                throw new InvalidOperationException(
+                    "Profile deletion failed and its rollback was incomplete.",
+                    new AggregateException(deleteException, rollbackException));
+            }
+            throw;
         }
 
         return OperationResult.Success("Profile deleted.");
@@ -89,7 +120,17 @@ public sealed class MailProfileService : IMailProfileService {
     /// <inheritdoc />
     public async Task<ProfileCapabilities?> GetCapabilitiesAsync(string profileId, CancellationToken cancellationToken = default) {
         var profile = await _profileStore.GetByIdAsync(profileId, cancellationToken).ConfigureAwait(false);
-        return profile?.GetCapabilities();
+        if (profile == null) {
+            return null;
+        }
+
+        ProfileCapabilities configured = profile.GetCapabilities();
+        if (_availableCapabilities == null) {
+            return configured;
+        }
+
+        _availableCapabilities.TryGetValue(profile.Kind, out MailCapability available);
+        return new ProfileCapabilities(profile.Kind, configured.Capabilities & available);
     }
 
     private async Task AddProviderReadinessChecksAsync(MailProfile profile, MailProfileValidationResult result, CancellationToken cancellationToken) {
@@ -122,16 +163,42 @@ public sealed class MailProfileService : IMailProfileService {
     }
 
     private async Task RemoveKnownSecretsAsync(string profileId, CancellationToken cancellationToken) {
-        var secretNames = new[] {
-            MailSecretNames.Password,
-            MailSecretNames.ClientSecret,
-            MailSecretNames.AccessToken,
-            MailSecretNames.RefreshToken,
-            MailSecretNames.CertificatePassword
-        };
-
-        foreach (var secretName in secretNames) {
+        foreach (string secretName in KnownSecretNames) {
             await _secretStore!.RemoveSecretAsync(profileId, secretName, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<IReadOnlyDictionary<string, string>> CaptureSecretsAsync(
+        string profileId,
+        CancellationToken cancellationToken) {
+        if (_secretStore == null) {
+            return new Dictionary<string, string>();
+        }
+        if (_secretStore is IMailProfileSecretCleanup cleanup) {
+            return await cleanup.GetProfileSecretsAsync(profileId, cancellationToken).ConfigureAwait(false);
+        }
+
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string secretName in KnownSecretNames) {
+            string? value = await _secretStore.GetSecretAsync(
+                profileId, secretName, cancellationToken).ConfigureAwait(false);
+            if (value != null) {
+                result[secretName] = value;
+            }
+        }
+        return result;
+    }
+
+    private async Task RestoreSecretsAsync(
+        string profileId,
+        IReadOnlyDictionary<string, string> secrets,
+        CancellationToken cancellationToken) {
+        if (_secretStore == null) {
+            return;
+        }
+        foreach (KeyValuePair<string, string> secret in secrets) {
+            await _secretStore.SetSecretAsync(
+                profileId, secret.Key, secret.Value, cancellationToken).ConfigureAwait(false);
         }
     }
 

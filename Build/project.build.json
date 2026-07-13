@@ -3,7 +3,9 @@
   "RootPath": "..",
   "ExpectedVersion": null,
   "ExpectedVersionMap": {
-    "Mailozaurr": "2.0.X"
+    "Mailozaurr": "2.0.X",
+    "Mailozaurr.Application": "2.0.X",
+    "Mailozaurr.Cli": "2.0.X"
   },
   "ExpectedVersionMapAsInclude": true,
   "ExpectedVersionMapUseWildcards": false,

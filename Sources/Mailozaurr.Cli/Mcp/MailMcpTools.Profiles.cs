@@ -5,12 +5,12 @@ using System.ComponentModel;
 namespace Mailozaurr.Cli.Mcp;
 
 public sealed partial class MailMcpTools {
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Lists configured Mailozaurr profiles that can be used for mailbox and send operations.")]
     public Task<IReadOnlyList<MailProfile>> mail_profiles_list(CancellationToken cancellationToken = default) =>
         _application.Profiles.GetProfilesAsync(cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Lists higher-level summaries for all configured Mailozaurr profiles, including kind, capabilities, auth posture, and readiness.")]
     public Task<IReadOnlyList<MailProfileOverview>> mail_profiles_summary_list(
         [Description("Optional provider kind filter, such as imap, graph, gmail, smtp, or pop3.")] string? kind = null,
@@ -33,7 +33,7 @@ public sealed partial class MailMcpTools {
             DefaultOnly = defaultOnly
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Lists lightweight profile summaries for all configured Mailozaurr profiles.")]
     public Task<IReadOnlyList<MailProfileOverviewCompact>> mail_profiles_summary_compact_list(
         [Description("Optional provider kind filter, such as imap, graph, gmail, smtp, or pop3.")] string? kind = null,
@@ -56,7 +56,7 @@ public sealed partial class MailMcpTools {
             DefaultOnly = defaultOnly
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Returns the effective capabilities for a configured Mailozaurr profile.")]
     public async Task<ProfileCapabilities> mail_capabilities_get(
         [Description("The profile identifier to inspect.")] string profileId,
@@ -65,7 +65,7 @@ public sealed partial class MailMcpTools {
         return capabilities ?? throw new InvalidOperationException($"Profile '{profileId}' was not found.");
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Gets a configured Mailozaurr profile by identifier.")]
     public async Task<MailProfile> mail_profile_get(
         [Description("The profile identifier to retrieve.")] string profileId,
@@ -74,14 +74,14 @@ public sealed partial class MailMcpTools {
         return profile ?? throw new InvalidOperationException($"Profile '{profileId}' was not found.");
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Inspects whether a configured Mailozaurr profile is ready to use, including provider-specific auth prerequisites.")]
     public Task<MailProfileValidationResult> mail_profile_doctor(
         [Description("The profile identifier to inspect.")] string profileId,
         CancellationToken cancellationToken = default) =>
         _application.Profiles.DiagnoseAsync(profileId, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Returns a higher-level summary for a configured Mailozaurr profile, combining kind, capabilities, auth posture, and readiness.")]
     public async Task<MailProfileOverview> mail_profile_summary(
         [Description("The profile identifier to summarize.")] string profileId,
@@ -90,7 +90,7 @@ public sealed partial class MailMcpTools {
         return overview ?? throw new InvalidOperationException($"Profile '{profileId}' was not found.");
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Returns a lightweight summary for a configured Mailozaurr profile.")]
     public async Task<MailProfileOverviewCompact> mail_profile_summary_compact(
         [Description("The profile identifier to summarize.")] string profileId,
@@ -99,7 +99,7 @@ public sealed partial class MailMcpTools {
         return overview ?? throw new InvalidOperationException($"Profile '{profileId}' was not found.");
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Runs structural validation for a configured Mailozaurr profile without provider-specific readiness checks.")]
     public async Task<MailProfileValidationResult> mail_profile_validate(
         [Description("The profile identifier to validate.")] string profileId,
@@ -156,12 +156,9 @@ public sealed partial class MailMcpTools {
         [Description("When true, marks this profile as the default profile.")] bool isDefault = false,
         [Description("Optional Graph client/application identifier.")] string? clientId = null,
         [Description("Optional Graph tenant/directory identifier.")] string? tenantId = null,
-        [Description("Optional confidential client secret to store securely. Prefer using clientSecretReference for MCP hosts.")] string? clientSecret = null,
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Graph client secret.")] string? clientSecretReference = null,
-        [Description("Optional explicit access token to store securely. Prefer using accessTokenReference for MCP hosts.")] string? accessToken = null,
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Graph access token.")] string? accessTokenReference = null,
         [Description("Optional certificate path for certificate-based auth.")] string? certificatePath = null,
-        [Description("Optional certificate password to store securely. Prefer using certificatePasswordReference for MCP hosts.")] string? certificatePassword = null,
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the certificate password.")] string? certificatePasswordReference = null,
         CancellationToken cancellationToken = default) {
         var result = await _application.ProfileBootstrap.SaveGraphProfileAsync(new GraphProfileBootstrapRequest {
@@ -173,12 +170,9 @@ public sealed partial class MailMcpTools {
             IsDefault = isDefault,
             ClientId = clientId,
             TenantId = tenantId,
-            ClientSecret = clientSecret,
             ClientSecretReference = clientSecretReference,
-            AccessToken = accessToken,
             AccessTokenReference = accessTokenReference,
             CertificatePath = certificatePath,
-            CertificatePassword = certificatePassword,
             CertificatePasswordReference = certificatePasswordReference
         }, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded) {
@@ -198,11 +192,8 @@ public sealed partial class MailMcpTools {
         [Description("Optional default sender email address. Defaults to the mailbox when appropriate.")] string? defaultSender = null,
         [Description("When true, marks this profile as the default profile.")] bool isDefault = false,
         [Description("Optional Google OAuth client identifier.")] string? clientId = null,
-        [Description("Optional Google OAuth client secret to store securely. Prefer using clientSecretReference for MCP hosts.")] string? clientSecret = null,
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Gmail client secret.")] string? clientSecretReference = null,
-        [Description("Optional Google OAuth refresh token to store securely. Prefer using refreshTokenReference for MCP hosts.")] string? refreshToken = null,
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Gmail refresh token.")] string? refreshTokenReference = null,
-        [Description("Optional explicit access token to store securely. Prefer using accessTokenReference for MCP hosts.")] string? accessToken = null,
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Gmail access token.")] string? accessTokenReference = null,
         CancellationToken cancellationToken = default) {
         var result = await _application.ProfileBootstrap.SaveGmailProfileAsync(new GmailProfileBootstrapRequest {
@@ -213,11 +204,8 @@ public sealed partial class MailMcpTools {
             DefaultSender = defaultSender,
             IsDefault = isDefault,
             ClientId = clientId,
-            ClientSecret = clientSecret,
             ClientSecretReference = clientSecretReference,
-            RefreshToken = refreshToken,
             RefreshTokenReference = refreshTokenReference,
-            AccessToken = accessToken,
             AccessTokenReference = accessTokenReference
         }, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded) {
@@ -254,7 +242,6 @@ public sealed partial class MailMcpTools {
         [Description("The saved Gmail profile identifier to authenticate.")] string profileId,
         [Description("Optional Gmail account override used for the login flow.")] string? mailbox = null,
         [Description("Optional OAuth client identifier override.")] string? clientId = null,
-        [Description("Optional OAuth client secret override. Prefer using clientSecretReference for MCP hosts.")] string? clientSecret = null,
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Gmail client secret override.")] string? clientSecretReference = null,
         [Description("Optional scopes override.")] string[]? scopes = null,
         CancellationToken cancellationToken = default) =>
@@ -262,7 +249,6 @@ public sealed partial class MailMcpTools {
             ProfileId = profileId,
             GmailAccount = mailbox,
             ClientId = clientId,
-            ClientSecret = clientSecret,
             ClientSecretReference = clientSecretReference,
             Scopes = scopes
         }, cancellationToken);
@@ -274,7 +260,7 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.ProfileAuth.RefreshAsync(profileId, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Returns the persisted authentication status for a saved Mailozaurr profile, including auth mode, token presence, and refreshability.")]
     public async Task<MailProfileAuthStatus> mail_profile_auth_status(
         [Description("The saved profile identifier to inspect.")] string profileId,
@@ -283,7 +269,7 @@ public sealed partial class MailMcpTools {
         return status ?? throw new InvalidOperationException($"Profile '{profileId}' was not found.");
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Runs a live provider connection test for a saved Mailozaurr profile.")]
     public Task<MailProfileConnectionTestResult> mail_profile_test(
         [Description("The saved profile identifier to test.")] string profileId,
@@ -306,17 +292,16 @@ public sealed partial class MailMcpTools {
         _application.Profiles.SetDefaultAsync(profileId, cancellationToken);
 
     [McpServerTool]
-    [Description("Stores or replaces a secret for an existing Mailozaurr profile.")]
-    public Task<OperationResult> mail_profile_secret_set(
+    [Description("Copies an existing stored secret to another Mailozaurr profile without exposing its value to MCP.")]
+    public Task<OperationResult> mail_profile_secret_copy(
         [Description("The profile identifier that owns the secret.")] string profileId,
         [Description("The stable secret name, such as password, client-secret, or refresh-token.")] string secretName,
-        [Description("The secret value to store. Prefer using secretReference for MCP hosts when the secret already exists in the shared store.")] string? secretValue = null,
-        [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' to copy without re-exposing the secret value.")] string? secretReference = null,
+        [Description("The required secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>'.")] string secretReference,
         CancellationToken cancellationToken = default) =>
         _application.ProfileSecrets.SetSecretAsync(
             profileId,
             secretName,
-            secretValue,
+            null,
             secretReference,
             cancellationToken);
 
