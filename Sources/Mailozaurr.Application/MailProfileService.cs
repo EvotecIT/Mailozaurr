@@ -124,13 +124,12 @@ public sealed class MailProfileService : IMailProfileService {
             return null;
         }
 
-        ProfileCapabilities configured = profile.GetCapabilities();
         if (_availableCapabilities == null) {
-            return configured;
+            return profile.GetCapabilities();
         }
 
         _availableCapabilities.TryGetValue(profile.Kind, out MailCapability available);
-        return new ProfileCapabilities(profile.Kind, configured.Capabilities & available);
+        return profile.GetCapabilities(available);
     }
 
     private async Task AddProviderReadinessChecksAsync(MailProfile profile, MailProfileValidationResult result, CancellationToken cancellationToken) {

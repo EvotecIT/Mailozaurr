@@ -15,13 +15,25 @@ public sealed class MailFolderAliasService : IMailFolderAliasService {
 
     private readonly IMailProfileStore _profileStore;
     private readonly IMailReadService _read;
+    private readonly IReadOnlyDictionary<MailProfileKind, MailCapability>? _availableCapabilities;
 
     /// <summary>
     /// Creates a new folder alias service.
     /// </summary>
-    public MailFolderAliasService(IMailProfileStore profileStore, IMailReadService read) {
+    public MailFolderAliasService(IMailProfileStore profileStore, IMailReadService read)
+        : this(profileStore, read, null) {
+    }
+
+    /// <summary>
+    /// Creates a new folder alias service with the capabilities backed by the current handler registry.
+    /// </summary>
+    public MailFolderAliasService(
+        IMailProfileStore profileStore,
+        IMailReadService read,
+        IReadOnlyDictionary<MailProfileKind, MailCapability>? availableCapabilities) {
         _profileStore = profileStore ?? throw new ArgumentNullException(nameof(profileStore));
         _read = read ?? throw new ArgumentNullException(nameof(read));
+        _availableCapabilities = availableCapabilities;
     }
 
     /// <inheritdoc />
@@ -30,7 +42,7 @@ public sealed class MailFolderAliasService : IMailFolderAliasService {
         string? mailboxId = null,
         CancellationToken cancellationToken = default) {
         var profile = await GetProfileAsync(profileId, cancellationToken).ConfigureAwait(false);
-        var capabilities = profile.GetCapabilities();
+        var capabilities = GetCapabilities(profile);
         var folders = await TryGetFoldersAsync(profile, mailboxId, capabilities, cancellationToken).ConfigureAwait(false);
         var results = new List<MailFolderAliasSummary>();
         foreach (var alias in KnownAliases) {
@@ -126,6 +138,15 @@ public sealed class MailFolderAliasService : IMailFolderAliasService {
 
         var profile = await _profileStore.GetByIdAsync(profileId.Trim(), cancellationToken).ConfigureAwait(false);
         return profile ?? throw new InvalidOperationException($"Profile '{profileId}' was not found.");
+    }
+
+    private ProfileCapabilities GetCapabilities(MailProfile profile) {
+        if (_availableCapabilities == null) {
+            return profile.GetCapabilities();
+        }
+
+        _availableCapabilities.TryGetValue(profile.Kind, out MailCapability available);
+        return profile.GetCapabilities(available);
     }
 
     private async Task<IReadOnlyList<FolderRef>> TryGetFoldersAsync(

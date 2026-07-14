@@ -310,8 +310,10 @@ public sealed class MailApplicationBuilder {
         var draftExchangeService = _draftExchangeService ?? new JsonMailDraftExchangeService();
 
         var readService = _readService ?? new RoutedMailReadService(profileStore, readHandlers);
-        var folderAliasService = _folderAliasService ?? new MailFolderAliasService(profileStore, readService);
-        var messageActionPreviewService = _messageActionPreviewService ?? new MailMessageActionPreviewService(profileStore, folderAliasService);
+        var folderAliasService = _folderAliasService ?? new MailFolderAliasService(
+            profileStore, readService, availableCapabilities);
+        var messageActionPreviewService = _messageActionPreviewService ?? new MailMessageActionPreviewService(
+            profileStore, folderAliasService, availableCapabilities);
         var messageActionService = _messageActionService ?? new RoutedMailMessageActionService(profileStore, messageActionHandlers, folderAliasService);
         var messageActionPlanService = _messageActionPlanService ?? new MailMessageActionPlanService(messageActionPreviewService, messageActionService);
         var messageActionPlanExchangeService = _messageActionPlanExchangeService ?? new JsonMailMessageActionPlanExchangeService();

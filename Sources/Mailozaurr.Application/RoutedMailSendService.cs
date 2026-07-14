@@ -30,12 +30,11 @@ public sealed class RoutedMailSendService : IMailSendService {
             throw new InvalidOperationException($"Profile '{request.ProfileId}' was not found.");
         }
 
-        if (!profile.GetCapabilities().Supports(MailCapability.SendMessages)) {
-            throw new NotSupportedException($"Profile '{profile.Id}' does not support '{MailCapability.SendMessages}'.");
-        }
-
         if (!_handlers.TryGetValue(profile.Kind, out var handler)) {
             throw new NotSupportedException($"No send handler is registered for profile kind '{profile.Kind}'.");
+        }
+        if (!profile.GetCapabilities(MailCapability.SendMessages).Supports(MailCapability.SendMessages)) {
+            throw new NotSupportedException($"Profile '{profile.Id}' does not support '{MailCapability.SendMessages}'.");
         }
 
         return await handler.SendAsync(profile, request, cancellationToken).ConfigureAwait(false);

@@ -37,15 +37,15 @@ internal sealed class JsonFileDocumentStore<TDocument> where TDocument : class {
         Func<TDocument, TResult> read,
         CancellationToken cancellationToken = default) {
         if (read == null) throw new ArgumentNullException(nameof(read));
-        return ExecuteAsync(document => Task.FromResult(read(document)), save: false, cancellationToken);
+        return ExecuteReadAsync(read, cancellationToken);
     }
 
     internal Task UpdateAsync(Action<TDocument> update, CancellationToken cancellationToken = default) {
         if (update == null) throw new ArgumentNullException(nameof(update));
-        return ExecuteAsync(document => {
+        return ExecuteUpdateAsync(document => {
             update(document);
             return Task.FromResult(true);
-        }, save: true, cancellationToken);
+        }, cancellationToken);
     }
 
     internal Task<bool> RemoveAsync(Func<TDocument, bool> remove, CancellationToken cancellationToken = default) {
@@ -70,18 +70,27 @@ internal sealed class JsonFileDocumentStore<TDocument> where TDocument : class {
         }
     }
 
-    private async Task<TResult> ExecuteAsync<TResult>(
-        Func<TDocument, Task<TResult>> action,
-        bool save,
+    private async Task<TResult> ExecuteReadAsync<TResult>(
+        Func<TDocument, TResult> read,
+        CancellationToken cancellationToken) {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try {
+            TDocument document = await LoadDocumentAsync(cancellationToken).ConfigureAwait(false);
+            return read(document);
+        } finally {
+            _gate.Release();
+        }
+    }
+
+    private async Task<TResult> ExecuteUpdateAsync<TResult>(
+        Func<TDocument, Task<TResult>> update,
         CancellationToken cancellationToken) {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             using FileStream fileLock = await AcquireFileLockAsync(cancellationToken).ConfigureAwait(false);
             TDocument document = await LoadDocumentAsync(cancellationToken).ConfigureAwait(false);
-            TResult result = await action(document).ConfigureAwait(false);
-            if (save) {
-                await SaveDocumentAsync(document, cancellationToken).ConfigureAwait(false);
-            }
+            TResult result = await update(document).ConfigureAwait(false);
+            await SaveDocumentAsync(document, cancellationToken).ConfigureAwait(false);
             return result;
         } finally {
             _gate.Release();
@@ -110,7 +119,11 @@ internal sealed class JsonFileDocumentStore<TDocument> where TDocument : class {
         if (!File.Exists(_filePath)) {
             document = _createDocument();
         } else {
-            using var stream = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var stream = new FileStream(
+                _filePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
             document = await JsonSerializer.DeserializeAsync(stream, _jsonTypeInfo, cancellationToken)
                 .ConfigureAwait(false) ?? _createDocument();
         }

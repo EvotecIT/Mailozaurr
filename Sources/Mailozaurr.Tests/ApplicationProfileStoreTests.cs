@@ -104,6 +104,31 @@ public sealed class ApplicationProfileStoreTests {
         Assert.Equal(24, profiles.Select(profile => profile.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count());
     }
 
+    [Fact]
+    public async Task ReadingExistingProfileFileDoesNotCreateLockArtifacts() {
+        var filePath = CreateTemporaryFilePath();
+        var store = new FileMailProfileStore(filePath);
+        await store.SaveAsync(new MailProfile {
+            Id = "inspection-only",
+            DisplayName = "Inspection only",
+            Kind = MailProfileKind.Imap
+        });
+        string lockDirectory = Path.Combine(Path.GetDirectoryName(filePath)!, ".mailozaurr-locks");
+        Directory.Delete(lockDirectory, true);
+        FileAttributes originalAttributes = File.GetAttributes(filePath);
+        File.SetAttributes(filePath, originalAttributes | FileAttributes.ReadOnly);
+
+        try {
+            var profiles = await new FileMailProfileStore(filePath).GetAllAsync();
+
+            Assert.Single(profiles);
+            Assert.Equal("inspection-only", profiles[0].Id);
+            Assert.False(Directory.Exists(lockDirectory));
+        } finally {
+            File.SetAttributes(filePath, originalAttributes);
+        }
+    }
+
     private static string CreateTemporaryFilePath() {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

@@ -4,6 +4,9 @@ namespace Mailozaurr.Application;
 /// Resolves a profile and routes message actions to the matching provider handler.
 /// </summary>
 public sealed class RoutedMailMessageActionService : IMailMessageActionService {
+    private const MailCapability HandlerCapabilities = MailCapability.MarkMessages
+        | MailCapability.MoveMessages
+        | MailCapability.DeleteMessages;
     private readonly IMailProfileStore _profileStore;
     private readonly IMailFolderAliasService? _folderAliases;
     private readonly IReadOnlyDictionary<MailProfileKind, IMailMessageActionHandler> _handlers;
@@ -247,7 +250,7 @@ public sealed class RoutedMailMessageActionService : IMailMessageActionService {
     }
 
     private static void EnsureCapability(MailProfile profile, MailCapability capability) {
-        if (!profile.GetCapabilities().Supports(capability)) {
+        if (!profile.GetCapabilities(HandlerCapabilities).Supports(capability)) {
             throw new NotSupportedException($"Profile '{profile.Id}' does not support '{capability}'.");
         }
     }
