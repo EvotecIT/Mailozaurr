@@ -282,6 +282,25 @@ public sealed class MailFileOfficeImoContractsTests {
     }
 
     [Fact]
+    public async Task MimeProjectionRejectsOfficeImoWriterDiagnostics() {
+        var document = new EmailDocument { Subject = "Incomplete attachment" };
+        document.Attachments.Add(new EmailAttachment {
+            FileName = "missing.bin",
+            ContentType = "application/octet-stream",
+            Length = 4,
+            Content = null
+        });
+
+        InvalidDataException syncError = Assert.Throws<InvalidDataException>(
+            () => MailFileMimeAdapter.ToMimeMessage(document));
+        InvalidDataException asyncError = await Assert.ThrowsAsync<InvalidDataException>(
+            () => MailFileMimeAdapter.ToMimeMessageAsync(document));
+
+        Assert.Contains("EMAIL_ATTACHMENT_CONTENT_UNAVAILABLE", syncError.Message, StringComparison.Ordinal);
+        Assert.Contains("EMAIL_ATTACHMENT_CONTENT_UNAVAILABLE", asyncError.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AttachmentContentCanBeBoundedWithoutLosingMetadata() {
         string directory = CreateTempDirectory();
         try {

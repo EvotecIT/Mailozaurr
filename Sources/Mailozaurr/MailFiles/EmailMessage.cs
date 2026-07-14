@@ -21,7 +21,9 @@ public static class EmailMessage {
         string tempFile = CreateTempOutputPath(msgFile);
         try {
             MailFileMessage source = MailFileMessage.Load(emlFile, RichReadOptions());
-            new EmailDocumentWriter().Write(source.OfficeDocument, tempFile, EmailFileFormat.OutlookMsg);
+            EmailWriteResult writeResult = new EmailDocumentWriter()
+                .Write(source.OfficeDocument, tempFile, EmailFileFormat.OutlookMsg);
+            MailFileDiagnostics.ThrowIfErrors(writeResult.Diagnostics, "The MSG file could not be written");
             return TryFinalizeConvertedFile(tempFile, msgFile.FullName, force, "MSG file already exists",
                 out string? error)
                 ? new EmlConversionResult { EmlFile = emlFile.FullName, MsgFile = msgFile.FullName, Status = true }
@@ -48,8 +50,12 @@ public static class EmailMessage {
         try {
             MailFileMessage source = await MailFileMessage.LoadAsync(emlFile, RichReadOptions(), cancellationToken)
                 .ConfigureAwait(false);
-            await new EmailDocumentWriter().WriteAsync(source.OfficeDocument, tempFile,
-                EmailFileFormat.OutlookMsg, cancellationToken).ConfigureAwait(false);
+            EmailWriteResult writeResult = await new EmailDocumentWriter().WriteAsync(
+                source.OfficeDocument,
+                tempFile,
+                EmailFileFormat.OutlookMsg,
+                cancellationToken).ConfigureAwait(false);
+            MailFileDiagnostics.ThrowIfErrors(writeResult.Diagnostics, "The MSG file could not be written");
             return TryFinalizeConvertedFile(tempFile, msgFile.FullName, force, "MSG file already exists",
                 out string? error)
                 ? new EmlConversionResult { EmlFile = emlFile.FullName, MsgFile = msgFile.FullName, Status = true }

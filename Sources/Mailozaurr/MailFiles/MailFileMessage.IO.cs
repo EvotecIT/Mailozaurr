@@ -46,13 +46,7 @@ public sealed partial class MailFileMessage {
         OfficeDocument.SaveAsync(filePath, format, options, cancellationToken);
 
     private static MailFileMessage GetMessageOrThrow(MailFileMessage message) {
-        if (!message.HasErrors) return message;
-        foreach (EmailDiagnostic diagnostic in message.Diagnostics) {
-            if (diagnostic.Severity == EmailDiagnosticSeverity.Error) {
-                throw new InvalidDataException(string.Concat(
-                    "The mail file could not be loaded: ", diagnostic.Code, ": ", diagnostic.Message));
-            }
-        }
-        throw new InvalidDataException("The mail file could not be loaded.");
+        MailFileDiagnostics.ThrowIfErrors(message.Diagnostics, "The mail file could not be loaded");
+        return message;
     }
 }

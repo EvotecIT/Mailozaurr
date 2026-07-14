@@ -9,7 +9,8 @@ public static class MailFileMimeAdapter {
     public static MimeMessage ToMimeMessage(EmailDocument document) {
         if (document == null) throw new ArgumentNullException(nameof(document));
         using var stream = new MemoryStream();
-        new EmailDocumentWriter().Write(document, stream, EmailFileFormat.Eml);
+        EmailWriteResult result = new EmailDocumentWriter().Write(document, stream, EmailFileFormat.Eml);
+        MailFileDiagnostics.ThrowIfErrors(result.Diagnostics, "The email document could not be projected to MIME");
         stream.Position = 0;
         return MimeMessage.Load(stream);
     }
@@ -19,8 +20,10 @@ public static class MailFileMimeAdapter {
         CancellationToken cancellationToken = default) {
         if (document == null) throw new ArgumentNullException(nameof(document));
         using var stream = new MemoryStream();
-        await new EmailDocumentWriter().WriteAsync(document, stream, EmailFileFormat.Eml, cancellationToken)
+        EmailWriteResult result = await new EmailDocumentWriter()
+            .WriteAsync(document, stream, EmailFileFormat.Eml, cancellationToken)
             .ConfigureAwait(false);
+        MailFileDiagnostics.ThrowIfErrors(result.Diagnostics, "The email document could not be projected to MIME");
         stream.Position = 0;
         return await MimeMessage.LoadAsync(stream, cancellationToken).ConfigureAwait(false);
     }

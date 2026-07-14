@@ -225,8 +225,12 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
         SecretUpdate[] effectiveUpdates = updates
             .Where(update => !string.IsNullOrWhiteSpace(update.Value))
             .ToArray();
-        Dictionary<string, string?> previousSecrets = await CaptureSecretsAsync(
-            profile.Id, effectiveUpdates, cancellationToken).ConfigureAwait(false);
+        MailSecretRollbackSnapshot previousSecrets = await MailSecretRollbackSnapshot.CaptureAsync(
+            _secretStore,
+            profile.Id,
+            KnownSecretNames,
+            effectiveUpdates.Select(update => update.Name).ToArray(),
+            cancellationToken).ConfigureAwait(false);
         string? previousDefaultProfileId = await CapturePreviousDefaultProfileIdAsync(
             profile, cancellationToken).ConfigureAwait(false);
 
@@ -275,7 +279,7 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
         string profileId,
         MailProfile? existing,
         string? previousDefaultProfileId,
-        IReadOnlyDictionary<string, string?> previousSecrets) {
+        MailSecretRollbackSnapshot previousSecrets) {
         if (existing == null) {
             OperationResult deleteResult = await _profiles.DeleteAsync(
                 profileId, CancellationToken.None).ConfigureAwait(false);
@@ -298,15 +302,10 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
             }
         }
 
-        foreach (KeyValuePair<string, string?> secret in previousSecrets) {
-            if (secret.Value == null) {
-                await _secretStore.RemoveSecretAsync(
-                    profileId, secret.Key, CancellationToken.None).ConfigureAwait(false);
-            } else {
-                await _secretStore.SetSecretAsync(
-                    profileId, secret.Key, secret.Value, CancellationToken.None).ConfigureAwait(false);
-            }
-        }
+        await previousSecrets.RestoreAsync(
+            _secretStore,
+            profileId,
+            CancellationToken.None).ConfigureAwait(false);
     }
 
     private async Task<string?> CapturePreviousDefaultProfileIdAsync(
@@ -321,35 +320,6 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
         return profiles.FirstOrDefault(candidate =>
             candidate.IsDefault &&
             !string.Equals(candidate.Id, profile.Id, StringComparison.OrdinalIgnoreCase))?.Id;
-    }
-
-    private async Task<Dictionary<string, string?>> CaptureSecretsAsync(
-        string profileId,
-        IReadOnlyList<SecretUpdate> updates,
-        CancellationToken cancellationToken) {
-        var snapshot = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        if (_secretStore is IMailProfileSecretCleanup cleanup) {
-            IReadOnlyDictionary<string, string> existingSecrets = await cleanup.GetProfileSecretsAsync(
-                profileId, cancellationToken).ConfigureAwait(false);
-            foreach (KeyValuePair<string, string> secret in existingSecrets) {
-                snapshot[secret.Key] = secret.Value;
-            }
-        } else {
-            foreach (string secretName in KnownSecretNames) {
-                string? value = await _secretStore.GetSecretAsync(
-                    profileId, secretName, cancellationToken).ConfigureAwait(false);
-                if (value != null) {
-                    snapshot[secretName] = value;
-                }
-            }
-        }
-
-        foreach (SecretUpdate update in updates) {
-            if (!snapshot.ContainsKey(update.Name)) {
-                snapshot[update.Name] = null;
-            }
-        }
-        return snapshot;
     }
 
     private sealed class SecretUpdate {

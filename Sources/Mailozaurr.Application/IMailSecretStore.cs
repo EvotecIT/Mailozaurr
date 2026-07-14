@@ -24,3 +24,25 @@ public interface IMailProfileSecretCleanup {
     /// <summary>Removes all secrets owned by the profile.</summary>
     Task RemoveProfileSecretsAsync(string profileId, CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// Represents an opaque, store-native snapshot of every secret associated with a profile.
+/// </summary>
+public interface IMailProfileSecretSnapshot {
+}
+
+/// <summary>
+/// Captures and restores profile secrets without requiring their protected representation to be decoded.
+/// </summary>
+public interface IMailProfileSecretSnapshotStore {
+    /// <summary>Captures every secret currently associated with the profile.</summary>
+    Task<IMailProfileSecretSnapshot> CaptureProfileSecretsAsync(
+        string profileId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Replaces the profile's current secrets with the captured snapshot.</summary>
+    Task RestoreProfileSecretsAsync(
+        string profileId,
+        IMailProfileSecretSnapshot snapshot,
+        CancellationToken cancellationToken = default);
+}

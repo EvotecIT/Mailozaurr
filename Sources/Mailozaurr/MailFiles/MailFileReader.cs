@@ -69,7 +69,14 @@ public static class MailFileReader {
             return false;
         }
         try {
-            message = Read(path, options);
+            MailFileMessage candidate = Read(path, options);
+            if (MailFileDiagnostics.TryGetError(
+                candidate.Diagnostics,
+                "The mail file could not be read",
+                out error)) {
+                return false;
+            }
+            message = candidate;
             return true;
         } catch (NotSupportedException) {
             error = $"File {path} is not a .msg or .eml file.";

@@ -148,4 +148,35 @@ public class EmailMessageConversionTests {
             Directory.Delete(tempDir, true);
         }
     }
+
+    [Fact]
+    public async Task ConvertEmlToMsg_RejectsWriterDiagnosticsBeforeFinalizingOutput() {
+        var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempDir);
+        try {
+            string emlPath = Path.Combine(tempDir, "invalid-rtf.eml");
+            string syncMsgPath = Path.Combine(tempDir, "sync.msg");
+            string asyncMsgPath = Path.Combine(tempDir, "async.msg");
+            File.WriteAllText(emlPath,
+                "From: a@example.com\r\nTo: b@example.com\r\nSubject: Invalid RTF\r\n" +
+                "MIME-Version: 1.0\r\nContent-Type: text/rtf; charset=utf-8\r\n" +
+                "Content-Transfer-Encoding: 8bit\r\n\r\n{\\rtf1 Emoji: \ud83d\ude42}",
+                System.Text.Encoding.UTF8);
+            Assert.False(MailFileReader.Read(emlPath).HasErrors);
+
+            EmlConversionResult syncResult = EmailMessage.ConvertEmlToMsg(
+                new FileInfo(emlPath), new FileInfo(syncMsgPath), true);
+            EmlConversionResult asyncResult = await EmailMessage.ConvertEmlToMsgAsync(
+                new FileInfo(emlPath), new FileInfo(asyncMsgPath), true);
+
+            Assert.False(syncResult.Status);
+            Assert.Contains("EMAIL_MSG_RTF_CHARACTER_UNENCODABLE", syncResult.Error, StringComparison.Ordinal);
+            Assert.False(File.Exists(syncMsgPath));
+            Assert.False(asyncResult.Status);
+            Assert.Contains("EMAIL_MSG_RTF_CHARACTER_UNENCODABLE", asyncResult.Error, StringComparison.Ordinal);
+            Assert.False(File.Exists(asyncMsgPath));
+        } finally {
+            Directory.Delete(tempDir, true);
+        }
+    }
 }

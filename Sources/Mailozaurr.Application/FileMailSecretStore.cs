@@ -3,7 +3,10 @@ namespace Mailozaurr.Application;
 /// <summary>
 /// Stores protected secrets in a JSON document on disk.
 /// </summary>
-public sealed class FileMailSecretStore : IMailSecretStore, IMailProfileSecretCleanup {
+public sealed class FileMailSecretStore :
+    IMailSecretStore,
+    IMailProfileSecretCleanup,
+    IMailProfileSecretSnapshotStore {
     private readonly JsonFileDocumentStore<MailSecretStoreDocument> _store;
     private readonly ICredentialProtector _protector;
     /// <summary>
@@ -32,8 +35,16 @@ public sealed class FileMailSecretStore : IMailSecretStore, IMailProfileSecretCl
         ValidateKeyPart(secretName, nameof(secretName));
 
         return _store.ReadAsync(document => {
-            if (!TryGetProfileSecrets(document, profileId, out Dictionary<string, string> secrets) ||
-                !secrets.TryGetValue(secretName.Trim(), out string? protectedValue)) {
+            string normalizedProfileId = profileId.Trim();
+            string normalizedSecretName = secretName.Trim();
+            string? protectedValue = null;
+            if (TryGetProfileSecrets(document, normalizedProfileId, out Dictionary<string, string> secrets)) {
+                secrets.TryGetValue(normalizedSecretName, out protectedValue);
+            }
+            if (protectedValue == null && document.Secrets != null) {
+                document.Secrets.TryGetValue(CreateLegacyKey(normalizedProfileId, normalizedSecretName), out protectedValue);
+            }
+            if (protectedValue == null) {
                 return null;
             }
 
@@ -50,8 +61,12 @@ public sealed class FileMailSecretStore : IMailSecretStore, IMailProfileSecretCl
         }
 
         await _store.UpdateAsync(document => {
-            Dictionary<string, string> secrets = GetOrCreateProfileSecrets(document, profileId);
-            secrets[secretName.Trim()] = _protector.Protect(secretValue);
+            string normalizedProfileId = profileId.Trim();
+            string normalizedSecretName = secretName.Trim();
+            Dictionary<string, string> secrets = GetOrCreateProfileSecrets(document, normalizedProfileId);
+            secrets[normalizedSecretName] = _protector.Protect(secretValue);
+            document.Secrets?.Remove(CreateLegacyKey(normalizedProfileId, normalizedSecretName));
+            RemoveEmptyLegacyStore(document);
         }, cancellationToken).ConfigureAwait(false);
     }
 
@@ -61,14 +76,18 @@ public sealed class FileMailSecretStore : IMailSecretStore, IMailProfileSecretCl
         ValidateKeyPart(secretName, nameof(secretName));
 
         return _store.RemoveAsync(document => {
-            if (!TryGetProfileSecrets(document, profileId, out Dictionary<string, string> secrets)) {
-                return false;
+            string normalizedProfileId = profileId.Trim();
+            string normalizedSecretName = secretName.Trim();
+            bool removed = false;
+            if (TryGetProfileSecrets(document, normalizedProfileId, out Dictionary<string, string> secrets)) {
+                removed = secrets.Remove(normalizedSecretName);
+                if (secrets.Count == 0) {
+                    document.ProfileSecrets.Remove(normalizedProfileId);
+                }
             }
 
-            bool removed = secrets.Remove(secretName.Trim());
-            if (removed && secrets.Count == 0) {
-                document.ProfileSecrets.Remove(profileId.Trim());
-            }
+            removed = (document.Secrets?.Remove(CreateLegacyKey(normalizedProfileId, normalizedSecretName)) ?? false) || removed;
+            RemoveEmptyLegacyStore(document);
             return removed;
         }, cancellationToken);
     }
@@ -85,6 +104,16 @@ public sealed class FileMailSecretStore : IMailSecretStore, IMailProfileSecretCl
                     result[secret.Key] = _protector.Unprotect(secret.Value);
                 }
             }
+            string legacyPrefix = string.Concat(profileId.Trim(), "::");
+            if (document.Secrets != null) {
+                foreach (KeyValuePair<string, string> secret in document.Secrets) {
+                    if (!secret.Key.StartsWith(legacyPrefix, StringComparison.OrdinalIgnoreCase)) continue;
+                    string secretName = secret.Key.Substring(legacyPrefix.Length);
+                    if (!result.ContainsKey(secretName)) {
+                        result[secretName] = _protector.Unprotect(secret.Value);
+                    }
+                }
+            }
             return result;
         }, cancellationToken);
     }
@@ -93,6 +122,59 @@ public sealed class FileMailSecretStore : IMailSecretStore, IMailProfileSecretCl
     public Task RemoveProfileSecretsAsync(string profileId, CancellationToken cancellationToken = default) {
         ValidateKeyPart(profileId, nameof(profileId));
         return _store.UpdateAsync(document => document.ProfileSecrets.Remove(profileId.Trim()), cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<IMailProfileSecretSnapshot> CaptureProfileSecretsAsync(
+        string profileId,
+        CancellationToken cancellationToken = default) {
+        ValidateKeyPart(profileId, nameof(profileId));
+        return _store.ReadAsync<IMailProfileSecretSnapshot>(document => {
+            var protectedSecrets = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var legacySecrets = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (TryGetProfileSecrets(document, profileId, out Dictionary<string, string> secrets)) {
+                foreach (KeyValuePair<string, string> secret in secrets) {
+                    protectedSecrets[secret.Key] = secret.Value;
+                }
+            }
+            string legacyPrefix = string.Concat(profileId.Trim(), "::");
+            if (document.Secrets != null) {
+                foreach (KeyValuePair<string, string> secret in document.Secrets) {
+                    if (secret.Key.StartsWith(legacyPrefix, StringComparison.OrdinalIgnoreCase)) {
+                        legacySecrets[secret.Key] = secret.Value;
+                    }
+                }
+            }
+            return new FileMailProfileSecretSnapshot(protectedSecrets, legacySecrets);
+        }, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task RestoreProfileSecretsAsync(
+        string profileId,
+        IMailProfileSecretSnapshot snapshot,
+        CancellationToken cancellationToken = default) {
+        ValidateKeyPart(profileId, nameof(profileId));
+        if (snapshot is not FileMailProfileSecretSnapshot fileSnapshot) {
+            throw new ArgumentException("The snapshot was not created by this secret store.", nameof(snapshot));
+        }
+
+        return _store.UpdateAsync(document => {
+            string normalizedProfileId = profileId.Trim();
+            if (fileSnapshot.ProtectedSecrets.Count == 0) {
+                document.ProfileSecrets.Remove(normalizedProfileId);
+                RestoreLegacySecrets(document, fileSnapshot.LegacySecrets);
+                return;
+            }
+
+            var restoredSecrets = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (KeyValuePair<string, string> secret in fileSnapshot.ProtectedSecrets) {
+                restoredSecrets[secret.Key] = secret.Value;
+            }
+            document.ProfileSecrets[normalizedProfileId] = restoredSecrets;
+
+            RestoreLegacySecrets(document, fileSnapshot.LegacySecrets);
+        }, cancellationToken);
     }
 
     private static void NormalizeDocument(MailSecretStoreDocument document) {
@@ -116,8 +198,11 @@ public sealed class FileMailSecretStore : IMailSecretStore, IMailProfileSecretCl
         }
 
         if (document.Secrets != null) {
-            foreach (KeyValuePair<string, string> legacySecret in document.Secrets) {
-                if (!TryParseLegacyKey(legacySecret.Key, out string? profileId, out string? secretName)) {
+            document.Secrets = new Dictionary<string, string>(
+                document.Secrets,
+                StringComparer.OrdinalIgnoreCase);
+            foreach (KeyValuePair<string, string> legacySecret in document.Secrets.ToArray()) {
+                if (!TryParseUnambiguousLegacyKey(legacySecret.Key, out string? profileId, out string? secretName)) {
                     continue;
                 }
 
@@ -125,8 +210,9 @@ public sealed class FileMailSecretStore : IMailSecretStore, IMailProfileSecretCl
                 if (!secrets.ContainsKey(secretName!)) {
                     secrets[secretName!] = legacySecret.Value;
                 }
+                document.Secrets.Remove(legacySecret.Key);
             }
-            document.Secrets = null;
+            RemoveEmptyLegacyStore(document);
         }
 
         document.Version = 2;
@@ -157,9 +243,14 @@ public sealed class FileMailSecretStore : IMailSecretStore, IMailProfileSecretCl
         return false;
     }
 
-    private static bool TryParseLegacyKey(string key, out string? profileId, out string? secretName) {
-        int separatorIndex = key.LastIndexOf("::", StringComparison.Ordinal);
+    private static bool TryParseUnambiguousLegacyKey(string key, out string? profileId, out string? secretName) {
+        int separatorIndex = key.IndexOf("::", StringComparison.Ordinal);
         if (separatorIndex <= 0 || separatorIndex + 2 >= key.Length) {
+            profileId = null;
+            secretName = null;
+            return false;
+        }
+        if (key.IndexOf("::", separatorIndex + 2, StringComparison.Ordinal) >= 0) {
             profileId = null;
             secretName = null;
             return false;
@@ -170,10 +261,40 @@ public sealed class FileMailSecretStore : IMailSecretStore, IMailProfileSecretCl
         return true;
     }
 
+    private static string CreateLegacyKey(string profileId, string secretName) => $"{profileId}::{secretName}";
+
+    private static void RemoveEmptyLegacyStore(MailSecretStoreDocument document) {
+        if (document.Secrets?.Count == 0) {
+            document.Secrets = null;
+        }
+    }
+
+    private static void RestoreLegacySecrets(
+        MailSecretStoreDocument document,
+        IReadOnlyDictionary<string, string> legacySecrets) {
+        if (legacySecrets.Count == 0) return;
+        document.Secrets ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, string> secret in legacySecrets) {
+            document.Secrets[secret.Key] = secret.Value;
+        }
+    }
+
     private static void ValidateKeyPart(string value, string parameterName) {
         if (string.IsNullOrWhiteSpace(value)) {
             throw new ArgumentException("A non-empty value is required.", parameterName);
         }
+    }
+
+    private sealed class FileMailProfileSecretSnapshot : IMailProfileSecretSnapshot {
+        internal FileMailProfileSecretSnapshot(
+            IReadOnlyDictionary<string, string> protectedSecrets,
+            IReadOnlyDictionary<string, string> legacySecrets) {
+            ProtectedSecrets = protectedSecrets;
+            LegacySecrets = legacySecrets;
+        }
+
+        internal IReadOnlyDictionary<string, string> ProtectedSecrets { get; }
+        internal IReadOnlyDictionary<string, string> LegacySecrets { get; }
     }
 
 }

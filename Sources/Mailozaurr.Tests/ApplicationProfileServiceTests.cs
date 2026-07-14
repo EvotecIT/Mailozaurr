@@ -87,6 +87,30 @@ public sealed class ApplicationProfileServiceTests {
         Assert.Equal("custom-secret", await secretStore.GetSecretAsync("smtp", "custom-api-key"));
     }
 
+    [Fact]
+    public async Task DeleteAsyncDoesNotDecryptSecretsBeforeRemovingProfile() {
+        var profilePath = CreateTemporaryFilePath("profiles.json");
+        var secretPath = CreateTemporaryFilePath("secrets.json");
+        var profileStore = new FileMailProfileStore(profilePath);
+        var secretStore = new FileMailSecretStore(secretPath, new UnreadableCredentialProtector());
+        var service = new MailProfileService(profileStore, secretStore);
+        await service.SaveAsync(new MailProfile {
+            Id = "smtp",
+            DisplayName = "SMTP",
+            Kind = MailProfileKind.Smtp,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Server] = "smtp.example.com"
+            }
+        });
+        await secretStore.SetSecretAsync("smtp", "broken-secret", "cannot-be-unprotected");
+
+        OperationResult result = await service.DeleteAsync("smtp");
+
+        Assert.True(result.Succeeded);
+        Assert.Null(await service.GetProfileAsync("smtp"));
+        Assert.Null(await secretStore.GetSecretAsync("smtp", "broken-secret"));
+    }
+
     private static string CreateTemporaryFilePath(string fileName) {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -102,6 +126,13 @@ public sealed class ApplicationProfileServiceTests {
                 ? decoded.Substring("protected::".Length)
                 : decoded;
         }
+    }
+
+    private sealed class UnreadableCredentialProtector : ICredentialProtector {
+        public string Protect(string plainText) => $"unreadable::{plainText}";
+
+        public string Unprotect(string protectedData) =>
+            throw new InvalidDataException("Simulated unreadable protected value.");
     }
 
     private sealed class FailingCleanupSecretStore : IMailSecretStore, IMailProfileSecretCleanup {

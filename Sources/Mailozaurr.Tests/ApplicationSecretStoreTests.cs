@@ -88,7 +88,7 @@ public sealed class ApplicationSecretStoreTests {
     }
 
     [Fact]
-    public async Task LegacyFlatSecretKeysUseTheLastSeparatorForProfileIdentity() {
+    public async Task AmbiguousLegacyFlatSecretKeysRemainAvailableAfterMigration() {
         var filePath = CreateTemporaryFilePath();
         var protector = new TestCredentialProtector();
         string teamValue = protector.Protect("team-secret");
@@ -103,6 +103,43 @@ public sealed class ApplicationSecretStoreTests {
 
         Assert.Null(await store.GetSecretAsync("team", "password"));
         Assert.Equal("archive-secret", await store.GetSecretAsync("team::archive", "password"));
+    }
+
+    [Fact]
+    public async Task AmbiguousLegacyFlatSecretNameSurvivesAnUnrelatedWrite() {
+        var filePath = CreateTemporaryFilePath();
+        var protector = new TestCredentialProtector();
+        string legacyValue = protector.Protect("legacy-secret");
+        File.WriteAllText(filePath,
+            "{\"Version\":1,\"Secrets\":{" +
+            $"\"work::api::token\":\"{legacyValue}\"}}}}");
+        var store = new FileMailSecretStore(filePath, protector);
+
+        await store.SetSecretAsync("personal", "password", "new-secret");
+
+        var reloaded = new FileMailSecretStore(filePath, protector);
+        Assert.Equal("legacy-secret", await reloaded.GetSecretAsync("work", "api::token"));
+        IReadOnlyDictionary<string, string> workSecrets = await reloaded.GetProfileSecretsAsync("work");
+        Assert.Equal("legacy-secret", workSecrets["api::token"]);
+        Assert.Equal("new-secret", await reloaded.GetSecretAsync("personal", "password"));
+    }
+
+    [Fact]
+    public async Task NativeSnapshotRestoresAnAmbiguousLegacySecretWithoutDecryptingIt() {
+        var filePath = CreateTemporaryFilePath();
+        var protector = new TestCredentialProtector();
+        string legacyValue = protector.Protect("legacy-secret");
+        File.WriteAllText(filePath,
+            "{\"Version\":1,\"Secrets\":{" +
+            $"\"work::api::token\":\"{legacyValue}\"}}}}");
+        var store = new FileMailSecretStore(filePath, protector);
+        var snapshotStore = (IMailProfileSecretSnapshotStore)store;
+        IMailProfileSecretSnapshot snapshot = await snapshotStore.CaptureProfileSecretsAsync("work");
+
+        await store.SetSecretAsync("work", "api::token", "replacement");
+        await snapshotStore.RestoreProfileSecretsAsync("work", snapshot);
+
+        Assert.Equal("legacy-secret", await store.GetSecretAsync("work", "api::token"));
     }
 
     private static string CreateTemporaryFilePath() {
