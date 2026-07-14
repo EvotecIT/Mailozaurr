@@ -31,7 +31,11 @@ internal sealed class MailProfileStoreDocument {
 }
 
 internal sealed class MailSecretStoreDocument {
-    public int Version { get; set; } = 1;
+    public int Version { get; set; } = 2;
 
-    public Dictionary<string, string> Secrets { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, Dictionary<string, string>> ProfileSecrets { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, string>? Secrets { get; set; }
 }

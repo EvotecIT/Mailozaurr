@@ -118,4 +118,34 @@ public class EmailMessageConversionTests {
             Directory.Delete(outputDir, true);
         }
     }
+
+    [Fact]
+    public async Task ConvertEmlToMsg_RejectsReadDiagnosticsBeforeWritingOutput() {
+        var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempDir);
+        try {
+            string emlPath = Path.Combine(tempDir, "invalid.eml");
+            string syncMsgPath = Path.Combine(tempDir, "sync.msg");
+            string asyncMsgPath = Path.Combine(tempDir, "async.msg");
+            File.WriteAllText(emlPath,
+                "From: a@example.com\r\nTo: b@example.com\r\nSubject: Invalid\r\n" +
+                "MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n" +
+                "Content-Transfer-Encoding: base64\r\n\r\n!!!!");
+            Assert.True(MailFileReader.Read(emlPath).HasErrors);
+
+            EmlConversionResult syncResult = EmailMessage.ConvertEmlToMsg(
+                new FileInfo(emlPath), new FileInfo(syncMsgPath), true);
+            EmlConversionResult asyncResult = await EmailMessage.ConvertEmlToMsgAsync(
+                new FileInfo(emlPath), new FileInfo(asyncMsgPath), true);
+
+            Assert.False(syncResult.Status);
+            Assert.Contains("EMAIL_MIME_BASE64_INVALID", syncResult.Error, StringComparison.Ordinal);
+            Assert.False(File.Exists(syncMsgPath));
+            Assert.False(asyncResult.Status);
+            Assert.Contains("EMAIL_MIME_BASE64_INVALID", asyncResult.Error, StringComparison.Ordinal);
+            Assert.False(File.Exists(asyncMsgPath));
+        } finally {
+            Directory.Delete(tempDir, true);
+        }
+    }
 }

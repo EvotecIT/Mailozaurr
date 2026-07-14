@@ -44,6 +44,10 @@ public sealed class CmdletImportMailFile : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter ExcludeAttachmentContent { get; set; }
 
+    /// <summary>Verifies S/MIME signatures and projects signer metadata when present.</summary>
+    [Parameter]
+    public SwitchParameter VerifySignature { get; set; }
+
     /// <summary>
     /// Imports the specified mail file and returns its contents as a message object.
     /// </summary>
@@ -57,7 +61,8 @@ public sealed class CmdletImportMailFile : AsyncPSCmdlet {
         var options = new MailFileReaderOptions {
             IncludeAttachments = !ExcludeAttachments.IsPresent,
             IncludeAttachmentContent = !ExcludeAttachmentContent.IsPresent,
-            IncludeHeaders = IncludeHeaders.IsPresent
+            IncludeHeaders = IncludeHeaders.IsPresent,
+            VerifySignature = this.VerifySignature.IsPresent
         };
         try {
             MailFileMessage message = await MailFileMessage.LoadAsync(inputPath!, options, CancelToken)

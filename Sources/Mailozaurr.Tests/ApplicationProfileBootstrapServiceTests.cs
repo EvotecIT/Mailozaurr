@@ -183,6 +183,45 @@ public sealed class ApplicationProfileBootstrapServiceTests {
     }
 
     [Fact]
+    public async Task FailedSecretWriteRestoresPreviousDefaultProfile() {
+        string directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var profileStore = new FileMailProfileStore(Path.Combine(directory, "profiles.json"));
+            var secretStore = new InMemorySecretStore();
+            var profileService = new MailProfileService(profileStore, secretStore);
+            OperationResult initialSave = await profileService.SaveAsync(new MailProfile {
+                Id = "existing-default",
+                DisplayName = "Existing default",
+                Kind = MailProfileKind.Graph,
+                DefaultMailbox = "existing@example.com",
+                IsDefault = true
+            });
+            Assert.True(initialSave.Succeeded);
+            var service = new MailProfileBootstrapService(
+                profileService,
+                new FailingProfileSecretService(),
+                secretStore);
+
+            OperationResult result = await service.SaveGraphProfileAsync(new GraphProfileBootstrapRequest {
+                ProfileId = "new-default",
+                DisplayName = "New default",
+                Mailbox = "new@example.com",
+                AccessToken = "access-token",
+                IsDefault = true
+            });
+
+            IReadOnlyList<MailProfile> profiles = await profileService.GetProfilesAsync();
+            Assert.False(result.Succeeded);
+            MailProfile restored = Assert.Single(profiles);
+            Assert.Equal("existing-default", restored.Id);
+            Assert.True(restored.IsDefault);
+        } finally {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
     public async Task GraphBootstrapReturnsValidationFailureForNullProfileId() {
         var profileStore = new InMemoryProfileStore();
         var secretStore = new InMemorySecretStore();

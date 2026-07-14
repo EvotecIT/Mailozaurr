@@ -20,7 +20,7 @@ public static class EmailMessage {
         EnsureOutputDirectory(msgFile);
         string tempFile = CreateTempOutputPath(msgFile);
         try {
-            MailFileMessage source = MailFileReader.Read(emlFile, RichReadOptions());
+            MailFileMessage source = MailFileMessage.Load(emlFile, RichReadOptions());
             new EmailDocumentWriter().Write(source.OfficeDocument, tempFile, EmailFileFormat.OutlookMsg);
             return TryFinalizeConvertedFile(tempFile, msgFile.FullName, force, "MSG file already exists",
                 out string? error)
@@ -46,7 +46,7 @@ public static class EmailMessage {
         EnsureOutputDirectory(msgFile);
         string tempFile = CreateTempOutputPath(msgFile);
         try {
-            MailFileMessage source = await MailFileReader.ReadAsync(emlFile, RichReadOptions(), cancellationToken)
+            MailFileMessage source = await MailFileMessage.LoadAsync(emlFile, RichReadOptions(), cancellationToken)
                 .ConfigureAwait(false);
             await new EmailDocumentWriter().WriteAsync(source.OfficeDocument, tempFile,
                 EmailFileFormat.OutlookMsg, cancellationToken).ConfigureAwait(false);
@@ -83,7 +83,7 @@ public static class EmailMessage {
         EnsureOutputDirectory(emlFile);
         string tempFile = CreateTempOutputPath(emlFile);
         try {
-            MailFileMessage source = MailFileReader.Read(msgFile, RichReadOptions());
+            MailFileMessage source = MailFileMessage.Load(msgFile, RichReadOptions());
             MimeMessage mimeMessage = source.ToMimeMessage();
             mimeMessage.WriteTo(tempFile);
             return TryFinalizeConvertedFile(tempFile, emlFile.FullName, force, "EML file already exists",
@@ -110,7 +110,7 @@ public static class EmailMessage {
         EnsureOutputDirectory(emlFile);
         string tempFile = CreateTempOutputPath(emlFile);
         try {
-            MailFileMessage source = await MailFileReader.ReadAsync(msgFile, RichReadOptions(), cancellationToken)
+            MailFileMessage source = await MailFileMessage.LoadAsync(msgFile, RichReadOptions(), cancellationToken)
                 .ConfigureAwait(false);
             MimeMessage mimeMessage = await source.OfficeDocument.ToMimeMessageAsync(cancellationToken)
                 .ConfigureAwait(false);

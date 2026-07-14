@@ -61,6 +61,15 @@ public class CmdletImportMailFileTests {
         }
     }
 
+    [Fact]
+    public void VerifySignature_IsExposedAsPowerShellParameter() {
+        PropertyInfo property = typeof(CmdletImportMailFile).GetProperty(
+            nameof(CmdletImportMailFile.VerifySignature))!;
+
+        Assert.Equal(typeof(SwitchParameter), property.PropertyType);
+        Assert.NotNull(property.GetCustomAttribute<ParameterAttribute>());
+    }
+
     private static (List<object?> Outputs, List<string> Warnings, List<ErrorRecord> Errors) InvokeAndCapture(
         CmdletImportMailFile cmdlet) {
         var asyncType = typeof(AsyncPSCmdlet);

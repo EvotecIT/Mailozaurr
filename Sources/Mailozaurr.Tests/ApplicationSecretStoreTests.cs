@@ -73,6 +73,38 @@ public sealed class ApplicationSecretStoreTests {
         Assert.Equal("super-secret", loaded);
     }
 
+    [Fact]
+    public async Task RemoveProfileSecretsMatchesProfileIdExactly() {
+        var filePath = CreateTemporaryFilePath();
+        var protector = new TestCredentialProtector();
+        var store = new FileMailSecretStore(filePath, protector);
+        await store.SetSecretAsync("team", "archive::password", "team-secret");
+        await store.SetSecretAsync("team::archive", "password", "archive-secret");
+
+        await store.RemoveProfileSecretsAsync("team");
+
+        Assert.Null(await store.GetSecretAsync("team", "archive::password"));
+        Assert.Equal("archive-secret", await store.GetSecretAsync("team::archive", "password"));
+    }
+
+    [Fact]
+    public async Task LegacyFlatSecretKeysUseTheLastSeparatorForProfileIdentity() {
+        var filePath = CreateTemporaryFilePath();
+        var protector = new TestCredentialProtector();
+        string teamValue = protector.Protect("team-secret");
+        string archiveValue = protector.Protect("archive-secret");
+        File.WriteAllText(filePath,
+            "{\"Version\":1,\"Secrets\":{" +
+            $"\"team::password\":\"{teamValue}\"," +
+            $"\"team::archive::password\":\"{archiveValue}\"}}}}");
+        var store = new FileMailSecretStore(filePath, protector);
+
+        await store.RemoveProfileSecretsAsync("team");
+
+        Assert.Null(await store.GetSecretAsync("team", "password"));
+        Assert.Equal("archive-secret", await store.GetSecretAsync("team::archive", "password"));
+    }
+
     private static string CreateTemporaryFilePath() {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

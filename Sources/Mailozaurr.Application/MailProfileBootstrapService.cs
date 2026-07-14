@@ -227,6 +227,8 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
             .ToArray();
         Dictionary<string, string?> previousSecrets = await CaptureSecretsAsync(
             profile.Id, effectiveUpdates, cancellationToken).ConfigureAwait(false);
+        string? previousDefaultProfileId = await CapturePreviousDefaultProfileIdAsync(
+            profile, cancellationToken).ConfigureAwait(false);
 
         OperationResult saveResult = await _profiles.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
         if (!saveResult.Succeeded) {
@@ -243,7 +245,8 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
                     cancellationToken).ConfigureAwait(false);
             } catch (Exception bootstrapException) {
                 try {
-                    await RollBackBootstrapAsync(profile.Id, existing, previousSecrets).ConfigureAwait(false);
+                    await RollBackBootstrapAsync(
+                        profile.Id, existing, previousDefaultProfileId, previousSecrets).ConfigureAwait(false);
                 } catch (Exception rollbackException) {
                     throw new InvalidOperationException(
                         "Profile bootstrap failed and its rollback was incomplete.",
@@ -254,7 +257,8 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
 
             if (!secretResult.Succeeded) {
                 try {
-                    await RollBackBootstrapAsync(profile.Id, existing, previousSecrets).ConfigureAwait(false);
+                    await RollBackBootstrapAsync(
+                        profile.Id, existing, previousDefaultProfileId, previousSecrets).ConfigureAwait(false);
                 } catch (Exception rollbackException) {
                     throw new InvalidOperationException(
                         "Profile bootstrap was rejected and its rollback was incomplete.",
@@ -270,6 +274,7 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
     private async Task RollBackBootstrapAsync(
         string profileId,
         MailProfile? existing,
+        string? previousDefaultProfileId,
         IReadOnlyDictionary<string, string?> previousSecrets) {
         if (existing == null) {
             OperationResult deleteResult = await _profiles.DeleteAsync(
@@ -284,6 +289,15 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
             }
         }
 
+        if (!string.IsNullOrWhiteSpace(previousDefaultProfileId)) {
+            OperationResult restoreDefault = await _profiles.SetDefaultAsync(
+                previousDefaultProfileId!, CancellationToken.None).ConfigureAwait(false);
+            if (!restoreDefault.Succeeded) {
+                throw new InvalidOperationException(
+                    restoreDefault.Message ?? "The previous default profile could not be restored.");
+            }
+        }
+
         foreach (KeyValuePair<string, string?> secret in previousSecrets) {
             if (secret.Value == null) {
                 await _secretStore.RemoveSecretAsync(
@@ -293,6 +307,20 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
                     profileId, secret.Key, secret.Value, CancellationToken.None).ConfigureAwait(false);
             }
         }
+    }
+
+    private async Task<string?> CapturePreviousDefaultProfileIdAsync(
+        MailProfile profile,
+        CancellationToken cancellationToken) {
+        if (!profile.IsDefault) {
+            return null;
+        }
+
+        IReadOnlyList<MailProfile> profiles = await _profiles.GetProfilesAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return profiles.FirstOrDefault(candidate =>
+            candidate.IsDefault &&
+            !string.Equals(candidate.Id, profile.Id, StringComparison.OrdinalIgnoreCase))?.Id;
     }
 
     private async Task<Dictionary<string, string?>> CaptureSecretsAsync(
