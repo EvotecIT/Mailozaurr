@@ -299,7 +299,12 @@ public sealed class MailApplicationBuilder {
         }
 
         var availableCapabilities = MailCapabilityCatalog.ForRegisteredHandlers(
-            readHandlers, messageActionHandlers, sendHandlers);
+            readHandlers,
+            messageActionHandlers,
+            sendHandlers,
+            hasReadServiceOverride: _readService != null,
+            hasMessageActionServiceOverride: _messageActionService != null,
+            hasSendServiceOverride: _sendService != null);
         var profileService = _profileService ?? new MailProfileService(
             profileStore, secretStore, availableCapabilities);
         var profileBootstrapService = _profileBootstrapService ?? new MailProfileBootstrapService(profileService, profileSecretService, secretStore);

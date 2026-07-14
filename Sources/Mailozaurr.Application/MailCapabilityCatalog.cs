@@ -4,6 +4,24 @@ namespace Mailozaurr.Application;
 /// Provides the default normalized capability map for each profile kind.
 /// </summary>
 public static class MailCapabilityCatalog {
+    private static readonly MailProfileKind[] KnownProfileKinds = {
+        MailProfileKind.Imap,
+        MailProfileKind.Pop3,
+        MailProfileKind.Graph,
+        MailProfileKind.Gmail,
+        MailProfileKind.Smtp,
+        MailProfileKind.SendGrid,
+        MailProfileKind.Mailgun,
+        MailProfileKind.Ses
+    };
+    private const MailCapability ReadServiceCapabilities = MailCapability.ListFolders
+        | MailCapability.SearchMessages
+        | MailCapability.ReadMessages
+        | MailCapability.SaveAttachments;
+    private const MailCapability MessageActionServiceCapabilities = MailCapability.MarkMessages
+        | MailCapability.MoveMessages
+        | MailCapability.DeleteMessages;
+
     /// <summary>
     /// Returns the default capabilities for a given profile kind.
     /// </summary>
@@ -42,15 +60,34 @@ public static class MailCapabilityCatalog {
     internal static IReadOnlyDictionary<MailProfileKind, MailCapability> ForRegisteredHandlers(
         IEnumerable<IMailReadHandler> readHandlers,
         IEnumerable<IMailMessageActionHandler> messageActionHandlers,
-        IEnumerable<IMailSendHandler> sendHandlers) {
+        IEnumerable<IMailSendHandler> sendHandlers,
+        bool hasReadServiceOverride = false,
+        bool hasMessageActionServiceOverride = false,
+        bool hasSendServiceOverride = false) {
         var result = new Dictionary<MailProfileKind, MailCapability>();
-        Add(result, readHandlers.Select(handler => handler.Kind),
-            MailCapability.ListFolders | MailCapability.SearchMessages |
-            MailCapability.ReadMessages | MailCapability.SaveAttachments);
-        Add(result, messageActionHandlers.Select(handler => handler.Kind),
-            MailCapability.MarkMessages | MailCapability.MoveMessages | MailCapability.DeleteMessages);
+        Add(result, readHandlers.Select(handler => handler.Kind), ReadServiceCapabilities);
+        Add(result, messageActionHandlers.Select(handler => handler.Kind), MessageActionServiceCapabilities);
         Add(result, sendHandlers.Select(handler => handler.Kind), MailCapability.SendMessages);
+        AddServiceOverrideCapabilities(result, hasReadServiceOverride, ReadServiceCapabilities);
+        AddServiceOverrideCapabilities(
+            result,
+            hasMessageActionServiceOverride,
+            MessageActionServiceCapabilities);
+        AddServiceOverrideCapabilities(result, hasSendServiceOverride, MailCapability.SendMessages);
         return result;
+    }
+
+    private static void AddServiceOverrideCapabilities(
+        IDictionary<MailProfileKind, MailCapability> destination,
+        bool hasServiceOverride,
+        MailCapability capabilities) {
+        if (!hasServiceOverride) return;
+        foreach (MailProfileKind kind in KnownProfileKinds) {
+            MailCapability available = For(kind).Capabilities & capabilities;
+            if (available == MailCapability.None) continue;
+            destination.TryGetValue(kind, out MailCapability existing);
+            destination[kind] = existing | available;
+        }
     }
 
     private static void Add(IDictionary<MailProfileKind, MailCapability> destination,

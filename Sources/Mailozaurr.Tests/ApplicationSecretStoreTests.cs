@@ -99,10 +99,29 @@ public sealed class ApplicationSecretStoreTests {
             $"\"team::archive::password\":\"{archiveValue}\"}}}}");
         var store = new FileMailSecretStore(filePath, protector);
 
-        await store.RemoveProfileSecretsAsync("team");
+        await ((IMailProfileSecretContextCleanup)store).RemoveProfileSecretsAsync(
+            "team",
+            new[] { "team", "team::archive" });
 
         Assert.Null(await store.GetSecretAsync("team", "password"));
         Assert.Equal("archive-secret", await store.GetSecretAsync("team::archive", "password"));
+    }
+
+    [Fact]
+    public async Task ProfileAwareCleanupPurgesLegacySecretsForSeparatorBearingProfileId() {
+        var filePath = CreateTemporaryFilePath();
+        var protector = new TestCredentialProtector();
+        string archiveValue = protector.Protect("archive-secret");
+        File.WriteAllText(filePath,
+            "{\"Version\":1,\"Secrets\":{" +
+            $"\"team::archive::password\":\"{archiveValue}\"}}}}");
+        var store = new FileMailSecretStore(filePath, protector);
+
+        await ((IMailProfileSecretContextCleanup)store).RemoveProfileSecretsAsync(
+            "team::archive",
+            new[] { "team", "team::archive" });
+
+        Assert.Null(await store.GetSecretAsync("team::archive", "password"));
     }
 
     [Fact]

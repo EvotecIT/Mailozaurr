@@ -111,6 +111,42 @@ public sealed class ApplicationProfileServiceTests {
         Assert.Null(await secretStore.GetSecretAsync("smtp", "broken-secret"));
     }
 
+    [Fact]
+    public async Task DeleteAsyncPurgesLegacySecretsUsingKnownProfileIdentity() {
+        var profilePath = CreateTemporaryFilePath("profiles.json");
+        var secretPath = CreateTemporaryFilePath("secrets.json");
+        var profileStore = new FileMailProfileStore(profilePath);
+        var protector = new TestCredentialProtector();
+        string archiveValue = protector.Protect("archive-secret");
+        File.WriteAllText(secretPath,
+            "{\"Version\":1,\"Secrets\":{" +
+            $"\"team::archive::password\":\"{archiveValue}\"}}}}");
+        var secretStore = new FileMailSecretStore(secretPath, protector);
+        var service = new MailProfileService(profileStore, secretStore);
+        await service.SaveAsync(new MailProfile {
+            Id = "team",
+            DisplayName = "Team",
+            Kind = MailProfileKind.Smtp,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Server] = "smtp.example.com"
+            }
+        });
+        await service.SaveAsync(new MailProfile {
+            Id = "team::archive",
+            DisplayName = "Team archive",
+            Kind = MailProfileKind.Smtp,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Server] = "smtp.example.com"
+            }
+        });
+
+        OperationResult result = await service.DeleteAsync("team::archive");
+
+        Assert.True(result.Succeeded);
+        Assert.Null(await secretStore.GetSecretAsync("team::archive", "password"));
+        Assert.NotNull(await service.GetProfileAsync("team"));
+    }
+
     private static string CreateTemporaryFilePath(string fileName) {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

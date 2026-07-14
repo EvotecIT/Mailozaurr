@@ -5,7 +5,7 @@ namespace Mailozaurr.Application;
 /// </summary>
 public sealed class FileMailSecretStore :
     IMailSecretStore,
-    IMailProfileSecretCleanup,
+    IMailProfileSecretContextCleanup,
     IMailProfileSecretSnapshotStore {
     private readonly JsonFileDocumentStore<MailSecretStoreDocument> _store;
     private readonly ICredentialProtector _protector;
@@ -121,7 +121,36 @@ public sealed class FileMailSecretStore :
     /// <inheritdoc />
     public Task RemoveProfileSecretsAsync(string profileId, CancellationToken cancellationToken = default) {
         ValidateKeyPart(profileId, nameof(profileId));
-        return _store.UpdateAsync(document => document.ProfileSecrets.Remove(profileId.Trim()), cancellationToken);
+        return RemoveProfileSecretsAsync(profileId, new[] { profileId }, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task RemoveProfileSecretsAsync(
+        string profileId,
+        IReadOnlyCollection<string> knownProfileIds,
+        CancellationToken cancellationToken = default) {
+        ValidateKeyPart(profileId, nameof(profileId));
+        if (knownProfileIds == null) throw new ArgumentNullException(nameof(knownProfileIds));
+
+        string normalizedProfileId = profileId.Trim();
+        string[] normalizedKnownProfileIds = knownProfileIds
+            .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
+            .Select(candidate => candidate.Trim())
+            .Append(normalizedProfileId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return _store.UpdateAsync(document => {
+            document.ProfileSecrets.Remove(normalizedProfileId);
+            if (document.Secrets == null) return;
+
+            foreach (string legacyKey in document.Secrets.Keys.ToArray()) {
+                string? ownerProfileId = ResolveLegacyOwner(legacyKey, normalizedKnownProfileIds);
+                if (string.Equals(ownerProfileId, normalizedProfileId, StringComparison.OrdinalIgnoreCase)) {
+                    document.Secrets.Remove(legacyKey);
+                }
+            }
+            RemoveEmptyLegacyStore(document);
+        }, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -259,6 +288,21 @@ public sealed class FileMailSecretStore :
         profileId = key.Substring(0, separatorIndex);
         secretName = key.Substring(separatorIndex + 2);
         return true;
+    }
+
+    private static string? ResolveLegacyOwner(string key, IReadOnlyCollection<string> knownProfileIds) {
+        string? owner = null;
+        foreach (string profileId in knownProfileIds) {
+            string prefix = string.Concat(profileId, "::");
+            if (key.Length <= prefix.Length ||
+                !key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) {
+                continue;
+            }
+            if (owner == null || profileId.Length > owner.Length) {
+                owner = profileId;
+            }
+        }
+        return owner;
     }
 
     private static string CreateLegacyKey(string profileId, string secretName) => $"{profileId}::{secretName}";

@@ -84,13 +84,25 @@ public sealed class MailProfileService : IMailProfileService {
                 KnownSecretNames,
                 requiredSecretNames: null,
                 cancellationToken).ConfigureAwait(false);
+        IReadOnlyCollection<string>? knownProfileIds = null;
+        if (_secretStore is IMailProfileSecretContextCleanup) {
+            IReadOnlyList<MailProfile> knownProfiles = await _profileStore.GetAllAsync(cancellationToken)
+                .ConfigureAwait(false);
+            knownProfileIds = knownProfiles.Select(candidate => candidate.Id).ToArray();
+        }
+
         var removed = await _profileStore.RemoveAsync(profileId, cancellationToken).ConfigureAwait(false);
         if (!removed) {
             return OperationResult.Failure("profile_not_found", "Profile was not found.");
         }
 
         try {
-            if (_secretStore is IMailProfileSecretCleanup cleanup) {
+            if (_secretStore is IMailProfileSecretContextCleanup contextCleanup) {
+                await contextCleanup.RemoveProfileSecretsAsync(
+                    profileId,
+                    knownProfileIds!,
+                    cancellationToken).ConfigureAwait(false);
+            } else if (_secretStore is IMailProfileSecretCleanup cleanup) {
                 await cleanup.RemoveProfileSecretsAsync(profileId, cancellationToken).ConfigureAwait(false);
             } else if (_secretStore != null) {
                 await RemoveKnownSecretsAsync(profileId, cancellationToken).ConfigureAwait(false);

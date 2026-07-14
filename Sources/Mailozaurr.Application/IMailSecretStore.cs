@@ -26,6 +26,18 @@ public interface IMailProfileSecretCleanup {
 }
 
 /// <summary>
+/// Removes legacy profile secrets using the complete set of profile ids to disambiguate separator-bearing ids
+/// from separator-bearing secret names.
+/// </summary>
+public interface IMailProfileSecretContextCleanup : IMailProfileSecretCleanup {
+    /// <summary>Removes secrets owned by the profile after resolving legacy keys against known profile ids.</summary>
+    Task RemoveProfileSecretsAsync(
+        string profileId,
+        IReadOnlyCollection<string> knownProfileIds,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>
 /// Represents an opaque, store-native snapshot of every secret associated with a profile.
 /// </summary>
 public interface IMailProfileSecretSnapshot {

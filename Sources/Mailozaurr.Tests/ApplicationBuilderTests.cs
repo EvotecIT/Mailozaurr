@@ -171,6 +171,47 @@ public sealed class ApplicationBuilderTests {
     }
 
     [Fact]
+    public async Task BuildReportsCapabilitiesBackedByInjectedServicesWhenHandlersAreDisabled() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var store = new FileMailProfileStore(Path.Combine(directory, "profiles.json"));
+            await store.SaveAsync(new MailProfile {
+                Id = "graph-service-override",
+                DisplayName = "Graph service override",
+                Kind = MailProfileKind.Graph
+            });
+            var builder = CreateCustomHandlerBuilder(directory, store)
+                .UseReadService(new RoutedMailReadService(
+                    store,
+                    new[] { new FakeReadHandler(MailProfileKind.Graph) }))
+                .UseSendService(new RoutedMailSendService(
+                    store,
+                    new[] { new FakeSendHandler(MailProfileKind.Graph) }));
+
+            MailApplication app = builder.Build();
+            ProfileCapabilities? capabilities = await app.Profiles.GetCapabilitiesAsync("graph-service-override");
+            IReadOnlyList<MessageSummary> search = await app.Read.SearchAsync(new MailSearchRequest {
+                ProfileId = "graph-service-override"
+            });
+            SendResult send = await app.Send.SendAsync(new SendMessageRequest {
+                ProfileId = "graph-service-override",
+                Message = new DraftMessage {
+                    ProfileId = "graph-service-override",
+                    Subject = "Hello"
+                }
+            });
+
+            Assert.NotNull(capabilities);
+            Assert.True(capabilities!.Supports(MailCapability.SearchMessages));
+            Assert.True(capabilities.Supports(MailCapability.SendMessages));
+            Assert.Empty(search);
+            Assert.True(send.Succeeded);
+        } finally {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
     public void BuildRejectsCustomPendingRepositoryWithoutMatchingDeadLetterRepository() {
         var builder = new MailApplicationBuilder(new MailApplicationOptions {
             EnableImapReadHandler = false,
