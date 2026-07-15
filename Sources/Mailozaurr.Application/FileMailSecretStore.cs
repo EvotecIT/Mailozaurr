@@ -104,16 +104,6 @@ public sealed class FileMailSecretStore :
                     result[secret.Key] = _protector.Unprotect(secret.Value);
                 }
             }
-            string legacyPrefix = string.Concat(profileId.Trim(), "::");
-            if (document.Secrets != null) {
-                foreach (KeyValuePair<string, string> secret in document.Secrets) {
-                    if (!secret.Key.StartsWith(legacyPrefix, StringComparison.OrdinalIgnoreCase)) continue;
-                    string secretName = secret.Key.Substring(legacyPrefix.Length);
-                    if (!result.ContainsKey(secretName)) {
-                        result[secretName] = _protector.Unprotect(secret.Value);
-                    }
-                }
-            }
             return result;
         }, cancellationToken);
     }

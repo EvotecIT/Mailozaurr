@@ -108,6 +108,25 @@ public sealed class ApplicationSecretStoreTests {
     }
 
     [Fact]
+    public async Task ProfileEnumerationDoesNotClaimAmbiguousLegacyKeysOwnedByLongerProfileIds() {
+        var filePath = CreateTemporaryFilePath();
+        var protector = new TestCredentialProtector();
+        string teamValue = protector.Protect("team-secret");
+        string archiveValue = protector.Protect("archive-secret");
+        File.WriteAllText(filePath,
+            "{\"Version\":1,\"Secrets\":{" +
+            $"\"team::password\":\"{teamValue}\"," +
+            $"\"team::archive::password\":\"{archiveValue}\"}}}}");
+        var store = new FileMailSecretStore(filePath, protector);
+
+        IReadOnlyDictionary<string, string> teamSecrets = await store.GetProfileSecretsAsync("team");
+
+        Assert.Equal("team-secret", teamSecrets["password"]);
+        Assert.DoesNotContain("archive::password", teamSecrets.Keys, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal("archive-secret", await store.GetSecretAsync("team::archive", "password"));
+    }
+
+    [Fact]
     public async Task ProfileAwareCleanupPurgesLegacySecretsForSeparatorBearingProfileId() {
         var filePath = CreateTemporaryFilePath();
         var protector = new TestCredentialProtector();
@@ -139,7 +158,7 @@ public sealed class ApplicationSecretStoreTests {
         var reloaded = new FileMailSecretStore(filePath, protector);
         Assert.Equal("legacy-secret", await reloaded.GetSecretAsync("work", "api::token"));
         IReadOnlyDictionary<string, string> workSecrets = await reloaded.GetProfileSecretsAsync("work");
-        Assert.Equal("legacy-secret", workSecrets["api::token"]);
+        Assert.DoesNotContain("api::token", workSecrets.Keys, StringComparer.OrdinalIgnoreCase);
         Assert.Equal("new-secret", await reloaded.GetSecretAsync("personal", "password"));
     }
 

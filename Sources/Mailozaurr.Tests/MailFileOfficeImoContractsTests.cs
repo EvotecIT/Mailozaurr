@@ -135,6 +135,30 @@ public sealed class MailFileOfficeImoContractsTests {
     }
 
     [Fact]
+    public void MailFileMessageSavePreservesExistingOutputWhenWriterDiagnosticsContainErrors() {
+        string directory = CreateTempDirectory();
+        try {
+            string sourcePath = WriteEml(directory, "invalid-save-source.eml", "Invalid save", "Body");
+            string outputPath = Path.Combine(directory, "existing.eml");
+            const string existingContent = "existing artifact";
+            File.WriteAllText(outputPath, existingContent);
+            MailFileMessage message = MailFileMessage.Load(sourcePath);
+            message.OfficeDocument.Attachments.Add(new EmailAttachment {
+                FileName = "missing.bin",
+                ContentType = "application/octet-stream",
+                Length = 10
+            });
+
+            InvalidDataException exception = Assert.Throws<InvalidDataException>(() => message.Save(outputPath));
+
+            Assert.Contains("EMAIL_ATTACHMENT_CONTENT_UNAVAILABLE", exception.Message, StringComparison.Ordinal);
+            Assert.Equal(existingContent, File.ReadAllText(outputPath));
+        } finally {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
     public void CompatibilityProjectionConversionAndSaveUseTheCurrentOfficeDocument() {
         string directory = CreateTempDirectory();
         try {
