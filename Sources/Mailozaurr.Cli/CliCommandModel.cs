@@ -62,6 +62,7 @@ internal static partial class CliCommandModel {
     private static Option CreateOption(string name, bool required, bool recursive) {
         if (IsFlag(name)) {
             return new Option<bool>($"--{name}") {
+                Arity = ArgumentArity.Zero,
                 Description = GetOptionDescription(name),
                 Recursive = recursive
             };
@@ -84,6 +85,10 @@ internal static partial class CliCommandModel {
         option.Validators.Add(result => {
             if (result.Tokens.Count == 0) {
                 result.AddError($"Option '--{name}' requires a value.");
+                return;
+            }
+            if (result.Tokens.Count < result.IdentifierTokenCount) {
+                result.AddError($"Option '--{name}' requires a value for every occurrence.");
                 return;
             }
             if (result.Tokens.Count > result.IdentifierTokenCount) {

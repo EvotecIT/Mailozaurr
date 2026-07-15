@@ -5,6 +5,15 @@ using System.CommandLine.Parsing;
 namespace Mailozaurr.Cli;
 
 internal sealed class CliArguments {
+    private static readonly HashSet<string> RejectedSensitiveOptions = new(StringComparer.Ordinal) {
+        "--access-token",
+        "--certificate-password",
+        "--client-secret",
+        "--password",
+        "--refresh-token",
+        "--value"
+    };
+
     private readonly ParseResult _parseResult;
 
     private CliArguments(ParseResult parseResult, IReadOnlyList<string> positionals, bool showHelp) {
@@ -103,11 +112,22 @@ internal sealed class CliArguments {
     }
 
     private static string FormatErrors(IReadOnlyList<ParseError> errors, IReadOnlyList<string> arguments) {
-        var optionValues = new HashSet<string>(StringComparer.Ordinal);
-        for (int index = 0; index + 1 < arguments.Count; index++) {
-            if (arguments[index].StartsWith("-", StringComparison.Ordinal) &&
-                !arguments[index + 1].StartsWith("-", StringComparison.Ordinal)) {
-                optionValues.Add(arguments[index + 1]);
+        var redactions = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (int index = 0; index < arguments.Count; index++) {
+            string argument = arguments[index];
+            if (!argument.StartsWith("-", StringComparison.Ordinal)) continue;
+
+            int separatorIndex = argument.IndexOf('=');
+            if (separatorIndex > 0 &&
+                RejectedSensitiveOptions.Contains(argument[..separatorIndex])) {
+                redactions[argument] = $"{argument[..separatorIndex]}=<value>";
+                continue;
+            }
+
+            if (index + 1 < arguments.Count &&
+                (RejectedSensitiveOptions.Contains(argument) ||
+                 !arguments[index + 1].StartsWith("-", StringComparison.Ordinal))) {
+                redactions[arguments[index + 1]] = "<value>";
                 index++;
             }
         }
@@ -115,8 +135,9 @@ internal sealed class CliArguments {
         var messages = new string[errors.Count];
         for (int index = 0; index < errors.Count; index++) {
             string message = errors[index].Message;
-            foreach (string optionValue in optionValues) {
-                message = message.Replace($"'{optionValue}'", "'<value>'", StringComparison.Ordinal);
+            foreach (KeyValuePair<string, string> redaction in redactions) {
+                message = message.Replace($"'{redaction.Key}'", $"'{redaction.Value}'",
+                    StringComparison.Ordinal);
             }
             messages[index] = message;
         }

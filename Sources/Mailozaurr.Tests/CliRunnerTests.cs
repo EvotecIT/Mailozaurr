@@ -75,18 +75,95 @@ public sealed partial class CliRunnerTests {
     }
 
     [Fact]
-    public async Task RawSecretCommandLineOptionIsRejected() {
+    public async Task RepeatedOptionOccurrenceWithoutAValueIsRejected() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        bool builderInvoked = false;
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "get-many",
+                "--profile", "work-imap",
+                "--message-id", "id-1",
+                "--message-id",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => {
+                builderInvoked = true;
+                return fixture.CreateBuilder();
+            });
+
+        Assert.Equal(1, exitCode);
+        Assert.False(builderInvoked);
+        using JsonDocument document = JsonDocument.Parse(stderr.ToString());
+        Assert.Contains("requires a value", document.RootElement.GetProperty("Error")
+            .GetProperty("Message").GetString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task PresenceOnlyFlagRejectsAnExplicitBooleanValue() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        bool builderInvoked = false;
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "mark-read",
+                "--profile", "work-imap",
+                "--message-id", "id-1",
+                "--unread", "false",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => {
+                builderInvoked = true;
+                return fixture.CreateBuilder();
+            });
+
+        Assert.Equal(1, exitCode);
+        Assert.False(builderInvoked);
+        using JsonDocument document = JsonDocument.Parse(stderr.ToString());
+        Assert.Contains("Unrecognized command or argument", document.RootElement.GetProperty("Error")
+            .GetProperty("Message").GetString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("would-leak")]
+    [InlineData("-p@ss")]
+    [InlineData("--looks-like-an-option")]
+    public async Task RawSecretCommandLineOptionIsRejectedWithoutExposingValue(string rawSecret) {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
 
         var exitCode = await CliRunner.RunAsync(new[] {
             "profile", "set-secret", "--profile", "work", "--name", "password",
-            "--value", "would-leak"
+            "--value", rawSecret
         }, stdout, stderr);
 
         Assert.Equal(1, exitCode);
         Assert.Contains("Unrecognized command or argument '--value'", stderr.ToString(), StringComparison.Ordinal);
-        Assert.DoesNotContain("would-leak", stderr.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(rawSecret, stderr.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InlineRawSecretCommandLineOptionIsRejectedWithoutExposingValue() {
+        const string rawSecret = "-inline-p@ss";
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+
+        var exitCode = await CliRunner.RunAsync(new[] {
+            "profile", "set-secret", "--profile", "work", "--name", "password",
+            $"--value={rawSecret}"
+        }, stdout, stderr);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("--value=<value>", stderr.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(rawSecret, stderr.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
