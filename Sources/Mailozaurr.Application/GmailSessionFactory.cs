@@ -9,19 +9,41 @@ namespace Mailozaurr.Application;
 /// </summary>
 public sealed class GmailSessionFactory : IGmailSessionFactory {
     private static readonly Uri GoogleTokenEndpoint = new("https://oauth2.googleapis.com/token");
-    private static readonly HttpClient GoogleTokenClient = new();
+    private static readonly HttpMessageInvoker SharedGoogleTokenTransport = new HttpClient();
     private readonly IMailSecretStore _secretStore;
+    private readonly HttpMessageInvoker _googleTokenTransport;
     private readonly Func<GmailRefreshRequest, CancellationToken, Task<OAuthCredential>> _refreshCredentialAsync;
     private readonly Func<GmailSessionRequest, CancellationToken, Task<GmailSession>> _connectAsync;
 
     /// <summary>
     /// Creates a new Gmail session factory.
     /// </summary>
+    /// <param name="secretStore">Store used to resolve Gmail authentication material.</param>
+    /// <param name="refreshCredentialAsync">Optional credential refresh override.</param>
+    /// <param name="connectAsync">Optional Gmail session construction override.</param>
     public GmailSessionFactory(
         IMailSecretStore secretStore,
         Func<GmailRefreshRequest, CancellationToken, Task<OAuthCredential>>? refreshCredentialAsync = null,
-        Func<GmailSessionRequest, CancellationToken, Task<GmailSession>>? connectAsync = null) {
+        Func<GmailSessionRequest, CancellationToken, Task<GmailSession>>? connectAsync = null)
+        : this(secretStore, refreshCredentialAsync, connectAsync, SharedGoogleTokenTransport) {
+    }
+
+    /// <summary>
+    /// Creates a Gmail session factory that sends Google token requests through an externally managed transport.
+    /// </summary>
+    /// <param name="secretStore">Store used to resolve Gmail authentication material.</param>
+    /// <param name="refreshCredentialAsync">Optional credential refresh override.</param>
+    /// <param name="connectAsync">Optional Gmail session construction override.</param>
+    /// <param name="googleTokenTransport">
+    /// Externally managed transport for Google token requests. The factory does not dispose it.
+    /// </param>
+    public GmailSessionFactory(
+        IMailSecretStore secretStore,
+        Func<GmailRefreshRequest, CancellationToken, Task<OAuthCredential>>? refreshCredentialAsync,
+        Func<GmailSessionRequest, CancellationToken, Task<GmailSession>>? connectAsync,
+        HttpMessageInvoker googleTokenTransport) {
         _secretStore = secretStore ?? throw new ArgumentNullException(nameof(secretStore));
+        _googleTokenTransport = googleTokenTransport ?? throw new ArgumentNullException(nameof(googleTokenTransport));
         _refreshCredentialAsync = refreshCredentialAsync ?? DefaultRefreshCredentialAsync;
         _connectAsync = connectAsync ?? DefaultConnectAsync;
     }
@@ -112,7 +134,7 @@ public sealed class GmailSessionFactory : IGmailSessionFactory {
         return (refreshed, refreshRequest);
     }
 
-    private static async Task<OAuthCredential> DefaultRefreshCredentialAsync(
+    private async Task<OAuthCredential> DefaultRefreshCredentialAsync(
         GmailRefreshRequest request,
         CancellationToken cancellationToken) {
         using var content = new FormUrlEncodedContent(new Dictionary<string, string> {
@@ -121,7 +143,10 @@ public sealed class GmailSessionFactory : IGmailSessionFactory {
             ["refresh_token"] = request.RefreshToken,
             ["grant_type"] = "refresh_token"
         });
-        using var response = await GoogleTokenClient.PostAsync(GoogleTokenEndpoint, content, cancellationToken).ConfigureAwait(false);
+        using var tokenRequest = new HttpRequestMessage(HttpMethod.Post, GoogleTokenEndpoint) {
+            Content = content
+        };
+        using var response = await _googleTokenTransport.SendAsync(tokenRequest, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 #else
