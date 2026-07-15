@@ -32,6 +32,59 @@ Import-Module Mailozaurr -Force
 `$mimeAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$message.GetType().Assembly)
 `$mailKitAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$query.GetType().Assembly)
 `$smtp = [Mailozaurr.Smtp]::new()
+`$expectedAllowedTypes = @(
+    'Mailozaurr.EmailEncryption'
+    'Mailozaurr.EmailMessage'
+    'Mailozaurr.EmailProvider'
+    'Mailozaurr.FileSentMessageRepository'
+    'Mailozaurr.GraphApiErrorParser'
+    'Mailozaurr.GraphAttachment'
+    'Mailozaurr.GraphContent'
+    'Mailozaurr.GraphHttpMethod'
+    'Mailozaurr.GraphMessage'
+    'Mailozaurr.GraphSendPolicy'
+    'Mailozaurr.HtmlUtils'
+    'Mailozaurr.MailozaurrOptions'
+    'Mailozaurr.MailFileAddress'
+    'Mailozaurr.MailFileAttachment'
+    'Mailozaurr.MailFileFormat'
+    'Mailozaurr.MailFileMessage'
+    'Mailozaurr.MailFileReader'
+    'Mailozaurr.MailFileReaderOptions'
+    'Mailozaurr.MailFileRecipient'
+    'Mailozaurr.MailFileRecipientType'
+    'Mailozaurr.SendLogResolver'
+    'Mailozaurr.Smtp'
+    'Mailozaurr.SmtpConnectionPool'
+)
+`$missingAllowedTypes = [Collections.Generic.List[string]]::new()
+`$wrongAllowedTypeContexts = [Collections.Generic.List[string]]::new()
+foreach (`$typeName in `$expectedAllowedTypes) {
+    try {
+        `$allowedType = [type] `$typeName
+        `$allowedTypeAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$allowedType.Assembly)
+        if (-not [object]::ReferenceEquals(`$allowedTypeAlc, `$commandAlc)) {
+            `$wrongAllowedTypeContexts.Add(`$typeName)
+        }
+    } catch {
+        `$missingAllowedTypes.Add(`$typeName)
+    }
+}
+`$typeAccelerators = [psobject].Assembly.GetType('System.Management.Automation.TypeAccelerators')
+`$getTypeAccelerators = `$typeAccelerators.GetProperty('Get', [System.Reflection.BindingFlags] 'Static,Public,NonPublic')
+`$actualAllowedTypes = @(
+    foreach (`$entry in `$getTypeAccelerators.GetValue(`$null).GetEnumerator()) {
+        if (`$entry.Key -notlike 'Mailozaurr.*') {
+            continue
+        }
+
+        `$entryAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$entry.Value.Assembly)
+        if ([object]::ReferenceEquals(`$entryAlc, `$commandAlc)) {
+            `$entry.Key
+        }
+    }
+)
+`$unexpectedAllowedTypes = @(`$actualAllowedTypes | Where-Object { `$expectedAllowedTypes -notcontains `$_ })
 `$unlistedTypeVisibleByName = `$true
 try {
     `$null = [type]'Mailozaurr.MicrosoftGraphUtils'
@@ -64,6 +117,11 @@ try {
     SearchQueryALC = `$mailKitAlc.Name
     SearchQueryALCIsDefault = [object]::ReferenceEquals(`$mailKitAlc, [System.Runtime.Loader.AssemblyLoadContext]::Default)
     SmtpCreated = `$null -ne `$smtp
+    AllowedTypeCount = `$expectedAllowedTypes.Count
+    ActualAllowedTypeCount = `$actualAllowedTypes.Count
+    MissingAllowedTypes = @(`$missingAllowedTypes)
+    UnexpectedAllowedTypes = @(`$unexpectedAllowedTypes)
+    WrongAllowedTypeContexts = @(`$wrongAllowedTypeContexts)
     UnlistedTypeVisibleByName = `$unlistedTypeVisibleByName
 } | ConvertTo-Json -Compress
 "@
@@ -99,6 +157,11 @@ try {
         $result.SearchQueryALC | Should -Be 'Mailozaurr'
         $result.SearchQueryALCIsDefault | Should -BeFalse
         $result.SmtpCreated | Should -BeTrue
+        $result.AllowedTypeCount | Should -Be 23
+        $result.ActualAllowedTypeCount | Should -Be 23
+        @($result.MissingAllowedTypes).Count | Should -Be 0
+        @($result.UnexpectedAllowedTypes).Count | Should -Be 0
+        @($result.WrongAllowedTypeContexts).Count | Should -Be 0
         $result.UnlistedTypeVisibleByName | Should -BeFalse
     }
 }

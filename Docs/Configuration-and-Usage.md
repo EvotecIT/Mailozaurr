@@ -173,6 +173,7 @@ The CLI also supports per-run overrides:
 ## CLI usage overview
 
 The executable is built from [Mailozaurr.Cli](../Sources/Mailozaurr.Cli).
+The Application and CLI package definitions are release-ready but are not published yet. Until a public release exists, use project references for `Mailozaurr.Application` and run the CLI from this checkout or from a locally built PowerForge artifact.
 
 To inspect current commands:
 
