@@ -3,6 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Management.Automation;
 using System.Reflection;
 using System.Threading.Tasks;
 using Xunit;
@@ -14,26 +15,27 @@ public class CmdletImportMailFileTests {
     public void ProcessRecordAsync_EmptyPath_Warns() {
         var cmdlet = new CmdletImportMailFile { InputPath = " " };
 
-        var (outputs, warnings) = InvokeAndCapture(cmdlet);
+        var (outputs, warnings, errors) = InvokeAndCapture(cmdlet);
 
         Assert.Empty(outputs);
+        Assert.Empty(errors);
         Assert.Single(warnings);
         Assert.Contains("File path is empty", warnings[0], StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void ProcessRecordAsync_UnsupportedExtension_Warns() {
+    public void ProcessRecordAsync_UnsupportedExtension_WritesActionableError() {
         var tempDir = CreateTempDirectory();
         try {
             var txtPath = Path.Combine(tempDir, "sample.txt");
             File.WriteAllText(txtPath, "data");
             var cmdlet = new CmdletImportMailFile { InputPath = txtPath };
 
-            var (outputs, warnings) = InvokeAndCapture(cmdlet);
+            var (outputs, warnings, errors) = InvokeAndCapture(cmdlet);
 
             Assert.Empty(outputs);
-            Assert.Single(warnings);
-            Assert.Contains("not a .msg or .eml", warnings[0], StringComparison.OrdinalIgnoreCase);
+            Assert.Empty(warnings);
+            Assert.Single(errors);
         } finally {
             Directory.Delete(tempDir, true);
         }
@@ -46,9 +48,10 @@ public class CmdletImportMailFileTests {
             var emlPath = CreateEmlFile(tempDir, "sample.eml", "Cmdlet subject", "Hello");
             var cmdlet = new CmdletImportMailFile { InputPath = emlPath };
 
-            var (outputs, warnings) = InvokeAndCapture(cmdlet);
+            var (outputs, warnings, errors) = InvokeAndCapture(cmdlet);
 
             Assert.Empty(warnings);
+            Assert.Empty(errors);
             Assert.Single(outputs);
             var message = Assert.IsType<MailFileMessage>(outputs[0]);
             Assert.Equal(MailFileFormat.Eml, message.Format);
@@ -58,7 +61,17 @@ public class CmdletImportMailFileTests {
         }
     }
 
-    private static (List<object?> Outputs, List<string> Warnings) InvokeAndCapture(CmdletImportMailFile cmdlet) {
+    [Fact]
+    public void VerifySignature_IsExposedAsPowerShellParameter() {
+        PropertyInfo property = typeof(CmdletImportMailFile).GetProperty(
+            nameof(CmdletImportMailFile.VerifySignature))!;
+
+        Assert.Equal(typeof(SwitchParameter), property.PropertyType);
+        Assert.NotNull(property.GetCustomAttribute<ParameterAttribute>());
+    }
+
+    private static (List<object?> Outputs, List<string> Warnings, List<ErrorRecord> Errors) InvokeAndCapture(
+        CmdletImportMailFile cmdlet) {
         var asyncType = typeof(AsyncPSCmdlet);
         var pipelineType = asyncType.GetNestedType("PipelineType", BindingFlags.NonPublic)!;
         var tupleType = typeof(ValueTuple<,>).MakeGenericType(typeof(object), pipelineType);
@@ -78,6 +91,7 @@ public class CmdletImportMailFileTests {
 
         var outputs = new List<object?>();
         var warnings = new List<string>();
+        var errors = new List<ErrorRecord>();
         var items = (Array)outPipeType.GetMethod("ToArray")!.Invoke(outPipe, null)!;
         var item1Field = tupleType.GetField("Item1")!;
         var item2Field = tupleType.GetField("Item2")!;
@@ -89,13 +103,15 @@ public class CmdletImportMailFileTests {
                 outputs.Add(data);
             } else if (string.Equals(pipeline, "Warning", StringComparison.Ordinal)) {
                 warnings.Add(data?.ToString() ?? string.Empty);
+            } else if (string.Equals(pipeline, "Error", StringComparison.Ordinal)) {
+                errors.Add(Assert.IsType<ErrorRecord>(data));
             }
         }
 
         outPipeField.SetValue(cmdlet, null);
         replyPipeField.SetValue(cmdlet, null);
 
-        return (outputs, warnings);
+        return (outputs, warnings, errors);
     }
 
     private static string CreateTempDirectory() {

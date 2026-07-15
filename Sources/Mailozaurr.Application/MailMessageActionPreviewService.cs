@@ -6,13 +6,25 @@ namespace Mailozaurr.Application;
 public sealed class MailMessageActionPreviewService : IMailMessageActionPreviewService {
     private readonly IMailProfileStore _profileStore;
     private readonly IMailFolderAliasService _folderAliases;
+    private readonly IReadOnlyDictionary<MailProfileKind, MailCapability>? _availableCapabilities;
 
     /// <summary>
     /// Creates a new message action preview service.
     /// </summary>
-    public MailMessageActionPreviewService(IMailProfileStore profileStore, IMailFolderAliasService folderAliases) {
+    public MailMessageActionPreviewService(IMailProfileStore profileStore, IMailFolderAliasService folderAliases)
+        : this(profileStore, folderAliases, null) {
+    }
+
+    /// <summary>
+    /// Creates a new message action preview service with the capabilities backed by the current handler registry.
+    /// </summary>
+    public MailMessageActionPreviewService(
+        IMailProfileStore profileStore,
+        IMailFolderAliasService folderAliases,
+        IReadOnlyDictionary<MailProfileKind, MailCapability>? availableCapabilities) {
         _profileStore = profileStore ?? throw new ArgumentNullException(nameof(profileStore));
         _folderAliases = folderAliases ?? throw new ArgumentNullException(nameof(folderAliases));
+        _availableCapabilities = availableCapabilities;
     }
 
     /// <inheritdoc />
@@ -215,7 +227,7 @@ public sealed class MailMessageActionPreviewService : IMailMessageActionPreviewS
         CancellationToken cancellationToken) {
         var preview = CreateMovePreview(request, context.Profile.Id, context.NormalizedMessageIds, context.RequestedCount);
 
-        if (!context.Profile.GetCapabilities().Supports(MailCapability.MoveMessages)) {
+        if (!GetCapabilities(context.Profile).Supports(MailCapability.MoveMessages)) {
             preview.Succeeded = false;
             preview.Code = "move_not_supported";
             preview.Message = $"Profile '{context.Profile.Id}' does not support '{MailCapability.MoveMessages}'.";
@@ -257,7 +269,7 @@ public sealed class MailMessageActionPreviewService : IMailMessageActionPreviewS
     private DeleteMessagesPreview CreateDeletePreview(DeleteMessagesPreviewRequest request, PreviewContext context) {
         var preview = CreateDeletePreview(request, context.Profile.Id, context.NormalizedMessageIds, context.RequestedCount);
 
-        if (!context.Profile.GetCapabilities().Supports(MailCapability.DeleteMessages)) {
+        if (!GetCapabilities(context.Profile).Supports(MailCapability.DeleteMessages)) {
             preview.Succeeded = false;
             preview.Code = "delete_not_supported";
             preview.Message = $"Profile '{context.Profile.Id}' does not support '{MailCapability.DeleteMessages}'.";
@@ -289,7 +301,7 @@ public sealed class MailMessageActionPreviewService : IMailMessageActionPreviewS
             request.FolderId,
             "read-state",
             request.IsRead);
-        if (!context.Profile.GetCapabilities().Supports(MailCapability.MarkMessages)) {
+        if (!GetCapabilities(context.Profile).Supports(MailCapability.MarkMessages)) {
             preview.Succeeded = false;
             preview.Code = "mark_not_supported";
             preview.Message = $"Profile '{context.Profile.Id}' does not support '{MailCapability.MarkMessages}'.";
@@ -323,7 +335,7 @@ public sealed class MailMessageActionPreviewService : IMailMessageActionPreviewS
             request.FolderId,
             "flagged-state",
             request.IsFlagged);
-        if (!context.Profile.GetCapabilities().Supports(MailCapability.MarkMessages)) {
+        if (!GetCapabilities(context.Profile).Supports(MailCapability.MarkMessages)) {
             preview.Succeeded = false;
             preview.Code = "mark_not_supported";
             preview.Message = $"Profile '{context.Profile.Id}' does not support '{MailCapability.MarkMessages}'.";
@@ -356,6 +368,15 @@ public sealed class MailMessageActionPreviewService : IMailMessageActionPreviewS
             .Select(id => id.Trim())
             .Distinct(StringComparer.Ordinal)
             .ToList();
+
+    private ProfileCapabilities GetCapabilities(MailProfile profile) {
+        if (_availableCapabilities == null) {
+            return profile.GetCapabilities();
+        }
+
+        _availableCapabilities.TryGetValue(profile.Kind, out MailCapability available);
+        return profile.GetCapabilities(available);
+    }
 
     private static MoveMessagesPreview CreateMovePreview(
         MoveMessagesPreviewRequest request,

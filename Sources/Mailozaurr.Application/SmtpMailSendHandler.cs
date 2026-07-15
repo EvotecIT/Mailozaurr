@@ -44,7 +44,7 @@ public sealed class SmtpMailSendHandler : IMailSendHandler {
         var session = await _sessionFactory.ConnectAsync(profile, cancellationToken).ConfigureAwait(false);
         try {
             var message = await _draftMimeMessageFactory.CreateAsync(profile, request.Message, cancellationToken).ConfigureAwait(false);
-            var queueEnabled = _pendingMessageRepository != null && request.PreferQueue && !request.RequireImmediateSend;
+            var queueEnabled = _pendingMessageRepository != null && request.QueueOnFailure;
             session.PendingMessageRepository = queueEnabled ? _pendingMessageRepository : null;
 
             var providerResult = await _sendAsync(session, profile, request, message, cancellationToken).ConfigureAwait(false);

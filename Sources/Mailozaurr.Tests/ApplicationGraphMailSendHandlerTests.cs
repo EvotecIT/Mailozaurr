@@ -1,4 +1,5 @@
 using Mailozaurr.Application;
+using System.Net.Http;
 
 namespace Mailozaurr.Tests;
 
@@ -26,7 +27,6 @@ public sealed class ApplicationGraphMailSendHandlerTests {
             },
             new SendMessageRequest {
                 ProfileId = "work-graph",
-                RequireImmediateSend = true,
                 Message = new DraftMessage {
                     Subject = "Hello Graph",
                     TextBody = "hello",
@@ -45,16 +45,15 @@ public sealed class ApplicationGraphMailSendHandlerTests {
     }
 
     [Fact]
-    public async Task HandlerQueuesMessageWhenQueueIsPreferred() {
+    public async Task HandlerQueuesFailedMessageWhenQueueOnFailureIsEnabled() {
         var repository = new FilePendingMessageRepository(new PendingMessageRepositoryOptions {
             DirectoryPath = CreateTemporaryDirectory()
         });
         var handler = new GraphMailSendHandler(
             new FakeGraphSessionFactory(),
             pendingMessageRepository: repository,
-            sendAsync: (session, profile, request, message, cancellationToken) => Task.FromResult(new GraphMessage {
-                Id = "graph-123"
-            }));
+            sendAsync: (session, profile, request, message, cancellationToken) =>
+                throw new HttpRequestException("temporary graph failure"));
 
         var result = await handler.SendAsync(
             new MailProfile {
@@ -66,6 +65,7 @@ public sealed class ApplicationGraphMailSendHandlerTests {
             },
             new SendMessageRequest {
                 ProfileId = "work-graph",
+                QueueOnFailure = true,
                 Message = new DraftMessage {
                     Subject = "Hello Graph",
                     TextBody = "hello",

@@ -148,12 +148,13 @@ public sealed partial class CliRunnerTests {
                 "--mailbox", "shared@example.com",
                 "--client-id", "client-id",
                 "--tenant-id", "tenant-id",
-                "--client-secret", "client-secret",
+                "--client-secret-stdin",
                 "--json"
             },
             stdout,
             stderr,
-            _ => fixture.CreateBuilder());
+            _ => fixture.CreateBuilder(),
+            new StringReader("client-secret"));
 
         var profile = await fixture.ProfileStore.GetByIdAsync("graph-work");
         var clientSecret = await fixture.SecretStore.GetSecretAsync("graph-work", MailSecretNames.ClientSecret);
@@ -166,6 +167,32 @@ public sealed partial class CliRunnerTests {
         Assert.Equal("client-id", profile.Settings[MailProfileSettingsKeys.ClientId]);
         Assert.Equal("tenant-id", profile.Settings[MailProfileSettingsKeys.TenantId]);
         Assert.Equal("client-secret", clientSecret);
+    }
+
+    [Fact]
+    public async Task ProfileGraphBootstrapRejectsMultipleStdinSecretSources() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "profile", "graph-bootstrap",
+                "--profile", "graph-invalid-stdin",
+                "--name", "Invalid Graph",
+                "--mailbox", "shared@example.com",
+                "--client-secret-stdin",
+                "--access-token-stdin",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder(),
+            new StringReader("one-value"));
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("Standard input can supply only one secret", stderr.ToString(), StringComparison.Ordinal);
+        Assert.Null(await fixture.ProfileStore.GetByIdAsync("graph-invalid-stdin"));
     }
 
     [Fact]
@@ -243,6 +270,8 @@ public sealed partial class CliRunnerTests {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
         var fixture = CreateFixture();
+        await fixture.SecretStore.SetSecretAsync("shared-secrets", MailSecretNames.ClientSecret, "client-secret");
+        await fixture.SecretStore.SetSecretAsync("shared-secrets", MailSecretNames.RefreshToken, "refresh-token");
 
         var exitCode = await CliRunner.RunAsync(
             new[] {
@@ -251,8 +280,8 @@ public sealed partial class CliRunnerTests {
                 "--name", "Work Gmail",
                 "--mailbox", "me@example.com",
                 "--client-id", "client-id",
-                "--client-secret", "client-secret",
-                "--refresh-token", "refresh-token",
+                "--client-secret-ref", $"shared-secrets:{MailSecretNames.ClientSecret}",
+                "--refresh-token-ref", $"shared-secrets:{MailSecretNames.RefreshToken}",
                 "--json"
             },
             stdout,
@@ -325,7 +354,7 @@ public sealed partial class CliRunnerTests {
 
         Assert.Equal(1, exitCode);
         Assert.Equal("InvalidOperationException", document.RootElement.GetProperty("Error").GetProperty("Type").GetString());
-        Assert.Contains("--value", document.RootElement.GetProperty("Error").GetProperty("Message").GetString(), StringComparison.Ordinal);
+        Assert.Contains("--value-env", document.RootElement.GetProperty("Error").GetProperty("Message").GetString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -595,12 +624,13 @@ public sealed partial class CliRunnerTests {
                 "profile", "set-secret",
                 "--profile", "work-imap",
                 "--name", MailSecretNames.Password,
-                "--value", "super-secret",
+                "--value-stdin",
                 "--json"
             },
             stdout,
             stderr,
-            _ => fixture.CreateBuilder());
+            _ => fixture.CreateBuilder(),
+            new StringReader("super-secret"));
 
         var secretValue = await fixture.SecretStore.GetSecretAsync("work-imap", MailSecretNames.Password);
 

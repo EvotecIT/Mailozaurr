@@ -257,18 +257,11 @@ public sealed class MailApplicationBuilder {
         var secretStore = _secretStore ?? new FileMailSecretStore(_options.SecretStore);
         var draftStore = _draftStore ?? new FileMailDraftStore(_options.DraftStore);
         var messageActionPlanBatchStore = _messageActionPlanBatchStore ?? new FileMailMessageActionPlanBatchStore(_options.ActionPlanBatchStore);
-        var profileService = _profileService ?? new MailProfileService(profileStore, secretStore);
         var imapSessionFactory = _imapSessionFactory ?? new ImapSessionFactory(secretStore);
         var graphSessionFactory = _graphSessionFactory ?? new GraphSessionFactory(secretStore);
         var gmailSessionFactory = _gmailSessionFactory ?? new GmailSessionFactory(secretStore);
         var smtpSessionFactory = _smtpSessionFactory ?? new SmtpSessionFactory(secretStore);
         var profileSecretService = _profileSecretService ?? new MailProfileSecretService(profileStore, secretStore);
-        var profileBootstrapService = _profileBootstrapService ?? new MailProfileBootstrapService(profileService, profileSecretService, secretStore);
-        var profileAuthService = _profileAuthService ?? new MailProfileAuthService(profileService, profileSecretService, secretStore);
-        var profileOverviewService = _profileOverviewService ?? new MailProfileOverviewService(profileService, profileAuthService);
-        var profileConnectionService = _profileConnectionService ?? new MailProfileConnectionService(profileStore, imapSessionFactory, graphSessionFactory, gmailSessionFactory, smtpSessionFactory);
-        var draftService = _draftService ?? new MailDraftService(draftStore, profileStore);
-        var draftExchangeService = _draftExchangeService ?? new JsonMailDraftExchangeService();
         var draftMimeMessageFactory = _draftMimeMessageFactory ?? new DraftMimeMessageFactory();
         var pendingMessageRepository = _pendingMessageRepository ?? new FilePendingMessageRepository(_options.PendingMessageStore);
 
@@ -305,9 +298,27 @@ public sealed class MailApplicationBuilder {
             sendHandlers.Add(new SmtpMailSendHandler(smtpSessionFactory, draftMimeMessageFactory, pendingMessageRepository));
         }
 
+        var availableCapabilities = MailCapabilityCatalog.ForRegisteredHandlers(
+            readHandlers,
+            messageActionHandlers,
+            sendHandlers,
+            hasReadServiceOverride: _readService != null,
+            hasMessageActionServiceOverride: _messageActionService != null,
+            hasSendServiceOverride: _sendService != null);
+        var profileService = _profileService ?? new MailProfileService(
+            profileStore, secretStore, availableCapabilities);
+        var profileBootstrapService = _profileBootstrapService ?? new MailProfileBootstrapService(profileService, profileSecretService, secretStore);
+        var profileAuthService = _profileAuthService ?? new MailProfileAuthService(profileService, profileSecretService, secretStore);
+        var profileOverviewService = _profileOverviewService ?? new MailProfileOverviewService(profileService, profileAuthService);
+        var profileConnectionService = _profileConnectionService ?? new MailProfileConnectionService(profileStore, imapSessionFactory, graphSessionFactory, gmailSessionFactory, smtpSessionFactory);
+        var draftService = _draftService ?? new MailDraftService(draftStore, profileStore);
+        var draftExchangeService = _draftExchangeService ?? new JsonMailDraftExchangeService();
+
         var readService = _readService ?? new RoutedMailReadService(profileStore, readHandlers);
-        var folderAliasService = _folderAliasService ?? new MailFolderAliasService(profileStore, readService);
-        var messageActionPreviewService = _messageActionPreviewService ?? new MailMessageActionPreviewService(profileStore, folderAliasService);
+        var folderAliasService = _folderAliasService ?? new MailFolderAliasService(
+            profileStore, readService, availableCapabilities);
+        var messageActionPreviewService = _messageActionPreviewService ?? new MailMessageActionPreviewService(
+            profileStore, folderAliasService, availableCapabilities);
         var messageActionService = _messageActionService ?? new RoutedMailMessageActionService(profileStore, messageActionHandlers, folderAliasService);
         var messageActionPlanService = _messageActionPlanService ?? new MailMessageActionPlanService(messageActionPreviewService, messageActionService);
         var messageActionPlanExchangeService = _messageActionPlanExchangeService ?? new JsonMailMessageActionPlanExchangeService();

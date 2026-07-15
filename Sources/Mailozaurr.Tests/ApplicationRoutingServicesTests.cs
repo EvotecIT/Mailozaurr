@@ -536,12 +536,13 @@ public sealed class ApplicationRoutingServicesTests {
     }
 
     [Fact]
-    public async Task RoutedReadServiceRejectsUnsupportedCapabilities() {
+    public async Task RoutedReadServiceHonorsExplicitCapabilityRestriction() {
         var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
         await store.SaveAsync(new MailProfile {
             Id = "work-smtp",
             DisplayName = "Work SMTP",
             Kind = MailProfileKind.Smtp,
+            Capabilities = new ProfileCapabilities(MailProfileKind.Smtp, MailCapability.SendMessages),
             Settings = new Dictionary<string, string> {
                 [MailProfileSettingsKeys.Server] = "smtp.example.com"
             }

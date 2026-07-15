@@ -5,7 +5,7 @@ using System.ComponentModel;
 namespace Mailozaurr.Cli.Mcp;
 
 public sealed partial class MailMcpTools {
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Lists folders or folder-like mailbox containers for a profile.")]
     public Task<IReadOnlyList<FolderRef>> mail_folders_list(
         [Description("The profile identifier to query.")] string profileId,
@@ -20,7 +20,7 @@ public sealed partial class MailMcpTools {
             RootOnly = rootOnly
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Lists folders or folder-like mailbox containers for a profile using a lightweight projection.")]
     public Task<IReadOnlyList<FolderRefCompact>> mail_folders_compact_list(
         [Description("The profile identifier to query.")] string profileId,
@@ -35,7 +35,7 @@ public sealed partial class MailMcpTools {
             RootOnly = rootOnly
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Lists provider-neutral folder aliases for a profile, resolving them to provider folders when possible.")]
     public Task<IReadOnlyList<MailFolderAliasSummary>> mail_folder_aliases_list(
         [Description("The profile identifier to query.")] string profileId,
@@ -43,7 +43,7 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.FolderAliases.GetAliasesAsync(profileId, mailboxId, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Resolves a requested folder target to a provider-neutral alias or an effective provider folder destination.")]
     public Task<MailFolderTargetResolution> mail_folder_resolve(
         [Description("The profile identifier to query.")] string profileId,
@@ -52,7 +52,7 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.FolderAliases.ResolveAsync(profileId, targetFolderId, mailboxId, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Creates a normalized execution plan for a selected message action, with optional preview-token validation and resolved destinations.")]
     public Task<MessageActionExecutionPlan> mail_action_plan(
         [Description("The selected action, such as mark-read, mark-unread, flag, unflag, archive, trash, move, or delete.")] string action,
@@ -73,7 +73,7 @@ public sealed partial class MailMcpTools {
             ConfirmationToken = confirmationToken
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Lists persisted reusable message action plan batches.")]
     public Task<IReadOnlyList<MailMessageActionPlanBatch>> mail_action_batch_store_list(
         [Description("Optional human-readable plan names that must exist in the returned batch.")] IReadOnlyList<string>? planNames = null,
@@ -84,7 +84,7 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.MessageActionPlanRegistry.GetBatchesAsync(BuildBatchQuery(planNames, profileIds, actions, sortBy, descending), cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Lists persisted reusable message action plan batches using a lightweight projection.")]
     public Task<IReadOnlyList<MailMessageActionPlanBatchCompact>> mail_action_batch_store_compact_list(
         [Description("Optional human-readable plan names that must exist in the returned batch.")] IReadOnlyList<string>? planNames = null,
@@ -95,7 +95,7 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.MessageActionPlanRegistry.GetBatchesCompactAsync(BuildBatchQuery(planNames, profileIds, actions, sortBy, descending), cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Lists persisted reusable message action plan batches using a richer summary projection.")]
     public Task<IReadOnlyList<MailMessageActionPlanBatchSummary>> mail_action_batch_store_summary_list(
         [Description("Optional human-readable plan names that must exist in the returned batch.")] IReadOnlyList<string>? planNames = null,
@@ -106,7 +106,7 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.MessageActionPlanRegistry.GetBatchesSummaryAsync(BuildBatchQuery(planNames, profileIds, actions, sortBy, descending), cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Gets one persisted reusable message action plan batch by identifier.")]
     public async Task<MailMessageActionPlanBatch> mail_action_batch_store_get(
         [Description("The persisted batch identifier to retrieve.")] string batchId,
@@ -115,7 +115,7 @@ public sealed partial class MailMcpTools {
         return batch ?? throw new InvalidOperationException($"Action plan batch '{batchId}' was not found.");
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Gets one persisted reusable message action plan batch by identifier using a lightweight projection.")]
     public async Task<MailMessageActionPlanBatchCompact> mail_action_batch_store_compact_get(
         [Description("The persisted batch identifier to retrieve.")] string batchId,
@@ -124,7 +124,7 @@ public sealed partial class MailMcpTools {
         return batch ?? throw new InvalidOperationException($"Action plan batch '{batchId}' was not found.");
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Gets one persisted reusable message action plan batch by identifier using a richer summary projection.")]
     public async Task<MailMessageActionPlanBatchSummary> mail_action_batch_store_summary_get(
         [Description("The persisted batch identifier to retrieve.")] string batchId,
@@ -234,7 +234,7 @@ public sealed partial class MailMcpTools {
             description,
             cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Previews a stored action plan batch transform before cloning and saving it.")]
     public Task<MailMessageActionPlanBatchTransformPreview> mail_action_batch_store_transform_preview(
         [Description("The persisted source batch identifier to preview.")] string sourceBatchId,
@@ -375,7 +375,7 @@ public sealed partial class MailMcpTools {
         return OperationResult.Success("Action plan exported.");
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Loads one normalized action plan from a file through the shared Mailozaurr plan-exchange service.")]
     public Task<MessageActionExecutionPlan> mail_action_plan_import(
         [Description("The source file path on the server filesystem.")] string path,
@@ -395,7 +395,7 @@ public sealed partial class MailMcpTools {
         return OperationResult.Success("Action plan batch exported.");
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Loads a batch of normalized action plans from a file through the shared Mailozaurr plan-exchange service.")]
     public Task<IReadOnlyList<MessageActionExecutionPlan>> mail_action_batch_import(
         [Description("The source file path on the server filesystem.")] string path,
@@ -437,7 +437,7 @@ public sealed partial class MailMcpTools {
             continueOnError,
             cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Builds a dry-run bundle of common message actions, including read/unread, flag/unflag, archive, trash, delete, and an optional custom move target.")]
     public Task<CommonMessageActionsPreview> mail_actions_bundle_preview(
         [Description("The profile identifier to query.")] string profileId,
@@ -454,7 +454,7 @@ public sealed partial class MailMcpTools {
             DestinationFolderId = destinationFolderId
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Builds a dry-run comparison for standard message actions such as archive, trash, delete, and an optional custom move target.")]
     public Task<StandardMessageActionsPreview> mail_actions_preview(
         [Description("The profile identifier to query.")] string profileId,
@@ -471,7 +471,7 @@ public sealed partial class MailMcpTools {
             DestinationFolderId = destinationFolderId
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Builds a dry-run preview for moving messages, including normalized message ids and the effective destination folder target.")]
     public Task<MoveMessagesPreview> mail_move_preview(
         [Description("The profile identifier to query.")] string profileId,
@@ -488,7 +488,7 @@ public sealed partial class MailMcpTools {
             DestinationFolderId = destinationFolderId
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Builds a dry-run preview for deleting messages, including normalized message ids before execution.")]
     public Task<DeleteMessagesPreview> mail_delete_preview(
         [Description("The profile identifier to query.")] string profileId,

@@ -42,8 +42,7 @@ public sealed class GraphMailSendHandler : IMailSendHandler {
 
         using var session = await _sessionFactory.ConnectAsync(profile, cancellationToken).ConfigureAwait(false);
         var message = await _draftMimeMessageFactory.CreateAsync(profile, request.Message, cancellationToken).ConfigureAwait(false);
-        var shouldQueue = _pendingMessageRepository != null && request.PreferQueue && !request.RequireImmediateSend;
-        if (request.NotBefore.HasValue || shouldQueue) {
+        if (request.NotBefore.HasValue) {
             if (_pendingMessageRepository == null) {
                 throw new NotSupportedException("Queue-backed Graph sends require a pending-message repository.");
             }
@@ -64,16 +63,29 @@ public sealed class GraphMailSendHandler : IMailSendHandler {
             };
         }
 
-        var providerResult = await _sendAsync(session, profile, request, message, cancellationToken).ConfigureAwait(false);
-
-        return new SendResult {
-            Succeeded = true,
-            ProfileId = profile.Id,
-            ProfileKind = profile.Kind,
-            ProviderMessageId = providerResult.Id,
-            QueueMessageId = message.MessageId,
-            Message = "Message sent successfully."
-        };
+        try {
+            var providerResult = await _sendAsync(session, profile, request, message, cancellationToken).ConfigureAwait(false);
+            return new SendResult {
+                Succeeded = true,
+                ProfileId = profile.Id,
+                ProfileKind = profile.Kind,
+                ProviderMessageId = providerResult.Id,
+                QueueMessageId = message.MessageId,
+                Message = "Message sent successfully."
+            };
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
+        } catch (Exception ex) when (request.QueueOnFailure && _pendingMessageRepository != null) {
+            var queued = await QueueMessageAsync(profile, session, message, null, cancellationToken).ConfigureAwait(false);
+            return new SendResult {
+                Succeeded = true,
+                ProfileId = profile.Id,
+                ProfileKind = profile.Kind,
+                Queued = true,
+                QueueMessageId = queued.MessageId,
+                Message = $"Message queued after send failure: {ex.Message}"
+            };
+        }
     }
 
     private static async Task<GraphMessage> DefaultSendAsync(

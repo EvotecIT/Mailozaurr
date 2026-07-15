@@ -5,17 +5,17 @@ using System.ComponentModel;
 namespace Mailozaurr.Cli.Mcp;
 
 public sealed partial class MailMcpTools {
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Lists reusable drafts stored by Mailozaurr.")]
     public Task<IReadOnlyList<MailDraft>> mail_draft_list(CancellationToken cancellationToken = default) =>
         _application.Drafts.GetDraftsAsync(cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Lists reusable drafts stored by Mailozaurr using a lightweight projection.")]
     public Task<IReadOnlyList<MailDraftCompact>> mail_draft_compact_list(CancellationToken cancellationToken = default) =>
         _application.Drafts.GetDraftsCompactAsync(cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Gets a reusable draft by identifier.")]
     public async Task<MailDraft> mail_draft_get(
         [Description("The stored draft identifier to retrieve.")] string draftId,
@@ -24,7 +24,7 @@ public sealed partial class MailMcpTools {
         return draft ?? throw new InvalidOperationException($"Draft '{draftId}' was not found.");
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Gets a reusable draft by identifier using a lightweight projection.")]
     public async Task<MailDraftCompact> mail_draft_compact_get(
         [Description("The stored draft identifier to retrieve.")] string draftId,
@@ -101,10 +101,10 @@ public sealed partial class MailMcpTools {
     }
 
     [McpServerTool]
-    [Description("Sends or queues a previously stored Mailozaurr draft. Queueing is the default unless sendNow is true.")]
+    [Description("Sends a stored Mailozaurr draft, optionally queueing it after a send failure.")]
     public async Task<SendResult> mail_draft_send(
         [Description("The stored draft identifier to send.")] string draftId,
-        [Description("When true, sends immediately instead of preferring the queue.")] bool sendNow = false,
+        [Description("When true, persists a failed send in the retry queue.")] bool queueOnFailure = false,
         CancellationToken cancellationToken = default) {
         var draft = await _application.Drafts.GetDraftAsync(draftId, cancellationToken).ConfigureAwait(false);
         if (draft == null) {
@@ -113,23 +113,22 @@ public sealed partial class MailMcpTools {
 
         return await _application.Send.SendAsync(new SendMessageRequest {
             ProfileId = draft.Message.ProfileId,
-            PreferQueue = !sendNow,
-            RequireImmediateSend = sendNow,
+            QueueOnFailure = queueOnFailure,
             Message = CloneDraftMessage(draft.Message)
         }, cancellationToken).ConfigureAwait(false);
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Lists outbound messages currently waiting in Mailozaurr's pending queue.")]
     public Task<IReadOnlyList<QueuedMessageSummary>> mail_queue_list(CancellationToken cancellationToken = default) =>
         _application.Queue.ListAsync(cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Lists outbound messages currently waiting in Mailozaurr's pending queue using a lightweight projection.")]
     public Task<IReadOnlyList<QueuedMessageCompact>> mail_queue_compact_list(CancellationToken cancellationToken = default) =>
         _application.Queue.ListCompactAsync(cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Gets a queued outbound message by identifier.")]
     public async Task<QueuedMessageSummary> mail_queue_get(
         [Description("The queued message identifier to inspect.")] string messageId,
@@ -138,7 +137,7 @@ public sealed partial class MailMcpTools {
         return message ?? throw new InvalidOperationException($"Queued message '{messageId}' was not found.");
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
     [Description("Gets a queued outbound message by identifier using a lightweight projection.")]
     public async Task<QueuedMessageCompact> mail_queue_compact_get(
         [Description("The queued message identifier to inspect.")] string messageId,

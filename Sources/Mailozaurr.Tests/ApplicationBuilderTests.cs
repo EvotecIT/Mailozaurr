@@ -97,6 +97,155 @@ public sealed class ApplicationBuilderTests {
     }
 
     [Fact]
+    public async Task BuildUsesRegisteredCustomHandlerCapabilitiesWithoutStaticDefaults() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var store = new FileMailProfileStore(Path.Combine(directory, "profiles.json"));
+            await store.SaveAsync(new MailProfile {
+                Id = "custom-provider",
+                DisplayName = "Custom provider",
+                Kind = MailProfileKind.SendGrid
+            });
+            var builder = CreateCustomHandlerBuilder(directory, store);
+            builder.AddReadHandler(new FakeReadHandler(MailProfileKind.SendGrid));
+            builder.AddMessageActionHandler(new FakeMessageActionHandler(MailProfileKind.SendGrid));
+            builder.AddSendHandler(new FakeSendHandler(MailProfileKind.SendGrid));
+            var app = builder.Build();
+
+            ProfileCapabilities? capabilities = await app.Profiles.GetCapabilitiesAsync("custom-provider");
+            var search = await app.Read.SearchAsync(new MailSearchRequest { ProfileId = "custom-provider" });
+            var preview = await app.MessageActionPreview.PreviewReadStateAsync(new SetReadStateRequest {
+                ProfileId = "custom-provider",
+                MessageIds = { "message-1" },
+                IsRead = true
+            });
+            var action = await app.MessageActions.SetReadStateAsync(new SetReadStateRequest {
+                ProfileId = "custom-provider",
+                MessageIds = { "message-1" },
+                IsRead = true,
+                ConfirmationToken = preview.ConfirmationToken
+            });
+            var send = await app.Send.SendAsync(new SendMessageRequest {
+                ProfileId = "custom-provider",
+                Message = new DraftMessage { ProfileId = "custom-provider", Subject = "Hello" }
+            });
+
+            Assert.NotNull(capabilities);
+            Assert.True(capabilities!.Supports(MailCapability.SearchMessages));
+            Assert.True(capabilities.Supports(MailCapability.MarkMessages));
+            Assert.True(capabilities.Supports(MailCapability.SendMessages));
+            Assert.Empty(search);
+            Assert.True(preview.Succeeded);
+            Assert.True(action.Succeeded);
+            Assert.True(send.Succeeded);
+        } finally {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public async Task BuildHonorsExplicitCapabilityOverrideForCustomHandler() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var store = new FileMailProfileStore(Path.Combine(directory, "profiles.json"));
+            await store.SaveAsync(new MailProfile {
+                Id = "disabled-custom-provider",
+                DisplayName = "Disabled custom provider",
+                Kind = MailProfileKind.SendGrid,
+                Capabilities = new ProfileCapabilities(MailProfileKind.SendGrid, MailCapability.None)
+            });
+            var builder = CreateCustomHandlerBuilder(directory, store);
+            builder.AddSendHandler(new FakeSendHandler(MailProfileKind.SendGrid));
+            var app = builder.Build();
+
+            ProfileCapabilities? capabilities = await app.Profiles.GetCapabilitiesAsync("disabled-custom-provider");
+            Assert.NotNull(capabilities);
+            Assert.False(capabilities!.Supports(MailCapability.SendMessages));
+            await Assert.ThrowsAsync<NotSupportedException>(() => app.Send.SendAsync(new SendMessageRequest {
+                ProfileId = "disabled-custom-provider",
+                Message = new DraftMessage { ProfileId = "disabled-custom-provider", Subject = "Hello" }
+            }));
+        } finally {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public async Task BuildReportsProviderCapabilitiesBackedByInjectedServicesWhenHandlersAreDisabled() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var store = new FileMailProfileStore(Path.Combine(directory, "profiles.json"));
+            var profiles = new[] {
+                new MailProfile {
+                    Id = "pop3-service-override",
+                    DisplayName = "POP3 service override",
+                    Kind = MailProfileKind.Pop3
+                },
+                new MailProfile {
+                    Id = "sendgrid-service-override",
+                    DisplayName = "SendGrid service override",
+                    Kind = MailProfileKind.SendGrid
+                },
+                new MailProfile {
+                    Id = "mailgun-service-override",
+                    DisplayName = "Mailgun service override",
+                    Kind = MailProfileKind.Mailgun
+                },
+                new MailProfile {
+                    Id = "ses-service-override",
+                    DisplayName = "SES service override",
+                    Kind = MailProfileKind.Ses
+                }
+            };
+            foreach (MailProfile profile in profiles) {
+                await store.SaveAsync(profile);
+            }
+            var builder = CreateCustomHandlerBuilder(directory, store)
+                .UseReadService(new RoutedMailReadService(
+                    store,
+                    new[] { new FakeReadHandler(MailProfileKind.Pop3) }))
+                .UseSendService(new RoutedMailSendService(
+                    store,
+                    new[] {
+                        new FakeSendHandler(MailProfileKind.SendGrid),
+                        new FakeSendHandler(MailProfileKind.Mailgun),
+                        new FakeSendHandler(MailProfileKind.Ses)
+                    }));
+
+            MailApplication app = builder.Build();
+            ProfileCapabilities? pop3Capabilities =
+                await app.Profiles.GetCapabilitiesAsync("pop3-service-override");
+            IReadOnlyList<MessageSummary> search = await app.Read.SearchAsync(new MailSearchRequest {
+                ProfileId = "pop3-service-override"
+            });
+
+            Assert.NotNull(pop3Capabilities);
+            Assert.True(pop3Capabilities!.Supports(MailCapability.SearchMessages));
+            Assert.False(pop3Capabilities.Supports(MailCapability.SendMessages));
+            Assert.Empty(search);
+
+            foreach (MailProfile profile in profiles.Where(profile =>
+                         profile.Kind is MailProfileKind.SendGrid or MailProfileKind.Mailgun or MailProfileKind.Ses)) {
+                ProfileCapabilities? capabilities = await app.Profiles.GetCapabilitiesAsync(profile.Id);
+                SendResult send = await app.Send.SendAsync(new SendMessageRequest {
+                    ProfileId = profile.Id,
+                    Message = new DraftMessage {
+                        ProfileId = profile.Id,
+                        Subject = "Hello"
+                    }
+                });
+
+                Assert.NotNull(capabilities);
+                Assert.True(capabilities!.Supports(MailCapability.SendMessages));
+                Assert.False(capabilities.Supports(MailCapability.SearchMessages));
+                Assert.True(send.Succeeded);
+            }
+        } finally {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
     public void BuildRejectsCustomPendingRepositoryWithoutMatchingDeadLetterRepository() {
         var builder = new MailApplicationBuilder(new MailApplicationOptions {
             EnableImapReadHandler = false,
@@ -140,6 +289,17 @@ public sealed class ApplicationBuilderTests {
         Directory.CreateDirectory(directory);
         return directory;
     }
+
+    private static MailApplicationBuilder CreateCustomHandlerBuilder(string directory, IMailProfileStore store) =>
+        new MailApplicationBuilder(new MailApplicationOptions {
+            EnableImapReadHandler = false,
+            EnableGraphReadHandler = false,
+            EnableGraphSendHandler = false,
+            EnableGmailReadHandler = false,
+            EnableGmailSendHandler = false,
+            EnableSmtpSendHandler = false,
+            SecretStore = new MailSecretStoreOptions { DirectoryPath = Path.Combine(directory, "secrets") }
+        }).UseProfileStore(store);
 
     private sealed class FakeImapSessionFactory : IImapSessionFactory {
         public Task<ImapClient> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) =>

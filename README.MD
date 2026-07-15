@@ -45,8 +45,7 @@ In V2, some functionality was moved to dedicated projects:
 
 - [MailKit](https://github.com/jstedfast/MailKit) - licensed MIT
 - [MimeKit](https://github.com/jstedfast/MimeKit) - licensed MIT
-- [MsgKit](https://github.com/Sicos1977/MsgKit) - licensed MIT
-- [MsgReader](https://github.com/Sicos1977/MSGReader) - licensed MIT
+- [OfficeIMO.Email](https://github.com/EvotecIT/OfficeIMO) - licensed MIT
 
 For OAuth2 support, Mailozaurr also bundles:
 
@@ -58,6 +57,50 @@ For OAuth2 support, Mailozaurr also bundles:
 Additional dependency:
 
 - [System.DataSQLite](https://system.data.sqlite.org/)
+
+## EML and Outlook MSG files
+
+Mailozaurr keeps MIME, transport, S/MIME, PGP, DKIM, and ARC workflows in MimeKit and MailKit. OfficeIMO.Email owns local email artifacts: Outlook MSG, typed Outlook appointments, contacts, tasks, journals and notes, TNEF, RTF-backed bodies, embedded items, and retained MAPI properties.
+
+PowerShell callers can import either file type through the same command:
+
+```powershell
+$mail = Import-MailFile './message.msg'
+
+$mail.Subject
+$mail.OutlookItemKind
+$mail.OfficeDocument.Contact
+$mail.Diagnostics
+```
+
+Exporting uses the destination extension, so the same pipeline converts in either direction:
+
+```powershell
+Import-MailFile './message.msg' | Export-MailFile './message.eml'
+Import-MailFile './message.eml' | Export-MailFile './message.msg'
+```
+
+Add `-Force` to replace an existing destination or `-PassThru` to return its `FileInfo`. Use `-IncludeHeaders` when merged headers are needed, `-ExcludeAttachments` for message metadata only, or `-ExcludeAttachmentContent` to retain attachment names and sizes without loading decoded bytes. EML input also exposes its native `MimeMessage`; MSG input can produce one with `$mail.ToMimeMessage()` when it needs to enter a Mailozaurr cryptography or transport workflow.
+
+The direction-specific conversion commands remain available for scripts that write batches to an output folder:
+
+```powershell
+ConvertFrom-EmlToMsg -InputPath './message.eml' -OutputFolder './converted'
+ConvertFrom-MsgToEml -InputPath './message.msg' -OutputFolder './converted'
+```
+
+The .NET API follows the same load/save shape:
+
+```csharp
+using Mailozaurr;
+
+MailFileMessage mail = MailFileMessage.Load("message.msg");
+Console.WriteLine(mail.Subject);
+
+await mail.SaveAsync("message.eml");
+```
+
+`MailFileMessage.Load` and `Import-MailFile` fail clearly on error diagnostics. Use `MailFileReader` when custom projection options or recovery from a partially readable artifact are needed; check `message.HasErrors` and `message.Diagnostics` before accepting it. The older `EmailMessage` conversion methods remain available for compatibility and batch conversion. A separate `Mailozaurr.Msg` package is no longer required.
 
 ## Architecture notes
 
@@ -81,6 +124,8 @@ If you want practical profile setup and usage guidance for CLI and MCP, see [Con
 ## CLI and MCP usage
 
 The repository now includes a cross-platform `mailozaurr` executable and an MCP server hosted by that same executable.
+
+The CLI and application packages are built by the repository release pipeline. Until those packages are published, run the CLI from a checkout as shown below.
 
 To see the current command surface from source:
 
@@ -114,7 +159,11 @@ Create a profile and inspect it:
 mailozaurr profile create --profile work-imap --kind imap --name "Work IMAP" `
   --setting server=imap.example.com --setting port=993 --json
 
-mailozaurr profile set-secret --profile work-imap --name password --value "secret" --json
+$env:MAILOZAURR_IMAP_PASSWORD = '<password>'
+mailozaurr profile set-secret --profile work-imap --name password `
+  --value-env MAILOZAURR_IMAP_PASSWORD --json
+Remove-Item Env:MAILOZAURR_IMAP_PASSWORD
+
 mailozaurr profile summary --profile work-imap --json
 mailozaurr profile test --profile work-imap --scope mailbox --json
 ```
@@ -139,6 +188,8 @@ mailozaurr send --draft weekly-update --json
 mailozaurr queue list --compact --json
 mailozaurr queue process --json
 ```
+
+Send commands attempt immediate delivery by default. Add `--queue-on-failure` when a failed immediate attempt should be persisted for later processing.
 
 Preview and execute mailbox actions:
 

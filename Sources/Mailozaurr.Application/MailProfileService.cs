@@ -4,15 +4,25 @@ namespace Mailozaurr.Application;
 /// Default implementation of profile lifecycle operations.
 /// </summary>
 public sealed class MailProfileService : IMailProfileService {
+    private static readonly string[] KnownSecretNames = {
+        MailSecretNames.Password,
+        MailSecretNames.ClientSecret,
+        MailSecretNames.AccessToken,
+        MailSecretNames.RefreshToken,
+        MailSecretNames.CertificatePassword
+    };
     private readonly IMailProfileStore _profileStore;
     private readonly IMailSecretStore? _secretStore;
+    private readonly IReadOnlyDictionary<MailProfileKind, MailCapability>? _availableCapabilities;
 
     /// <summary>
     /// Creates a new profile service.
     /// </summary>
-    public MailProfileService(IMailProfileStore profileStore, IMailSecretStore? secretStore = null) {
+    public MailProfileService(IMailProfileStore profileStore, IMailSecretStore? secretStore = null,
+        IReadOnlyDictionary<MailProfileKind, MailCapability>? availableCapabilities = null) {
         _profileStore = profileStore ?? throw new ArgumentNullException(nameof(profileStore));
         _secretStore = secretStore;
+        _availableCapabilities = availableCapabilities;
     }
 
     /// <inheritdoc />
@@ -61,13 +71,57 @@ public sealed class MailProfileService : IMailProfileService {
 
     /// <inheritdoc />
     public async Task<OperationResult> DeleteAsync(string profileId, CancellationToken cancellationToken = default) {
+        var profile = await _profileStore.GetByIdAsync(profileId, cancellationToken).ConfigureAwait(false);
+        if (profile == null) {
+            return OperationResult.Failure("profile_not_found", "Profile was not found.");
+        }
+
+        MailSecretRollbackSnapshot? secretSnapshot = _secretStore == null
+            ? null
+            : await MailSecretRollbackSnapshot.CaptureAsync(
+                _secretStore,
+                profileId,
+                KnownSecretNames,
+                requiredSecretNames: null,
+                cancellationToken).ConfigureAwait(false);
+        IReadOnlyCollection<string>? knownProfileIds = null;
+        if (_secretStore is IMailProfileSecretContextCleanup) {
+            IReadOnlyList<MailProfile> knownProfiles = await _profileStore.GetAllAsync(cancellationToken)
+                .ConfigureAwait(false);
+            knownProfileIds = knownProfiles.Select(candidate => candidate.Id).ToArray();
+        }
+
         var removed = await _profileStore.RemoveAsync(profileId, cancellationToken).ConfigureAwait(false);
         if (!removed) {
             return OperationResult.Failure("profile_not_found", "Profile was not found.");
         }
 
-        if (_secretStore != null) {
-            await RemoveKnownSecretsAsync(profileId, cancellationToken).ConfigureAwait(false);
+        try {
+            if (_secretStore is IMailProfileSecretContextCleanup contextCleanup) {
+                await contextCleanup.RemoveProfileSecretsAsync(
+                    profileId,
+                    knownProfileIds!,
+                    cancellationToken).ConfigureAwait(false);
+            } else if (_secretStore is IMailProfileSecretCleanup cleanup) {
+                await cleanup.RemoveProfileSecretsAsync(profileId, cancellationToken).ConfigureAwait(false);
+            } else if (_secretStore != null) {
+                await RemoveKnownSecretsAsync(profileId, cancellationToken).ConfigureAwait(false);
+            }
+        } catch (Exception deleteException) {
+            try {
+                await _profileStore.SaveAsync(profile, CancellationToken.None).ConfigureAwait(false);
+                if (secretSnapshot != null) {
+                    await secretSnapshot.RestoreAsync(
+                        _secretStore!,
+                        profileId,
+                        CancellationToken.None).ConfigureAwait(false);
+                }
+            } catch (Exception rollbackException) {
+                throw new InvalidOperationException(
+                    "Profile deletion failed and its rollback was incomplete.",
+                    new AggregateException(deleteException, rollbackException));
+            }
+            throw;
         }
 
         return OperationResult.Success("Profile deleted.");
@@ -89,7 +143,16 @@ public sealed class MailProfileService : IMailProfileService {
     /// <inheritdoc />
     public async Task<ProfileCapabilities?> GetCapabilitiesAsync(string profileId, CancellationToken cancellationToken = default) {
         var profile = await _profileStore.GetByIdAsync(profileId, cancellationToken).ConfigureAwait(false);
-        return profile?.GetCapabilities();
+        if (profile == null) {
+            return null;
+        }
+
+        if (_availableCapabilities == null) {
+            return profile.GetCapabilities();
+        }
+
+        _availableCapabilities.TryGetValue(profile.Kind, out MailCapability available);
+        return profile.GetCapabilities(available);
     }
 
     private async Task AddProviderReadinessChecksAsync(MailProfile profile, MailProfileValidationResult result, CancellationToken cancellationToken) {
@@ -122,15 +185,7 @@ public sealed class MailProfileService : IMailProfileService {
     }
 
     private async Task RemoveKnownSecretsAsync(string profileId, CancellationToken cancellationToken) {
-        var secretNames = new[] {
-            MailSecretNames.Password,
-            MailSecretNames.ClientSecret,
-            MailSecretNames.AccessToken,
-            MailSecretNames.RefreshToken,
-            MailSecretNames.CertificatePassword
-        };
-
-        foreach (var secretName in secretNames) {
+        foreach (string secretName in KnownSecretNames) {
             await _secretStore!.RemoveSecretAsync(profileId, secretName, cancellationToken).ConfigureAwait(false);
         }
     }

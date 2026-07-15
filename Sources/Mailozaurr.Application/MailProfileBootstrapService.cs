@@ -4,6 +4,13 @@ namespace Mailozaurr.Application;
 /// Default implementation of reusable provider bootstrap workflows.
 /// </summary>
 public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
+    private static readonly string[] KnownSecretNames = {
+        MailSecretNames.Password,
+        MailSecretNames.ClientSecret,
+        MailSecretNames.AccessToken,
+        MailSecretNames.RefreshToken,
+        MailSecretNames.CertificatePassword
+    };
     private readonly IMailProfileService _profiles;
     private readonly IMailProfileSecretService _profileSecrets;
     private readonly IMailSecretStore _secretStore;
@@ -23,9 +30,19 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
             throw new ArgumentNullException(nameof(request));
         }
 
-        var profileId = request.ProfileId.Trim();
-        var displayName = request.DisplayName.Trim();
-        var mailbox = request.Mailbox.Trim();
+        var profileId = request.ProfileId?.Trim() ?? string.Empty;
+        var displayName = request.DisplayName?.Trim() ?? string.Empty;
+        var mailbox = request.Mailbox?.Trim() ?? string.Empty;
+        if (profileId.Length == 0) {
+            return OperationResult.Failure("profile_required", "Profile id is required.");
+        }
+        if (displayName.Length == 0) {
+            return OperationResult.Failure("display_name_required", "Display name is required.");
+        }
+        if (mailbox.Length == 0) {
+            return OperationResult.Failure("mailbox_required", "Mailbox is required.");
+        }
+
         var defaultSender = string.IsNullOrWhiteSpace(request.DefaultSender) ? mailbox : request.DefaultSender!.Trim();
         var existing = await _profiles.GetProfileAsync(profileId, cancellationToken).ConfigureAwait(false);
         string? clientSecret;
@@ -66,15 +83,6 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
                               await HasStoredSecretAsync(profileId, MailSecretNames.ClientSecret, cancellationToken).ConfigureAwait(false);
         var hasCertificate = !string.IsNullOrWhiteSpace(effectiveCertificatePath);
 
-        if (profileId.Length == 0) {
-            return OperationResult.Failure("profile_required", "Profile id is required.");
-        }
-        if (displayName.Length == 0) {
-            return OperationResult.Failure("display_name_required", "Display name is required.");
-        }
-        if (mailbox.Length == 0) {
-            return OperationResult.Failure("mailbox_required", "Mailbox is required.");
-        }
         if (!hasAccessToken &&
             (string.IsNullOrWhiteSpace(effectiveClientId) || string.IsNullOrWhiteSpace(effectiveTenantId) || (!hasClientSecret && !hasCertificate))) {
             return OperationResult.Failure(
@@ -104,31 +112,16 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
         UpsertSetting(profile.Settings, MailProfileSettingsKeys.TenantId, effectiveTenantId);
         UpsertSetting(profile.Settings, MailProfileSettingsKeys.CertificatePath, effectiveCertificatePath);
 
-        var saveResult = await _profiles.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
-        if (!saveResult.Succeeded) {
-            return saveResult;
-        }
-
-        if (!string.IsNullOrWhiteSpace(clientSecret)) {
-            var clientSecretResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.ClientSecret, clientSecret!.Trim(), cancellationToken).ConfigureAwait(false);
-            if (!clientSecretResult.Succeeded) {
-                return clientSecretResult;
-            }
-        }
-        if (!string.IsNullOrWhiteSpace(accessToken)) {
-            var accessTokenResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.AccessToken, accessToken!.Trim(), cancellationToken).ConfigureAwait(false);
-            if (!accessTokenResult.Succeeded) {
-                return accessTokenResult;
-            }
-        }
-        if (!string.IsNullOrWhiteSpace(certificatePassword)) {
-            var certificatePasswordResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.CertificatePassword, certificatePassword!.Trim(), cancellationToken).ConfigureAwait(false);
-            if (!certificatePasswordResult.Succeeded) {
-                return certificatePasswordResult;
-            }
-        }
-
-        return OperationResult.Success("Graph profile saved.");
+        return await SaveProfileAndSecretsAsync(
+            profile,
+            existing,
+            new[] {
+                new SecretUpdate(MailSecretNames.ClientSecret, clientSecret),
+                new SecretUpdate(MailSecretNames.AccessToken, accessToken),
+                new SecretUpdate(MailSecretNames.CertificatePassword, certificatePassword)
+            },
+            "Graph profile saved.",
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -137,9 +130,16 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
             throw new ArgumentNullException(nameof(request));
         }
 
-        var profileId = request.ProfileId.Trim();
-        var displayName = request.DisplayName.Trim();
+        var profileId = request.ProfileId?.Trim() ?? string.Empty;
+        var displayName = request.DisplayName?.Trim() ?? string.Empty;
         var mailbox = string.IsNullOrWhiteSpace(request.Mailbox) ? "me" : request.Mailbox!.Trim();
+        if (profileId.Length == 0) {
+            return OperationResult.Failure("profile_required", "Profile id is required.");
+        }
+        if (displayName.Length == 0) {
+            return OperationResult.Failure("display_name_required", "Display name is required.");
+        }
+
         var existing = await _profiles.GetProfileAsync(profileId, cancellationToken).ConfigureAwait(false);
         string? clientSecret;
         string? refreshToken;
@@ -177,12 +177,6 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
         var hasClientSecret = !string.IsNullOrWhiteSpace(clientSecret) ||
                               await HasStoredSecretAsync(profileId, MailSecretNames.ClientSecret, cancellationToken).ConfigureAwait(false);
 
-        if (profileId.Length == 0) {
-            return OperationResult.Failure("profile_required", "Profile id is required.");
-        }
-        if (displayName.Length == 0) {
-            return OperationResult.Failure("display_name_required", "Display name is required.");
-        }
         if (!hasAccessToken && (!hasRefreshToken || string.IsNullOrWhiteSpace(effectiveClientId) || !hasClientSecret)) {
             return OperationResult.Failure(
                 "gmail_auth_required",
@@ -210,31 +204,132 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
 
         UpsertSetting(profile.Settings, MailProfileSettingsKeys.ClientId, effectiveClientId);
 
-        var saveResult = await _profiles.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
+        return await SaveProfileAndSecretsAsync(
+            profile,
+            existing,
+            new[] {
+                new SecretUpdate(MailSecretNames.ClientSecret, clientSecret),
+                new SecretUpdate(MailSecretNames.RefreshToken, refreshToken),
+                new SecretUpdate(MailSecretNames.AccessToken, accessToken)
+            },
+            "Gmail profile saved.",
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<OperationResult> SaveProfileAndSecretsAsync(
+        MailProfile profile,
+        MailProfile? existing,
+        IReadOnlyList<SecretUpdate> updates,
+        string successMessage,
+        CancellationToken cancellationToken) {
+        SecretUpdate[] effectiveUpdates = updates
+            .Where(update => !string.IsNullOrWhiteSpace(update.Value))
+            .ToArray();
+        MailSecretRollbackSnapshot previousSecrets = await MailSecretRollbackSnapshot.CaptureAsync(
+            _secretStore,
+            profile.Id,
+            KnownSecretNames,
+            effectiveUpdates.Select(update => update.Name).ToArray(),
+            cancellationToken).ConfigureAwait(false);
+        string? previousDefaultProfileId = await CapturePreviousDefaultProfileIdAsync(
+            profile, cancellationToken).ConfigureAwait(false);
+
+        OperationResult saveResult = await _profiles.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
         if (!saveResult.Succeeded) {
             return saveResult;
         }
 
-        if (!string.IsNullOrWhiteSpace(clientSecret)) {
-            var clientSecretResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.ClientSecret, clientSecret!.Trim(), cancellationToken).ConfigureAwait(false);
-            if (!clientSecretResult.Succeeded) {
-                return clientSecretResult;
+        foreach (SecretUpdate update in effectiveUpdates) {
+            OperationResult secretResult;
+            try {
+                secretResult = await _profileSecrets.SetSecretAsync(
+                    profile.Id,
+                    update.Name,
+                    update.Value!.Trim(),
+                    cancellationToken).ConfigureAwait(false);
+            } catch (Exception bootstrapException) {
+                try {
+                    await RollBackBootstrapAsync(
+                        profile.Id, existing, previousDefaultProfileId, previousSecrets).ConfigureAwait(false);
+                } catch (Exception rollbackException) {
+                    throw new InvalidOperationException(
+                        "Profile bootstrap failed and its rollback was incomplete.",
+                        new AggregateException(bootstrapException, rollbackException));
+                }
+                throw;
             }
-        }
-        if (!string.IsNullOrWhiteSpace(refreshToken)) {
-            var refreshTokenResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.RefreshToken, refreshToken!.Trim(), cancellationToken).ConfigureAwait(false);
-            if (!refreshTokenResult.Succeeded) {
-                return refreshTokenResult;
-            }
-        }
-        if (!string.IsNullOrWhiteSpace(accessToken)) {
-            var accessTokenResult = await _profileSecrets.SetSecretAsync(profile.Id, MailSecretNames.AccessToken, accessToken!.Trim(), cancellationToken).ConfigureAwait(false);
-            if (!accessTokenResult.Succeeded) {
-                return accessTokenResult;
+
+            if (!secretResult.Succeeded) {
+                try {
+                    await RollBackBootstrapAsync(
+                        profile.Id, existing, previousDefaultProfileId, previousSecrets).ConfigureAwait(false);
+                } catch (Exception rollbackException) {
+                    throw new InvalidOperationException(
+                        "Profile bootstrap was rejected and its rollback was incomplete.",
+                        rollbackException);
+                }
+                return secretResult;
             }
         }
 
-        return OperationResult.Success("Gmail profile saved.");
+        return OperationResult.Success(successMessage);
+    }
+
+    private async Task RollBackBootstrapAsync(
+        string profileId,
+        MailProfile? existing,
+        string? previousDefaultProfileId,
+        MailSecretRollbackSnapshot previousSecrets) {
+        if (existing == null) {
+            OperationResult deleteResult = await _profiles.DeleteAsync(
+                profileId, CancellationToken.None).ConfigureAwait(false);
+            if (!deleteResult.Succeeded) {
+                throw new InvalidOperationException(deleteResult.Message ?? "The new profile could not be rolled back.");
+            }
+        } else {
+            OperationResult restoreProfile = await _profiles.SaveAsync(existing, CancellationToken.None).ConfigureAwait(false);
+            if (!restoreProfile.Succeeded) {
+                throw new InvalidOperationException(restoreProfile.Message ?? "The previous profile could not be restored.");
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(previousDefaultProfileId)) {
+            OperationResult restoreDefault = await _profiles.SetDefaultAsync(
+                previousDefaultProfileId!, CancellationToken.None).ConfigureAwait(false);
+            if (!restoreDefault.Succeeded) {
+                throw new InvalidOperationException(
+                    restoreDefault.Message ?? "The previous default profile could not be restored.");
+            }
+        }
+
+        await previousSecrets.RestoreAsync(
+            _secretStore,
+            profileId,
+            CancellationToken.None).ConfigureAwait(false);
+    }
+
+    private async Task<string?> CapturePreviousDefaultProfileIdAsync(
+        MailProfile profile,
+        CancellationToken cancellationToken) {
+        if (!profile.IsDefault) {
+            return null;
+        }
+
+        IReadOnlyList<MailProfile> profiles = await _profiles.GetProfilesAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return profiles.FirstOrDefault(candidate =>
+            candidate.IsDefault &&
+            !string.Equals(candidate.Id, profile.Id, StringComparison.OrdinalIgnoreCase))?.Id;
+    }
+
+    private sealed class SecretUpdate {
+        internal SecretUpdate(string name, string? value) {
+            Name = name;
+            Value = value;
+        }
+
+        internal string Name { get; }
+        internal string? Value { get; }
     }
 
     private static MailProfile CloneProfile(MailProfile profile) => new() {

@@ -68,6 +68,26 @@ public class MailFileReaderTests {
     }
 
     [Fact]
+    public void TryRead_ErrorDiagnostic_ReturnsFalseAndDiagnosticCode() {
+        var tempDir = CreateTempDirectory();
+        try {
+            string emlPath = Path.Combine(tempDir, "invalid.eml");
+            File.WriteAllText(emlPath,
+                "From: a@example.com\r\nTo: b@example.com\r\nSubject: Invalid\r\n" +
+                "MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n" +
+                "Content-Transfer-Encoding: base64\r\n\r\n!!!!");
+
+            bool result = MailFileReader.TryRead(emlPath, out MailFileMessage? message, out string? error);
+
+            Assert.False(result);
+            Assert.Null(message);
+            Assert.Contains("EMAIL_MIME_BASE64_INVALID", error, StringComparison.Ordinal);
+        } finally {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
     public void ReadMsg_FromConvertedEml_MapsFields() {
         var tempDir = CreateTempDirectory();
         var outputDir = CreateTempDirectory();

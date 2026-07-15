@@ -1,6 +1,27 @@
 namespace Mailozaurr.Cli;
 
 internal sealed class CliArguments {
+    private static readonly HashSet<string> FlagOptions = new(StringComparer.OrdinalIgnoreCase) {
+        "access-token-stdin", "can-read", "can-send", "certificate-password-stdin",
+        "client-secret-stdin", "compact", "default-only", "desc", "has-attachments",
+        "include-raw", "is-default", "json", "overwrite", "queue-on-failure",
+        "ready-only", "refresh-token-stdin", "root-only", "stop-on-error", "summary",
+        "unflag", "unread", "value-stdin"
+    };
+
+    private static readonly HashSet<string> ValueOptions = new(StringComparer.OrdinalIgnoreCase) {
+        "access-token-env", "access-token-ref", "action", "attachment", "attachment-id", "batch",
+        "bcc", "cc", "certificate-password-env", "certificate-password-ref", "certificate-path",
+        "client-id", "client-secret-env", "client-secret-ref", "confirm-token", "content-type",
+        "default-mailbox", "default-sender", "description", "draft", "drafts-dir", "file",
+        "folder", "from", "header", "html", "index", "kind", "limit", "login", "mailbox",
+        "message-id", "name", "name-contains", "parent-folder", "path", "plan-batches-dir", "plan-name",
+        "profile", "profiles-dir", "query", "redirect-uri", "refresh-token-env",
+        "refresh-token-ref", "reply-to", "scope", "secrets-dir", "setting", "sort", "source-batch",
+        "subject", "target-batch", "target-folder", "target-profile", "tenant-id", "text", "to",
+        "value-env", "value-ref"
+    };
+
     public List<string> Positionals { get; } = new();
 
     public Dictionary<string, List<string?>> Options { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -68,16 +89,24 @@ internal sealed class CliArguments {
 
             if (arg.StartsWith("--", StringComparison.Ordinal)) {
                 var key = arg.Substring(2);
-                string? value = null;
-                if (i + 1 < args.Count && !args[i + 1].StartsWith("--", StringComparison.Ordinal)) {
+                if (key.Length == 0 || (!FlagOptions.Contains(key) && !ValueOptions.Contains(key))) {
+                    throw new InvalidOperationException($"Unknown option '--{key}'.");
+                }
+
+                string value;
+                if (FlagOptions.Contains(key)) {
+                    value = "true";
+                } else {
+                    if (i + 1 >= args.Count || args[i + 1].StartsWith("--", StringComparison.Ordinal)) {
+                        throw new InvalidOperationException($"Option '--{key}' requires a value.");
+                    }
                     value = args[++i];
                 }
                 if (!result.Options.TryGetValue(key, out var values)) {
                     values = new List<string?>();
                     result.Options[key] = values;
                 }
-
-                values.Add(value ?? "true");
+                values.Add(value);
                 continue;
             }
 
@@ -85,5 +114,16 @@ internal sealed class CliArguments {
         }
 
         return result;
+    }
+
+    public void ValidatePositionalCount() {
+        if (Positionals.Count == 0) {
+            return;
+        }
+
+        int maximum = string.Equals(Positionals[0], "send", StringComparison.OrdinalIgnoreCase) ? 1 : 2;
+        if (Positionals.Count > maximum) {
+            throw new InvalidOperationException($"Unexpected positional argument '{Positionals[maximum]}'.");
+        }
     }
 }

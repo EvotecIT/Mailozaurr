@@ -10,11 +10,8 @@ public sealed class SendMessageRequest {
     /// <summary>Draft to send or queue.</summary>
     public DraftMessage Message { get; set; } = new();
 
-    /// <summary>Whether queueing should be preferred when supported.</summary>
-    public bool PreferQueue { get; set; } = true;
-
-    /// <summary>Whether sending immediately is required.</summary>
-    public bool RequireImmediateSend { get; set; }
+    /// <summary>Whether a failed immediate send should be persisted for retry.</summary>
+    public bool QueueOnFailure { get; set; }
 
     /// <summary>Optional scheduled send time for queue-capable implementations.</summary>
     public DateTimeOffset? NotBefore { get; set; }

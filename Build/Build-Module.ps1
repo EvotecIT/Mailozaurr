@@ -4,6 +4,8 @@
 
     [bool] $SignModule = $true,
 
+    [string] $ProjectBuildConfigPath = 'Build\project.build.json',
+
     [string] $PowerShellGalleryApiKeyPath = 'C:\Support\Important\PowerShellGalleryAPI.txt',
 
     [string] $GitHubApiKeyPath = 'C:\Support\Important\GitHubAPI.txt'
@@ -114,6 +116,14 @@ Build-Module -ModuleName 'Mailozaurr' {
             'Mailozaurr.GraphSendPolicy'
             'Mailozaurr.HtmlUtils'
             'Mailozaurr.MailozaurrOptions'
+            'Mailozaurr.MailFileAddress'
+            'Mailozaurr.MailFileAttachment'
+            'Mailozaurr.MailFileFormat'
+            'Mailozaurr.MailFileMessage'
+            'Mailozaurr.MailFileReader'
+            'Mailozaurr.MailFileReaderOptions'
+            'Mailozaurr.MailFileRecipient'
+            'Mailozaurr.MailFileRecipientType'
             'Mailozaurr.SendLogResolver'
             'Mailozaurr.Smtp'
             'Mailozaurr.SmtpConnectionPool'
@@ -127,7 +137,7 @@ Build-Module -ModuleName 'Mailozaurr' {
 
     New-ConfigurationBuild @newConfigurationBuildSplat #-DotSourceLibraries -DotSourceClasses -MergeModuleOnBuild -Enable -SignModule -DeleteTargetModuleBeforeBuild -CertificateThumbprint '483292C9E317AA13B07BB7A96AE9D1A5ED9E7703' -MergeFunctionsFromApprovedModules
 
-    New-ConfigurationProjectBuild -Name 'Mailozaurr' -ConfigPath 'Build\project.build.json' -Enabled:$false -BuildBeforeModule -UseAsReleaseVersionSource -ProvideLocalNuGetFeed -PublishNuget -PublishGitHub
+    New-ConfigurationProjectBuild -Name 'Mailozaurr' -ConfigPath $ProjectBuildConfigPath -Enabled -BuildBeforeModule -UseAsReleaseVersionSource -ProvideLocalNuGetFeed -PublishNuget -PublishGitHub
     New-ConfigurationRelease -StageRoot 'Artefacts\UploadReady' -VersionSource ProjectBuild -PrimaryProject 'Mailozaurr' -BuildOrder 'Packages', 'Module' -PublishOrder 'NuGet', 'PowerShellGallery', 'GitHub'
 
     New-ConfigurationArtefact -Type Unpacked -Enable -Path 'Artefacts\Unpacked' -ModulesPath 'Artefacts\Unpacked\Modules'

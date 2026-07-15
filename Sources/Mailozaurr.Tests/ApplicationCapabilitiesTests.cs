@@ -4,12 +4,10 @@ namespace Mailozaurr.Tests;
 
 public sealed class ApplicationCapabilitiesTests {
     [Theory]
-    [InlineData(MailProfileKind.Imap, MailCapability.ListFolders | MailCapability.SearchMessages | MailCapability.ReadMessages | MailCapability.MoveMessages | MailCapability.WaitForMessages)]
-    [InlineData(MailProfileKind.Pop3, MailCapability.SearchMessages | MailCapability.ReadMessages | MailCapability.DeleteMessages)]
-    [InlineData(MailProfileKind.Graph, MailCapability.ListFolders | MailCapability.SendMessages | MailCapability.ManageRules | MailCapability.ManageEvents | MailCapability.ManagePermissions)]
-    [InlineData(MailProfileKind.Gmail, MailCapability.SearchMessages | MailCapability.MarkMessages | MailCapability.MoveMessages | MailCapability.SendMessages | MailCapability.UseThreads | MailCapability.UseLabels)]
+    [InlineData(MailProfileKind.Imap, MailCapability.ListFolders | MailCapability.SearchMessages | MailCapability.ReadMessages | MailCapability.MoveMessages)]
+    [InlineData(MailProfileKind.Graph, MailCapability.ListFolders | MailCapability.SendMessages | MailCapability.MarkMessages)]
+    [InlineData(MailProfileKind.Gmail, MailCapability.SearchMessages | MailCapability.MarkMessages | MailCapability.MoveMessages | MailCapability.SendMessages)]
     [InlineData(MailProfileKind.Smtp, MailCapability.SendMessages)]
-    [InlineData(MailProfileKind.SendGrid, MailCapability.SendMessages)]
     public void CatalogExposesExpectedCapabilities(MailProfileKind kind, MailCapability required) {
         var capabilities = MailCapabilityCatalog.For(kind);
 
@@ -28,8 +26,46 @@ public sealed class ApplicationCapabilitiesTests {
         var capabilities = profile.GetCapabilities();
 
         Assert.True(capabilities.Supports(MailCapability.SearchMessages));
-        Assert.True(capabilities.Supports(MailCapability.WaitForMessages));
+        Assert.False(capabilities.Supports(MailCapability.WaitForMessages));
         Assert.False(capabilities.Supports(MailCapability.SendMessages));
+    }
+
+    [Theory]
+    [InlineData(MailProfileKind.Pop3)]
+    [InlineData(MailProfileKind.SendGrid)]
+    [InlineData(MailProfileKind.Mailgun)]
+    [InlineData(MailProfileKind.Ses)]
+    public void CatalogDoesNotAdvertiseProvidersWithoutNormalizedHandlers(MailProfileKind kind) {
+        Assert.Equal(MailCapability.None, MailCapabilityCatalog.For(kind).Capabilities);
+    }
+
+    [Fact]
+    public async Task BuiltApplicationReportsOnlyCapabilitiesBackedByRegisteredHandlers() {
+        string directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var store = new FileMailProfileStore(Path.Combine(directory, "profiles.json"));
+            await store.SaveAsync(new MailProfile {
+                Id = "graph-actions-only",
+                DisplayName = "Graph actions only",
+                Kind = MailProfileKind.Graph
+            });
+            var application = new MailApplicationBuilder(new MailApplicationOptions {
+                EnableGraphReadHandler = false,
+                EnableGraphSendHandler = false
+            }).UseProfileStore(store).Build();
+
+            ProfileCapabilities? capabilities =
+                await application.Profiles.GetCapabilitiesAsync("graph-actions-only");
+            Assert.NotNull(capabilities);
+
+            Assert.True(capabilities!.Supports(MailCapability.MarkMessages));
+            Assert.True(capabilities.Supports(MailCapability.MoveMessages));
+            Assert.False(capabilities.Supports(MailCapability.SearchMessages));
+            Assert.False(capabilities.Supports(MailCapability.SendMessages));
+        } finally {
+            Directory.Delete(directory, true);
+        }
     }
 
     [Fact]

@@ -13,10 +13,10 @@ public static partial class CliRunner {
         output.WriteLine("Commands:");
         output.WriteLine("  profile list [--summary] [--compact] [--kind <kind>] [--ready-only] [--can-read] [--can-send] [--default-only] [--sort <id|kind|readiness>] [--desc] [--json]");
         output.WriteLine("  profile create --profile <id> --kind <kind> --name <display-name> [--description <text>] [--default-sender <email>] [--default-mailbox <value>] [--is-default] [--setting <key=value>] [--json]");
-        output.WriteLine("  profile graph-bootstrap --profile <id> --name <display-name> --mailbox <address> [--description <text>] [--default-sender <email>] [--is-default] [--client-id <id>] [--tenant-id <id>] [--client-secret <secret>|--client-secret-env <name>|--client-secret-stdin|--client-secret-ref <profile-id:secret-name>] [--access-token <token>|--access-token-env <name>|--access-token-stdin|--access-token-ref <profile-id:secret-name>] [--certificate-path <path>] [--certificate-password <secret>|--certificate-password-env <name>|--certificate-password-stdin|--certificate-password-ref <profile-id:secret-name>] [--json]");
-        output.WriteLine("  profile gmail-bootstrap --profile <id> --name <display-name> [--mailbox <address|me>] [--description <text>] [--default-sender <email>] [--is-default] [--client-id <id>] [--client-secret <secret>|--client-secret-env <name>|--client-secret-stdin|--client-secret-ref <profile-id:secret-name>] [--refresh-token <token>|--refresh-token-env <name>|--refresh-token-stdin|--refresh-token-ref <profile-id:secret-name>] [--access-token <token>|--access-token-env <name>|--access-token-stdin|--access-token-ref <profile-id:secret-name>] [--json]");
+        output.WriteLine("  profile graph-bootstrap --profile <id> --name <display-name> --mailbox <address> [--description <text>] [--default-sender <email>] [--is-default] [--client-id <id>] [--tenant-id <id>] [--client-secret-env <name>|--client-secret-stdin|--client-secret-ref <profile-id:secret-name>] [--access-token-env <name>|--access-token-stdin|--access-token-ref <profile-id:secret-name>] [--certificate-path <path>] [--certificate-password-env <name>|--certificate-password-stdin|--certificate-password-ref <profile-id:secret-name>] [--json]");
+        output.WriteLine("  profile gmail-bootstrap --profile <id> --name <display-name> [--mailbox <address|me>] [--description <text>] [--default-sender <email>] [--is-default] [--client-id <id>] [--client-secret-env <name>|--client-secret-stdin|--client-secret-ref <profile-id:secret-name>] [--refresh-token-env <name>|--refresh-token-stdin|--refresh-token-ref <profile-id:secret-name>] [--access-token-env <name>|--access-token-stdin|--access-token-ref <profile-id:secret-name>] [--json]");
         output.WriteLine("  profile graph-login --profile <id> [--login <upn>] [--mailbox <address>] [--client-id <id>] [--tenant-id <id>] [--redirect-uri <uri>] [--scope <value>] [--scope <value>] [--json]");
-        output.WriteLine("  profile gmail-login --profile <id> [--mailbox <address>] [--client-id <id>] [--client-secret <secret>|--client-secret-env <name>|--client-secret-stdin|--client-secret-ref <profile-id:secret-name>] [--scope <value>] [--scope <value>] [--json]");
+        output.WriteLine("  profile gmail-login --profile <id> [--mailbox <address>] [--client-id <id>] [--client-secret-env <name>|--client-secret-stdin|--client-secret-ref <profile-id:secret-name>] [--scope <value>] [--scope <value>] [--json]");
         output.WriteLine("  profile refresh-auth --profile <id> [--json]");
         output.WriteLine("  profile auth-status --profile <id> [--json]");
         output.WriteLine("  profile test --profile <id> [--scope <auto|auth|mailbox|send>] [--json]");
@@ -27,7 +27,7 @@ public static partial class CliRunner {
         output.WriteLine("  profile doctor --profile <id> [--json]");
         output.WriteLine("  profile delete --profile <id> [--json]");
         output.WriteLine("  profile set-default --profile <id> [--json]");
-        output.WriteLine("  profile set-secret --profile <id> --name <secret-name> [--value <secret-value>|--value-env <name>|--value-stdin|--value-ref <profile-id:secret-name>] [--json]");
+        output.WriteLine("  profile set-secret --profile <id> --name <secret-name> [--value-env <name>|--value-stdin|--value-ref <profile-id:secret-name>] [--json]");
         output.WriteLine("  profile remove-secret --profile <id> --name <secret-name> [--json]");
         output.WriteLine("  draft list [--compact] [--json]");
         output.WriteLine("  draft save --file <path> [--draft <id>] [--name <display-name>] [--json]");
@@ -79,9 +79,9 @@ public static partial class CliRunner {
         output.WriteLine("  mail save-attachments --profile <id> --message-id <id> --path <destination> [--mailbox <id>] [--folder <name>] [--attachment-id <id>] [--attachment-id <id>] [--name-contains <text>] [--content-type <text>] [--overwrite] [--json]");
         output.WriteLine("  mail save-attachments-many --profile <id> --message-id <id> [--message-id <id>] --path <destination> [--mailbox <id>] [--folder <name>] [--attachment-id <id>] [--attachment-id <id>] [--name-contains <text>] [--content-type <text>] [--overwrite] [--json]");
         output.WriteLine("  mcp serve");
-        output.WriteLine("  send --draft <id> [--send-now] [--json]");
-        output.WriteLine("  send --file <path> [--send-now] [--json]");
-        output.WriteLine("  send --profile <id> --to <address> [--to <address>] [--cc <address>] [--bcc <address>] [--reply-to <address>] [--from <address>] [--subject <text>] [--text <text>] [--html <html>] [--attachment <path>] [--header <key=value>] [--send-now] [--json]");
+        output.WriteLine("  send --draft <id> [--queue-on-failure] [--json]");
+        output.WriteLine("  send --file <path> [--queue-on-failure] [--json]");
+        output.WriteLine("  send --profile <id> --to <address> [--to <address>] [--cc <address>] [--bcc <address>] [--reply-to <address>] [--from <address>] [--subject <text>] [--text <text>] [--html <html>] [--attachment <path>] [--header <key=value>] [--queue-on-failure] [--json]");
         output.WriteLine("  queue list [--compact] [--json]");
         output.WriteLine("  queue get --message-id <id> [--compact] [--json]");
         output.WriteLine("  queue remove --message-id <id> [--json]");

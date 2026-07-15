@@ -4,6 +4,10 @@ namespace Mailozaurr.Application;
 /// Resolves a profile and routes read operations to the matching provider handler.
 /// </summary>
 public sealed class RoutedMailReadService : IMailReadService {
+    private const MailCapability HandlerCapabilities = MailCapability.ListFolders
+        | MailCapability.SearchMessages
+        | MailCapability.ReadMessages
+        | MailCapability.SaveAttachments;
     private readonly IMailProfileStore _profileStore;
     private readonly IReadOnlyDictionary<MailProfileKind, IMailReadHandler> _handlers;
 
@@ -257,7 +261,7 @@ public sealed class RoutedMailReadService : IMailReadService {
             : throw new NotSupportedException($"No read handler is registered for profile kind '{kind}'.");
 
     private static void EnsureCapability(MailProfile profile, MailCapability capability) {
-        if (!profile.GetCapabilities().Supports(capability)) {
+        if (!profile.GetCapabilities(HandlerCapabilities).Supports(capability)) {
             throw new NotSupportedException($"Profile '{profile.Id}' does not support '{capability}'.");
         }
     }

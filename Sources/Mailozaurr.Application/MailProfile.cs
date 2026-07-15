@@ -37,4 +37,13 @@ public sealed class MailProfile {
     /// Returns the effective capabilities for this profile.
     /// </summary>
     public ProfileCapabilities GetCapabilities() => Capabilities ?? ProfileCapabilities.CreateDefault(Kind);
+
+    /// <summary>
+    /// Returns the effective capabilities after applying the handlers available in the current application.
+    /// Explicit profile overrides remain restrictive; otherwise the registered handlers define the capability set.
+    /// </summary>
+    internal ProfileCapabilities GetCapabilities(MailCapability availableCapabilities) {
+        MailCapability configured = Capabilities?.Capabilities ?? availableCapabilities;
+        return new ProfileCapabilities(Kind, configured & availableCapabilities);
+    }
 }

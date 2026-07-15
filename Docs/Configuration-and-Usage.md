@@ -203,7 +203,11 @@ mailozaurr profile create --profile work-imap --kind imap --name "Work IMAP" `
   --setting userName=user@example.com `
   --json
 
-mailozaurr profile set-secret --profile work-imap --name password --value "secret" --json
+$env:MAILOZAURR_IMAP_PASSWORD = '<password>'
+mailozaurr profile set-secret --profile work-imap --name password `
+  --value-env MAILOZAURR_IMAP_PASSWORD --json
+Remove-Item Env:MAILOZAURR_IMAP_PASSWORD
+
 mailozaurr profile test --profile work-imap --scope mailbox --json
 ```
 
@@ -218,19 +222,25 @@ mailozaurr profile create --profile alerts-smtp --kind smtp --name "Alerts SMTP"
   --setting useSsl=true `
   --json
 
-mailozaurr profile set-secret --profile alerts-smtp --name password --value "secret" --json
+$env:MAILOZAURR_SMTP_PASSWORD = '<password>'
+mailozaurr profile set-secret --profile alerts-smtp --name password `
+  --value-env MAILOZAURR_SMTP_PASSWORD --json
+Remove-Item Env:MAILOZAURR_SMTP_PASSWORD
+
 mailozaurr profile test --profile alerts-smtp --scope send --json
 ```
 
 ### Microsoft Graph profile
 
 ```powershell
+$env:MAILOZAURR_GRAPH_CLIENT_SECRET = '<client-secret>'
 mailozaurr profile graph-bootstrap --profile work-graph --name "Work Graph" `
   --mailbox user@example.com `
   --client-id <app-id> `
   --tenant-id <tenant-id> `
-  --client-secret <secret> `
+  --client-secret-env MAILOZAURR_GRAPH_CLIENT_SECRET `
   --json
+Remove-Item Env:MAILOZAURR_GRAPH_CLIENT_SECRET
 
 mailozaurr profile auth-status --profile work-graph --json
 mailozaurr profile test --profile work-graph --scope mailbox --json
@@ -239,12 +249,16 @@ mailozaurr profile test --profile work-graph --scope mailbox --json
 ### Gmail profile
 
 ```powershell
+$env:MAILOZAURR_GMAIL_CLIENT_SECRET = '<client-secret>'
+$env:MAILOZAURR_GMAIL_REFRESH_TOKEN = '<refresh-token>'
 mailozaurr profile gmail-bootstrap --profile personal-gmail --name "Personal Gmail" `
   --mailbox user@gmail.com `
   --client-id <client-id> `
-  --client-secret <secret> `
-  --refresh-token <token> `
+  --client-secret-env MAILOZAURR_GMAIL_CLIENT_SECRET `
+  --refresh-token-env MAILOZAURR_GMAIL_REFRESH_TOKEN `
   --json
+Remove-Item Env:MAILOZAURR_GMAIL_CLIENT_SECRET
+Remove-Item Env:MAILOZAURR_GMAIL_REFRESH_TOKEN
 
 mailozaurr profile auth-status --profile personal-gmail --json
 mailozaurr profile test --profile personal-gmail --scope mailbox --json
@@ -269,6 +283,8 @@ mailozaurr send --draft weekly-update --json
 mailozaurr queue list --compact --json
 mailozaurr queue process --json
 ```
+
+Send commands attempt immediate delivery by default. Use `--queue-on-failure` to persist a message only when that immediate attempt fails.
 
 ### Preview before destructive actions
 

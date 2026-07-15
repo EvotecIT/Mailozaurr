@@ -1,13 +1,10 @@
-using System.Text.Json;
-
 namespace Mailozaurr.Application;
 
 /// <summary>
 /// Stores reusable message action plan batches in a JSON document on disk.
 /// </summary>
 public sealed class FileMailMessageActionPlanBatchStore : IMailMessageActionPlanBatchStore {
-    private readonly string _filePath;
-    private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly JsonFileDocumentStore<MailMessageActionPlanBatchStoreDocument> _store;
     /// <summary>
     /// Creates a new store using the provided options.
     /// </summary>
@@ -19,47 +16,39 @@ public sealed class FileMailMessageActionPlanBatchStore : IMailMessageActionPlan
     /// Creates a new store using the specified file path.
     /// </summary>
     public FileMailMessageActionPlanBatchStore(string filePath) {
-        _filePath = Path.GetFullPath(filePath ?? throw new ArgumentNullException(nameof(filePath)));
+        _store = new JsonFileDocumentStore<MailMessageActionPlanBatchStoreDocument>(
+            filePath,
+            "Action plan batch store path is invalid.",
+            ApplicationJsonContext.Default.MailMessageActionPlanBatchStoreDocument,
+            static () => new MailMessageActionPlanBatchStoreDocument());
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<MailMessageActionPlanBatch>> GetAllAsync(CancellationToken cancellationToken = default) {
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try {
-            var document = await LoadDocumentAsync(cancellationToken).ConfigureAwait(false);
-            return document.Batches
+    public Task<IReadOnlyList<MailMessageActionPlanBatch>> GetAllAsync(CancellationToken cancellationToken = default) =>
+        _store.ReadAsync<IReadOnlyList<MailMessageActionPlanBatch>>(document => document.Batches
                 .Select(CloneBatch)
                 .OrderBy(batch => batch.Name, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(batch => batch.Id, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-        } finally {
-            _gate.Release();
-        }
-    }
+                .ToArray(), cancellationToken);
 
     /// <inheritdoc />
-    public async Task<MailMessageActionPlanBatch?> GetByIdAsync(string batchId, CancellationToken cancellationToken = default) {
+    public Task<MailMessageActionPlanBatch?> GetByIdAsync(string batchId, CancellationToken cancellationToken = default) {
         if (string.IsNullOrWhiteSpace(batchId)) {
             throw new ArgumentException("Batch id is required.", nameof(batchId));
         }
 
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try {
-            var document = await LoadDocumentAsync(cancellationToken).ConfigureAwait(false);
-            var batch = document.Batches.FirstOrDefault(existing => string.Equals(existing.Id, batchId, StringComparison.OrdinalIgnoreCase));
+        return _store.ReadAsync(document => {
+            MailMessageActionPlanBatch? batch = document.Batches.FirstOrDefault(existing =>
+                string.Equals(existing.Id, batchId, StringComparison.OrdinalIgnoreCase));
             return batch == null ? null : CloneBatch(batch);
-        } finally {
-            _gate.Release();
-        }
+        }, cancellationToken);
     }
 
     /// <inheritdoc />
     public async Task SaveAsync(MailMessageActionPlanBatch batch, CancellationToken cancellationToken = default) {
         ValidateBatch(batch);
 
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try {
-            var document = await LoadDocumentAsync(cancellationToken).ConfigureAwait(false);
+        await _store.UpdateAsync(document => {
             var index = document.Batches.FindIndex(existing => string.Equals(existing.Id, batch.Id, StringComparison.OrdinalIgnoreCase));
             var batchToStore = CloneBatch(batch);
             if (batchToStore.CreatedAt == default) {
@@ -75,53 +64,18 @@ public sealed class FileMailMessageActionPlanBatchStore : IMailMessageActionPlan
             } else {
                 document.Batches.Add(batchToStore);
             }
-
-            await SaveDocumentAsync(document, cancellationToken).ConfigureAwait(false);
-        } finally {
-            _gate.Release();
-        }
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task<bool> RemoveAsync(string batchId, CancellationToken cancellationToken = default) {
+    public Task<bool> RemoveAsync(string batchId, CancellationToken cancellationToken = default) {
         if (string.IsNullOrWhiteSpace(batchId)) {
             throw new ArgumentException("Batch id is required.", nameof(batchId));
         }
 
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try {
-            var document = await LoadDocumentAsync(cancellationToken).ConfigureAwait(false);
-            var removed = document.Batches.RemoveAll(existing => string.Equals(existing.Id, batchId, StringComparison.OrdinalIgnoreCase)) > 0;
-            if (!removed) {
-                return false;
-            }
-
-            await SaveDocumentAsync(document, cancellationToken).ConfigureAwait(false);
-            return true;
-        } finally {
-            _gate.Release();
-        }
+        return _store.RemoveAsync(document => document.Batches.RemoveAll(existing =>
+            string.Equals(existing.Id, batchId, StringComparison.OrdinalIgnoreCase)) > 0, cancellationToken);
     }
-
-    private async Task<MailMessageActionPlanBatchStoreDocument> LoadDocumentAsync(CancellationToken cancellationToken) {
-        if (!File.Exists(_filePath)) {
-            return new MailMessageActionPlanBatchStoreDocument();
-        }
-
-        using (var stream = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.Read)) {
-            var document = await JsonSerializer.DeserializeAsync(stream, ApplicationJsonContext.Default.MailMessageActionPlanBatchStoreDocument, cancellationToken).ConfigureAwait(false);
-            return document ?? new MailMessageActionPlanBatchStoreDocument();
-        }
-    }
-
-    private Task SaveDocumentAsync(MailMessageActionPlanBatchStoreDocument document, CancellationToken cancellationToken) =>
-        AtomicFileWriter.WriteAsync(
-            _filePath,
-            "Action plan batch store path is invalid.",
-            async (stream, token) => {
-                await JsonSerializer.SerializeAsync(stream, document, ApplicationJsonContext.Default.MailMessageActionPlanBatchStoreDocument, token).ConfigureAwait(false);
-            },
-            cancellationToken);
 
     private static void ValidateBatch(MailMessageActionPlanBatch? batch) {
         if (batch == null) {

@@ -135,6 +135,113 @@ public sealed class ApplicationProfileBootstrapServiceTests {
     }
 
     [Fact]
+    public async Task FailedSecretWriteRollsBackNewProfile() {
+        var profileStore = new InMemoryProfileStore();
+        var secretStore = new InMemorySecretStore();
+        var profileService = new MailProfileService(profileStore, secretStore);
+        var service = new MailProfileBootstrapService(
+            profileService,
+            new FailingProfileSecretService(),
+            secretStore);
+
+        var result = await service.SaveGraphProfileAsync(new GraphProfileBootstrapRequest {
+            ProfileId = "graph-work",
+            DisplayName = "Work Graph",
+            Mailbox = "shared@example.com",
+            AccessToken = "access-token"
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("secret_write_failed", result.Code);
+        Assert.Null(await profileStore.GetByIdAsync("graph-work"));
+        Assert.Null(await secretStore.GetSecretAsync("graph-work", MailSecretNames.AccessToken));
+    }
+
+    [Fact]
+    public async Task FailedSecretWritePreservesSecretsThatPredatedNewProfile() {
+        var profileStore = new InMemoryProfileStore();
+        var secretStore = new InMemorySecretStore();
+        await secretStore.SetSecretAsync("graph-work", MailSecretNames.Password, "preexisting-password");
+        var service = new MailProfileBootstrapService(
+            new MailProfileService(profileStore, secretStore),
+            new FailingProfileSecretService(),
+            secretStore);
+
+        var result = await service.SaveGraphProfileAsync(new GraphProfileBootstrapRequest {
+            ProfileId = "graph-work",
+            DisplayName = "Work Graph",
+            Mailbox = "shared@example.com",
+            AccessToken = "new-access-token"
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Null(await profileStore.GetByIdAsync("graph-work"));
+        Assert.Equal(
+            "preexisting-password",
+            await secretStore.GetSecretAsync("graph-work", MailSecretNames.Password));
+        Assert.Null(await secretStore.GetSecretAsync("graph-work", MailSecretNames.AccessToken));
+    }
+
+    [Fact]
+    public async Task FailedSecretWriteRestoresPreviousDefaultProfile() {
+        string directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var profileStore = new FileMailProfileStore(Path.Combine(directory, "profiles.json"));
+            var secretStore = new InMemorySecretStore();
+            var profileService = new MailProfileService(profileStore, secretStore);
+            OperationResult initialSave = await profileService.SaveAsync(new MailProfile {
+                Id = "existing-default",
+                DisplayName = "Existing default",
+                Kind = MailProfileKind.Graph,
+                DefaultMailbox = "existing@example.com",
+                IsDefault = true
+            });
+            Assert.True(initialSave.Succeeded);
+            var service = new MailProfileBootstrapService(
+                profileService,
+                new FailingProfileSecretService(),
+                secretStore);
+
+            OperationResult result = await service.SaveGraphProfileAsync(new GraphProfileBootstrapRequest {
+                ProfileId = "new-default",
+                DisplayName = "New default",
+                Mailbox = "new@example.com",
+                AccessToken = "access-token",
+                IsDefault = true
+            });
+
+            IReadOnlyList<MailProfile> profiles = await profileService.GetProfilesAsync();
+            Assert.False(result.Succeeded);
+            MailProfile restored = Assert.Single(profiles);
+            Assert.Equal("existing-default", restored.Id);
+            Assert.True(restored.IsDefault);
+        } finally {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public async Task GraphBootstrapReturnsValidationFailureForNullProfileId() {
+        var profileStore = new InMemoryProfileStore();
+        var secretStore = new InMemorySecretStore();
+        var service = new MailProfileBootstrapService(
+            new MailProfileService(profileStore, secretStore),
+            new MailProfileSecretService(profileStore, secretStore),
+            secretStore);
+
+        var result = await service.SaveGraphProfileAsync(new GraphProfileBootstrapRequest {
+            ProfileId = null!,
+            DisplayName = "Work Graph",
+            Mailbox = "shared@example.com",
+            AccessToken = "access-token"
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("profile_required", result.Code);
+    }
+
+    [Fact]
     public async Task DiagnoseAsyncReportsMissingGmailSecrets() {
         var profileStore = new InMemoryProfileStore();
         var secretStore = new InMemorySecretStore();
@@ -192,5 +299,28 @@ public sealed class ApplicationProfileBootstrapServiceTests {
             _values[$"{profileId}::{secretName}"] = secretValue;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FailingProfileSecretService : IMailProfileSecretService {
+        public Task<OperationResult> SetSecretAsync(
+            string profileId,
+            string secretName,
+            string secretValue,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(OperationResult.Failure("secret_write_failed", "Simulated secret write failure."));
+
+        public Task<OperationResult> SetSecretAsync(
+            string profileId,
+            string secretName,
+            string? secretValue,
+            string? secretReference,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(OperationResult.Failure("secret_write_failed", "Simulated secret write failure."));
+
+        public Task<OperationResult> RemoveSecretAsync(
+            string profileId,
+            string secretName,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(OperationResult.Success());
     }
 }

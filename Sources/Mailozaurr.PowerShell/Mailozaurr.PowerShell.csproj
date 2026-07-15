@@ -19,7 +19,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
-        <ProjectReference Include="..\Mailozaurr.Msg\Mailozaurr.Msg.csproj" />
     </ItemGroup>
 
     <ItemGroup>
