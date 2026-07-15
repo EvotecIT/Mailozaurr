@@ -5,7 +5,7 @@ using System.ComponentModel;
 namespace Mailozaurr.Cli.Mcp;
 
 public sealed partial class MailMcpTools {
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
     [Description("Searches messages in a mailbox using normalized Mailozaurr filters.")]
     public Task<IReadOnlyList<MessageSummary>> mail_search(
         [Description("The profile identifier to query.")] string profileId,
@@ -30,7 +30,7 @@ public sealed partial class MailMcpTools {
             Limit = limit
         }, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
     [Description("Searches messages in a mailbox using a lightweight Mailozaurr message projection.")]
     public Task<IReadOnlyList<MessageSummaryCompact>> mail_search_compact(
         [Description("The profile identifier to query.")] string profileId,
@@ -55,7 +55,7 @@ public sealed partial class MailMcpTools {
             Limit = limit
         }, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
     [Description("Gets a detailed message view for a specific message identifier.")]
     public async Task<MessageDetail> mail_get(
         [Description("The profile identifier to query.")] string profileId,
@@ -75,7 +75,7 @@ public sealed partial class MailMcpTools {
         return message ?? throw new InvalidOperationException($"Message '{messageId}' was not found.");
     }
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
     [Description("Gets a lightweight detailed message view for a specific message identifier.")]
     public async Task<MessageDetailCompact> mail_get_compact(
         [Description("The profile identifier to query.")] string profileId,
@@ -95,7 +95,7 @@ public sealed partial class MailMcpTools {
         return message ?? throw new InvalidOperationException($"Message '{messageId}' was not found.");
     }
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
     [Description("Gets detailed message views for multiple specific message identifiers.")]
     public Task<IReadOnlyList<MessageDetail>> mail_get_many(
         [Description("The profile identifier to query.")] string profileId,
@@ -112,7 +112,7 @@ public sealed partial class MailMcpTools {
             IncludeRawContent = includeRawContent
         }, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
     [Description("Gets lightweight detailed message views for multiple specific message identifiers.")]
     public Task<IReadOnlyList<MessageDetailCompact>> mail_get_many_compact(
         [Description("The profile identifier to query.")] string profileId,
@@ -129,7 +129,7 @@ public sealed partial class MailMcpTools {
             IncludeRawContent = includeRawContent
         }, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Builds a dry-run preview for changing messages to read or unread, including normalized message ids and a reusable confirmation token.")]
     public Task<MessageStateChangePreview> mail_mark_read_preview(
         [Description("The profile identifier to query.")] string profileId,
@@ -146,7 +146,7 @@ public sealed partial class MailMcpTools {
             IsRead = isRead
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
     [Description("Marks one or more messages as read or unread using the shared Mailozaurr message-action service.")]
     public Task<MessageActionResult> mail_mark_read(
         [Description("The profile identifier to query.")] string profileId,
@@ -165,7 +165,7 @@ public sealed partial class MailMcpTools {
             ConfirmationToken = confirmationToken
         }, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Builds a dry-run preview for flagging or unflagging messages, including normalized message ids and a reusable confirmation token.")]
     public Task<MessageStateChangePreview> mail_flag_preview(
         [Description("The profile identifier to query.")] string profileId,
@@ -182,7 +182,7 @@ public sealed partial class MailMcpTools {
             IsFlagged = isFlagged
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
     [Description("Flags or unflags one or more messages using the shared Mailozaurr message-action service.")]
     public Task<MessageActionResult> mail_flag(
         [Description("The profile identifier to query.")] string profileId,
@@ -201,7 +201,7 @@ public sealed partial class MailMcpTools {
             ConfirmationToken = confirmationToken
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
     [Description("Archives one or more messages using the shared Mailozaurr message-action service and a provider-neutral Archive alias.")]
     public Task<MessageActionResult> mail_archive(
         [Description("The profile identifier to query.")] string profileId,
@@ -219,7 +219,7 @@ public sealed partial class MailMcpTools {
             ConfirmationToken = confirmationToken
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
     [Description("Moves one or more messages to trash using the shared Mailozaurr message-action service and a provider-neutral Trash alias.")]
     public Task<MessageActionResult> mail_trash(
         [Description("The profile identifier to query.")] string profileId,
@@ -237,7 +237,7 @@ public sealed partial class MailMcpTools {
             ConfirmationToken = confirmationToken
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
     [Description("Moves one or more messages to a destination folder using the shared Mailozaurr message-action service.")]
     public Task<MessageActionResult> mail_move(
         [Description("The profile identifier to query.")] string profileId,
@@ -256,7 +256,7 @@ public sealed partial class MailMcpTools {
             ConfirmationToken = confirmationToken
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
     [Description("Deletes one or more messages using the shared Mailozaurr message-action service.")]
     public Task<MessageActionResult> mail_delete(
         [Description("The profile identifier to query.")] string profileId,
@@ -273,7 +273,7 @@ public sealed partial class MailMcpTools {
             ConfirmationToken = confirmationToken
         }, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
     [Description("Lists attachment metadata for a specific message without returning the full message body.")]
     public Task<IReadOnlyList<AttachmentSummary>> mail_attachments_list(
         [Description("The profile identifier to query.")] string profileId,
@@ -288,7 +288,7 @@ public sealed partial class MailMcpTools {
             MessageId = messageId
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
     [Description("Saves a message attachment to a local path that the Mailozaurr server can access.")]
     public Task<OperationResult> mail_attachment_save(
         [Description("The profile identifier to query.")] string profileId,
@@ -309,7 +309,7 @@ public sealed partial class MailMcpTools {
             Overwrite = overwrite
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
     [Description("Saves one or more attachments from a message using shared Mailozaurr filtering and batching logic.")]
     public Task<SaveAttachmentsResult> mail_attachments_save(
         [Description("The profile identifier to query.")] string profileId,
@@ -334,7 +334,7 @@ public sealed partial class MailMcpTools {
             Overwrite = overwrite
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
     [Description("Saves attachments from multiple messages using shared Mailozaurr filtering and batching logic.")]
     public Task<SaveAttachmentsManyResult> mail_attachments_save_many(
         [Description("The profile identifier to query.")] string profileId,
@@ -359,7 +359,7 @@ public sealed partial class MailMcpTools {
             Overwrite = overwrite
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true)]
     [Description("Sends a message using a configured Mailozaurr profile, optionally queueing it after a send failure.")]
     public Task<SendResult> mail_send(
         [Description("The profile identifier to use for sending.")] string profileId,

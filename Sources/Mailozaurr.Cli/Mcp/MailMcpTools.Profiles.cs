@@ -5,12 +5,12 @@ using System.ComponentModel;
 namespace Mailozaurr.Cli.Mcp;
 
 public sealed partial class MailMcpTools {
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Lists configured Mailozaurr profiles that can be used for mailbox and send operations.")]
     public Task<IReadOnlyList<MailProfile>> mail_profiles_list(CancellationToken cancellationToken = default) =>
         _application.Profiles.GetProfilesAsync(cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Lists higher-level summaries for all configured Mailozaurr profiles, including kind, capabilities, auth posture, and readiness.")]
     public Task<IReadOnlyList<MailProfileOverview>> mail_profiles_summary_list(
         [Description("Optional provider kind filter, such as imap, graph, gmail, smtp, or pop3.")] string? kind = null,
@@ -33,7 +33,7 @@ public sealed partial class MailMcpTools {
             DefaultOnly = defaultOnly
         }, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Lists lightweight profile summaries for all configured Mailozaurr profiles.")]
     public Task<IReadOnlyList<MailProfileOverviewCompact>> mail_profiles_summary_compact_list(
         [Description("Optional provider kind filter, such as imap, graph, gmail, smtp, or pop3.")] string? kind = null,
@@ -56,7 +56,7 @@ public sealed partial class MailMcpTools {
             DefaultOnly = defaultOnly
         }, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Returns the effective capabilities for a configured Mailozaurr profile.")]
     public async Task<ProfileCapabilities> mail_capabilities_get(
         [Description("The profile identifier to inspect.")] string profileId,
@@ -65,7 +65,7 @@ public sealed partial class MailMcpTools {
         return capabilities ?? throw new InvalidOperationException($"Profile '{profileId}' was not found.");
     }
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Gets a configured Mailozaurr profile by identifier.")]
     public async Task<MailProfile> mail_profile_get(
         [Description("The profile identifier to retrieve.")] string profileId,
@@ -74,14 +74,14 @@ public sealed partial class MailMcpTools {
         return profile ?? throw new InvalidOperationException($"Profile '{profileId}' was not found.");
     }
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Inspects whether a configured Mailozaurr profile is ready to use, including provider-specific auth prerequisites.")]
     public Task<MailProfileValidationResult> mail_profile_doctor(
         [Description("The profile identifier to inspect.")] string profileId,
         CancellationToken cancellationToken = default) =>
         _application.Profiles.DiagnoseAsync(profileId, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Returns a higher-level summary for a configured Mailozaurr profile, combining kind, capabilities, auth posture, and readiness.")]
     public async Task<MailProfileOverview> mail_profile_summary(
         [Description("The profile identifier to summarize.")] string profileId,
@@ -90,7 +90,7 @@ public sealed partial class MailMcpTools {
         return overview ?? throw new InvalidOperationException($"Profile '{profileId}' was not found.");
     }
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Returns a lightweight summary for a configured Mailozaurr profile.")]
     public async Task<MailProfileOverviewCompact> mail_profile_summary_compact(
         [Description("The profile identifier to summarize.")] string profileId,
@@ -99,7 +99,7 @@ public sealed partial class MailMcpTools {
         return overview ?? throw new InvalidOperationException($"Profile '{profileId}' was not found.");
     }
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Runs structural validation for a configured Mailozaurr profile without provider-specific readiness checks.")]
     public async Task<MailProfileValidationResult> mail_profile_validate(
         [Description("The profile identifier to validate.")] string profileId,
@@ -112,7 +112,7 @@ public sealed partial class MailMcpTools {
         return await _application.Profiles.ValidateAsync(profile, cancellationToken).ConfigureAwait(false);
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Creates or updates a Mailozaurr profile using shared profile storage.")]
     public async Task<MailProfile> mail_profile_save(
         [Description("The stable profile identifier to create or update.")] string profileId,
@@ -145,7 +145,7 @@ public sealed partial class MailMcpTools {
         return await mail_profile_get(profileId, cancellationToken).ConfigureAwait(false);
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Creates or updates a Microsoft Graph profile using the shared Graph bootstrap workflow.")]
     public async Task<MailProfile> mail_profile_graph_bootstrap(
         [Description("The stable profile identifier to create or update.")] string profileId,
@@ -182,7 +182,7 @@ public sealed partial class MailMcpTools {
         return await mail_profile_get(profileId, cancellationToken).ConfigureAwait(false);
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Creates or updates a Gmail profile using the shared Gmail bootstrap workflow.")]
     public async Task<MailProfile> mail_profile_gmail_bootstrap(
         [Description("The stable profile identifier to create or update.")] string profileId,
@@ -215,7 +215,7 @@ public sealed partial class MailMcpTools {
         return await mail_profile_get(profileId, cancellationToken).ConfigureAwait(false);
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true)]
     [Description("Authenticates a saved Microsoft Graph profile using the shared interactive login workflow and persists the resulting token.")]
     public Task<MailProfileAuthenticationResult> mail_profile_graph_login(
         [Description("The saved Graph profile identifier to authenticate.")] string profileId,
@@ -236,7 +236,7 @@ public sealed partial class MailMcpTools {
             Scopes = scopes
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true)]
     [Description("Authenticates a saved Gmail profile using the shared interactive login workflow and persists the resulting tokens.")]
     public Task<MailProfileAuthenticationResult> mail_profile_gmail_login(
         [Description("The saved Gmail profile identifier to authenticate.")] string profileId,
@@ -253,14 +253,14 @@ public sealed partial class MailMcpTools {
             Scopes = scopes
         }, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true)]
     [Description("Refreshes or reauthenticates a saved profile using its persisted Mailozaurr auth metadata.")]
     public Task<MailProfileAuthenticationResult> mail_profile_refresh_auth(
         [Description("The saved profile identifier to refresh.")] string profileId,
         CancellationToken cancellationToken = default) =>
         _application.ProfileAuth.RefreshAsync(profileId, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Returns the persisted authentication status for a saved Mailozaurr profile, including auth mode, token presence, and refreshability.")]
     public async Task<MailProfileAuthStatus> mail_profile_auth_status(
         [Description("The saved profile identifier to inspect.")] string profileId,
@@ -269,7 +269,7 @@ public sealed partial class MailMcpTools {
         return status ?? throw new InvalidOperationException($"Profile '{profileId}' was not found.");
     }
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
     [Description("Runs a live provider connection test for a saved Mailozaurr profile.")]
     public Task<MailProfileConnectionTestResult> mail_profile_test(
         [Description("The saved profile identifier to test.")] string profileId,
@@ -277,21 +277,21 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.ProfileConnections.TestAsync(profileId, ParseConnectionTestScope(scope), cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Deletes a Mailozaurr profile from shared profile storage.")]
     public Task<OperationResult> mail_profile_delete(
         [Description("The profile identifier to delete.")] string profileId,
         CancellationToken cancellationToken = default) =>
         _application.Profiles.DeleteAsync(profileId, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Marks a Mailozaurr profile as the shared default profile.")]
     public Task<OperationResult> mail_profile_set_default(
         [Description("The profile identifier to mark as default.")] string profileId,
         CancellationToken cancellationToken = default) =>
         _application.Profiles.SetDefaultAsync(profileId, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Copies an existing stored secret to another Mailozaurr profile without exposing its value to MCP.")]
     public Task<OperationResult> mail_profile_secret_copy(
         [Description("The profile identifier that owns the secret.")] string profileId,
@@ -305,7 +305,7 @@ public sealed partial class MailMcpTools {
             secretReference,
             cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Removes a secret associated with an existing Mailozaurr profile.")]
     public Task<OperationResult> mail_profile_secret_remove(
         [Description("The profile identifier that owns the secret.")] string profileId,
@@ -313,13 +313,13 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.ProfileSecrets.RemoveSecretAsync(profileId, secretName, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Reports structured secret sets whose owning Mailozaurr profiles no longer exist, while identifying ambiguous legacy keys without exposing secret values.")]
     public Task<MailProfileSecretMaintenanceResult> mail_profile_secrets_orphaned_inspect(
         CancellationToken cancellationToken = default) =>
         _application.ProfileSecretMaintenance.InspectOrphanedSecretsAsync(cancellationToken);
 
-    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true)]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Removes structured orphan secret sets while retaining ambiguous legacy keys that cannot be assigned safely.")]
     public Task<MailProfileSecretMaintenanceResult> mail_profile_secrets_orphaned_cleanup(
         CancellationToken cancellationToken = default) =>

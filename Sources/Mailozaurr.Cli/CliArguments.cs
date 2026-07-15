@@ -1,129 +1,158 @@
+using System.CommandLine;
+using System.CommandLine.Help;
+using System.CommandLine.Parsing;
+
 namespace Mailozaurr.Cli;
 
 internal sealed class CliArguments {
-    private static readonly HashSet<string> FlagOptions = new(StringComparer.OrdinalIgnoreCase) {
-        "access-token-stdin", "can-read", "can-send", "certificate-password-stdin",
-        "client-secret-stdin", "compact", "default-only", "desc", "has-attachments",
-        "include-raw", "is-default", "json", "overwrite", "queue-on-failure",
-        "ready-only", "refresh-token-stdin", "root-only", "stop-on-error", "summary",
-        "unflag", "unread", "value-stdin"
+    private static readonly char[] InlineValueSeparators = { '=', ':' };
+
+    private static readonly ParserConfiguration ParserConfiguration = new() {
+        ResponseFileTokenReplacer = null
     };
 
-    private static readonly HashSet<string> ValueOptions = new(StringComparer.OrdinalIgnoreCase) {
-        "access-token-env", "access-token-ref", "action", "attachment", "attachment-id", "batch",
-        "bcc", "cc", "certificate-password-env", "certificate-password-ref", "certificate-path",
-        "client-id", "client-secret-env", "client-secret-ref", "confirm-token", "content-type",
-        "default-mailbox", "default-sender", "description", "draft", "drafts-dir", "file",
-        "folder", "from", "header", "html", "index", "kind", "limit", "login", "mailbox",
-        "message-id", "name", "name-contains", "parent-folder", "path", "plan-batches-dir", "plan-name",
-        "profile", "profiles-dir", "query", "redirect-uri", "refresh-token-env",
-        "refresh-token-ref", "reply-to", "scope", "secrets-dir", "setting", "sort", "source-batch",
-        "subject", "target-batch", "target-folder", "target-profile", "tenant-id", "text", "to",
-        "value-env", "value-ref"
+    private static readonly HashSet<string> RejectedSensitiveOptions = new(StringComparer.OrdinalIgnoreCase) {
+        "--access-token",
+        "--certificate-password",
+        "--client-secret",
+        "--password",
+        "--refresh-token",
+        "--value"
     };
 
-    public List<string> Positionals { get; } = new();
+    private readonly ParseResult _parseResult;
 
-    public Dictionary<string, List<string?>> Options { get; } = new(StringComparer.OrdinalIgnoreCase);
-
-    public bool ShowHelp { get; private set; }
-
-    public bool HasFlag(string name) {
-        var value = GetOption(name);
-        return value != null && value.Equals("true", StringComparison.OrdinalIgnoreCase);
+    private CliArguments(ParseResult parseResult, IReadOnlyList<string> positionals, bool showHelp) {
+        _parseResult = parseResult;
+        Positionals = positionals;
+        ShowHelp = showHelp;
     }
 
-    public string? GetOption(string name) =>
-        Options.TryGetValue(name, out var values) && values.Count > 0
-            ? values[^1]
-            : null;
+    public IReadOnlyList<string> Positionals { get; }
 
-    public IReadOnlyList<string?> GetOptionValues(string name) =>
-        Options.TryGetValue(name, out var values)
-            ? values.AsReadOnly()
-            : Array.Empty<string?>();
+    public bool ShowHelp { get; }
+
+    internal Command SelectedCommand => _parseResult.CommandResult.Command;
+
+    public bool HasFlag(string name) => _parseResult.GetValue<bool>($"--{name}");
+
+    public string? GetOption(string name) {
+        string[] values = GetValues(name);
+        return values.Length == 0 ? null : values[^1];
+    }
+
+    public IReadOnlyList<string?> GetOptionValues(string name) {
+        string[] values = GetValues(name);
+        if (values.Length == 0) return Array.Empty<string?>();
+
+        var result = new string?[values.Length];
+        for (int index = 0; index < values.Length; index++) {
+            result[index] = values[index];
+        }
+        return result;
+    }
 
     public int? GetIntOption(string name) {
-        var value = GetOption(name);
-        if (string.IsNullOrWhiteSpace(value)) {
-            return null;
-        }
-        if (int.TryParse(value, out var parsed)) {
-            return parsed;
-        }
+        string? value = GetOption(name);
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (int.TryParse(value, out int parsed)) return parsed;
 
         throw new InvalidOperationException($"Option '--{name}' must be an integer.");
     }
 
     public IReadOnlyList<int> GetIntOptionValues(string name) {
-        var values = GetOptionValues(name);
-        if (values.Count == 0) {
-            return Array.Empty<int>();
-        }
+        string[] values = GetValues(name);
+        if (values.Length == 0) return Array.Empty<int>();
 
-        var parsed = new List<int>(values.Count);
-        foreach (var value in values) {
-            if (string.IsNullOrWhiteSpace(value)) {
-                continue;
-            }
-            if (int.TryParse(value, out var item)) {
+        var parsed = new List<int>(values.Length);
+        foreach (string value in values) {
+            if (string.IsNullOrWhiteSpace(value)) continue;
+            if (int.TryParse(value, out int item)) {
                 parsed.Add(item);
                 continue;
             }
 
             throw new InvalidOperationException($"Option '--{name}' must be an integer.");
         }
-
         return parsed;
     }
 
     public static CliArguments Parse(IReadOnlyList<string> args) {
-        var result = new CliArguments();
-        for (var i = 0; i < args.Count; i++) {
-            var arg = args[i];
-            if (string.Equals(arg, "--help", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(arg, "-h", StringComparison.OrdinalIgnoreCase)) {
-                result.ShowHelp = true;
-                continue;
-            }
+        if (args == null) throw new ArgumentNullException(nameof(args));
 
-            if (arg.StartsWith("--", StringComparison.Ordinal)) {
-                var key = arg.Substring(2);
-                if (key.Length == 0 || (!FlagOptions.Contains(key) && !ValueOptions.Contains(key))) {
-                    throw new InvalidOperationException($"Unknown option '--{key}'.");
-                }
-
-                string value;
-                if (FlagOptions.Contains(key)) {
-                    value = "true";
-                } else {
-                    if (i + 1 >= args.Count || args[i + 1].StartsWith("--", StringComparison.Ordinal)) {
-                        throw new InvalidOperationException($"Option '--{key}' requires a value.");
-                    }
-                    value = args[++i];
-                }
-                if (!result.Options.TryGetValue(key, out var values)) {
-                    values = new List<string?>();
-                    result.Options[key] = values;
-                }
-                values.Add(value);
-                continue;
-            }
-
-            result.Positionals.Add(arg);
+        string[] arguments = CliCommandModel.NormalizeOptionAliases(args);
+        ParseResult parseResult = CliCommandModel.Root.Parse(arguments, ParserConfiguration);
+        bool showHelp = arguments.Length == 0 || parseResult.Action is HelpAction;
+        if (!showHelp && parseResult.Errors.Count > 0) {
+            throw new InvalidOperationException(FormatErrors(parseResult.Errors, arguments));
+        }
+        if (!showHelp && parseResult.Tokens.Any(token => token.Type == TokenType.Directive)) {
+            throw new InvalidOperationException("Command-line directives are not supported.");
+        }
+        if (!showHelp && parseResult.Action != null) {
+            throw new InvalidOperationException("Command-line directives are not supported.");
         }
 
-        return result;
+        return new CliArguments(parseResult, BuildCommandPath(parseResult.CommandResult), showHelp);
     }
 
-    public void ValidatePositionalCount() {
-        if (Positionals.Count == 0) {
-            return;
+    internal void WriteHelp(TextWriter output) {
+        if (output == null) throw new ArgumentNullException(nameof(output));
+        CliCommandModel.WriteHelp(SelectedCommand, output);
+    }
+
+    private string[] GetValues(string name) {
+        SymbolResult? result = _parseResult.GetResult($"--{name}");
+        if (result == null || result.Tokens.Count == 0) return Array.Empty<string>();
+
+        var values = new string[result.Tokens.Count];
+        for (int index = 0; index < result.Tokens.Count; index++) {
+            values[index] = result.Tokens[index].Value;
+        }
+        return values;
+    }
+
+    private static IReadOnlyList<string> BuildCommandPath(CommandResult selected) {
+        var path = new Stack<string>();
+        SymbolResult? current = selected;
+        while (current is CommandResult commandResult) {
+            if (commandResult.Command is RootCommand) break;
+            path.Push(commandResult.Command.Name);
+            current = commandResult.Parent;
+        }
+        return path.ToArray();
+    }
+
+    private static string FormatErrors(IReadOnlyList<ParseError> errors, IReadOnlyList<string> arguments) {
+        var redactions = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (int index = 0; index < arguments.Count; index++) {
+            string argument = arguments[index];
+            if (!argument.StartsWith("-", StringComparison.Ordinal)) continue;
+
+            int separatorIndex = argument.IndexOfAny(InlineValueSeparators);
+            if (separatorIndex > 0 &&
+                RejectedSensitiveOptions.Contains(argument[..separatorIndex])) {
+                redactions[argument] = $"{argument[..separatorIndex]}=<value>";
+                continue;
+            }
+
+            if (index + 1 < arguments.Count &&
+                (RejectedSensitiveOptions.Contains(argument) ||
+                 !arguments[index + 1].StartsWith("-", StringComparison.Ordinal))) {
+                redactions[arguments[index + 1]] = "<value>";
+                index++;
+            }
         }
 
-        int maximum = string.Equals(Positionals[0], "send", StringComparison.OrdinalIgnoreCase) ? 1 : 2;
-        if (Positionals.Count > maximum) {
-            throw new InvalidOperationException($"Unexpected positional argument '{Positionals[maximum]}'.");
+        var messages = new string[errors.Count];
+        for (int index = 0; index < errors.Count; index++) {
+            string message = errors[index].Message;
+            foreach (KeyValuePair<string, string> redaction in redactions) {
+                message = message.Replace($"'{redaction.Key}'", $"'{redaction.Value}'",
+                    StringComparison.Ordinal);
+            }
+            messages[index] = message;
         }
+        return string.Join(Environment.NewLine, messages);
     }
 }

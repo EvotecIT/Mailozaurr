@@ -26,7 +26,6 @@ public static partial class CliRunner {
         CliArguments parseResult;
         try {
             parseResult = CliArguments.Parse(args);
-            parseResult.ValidatePositionalCount();
         } catch (Exception ex) {
             await WriteExceptionAsync(
                 error,
@@ -37,7 +36,7 @@ public static partial class CliRunner {
         }
         input ??= TextReader.Null;
         if (parseResult.ShowHelp || parseResult.Positionals.Count == 0) {
-            WriteHelp(output);
+            parseResult.WriteHelp(output);
             return 0;
         }
 
