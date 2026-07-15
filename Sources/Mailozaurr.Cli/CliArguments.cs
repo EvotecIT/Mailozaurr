@@ -5,6 +5,8 @@ using System.CommandLine.Parsing;
 namespace Mailozaurr.Cli;
 
 internal sealed class CliArguments {
+    private static readonly char[] InlineValueSeparators = { '=', ':' };
+
     private static readonly ParserConfiguration ParserConfiguration = new() {
         ResponseFileTokenReplacer = null
     };
@@ -127,7 +129,7 @@ internal sealed class CliArguments {
             string argument = arguments[index];
             if (!argument.StartsWith("-", StringComparison.Ordinal)) continue;
 
-            int separatorIndex = argument.IndexOf('=');
+            int separatorIndex = argument.IndexOfAny(InlineValueSeparators);
             if (separatorIndex > 0 &&
                 RejectedSensitiveOptions.Contains(argument[..separatorIndex])) {
                 redactions[argument] = $"{argument[..separatorIndex]}=<value>";

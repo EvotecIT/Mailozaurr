@@ -193,15 +193,17 @@ public sealed partial class CliRunnerTests {
         Assert.DoesNotContain(rawSecret, stderr.ToString(), StringComparison.Ordinal);
     }
 
-    [Fact]
-    public async Task InlineRawSecretCommandLineOptionIsRejectedWithoutExposingValue() {
-        const string rawSecret = "-inline-p@ss";
+    [Theory]
+    [InlineData("=")]
+    [InlineData(":")]
+    public async Task InlineRawSecretCommandLineOptionIsRejectedWithoutExposingValue(string delimiter) {
+        const string rawSecret = "s3cr3t-value";
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
 
         var exitCode = await CliRunner.RunAsync(new[] {
             "profile", "set-secret", "--profile", "work", "--name", "password",
-            $"--value={rawSecret}"
+            $"--value{delimiter}{rawSecret}"
         }, stdout, stderr);
 
         Assert.Equal(1, exitCode);
