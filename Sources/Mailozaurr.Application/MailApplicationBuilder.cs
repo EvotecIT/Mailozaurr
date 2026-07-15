@@ -16,6 +16,7 @@ public sealed class MailApplicationBuilder {
     private IMailProfileOverviewService? _profileOverviewService;
     private IMailProfileConnectionService? _profileConnectionService;
     private IMailProfileSecretService? _profileSecretService;
+    private IMailProfileSecretMaintenanceService? _profileSecretMaintenanceService;
     private IMailProfileBootstrapService? _profileBootstrapService;
     private IMailProfileAuthService? _profileAuthService;
     private IMailFolderAliasService? _folderAliasService;
@@ -102,6 +103,14 @@ public sealed class MailApplicationBuilder {
     /// <summary>Uses an explicit profile secret service.</summary>
     public MailApplicationBuilder UseProfileSecretService(IMailProfileSecretService profileSecretService) {
         _profileSecretService = profileSecretService ?? throw new ArgumentNullException(nameof(profileSecretService));
+        return this;
+    }
+
+    /// <summary>Uses an explicit orphaned profile-secret maintenance service.</summary>
+    public MailApplicationBuilder UseProfileSecretMaintenanceService(
+        IMailProfileSecretMaintenanceService profileSecretMaintenanceService) {
+        _profileSecretMaintenanceService = profileSecretMaintenanceService ??
+            throw new ArgumentNullException(nameof(profileSecretMaintenanceService));
         return this;
     }
 
@@ -262,6 +271,8 @@ public sealed class MailApplicationBuilder {
         var gmailSessionFactory = _gmailSessionFactory ?? new GmailSessionFactory(secretStore);
         var smtpSessionFactory = _smtpSessionFactory ?? new SmtpSessionFactory(secretStore);
         var profileSecretService = _profileSecretService ?? new MailProfileSecretService(profileStore, secretStore);
+        var profileSecretMaintenanceService = _profileSecretMaintenanceService ??
+            new MailProfileSecretMaintenanceService(profileStore, secretStore);
         var draftMimeMessageFactory = _draftMimeMessageFactory ?? new DraftMimeMessageFactory();
         var pendingMessageRepository = _pendingMessageRepository ?? new FilePendingMessageRepository(_options.PendingMessageStore);
 
@@ -335,6 +346,7 @@ public sealed class MailApplicationBuilder {
             profileOverviewService,
             profileConnectionService,
             profileSecretService,
+            profileSecretMaintenanceService,
             profileBootstrapService,
             profileAuthService,
             folderAliasService,

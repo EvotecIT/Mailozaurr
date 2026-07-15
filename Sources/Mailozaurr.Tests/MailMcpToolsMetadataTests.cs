@@ -32,6 +32,19 @@ public sealed class MailMcpToolsMetadataTests {
     }
 
     [Fact]
+    public void OrphanSecretToolsDeclareAccurateMcpMetadata() {
+        var inspection = GetToolAttribute(nameof(MailMcpTools.mail_profile_secrets_orphaned_inspect));
+        var cleanup = GetToolAttribute(nameof(MailMcpTools.mail_profile_secrets_orphaned_cleanup));
+
+        Assert.True(inspection.ReadOnly);
+        Assert.False(inspection.Destructive);
+        Assert.True(inspection.Idempotent);
+        Assert.False(cleanup.ReadOnly);
+        Assert.True(cleanup.Destructive);
+        Assert.True(cleanup.Idempotent);
+    }
+
+    [Fact]
     public void McpToolsDoNotAcceptRawSecretValues() {
         var unsafeParameters = typeof(MailMcpTools)
             .GetMethods(BindingFlags.Instance | BindingFlags.Public)

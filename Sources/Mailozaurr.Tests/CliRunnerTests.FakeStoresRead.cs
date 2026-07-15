@@ -8,7 +8,8 @@ namespace Mailozaurr.Tests;
 public sealed partial class CliRunnerTests {
     private static TestApplicationFixture CreateFixture() => new();
 
-    private sealed class InMemoryProfileStore : IMailProfileStore {
+    private sealed class InMemoryProfileStore : IMailProfileStore, IMailProfileMaintenanceCoordinator {
+        private readonly SemaphoreSlim _writerGate = new(1, 1);
         private readonly Dictionary<string, MailProfile> _profiles;
 
         public InMemoryProfileStore(IEnumerable<MailProfile> profiles) {
@@ -23,16 +24,37 @@ public sealed partial class CliRunnerTests {
             return Task.FromResult(profile);
         }
 
-        public Task<bool> RemoveAsync(string profileId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(_profiles.Remove(profileId));
+        public async Task<bool> RemoveAsync(string profileId, CancellationToken cancellationToken = default) {
+            await _writerGate.WaitAsync(cancellationToken);
+            try {
+                return _profiles.Remove(profileId);
+            } finally {
+                _writerGate.Release();
+            }
+        }
 
-        public Task SaveAsync(MailProfile profile, CancellationToken cancellationToken = default) {
-            _profiles[profile.Id] = profile;
-            return Task.CompletedTask;
+        public async Task SaveAsync(MailProfile profile, CancellationToken cancellationToken = default) {
+            await _writerGate.WaitAsync(cancellationToken);
+            try {
+                _profiles[profile.Id] = profile;
+            } finally {
+                _writerGate.Release();
+            }
+        }
+
+        public async Task<TResult> ExecuteWithStableProfileIdsAsync<TResult>(
+            Func<IReadOnlyCollection<string>, CancellationToken, Task<TResult>> operation,
+            CancellationToken cancellationToken = default) {
+            await _writerGate.WaitAsync(cancellationToken);
+            try {
+                return await operation(_profiles.Keys.ToArray(), cancellationToken);
+            } finally {
+                _writerGate.Release();
+            }
         }
     }
 
-    private sealed class InMemorySecretStore : IMailSecretStore {
+    private sealed class InMemorySecretStore : IMailSecretStore, IMailProfileSecretMaintenanceStore {
         private readonly Dictionary<string, Dictionary<string, string>> _secrets = new(StringComparer.OrdinalIgnoreCase);
 
         public Task<string?> GetSecretAsync(string profileId, string secretName, CancellationToken cancellationToken = default) {
@@ -58,6 +80,35 @@ public sealed partial class CliRunnerTests {
 
             profileSecrets[secretName] = secretValue;
             return Task.CompletedTask;
+        }
+
+        public Task<MailProfileSecretMaintenanceResult> InspectOrphanedSecretsAsync(
+            IReadOnlyCollection<string> knownProfileIds,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(CreateMaintenanceResult(knownProfileIds, remove: false));
+
+        public Task<MailProfileSecretMaintenanceResult> RemoveOrphanedSecretsAsync(
+            IReadOnlyCollection<string> knownProfileIds,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(CreateMaintenanceResult(knownProfileIds, remove: true));
+
+        private MailProfileSecretMaintenanceResult CreateMaintenanceResult(
+            IReadOnlyCollection<string> knownProfileIds,
+            bool remove) {
+            var knownProfiles = new HashSet<string>(knownProfileIds, StringComparer.OrdinalIgnoreCase);
+            string[] orphans = _secrets.Keys
+                .Where(profileId => !knownProfiles.Contains(profileId))
+                .OrderBy(profileId => profileId, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var result = new MailProfileSecretMaintenanceResult { Succeeded = true };
+            result.OrphanedProfileIds.AddRange(orphans);
+            if (remove) {
+                foreach (string orphan in orphans) {
+                    _secrets.Remove(orphan);
+                    result.RemovedProfileIds.Add(orphan);
+                }
+            }
+            return result;
         }
     }
 

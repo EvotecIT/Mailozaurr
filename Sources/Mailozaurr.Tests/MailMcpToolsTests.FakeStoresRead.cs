@@ -5,7 +5,8 @@ using Mailozaurr.Cli.Mcp;
 namespace Mailozaurr.Tests;
 
 public sealed partial class MailMcpToolsTests {
-    private sealed class InMemoryProfileStore : IMailProfileStore {
+    private sealed class InMemoryProfileStore : IMailProfileStore, IMailProfileMaintenanceCoordinator {
+        private readonly SemaphoreSlim _writerGate = new(1, 1);
         private readonly Dictionary<string, MailProfile> _profiles;
 
         public InMemoryProfileStore(IEnumerable<MailProfile> profiles) {
@@ -20,13 +21,34 @@ public sealed partial class MailMcpToolsTests {
             return Task.FromResult(profile == null ? null : CloneProfile(profile));
         }
 
-        public Task SaveAsync(MailProfile profile, CancellationToken cancellationToken = default) {
-            _profiles[profile.Id] = CloneProfile(profile);
-            return Task.CompletedTask;
+        public async Task SaveAsync(MailProfile profile, CancellationToken cancellationToken = default) {
+            await _writerGate.WaitAsync(cancellationToken);
+            try {
+                _profiles[profile.Id] = CloneProfile(profile);
+            } finally {
+                _writerGate.Release();
+            }
         }
 
-        public Task<bool> RemoveAsync(string profileId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(_profiles.Remove(profileId));
+        public async Task<bool> RemoveAsync(string profileId, CancellationToken cancellationToken = default) {
+            await _writerGate.WaitAsync(cancellationToken);
+            try {
+                return _profiles.Remove(profileId);
+            } finally {
+                _writerGate.Release();
+            }
+        }
+
+        public async Task<TResult> ExecuteWithStableProfileIdsAsync<TResult>(
+            Func<IReadOnlyCollection<string>, CancellationToken, Task<TResult>> operation,
+            CancellationToken cancellationToken = default) {
+            await _writerGate.WaitAsync(cancellationToken);
+            try {
+                return await operation(_profiles.Keys.ToArray(), cancellationToken);
+            } finally {
+                _writerGate.Release();
+            }
+        }
 
         private static MailProfile CloneProfile(MailProfile profile) => new() {
             Id = profile.Id,
@@ -43,7 +65,7 @@ public sealed partial class MailMcpToolsTests {
         };
     }
 
-    private sealed class InMemorySecretStore : IMailSecretStore {
+    private sealed class InMemorySecretStore : IMailSecretStore, IMailProfileSecretMaintenanceStore {
         private readonly Dictionary<string, string> _secrets = new(StringComparer.OrdinalIgnoreCase);
 
         public Task<string?> GetSecretAsync(string profileId, string secretName, CancellationToken cancellationToken = default) {
@@ -58,6 +80,44 @@ public sealed partial class MailMcpToolsTests {
 
         public Task<bool> RemoveSecretAsync(string profileId, string secretName, CancellationToken cancellationToken = default) =>
             Task.FromResult(_secrets.Remove(CreateKey(profileId, secretName)));
+
+        public Task<MailProfileSecretMaintenanceResult> InspectOrphanedSecretsAsync(
+            IReadOnlyCollection<string> knownProfileIds,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(CreateMaintenanceResult(knownProfileIds, remove: false));
+
+        public Task<MailProfileSecretMaintenanceResult> RemoveOrphanedSecretsAsync(
+            IReadOnlyCollection<string> knownProfileIds,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(CreateMaintenanceResult(knownProfileIds, remove: true));
+
+        private MailProfileSecretMaintenanceResult CreateMaintenanceResult(
+            IReadOnlyCollection<string> knownProfileIds,
+            bool remove) {
+            var knownProfiles = new HashSet<string>(knownProfileIds, StringComparer.OrdinalIgnoreCase);
+            string[] orphanKeys = _secrets.Keys
+                .Where(key => !knownProfiles.Contains(GetProfileId(key)))
+                .ToArray();
+            string[] orphanProfiles = orphanKeys
+                .Select(GetProfileId)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(profileId => profileId, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var result = new MailProfileSecretMaintenanceResult { Succeeded = true };
+            result.OrphanedProfileIds.AddRange(orphanProfiles);
+            if (remove) {
+                foreach (string key in orphanKeys) {
+                    _secrets.Remove(key);
+                }
+                result.RemovedProfileIds.AddRange(orphanProfiles);
+            }
+            return result;
+        }
+
+        private static string GetProfileId(string key) {
+            int separator = key.IndexOf("::", StringComparison.Ordinal);
+            return separator < 0 ? key : key.Substring(0, separator);
+        }
 
         private static string CreateKey(string profileId, string secretName) => $"{profileId}::{secretName}";
     }

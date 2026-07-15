@@ -29,6 +29,8 @@ public static partial class CliRunner {
         output.WriteLine("  profile set-default --profile <id> [--json]");
         output.WriteLine("  profile set-secret --profile <id> --name <secret-name> [--value-env <name>|--value-stdin|--value-ref <profile-id:secret-name>] [--json]");
         output.WriteLine("  profile remove-secret --profile <id> --name <secret-name> [--json]");
+        output.WriteLine("  profile inspect-orphan-secrets [--json]");
+        output.WriteLine("  profile cleanup-orphan-secrets [--json]");
         output.WriteLine("  draft list [--compact] [--json]");
         output.WriteLine("  draft save --file <path> [--draft <id>] [--name <display-name>] [--json]");
         output.WriteLine("  draft save --draft <id> --name <display-name> --profile <id> --to <address> [--to <address>] [--cc <address>] [--bcc <address>] [--reply-to <address>] [--from <address>] [--subject <text>] [--text <text>] [--html <html>] [--attachment <path>] [--header <key=value>] [--json]");

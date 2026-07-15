@@ -58,3 +58,22 @@ public interface IMailProfileSecretSnapshotStore {
         IMailProfileSecretSnapshot snapshot,
         CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// Inspects and removes profile-scoped secret sets whose owning profiles no longer exist.
+/// </summary>
+public interface IMailProfileSecretMaintenanceStore {
+    /// <summary>
+    /// Reports structured orphan secret sets and ambiguous legacy keys without decrypting secret values.
+    /// </summary>
+    Task<MailProfileSecretMaintenanceResult> InspectOrphanedSecretsAsync(
+        IReadOnlyCollection<string> knownProfileIds,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes structured orphan secret sets while retaining ambiguous legacy keys that cannot be assigned safely.
+    /// </summary>
+    Task<MailProfileSecretMaintenanceResult> RemoveOrphanedSecretsAsync(
+        IReadOnlyCollection<string> knownProfileIds,
+        CancellationToken cancellationToken = default);
+}

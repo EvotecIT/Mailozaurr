@@ -6,7 +6,8 @@ namespace Mailozaurr.Application;
 public sealed class FileMailSecretStore :
     IMailSecretStore,
     IMailProfileSecretContextCleanup,
-    IMailProfileSecretSnapshotStore {
+    IMailProfileSecretSnapshotStore,
+    IMailProfileSecretMaintenanceStore {
     private readonly JsonFileDocumentStore<MailSecretStoreDocument> _store;
     private readonly ICredentialProtector _protector;
     /// <summary>
@@ -199,6 +200,75 @@ public sealed class FileMailSecretStore :
 
             RestoreLegacySecrets(document, fileSnapshot.LegacySecrets);
         }, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<MailProfileSecretMaintenanceResult> InspectOrphanedSecretsAsync(
+        IReadOnlyCollection<string> knownProfileIds,
+        CancellationToken cancellationToken = default) {
+        HashSet<string> knownProfiles = NormalizeKnownProfileIds(knownProfileIds);
+        return _store.ReadAsync(
+            document => InspectOrphanedSecrets(document, knownProfiles, remove: false, out _),
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<MailProfileSecretMaintenanceResult> RemoveOrphanedSecretsAsync(
+        IReadOnlyCollection<string> knownProfileIds,
+        CancellationToken cancellationToken = default) {
+        HashSet<string> knownProfiles = NormalizeKnownProfileIds(knownProfileIds);
+        MailProfileSecretMaintenanceResult? result = null;
+        await _store.RemoveAsync(document => {
+            result = InspectOrphanedSecrets(document, knownProfiles, remove: true, out bool changed);
+            return changed;
+        }, cancellationToken).ConfigureAwait(false);
+        return result!;
+    }
+
+    private static HashSet<string> NormalizeKnownProfileIds(IReadOnlyCollection<string> knownProfileIds) {
+        if (knownProfileIds == null) throw new ArgumentNullException(nameof(knownProfileIds));
+        return new HashSet<string>(
+            knownProfileIds
+                .Where(profileId => !string.IsNullOrWhiteSpace(profileId))
+                .Select(profileId => profileId.Trim()),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static MailProfileSecretMaintenanceResult InspectOrphanedSecrets(
+        MailSecretStoreDocument document,
+        HashSet<string> knownProfileIds,
+        bool remove,
+        out bool changed) {
+        var result = new MailProfileSecretMaintenanceResult { Succeeded = true };
+        changed = false;
+
+        foreach (string profileId in document.ProfileSecrets.Keys.ToArray()) {
+            if (knownProfileIds.Contains(profileId)) continue;
+
+            Dictionary<string, string>? secrets = document.ProfileSecrets[profileId];
+            if (secrets != null && secrets.Count > 0) {
+                result.OrphanedProfileIds.Add(profileId);
+                if (remove) {
+                    result.RemovedProfileIds.Add(profileId);
+                }
+            }
+            if (remove) {
+                changed = document.ProfileSecrets.Remove(profileId) || changed;
+            }
+        }
+
+        if (document.Secrets != null) {
+            foreach (string legacyKey in document.Secrets.Keys) {
+                if (ResolveLegacyOwner(legacyKey, knownProfileIds) == null) {
+                    result.UnresolvedLegacyKeys.Add(legacyKey);
+                }
+            }
+        }
+
+        result.OrphanedProfileIds.Sort(StringComparer.OrdinalIgnoreCase);
+        result.RemovedProfileIds.Sort(StringComparer.OrdinalIgnoreCase);
+        result.UnresolvedLegacyKeys.Sort(StringComparer.OrdinalIgnoreCase);
+        return result;
     }
 
     private static void NormalizeDocument(MailSecretStoreDocument document) {

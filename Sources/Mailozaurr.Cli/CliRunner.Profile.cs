@@ -14,7 +14,7 @@ public static partial class CliRunner {
         TextWriter error,
         TextReader input) {
         if (parseResult.Positionals.Count < 2) {
-            await error.WriteLineAsync("Missing profile command. Use 'profile list', 'profile create', 'profile graph-bootstrap', 'profile gmail-bootstrap', 'profile graph-login', 'profile gmail-login', 'profile refresh-auth', 'profile auth-status', 'profile test', 'profile summary', 'profile capabilities', 'profile show', 'profile validate', 'profile doctor', 'profile delete', 'profile set-default', 'profile set-secret', or 'profile remove-secret'.").ConfigureAwait(false);
+            await error.WriteLineAsync("Missing profile command. Use 'profile list', 'profile create', 'profile graph-bootstrap', 'profile gmail-bootstrap', 'profile graph-login', 'profile gmail-login', 'profile refresh-auth', 'profile auth-status', 'profile test', 'profile summary', 'profile capabilities', 'profile show', 'profile validate', 'profile doctor', 'profile delete', 'profile set-default', 'profile set-secret', 'profile remove-secret', 'profile inspect-orphan-secrets', or 'profile cleanup-orphan-secrets'.").ConfigureAwait(false);
             return 1;
         }
 
@@ -206,6 +206,24 @@ public static partial class CliRunner {
                     RequireOption(parseResult, "name")).ConfigureAwait(false);
                 await WriteItemAsync(output, removeSecretResult, json, value => value.Message ?? "Secret removed.").ConfigureAwait(false);
                 return removeSecretResult.Succeeded ? 0 : 1;
+            case "inspect-orphan-secrets":
+                var orphanInspection = await application.ProfileSecretMaintenance.InspectOrphanedSecretsAsync()
+                    .ConfigureAwait(false);
+                await WriteItemAsync(
+                    output,
+                    orphanInspection,
+                    json,
+                    value => value.Message ?? "Orphan-secret inspection completed.").ConfigureAwait(false);
+                return orphanInspection.Succeeded ? 0 : 1;
+            case "cleanup-orphan-secrets":
+                var orphanCleanup = await application.ProfileSecretMaintenance.RemoveOrphanedSecretsAsync()
+                    .ConfigureAwait(false);
+                await WriteItemAsync(
+                    output,
+                    orphanCleanup,
+                    json,
+                    value => value.Message ?? "Orphan-secret cleanup completed.").ConfigureAwait(false);
+                return orphanCleanup.Succeeded ? 0 : 1;
             default:
                 await error.WriteLineAsync($"Unknown profile command '{subCommand}'.").ConfigureAwait(false);
                 return 1;

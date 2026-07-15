@@ -505,6 +505,21 @@ public sealed partial class MailMcpToolsTests {
     }
 
     [Fact]
+    public async Task MailProfileOrphanSecretToolsInspectAndCleanThroughTheSharedService() {
+        using var fixture = new TestFixture();
+        await fixture.SecretStore.SetSecretAsync("retired", "password", "retired-secret");
+
+        MailProfileSecretMaintenanceResult inspection =
+            await fixture.Tools.mail_profile_secrets_orphaned_inspect();
+        MailProfileSecretMaintenanceResult cleanup =
+            await fixture.Tools.mail_profile_secrets_orphaned_cleanup();
+
+        Assert.Equal(new[] { "retired" }, inspection.OrphanedProfileIds);
+        Assert.Equal(new[] { "retired" }, cleanup.RemovedProfileIds);
+        Assert.Null(await fixture.SecretStore.GetSecretAsync("retired", "password"));
+    }
+
+    [Fact]
     public async Task MailProfileDeleteRemovesProfile() {
         using var fixture = new TestFixture();
         await fixture.Tools.mail_profile_save(

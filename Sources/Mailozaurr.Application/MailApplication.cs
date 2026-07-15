@@ -12,6 +12,7 @@ public sealed class MailApplication {
         IMailProfileOverviewService profileOverview,
         IMailProfileConnectionService profileConnections,
         IMailProfileSecretService profileSecrets,
+        IMailProfileSecretMaintenanceService profileSecretMaintenance,
         IMailProfileBootstrapService profileBootstrap,
         IMailProfileAuthService profileAuth,
         IMailFolderAliasService folderAliases,
@@ -36,6 +37,7 @@ public sealed class MailApplication {
         ProfileOverview = profileOverview;
         ProfileConnections = profileConnections;
         ProfileSecrets = profileSecrets;
+        ProfileSecretMaintenance = profileSecretMaintenance;
         ProfileBootstrap = profileBootstrap;
         ProfileAuth = profileAuth;
         FolderAliases = folderAliases;
@@ -75,6 +77,9 @@ public sealed class MailApplication {
 
     /// <summary>Profile secret lifecycle service.</summary>
     public IMailProfileSecretService ProfileSecrets { get; }
+
+    /// <summary>Orphaned profile-secret inspection and cleanup service.</summary>
+    public IMailProfileSecretMaintenanceService ProfileSecretMaintenance { get; }
 
     /// <summary>Higher-level profile bootstrap workflows.</summary>
     public IMailProfileBootstrapService ProfileBootstrap { get; }
