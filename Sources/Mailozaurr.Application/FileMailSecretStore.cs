@@ -108,10 +108,15 @@ public sealed class FileMailSecretStore :
         }, cancellationToken);
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Removes profile-scoped secrets while retaining ambiguous flat legacy keys that require known profile ids.
+    /// </summary>
     public Task RemoveProfileSecretsAsync(string profileId, CancellationToken cancellationToken = default) {
         ValidateKeyPart(profileId, nameof(profileId));
-        return RemoveProfileSecretsAsync(profileId, new[] { profileId }, cancellationToken);
+        string normalizedProfileId = profileId.Trim();
+        return _store.UpdateAsync(
+            document => document.ProfileSecrets.Remove(normalizedProfileId),
+            cancellationToken);
     }
 
     /// <inheritdoc />
