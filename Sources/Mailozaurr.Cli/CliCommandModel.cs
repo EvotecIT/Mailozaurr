@@ -3,10 +3,31 @@ using System.CommandLine;
 namespace Mailozaurr.Cli;
 
 internal static partial class CliCommandModel {
+    private static readonly Dictionary<string, string> CanonicalOptionAliases =
+        new(StringComparer.OrdinalIgnoreCase) {
+            ["--help"] = "--help",
+            ["-h"] = "-h"
+        };
+
     internal static RootCommand Root { get; } = CreateRoot();
 
     internal static void WriteHelp(Command command, TextWriter output) =>
         CliHelpWriter.Write(Root, command, output);
+
+    internal static string[] NormalizeOptionAliases(IReadOnlyList<string> arguments) {
+        var normalized = new string[arguments.Count];
+        for (int index = 0; index < arguments.Count; index++) {
+            string argument = arguments[index];
+            int separatorIndex = argument.IndexOfAny('=', ':');
+            string alias = separatorIndex > 0 ? argument[..separatorIndex] : argument;
+            normalized[index] = CanonicalOptionAliases.TryGetValue(alias, out string? canonical)
+                ? separatorIndex > 0
+                    ? canonical + argument[separatorIndex..]
+                    : canonical
+                : argument;
+        }
+        return normalized;
+    }
 
     private static RootCommand CreateRoot() {
         var root = new RootCommand("Mailozaurr command-line and MCP host.");
@@ -61,15 +82,17 @@ internal static partial class CliCommandModel {
         command.Add(CreateOption(name, required: false, recursive: true));
 
     private static Option CreateOption(string name, bool required, bool recursive) {
+        string alias = $"--{name}";
+        CanonicalOptionAliases[alias] = alias;
         if (IsFlag(name)) {
-            return new Option<bool>($"--{name}") {
+            return new Option<bool>(alias) {
                 Arity = ArgumentArity.Zero,
                 Description = GetOptionDescription(name),
                 Recursive = recursive
             };
         }
 
-        var option = new Option<string[]>($"--{name}") {
+        var option = new Option<string[]>(alias) {
             Description = GetOptionDescription(name),
             Arity = ArgumentArity.OneOrMore,
             AllowMultipleArgumentsPerToken = false,

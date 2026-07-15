@@ -51,6 +51,27 @@ public sealed partial class CliRunnerTests {
         Assert.Equal("@profiles", profilesDirectory);
     }
 
+    [Fact]
+    public async Task OptionNamesRemainCaseInsensitive() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        string? profilesDirectory = null;
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "profile", "list", "--PROFILES-DIR", "MixedCase", "--JSON" },
+            stdout,
+            stderr,
+            options => {
+                profilesDirectory = options.ProfileStore.DirectoryPath;
+                return fixture.CreateBuilder();
+            });
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("MixedCase", profilesDirectory);
+        Assert.True(string.IsNullOrWhiteSpace(stderr.ToString()));
+    }
+
     [Theory]
     [InlineData("[diagram]")]
     [InlineData("[suggest]")]
@@ -194,20 +215,23 @@ public sealed partial class CliRunnerTests {
     }
 
     [Theory]
-    [InlineData("=")]
-    [InlineData(":")]
-    public async Task InlineRawSecretCommandLineOptionIsRejectedWithoutExposingValue(string delimiter) {
+    [InlineData("--value", "=")]
+    [InlineData("--value", ":")]
+    [InlineData("--VaLuE", ":")]
+    public async Task InlineRawSecretCommandLineOptionIsRejectedWithoutExposingValue(
+        string option,
+        string delimiter) {
         const string rawSecret = "s3cr3t-value";
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
 
         var exitCode = await CliRunner.RunAsync(new[] {
             "profile", "set-secret", "--profile", "work", "--name", "password",
-            $"--value{delimiter}{rawSecret}"
+            $"{option}{delimiter}{rawSecret}"
         }, stdout, stderr);
 
         Assert.Equal(1, exitCode);
-        Assert.Contains("--value=<value>", stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains($"{option}=<value>", stderr.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain(rawSecret, stderr.ToString(), StringComparison.Ordinal);
     }
 

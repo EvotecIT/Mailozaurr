@@ -11,7 +11,7 @@ internal sealed class CliArguments {
         ResponseFileTokenReplacer = null
     };
 
-    private static readonly HashSet<string> RejectedSensitiveOptions = new(StringComparer.Ordinal) {
+    private static readonly HashSet<string> RejectedSensitiveOptions = new(StringComparer.OrdinalIgnoreCase) {
         "--access-token",
         "--certificate-password",
         "--client-secret",
@@ -80,7 +80,7 @@ internal sealed class CliArguments {
     public static CliArguments Parse(IReadOnlyList<string> args) {
         if (args == null) throw new ArgumentNullException(nameof(args));
 
-        string[] arguments = args as string[] ?? args.ToArray();
+        string[] arguments = CliCommandModel.NormalizeOptionAliases(args);
         ParseResult parseResult = CliCommandModel.Root.Parse(arguments, ParserConfiguration);
         bool showHelp = arguments.Length == 0 || parseResult.Action is HelpAction;
         if (!showHelp && parseResult.Errors.Count > 0) {
