@@ -86,6 +86,10 @@ internal static partial class CliCommandModel {
                 result.AddError($"Option '--{name}' requires a value.");
                 return;
             }
+            if (result.Tokens.Count > result.IdentifierTokenCount) {
+                result.AddError($"Option '--{name}' accepts one value per occurrence.");
+                return;
+            }
             foreach (var token in result.Tokens) {
                 if (token.Value.StartsWith("--", StringComparison.Ordinal)) {
                     result.AddError($"Option '--{name}' requires a value.");

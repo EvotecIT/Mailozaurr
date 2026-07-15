@@ -32,6 +32,35 @@ public sealed partial class CliRunnerTests {
     }
 
     [Fact]
+    public async Task ScalarOptionCannotConsumeTrailingArgument() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        bool builderInvoked = false;
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "get",
+                "--profile", "work-imap",
+                "--message-id", "real-id",
+                "stray",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => {
+                builderInvoked = true;
+                return fixture.CreateBuilder();
+            });
+
+        Assert.Equal(1, exitCode);
+        Assert.False(builderInvoked);
+        using JsonDocument document = JsonDocument.Parse(stderr.ToString());
+        Assert.Contains("stray", document.RootElement.GetProperty("Error")
+            .GetProperty("Message").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task MissingOptionValueIsReportedAsJsonWhenRequested() {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
