@@ -54,10 +54,6 @@ For OAuth2 support, Mailozaurr also bundles:
 - [Google.Apis.Core](https://www.nuget.org/packages/Google.Apis.Core)
 - [Google.Apis.Auth](https://www.nuget.org/packages/Google.Apis.Auth)
 
-Additional dependency:
-
-- [System.DataSQLite](https://system.data.sqlite.org/)
-
 ## EML and Outlook MSG files
 
 Mailozaurr keeps MIME, transport, S/MIME, PGP, DKIM, and ARC workflows in MimeKit and MailKit. OfficeIMO.Email owns local email artifacts: Outlook MSG, typed Outlook appointments, contacts, tasks, journals and notes, TNEF, RTF-backed bodies, embedded items, and retained MAPI properties.
