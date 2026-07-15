@@ -56,9 +56,84 @@ public sealed partial class CliRunnerTests {
         }, stdout, stderr);
 
         Assert.Equal(1, exitCode);
-        Assert.Contains("Unknown option '--value'", stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("Unrecognized command or argument '--value'", stderr.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("would-leak", stderr.ToString(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task CommandScopedOptionCannotConsumeARootCommand() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        bool builderInvoked = false;
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "--profile", "send", "--json" },
+            stdout,
+            stderr,
+            _ => {
+                builderInvoked = true;
+                return fixture.CreateBuilder();
+            });
+
+        Assert.Equal(1, exitCode);
+        Assert.False(builderInvoked);
+        using JsonDocument document = JsonDocument.Parse(stderr.ToString());
+        Assert.Contains("--profile", document.RootElement.GetProperty("Error")
+            .GetProperty("Message").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OptionsAreValidatedAgainstTheSelectedCommand() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        bool builderInvoked = false;
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "profile", "list", "--subject", "ignored-before" },
+            stdout,
+            stderr,
+            _ => {
+                builderInvoked = true;
+                return fixture.CreateBuilder();
+            });
+
+        Assert.Equal(1, exitCode);
+        Assert.False(builderInvoked);
+        Assert.Contains("Unrecognized command or argument '--subject'", stderr.ToString(),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task UnknownCommandNameRemainsVisibleInTheParseError() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "definitely-not-a-command" },
+            stdout,
+            stderr);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("definitely-not-a-command", stderr.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task HelpIsGeneratedForTheSelectedTypedCommand() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "profile", "show", "--help" },
+            stdout,
+            stderr);
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("mailozaurr profile show", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("--profile <value> (required)", stdout.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("graph-bootstrap", stdout.ToString(), StringComparison.Ordinal);
+    }
 
 
 

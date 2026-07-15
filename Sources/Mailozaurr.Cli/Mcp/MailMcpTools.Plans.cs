@@ -5,7 +5,7 @@ using System.ComponentModel;
 namespace Mailozaurr.Cli.Mcp;
 
 public sealed partial class MailMcpTools {
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
     [Description("Lists folders or folder-like mailbox containers for a profile.")]
     public Task<IReadOnlyList<FolderRef>> mail_folders_list(
         [Description("The profile identifier to query.")] string profileId,
@@ -20,7 +20,7 @@ public sealed partial class MailMcpTools {
             RootOnly = rootOnly
         }, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
     [Description("Lists folders or folder-like mailbox containers for a profile using a lightweight projection.")]
     public Task<IReadOnlyList<FolderRefCompact>> mail_folders_compact_list(
         [Description("The profile identifier to query.")] string profileId,
@@ -35,7 +35,7 @@ public sealed partial class MailMcpTools {
             RootOnly = rootOnly
         }, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
     [Description("Lists provider-neutral folder aliases for a profile, resolving them to provider folders when possible.")]
     public Task<IReadOnlyList<MailFolderAliasSummary>> mail_folder_aliases_list(
         [Description("The profile identifier to query.")] string profileId,
@@ -43,7 +43,7 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.FolderAliases.GetAliasesAsync(profileId, mailboxId, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
     [Description("Resolves a requested folder target to a provider-neutral alias or an effective provider folder destination.")]
     public Task<MailFolderTargetResolution> mail_folder_resolve(
         [Description("The profile identifier to query.")] string profileId,
@@ -52,7 +52,7 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.FolderAliases.ResolveAsync(profileId, targetFolderId, mailboxId, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
     [Description("Creates a normalized execution plan for a selected message action, with optional preview-token validation and resolved destinations.")]
     public Task<MessageActionExecutionPlan> mail_action_plan(
         [Description("The selected action, such as mark-read, mark-unread, flag, unflag, archive, trash, move, or delete.")] string action,
@@ -73,7 +73,7 @@ public sealed partial class MailMcpTools {
             ConfirmationToken = confirmationToken
         }, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Lists persisted reusable message action plan batches.")]
     public Task<IReadOnlyList<MailMessageActionPlanBatch>> mail_action_batch_store_list(
         [Description("Optional human-readable plan names that must exist in the returned batch.")] IReadOnlyList<string>? planNames = null,
@@ -84,7 +84,7 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.MessageActionPlanRegistry.GetBatchesAsync(BuildBatchQuery(planNames, profileIds, actions, sortBy, descending), cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Lists persisted reusable message action plan batches using a lightweight projection.")]
     public Task<IReadOnlyList<MailMessageActionPlanBatchCompact>> mail_action_batch_store_compact_list(
         [Description("Optional human-readable plan names that must exist in the returned batch.")] IReadOnlyList<string>? planNames = null,
@@ -95,7 +95,7 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.MessageActionPlanRegistry.GetBatchesCompactAsync(BuildBatchQuery(planNames, profileIds, actions, sortBy, descending), cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Lists persisted reusable message action plan batches using a richer summary projection.")]
     public Task<IReadOnlyList<MailMessageActionPlanBatchSummary>> mail_action_batch_store_summary_list(
         [Description("Optional human-readable plan names that must exist in the returned batch.")] IReadOnlyList<string>? planNames = null,
@@ -106,7 +106,7 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.MessageActionPlanRegistry.GetBatchesSummaryAsync(BuildBatchQuery(planNames, profileIds, actions, sortBy, descending), cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Gets one persisted reusable message action plan batch by identifier.")]
     public async Task<MailMessageActionPlanBatch> mail_action_batch_store_get(
         [Description("The persisted batch identifier to retrieve.")] string batchId,
@@ -115,7 +115,7 @@ public sealed partial class MailMcpTools {
         return batch ?? throw new InvalidOperationException($"Action plan batch '{batchId}' was not found.");
     }
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Gets one persisted reusable message action plan batch by identifier using a lightweight projection.")]
     public async Task<MailMessageActionPlanBatchCompact> mail_action_batch_store_compact_get(
         [Description("The persisted batch identifier to retrieve.")] string batchId,
@@ -124,7 +124,7 @@ public sealed partial class MailMcpTools {
         return batch ?? throw new InvalidOperationException($"Action plan batch '{batchId}' was not found.");
     }
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Gets one persisted reusable message action plan batch by identifier using a richer summary projection.")]
     public async Task<MailMessageActionPlanBatchSummary> mail_action_batch_store_summary_get(
         [Description("The persisted batch identifier to retrieve.")] string batchId,
@@ -133,7 +133,7 @@ public sealed partial class MailMcpTools {
         return batch ?? throw new InvalidOperationException($"Action plan batch '{batchId}' was not found.");
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Imports a persisted reusable message action plan batch from an external batch file.")]
     public Task<OperationResult> mail_action_batch_store_import(
         [Description("The persisted batch identifier to create or update.")] string batchId,
@@ -143,7 +143,7 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.MessageActionPlanRegistry.ImportAsync(batchId, name, path, description, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Exports a persisted reusable message action plan batch to an external batch file.")]
     public Task<OperationResult> mail_action_batch_store_export(
         [Description("The persisted batch identifier to export.")] string batchId,
@@ -151,7 +151,7 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.MessageActionPlanRegistry.ExportAsync(batchId, path, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
     [Description("Builds and stores a reusable action plan batch from a common message selection and selected common actions.")]
     public Task<OperationResult> mail_action_batch_store_create_common(
         [Description("The persisted batch identifier to create or update.")] string batchId,
@@ -178,7 +178,7 @@ public sealed partial class MailMcpTools {
             description,
             cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Builds and stores a reusable action plan batch from an existing common action preview bundle and optional selected previewed actions.")]
     public Task<OperationResult> mail_action_batch_store_create_from_preview(
         [Description("The persisted batch identifier to create or update.")] string batchId,
@@ -195,7 +195,7 @@ public sealed partial class MailMcpTools {
             description,
             cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Clones an existing persisted reusable message action plan batch to a new identifier and name.")]
     public Task<OperationResult> mail_action_batch_store_clone(
         [Description("The persisted source batch identifier to clone.")] string sourceBatchId,
@@ -205,7 +205,7 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.MessageActionPlanRegistry.CloneAsync(sourceBatchId, targetBatchId, name, description, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Clones an existing persisted reusable message action plan batch while applying shared profile, mailbox, folder, or destination transforms.")]
     public Task<OperationResult> mail_action_batch_store_transform_clone(
         [Description("The persisted source batch identifier to clone.")] string sourceBatchId,
@@ -234,7 +234,7 @@ public sealed partial class MailMcpTools {
             description,
             cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Previews a stored action plan batch transform before cloning and saving it.")]
     public Task<MailMessageActionPlanBatchTransformPreview> mail_action_batch_store_transform_preview(
         [Description("The persisted source batch identifier to preview.")] string sourceBatchId,
@@ -257,7 +257,7 @@ public sealed partial class MailMcpTools {
             },
             cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true)]
     [Description("Appends one newly planned normalized action to an existing persisted batch.")]
     public async Task<OperationResult> mail_action_batch_store_append_plan(
         [Description("The persisted batch identifier to update.")] string batchId,
@@ -282,7 +282,7 @@ public sealed partial class MailMcpTools {
         return await _application.MessageActionPlanRegistry.AppendPlanAsync(batchId, plan, cancellationToken).ConfigureAwait(false);
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
     [Description("Loads one normalized action plan from a file and appends it to an existing persisted batch.")]
     public Task<OperationResult> mail_action_batch_store_append_imported_plan(
         [Description("The persisted batch identifier to update.")] string batchId,
@@ -290,7 +290,7 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.MessageActionPlanRegistry.AppendImportedPlanAsync(batchId, path, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
     [Description("Replaces one stored plan in an existing persisted batch using a newly planned normalized action.")]
     public async Task<OperationResult> mail_action_batch_store_replace_plan(
         [Description("The persisted batch identifier to update.")] string batchId,
@@ -316,7 +316,7 @@ public sealed partial class MailMcpTools {
         return await _application.MessageActionPlanRegistry.ReplacePlanAtAsync(batchId, index, plan, cancellationToken).ConfigureAwait(false);
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Loads one normalized action plan from a file and replaces a stored plan by zero-based index.")]
     public Task<OperationResult> mail_action_batch_store_replace_imported_plan(
         [Description("The persisted batch identifier to update.")] string batchId,
@@ -325,7 +325,7 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.MessageActionPlanRegistry.ReplaceImportedPlanAtAsync(batchId, index, path, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = false)]
     [Description("Removes one plan from an existing persisted batch by zero-based index.")]
     public Task<OperationResult> mail_action_batch_store_remove_plan(
         [Description("The persisted batch identifier to update.")] string batchId,
@@ -333,14 +333,14 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.MessageActionPlanRegistry.RemovePlanAtAsync(batchId, index, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Deletes a persisted reusable message action plan batch.")]
     public Task<OperationResult> mail_action_batch_store_delete(
         [Description("The persisted batch identifier to delete.")] string batchId,
         CancellationToken cancellationToken = default) =>
         _application.MessageActionPlanRegistry.DeleteAsync(batchId, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
     [Description("Executes a persisted reusable message action plan batch through the shared batch-execution service.")]
     public Task<MessageActionBatchExecutionResult> mail_action_batch_store_execute(
         [Description("The persisted batch identifier to execute.")] string batchId,
@@ -349,7 +349,7 @@ public sealed partial class MailMcpTools {
         CancellationToken cancellationToken = default) =>
         _application.MessageActionPlanRegistry.ExecuteAsync(batchId, continueOnError, cancellationToken, confirmationTokens);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
     [Description("Creates a normalized action plan and exports it to a file through the shared Mailozaurr plan-exchange service.")]
     public async Task<OperationResult> mail_action_plan_export(
         [Description("The selected action, such as mark-read, mark-unread, flag, unflag, archive, trash, move, or delete.")] string action,
@@ -375,14 +375,14 @@ public sealed partial class MailMcpTools {
         return OperationResult.Success("Action plan exported.");
     }
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Loads one normalized action plan from a file through the shared Mailozaurr plan-exchange service.")]
     public Task<MessageActionExecutionPlan> mail_action_plan_import(
         [Description("The source file path on the server filesystem.")] string path,
         CancellationToken cancellationToken = default) =>
         _application.MessageActionPlanExchange.LoadAsync(path, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Exports a batch of normalized action plans to a file through the shared Mailozaurr plan-exchange service.")]
     public async Task<OperationResult> mail_action_batch_export(
         [Description("The destination file path on the server filesystem.")] string path,
@@ -395,14 +395,14 @@ public sealed partial class MailMcpTools {
         return OperationResult.Success("Action plan batch exported.");
     }
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Loads a batch of normalized action plans from a file through the shared Mailozaurr plan-exchange service.")]
     public Task<IReadOnlyList<MessageActionExecutionPlan>> mail_action_batch_import(
         [Description("The source file path on the server filesystem.")] string path,
         CancellationToken cancellationToken = default) =>
         _application.MessageActionPlanExchange.LoadBatchAsync(path, cancellationToken);
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
     [Description("Creates and executes one normalized message action plan through the shared Mailozaurr planning and batch-execution services.")]
     public async Task<MessageActionBatchExecutionResult> mail_action_execute(
         [Description("The selected action, such as mark-read, mark-unread, flag, unflag, archive, trash, move, or delete.")] string action,
@@ -426,7 +426,7 @@ public sealed partial class MailMcpTools {
         return await _application.MessageActionBatch.ExecuteAsync(new[] { plan }, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
-    [McpServerTool]
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
     [Description("Executes a batch of prebuilt normalized message action plans through the shared Mailozaurr batch-execution service.")]
     public Task<MessageActionBatchExecutionResult> mail_action_batch_execute(
         [Description("The normalized action plans to execute.")] MessageActionExecutionPlan[] plans,
@@ -437,7 +437,7 @@ public sealed partial class MailMcpTools {
             continueOnError,
             cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
     [Description("Builds a dry-run bundle of common message actions, including read/unread, flag/unflag, archive, trash, delete, and an optional custom move target.")]
     public Task<CommonMessageActionsPreview> mail_actions_bundle_preview(
         [Description("The profile identifier to query.")] string profileId,
@@ -454,7 +454,7 @@ public sealed partial class MailMcpTools {
             DestinationFolderId = destinationFolderId
         }, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
     [Description("Builds a dry-run comparison for standard message actions such as archive, trash, delete, and an optional custom move target.")]
     public Task<StandardMessageActionsPreview> mail_actions_preview(
         [Description("The profile identifier to query.")] string profileId,
@@ -471,7 +471,7 @@ public sealed partial class MailMcpTools {
             DestinationFolderId = destinationFolderId
         }, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
     [Description("Builds a dry-run preview for moving messages, including normalized message ids and the effective destination folder target.")]
     public Task<MoveMessagesPreview> mail_move_preview(
         [Description("The profile identifier to query.")] string profileId,
@@ -488,7 +488,7 @@ public sealed partial class MailMcpTools {
             DestinationFolderId = destinationFolderId
         }, cancellationToken);
 
-    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = false)]
     [Description("Builds a dry-run preview for deleting messages, including normalized message ids before execution.")]
     public Task<DeleteMessagesPreview> mail_delete_preview(
         [Description("The profile identifier to query.")] string profileId,
