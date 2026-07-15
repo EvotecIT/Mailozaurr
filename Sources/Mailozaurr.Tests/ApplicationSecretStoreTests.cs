@@ -198,6 +198,38 @@ public sealed class ApplicationSecretStoreTests {
         Assert.Equal("legacy-secret", await store.GetSecretAsync("work", "api::token"));
     }
 
+    [Fact]
+    public async Task OrphanMaintenanceRemovesOnlyStructuredOrphansAndRetainsAmbiguousLegacyKeys() {
+        var filePath = CreateTemporaryFilePath();
+        var protector = new TestCredentialProtector();
+        string workValue = protector.Protect("work-secret");
+        string knownLegacyValue = protector.Protect("known-legacy-secret");
+        string unresolvedLegacyValue = protector.Protect("unresolved-legacy-secret");
+        File.WriteAllText(filePath,
+            "{\"Version\":2,\"ProfileSecrets\":{" +
+            $"\"work\":{{\"password\":\"{workValue}\"}}," +
+            "\"retired\":{\"password\":\"not-valid-protected-data\"}}," +
+            "\"Secrets\":{" +
+            $"\"work::api::token\":\"{knownLegacyValue}\"," +
+            $"\"lost::api::token\":\"{unresolvedLegacyValue}\"}}}}");
+        var store = new FileMailSecretStore(filePath, protector);
+        var maintenance = (IMailProfileSecretMaintenanceStore)store;
+
+        MailProfileSecretMaintenanceResult inspection = await maintenance.InspectOrphanedSecretsAsync(
+            new[] { "work" });
+        MailProfileSecretMaintenanceResult cleanup = await maintenance.RemoveOrphanedSecretsAsync(
+            new[] { "work" });
+
+        Assert.True(inspection.Succeeded);
+        Assert.Equal(new[] { "retired" }, inspection.OrphanedProfileIds);
+        Assert.Equal(new[] { "lost::api::token" }, inspection.UnresolvedLegacyKeys);
+        Assert.Equal(new[] { "retired" }, cleanup.RemovedProfileIds);
+        Assert.Equal("work-secret", await store.GetSecretAsync("work", "password"));
+        Assert.Null(await store.GetSecretAsync("retired", "password"));
+        Assert.Equal("known-legacy-secret", await store.GetSecretAsync("work", "api::token"));
+        Assert.Equal("unresolved-legacy-secret", await store.GetSecretAsync("lost", "api::token"));
+    }
+
     private static string CreateTemporaryFilePath() {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

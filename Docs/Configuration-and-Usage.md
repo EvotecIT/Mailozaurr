@@ -191,6 +191,22 @@ Main command groups:
 
 Most commands support `--json`, which is the preferred mode for automation.
 
+### Orphaned profile secrets
+
+Inspect the secret store after profiles have been moved, restored, or edited outside the application:
+
+```powershell
+mailozaurr profile inspect-orphan-secrets --json
+```
+
+The report contains structured secret sets whose profile no longer exists. It also lists ambiguous legacy keys separately without exposing their protected values. Cleanup removes only the structured orphan sets; ambiguous legacy keys are retained because Mailozaurr cannot prove where the profile identifier ends and the secret name begins.
+
+The built-in file stores coordinate cleanup with profile writes so a profile created in another process cannot lose its secrets. Applications that replace the stores should implement `IMailProfileMaintenanceCoordinator` together with `IMailProfileSecretMaintenanceStore`, or inject an `IMailProfileSecretMaintenanceService` that provides equivalent coordination.
+
+```powershell
+mailozaurr profile cleanup-orphan-secrets --json
+```
+
 ## Common CLI recipes
 
 ### Generic IMAP profile

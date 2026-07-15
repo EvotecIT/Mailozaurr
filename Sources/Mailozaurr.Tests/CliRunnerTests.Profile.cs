@@ -135,6 +135,32 @@ public sealed partial class CliRunnerTests {
     }
 
     [Fact]
+    public async Task ProfileOrphanSecretCommandsUseSharedMaintenanceService() {
+        using var inspectOutput = new StringWriter();
+        using var cleanupOutput = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        await fixture.SecretStore.SetSecretAsync("retired", "password", "retired-secret");
+
+        int inspectExitCode = await CliRunner.RunAsync(
+            new[] { "profile", "inspect-orphan-secrets", "--json" },
+            inspectOutput,
+            stderr,
+            _ => fixture.CreateBuilder());
+        int cleanupExitCode = await CliRunner.RunAsync(
+            new[] { "profile", "cleanup-orphan-secrets", "--json" },
+            cleanupOutput,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, inspectExitCode);
+        Assert.Equal(0, cleanupExitCode);
+        Assert.Contains("\"retired\"", inspectOutput.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"RemovedProfileIds\"", cleanupOutput.ToString(), StringComparison.Ordinal);
+        Assert.Null(await fixture.SecretStore.GetSecretAsync("retired", "password"));
+    }
+
+    [Fact]
     public async Task ProfileGraphBootstrapSavesProfileAndSecretsThroughApplicationServices() {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();

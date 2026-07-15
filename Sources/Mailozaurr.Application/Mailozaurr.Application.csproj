@@ -28,6 +28,12 @@
         <ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+            <_Parameter1>Mailozaurr.Tests</_Parameter1>
+        </AssemblyAttribute>
+    </ItemGroup>
+
     <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' ">
         <PackageReference Include="System.Text.Json" Version="10.0.9" />
     </ItemGroup>

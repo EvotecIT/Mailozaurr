@@ -21,6 +21,8 @@ public sealed class ApplicationBuilderTests {
         Assert.NotNull(app.Profiles);
         Assert.NotNull(app.ProfileOverview);
         Assert.NotNull(app.ProfileConnections);
+        Assert.NotNull(app.ProfileSecrets);
+        Assert.NotNull(app.ProfileSecretMaintenance);
         Assert.NotNull(app.Drafts);
         Assert.NotNull(app.DraftExchange);
         Assert.NotNull(app.ProfileBootstrap);
@@ -284,6 +286,19 @@ public sealed class ApplicationBuilderTests {
         Assert.NotNull(app.Queue);
     }
 
+    [Fact]
+    public void BuildUsesInjectedProfileSecretMaintenanceService() {
+        var maintenanceService = new FakeProfileSecretMaintenanceService();
+        var builder = new MailApplicationBuilder(new MailApplicationOptions {
+            ProfileStore = new MailProfileStoreOptions { DirectoryPath = CreateTemporaryDirectory() },
+            SecretStore = new MailSecretStoreOptions { DirectoryPath = CreateTemporaryDirectory() }
+        }).UseProfileSecretMaintenanceService(maintenanceService);
+
+        MailApplication app = builder.Build();
+
+        Assert.Same(maintenanceService, app.ProfileSecretMaintenance);
+    }
+
     private static string CreateTemporaryDirectory() {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -413,5 +428,15 @@ public sealed class ApplicationBuilderTests {
 
         public Task RemoveAsync(string messageId, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class FakeProfileSecretMaintenanceService : IMailProfileSecretMaintenanceService {
+        public Task<MailProfileSecretMaintenanceResult> InspectOrphanedSecretsAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new MailProfileSecretMaintenanceResult { Succeeded = true });
+
+        public Task<MailProfileSecretMaintenanceResult> RemoveOrphanedSecretsAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new MailProfileSecretMaintenanceResult { Succeeded = true });
     }
 }

@@ -3,7 +3,7 @@ namespace Mailozaurr.Application;
 /// <summary>
 /// Stores profiles in a JSON document on disk.
 /// </summary>
-public sealed class FileMailProfileStore : IMailProfileStore {
+public sealed class FileMailProfileStore : IMailProfileStore, IMailProfileMaintenanceCoordinator {
     private readonly JsonFileDocumentStore<MailProfileStoreDocument> _store;
     /// <summary>
     /// Creates a new store using the provided options.
@@ -70,6 +70,21 @@ public sealed class FileMailProfileStore : IMailProfileStore {
 
         return _store.RemoveAsync(document => document.Profiles.RemoveAll(p =>
             string.Equals(p.Id, profileId, StringComparison.OrdinalIgnoreCase)) > 0, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<TResult> ExecuteWithStableProfileIdsAsync<TResult>(
+        Func<IReadOnlyCollection<string>, CancellationToken, Task<TResult>> operation,
+        CancellationToken cancellationToken = default) {
+        if (operation == null) throw new ArgumentNullException(nameof(operation));
+        return _store.ExecuteUnderWriterLockAsync(document => {
+            string[] profileIds = document.Profiles
+                .Where(profile => !string.IsNullOrWhiteSpace(profile.Id))
+                .Select(profile => profile.Id.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            return operation(profileIds, cancellationToken);
+        }, cancellationToken);
     }
 
     private static void ValidateProfile(MailProfile? profile) {

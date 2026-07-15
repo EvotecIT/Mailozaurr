@@ -312,4 +312,16 @@ public sealed partial class MailMcpTools {
         [Description("The stable secret name to remove.")] string secretName,
         CancellationToken cancellationToken = default) =>
         _application.ProfileSecrets.RemoveSecretAsync(profileId, secretName, cancellationToken);
+
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true)]
+    [Description("Reports structured secret sets whose owning Mailozaurr profiles no longer exist, while identifying ambiguous legacy keys without exposing secret values.")]
+    public Task<MailProfileSecretMaintenanceResult> mail_profile_secrets_orphaned_inspect(
+        CancellationToken cancellationToken = default) =>
+        _application.ProfileSecretMaintenance.InspectOrphanedSecretsAsync(cancellationToken);
+
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true)]
+    [Description("Removes structured orphan secret sets while retaining ambiguous legacy keys that cannot be assigned safely.")]
+    public Task<MailProfileSecretMaintenanceResult> mail_profile_secrets_orphaned_cleanup(
+        CancellationToken cancellationToken = default) =>
+        _application.ProfileSecretMaintenance.RemoveOrphanedSecretsAsync(cancellationToken);
 }

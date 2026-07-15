@@ -15,6 +15,7 @@ namespace Mailozaurr.Cli;
 [JsonSerializable(typeof(MailProfile))]
 [JsonSerializable(typeof(ProfileCapabilities))]
 [JsonSerializable(typeof(MailProfileValidationResult))]
+[JsonSerializable(typeof(MailProfileSecretMaintenanceResult))]
 [JsonSerializable(typeof(FolderRefCompact))]
 [JsonSerializable(typeof(FolderRef))]
 [JsonSerializable(typeof(MailFolderAliasSummary))]
