@@ -7,6 +7,7 @@
         <AssemblyName>Mailozaurr.Application</AssemblyName>
         <PackageId>Mailozaurr.Application</PackageId>
         <Description>Reusable provider-neutral application services for Mailozaurr profiles, mailbox operations, drafts, queues, and delivery.</Description>
+        <Copyright>(c) 2011 - 2026 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
         <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
@@ -15,6 +16,8 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <IsPackable>true</IsPackable>
         <PackageIcon>Mailozaurr.png</PackageIcon>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/EvotecIT/Mailozaurr</PackageProjectUrl>
         <PackageReadmeFile>README.MD</PackageReadmeFile>
         <RepositoryUrl>https://github.com/EvotecIT/Mailozaurr</RepositoryUrl>
         <PackageTags>Windows;MacOS;Linux;Mail;Email;Graph;Gmail;IMAP;SMTP</PackageTags>
