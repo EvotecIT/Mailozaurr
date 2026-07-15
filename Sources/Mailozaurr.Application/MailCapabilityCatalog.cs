@@ -4,9 +4,18 @@ namespace Mailozaurr.Application;
 /// Provides the default normalized capability map for each profile kind.
 /// </summary>
 public static class MailCapabilityCatalog {
-    private static readonly MailProfileKind[] KnownProfileKinds = {
+    private static readonly MailProfileKind[] ReadServiceProfileKinds = {
         MailProfileKind.Imap,
         MailProfileKind.Pop3,
+        MailProfileKind.Graph,
+        MailProfileKind.Gmail
+    };
+    private static readonly MailProfileKind[] MessageActionServiceProfileKinds = {
+        MailProfileKind.Imap,
+        MailProfileKind.Graph,
+        MailProfileKind.Gmail
+    };
+    private static readonly MailProfileKind[] SendServiceProfileKinds = {
         MailProfileKind.Graph,
         MailProfileKind.Gmail,
         MailProfileKind.Smtp,
@@ -68,26 +77,31 @@ public static class MailCapabilityCatalog {
         Add(result, readHandlers.Select(handler => handler.Kind), ReadServiceCapabilities);
         Add(result, messageActionHandlers.Select(handler => handler.Kind), MessageActionServiceCapabilities);
         Add(result, sendHandlers.Select(handler => handler.Kind), MailCapability.SendMessages);
-        AddServiceOverrideCapabilities(result, hasReadServiceOverride, ReadServiceCapabilities);
+        AddServiceOverrideCapabilities(
+            result,
+            hasReadServiceOverride,
+            ReadServiceProfileKinds,
+            ReadServiceCapabilities);
         AddServiceOverrideCapabilities(
             result,
             hasMessageActionServiceOverride,
+            MessageActionServiceProfileKinds,
             MessageActionServiceCapabilities);
-        AddServiceOverrideCapabilities(result, hasSendServiceOverride, MailCapability.SendMessages);
+        AddServiceOverrideCapabilities(
+            result,
+            hasSendServiceOverride,
+            SendServiceProfileKinds,
+            MailCapability.SendMessages);
         return result;
     }
 
     private static void AddServiceOverrideCapabilities(
         IDictionary<MailProfileKind, MailCapability> destination,
         bool hasServiceOverride,
+        IEnumerable<MailProfileKind> kinds,
         MailCapability capabilities) {
         if (!hasServiceOverride) return;
-        foreach (MailProfileKind kind in KnownProfileKinds) {
-            MailCapability available = For(kind).Capabilities & capabilities;
-            if (available == MailCapability.None) continue;
-            destination.TryGetValue(kind, out MailCapability existing);
-            destination[kind] = existing | available;
-        }
+        Add(destination, kinds, capabilities);
     }
 
     private static void Add(IDictionary<MailProfileKind, MailCapability> destination,
