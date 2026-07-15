@@ -5,6 +5,10 @@ using System.CommandLine.Parsing;
 namespace Mailozaurr.Cli;
 
 internal sealed class CliArguments {
+    private static readonly ParserConfiguration ParserConfiguration = new() {
+        ResponseFileTokenReplacer = null
+    };
+
     private static readonly HashSet<string> RejectedSensitiveOptions = new(StringComparer.Ordinal) {
         "--access-token",
         "--certificate-password",
@@ -75,10 +79,16 @@ internal sealed class CliArguments {
         if (args == null) throw new ArgumentNullException(nameof(args));
 
         string[] arguments = args as string[] ?? args.ToArray();
-        ParseResult parseResult = CliCommandModel.Root.Parse(arguments);
+        ParseResult parseResult = CliCommandModel.Root.Parse(arguments, ParserConfiguration);
         bool showHelp = arguments.Length == 0 || parseResult.Action is HelpAction;
         if (!showHelp && parseResult.Errors.Count > 0) {
             throw new InvalidOperationException(FormatErrors(parseResult.Errors, arguments));
+        }
+        if (!showHelp && parseResult.Tokens.Any(token => token.Type == TokenType.Directive)) {
+            throw new InvalidOperationException("Command-line directives are not supported.");
+        }
+        if (!showHelp && parseResult.Action != null) {
+            throw new InvalidOperationException("Command-line directives are not supported.");
         }
 
         return new CliArguments(parseResult, BuildCommandPath(parseResult.CommandResult), showHelp);

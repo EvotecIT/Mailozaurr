@@ -32,6 +32,49 @@ public sealed partial class CliRunnerTests {
     }
 
     [Fact]
+    public async Task AtPrefixedOptionValueRemainsLiteral() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        string? profilesDirectory = null;
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { "profile", "list", "--profiles-dir", "@profiles" },
+            stdout,
+            stderr,
+            options => {
+                profilesDirectory = options.ProfileStore.DirectoryPath;
+                return fixture.CreateBuilder();
+            });
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal("@profiles", profilesDirectory);
+    }
+
+    [Theory]
+    [InlineData("[diagram]")]
+    [InlineData("[suggest]")]
+    public async Task ParserDirectiveCannotExecuteApplication(string directive) {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        bool builderInvoked = false;
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] { directive, "profile", "list" },
+            stdout,
+            stderr,
+            _ => {
+                builderInvoked = true;
+                return fixture.CreateBuilder();
+            });
+
+        Assert.Equal(1, exitCode);
+        Assert.False(builderInvoked);
+        Assert.False(string.IsNullOrWhiteSpace(stderr.ToString()));
+    }
+
+    [Fact]
     public async Task ScalarOptionCannotConsumeTrailingArgument() {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();

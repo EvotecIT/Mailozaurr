@@ -10,6 +10,7 @@ internal static partial class CliCommandModel {
 
     private static RootCommand CreateRoot() {
         var root = new RootCommand("Mailozaurr command-line and MCP host.");
+        root.Directives.Clear();
         RemoveBuiltInVersionOption(root);
         AddRecursiveOption(root, "json");
         AddRecursiveOption(root, "profiles-dir");
