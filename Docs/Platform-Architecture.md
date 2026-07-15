@@ -31,9 +31,10 @@ The preferred long-term structure is:
 - `Mailozaurr`
 - `Mailozaurr.Application`
 - `Mailozaurr.PowerShell`
-- `Mailozaurr.Cli`
-- `Mailozaurr.Mcp`
+- `Mailozaurr.Cli`, including the MCP host
 - Desktop/GUI app projects
+
+`Mailozaurr.Application` and `Mailozaurr.Cli` have package definitions and are built by the shared release pipeline, but they are not public packages yet. Until they are explicitly published, consume Application through a project reference and run the CLI from source or from a locally built PowerForge artifact. Public installation instructions should only be added after those artifacts exist on the public feed.
 
 ### Layer Responsibilities
 
@@ -71,9 +72,6 @@ The preferred long-term structure is:
 - Human-readable output
 - JSON output
 - Exit codes
-
-`Mailozaurr.Mcp`
-
 - MCP transport and tool registration
 - Tool schema definitions
 - Mapping tool calls to application services
@@ -119,7 +117,7 @@ Examples:
 
 - PowerShell parameter sets and pipeline binding belong in `Mailozaurr.PowerShell`
 - CLI help text and shell-friendly formatting belong in `Mailozaurr.Cli`
-- MCP tool schemas belong in `Mailozaurr.Mcp`
+- MCP tool schemas belong in `Mailozaurr.Cli/Mcp`
 - GUI dialogs, views, and local UX behavior belong in the GUI project
 
 ## Feature Placement Guide
@@ -156,9 +154,6 @@ Place it in `Mailozaurr.Cli` if it is:
 - argument parsing
 - console output formatting
 - shell completion and exit code concerns
-
-Place it in `Mailozaurr.Mcp` if it is:
-
 - MCP server bootstrapping
 - tool declaration and transport behavior
 - mapping between tool requests and application services
@@ -237,7 +232,8 @@ Safety behavior should be shared, not reimplemented separately in each surface.
 Preferred defaults:
 
 - drafts before send when practical
-- queue-first sending for automation and agents
+- immediate delivery for explicit send requests
+- queue-on-failure only when the caller asks for it, with queue processing kept as a separate workflow
 - explicit confirmation for destructive actions
 - provider-limit validation before send
 - dry-run support where possible
@@ -251,7 +247,7 @@ The recommended shape is:
 
 - CLI for human and automation use
 - MCP as a structured tool surface over the same workflows
-- one executable host eventually able to run both normal CLI commands and `mcp serve`
+- one executable host that runs both normal CLI commands and `mcp serve`
 
 This avoids duplicating logic and gives one headless contract for the ecosystem.
 
@@ -267,7 +263,7 @@ The preferred split is:
 Examples of skill responsibilities:
 
 - when to prefer drafts over immediate send
-- when to use queue-first sending
+- when to opt into queue-on-failure or process the persistent queue
 - how to summarize before delete/move
 - how to select compact versus rich read surfaces
 
