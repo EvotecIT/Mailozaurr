@@ -4,6 +4,7 @@
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
         <VersionPrefix>2.0.13</VersionPrefix>
+        <OfficeIMOVersion>3.0.0</OfficeIMOVersion>
         <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
         <AssemblyName>Mailozaurr</AssemblyName>
         <Description>Email transport, mailbox, and message-file library for .NET with SMTP, IMAP, POP3, Microsoft Graph, Gmail, SendGrid, Mailgun, and Amazon SES support.</Description>
@@ -26,6 +27,11 @@
             Windows;MacOS;Linux;Mail;Email;MX;SPF;DMARC;DKIM;GraphApi;SendGrid;Graph;IMAP;POP3</PackageTags>
     </PropertyGroup>
 
+    <PropertyGroup>
+        <OfficeIMORoot Condition=" '$(OfficeIMORoot)' == '' ">..\..\..\OfficeIMO</OfficeIMORoot>
+        <UseOfficeIMOProjectReferences Condition=" '$(UseOfficeIMOProjectReferences)' == '' ">false</UseOfficeIMOProjectReferences>
+    </PropertyGroup>
+
     <PropertyGroup Condition=" '$(TargetFramework)' == 'net8.0' ">
         <IsAotCompatible>true</IsAotCompatible>
     </PropertyGroup>
@@ -41,10 +47,17 @@
         <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
         <PackageReference Include="MailKit" Version="4.17.0" />
         <PackageReference Include="MimeKit" Version="4.17.0" />
-        <PackageReference Include="OfficeIMO.Email" Version="2.0.1" />
         <PackageReference Include="Microsoft.Identity.Client" Version="4.86.0" />
         <PackageReference Include="NSspi" Version="0.3.1" />
         <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
+    </ItemGroup>
+
+    <ItemGroup Condition=" '$(UseOfficeIMOProjectReferences)' == 'true' ">
+        <ProjectReference Include="$(OfficeIMORoot)\OfficeIMO.Email\OfficeIMO.Email.csproj" />
+    </ItemGroup>
+
+    <ItemGroup Condition=" '$(UseOfficeIMOProjectReferences)' != 'true' ">
+        <PackageReference Include="OfficeIMO.Email" Version="$(OfficeIMOVersion)" />
     </ItemGroup>
 
     <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">

@@ -1,79 +1,48 @@
-using MimeKit;
-using MimeKit.Cryptography;
 using OfficeIMO.Email;
+using System.Security.Cryptography.X509Certificates;
 
 namespace Mailozaurr;
 
 internal static class MailFileSignatureProjection {
-    internal static MailFileSignatureInfo Evaluate(EmailDocument document, MimeMessage? mimeMessage) {
-        if (mimeMessage?.Body != null) return Evaluate(mimeMessage.Body);
-        if (!MailFileMimeAdapter.TryGetProtectedMimeEntity(document, out MimeEntity? entity) || entity == null) {
-            return default;
-        }
-
-        using (entity) {
-            return Evaluate(entity);
-        }
+    internal static MailFileSignatureInfo Evaluate(EmailDocument document, EmailReaderOptions contentReaderOptions) {
+        EmailSmimeVerificationResult verification = EmailSmime.Verify(
+            document,
+            contentReaderOptions: contentReaderOptions);
+        var signer = verification.Cryptography?.Signers.FirstOrDefault();
+        return signer == null
+            ? new MailFileSignatureInfo(verification, null, null, null)
+            : new MailFileSignatureInfo(
+                verification,
+                verification.IsCryptographicallyValid,
+                GetCompatibilitySignerName(signer.SignerCertificate, signer.Subject),
+                signer.SigningTime);
     }
 
-    private static MailFileSignatureInfo Evaluate(MimeEntity entity) {
-        try {
-            DigitalSignatureCollection? signatures = GetSignatures(entity);
-            if (signatures == null || signatures.Count == 0) return default;
-
-            bool valid = true;
-            foreach (IDigitalSignature signature in signatures) {
-                try {
-                    valid &= signature.Verify(true);
-                } catch (DigitalSignatureVerifyException) {
-                    valid = false;
-                }
-            }
-
-            IDigitalSignature first = signatures[0];
-            IDigitalCertificate? certificate = first.SignerCertificate;
-            string? signedBy = FirstNonEmpty(certificate?.Name, certificate?.Email);
-            return new MailFileSignatureInfo(valid, signedBy, first.CreationDate);
-        } catch (FormatException) {
-            return default;
-        } catch (InvalidOperationException) {
-            return default;
-        } catch (NotSupportedException) {
-            return default;
-        } catch (Org.BouncyCastle.Cms.CmsException) {
-            return default;
+    private static string? GetCompatibilitySignerName(byte[]? certificateBytes, string? subject) {
+        if (certificateBytes != null && certificateBytes.Length > 0) {
+#pragma warning disable SYSLIB0057
+            using var certificate = new X509Certificate2(certificateBytes);
+#pragma warning restore SYSLIB0057
+            string name = certificate.GetNameInfo(X509NameType.SimpleName, forIssuer: false);
+            if (!string.IsNullOrWhiteSpace(name)) return name;
+            string email = certificate.GetNameInfo(X509NameType.EmailName, forIssuer: false);
+            if (!string.IsNullOrWhiteSpace(email)) return email;
         }
-    }
 
-    private static DigitalSignatureCollection? GetSignatures(MimeEntity entity) {
-        using var context = new TemporarySecureMimeContext();
-        if (entity is MultipartSigned multipart && IsSmimeSignature(multipart)) {
-            return multipart.Verify(context);
-        }
-        if (entity is ApplicationPkcs7Mime pkcs7 && pkcs7.SecureMimeType == SecureMimeType.SignedData) {
-            DigitalSignatureCollection signatures = pkcs7.Verify(context, out MimeEntity extracted);
-            extracted.Dispose();
-            return signatures;
-        }
-        return null;
+        return subject;
     }
-
-    private static bool IsSmimeSignature(MultipartSigned multipart) {
-        string? protocol = multipart.ContentType.Parameters["protocol"];
-        return string.Equals(protocol, "application/pkcs7-signature", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(protocol, "application/x-pkcs7-signature", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string? FirstNonEmpty(params string?[] values) =>
-        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 }
 
 internal readonly struct MailFileSignatureInfo {
-    internal MailFileSignatureInfo(bool isValid, string? signedBy, DateTimeOffset signedOn) {
+    internal MailFileSignatureInfo(EmailSmimeVerificationResult verification, bool? isValid,
+        string? signedBy, DateTimeOffset? signedOn) {
+        Verification = verification;
         IsValid = isValid;
         SignedBy = signedBy;
         SignedOn = signedOn;
     }
+
+    internal EmailSmimeVerificationResult? Verification { get; }
 
     internal bool? IsValid { get; }
 

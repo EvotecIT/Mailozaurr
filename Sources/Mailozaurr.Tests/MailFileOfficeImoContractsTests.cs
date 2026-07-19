@@ -13,6 +13,7 @@ public sealed class MailFileOfficeImoContractsTests {
 
         string[] references = assembly.GetReferencedAssemblies().Select(item => item.Name!).ToArray();
         Assert.Contains("OfficeIMO.Email", references);
+        Assert.Contains("OfficeIMO.Security", references);
         Assert.Contains("MimeKit", references);
         Assert.DoesNotContain("Mailozaurr.Msg", references);
         Assert.DoesNotContain("MsgKit", references);
@@ -223,24 +224,77 @@ public sealed class MailFileOfficeImoContractsTests {
             message.From.Add(new MailboxAddress("Signer", "signer@example.com"));
             message.To.Add(new MailboxAddress("Recipient", "recipient@example.com"));
             message.Subject = "Signed owner";
-            message.Body = new TextPart("plain") { Text = "Signed body" };
+            var signedBody = new Multipart("mixed") {
+                new TextPart("plain") { Text = "Signed body" },
+                new MimePart("application", "octet-stream") {
+                    Content = new MimeContent(new MemoryStream(new byte[] { 1, 2, 3, 4 })),
+                    ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+                    FileName = "signed.bin"
+                }
+            };
             using (var context = new TemporarySecureMimeContext()) {
                 var signer = new CmsSigner(certificate) { DigestAlgorithm = DigestAlgorithm.Sha256 };
-                message.Body = MultipartSigned.Create(context, signer, message.Body);
+                message.Body = MultipartSigned.Create(context, signer, signedBody);
             }
             message.WriteTo(path);
 
-            MailFileMessage unverified = MailFileReader.Read(path);
+            string? expectedSignerName;
+            DateTimeOffset expectedSigningTime;
+            using (var context = new TemporarySecureMimeContext()) {
+                DigitalSignatureCollection signatures = ((MultipartSigned)message.Body).Verify(context);
+                IDigitalSignature signature = Assert.Single(signatures);
+                expectedSignerName = !string.IsNullOrWhiteSpace(signature.SignerCertificate?.Name)
+                    ? signature.SignerCertificate!.Name
+                    : signature.SignerCertificate?.Email;
+                expectedSigningTime = signature.CreationDate;
+            }
+
+            using MailFileMessage unverified = MailFileReader.Read(path);
             Assert.Null(unverified.SignatureIsValid);
             Assert.Null(unverified.SignedBy);
             Assert.Null(unverified.SignedOn);
 
-            MailFileMessage result = MailFileReader.Read(path,
-                new MailFileReaderOptions { VerifySignature = true });
+            using MailFileMessage result = MailFileReader.Read(path,
+                new MailFileReaderOptions {
+                    VerifySignature = true,
+                    OfficeReaderOptions = new EmailReaderOptions(includeAttachmentContent: false)
+                });
 
             Assert.True(result.SignatureIsValid);
-            Assert.Contains("Mail File Signer", result.SignedBy, StringComparison.OrdinalIgnoreCase);
-            Assert.NotNull(result.SignedOn);
+            Assert.NotNull(result.SignatureVerification);
+            Assert.True(result.SignatureVerification!.IsCryptographicallyValid);
+            Assert.Equal(expectedSignerName, result.SignedBy);
+            Assert.Equal(expectedSigningTime, result.SignedOn);
+            EmailAttachment signedAttachment = Assert.Single(result.SignatureVerification.SignedContent!.Attachments);
+            Assert.Equal("signed.bin", signedAttachment.FileName);
+            Assert.Equal(4, signedAttachment.Length);
+            Assert.Null(signedAttachment.Content);
+        } finally {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Theory]
+    [InlineData("message.oft", EmailFileFormat.OutlookTemplate, MailFileFormat.OutlookTemplate)]
+    [InlineData("winmail.dat", EmailFileFormat.Tnef, MailFileFormat.Tnef)]
+    public void ImportSupportsOutlookTemplateAndTnefArtifacts(
+        string fileName,
+        EmailFileFormat officeFormat,
+        MailFileFormat expectedFormat) {
+        string directory = CreateTempDirectory();
+        try {
+            string path = Path.Combine(directory, fileName);
+            var document = new EmailDocument {
+                Subject = "Expanded mail-file input",
+                Body = { Text = "Owner-backed content" }
+            };
+            new EmailDocumentWriter().Write(document, path, officeFormat);
+
+            using MailFileMessage result = MailFileReader.Read(path);
+
+            Assert.Equal(expectedFormat, result.Format);
+            Assert.Equal(officeFormat, result.OfficeDocument.Format);
+            Assert.Equal("Expanded mail-file input", result.Subject);
         } finally {
             Directory.Delete(directory, true);
         }

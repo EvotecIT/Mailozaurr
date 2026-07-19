@@ -54,19 +54,22 @@ For OAuth2 support, Mailozaurr also bundles:
 - [Google.Apis.Core](https://www.nuget.org/packages/Google.Apis.Core)
 - [Google.Apis.Auth](https://www.nuget.org/packages/Google.Apis.Auth)
 
-## EML and Outlook MSG files
+## EML, MSG, OFT, and TNEF files
 
-Mailozaurr keeps MIME, transport, S/MIME, PGP, DKIM, and ARC workflows in MimeKit and MailKit. OfficeIMO.Email owns local email artifacts: Outlook MSG, typed Outlook appointments, contacts, tasks, journals and notes, TNEF, RTF-backed bodies, embedded items, and retained MAPI properties.
+Mailozaurr keeps transport, mailbox access, MimeKit message composition, PGP, DKIM, ARC, and outbound S/MIME workflows. OfficeIMO.Email owns local EML, MSG, OFT, and TNEF artifact reading, writing, and projection, including typed Outlook items, RTF-backed bodies, embedded items, retained MAPI properties, and bounded S/MIME verification through OfficeIMO.Security.
 
-PowerShell callers can import either file type through the same command:
+PowerShell callers can import EML, MSG, OFT, and TNEF files through the same command. The returned message owns the OfficeIMO read result, so dispose it when the projection is no longer needed:
 
 ```powershell
 $mail = Import-MailFile './message.msg'
-
-$mail.Subject
-$mail.OutlookItemKind
-$mail.OfficeDocument.Contact
-$mail.Diagnostics
+try {
+    $mail.Subject
+    $mail.OutlookItemKind
+    $mail.OfficeDocument.Contact
+    $mail.Diagnostics
+} finally {
+    $mail.Dispose()
+}
 ```
 
 Exporting uses the destination extension, so the same pipeline converts in either direction:
@@ -90,13 +93,13 @@ The .NET API follows the same load/save shape:
 ```csharp
 using Mailozaurr;
 
-MailFileMessage mail = MailFileMessage.Load("message.msg");
+using MailFileMessage mail = MailFileMessage.Load("message.msg");
 Console.WriteLine(mail.Subject);
 
 await mail.SaveAsync("message.eml");
 ```
 
-`MailFileMessage.Load` and `Import-MailFile` fail clearly on error diagnostics. Use `MailFileReader` when custom projection options or recovery from a partially readable artifact are needed; check `message.HasErrors` and `message.Diagnostics` before accepting it. The older `EmailMessage` conversion methods remain available for compatibility and batch conversion. A separate `Mailozaurr.Msg` package is no longer required.
+`MailFileMessage.Load` and `Import-MailFile` fail clearly on error diagnostics. Use `MailFileReader` when custom projection options or recovery from a partially readable artifact are needed; check `message.HasErrors` and `message.Diagnostics` before accepting it. Disposing the message releases any temporary file-backed attachment content retained by OfficeIMO. The older `EmailMessage` conversion methods remain available for compatibility and batch conversion. A separate `Mailozaurr.Msg` package is no longer required.
 
 ## Architecture notes
 

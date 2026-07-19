@@ -1,4 +1,3 @@
-using MimeKit;
 using OfficeIMO.Email;
 
 namespace Mailozaurr;
@@ -13,8 +12,6 @@ public sealed class MailFileReaderOptions {
     public bool IncludeHeaders { get; set; }
     /// <summary>Optional immutable OfficeIMO bounded-reader policy.</summary>
     public EmailReaderOptions? OfficeReaderOptions { get; set; }
-    /// <summary>Verifies S/MIME signatures through MimeKit when true. This performs an additional EML parse.</summary>
+    /// <summary>Verifies retained EML, MSG, or TNEF S/MIME signatures through OfficeIMO.Security when true.</summary>
     public bool VerifySignature { get; set; }
-    /// <summary>Optional MimeKit parser policy used when S/MIME signature verification is enabled.</summary>
-    public ParserOptions? MimeParserOptions { get; set; }
 }

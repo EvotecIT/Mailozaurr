@@ -3,15 +3,15 @@ using OfficeIMO.Email;
 namespace Mailozaurr;
 
 public sealed partial class MailFileMessage {
-    /// <summary>Loads one MSG or EML file with the default Mailozaurr projection.</summary>
+    /// <summary>Loads one EML, MSG, OFT, or TNEF file with the default Mailozaurr projection.</summary>
     public static MailFileMessage Load(string filePath, MailFileReaderOptions? options = null) =>
         GetMessageOrThrow(MailFileReader.Read(filePath, options));
 
-    /// <summary>Loads one MSG or EML file from a file descriptor.</summary>
+    /// <summary>Loads one EML, MSG, OFT, or TNEF file from a file descriptor.</summary>
     public static MailFileMessage Load(FileInfo fileInfo, MailFileReaderOptions? options = null) =>
         GetMessageOrThrow(MailFileReader.Read(fileInfo, options));
 
-    /// <summary>Asynchronously loads one MSG or EML file with the default Mailozaurr projection.</summary>
+    /// <summary>Asynchronously loads one EML, MSG, OFT, or TNEF file with the default Mailozaurr projection.</summary>
     public static async Task<MailFileMessage> LoadAsync(string filePath, MailFileReaderOptions? options = null,
         CancellationToken cancellationToken = default) {
         MailFileMessage message = await MailFileReader.ReadAsync(filePath, options, cancellationToken)
@@ -19,7 +19,7 @@ public sealed partial class MailFileMessage {
         return GetMessageOrThrow(message);
     }
 
-    /// <summary>Asynchronously loads one MSG or EML file from a file descriptor.</summary>
+    /// <summary>Asynchronously loads one EML, MSG, OFT, or TNEF file from a file descriptor.</summary>
     public static async Task<MailFileMessage> LoadAsync(FileInfo fileInfo, MailFileReaderOptions? options = null,
         CancellationToken cancellationToken = default) {
         MailFileMessage message = await MailFileReader.ReadAsync(fileInfo, options, cancellationToken)
@@ -46,7 +46,12 @@ public sealed partial class MailFileMessage {
         OfficeDocument.SaveAsync(filePath, format, options, cancellationToken);
 
     private static MailFileMessage GetMessageOrThrow(MailFileMessage message) {
-        MailFileDiagnostics.ThrowIfErrors(message.Diagnostics, "The mail file could not be loaded");
-        return message;
+        try {
+            MailFileDiagnostics.ThrowIfErrors(message.Diagnostics, "The mail file could not be loaded");
+            return message;
+        } catch {
+            message.Dispose();
+            throw;
+        }
     }
 }

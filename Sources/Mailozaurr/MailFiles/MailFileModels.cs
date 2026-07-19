@@ -8,7 +8,11 @@ public enum MailFileFormat {
     /// <summary>Outlook MSG format.</summary>
     Msg,
     /// <summary>RFC 822 EML format.</summary>
-    Eml
+    Eml,
+    /// <summary>Outlook OFT template format.</summary>
+    OutlookTemplate,
+    /// <summary>Transport Neutral Encapsulation Format, commonly winmail.dat.</summary>
+    Tnef
 }
 
 /// <summary>Recipient classification.</summary>
@@ -97,18 +101,20 @@ public sealed class MailFileAttachment {
 }
 
 /// <summary>Represents a mail file backed by one mutable OfficeIMO document.</summary>
-public sealed partial class MailFileMessage {
+/// <remarks>Dispose the message when finished so OfficeIMO can release any temporary file-backed attachment content.</remarks>
+public sealed partial class MailFileMessage : IDisposable {
     private readonly bool _includeAttachments;
     private readonly bool _includeAttachmentContent;
     private readonly bool _includeHeaders;
 
-    internal MailFileMessage(string filePath, MailFileFormat format, EmailDocument officeDocument,
-        IReadOnlyList<EmailDiagnostic> diagnostics, MailFileSignatureInfo signature,
-        MailFileReaderOptions options) {
+    internal MailFileMessage(string filePath, MailFileFormat format, EmailReadResult officeReadResult,
+        MailFileSignatureInfo signature, MailFileReaderOptions options) {
         FilePath = filePath ?? throw new ArgumentNullException(nameof(filePath));
         Format = format;
-        OfficeDocument = officeDocument ?? throw new ArgumentNullException(nameof(officeDocument));
-        Diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+        OfficeReadResult = officeReadResult ?? throw new ArgumentNullException(nameof(officeReadResult));
+        OfficeDocument = officeReadResult.Document;
+        Diagnostics = officeReadResult.Diagnostics;
+        SignatureVerification = signature.Verification;
         SignatureIsValid = signature.IsValid;
         SignedBy = signature.SignedBy;
         SignedOn = signature.SignedOn;
@@ -166,6 +172,8 @@ public sealed partial class MailFileMessage {
     public IReadOnlyList<string> Categories => OfficeDocument.MessageMetadata.Categories.ToArray();
     /// <summary>Protected-message classification.</summary>
     public EmailProtectionKind ProtectionKind => OfficeDocument.Protection.Kind;
+    /// <summary>Complete bounded OfficeIMO S/MIME verification result when verification was requested.</summary>
+    public EmailSmimeVerificationResult? SignatureVerification { get; }
     /// <summary>Indicates whether the embedded S/MIME signature passed signature-only validation; null when absent or unverifiable.</summary>
     public bool? SignatureIsValid { get; }
     /// <summary>Signer identity projected from the embedded S/MIME certificate.</summary>
@@ -189,6 +197,11 @@ public sealed partial class MailFileMessage {
     }
     /// <summary>Complete owner document, including typed Outlook items and retained MAPI values.</summary>
     public EmailDocument OfficeDocument { get; }
+    /// <summary>Owner read result, including consumed bytes and file-backed attachment lifetime.</summary>
+    public EmailReadResult OfficeReadResult { get; }
+
+    /// <summary>Releases temporary file-backed attachment content owned by the OfficeIMO read result.</summary>
+    public void Dispose() => OfficeReadResult.Dispose();
 
     /// <summary>Creates a MimeKit message from the current OfficeIMO owner document.</summary>
     public MimeMessage ToMimeMessage() => MailFileMimeAdapter.ToMimeMessage(OfficeDocument);
