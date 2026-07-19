@@ -106,6 +106,7 @@ public sealed partial class MailFileMessage : IDisposable {
     private readonly bool _includeAttachments;
     private readonly bool _includeAttachmentContent;
     private readonly bool _includeHeaders;
+    private bool _disposed;
 
     internal MailFileMessage(string filePath, MailFileFormat format, EmailReadResult officeReadResult,
         MailFileSignatureInfo signature, MailFileReaderOptions options) {
@@ -199,9 +200,15 @@ public sealed partial class MailFileMessage : IDisposable {
     public EmailDocument OfficeDocument { get; }
     /// <summary>Owner read result, including consumed bytes and file-backed attachment lifetime.</summary>
     public EmailReadResult OfficeReadResult { get; }
+    /// <summary>True after this message has released its OfficeIMO read-result resources.</summary>
+    public bool IsDisposed => _disposed;
 
     /// <summary>Releases temporary file-backed attachment content owned by the OfficeIMO read result.</summary>
-    public void Dispose() => OfficeReadResult.Dispose();
+    public void Dispose() {
+        if (_disposed) return;
+        OfficeReadResult.Dispose();
+        _disposed = true;
+    }
 
     /// <summary>Creates a MimeKit message from the current OfficeIMO owner document.</summary>
     public MimeMessage ToMimeMessage() => MailFileMimeAdapter.ToMimeMessage(OfficeDocument);

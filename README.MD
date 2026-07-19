@@ -79,7 +79,7 @@ Import-MailFile './message.msg' | Export-MailFile './message.eml'
 Import-MailFile './message.eml' | Export-MailFile './message.msg'
 ```
 
-Add `-Force` to replace an existing destination or `-PassThru` to return its `FileInfo`. Use `-IncludeHeaders` when merged headers are needed, `-ExcludeAttachments` for message metadata only, or `-ExcludeAttachmentContent` to retain attachment names and sizes without loading decoded bytes. EML input also exposes its native `MimeMessage`; MSG input can produce one with `$mail.ToMimeMessage()` when it needs to enter a Mailozaurr cryptography or transport workflow.
+`Export-MailFile` consumes and disposes each input message after processing, including when conversion reports an error. Add `-KeepInputOpen` when a retained `$mail` variable must remain usable after export. Add `-Force` to replace an existing destination or `-PassThru` to return its `FileInfo`. Use `-IncludeHeaders` when merged headers are needed, `-ExcludeAttachments` for message metadata only, or `-ExcludeAttachmentContent` to retain attachment names and sizes without loading decoded bytes. EML input also exposes its native `MimeMessage`; MSG input can produce one with `$mail.ToMimeMessage()` when it needs to enter a Mailozaurr cryptography or transport workflow.
 
 The direction-specific conversion commands remain available for scripts that write batches to an output folder:
 
