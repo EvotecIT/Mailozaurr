@@ -5,7 +5,7 @@ namespace Mailozaurr.PowerShell;
 
 /// <summary>
 /// <para type="synopsis">Exports an imported mail file as EML, MSG, or TNEF.</para>
-/// <para type="description">Writes a <see cref="MailFileMessage"/> to a file and disposes the consumed input unless <c>-KeepInputOpen</c> is specified. The destination extension selects EML, MSG, or TNEF, so the same command handles conversion in either direction.</para>
+/// <para type="description">Writes a <see cref="MailFileMessage"/> to a file and disposes the input after an attempted export unless <c>-KeepInputOpen</c> is specified. Previewed or rejected operations leave the input open. The destination extension selects EML, MSG, or TNEF, so the same command handles conversion in either direction.</para>
 /// <example>
 ///   <summary>Convert an Outlook MSG file to EML</summary>
 ///   <code>Import-MailFile './message.msg' | Export-MailFile './message.eml'</code>
@@ -46,6 +46,7 @@ public sealed class CmdletExportMailFile : PSCmdlet {
     protected override void ProcessRecord() {
         MailFileMessage? input = InputObject;
         if (input == null) return;
+        bool exportAttempted = false;
 
         try {
             if (string.IsNullOrWhiteSpace(OutputPath)) return;
@@ -65,6 +66,7 @@ public sealed class CmdletExportMailFile : PSCmdlet {
                 return;
             }
             if (!ShouldProcess(outputPath, "Export mail file")) return;
+            exportAttempted = true;
 
             EmailWriteResult result;
             try {
@@ -89,7 +91,7 @@ public sealed class CmdletExportMailFile : PSCmdlet {
             }
             if (!hasErrors && PassThru.IsPresent) WriteObject(new FileInfo(outputPath));
         } finally {
-            if (!KeepInputOpen.IsPresent) input.Dispose();
+            if (exportAttempted && !KeepInputOpen.IsPresent) input.Dispose();
             InputObject = null;
         }
     }

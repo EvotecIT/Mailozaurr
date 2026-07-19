@@ -59,7 +59,7 @@ Describe 'Export-MailFile input ownership' {
         $outputPath | Should -Exist
     }
 
-    It 'disposes the input when export exits early for an existing destination' {
+    It 'keeps the input open when export is rejected before an attempt' {
         $script:message = Import-MailFile -InputPath $script:sourcePath
         $outputPath = Join-Path $TestDrive 'existing.msg'
         Set-Content -LiteralPath $outputPath -Value 'existing'
@@ -67,7 +67,28 @@ Describe 'Export-MailFile input ownership' {
         $errors = @()
         $script:message | Export-MailFile -OutputPath $outputPath -ErrorAction SilentlyContinue -ErrorVariable errors
 
-        $script:message.IsDisposed | Should -BeTrue
+        $script:message.IsDisposed | Should -BeFalse
         $errors.FullyQualifiedErrorId | Should -Contain 'MailFileAlreadyExists,Mailozaurr.PowerShell.CmdletExportMailFile'
+    }
+
+    It 'keeps the input open when WhatIf skips the export' {
+        $script:message = Import-MailFile -InputPath $script:sourcePath
+        $outputPath = Join-Path $TestDrive 'whatif.msg'
+
+        $script:message | Export-MailFile -OutputPath $outputPath -WhatIf
+
+        $script:message.IsDisposed | Should -BeFalse
+        $outputPath | Should -Not -Exist
+    }
+
+    It 'disposes the input when an attempted export fails' {
+        $script:message = Import-MailFile -InputPath $script:sourcePath
+        $outputPath = Join-Path $TestDrive 'unsupported.txt'
+
+        $errors = @()
+        $script:message | Export-MailFile -OutputPath $outputPath -ErrorAction SilentlyContinue -ErrorVariable errors
+
+        $script:message.IsDisposed | Should -BeTrue
+        $errors.FullyQualifiedErrorId | Should -Contain 'MailFileExportFailed,Mailozaurr.PowerShell.CmdletExportMailFile'
     }
 }
