@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 namespace Mailozaurr.PowerShell;
 
 /// <summary>
-/// <para type="synopsis">Imports a .msg or .eml mail file and returns its contents as a message object.</para>
-/// <para type="description">The <c>Import-MailFile</c> cmdlet loads a .msg (Outlook) or .eml (RFC822) file from disk and returns a <see cref="MailFileMessage"/> for further processing, inspection, or conversion.</para>
+/// <para type="synopsis">Imports an EML, MSG, OFT, or TNEF mail file and returns its contents as a message object.</para>
+/// <para type="description">The <c>Import-MailFile</c> cmdlet loads a native mail artifact and returns a <see cref="MailFileMessage"/> for further processing, inspection, or conversion.</para>
 /// <example>
 ///   <summary>Import a .msg file</summary>
 ///   <code>Import-MailFile "C:\Mail\message.msg"</code>
@@ -17,7 +17,8 @@ namespace Mailozaurr.PowerShell;
 /// </example>
 /// <remarks>
 /// Use this cmdlet to inspect, convert, or process mail files in automation or 
-/// migration scenarios.
+/// migration scenarios. Dispose the returned message when finished so temporary
+/// file-backed attachment content can be released promptly.
 /// </remarks>
 /// <seealso href="https://github.com/EvotecIT/Mailozaurr">Mailozaurr Documentation</seealso>
 /// </summary>
@@ -25,7 +26,7 @@ namespace Mailozaurr.PowerShell;
 public sealed class CmdletImportMailFile : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">Specifies the path to the .msg or .eml file to 
-    /// import. Accepts aliases FilePath and Path.</para>
+    /// import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts aliases FilePath and Path.</para>
     /// </summary>
     [Parameter(Mandatory = true, Position = 0)]
     [Alias("FilePath", "Path")]
@@ -44,7 +45,7 @@ public sealed class CmdletImportMailFile : AsyncPSCmdlet {
     [Parameter]
     public SwitchParameter ExcludeAttachmentContent { get; set; }
 
-    /// <summary>Verifies S/MIME signatures and projects signer metadata when present.</summary>
+    /// <summary>Verifies retained EML, MSG, or TNEF S/MIME signatures and projects the bounded OfficeIMO result.</summary>
     [Parameter]
     public SwitchParameter VerifySignature { get; set; }
 
@@ -64,8 +65,9 @@ public sealed class CmdletImportMailFile : AsyncPSCmdlet {
             IncludeHeaders = IncludeHeaders.IsPresent,
             VerifySignature = this.VerifySignature.IsPresent
         };
+        MailFileMessage? message = null;
         try {
-            MailFileMessage message = await MailFileMessage.LoadAsync(inputPath!, options, CancelToken)
+            message = await MailFileMessage.LoadAsync(inputPath!, options, CancelToken)
                 .ConfigureAwait(false);
             foreach (EmailDiagnostic diagnostic in message.Diagnostics) {
                 string diagnosticMessage = $"{diagnostic.Code}: {diagnostic.Message}";
@@ -76,6 +78,7 @@ public sealed class CmdletImportMailFile : AsyncPSCmdlet {
                 }
             }
             WriteObject(message);
+            message = null;
         } catch (OperationCanceledException) when (CancelToken.IsCancellationRequested) {
             throw;
         } catch (NotSupportedException exception) {
@@ -88,6 +91,8 @@ public sealed class CmdletImportMailFile : AsyncPSCmdlet {
             WriteError(new ErrorRecord(exception, "MailFileFormatMismatch", ErrorCategory.InvalidData, inputPath));
         } catch (Exception ex) {
             WriteError(new ErrorRecord(ex, "MailFileImportFailed", ErrorCategory.ReadError, inputPath));
+        } finally {
+            message?.Dispose();
         }
     }
 }

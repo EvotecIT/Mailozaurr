@@ -61,7 +61,7 @@ public class MailFileReaderTests {
             Assert.False(result);
             Assert.Null(message);
             Assert.NotNull(error);
-            Assert.Contains("not a .msg or .eml", error!, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("not a supported", error!, StringComparison.OrdinalIgnoreCase);
         } finally {
             Directory.Delete(tempDir, true);
         }

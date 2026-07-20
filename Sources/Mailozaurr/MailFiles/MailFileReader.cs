@@ -1,9 +1,8 @@
-using MimeKit;
 using OfficeIMO.Email;
 
 namespace Mailozaurr;
 
-/// <summary>Reads MSG and EML files into compatibility fields and their rich owner models.</summary>
+/// <summary>Reads EML, MSG, OFT, and TNEF files into compatibility fields and their rich owner models.</summary>
 public static class MailFileReader {
     /// <summary>Reads a mail file from a path.</summary>
     public static MailFileMessage Read(string path, MailFileReaderOptions? options = null) {
@@ -20,12 +19,13 @@ public static class MailFileReader {
         MailFileFormat format = ResolveFormat(fileInfo);
         EmailReaderOptions officeOptions = ResolveOfficeOptions(options);
         EmailReadResult result = new EmailDocumentReader(officeOptions).Read(fileInfo.FullName);
-        EnsureExpectedFormat(result.Document, format, fileInfo.FullName);
-
-        MimeMessage? mimeMessage = options.VerifySignature && format == MailFileFormat.Eml
-            ? LoadMimeMessage(fileInfo.FullName, options.MimeParserOptions)
-            : null;
-        return Project(fileInfo.FullName, format, result, mimeMessage, options);
+        try {
+            EnsureExpectedFormat(result.Document, format, fileInfo.FullName);
+            return Project(fileInfo.FullName, format, result, options, officeOptions);
+        } catch {
+            result.Dispose();
+            throw;
+        }
     }
 
     /// <summary>Asynchronously reads a mail file from a path.</summary>
@@ -46,13 +46,13 @@ public static class MailFileReader {
         EmailReaderOptions officeOptions = ResolveOfficeOptions(options);
         EmailReadResult result = await new EmailDocumentReader(officeOptions)
             .ReadAsync(fileInfo.FullName, cancellationToken).ConfigureAwait(false);
-        EnsureExpectedFormat(result.Document, format, fileInfo.FullName);
-
-        MimeMessage? mimeMessage = options.VerifySignature && format == MailFileFormat.Eml
-            ? await LoadMimeMessageAsync(fileInfo.FullName, options.MimeParserOptions, cancellationToken)
-                .ConfigureAwait(false)
-            : null;
-        return Project(fileInfo.FullName, format, result, mimeMessage, options);
+        try {
+            EnsureExpectedFormat(result.Document, format, fileInfo.FullName);
+            return Project(fileInfo.FullName, format, result, options, officeOptions);
+        } catch {
+            result.Dispose();
+            throw;
+        }
     }
 
     /// <summary>Attempts to read a mail file and returns an error message on failure.</summary>
@@ -74,40 +74,32 @@ public static class MailFileReader {
                 candidate.Diagnostics,
                 "The mail file could not be read",
                 out error)) {
+                candidate.Dispose();
                 return false;
             }
             message = candidate;
             return true;
         } catch (NotSupportedException) {
-            error = $"File {path} is not a .msg or .eml file.";
+            error = $"File {path} is not a supported EML, MSG, OFT, or TNEF file.";
             return false;
         } catch (Exception ex) {
-            error = $"File {path} is not a .msg or .eml file or another error occurred. Error: {ex.Message}";
+            error = $"File {path} is not a supported mail file or another error occurred. Error: {ex.Message}";
             return false;
         }
     }
 
     private static MailFileMessage Project(string path, MailFileFormat format, EmailReadResult result,
-        MimeMessage? mimeMessage, MailFileReaderOptions options) {
+        MailFileReaderOptions options, EmailReaderOptions officeOptions) {
         EmailDocument document = result.Document;
         MailFileSignatureInfo signature = options.VerifySignature
-            ? MailFileSignatureProjection.Evaluate(document, mimeMessage)
+            ? MailFileSignatureProjection.Evaluate(document, officeOptions)
             : default;
-        return new MailFileMessage(path, format, document, result.Diagnostics, signature, options);
+        return new MailFileMessage(path, format, result, signature, options);
     }
 
     private static EmailReaderOptions ResolveOfficeOptions(MailFileReaderOptions options) =>
         options.OfficeReaderOptions ?? new EmailReaderOptions(
             includeAttachmentContent: options.IncludeAttachments && options.IncludeAttachmentContent);
-
-    private static MimeMessage LoadMimeMessage(string path, ParserOptions? options) => options == null
-        ? MimeMessage.Load(path)
-        : MimeMessage.Load(options, path);
-
-    private static Task<MimeMessage> LoadMimeMessageAsync(string path, ParserOptions? options,
-        CancellationToken cancellationToken) => options == null
-        ? MimeMessage.LoadAsync(path, cancellationToken)
-        : MimeMessage.LoadAsync(options, path, cancellationToken);
 
     private static void ValidateFile(FileInfo fileInfo) {
         if (fileInfo == null) throw new ArgumentNullException(nameof(fileInfo));
@@ -116,14 +108,21 @@ public static class MailFileReader {
 
     private static MailFileFormat ResolveFormat(FileInfo fileInfo) {
         if (fileInfo.Extension.Equals(".msg", StringComparison.OrdinalIgnoreCase)) return MailFileFormat.Msg;
+        if (fileInfo.Extension.Equals(".oft", StringComparison.OrdinalIgnoreCase)) return MailFileFormat.OutlookTemplate;
         if (fileInfo.Extension.Equals(".eml", StringComparison.OrdinalIgnoreCase)) return MailFileFormat.Eml;
+        if (fileInfo.Extension.Equals(".tnef", StringComparison.OrdinalIgnoreCase) ||
+            fileInfo.Extension.Equals(".dat", StringComparison.OrdinalIgnoreCase)) return MailFileFormat.Tnef;
         throw new NotSupportedException($"Unsupported mail file extension '{fileInfo.Extension}'.");
     }
 
     private static void EnsureExpectedFormat(EmailDocument document, MailFileFormat format, string path) {
-        bool valid = format == MailFileFormat.Msg
-            ? document.Format == EmailFileFormat.OutlookMsg
-            : document.Format == EmailFileFormat.Eml;
+        bool valid = format switch {
+            MailFileFormat.Msg => document.Format == EmailFileFormat.OutlookMsg,
+            MailFileFormat.Eml => document.Format == EmailFileFormat.Eml,
+            MailFileFormat.OutlookTemplate => document.Format == EmailFileFormat.OutlookTemplate,
+            MailFileFormat.Tnef => document.Format == EmailFileFormat.Tnef,
+            _ => false
+        };
         if (!valid) throw new FormatException($"File '{path}' content does not match its {format} extension.");
     }
 }

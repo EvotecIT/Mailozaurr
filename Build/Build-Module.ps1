@@ -29,11 +29,11 @@ Build-Module -ModuleName 'Mailozaurr' {
         # Copyright statement for this module
         Copyright            = "(c) 2011 - $((Get-Date).Year) Przemyslaw Klys @ Evotec. All rights reserved."
         # Description of the functionality provided by this module
-        Description          = 'PowerShell email toolkit for SMTP, IMAP, POP3, Microsoft Graph, Gmail, SendGrid, Mailgun, and Amazon SES, with message-file, signing, and encryption workflows.'
+        Description          = 'PowerShell email toolkit for SMTP, IMAP, POP3, Microsoft Graph, Gmail, SendGrid, Mailgun, and Amazon SES, with message-file, PST/OST archive, signing, and encryption workflows.'
         # Minimum version of the Windows PowerShell engine required by this module
         PowerShellVersion    = '5.1'
         # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
-        Tags                 = @('Windows', 'MacOS', 'Linux', 'Mail', 'Email', 'MX', 'SPF', 'DMARC', 'DKIM', 'GraphApi', 'SendGrid', 'Graph', 'IMAP', 'POP3')
+        Tags                 = @('Windows', 'MacOS', 'Linux', 'Mail', 'Email', 'MX', 'SPF', 'DMARC', 'DKIM', 'GraphApi', 'SendGrid', 'Graph', 'IMAP', 'POP3', 'PST', 'OST', 'OLM', 'Mbox', 'EMLX', 'Maildir')
 
         IconUri              = 'https://evotec.xyz/wp-content/uploads/2020/07/MailoZaurr.png'
 
@@ -127,6 +127,23 @@ Build-Module -ModuleName 'Mailozaurr' {
             'Mailozaurr.SendLogResolver'
             'Mailozaurr.Smtp'
             'Mailozaurr.SmtpConnectionPool'
+            'OfficeIMO.Email.AddressBook.OfflineAddressBookReaderOptions'
+            'OfficeIMO.Email.ContentLineReaderOptions'
+            'OfficeIMO.Email.Data.EmailDataArtifactKind'
+            'OfficeIMO.Email.Data.EmailDataOpenOptions'
+            'OfficeIMO.Email.Data.EmailDataOpenResult'
+            'OfficeIMO.Email.EmailReaderOptions'
+            'OfficeIMO.Email.OutlookItemKind'
+            'OfficeIMO.Email.Store.EmailStoreContentMatchMode'
+            'OfficeIMO.Email.Store.EmailStoreContentSearchCheckpoint'
+            'OfficeIMO.Email.Store.EmailStoreContentSearchFields'
+            'OfficeIMO.Email.Store.EmailStoreFormat'
+            'OfficeIMO.Email.Store.EmailStoreItemReadParts'
+            'OfficeIMO.Email.Store.EmailStoreMergeFolderMode'
+            'OfficeIMO.Email.Store.EmailStoreReaderOptions'
+            'OfficeIMO.Email.Store.EmailStoreSession'
+            'OfficeIMO.Email.Store.EmailStoreSpecialFolderKind'
+            'OfficeIMO.Email.Store.EmailStoreValidationMode'
         )
         #NETMergeLibraryDebugging          = $true
         DotSourceLibraries                = $true

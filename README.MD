@@ -54,19 +54,22 @@ For OAuth2 support, Mailozaurr also bundles:
 - [Google.Apis.Core](https://www.nuget.org/packages/Google.Apis.Core)
 - [Google.Apis.Auth](https://www.nuget.org/packages/Google.Apis.Auth)
 
-## EML and Outlook MSG files
+## EML, MSG, OFT, and TNEF files
 
-Mailozaurr keeps MIME, transport, S/MIME, PGP, DKIM, and ARC workflows in MimeKit and MailKit. OfficeIMO.Email owns local email artifacts: Outlook MSG, typed Outlook appointments, contacts, tasks, journals and notes, TNEF, RTF-backed bodies, embedded items, and retained MAPI properties.
+Mailozaurr keeps transport, mailbox access, MimeKit message composition, PGP, DKIM, ARC, and outbound S/MIME workflows. OfficeIMO.Email owns local EML, MSG, OFT, and TNEF artifact reading, writing, and projection, including typed Outlook items, RTF-backed bodies, embedded items, retained MAPI properties, and bounded S/MIME verification through OfficeIMO.Security.
 
-PowerShell callers can import either file type through the same command:
+PowerShell callers can import EML, MSG, OFT, and TNEF files through the same command. The returned message owns the OfficeIMO read result, so dispose it when the projection is no longer needed:
 
 ```powershell
 $mail = Import-MailFile './message.msg'
-
-$mail.Subject
-$mail.OutlookItemKind
-$mail.OfficeDocument.Contact
-$mail.Diagnostics
+try {
+    $mail.Subject
+    $mail.OutlookItemKind
+    $mail.OfficeDocument.Contact
+    $mail.Diagnostics
+} finally {
+    $mail.Dispose()
+}
 ```
 
 Exporting uses the destination extension, so the same pipeline converts in either direction:
@@ -76,7 +79,7 @@ Import-MailFile './message.msg' | Export-MailFile './message.eml'
 Import-MailFile './message.eml' | Export-MailFile './message.msg'
 ```
 
-Add `-Force` to replace an existing destination or `-PassThru` to return its `FileInfo`. Use `-IncludeHeaders` when merged headers are needed, `-ExcludeAttachments` for message metadata only, or `-ExcludeAttachmentContent` to retain attachment names and sizes without loading decoded bytes. EML input also exposes its native `MimeMessage`; MSG input can produce one with `$mail.ToMimeMessage()` when it needs to enter a Mailozaurr cryptography or transport workflow.
+`Export-MailFile` consumes and disposes each input message after an attempted export, including when conversion reports an error. Previewed or rejected operations such as `-WhatIf` or an existing destination without `-Force` leave the message open. Add `-KeepInputOpen` when a retained `$mail` variable must remain usable after export. Add `-Force` to replace an existing destination or `-PassThru` to return its `FileInfo`. Use `-IncludeHeaders` when merged headers are needed, `-ExcludeAttachments` for message metadata only, or `-ExcludeAttachmentContent` to retain attachment names and sizes without loading decoded bytes. EML input also exposes its native `MimeMessage`; MSG input can produce one with `$mail.ToMimeMessage()` when it needs to enter a Mailozaurr cryptography or transport workflow.
 
 The direction-specific conversion commands remain available for scripts that write batches to an output folder:
 
@@ -90,13 +93,69 @@ The .NET API follows the same load/save shape:
 ```csharp
 using Mailozaurr;
 
-MailFileMessage mail = MailFileMessage.Load("message.msg");
+using MailFileMessage mail = MailFileMessage.Load("message.msg");
 Console.WriteLine(mail.Subject);
 
 await mail.SaveAsync("message.eml");
 ```
 
-`MailFileMessage.Load` and `Import-MailFile` fail clearly on error diagnostics. Use `MailFileReader` when custom projection options or recovery from a partially readable artifact are needed; check `message.HasErrors` and `message.Diagnostics` before accepting it. The older `EmailMessage` conversion methods remain available for compatibility and batch conversion. A separate `Mailozaurr.Msg` package is no longer required.
+`MailFileMessage.Load` and `Import-MailFile` fail clearly on error diagnostics. Use `MailFileReader` when custom projection options or recovery from a partially readable artifact are needed; check `message.HasErrors` and `message.Diagnostics` before accepting it. Disposing the message releases any temporary file-backed attachment content retained by OfficeIMO. The older `EmailMessage` conversion methods remain available for compatibility and batch conversion. A separate `Mailozaurr.Msg` package is no longer required.
+
+## PST, OST, OLM, Mbox, EMLX, and mailbox directories
+
+Mailozaurr exposes OfficeIMO.Email's offline store workflows without maintaining a second archive engine. `Import-MailData` detects PST, supported PST-compatible OST data, Outlook for Mac OLM, Mbox, EMLX, Maildir, Apple Mail trees, and directories containing EML files. The returned object owns the open store session, so close it when the workflow is complete:
+
+```powershell
+$data = Import-MailData './offline.ost'
+try {
+    $data.Kind
+    $data.Store.Format
+
+    $folders = $data | Get-MailStoreFolder
+    $messages = $data | Search-MailStore -SubjectContains 'invoice' -MaxResults 50
+    $content = $data | Search-MailStore -Term 'renewal','contract' -ResultsOnly
+
+    $batch = $data | Search-MailStore -Term 'project' -MaxItemsScanned 100
+    if (-not $batch.IsComplete) {
+        $nextBatch = $data | Search-MailStore -Term 'project' -MaxItemsScanned 100 -ResumeFrom $batch.NextCheckpoint
+    }
+
+    $data | Test-MailStore -VerifyStructuralIntegrity
+    Export-MailStore -InputObject $data -OutputPath './exported-mail' -Format Eml
+} finally {
+    $data | Close-MailData
+}
+```
+
+`Get-MailStoreItem` returns lightweight references by default. Add `-Read` to project selected content while the store remains open, and use `-Parts` when only metadata, bodies, recipients, or attachment metadata is needed.
+
+.NET consumers use the same native OfficeIMO owner directly; installing Mailozaurr brings the matching OfficeIMO.Email dependency:
+
+```csharp
+using OfficeIMO.Email.Data;
+using OfficeIMO.Email.Store;
+
+using EmailDataOpenResult data = EmailDataArtifact.Open("offline.ost");
+EmailStoreSession store = data.Store ?? throw new InvalidDataException("Not a mail store.");
+foreach (EmailStoreFolderInfo folder in store.Folders) {
+    Console.WriteLine($"{folder.Name}: {folder.ItemCount}");
+}
+```
+
+Store exports support EML, MSG, OFT, TNEF, Mbox, Maildir, and EMLX. Conversion and merge commands create new Unicode PST files, leave every source read-only, and retain OfficeIMO's verification and diagnostic reports:
+
+```powershell
+ConvertTo-MailPst './offline.ost' './portable.pst'
+Merge-MailStore './old.pst','./portable.pst' './combined.pst'
+```
+
+Both write commands accept `-StoreReaderOptions` for custom safety bounds and password-protected PST input. `Merge-MailStore` accepts one shared options object or one object per input path, so archives with different passwords or limits remain explicit.
+
+Use `-Flatten` for directory exports when preserving a deep archive hierarchy would exceed the host's path limit, especially under Windows PowerShell 5.1.
+
+OST input is read-only: Mailozaurr does not pretend to reconstruct server-only content or write an OST. OfficeIMO.Email also provides existing Unicode PST mutation, recovery export, compaction, splitting, associated Outlook data, reminder queues, and category/view/rule inspection. Mailozaurr does not mirror those specialized APIs; .NET callers use them directly, while PowerShell workflows can continue from the native `$data.Store` session for session-backed operations.
+
+`Import-MailData` is also the discovery entry point for standalone ICS and VCF files and Outlook Offline Address Book data. It returns the native OfficeIMO owner through `Calendar`, `Contact`, or `AddressBook`, preserving the complete API instead of projecting a smaller Mailozaurr copy.
 
 ## Architecture notes
 
