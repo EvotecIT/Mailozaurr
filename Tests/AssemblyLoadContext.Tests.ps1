@@ -56,6 +56,22 @@ Import-Module Mailozaurr -Force
     'Mailozaurr.SendLogResolver'
     'Mailozaurr.Smtp'
     'Mailozaurr.SmtpConnectionPool'
+    'OfficeIMO.Email.AddressBook.OfflineAddressBookReaderOptions'
+    'OfficeIMO.Email.ContentLineReaderOptions'
+    'OfficeIMO.Email.Data.EmailDataArtifactKind'
+    'OfficeIMO.Email.Data.EmailDataOpenOptions'
+    'OfficeIMO.Email.Data.EmailDataOpenResult'
+    'OfficeIMO.Email.EmailReaderOptions'
+    'OfficeIMO.Email.OutlookItemKind'
+    'OfficeIMO.Email.Store.EmailStoreContentMatchMode'
+    'OfficeIMO.Email.Store.EmailStoreContentSearchFields'
+    'OfficeIMO.Email.Store.EmailStoreFormat'
+    'OfficeIMO.Email.Store.EmailStoreItemReadParts'
+    'OfficeIMO.Email.Store.EmailStoreMergeFolderMode'
+    'OfficeIMO.Email.Store.EmailStoreReaderOptions'
+    'OfficeIMO.Email.Store.EmailStoreSession'
+    'OfficeIMO.Email.Store.EmailStoreSpecialFolderKind'
+    'OfficeIMO.Email.Store.EmailStoreValidationMode'
 )
 `$missingAllowedTypes = [Collections.Generic.List[string]]::new()
 `$wrongAllowedTypeContexts = [Collections.Generic.List[string]]::new()
@@ -74,7 +90,7 @@ foreach (`$typeName in `$expectedAllowedTypes) {
 `$getTypeAccelerators = `$typeAccelerators.GetProperty('Get', [System.Reflection.BindingFlags] 'Static,Public,NonPublic')
 `$actualAllowedTypes = @(
     foreach (`$entry in `$getTypeAccelerators.GetValue(`$null).GetEnumerator()) {
-        if (`$entry.Key -notlike 'Mailozaurr.*') {
+        if (`$entry.Key -notlike 'Mailozaurr.*' -and `$entry.Key -notlike 'OfficeIMO.Email.*') {
             continue
         }
 
@@ -157,8 +173,8 @@ try {
         $result.SearchQueryALC | Should -Be 'Mailozaurr'
         $result.SearchQueryALCIsDefault | Should -BeFalse
         $result.SmtpCreated | Should -BeTrue
-        $result.AllowedTypeCount | Should -Be 23
-        $result.ActualAllowedTypeCount | Should -Be 23
+        $result.AllowedTypeCount | Should -Be 39
+        $result.ActualAllowedTypeCount | Should -Be 39
         @($result.MissingAllowedTypes).Count | Should -Be 0
         @($result.UnexpectedAllowedTypes).Count | Should -Be 0
         @($result.WrongAllowedTypeContexts).Count | Should -Be 0

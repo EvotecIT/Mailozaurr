@@ -6,7 +6,7 @@
         <VersionPrefix>2.0.4</VersionPrefix>
         <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
         <AssemblyName>Mailozaurr.PowerShell</AssemblyName>
-        <Description>PowerShell cmdlet host for Mailozaurr email, mailbox, message-file, and cryptography workflows.</Description>
+        <Description>PowerShell cmdlet host for Mailozaurr email, mailbox, message-file, offline mail-store, and cryptography workflows.</Description>
         <Nullable>enable</Nullable>
         <Copyright>(c) 2011 - 2026 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
         <LangVersion>latest</LangVersion>
@@ -15,7 +15,7 @@
         <PackageReadmeFile>README.MD</PackageReadmeFile>
         <RepositoryUrl>https://github.com/EvotecIT/Mailozaurr</RepositoryUrl>
         <PackageTags>
-            Windows;MacOS;Linux;Mail;Email;MX;SPF;DMARC;DKIM;GraphApi;SendGrid;Graph;IMAP;POP3</PackageTags>
+            Windows;MacOS;Linux;Mail;Email;MX;SPF;DMARC;DKIM;GraphApi;SendGrid;Graph;IMAP;POP3;PST;OST;OLM;Mbox;EMLX;Maildir</PackageTags>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     </PropertyGroup>
 
