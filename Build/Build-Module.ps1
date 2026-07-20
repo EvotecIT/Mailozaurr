@@ -135,6 +135,7 @@ Build-Module -ModuleName 'Mailozaurr' {
             'OfficeIMO.Email.EmailReaderOptions'
             'OfficeIMO.Email.OutlookItemKind'
             'OfficeIMO.Email.Store.EmailStoreContentMatchMode'
+            'OfficeIMO.Email.Store.EmailStoreContentSearchCheckpoint'
             'OfficeIMO.Email.Store.EmailStoreContentSearchFields'
             'OfficeIMO.Email.Store.EmailStoreFormat'
             'OfficeIMO.Email.Store.EmailStoreItemReadParts'

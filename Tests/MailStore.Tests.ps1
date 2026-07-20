@@ -81,6 +81,16 @@ Describe 'OfficeIMO.Email mail-store workflows' {
         $script:conversionTwo.ConvertedItems | Should -Be 1
     }
 
+    It 'keeps single-destination write commands off the pipeline' {
+        $convertInput = (Get-Command ConvertTo-MailPst -Module Mailozaurr).Parameters['InputPath']
+        $exportInput = (Get-Command Export-MailStore -Module Mailozaurr).Parameters['InputObject']
+
+        @($convertInput.Attributes.ValueFromPipeline) | Should -Not -Contain $true
+        @($convertInput.Attributes.ValueFromPipelineByPropertyName) | Should -Not -Contain $true
+        @($exportInput.Attributes.ValueFromPipeline) | Should -Not -Contain $true
+        @($exportInput.Attributes.ValueFromPipelineByPropertyName) | Should -Not -Contain $true
+    }
+
     It 'verifies a normalized PST conversion before committing it' {
         $verifiedPath = Join-Path $TestDrive 'verified-copy.pst'
         $report = ConvertTo-MailPst $script:pstOne $verifiedPath -ErrorAction Stop
@@ -116,6 +126,31 @@ Describe 'OfficeIMO.Email mail-store workflows' {
         $content[0].Snippet | Should -Match 'Renewal contract'
     }
 
+    It 'continues bounded content search from the native checkpoint' {
+        $first = $script:data | Search-MailStore -Term 'body' -Fields Bodies -MaxItemsScanned 1
+        $second = $script:data | Search-MailStore -Term 'body' -Fields Bodies -MaxItemsScanned 1 -ResumeFrom $first.NextCheckpoint
+
+        $first.IsComplete | Should -BeFalse
+        $first.NextCheckpoint.ItemOffset | Should -Be 1
+        $first.Results.Count | Should -Be 1
+        $second.IsComplete | Should -BeTrue
+        $second.Results.Count | Should -Be 1
+        $second.Results[0].Reference.Id | Should -Not -Be $first.Results[0].Reference.Id
+    }
+
+    It 'passes custom reader bounds into conversion and per-source merge inputs' {
+        $boundedConversionPath = Join-Path $TestDrive 'bounded-conversion.pst'
+        $boundedMergePath = Join-Path $TestDrive 'bounded-merge.pst'
+        $oneByteReader = [OfficeIMO.Email.Store.EmailStoreReaderOptions]::new([long] 1)
+
+        { ConvertTo-MailPst $script:pstOne $boundedConversionPath -StoreReaderOptions $oneByteReader -ErrorAction Stop } | Should -Throw
+        $boundedConversionPath | Should -Not -Exist
+
+        $perSourceReaders = @($oneByteReader, [OfficeIMO.Email.Store.EmailStoreReaderOptions]::Default)
+        { Merge-MailStore $script:pstOne, $script:pstTwo $boundedMergePath -StoreReaderOptions $perSourceReaders -StopOnSourceError -ErrorAction Stop } | Should -Throw
+        $boundedMergePath | Should -Not -Exist
+    }
+
     It 'returns a complete native validation report' {
         $report = $script:data | Test-MailStore -VerifyStructuralIntegrity -MaxItems 10
 
@@ -131,10 +166,10 @@ Describe 'OfficeIMO.Email mail-store workflows' {
         $maildirPath = Join-Path $TestDrive 'maildir-export'
         $emlxPath = Join-Path $TestDrive 'emlx-export'
 
-        $eml = $script:data | Export-MailStore $emlDirectory -Format Eml -Flatten -ErrorAction Stop
-        $mbox = $script:data | Export-MailStore $mboxPath -Format Mbox -ErrorAction Stop
-        $maildir = $script:data | Export-MailStore $maildirPath -Format Maildir -Flatten -ErrorAction Stop
-        $emlx = $script:data | Export-MailStore $emlxPath -Format Emlx -Flatten -ErrorAction Stop
+        $eml = Export-MailStore -InputObject $script:data -OutputPath $emlDirectory -Format Eml -Flatten -ErrorAction Stop
+        $mbox = Export-MailStore -InputObject $script:data -OutputPath $mboxPath -Format Mbox -ErrorAction Stop
+        $maildir = Export-MailStore -InputObject $script:data -OutputPath $maildirPath -Format Maildir -Flatten -ErrorAction Stop
+        $emlx = Export-MailStore -InputObject $script:data -OutputPath $emlxPath -Format Emlx -Flatten -ErrorAction Stop
 
         $eml.SucceededCount | Should -Be 2
         $mbox.SucceededCount | Should -Be 2
@@ -165,7 +200,7 @@ Describe 'OfficeIMO.Email mail-store workflows' {
         $conversionPath = Join-Path $TestDrive 'whatif-conversion.pst'
         $mergePath = Join-Path $TestDrive 'whatif-merge.pst'
 
-        $script:data | Export-MailStore $exportPath -Format Eml -WhatIf
+        Export-MailStore -InputObject $script:data -OutputPath $exportPath -Format Eml -WhatIf
         ConvertTo-MailPst $script:pstOne $conversionPath -WhatIf
         Merge-MailStore $script:pstOne, $script:pstTwo $mergePath -WhatIf
 

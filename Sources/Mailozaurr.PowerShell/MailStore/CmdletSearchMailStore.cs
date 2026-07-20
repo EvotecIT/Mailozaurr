@@ -99,6 +99,10 @@ public sealed class CmdletSearchMailStore : MailStoreCmdletBase {
     [ValidateRange(32, int.MaxValue)]
     public int SnippetCharacters { get; set; } = 240;
 
+    /// <summary>Checkpoint returned by a previous bounded content-search batch.</summary>
+    [Parameter(ParameterSetName = ContentParameterSet)]
+    public EmailStoreContentSearchCheckpoint? ResumeFrom { get; set; }
+
     /// <summary>Writes content-search matches instead of the report containing completion and resume state.</summary>
     [Parameter(ParameterSetName = ContentParameterSet)]
     public SwitchParameter ResultsOnly { get; set; }
@@ -116,7 +120,8 @@ public sealed class CmdletSearchMailStore : MailStoreCmdletBase {
                     metadata,
                     MaxItemsScanned,
                     MaxResults,
-                    snippetCharacters: SnippetCharacters);
+                    snippetCharacters: SnippetCharacters,
+                    resumeFrom: ResumeFrom);
                 EmailStoreContentSearchReport report = session.SearchContent(query, cancellationToken: CancelToken);
                 if (ResultsOnly.IsPresent) {
                     foreach (EmailStoreContentSearchResult result in report.Results) WriteObject(result);

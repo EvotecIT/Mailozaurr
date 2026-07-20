@@ -8,18 +8,18 @@ namespace Mailozaurr.PowerShell;
 /// <para type="description">Delegates to OfficeIMO.Email for EML, MSG, OFT, TNEF, Mbox, Maildir, or EMLX output. The source store remains read-only and the native preservation report is returned.</para>
 /// <example>
 ///   <summary>Export an OST to EML files</summary>
-///   <code>$data | Export-MailStore './export' -Format Eml</code>
+///   <code>Export-MailStore -InputObject $data -OutputPath './export' -Format Eml</code>
 /// </example>
 /// <example>
 ///   <summary>Export one folder hierarchy to Mbox</summary>
-///   <code>$data | Export-MailStore './archive.mbox' -Format Mbox -FolderId $folder.Id -IncludeDescendants</code>
+///   <code>Export-MailStore -InputObject $data -OutputPath './archive.mbox' -Format Mbox -FolderId $folder.Id -IncludeDescendants</code>
 /// </example>
 /// </summary>
 [Cmdlet(VerbsData.Export, "MailStore", SupportsShouldProcess = true)]
 [OutputType(typeof(EmailStoreExportReport), typeof(EmailStoreMboxExportReport))]
 public sealed class CmdletExportMailStore : MailStoreCmdletBase {
     /// <summary>An Import-MailData result containing a store, or a native EmailStoreSession.</summary>
-    [Parameter(Mandatory = true, ValueFromPipeline = true)]
+    [Parameter(Mandatory = true)]
     [Alias("Store")]
     [ValidateNotNull]
     public object? InputObject { get; set; }

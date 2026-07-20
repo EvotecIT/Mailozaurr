@@ -14,7 +14,7 @@ namespace Mailozaurr.PowerShell;
 [OutputType(typeof(EmailStorePstConversionReport))]
 public sealed class CmdletConvertToMailPst : MailStoreCmdletBase {
     /// <summary>Source PST, OST, OLM, Mbox, EMLX, EML, or mailbox-directory path.</summary>
-    [Parameter(Mandatory = true, Position = 0, ValueFromPipeline = true, ValueFromPipelineByPropertyName = true)]
+    [Parameter(Mandatory = true, Position = 0)]
     [Alias("Path", "FullName")]
     [ValidateNotNullOrEmpty]
     public string? InputPath { get; set; }
@@ -24,6 +24,10 @@ public sealed class CmdletConvertToMailPst : MailStoreCmdletBase {
     [Alias("DestinationPath")]
     [ValidateNotNullOrEmpty]
     public string? OutputPath { get; set; }
+
+    /// <summary>Optional source reader limits and PST password.</summary>
+    [Parameter]
+    public EmailStoreReaderOptions? StoreReaderOptions { get; set; }
 
     /// <summary>Allows an existing destination PST to be atomically replaced.</summary>
     [Parameter]
@@ -92,6 +96,7 @@ public sealed class CmdletConvertToMailPst : MailStoreCmdletBase {
             EmailStorePstConversionReport report = EmailStoreConverter.ConvertToPst(
                 source,
                 destination,
+                readerOptions: StoreReaderOptions,
                 conversionOptions: options,
                 cancellationToken: CancelToken);
             WriteObject(report);

@@ -64,6 +64,7 @@ Import-Module Mailozaurr -Force
     'OfficeIMO.Email.EmailReaderOptions'
     'OfficeIMO.Email.OutlookItemKind'
     'OfficeIMO.Email.Store.EmailStoreContentMatchMode'
+    'OfficeIMO.Email.Store.EmailStoreContentSearchCheckpoint'
     'OfficeIMO.Email.Store.EmailStoreContentSearchFields'
     'OfficeIMO.Email.Store.EmailStoreFormat'
     'OfficeIMO.Email.Store.EmailStoreItemReadParts'
@@ -173,8 +174,8 @@ try {
         $result.SearchQueryALC | Should -Be 'Mailozaurr'
         $result.SearchQueryALCIsDefault | Should -BeFalse
         $result.SmtpCreated | Should -BeTrue
-        $result.AllowedTypeCount | Should -Be 39
-        $result.ActualAllowedTypeCount | Should -Be 39
+        $result.AllowedTypeCount | Should -Be 40
+        $result.ActualAllowedTypeCount | Should -Be 40
         @($result.MissingAllowedTypes).Count | Should -Be 0
         @($result.UnexpectedAllowedTypes).Count | Should -Be 0
         @($result.WrongAllowedTypeContexts).Count | Should -Be 0

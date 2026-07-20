@@ -115,8 +115,13 @@ try {
     $messages = $data | Search-MailStore -SubjectContains 'invoice' -MaxResults 50
     $content = $data | Search-MailStore -Term 'renewal','contract' -ResultsOnly
 
+    $batch = $data | Search-MailStore -Term 'project' -MaxItemsScanned 100
+    if (-not $batch.IsComplete) {
+        $nextBatch = $data | Search-MailStore -Term 'project' -MaxItemsScanned 100 -ResumeFrom $batch.NextCheckpoint
+    }
+
     $data | Test-MailStore -VerifyStructuralIntegrity
-    $data | Export-MailStore './exported-mail' -Format Eml
+    Export-MailStore -InputObject $data -OutputPath './exported-mail' -Format Eml
 } finally {
     $data | Close-MailData
 }
@@ -143,6 +148,8 @@ Store exports support EML, MSG, OFT, TNEF, Mbox, Maildir, and EMLX. Conversion a
 ConvertTo-MailPst './offline.ost' './portable.pst'
 Merge-MailStore './old.pst','./portable.pst' './combined.pst'
 ```
+
+Both write commands accept `-StoreReaderOptions` for custom safety bounds and password-protected PST input. `Merge-MailStore` accepts one shared options object or one object per input path, so archives with different passwords or limits remain explicit.
 
 Use `-Flatten` for directory exports when preserving a deep archive hierarchy would exceed the host's path limit, especially under Windows PowerShell 5.1.
 

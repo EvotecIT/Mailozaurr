@@ -25,6 +25,10 @@ public sealed class CmdletMergeMailStore : MailStoreCmdletBase {
     [ValidateNotNullOrEmpty]
     public string? OutputPath { get; set; }
 
+    /// <summary>Optional source reader limits and PST passwords. Supply one value for every source, or one value per InputPath.</summary>
+    [Parameter]
+    public EmailStoreReaderOptions?[]? StoreReaderOptions { get; set; }
+
     /// <summary>Allows an existing destination PST to be atomically replaced.</summary>
     [Parameter]
     public SwitchParameter Force { get; set; }
@@ -74,11 +78,11 @@ public sealed class CmdletMergeMailStore : MailStoreCmdletBase {
             return Task.CompletedTask;
         }
         try {
-            string[] sources = inputPaths
-                .Where(path => !string.IsNullOrWhiteSpace(path))
-                .Select(GetUnresolvedProviderPathFromPSPath)
-                .ToArray();
-            if (sources.Length == 0) throw new PSArgumentException("At least one source store is required.");
+            if (inputPaths.Any(string.IsNullOrWhiteSpace)) {
+                throw new PSArgumentException("InputPath cannot contain an empty source path.");
+            }
+            string[] sources = inputPaths.Select(GetUnresolvedProviderPathFromPSPath).ToArray();
+            ValidateReaderOptionCount(sources.Length);
             string destination = GetUnresolvedProviderPathFromPSPath(outputPath);
             if (!ShouldProcess(destination, $"Merge {sources.Length} mail stores into a Unicode PST")) {
                 return Task.CompletedTask;
@@ -95,7 +99,9 @@ public sealed class CmdletMergeMailStore : MailStoreCmdletBase {
                 includeSearchFolders: IncludeSearchFolders.IsPresent,
                 maxItems: MaxItems);
             EmailStoreMergeSource[] mergeSources = sources
-                .Select(path => new EmailStoreMergeSource(path))
+                .Select((path, index) => new EmailStoreMergeSource(
+                    path,
+                    readerOptions: GetReaderOptions(index)))
                 .ToArray();
             EmailStorePstMergeReport report = EmailStoreConverter.MergeToPst(
                 mergeSources,
@@ -110,5 +116,19 @@ public sealed class CmdletMergeMailStore : MailStoreCmdletBase {
             WriteError(new ErrorRecord(exception, "MailStoreMergeFailed", ErrorCategory.WriteError, outputPath));
         }
         return Task.CompletedTask;
+    }
+
+    private void ValidateReaderOptionCount(int sourceCount) {
+        int optionCount = StoreReaderOptions?.Length ?? 0;
+        if (optionCount != 0 && optionCount != 1 && optionCount != sourceCount) {
+            throw new PSArgumentException(
+                "StoreReaderOptions must contain one shared value or one value for each InputPath.");
+        }
+    }
+
+    private EmailStoreReaderOptions? GetReaderOptions(int index) {
+        EmailStoreReaderOptions?[]? options = StoreReaderOptions;
+        if (options == null || options.Length == 0) return null;
+        return options.Length == 1 ? options[0] : options[index];
     }
 }
