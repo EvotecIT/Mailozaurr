@@ -8,6 +8,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
+using Mailozaurr.Definitions;
 
 namespace Mailozaurr.Tests;
 
@@ -77,6 +78,18 @@ public class MailgunClientTests {
         var ex = Assert.Throws<TargetInvocationException>(() => prop!.GetValue(client));
         Assert.IsType<ArgumentException>(ex.InnerException);
         Assert.Contains("invalid", ex.InnerException!.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EmailDomain_UsesStructuredNamedSenderAddress() {
+        using var client = new MailgunClient {
+            From = new MimeKit.MailboxAddress("Sender", "sender@example.com")
+        };
+        PropertyInfo? prop = typeof(MailgunClient).GetProperty("EmailDomain", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        var domain = Assert.IsType<string>(prop!.GetValue(client));
+
+        Assert.Equal("example.com", domain);
     }
 
     [Fact]
@@ -197,6 +210,35 @@ public class MailgunClientTests {
         } finally {
             File.Delete(attachment);
             File.Delete(inline);
+        }
+    }
+
+    [Fact]
+    public async Task CreateContentAsync_PreservesStructuredAttachmentMetadata() {
+        var file = Path.GetTempFileName();
+        try {
+            using var client = new MailgunClient {
+                From = "sender@example.com",
+                To = new List<object> { "to@example.com" },
+                Attachments = new List<AttachmentDescriptor> {
+                    new FileAttachmentDescriptor(file) {
+                        FileName = "report.pdf",
+                        ContentType = "application/pdf",
+                        ContentId = "report-content"
+                    }
+                }
+            };
+
+            MethodInfo? method = typeof(MailgunClient).GetMethod("CreateContentAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+            var task = (Task<MultipartFormDataContent>)method!.Invoke(client, new object[] { default(CancellationToken) })!;
+            using var content = await task;
+            var attachment = content.Single(part => part.Headers.ContentDisposition?.Name?.Trim('"') == "attachment");
+
+            Assert.Equal("report.pdf", attachment.Headers.ContentDisposition?.FileName?.Trim('"'));
+            Assert.Equal("application/pdf", attachment.Headers.ContentType?.MediaType);
+            Assert.Contains("report-content", attachment.Headers.GetValues("Content-ID"));
+        } finally {
+            File.Delete(file);
         }
     }
 

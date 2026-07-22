@@ -1,0 +1,221 @@
+using Mailozaurr.Application;
+using Mailozaurr.Definitions;
+using MimeKit;
+using System.Net;
+using System.Runtime.CompilerServices;
+
+namespace Mailozaurr.Tests;
+
+public sealed class ApplicationProviderMailSendHandlerTests {
+    [Fact]
+    public async Task SendGridHandlerMapsProfileMessageAndSecret() {
+        var secrets = new FakeSecretStore(("sendgrid", MailSecretNames.ApiKey, "sg-secret"));
+        var handler = new SendGridMailSendHandler(secrets, sendAsync: (client, cancellationToken) => {
+            var credential = Assert.IsType<NetworkCredential>(client.Credentials);
+            Assert.Equal("sg-secret", credential.Password);
+            var sender = Assert.IsType<SendGridEmailAddress>(client.From);
+            Assert.Equal("Sender", sender.Name);
+            Assert.Equal("sender@example.com", sender.Email);
+            var recipient = Assert.IsType<SendGridEmailAddress>(Assert.Single(client.To!));
+            Assert.Equal("Alice", recipient.Name);
+            Assert.Equal("alice@example.com", recipient.Email);
+            Assert.Equal("Provider test", client.Subject);
+            Assert.Equal(2, client.RetryCount);
+            AssertAttachmentMetadata(Assert.Single(client.Attachments!));
+            return Task.FromResult(Succeeded("sendgrid-message"));
+        });
+
+        var result = await handler.SendAsync(CreateProfile("sendgrid", MailProfileKind.SendGrid), CreateRequest("sendgrid"));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("sendgrid-message", result.ProviderMessageId);
+    }
+
+    [Fact]
+    public async Task MailgunHandlerMapsDomainAndApiKey() {
+        var secrets = new FakeSecretStore(("mailgun", MailSecretNames.ApiKey, "mg-secret"));
+        var profile = CreateProfile("mailgun", MailProfileKind.Mailgun);
+        profile.Settings[MailProfileSettingsKeys.Domain] = "mg.example.com";
+        var handler = new MailgunMailSendHandler(secrets, sendAsync: (client, cancellationToken) => {
+            var credential = Assert.IsType<NetworkCredential>(client.Credentials);
+            Assert.Equal("mg-secret", credential.Password);
+            Assert.Equal("mg.example.com", client.Domain);
+            var recipient = Assert.IsType<MailboxAddress>(Assert.Single(client.To));
+            Assert.Equal("Alice", recipient.Name);
+            Assert.Equal("alice@example.com", recipient.Address);
+            AssertAttachmentMetadata(Assert.Single(client.Attachments!));
+            return Task.FromResult(Succeeded("mailgun-message"));
+        });
+
+        var result = await handler.SendAsync(profile, CreateRequest("mailgun"));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("mailgun-message", result.ProviderMessageId);
+    }
+
+    [Fact]
+    public async Task SesHandlerMapsRegionAndCredentialPair() {
+        var secrets = new FakeSecretStore(
+            ("ses", MailSecretNames.AccessKeyId, "access-key"),
+            ("ses", MailSecretNames.SecretAccessKey, "secret-key"));
+        var profile = CreateProfile("ses", MailProfileKind.Ses);
+        profile.Settings[MailProfileSettingsKeys.Region] = "eu-central-1";
+        var handler = new SesMailSendHandler(secrets, sendAsync: (client, cancellationToken) => {
+            var credential = Assert.IsType<NetworkCredential>(client.Credentials);
+            Assert.Equal("access-key", credential.UserName);
+            Assert.Equal("secret-key", credential.Password);
+            Assert.Equal("eu-central-1", client.Region);
+            var recipient = Assert.IsType<MailboxAddress>(Assert.Single(client.To));
+            Assert.Equal("Alice", recipient.Name);
+            Assert.Equal("alice@example.com", recipient.Address);
+            AssertAttachmentMetadata(Assert.Single(client.Attachments!));
+            return Task.FromResult(Succeeded("ses-message"));
+        });
+
+        var result = await handler.SendAsync(profile, CreateRequest("ses"));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("ses-message", result.ProviderMessageId);
+    }
+
+    [Fact]
+    public async Task ProviderHandlerReportsAQueuedFailure() {
+        var secrets = new FakeSecretStore(("sendgrid", MailSecretNames.ApiKey, "sg-secret"));
+        var pending = new FakePendingMessageRepository(new PendingMessageRecord { MessageId = "queued-message" });
+        var handler = new SendGridMailSendHandler(secrets, pending, sendAsync: (client, cancellationToken) =>
+            Task.FromResult(new SmtpResult(false, EmailAction.Send, "alice@example.com", "sender@example.com", "SendGridApi", 0, TimeSpan.Zero, error: "temporary failure") {
+                MessageId = "queued-message"
+            }));
+
+        var request = CreateRequest("sendgrid");
+        request.QueueOnFailure = true;
+        var result = await handler.SendAsync(CreateProfile("sendgrid", MailProfileKind.SendGrid), request);
+
+        Assert.True(result.Succeeded);
+        Assert.True(result.Queued);
+        Assert.Equal("queued-message", result.QueueMessageId);
+    }
+
+    [Fact]
+    public async Task ProviderHandlerDoesNotClaimQueueSuccessWithoutPersistedRecord() {
+        var secrets = new FakeSecretStore(("sendgrid", MailSecretNames.ApiKey, "sg-secret"));
+        var pending = new FakePendingMessageRepository();
+        var handler = new SendGridMailSendHandler(secrets, pending, sendAsync: (client, cancellationToken) =>
+            Task.FromResult(new SmtpResult(false, EmailAction.Send, "alice@example.com", "sender@example.com", "SendGridApi", 0, TimeSpan.Zero, error: "temporary failure") {
+                MessageId = "not-persisted"
+            }));
+
+        var request = CreateRequest("sendgrid");
+        request.QueueOnFailure = true;
+        var result = await handler.SendAsync(CreateProfile("sendgrid", MailProfileKind.SendGrid), request);
+
+        Assert.False(result.Succeeded);
+        Assert.False(result.Queued);
+        Assert.Null(result.QueueMessageId);
+    }
+
+    private static MailProfile CreateProfile(string id, MailProfileKind kind) => new() {
+        Id = id,
+        DisplayName = id,
+        Kind = kind,
+        DefaultSender = "Sender <sender@example.com>",
+        Settings = new Dictionary<string, string> {
+            [MailProfileSettingsKeys.RetryCount] = "2"
+        }
+    };
+
+    private static SendMessageRequest CreateRequest(string profileId) => new() {
+        ProfileId = profileId,
+        Message = new DraftMessage {
+            ProfileId = profileId,
+            Subject = "Provider test",
+            TextBody = "Hello",
+            To = {
+                new MessageRecipient { Name = "Alice", Address = "alice@example.com" }
+            },
+            Attachments = {
+                new DraftAttachment {
+                    Path = Path.Combine(Path.GetTempPath(), "mailozaurr-provider-test.bin"),
+                    FileName = "renamed-report.pdf",
+                    ContentType = "application/pdf",
+                    ContentId = "report-content"
+                }
+            }
+        }
+    };
+
+    private static void AssertAttachmentMetadata(AttachmentDescriptor attachment) {
+        Assert.Equal("renamed-report.pdf", attachment.FileName);
+        Assert.Equal("application/pdf", attachment.ContentType);
+        Assert.Equal("report-content", attachment.ContentId);
+        Assert.Equal(ContentDisposition.Attachment, attachment.ContentDisposition?.Disposition);
+    }
+
+    private static SmtpResult Succeeded(string messageId) =>
+        new(true, EmailAction.Send, "alice@example.com", "sender@example.com", "provider", 0, TimeSpan.Zero) {
+            MessageId = messageId
+        };
+
+    private sealed class FakeSecretStore : IMailSecretStore {
+        private readonly Dictionary<string, string> _secrets;
+
+        public FakeSecretStore(params (string ProfileId, string Name, string Value)[] secrets) {
+            _secrets = secrets.ToDictionary(
+                secret => $"{secret.ProfileId}:{secret.Name}",
+                secret => secret.Value,
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        public Task<string?> GetSecretAsync(string profileId, string secretName, CancellationToken cancellationToken = default) {
+            _secrets.TryGetValue($"{profileId}:{secretName}", out var value);
+            return Task.FromResult<string?>(value);
+        }
+
+        public Task SetSecretAsync(string profileId, string secretName, string secretValue, CancellationToken cancellationToken = default) {
+            _secrets[$"{profileId}:{secretName}"] = secretValue;
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> RemoveSecretAsync(string profileId, string secretName, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_secrets.Remove($"{profileId}:{secretName}"));
+    }
+
+    private sealed class FakePendingMessageRepository : IPendingMessageRepository {
+        private readonly Dictionary<string, PendingMessageRecord> _records;
+
+        public FakePendingMessageRepository(params PendingMessageRecord[] records) {
+            _records = records.ToDictionary(record => record.MessageId, StringComparer.OrdinalIgnoreCase);
+        }
+
+        public Task SaveAsync(PendingMessageRecord record, CancellationToken cancellationToken = default) {
+            _records[record.MessageId] = record;
+            return Task.CompletedTask;
+        }
+
+        public Task<PendingMessageRecord?> TryAcquireLeaseAsync(
+            string messageId,
+            DateTimeOffset dueBeforeOrAt,
+            DateTimeOffset leaseUntil,
+            CancellationToken cancellationToken = default) =>
+            GetByMessageIdAsync(messageId, cancellationToken);
+
+        public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) {
+            _records.TryGetValue(messageId, out var record);
+            return Task.FromResult<PendingMessageRecord?>(record);
+        }
+
+        public async IAsyncEnumerable<PendingMessageRecord> GetAllAsync(
+            [EnumeratorCancellation] CancellationToken cancellationToken = default) {
+            foreach (var record in _records.Values) {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return record;
+                await Task.Yield();
+            }
+        }
+
+        public Task RemoveAsync(string messageId, CancellationToken cancellationToken = default) {
+            _records.Remove(messageId);
+            return Task.CompletedTask;
+        }
+    }
+}

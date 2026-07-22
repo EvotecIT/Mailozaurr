@@ -44,6 +44,10 @@ public class SesClient : IDisposable {
     public string[]? Attachment { get; set; }
     /// <summary>Paths to inline attachments to include.</summary>
     public string[]? InlineAttachment { get; set; }
+    /// <summary>Structured attachments to include.</summary>
+    public List<AttachmentDescriptor>? Attachments { get; set; }
+    /// <summary>Structured inline attachments to include.</summary>
+    public List<AttachmentDescriptor>? InlineAttachments { get; set; }
 
     /// <summary>Name of the SES template to use.</summary>
     public string? TemplateName { get; set; }
@@ -130,6 +134,14 @@ public class SesClient : IDisposable {
         smtp.HtmlBody = Html;
         if (Attachment != null) smtp.Attachments = Attachment.Select(path => (AttachmentDescriptor)new FileAttachmentDescriptor(path)).ToList();
         if (InlineAttachment != null) smtp.InlineAttachments = InlineAttachment.Select(path => (AttachmentDescriptor)new FileAttachmentDescriptor(path)).ToList();
+        if (Attachments != null) {
+            smtp.Attachments ??= new List<AttachmentDescriptor>();
+            smtp.Attachments.AddRange(Attachments);
+        }
+        if (InlineAttachments != null) {
+            smtp.InlineAttachments ??= new List<AttachmentDescriptor>();
+            smtp.InlineAttachments.AddRange(InlineAttachments);
+        }
         if (Headers != null) smtp.Headers = Headers;
         smtp.CreateMessage();
         return smtp.Message;
@@ -175,18 +187,18 @@ public class SesClient : IDisposable {
         return request;
     }
 
-    private async Task QueuePendingMessageAsync(MimeMessage? message, string? mimeMessageBase64, CancellationToken cancellationToken) {
+    private async Task<string?> QueuePendingMessageAsync(MimeMessage? message, string? mimeMessageBase64, CancellationToken cancellationToken) {
         if (PendingMessageRepository == null) {
-            return;
+            return null;
         }
 
         if (Credentials is not NetworkCredential net) {
             LogCollector.LogWarning("Send-EmailMessage - Unable to queue SES message because credentials are not network credentials.");
-            return;
+            return null;
         }
 
         if (string.IsNullOrEmpty(net.UserName) || string.IsNullOrEmpty(net.Password)) {
-            return;
+            return null;
         }
 
         var base64 = mimeMessageBase64;
@@ -205,14 +217,14 @@ public class SesClient : IDisposable {
             messageId = message.MessageId!;
         } else {
             if (string.IsNullOrEmpty(base64)) {
-                return;
+                return null;
             }
 
             messageId = Guid.NewGuid().ToString("N");
         }
 
         if (string.IsNullOrEmpty(base64)) {
-            return;
+            return null;
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -234,10 +246,12 @@ public class SesClient : IDisposable {
 
         try {
             await PendingMessageRepository.SaveAsync(record, cancellationToken).ConfigureAwait(false);
+            return record.MessageId;
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Failed to persist SES pending message: {ex.Message}");
+            return null;
         }
     }
 
@@ -271,11 +285,13 @@ public class SesClient : IDisposable {
             }
 
             if ((!Helpers.IsTransient(lastException) && !RetryAlways) || attempts >= RetryCount) {
-                await QueuePendingMessageAsync(message, mimeMessageBase64, cancellationToken).ConfigureAwait(false);
+                var queuedMessageId = await QueuePendingMessageAsync(message, mimeMessageBase64, cancellationToken).ConfigureAwait(false);
                 if (ErrorAction == ActionPreference.Stop && lastException != null) {
                     throw lastException;
                 }
-                SmtpResult fail = new(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, lastException?.Message);
+                SmtpResult fail = new(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, lastException?.Message) {
+                    MessageId = queuedMessageId
+                };
                 await Helpers.PostWebhookAsync(WebhookUrl, fail, cancellationToken, _client);
                 return fail;
             }
@@ -294,8 +310,10 @@ public class SesClient : IDisposable {
         }
         while (attempts <= RetryCount);
 
-        await QueuePendingMessageAsync(message, mimeMessageBase64, cancellationToken).ConfigureAwait(false);
-        SmtpResult final = new(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, lastException?.Message);
+        var finalQueuedMessageId = await QueuePendingMessageAsync(message, mimeMessageBase64, cancellationToken).ConfigureAwait(false);
+        SmtpResult final = new(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, lastException?.Message) {
+            MessageId = finalQueuedMessageId
+        };
         await Helpers.PostWebhookAsync(WebhookUrl, final, cancellationToken, _client);
         return final;
     }

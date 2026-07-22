@@ -18,4 +18,13 @@ public static class MailSecretNames {
 
     /// <summary>Certificate password when certificate auth is used.</summary>
     public const string CertificatePassword = "certificatePassword";
+
+    /// <summary>API key used by an HTTP delivery provider.</summary>
+    public const string ApiKey = "apiKey";
+
+    /// <summary>Amazon access key identifier.</summary>
+    public const string AccessKeyId = "accessKeyId";
+
+    /// <summary>Amazon secret access key.</summary>
+    public const string SecretAccessKey = "secretAccessKey";
 }

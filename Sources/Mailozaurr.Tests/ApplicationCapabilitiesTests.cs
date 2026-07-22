@@ -8,6 +8,9 @@ public sealed class ApplicationCapabilitiesTests {
     [InlineData(MailProfileKind.Graph, MailCapability.ListFolders | MailCapability.SendMessages | MailCapability.MarkMessages)]
     [InlineData(MailProfileKind.Gmail, MailCapability.SearchMessages | MailCapability.MarkMessages | MailCapability.MoveMessages | MailCapability.SendMessages)]
     [InlineData(MailProfileKind.Smtp, MailCapability.SendMessages)]
+    [InlineData(MailProfileKind.SendGrid, MailCapability.SendMessages)]
+    [InlineData(MailProfileKind.Mailgun, MailCapability.SendMessages)]
+    [InlineData(MailProfileKind.Ses, MailCapability.SendMessages)]
     public void CatalogExposesExpectedCapabilities(MailProfileKind kind, MailCapability required) {
         var capabilities = MailCapabilityCatalog.For(kind);
 
@@ -32,9 +35,6 @@ public sealed class ApplicationCapabilitiesTests {
 
     [Theory]
     [InlineData(MailProfileKind.Pop3)]
-    [InlineData(MailProfileKind.SendGrid)]
-    [InlineData(MailProfileKind.Mailgun)]
-    [InlineData(MailProfileKind.Ses)]
     public void CatalogDoesNotAdvertiseProvidersWithoutNormalizedHandlers(MailProfileKind kind) {
         Assert.Equal(MailCapability.None, MailCapabilityCatalog.For(kind).Capabilities);
     }
@@ -77,5 +77,20 @@ public sealed class ApplicationCapabilitiesTests {
         Assert.Equal("Queued", success.Message);
         Assert.False(failure.Succeeded);
         Assert.Equal("auth_failed", failure.Code);
+    }
+
+    [Theory]
+    [InlineData(MailProfileKind.SendGrid)]
+    [InlineData(MailProfileKind.Mailgun)]
+    [InlineData(MailProfileKind.Ses)]
+    public void ProviderProfileAllowsSenderToBeSuppliedPerMessage(MailProfileKind kind) {
+        var result = MailProfileValidator.Validate(new MailProfile {
+            Id = kind.ToString().ToLowerInvariant(),
+            DisplayName = kind.ToString(),
+            Kind = kind
+        });
+
+        Assert.True(result.Succeeded);
+        Assert.Contains(result.Warnings, warning => warning.Contains("DefaultSender", StringComparison.Ordinal));
     }
 }

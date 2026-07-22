@@ -392,11 +392,13 @@ public sealed class SendGridClient : IDisposable {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - HTTP error during sending using SendGrid: {ex.Message}");
                 if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
-                    await QueuePendingMessageAsync(apiKey, cancellationToken).ConfigureAwait(false);
+                    var queuedMessageId = await QueuePendingMessageAsync(apiKey, cancellationToken).ConfigureAwait(false);
                     if (ErrorAction == ActionPreference.Stop && lastException != null) {
                         throw lastException;
                     }
-                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message) {
+                        MessageId = queuedMessageId
+                    };
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
                     return failResult;
                 }
@@ -417,11 +419,13 @@ public sealed class SendGridClient : IDisposable {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Request canceled: {ex.Message}");
                 if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
-                    await QueuePendingMessageAsync(apiKey, cancellationToken).ConfigureAwait(false);
+                    var queuedMessageId = await QueuePendingMessageAsync(apiKey, cancellationToken).ConfigureAwait(false);
                     if (ErrorAction == ActionPreference.Stop && lastException != null) {
                         throw lastException;
                     }
-                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message) {
+                        MessageId = queuedMessageId
+                    };
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
                     return failResult;
                 }
@@ -439,23 +443,25 @@ public sealed class SendGridClient : IDisposable {
             attempts++;
         } while (attempts <= RetryCount);
 
-        await QueuePendingMessageAsync(apiKey, cancellationToken).ConfigureAwait(false);
-        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message);
+        var finalQueuedMessageId = await QueuePendingMessageAsync(apiKey, cancellationToken).ConfigureAwait(false);
+        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message) {
+            MessageId = finalQueuedMessageId
+        };
         await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken).ConfigureAwait(false);
         return finalResult;
     }
 
-    private async Task QueuePendingMessageAsync(string apiKey, CancellationToken cancellationToken) {
+    private async Task<string?> QueuePendingMessageAsync(string apiKey, CancellationToken cancellationToken) {
         if (PendingMessageRepository == null) {
-            return;
+            return null;
         }
 
         if (string.IsNullOrWhiteSpace(MessageJson)) {
-            return;
+            return null;
         }
 
         if (string.IsNullOrEmpty(apiKey)) {
-            return;
+            return null;
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -473,10 +479,12 @@ public sealed class SendGridClient : IDisposable {
 
         try {
             await PendingMessageRepository.SaveAsync(record, cancellationToken).ConfigureAwait(false);
+            return record.MessageId;
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Failed to persist SendGrid pending message: {ex.Message}");
+            return null;
         }
     }
 

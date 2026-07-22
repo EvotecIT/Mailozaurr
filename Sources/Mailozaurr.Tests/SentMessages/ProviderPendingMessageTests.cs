@@ -156,6 +156,7 @@ public sealed class ProviderPendingMessageTests {
         Assert.NotNull(record);
         Assert.Equal(EmailProvider.SendGrid, record.Provider);
         Assert.False(string.IsNullOrWhiteSpace(record.MessageId));
+        Assert.Equal(record.MessageId, result.MessageId);
         Assert.True(record.ProviderData.TryGetValue(SendGridPendingMessageSender.MessageJsonKey, out var json));
         Assert.False(string.IsNullOrWhiteSpace(json));
         Assert.True(record.ProviderData.TryGetValue(SendGridPendingMessageSender.ApiKeyProtectedKey, out var apiKeyProtected));
@@ -259,6 +260,7 @@ public sealed class ProviderPendingMessageTests {
         var record = repository.LastSaved;
         Assert.NotNull(record);
         Assert.Equal(EmailProvider.Mailgun, record.Provider);
+        Assert.Equal(record.MessageId, result.MessageId);
         Assert.Equal("example.com", record.ProviderData[MailgunPendingMessageSender.DomainKey]);
         Assert.True(record.ProviderData.TryGetValue(MailgunPendingMessageSender.ApiKeyProtectedKey, out var mailgunProtected));
         Assert.False(string.IsNullOrWhiteSpace(mailgunProtected));
@@ -507,6 +509,7 @@ public sealed class ProviderPendingMessageTests {
         var record = repository.LastSaved;
         Assert.NotNull(record);
         Assert.Equal(EmailProvider.SES, record.Provider);
+        Assert.Equal(record.MessageId, result.MessageId);
         Assert.True(record.ProviderData.TryGetValue(SesPendingMessageSender.AccessKeyIdProtectedKey, out var sesAccessProtected));
         Assert.True(record.ProviderData.TryGetValue(SesPendingMessageSender.SecretAccessKeyProtectedKey, out var sesSecretProtected));
         Assert.Equal("AKIA123", CredentialProtection.UnprotectWithFallback(sesAccessProtected));

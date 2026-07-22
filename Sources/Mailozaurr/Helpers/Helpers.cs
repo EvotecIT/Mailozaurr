@@ -6,6 +6,7 @@ using System.Security;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
+using MimeKit;
 
 namespace Mailozaurr;
 
@@ -93,6 +94,12 @@ public static class Helpers {
         if (from is string s) {
             return s;
         }
+        if (from is MailboxAddress mailboxAddress) {
+            return mailboxAddress.Address;
+        }
+        if (from is SendGridEmailAddress sendGridAddress) {
+            return sendGridAddress.Email;
+        }
         if (from is IDictionary<string, object> dict) {
             if (dict.TryGetValue("Email", out var emailObj)) {
                 return emailObj?.ToString() ?? string.Empty;
@@ -119,6 +126,12 @@ public static class Helpers {
     public static (string? Email, string? Name) GetEmailAndName(object? from) {
         if (from is string s) {
             return (s, null);
+        }
+        if (from is MailboxAddress mailboxAddress) {
+            return (mailboxAddress.Address, mailboxAddress.Name);
+        }
+        if (from is SendGridEmailAddress sendGridAddress) {
+            return (sendGridAddress.Email, sendGridAddress.Name);
         }
         if (from is IDictionary dict) {
             var email = dict.Contains("Email") ? dict["Email"]?.ToString() : null;

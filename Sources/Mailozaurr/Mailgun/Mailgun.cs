@@ -28,6 +28,9 @@ public class MailgunClient : IDisposable {
     }
     private string EmailDomain {
         get {
+            if (!string.IsNullOrWhiteSpace(Domain)) {
+                return Domain!.Trim();
+            }
             var address = Helpers.GetEmailAddress(From);
             if (!address.Contains('@')) {
                 throw new ArgumentException($"Invalid email address: {address}", nameof(From));
@@ -39,6 +42,8 @@ public class MailgunClient : IDisposable {
     /// <summary>Credentials used to authenticate to the API.</summary>
     /// <remarks>Must be <see cref="NetworkCredential"/>.</remarks>
     public ICredentials Credentials { get; set; } = null!;
+    /// <summary>Optional explicit Mailgun sending domain. Defaults to the sender address domain.</summary>
+    public string? Domain { get; set; }
     /// <summary>Determines how errors are handled.</summary>
     public ActionPreference? ErrorAction { get; set; }
 
@@ -62,6 +67,10 @@ public class MailgunClient : IDisposable {
     public string[]? Attachment { get; set; }
     /// <summary>File paths to include as inline attachments.</summary>
     public string[]? InlineAttachment { get; set; }
+    /// <summary>Structured attachments to include.</summary>
+    public List<AttachmentDescriptor>? Attachments { get; set; }
+    /// <summary>Structured inline attachments to include.</summary>
+    public List<AttachmentDescriptor>? InlineAttachments { get; set; }
 
     /// <summary>Custom headers to include with the message.</summary>
     public Dictionary<string, string>? Headers { get; set; }
@@ -143,6 +152,27 @@ public class MailgunClient : IDisposable {
         return streamContent;
     }
 
+    private static StreamContent CreateStreamContent(AttachmentDescriptor descriptor) {
+        Stream stream = descriptor.SourcePath is { Length: > 0 } sourcePath
+            ? new FileStream(
+                sourcePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 8192,
+                options: FileOptions.Asynchronous | FileOptions.SequentialScan)
+            : new MemoryStream(descriptor.GetContentBytes(), writable: false);
+        var streamContent = new StreamContent(stream);
+        streamContent.Headers.ContentType = new MediaTypeHeaderValue(
+            string.IsNullOrWhiteSpace(descriptor.ContentType)
+                ? "application/octet-stream"
+                : descriptor.ContentType);
+        if (!string.IsNullOrWhiteSpace(descriptor.ContentId)) {
+            streamContent.Headers.TryAddWithoutValidation("Content-ID", descriptor.ContentId);
+        }
+        return streamContent;
+    }
+
     /// <summary>
     /// Builds the multipart HTTP content used for the Mailgun API request.
     /// </summary>
@@ -186,12 +216,27 @@ public class MailgunClient : IDisposable {
                 content.Add(fileContent, "inline", Path.GetFileName(path));
             }
         }
+        AddStructuredAttachments(content, Attachments, "attachment");
+        AddStructuredAttachments(content, InlineAttachments, "inline");
         if (Headers != null) {
             foreach (var kvp in Headers) {
                 content.Add(new StringContent(kvp.Value), $"h:{kvp.Key}");
             }
         }
         return Task.FromResult(content);
+    }
+
+    private static void AddStructuredAttachments(
+        MultipartFormDataContent content,
+        IEnumerable<AttachmentDescriptor>? attachments,
+        string fieldName) {
+        if (attachments == null) return;
+        foreach (var descriptor in attachments) {
+            var fileName = string.IsNullOrWhiteSpace(descriptor.FileName)
+                ? Path.GetFileName(descriptor.SourcePath) ?? "attachment"
+                : descriptor.FileName!;
+            content.Add(CreateStreamContent(descriptor), fieldName, fileName);
+        }
     }
 
     private MimeMessage BuildMimeMessage() {
@@ -212,13 +257,21 @@ public class MailgunClient : IDisposable {
         if (InlineAttachment != null) {
             smtp.InlineAttachments = InlineAttachment.Select(path => new FileAttachmentDescriptor(path)).Cast<AttachmentDescriptor>().ToList();
         }
+        if (Attachments != null) {
+            smtp.Attachments ??= new List<AttachmentDescriptor>();
+            smtp.Attachments.AddRange(Attachments);
+        }
+        if (InlineAttachments != null) {
+            smtp.InlineAttachments ??= new List<AttachmentDescriptor>();
+            smtp.InlineAttachments.AddRange(InlineAttachments);
+        }
         smtp.CreateMessage();
         return smtp.Message;
     }
 
-    private async Task QueuePendingMessageAsync(CancellationToken cancellationToken) {
+    private async Task<string?> QueuePendingMessageAsync(CancellationToken cancellationToken) {
         if (PendingMessageRepository == null) {
-            return;
+            return null;
         }
 
         string apiKey;
@@ -228,11 +281,11 @@ public class MailgunClient : IDisposable {
             domain = EmailDomain;
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Failed to capture Mailgun credentials for retry: {ex.Message}");
-            return;
+            return null;
         }
 
         if (string.IsNullOrEmpty(apiKey)) {
-            return;
+            return null;
         }
 
         MimeMessage message;
@@ -240,7 +293,7 @@ public class MailgunClient : IDisposable {
             message = BuildMimeMessage();
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Failed to serialize Mailgun message for retry: {ex.Message}");
-            return;
+            return null;
         }
 
         var messageId = string.IsNullOrEmpty(message.MessageId)
@@ -266,10 +319,12 @@ public class MailgunClient : IDisposable {
 
         try {
             await PendingMessageRepository.SaveAsync(record, cancellationToken).ConfigureAwait(false);
+            return record.MessageId;
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Failed to persist Mailgun pending message: {ex.Message}");
+            return null;
         }
     }
 
@@ -321,9 +376,11 @@ public class MailgunClient : IDisposable {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Mailgun: {ex.Message}");
                 if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
-                    await QueuePendingMessageAsync(cancellationToken).ConfigureAwait(false);
+                    var queuedMessageId = await QueuePendingMessageAsync(cancellationToken).ConfigureAwait(false);
                     if (ErrorAction == ActionPreference.Stop) throw;
-                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", ex.Message);
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", ex.Message) {
+                        MessageId = queuedMessageId
+                    };
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
                     return failResult;
                 }
@@ -338,8 +395,10 @@ public class MailgunClient : IDisposable {
             }
             attempts++;
         } while (attempts <= RetryCount);
-        await QueuePendingMessageAsync(cancellationToken).ConfigureAwait(false);
-        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", lastException?.Message);
+        var finalQueuedMessageId = await QueuePendingMessageAsync(cancellationToken).ConfigureAwait(false);
+        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", lastException?.Message) {
+            MessageId = finalQueuedMessageId
+        };
         await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken).ConfigureAwait(false);
         return finalResult;
     }
