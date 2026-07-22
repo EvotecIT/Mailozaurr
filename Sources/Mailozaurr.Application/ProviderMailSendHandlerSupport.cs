@@ -14,6 +14,11 @@ internal static class ProviderMailSendHandlerSupport {
         if (request.NotBefore.HasValue) {
             throw new NotSupportedException($"Scheduled {expectedKind} sends are not yet supported by the application send handler.");
         }
+        if (!request.Message.To.Any(HasAddress) &&
+            !request.Message.Cc.Any(HasAddress) &&
+            !request.Message.Bcc.Any(HasAddress)) {
+            throw new InvalidOperationException("At least one non-empty To, Cc, or Bcc recipient is required.");
+        }
     }
 
     public static async Task<string> RequireSecretAsync(
@@ -56,6 +61,9 @@ internal static class ProviderMailSendHandlerSupport {
         Name = string.IsNullOrWhiteSpace(recipient.Name) ? null : recipient.Name!.Trim(),
         Email = recipient.Address.Trim()
     };
+
+    public static MessageRecipient? ResolveReplyTo(DraftMessage message) =>
+        message.ReplyTo.FirstOrDefault(HasAddress);
 
     public static List<AttachmentDescriptor> Attachments(DraftMessage message) =>
         message.Attachments
@@ -108,14 +116,17 @@ internal static class ProviderMailSendHandlerSupport {
 
     private static AttachmentDescriptor CreateAttachment(DraftAttachment attachment) {
         var descriptor = new FileAttachmentDescriptor(attachment.Path) {
-            FileName = attachment.FileName,
-            ContentType = attachment.ContentType,
-            ContentId = attachment.ContentId,
             ContentDisposition = new ContentDisposition(
                 attachment.IsInline ? ContentDisposition.Inline : ContentDisposition.Attachment)
         };
+        if (attachment.FileName is { } fileName && !string.IsNullOrWhiteSpace(fileName)) descriptor.FileName = fileName.Trim();
+        if (attachment.ContentType is { } contentType && !string.IsNullOrWhiteSpace(contentType)) descriptor.ContentType = contentType.Trim();
+        if (attachment.ContentId is { } contentId && !string.IsNullOrWhiteSpace(contentId)) descriptor.ContentId = contentId.Trim();
         return descriptor;
     }
+
+    private static bool HasAddress(MessageRecipient recipient) =>
+        !string.IsNullOrWhiteSpace(recipient.Address);
 
     private static int? GetInt(MailProfile profile, string key) {
         var value = GetSetting(profile, key);

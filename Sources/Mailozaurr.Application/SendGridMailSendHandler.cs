@@ -34,9 +34,9 @@ public sealed class SendGridMailSendHandler : IMailSendHandler {
             To = ProviderMailSendHandlerSupport.SendGridRecipients(request.Message.To),
             Cc = ProviderMailSendHandlerSupport.SendGridRecipients(request.Message.Cc),
             Bcc = ProviderMailSendHandlerSupport.SendGridRecipients(request.Message.Bcc),
-            ReplyTo = request.Message.ReplyTo.Count == 0
-                ? null
-                : ProviderMailSendHandlerSupport.ToSendGridAddress(request.Message.ReplyTo[0]),
+            ReplyTo = ProviderMailSendHandlerSupport.ResolveReplyTo(request.Message) is { } replyTo
+                ? ProviderMailSendHandlerSupport.ToSendGridAddress(replyTo)
+                : null,
             Subject = request.Message.Subject,
             Text = request.Message.TextBody ?? string.Empty,
             Html = request.Message.HtmlBody ?? string.Empty,

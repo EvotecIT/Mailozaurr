@@ -38,9 +38,9 @@ public sealed class SesMailSendHandler : IMailSendHandler {
             To = ProviderMailSendHandlerSupport.Recipients(request.Message.To),
             Cc = ProviderMailSendHandlerSupport.Recipients(request.Message.Cc),
             Bcc = ProviderMailSendHandlerSupport.Recipients(request.Message.Bcc),
-            ReplyTo = request.Message.ReplyTo.Count == 0
-                ? null
-                : ProviderMailSendHandlerSupport.ToMailboxAddress(request.Message.ReplyTo[0]),
+            ReplyTo = ProviderMailSendHandlerSupport.ResolveReplyTo(request.Message) is { } replyTo
+                ? ProviderMailSendHandlerSupport.ToMailboxAddress(replyTo)
+                : null,
             Subject = request.Message.Subject,
             Text = request.Message.TextBody ?? string.Empty,
             Html = request.Message.HtmlBody ?? string.Empty,

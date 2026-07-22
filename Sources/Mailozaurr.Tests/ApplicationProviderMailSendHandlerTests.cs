@@ -114,6 +114,75 @@ public sealed class ApplicationProviderMailSendHandlerTests {
         Assert.Null(result.QueueMessageId);
     }
 
+    [Fact]
+    public async Task ProviderHandlerRejectsMessagesWithoutAUsableRecipient() {
+        var secrets = new FakeSecretStore(("sendgrid", MailSecretNames.ApiKey, "sg-secret"));
+        var handler = new SendGridMailSendHandler(secrets, sendAsync: (client, cancellationToken) =>
+            throw new InvalidOperationException("Provider dispatch must not be reached."));
+        var request = CreateRequest("sendgrid");
+        request.Message.To.Clear();
+        request.Message.Cc.Add(new MessageRecipient { Address = "  " });
+        request.Message.Bcc.Add(new MessageRecipient { Address = string.Empty });
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            handler.SendAsync(CreateProfile("sendgrid", MailProfileKind.SendGrid), request));
+
+        Assert.Contains("recipient", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ProviderHandlersUseTheFirstNonBlankReplyToAddress() {
+        var sendGridSecrets = new FakeSecretStore(("sendgrid", MailSecretNames.ApiKey, "sg-secret"));
+        var sendGrid = new SendGridMailSendHandler(sendGridSecrets, sendAsync: (client, cancellationToken) => {
+            var replyTo = Assert.IsType<SendGridEmailAddress>(client.ReplyTo);
+            Assert.Equal("reply@example.com", replyTo.Email);
+            return Task.FromResult(Succeeded("sendgrid-message"));
+        });
+        await sendGrid.SendAsync(
+            CreateProfile("sendgrid", MailProfileKind.SendGrid),
+            CreateRequestWithReplyTo("sendgrid"));
+
+        var mailgunSecrets = new FakeSecretStore(("mailgun", MailSecretNames.ApiKey, "mg-secret"));
+        var mailgun = new MailgunMailSendHandler(mailgunSecrets, sendAsync: (client, cancellationToken) => {
+            var replyTo = Assert.IsType<MailboxAddress>(client.ReplyTo);
+            Assert.Equal("reply@example.com", replyTo.Address);
+            return Task.FromResult(Succeeded("mailgun-message"));
+        });
+        await mailgun.SendAsync(
+            CreateProfile("mailgun", MailProfileKind.Mailgun),
+            CreateRequestWithReplyTo("mailgun"));
+
+        var sesSecrets = new FakeSecretStore(
+            ("ses", MailSecretNames.AccessKeyId, "access-key"),
+            ("ses", MailSecretNames.SecretAccessKey, "secret-key"));
+        var ses = new SesMailSendHandler(sesSecrets, sendAsync: (client, cancellationToken) => {
+            var replyTo = Assert.IsType<MailboxAddress>(client.ReplyTo);
+            Assert.Equal("reply@example.com", replyTo.Address);
+            return Task.FromResult(Succeeded("ses-message"));
+        });
+        await ses.SendAsync(
+            CreateProfile("ses", MailProfileKind.Ses),
+            CreateRequestWithReplyTo("ses"));
+    }
+
+    [Fact]
+    public async Task ProviderAttachmentKeepsThePathDerivedFileNameWhenNoOverrideIsProvided() {
+        var secrets = new FakeSecretStore(
+            ("ses", MailSecretNames.AccessKeyId, "access-key"),
+            ("ses", MailSecretNames.SecretAccessKey, "secret-key"));
+        var request = CreateRequest("ses");
+        request.Message.Attachments[0].FileName = null;
+        request.Message.Attachments[0].ContentType = null;
+        var expectedFileName = Path.GetFileName(request.Message.Attachments[0].Path);
+        var handler = new SesMailSendHandler(secrets, sendAsync: (client, cancellationToken) => {
+            var attachment = Assert.IsType<FileAttachmentDescriptor>(Assert.Single(client.Attachments!));
+            Assert.Equal(expectedFileName, attachment.FileName);
+            return Task.FromResult(Succeeded("ses-message"));
+        });
+
+        await handler.SendAsync(CreateProfile("ses", MailProfileKind.Ses), request);
+    }
+
     private static MailProfile CreateProfile(string id, MailProfileKind kind) => new() {
         Id = id,
         DisplayName = id,
@@ -143,6 +212,13 @@ public sealed class ApplicationProviderMailSendHandlerTests {
             }
         }
     };
+
+    private static SendMessageRequest CreateRequestWithReplyTo(string profileId) {
+        var request = CreateRequest(profileId);
+        request.Message.ReplyTo.Add(new MessageRecipient { Address = "  " });
+        request.Message.ReplyTo.Add(new MessageRecipient { Name = "Reply", Address = "reply@example.com" });
+        return request;
+    }
 
     private static void AssertAttachmentMetadata(AttachmentDescriptor attachment) {
         Assert.Equal("renamed-report.pdf", attachment.FileName);
