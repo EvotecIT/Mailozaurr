@@ -292,6 +292,8 @@ public sealed class ProviderPendingMessageTests {
         var repository = new InMemoryPendingMessageRepository();
         using var client = new MailgunClient {
             PendingMessageRepository = repository,
+            RetryCount = 1,
+            RetryDelayMilliseconds = 0,
             Credentials = new NetworkCredential("user", "mailgun-api-key"),
             From = "sender@example.com",
             To = new List<object> { "recipient@example.com" },
@@ -306,6 +308,7 @@ public sealed class ProviderPendingMessageTests {
         var result = await client.SendEmailAsync(CancellationToken.None);
 
         Assert.False(result.Status);
+        Assert.Equal(2, timeoutHandler.CallCount);
         Assert.NotNull(repository.LastSaved);
         Assert.Equal(repository.LastSaved!.MessageId, result.MessageId);
         Assert.Equal(EmailProvider.Mailgun, repository.LastSaved.Provider);
@@ -565,6 +568,8 @@ public sealed class ProviderPendingMessageTests {
         var repository = new InMemoryPendingMessageRepository();
         using var client = new SesClient {
             PendingMessageRepository = repository,
+            RetryCount = 1,
+            RetryDelayMilliseconds = 0,
             Credentials = new NetworkCredential("AKIA123", "secret-key"),
             Region = "us-east-1",
             From = "sender@example.com",
@@ -580,6 +585,7 @@ public sealed class ProviderPendingMessageTests {
         var result = await client.SendEmailAsync(CancellationToken.None);
 
         Assert.False(result.Status);
+        Assert.Equal(2, timeoutHandler.CallCount);
         Assert.NotNull(repository.LastSaved);
         Assert.Equal(repository.LastSaved!.MessageId, result.MessageId);
         Assert.Equal(EmailProvider.SES, repository.LastSaved.Provider);
