@@ -288,6 +288,30 @@ public sealed class ProviderPendingMessageTests {
     }
 
     [Fact]
+    public async Task MailgunClient_HttpTimeoutQueuesPendingMessage() {
+        var repository = new InMemoryPendingMessageRepository();
+        using var client = new MailgunClient {
+            PendingMessageRepository = repository,
+            Credentials = new NetworkCredential("user", "mailgun-api-key"),
+            From = "sender@example.com",
+            To = new List<object> { "recipient@example.com" },
+            Subject = "mailgun-timeout",
+            Text = "body"
+        };
+        var timeoutHandler = new TestHandler((_, _) =>
+            Task.FromException<HttpResponseMessage>(new TaskCanceledException("HTTP request timeout")));
+        var httpClientField = typeof(MailgunClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        httpClientField.SetValue(client, new HttpClient(timeoutHandler));
+
+        var result = await client.SendEmailAsync(CancellationToken.None);
+
+        Assert.False(result.Status);
+        Assert.NotNull(repository.LastSaved);
+        Assert.Equal(repository.LastSaved!.MessageId, result.MessageId);
+        Assert.Equal(EmailProvider.Mailgun, repository.LastSaved.Provider);
+    }
+
+    [Fact]
     public async Task MailgunClient_CancellationDuringPendingSave_PropagatesCancellation() {
         var repository = new CancellationOnSavePendingMessageRepository();
         using var client = new MailgunClient {

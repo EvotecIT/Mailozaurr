@@ -378,7 +378,9 @@ public class MailgunClient : IDisposable {
                 var error = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
                 throw new HttpRequestException(error);
-            } catch (HttpRequestException ex) {
+            } catch (Exception ex) when (
+                ex is HttpRequestException ||
+                ex is TaskCanceledException && !cancellationToken.IsCancellationRequested) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Mailgun: {ex.Message}");
                 if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
