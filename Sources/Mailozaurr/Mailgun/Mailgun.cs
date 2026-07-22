@@ -226,12 +226,18 @@ public class MailgunClient : IDisposable {
         return Task.FromResult(content);
     }
 
-    private static void AddStructuredAttachments(
+    private void AddStructuredAttachments(
         MultipartFormDataContent content,
         IEnumerable<AttachmentDescriptor>? attachments,
         string fieldName) {
         if (attachments == null) return;
         foreach (var descriptor in attachments) {
+            if (descriptor is FileAttachmentDescriptor fileDescriptor && !File.Exists(fileDescriptor.FilePath)) {
+                LogCollector.LogWarning($"Send-EmailMessage - Attachment file not found: {fileDescriptor.FilePath}");
+                LogCollector.LogWarning($"Send-EmailMessage - Possible issue: Path '{fileDescriptor.FilePath}' is invalid. Verify the file exists and the path is correct.");
+                continue;
+            }
+
             var fileName = string.IsNullOrWhiteSpace(descriptor.FileName)
                 ? Path.GetFileName(descriptor.SourcePath) ?? "attachment"
                 : descriptor.FileName!;

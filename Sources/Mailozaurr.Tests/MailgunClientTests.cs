@@ -243,6 +243,22 @@ public class MailgunClientTests {
     }
 
     [Fact]
+    public async Task CreateContentAsync_SkipsMissingStructuredFileAttachment() {
+        string missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
+        using var client = new MailgunClient {
+            From = "sender@example.com",
+            To = new List<object> { "to@example.com" },
+            Attachments = new List<AttachmentDescriptor> { new FileAttachmentDescriptor(missing) }
+        };
+
+        MethodInfo? method = typeof(MailgunClient).GetMethod("CreateContentAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+        var task = (Task<MultipartFormDataContent>)method!.Invoke(client, new object[] { default(CancellationToken) })!;
+        using var content = await task;
+
+        Assert.DoesNotContain(content, part => part.Headers.ContentDisposition?.Name?.Trim('"') == "attachment");
+    }
+
+    [Fact]
     public async Task SendEmailAsync_InvalidCredentials_ThrowsInvalidOperationException() {
         using var client = new MailgunClient {
             From = "sender@example.com",
