@@ -282,6 +282,11 @@ public class SesClient : IDisposable {
             } catch (HttpRequestException ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SES: {ex.Message}");
+            } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                throw;
+            } catch (TaskCanceledException ex) {
+                lastException = ex;
+                LogCollector.LogWarning($"Send-EmailMessage - SES request timed out: {ex.Message}");
             }
 
             if ((!Helpers.IsTransient(lastException) && !RetryAlways) || attempts >= RetryCount) {

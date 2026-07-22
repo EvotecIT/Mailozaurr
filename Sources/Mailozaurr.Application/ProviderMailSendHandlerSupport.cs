@@ -1,5 +1,6 @@
 using Mailozaurr.Definitions;
 using MimeKit;
+using MimeKit.Utils;
 using System.Globalization;
 
 namespace Mailozaurr.Application;
@@ -34,7 +35,7 @@ internal static class ProviderMailSendHandlerSupport {
     }
 
     public static MessageRecipient ResolveSender(MailProfile profile, DraftMessage message) {
-        if (message.From is { Address.Length: > 0 } sender) return sender;
+        if (message.From is { } sender && HasAddress(sender)) return sender;
         if (string.IsNullOrWhiteSpace(profile.DefaultSender)) {
             throw new InvalidOperationException($"Profile '{profile.Id}' requires a default sender or message sender.");
         }
@@ -121,7 +122,13 @@ internal static class ProviderMailSendHandlerSupport {
         };
         if (attachment.FileName is { } fileName && !string.IsNullOrWhiteSpace(fileName)) descriptor.FileName = fileName.Trim();
         if (attachment.ContentType is { } contentType && !string.IsNullOrWhiteSpace(contentType)) descriptor.ContentType = contentType.Trim();
-        if (attachment.ContentId is { } contentId && !string.IsNullOrWhiteSpace(contentId)) descriptor.ContentId = contentId.Trim();
+        if (attachment.ContentId is { } contentId && !string.IsNullOrWhiteSpace(contentId)) {
+            descriptor.ContentId = contentId.Trim();
+        } else if (attachment.IsInline) {
+            descriptor.ContentId = !string.IsNullOrWhiteSpace(descriptor.FileName)
+                ? descriptor.FileName
+                : MimeUtils.GenerateMessageId();
+        }
         return descriptor;
     }
 

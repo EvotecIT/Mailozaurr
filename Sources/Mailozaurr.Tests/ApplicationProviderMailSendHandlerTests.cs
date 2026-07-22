@@ -183,6 +183,36 @@ public sealed class ApplicationProviderMailSendHandlerTests {
         await handler.SendAsync(CreateProfile("ses", MailProfileKind.Ses), request);
     }
 
+    [Fact]
+    public async Task ProviderHandlerFallsBackToProfileSenderWhenDraftSenderIsWhitespace() {
+        var secrets = new FakeSecretStore(("sendgrid", MailSecretNames.ApiKey, "sg-secret"));
+        var request = CreateRequest("sendgrid");
+        request.Message.From = new MessageRecipient { Address = "  " };
+        var handler = new SendGridMailSendHandler(secrets, sendAsync: (client, cancellationToken) => {
+            var sender = Assert.IsType<SendGridEmailAddress>(client.From);
+            Assert.Equal("sender@example.com", sender.Email);
+            return Task.FromResult(Succeeded("sendgrid-message"));
+        });
+
+        await handler.SendAsync(CreateProfile("sendgrid", MailProfileKind.SendGrid), request);
+    }
+
+    [Fact]
+    public async Task ProviderInlineAttachmentGetsAUsableContentIdWhenNoOverrideIsProvided() {
+        var secrets = new FakeSecretStore(("sendgrid", MailSecretNames.ApiKey, "sg-secret"));
+        var request = CreateRequest("sendgrid");
+        request.Message.Attachments[0].IsInline = true;
+        request.Message.Attachments[0].ContentId = null;
+        var handler = new SendGridMailSendHandler(secrets, sendAsync: (client, cancellationToken) => {
+            var attachment = Assert.Single(client.Attachments!);
+            Assert.Equal("renamed-report.pdf", attachment.ContentId);
+            Assert.Equal(ContentDisposition.Inline, attachment.ContentDisposition?.Disposition);
+            return Task.FromResult(Succeeded("sendgrid-message"));
+        });
+
+        await handler.SendAsync(CreateProfile("sendgrid", MailProfileKind.SendGrid), request);
+    }
+
     private static MailProfile CreateProfile(string id, MailProfileKind kind) => new() {
         Id = id,
         DisplayName = id,
