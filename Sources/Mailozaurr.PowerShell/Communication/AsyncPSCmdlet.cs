@@ -55,9 +55,53 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
         public object? Value { get; }
     }
 
+    private sealed class PipelineReplyChannel
+    {
+        private readonly BlockingCollection<PipelineReply> _pipe = new(boundedCapacity: 1);
+        private int _owners = 2;
+
+        public PipelineReply Take(CancellationToken cancellationToken)
+            => _pipe.Take(cancellationToken);
+
+        public void Publish(Func<object?> createValue)
+        {
+            try
+            {
+                var reply = new PipelineReply(createValue());
+                try
+                {
+                    _pipe.Add(reply);
+                }
+                catch (InvalidOperationException)
+                {
+                    // The requester and pipeline can finish concurrently during cancellation.
+                }
+            }
+            finally
+            {
+                Release();
+            }
+        }
+
+        public void Abandon()
+        {
+            Release();
+            Release();
+        }
+
+        public void ReleaseRequester()
+            => Release();
+
+        private void Release()
+        {
+            if (Interlocked.Decrement(ref _owners) == 0)
+                _pipe.Dispose();
+        }
+    }
+
     private sealed class PipelineItem
     {
-        public PipelineItem(object? value, PipelineType type, BlockingCollection<PipelineReply>? replyPipe = null)
+        public PipelineItem(object? value, PipelineType type, PipelineReplyChannel? replyPipe = null)
         {
             Value = value;
             Type = type;
@@ -68,7 +112,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
 
         public PipelineType Type { get; }
 
-        public BlockingCollection<PipelineReply>? ReplyPipe { get; }
+        public PipelineReplyChannel? ReplyPipe { get; }
     }
 
     private readonly CancellationTokenSource _cancelSource = new();
@@ -374,6 +418,8 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
         {
             DisposeCancelSourceIfInactive();
         }
+
+        _pipelineThreadId = 0;
     }
 
     private bool IsPipelineThread
@@ -394,15 +440,22 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     private object? RequestPipelineReply(object? value, PipelineType type)
     {
         ThrowIfStopped();
-        using var replyPipe = new BlockingCollection<PipelineReply>(boundedCapacity: 1);
+        var replyPipe = new PipelineReplyChannel();
         if (!TryQueue(new PipelineItem(value, type, replyPipe)))
         {
+            replyPipe.Abandon();
             ThrowIfStopped();
             throw new InvalidOperationException("No active PowerShell pipeline is available for the asynchronous request.");
         }
 
-        var reply = replyPipe.Take(CancelToken);
-        return reply.Value;
+        try
+        {
+            return replyPipe.Take(CancelToken).Value;
+        }
+        finally
+        {
+            replyPipe.ReleaseRequester();
+        }
     }
 
     private bool TryQueue(PipelineItem item)
@@ -415,6 +468,10 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
         {
             outPipe.Add(item, CancelToken);
             return true;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
         }
         catch (InvalidOperationException)
         {
@@ -448,8 +505,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
 
         void ClearPipes()
         {
-            if (ReferenceEquals(Interlocked.CompareExchange(ref _currentOutPipe, null, outPipe), outPipe))
-                _pipelineThreadId = 0;
+            _ = Interlocked.CompareExchange(ref _currentOutPipe, null, outPipe);
             CompleteAddingIfNeeded(outPipe);
         }
 
@@ -504,60 +560,75 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
                     base.WriteProgress((ProgressRecord)item.Value!);
                     break;
                 case PipelineType.ShouldProcessTarget:
-                    item.ReplyPipe!.Add(new PipelineReply(base.ShouldProcess((string)item.Value!)));
+                    item.ReplyPipe!.Publish(
+                        () => base.ShouldProcess((string)item.Value!));
                     break;
                 case PipelineType.ShouldProcess:
                     var should = ((string Target, string Action))item.Value!;
-                    item.ReplyPipe!.Add(new PipelineReply(base.ShouldProcess(should.Target, should.Action)));
+                    item.ReplyPipe!.Publish(
+                        () => base.ShouldProcess(should.Target, should.Action));
                     break;
                 case PipelineType.ShouldProcessVerbose:
                     var verbose = ((string Description, string Warning, string Caption))item.Value!;
-                    item.ReplyPipe!.Add(new PipelineReply(
-                        base.ShouldProcess(verbose.Description, verbose.Warning, verbose.Caption)));
+                    item.ReplyPipe!.Publish(
+                        () => base.ShouldProcess(verbose.Description, verbose.Warning, verbose.Caption));
                     break;
                 case PipelineType.ShouldProcessReason:
                     var reasonRequest = ((string Description, string Warning, string Caption))item.Value!;
-                    var result = base.ShouldProcess(
-                        reasonRequest.Description,
-                        reasonRequest.Warning,
-                        reasonRequest.Caption,
-                        out var reason);
-                    item.ReplyPipe!.Add(new PipelineReply((result, reason)));
+                    item.ReplyPipe!.Publish(() =>
+                    {
+                        var result = base.ShouldProcess(
+                            reasonRequest.Description,
+                            reasonRequest.Warning,
+                            reasonRequest.Caption,
+                            out var reason);
+                        return (result, reason);
+                    });
                     break;
                 case PipelineType.ShouldContinue:
                     var shouldContinue = ((string Query, string Caption))item.Value!;
-                    item.ReplyPipe!.Add(new PipelineReply(
-                        base.ShouldContinue(shouldContinue.Query, shouldContinue.Caption)));
+                    item.ReplyPipe!.Publish(
+                        () => base.ShouldContinue(shouldContinue.Query, shouldContinue.Caption));
                     break;
                 case PipelineType.ShouldContinueAll:
                     var shouldContinueAll =
                         ((string Query, string Caption, bool YesToAll, bool NoToAll))item.Value!;
-                    var yesToAll = shouldContinueAll.YesToAll;
-                    var noToAll = shouldContinueAll.NoToAll;
-                    var continueAll = base.ShouldContinue(
-                        shouldContinueAll.Query,
-                        shouldContinueAll.Caption,
-                        ref yesToAll,
-                        ref noToAll);
-                    item.ReplyPipe!.Add(new PipelineReply((continueAll, yesToAll, noToAll)));
+                    item.ReplyPipe!.Publish(() =>
+                    {
+                        var yesToAll = shouldContinueAll.YesToAll;
+                        var noToAll = shouldContinueAll.NoToAll;
+                        var continueAll = base.ShouldContinue(
+                            shouldContinueAll.Query,
+                            shouldContinueAll.Caption,
+                            ref yesToAll,
+                            ref noToAll);
+                        return (continueAll, yesToAll, noToAll);
+                    });
                     break;
                 case PipelineType.ShouldContinueSecurity:
                     var shouldContinueSecurity =
                         ((string Query, string Caption, bool HasSecurityImpact, bool YesToAll, bool NoToAll))item.Value!;
-                    yesToAll = shouldContinueSecurity.YesToAll;
-                    noToAll = shouldContinueSecurity.NoToAll;
-                    var continueSecurity = base.ShouldContinue(
-                        shouldContinueSecurity.Query,
-                        shouldContinueSecurity.Caption,
-                        shouldContinueSecurity.HasSecurityImpact,
-                        ref yesToAll,
-                        ref noToAll);
-                    item.ReplyPipe!.Add(new PipelineReply((continueSecurity, yesToAll, noToAll)));
+                    item.ReplyPipe!.Publish(() =>
+                    {
+                        var yesToAll = shouldContinueSecurity.YesToAll;
+                        var noToAll = shouldContinueSecurity.NoToAll;
+                        var continueSecurity = base.ShouldContinue(
+                            shouldContinueSecurity.Query,
+                            shouldContinueSecurity.Caption,
+                            shouldContinueSecurity.HasSecurityImpact,
+                            ref yesToAll,
+                            ref noToAll);
+                        return (continueSecurity, yesToAll, noToAll);
+                    });
                     break;
                 case PipelineType.PromptForCredential:
                     var prompt = ((string Caption, string Message, string UserName, string TargetName))item.Value!;
-                    item.ReplyPipe!.Add(new PipelineReply(
-                        Host.UI.PromptForCredential(prompt.Caption, prompt.Message, prompt.UserName, prompt.TargetName)));
+                    item.ReplyPipe!.Publish(
+                        () => Host.UI.PromptForCredential(
+                            prompt.Caption,
+                            prompt.Message,
+                            prompt.UserName,
+                            prompt.TargetName));
                     break;
             }
         }
