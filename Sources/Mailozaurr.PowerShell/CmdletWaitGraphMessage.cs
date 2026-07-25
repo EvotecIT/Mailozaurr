@@ -74,13 +74,13 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
         _listener = new GraphMessageListener(conn.Credential, UserPrincipalName!);
         _listener.MessageArrived += OnMessageArrived;
         _matchSource = new CancellationTokenSource();
+        await _listener.StartAsync(CancelToken);
         _timeoutSource = TimeoutSeconds > 0
             ? new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds))
             : null;
         _linkedSource = _timeoutSource == null
             ? CancellationTokenSource.CreateLinkedTokenSource(CancelToken, _matchSource.Token)
             : CancellationTokenSource.CreateLinkedTokenSource(CancelToken, _timeoutSource.Token, _matchSource.Token);
-        await _listener.StartAsync(CancelToken);
 
         try {
             await Task.Delay(-1, _linkedSource.Token);
