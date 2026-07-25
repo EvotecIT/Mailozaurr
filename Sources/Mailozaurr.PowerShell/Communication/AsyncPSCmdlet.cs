@@ -37,14 +37,27 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
         Debug,
         Information,
         Progress,
+        ShouldProcessTarget,
         ShouldProcess,
+        ShouldProcessVerbose,
+        ShouldProcessReason,
         ShouldContinue,
+        ShouldContinueAll,
+        ShouldContinueSecurity,
         PromptForCredential
+    }
+
+    private sealed class PipelineReply
+    {
+        public PipelineReply(object? value)
+            => Value = value;
+
+        public object? Value { get; }
     }
 
     private sealed class PipelineItem
     {
-        public PipelineItem(object? value, PipelineType type, BlockingCollection<object?>? replyPipe = null)
+        public PipelineItem(object? value, PipelineType type, BlockingCollection<PipelineReply>? replyPipe = null)
         {
             Value = value;
             Type = type;
@@ -55,13 +68,14 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
 
         public PipelineType Type { get; }
 
-        public BlockingCollection<object?>? ReplyPipe { get; }
+        public BlockingCollection<PipelineReply>? ReplyPipe { get; }
     }
 
     private readonly CancellationTokenSource _cancelSource = new();
     private static readonly SynchronizationContext HookSynchronizationContext = new AsyncHookSynchronizationContext();
     private BlockingCollection<PipelineItem>? _currentOutPipe;
     private int _pipelineThreadId;
+    private int _disposed;
 
     /// <summary>Cancellation token triggered when PowerShell stops the cmdlet.</summary>
     protected internal CancellationToken CancelToken => _cancelSource.Token;
@@ -95,39 +109,102 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
         => _cancelSource.Cancel();
 
     /// <summary>Thread-safe ShouldProcess bridge for asynchronous cmdlet code.</summary>
+    public new bool ShouldProcess(string? target)
+    {
+        if (IsPipelineThread)
+            return base.ShouldProcess(target ?? string.Empty);
+
+        return (bool)RequestPipelineReply(target ?? string.Empty, PipelineType.ShouldProcessTarget)!;
+    }
+
+    /// <summary>Thread-safe ShouldProcess bridge for asynchronous cmdlet code.</summary>
     public new bool ShouldProcess(string? target, string action)
     {
-        ThrowIfStopped();
-        if (_currentOutPipe is null || IsPipelineThread)
+        if (IsPipelineThread)
             return base.ShouldProcess(target ?? string.Empty, action);
 
-        using var replyPipe = new BlockingCollection<object?>(boundedCapacity: 1);
-        _currentOutPipe.Add(new PipelineItem((target ?? string.Empty, action), PipelineType.ShouldProcess, replyPipe), CancelToken);
-        return (bool)replyPipe.Take(CancelToken)!;
+        return (bool)RequestPipelineReply((target ?? string.Empty, action), PipelineType.ShouldProcess)!;
+    }
+
+    /// <summary>Thread-safe ShouldProcess bridge for asynchronous cmdlet code.</summary>
+    public new bool ShouldProcess(string verboseDescription, string verboseWarning, string caption)
+    {
+        if (IsPipelineThread)
+            return base.ShouldProcess(verboseDescription, verboseWarning, caption);
+
+        return (bool)RequestPipelineReply(
+            (verboseDescription, verboseWarning, caption),
+            PipelineType.ShouldProcessVerbose)!;
+    }
+
+    /// <summary>Thread-safe ShouldProcess bridge for asynchronous cmdlet code.</summary>
+    public new bool ShouldProcess(
+        string verboseDescription,
+        string verboseWarning,
+        string caption,
+        out ShouldProcessReason shouldProcessReason)
+    {
+        if (IsPipelineThread)
+            return base.ShouldProcess(verboseDescription, verboseWarning, caption, out shouldProcessReason);
+
+        var reply = ((bool Result, ShouldProcessReason Reason))RequestPipelineReply(
+            (verboseDescription, verboseWarning, caption),
+            PipelineType.ShouldProcessReason)!;
+        shouldProcessReason = reply.Reason;
+        return reply.Result;
     }
 
     /// <summary>Thread-safe ShouldContinue bridge for asynchronous cmdlet code.</summary>
     public new bool ShouldContinue(string query, string caption)
     {
-        ThrowIfStopped();
-        if (_currentOutPipe is null || IsPipelineThread)
+        if (IsPipelineThread)
             return base.ShouldContinue(query, caption);
 
-        using var replyPipe = new BlockingCollection<object?>(boundedCapacity: 1);
-        _currentOutPipe.Add(new PipelineItem((query, caption), PipelineType.ShouldContinue, replyPipe), CancelToken);
-        return (bool)replyPipe.Take(CancelToken)!;
+        return (bool)RequestPipelineReply((query, caption), PipelineType.ShouldContinue)!;
+    }
+
+    /// <summary>Thread-safe ShouldContinue bridge for asynchronous cmdlet code.</summary>
+    public new bool ShouldContinue(string query, string caption, ref bool yesToAll, ref bool noToAll)
+    {
+        if (IsPipelineThread)
+            return base.ShouldContinue(query, caption, ref yesToAll, ref noToAll);
+
+        var reply = ((bool Result, bool YesToAll, bool NoToAll))RequestPipelineReply(
+            (query, caption, yesToAll, noToAll),
+            PipelineType.ShouldContinueAll)!;
+        yesToAll = reply.YesToAll;
+        noToAll = reply.NoToAll;
+        return reply.Result;
+    }
+
+    /// <summary>Thread-safe ShouldContinue bridge for asynchronous cmdlet code.</summary>
+    public new bool ShouldContinue(
+        string query,
+        string caption,
+        bool hasSecurityImpact,
+        ref bool yesToAll,
+        ref bool noToAll)
+    {
+        if (IsPipelineThread)
+            return base.ShouldContinue(query, caption, hasSecurityImpact, ref yesToAll, ref noToAll);
+
+        var reply = ((bool Result, bool YesToAll, bool NoToAll))RequestPipelineReply(
+            (query, caption, hasSecurityImpact, yesToAll, noToAll),
+            PipelineType.ShouldContinueSecurity)!;
+        yesToAll = reply.YesToAll;
+        noToAll = reply.NoToAll;
+        return reply.Result;
     }
 
     /// <summary>Thread-safe credential prompt bridge for asynchronous cmdlet code.</summary>
     public PSCredential? PromptForCredential(string caption, string message, string userName, string targetName)
     {
-        ThrowIfStopped();
-        if (_currentOutPipe is null || IsPipelineThread)
+        if (IsPipelineThread)
             return Host.UI.PromptForCredential(caption, message, userName, targetName);
 
-        using var replyPipe = new BlockingCollection<object?>(boundedCapacity: 1);
-        _currentOutPipe.Add(new PipelineItem((caption, message, userName, targetName), PipelineType.PromptForCredential, replyPipe), CancelToken);
-        return (PSCredential?)replyPipe.Take(CancelToken);
+        return (PSCredential?)RequestPipelineReply(
+            (caption, message, userName, targetName),
+            PipelineType.PromptForCredential);
     }
 
     /// <summary>Thread-safe output bridge for asynchronous cmdlet code.</summary>
@@ -137,106 +214,129 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe output bridge for asynchronous cmdlet code.</summary>
     public new void WriteObject(object? sendToPipeline, bool enumerateCollection)
     {
+        if (!IsPipelineThread && Volatile.Read(ref _currentOutPipe) is null)
+            return;
+
         ThrowIfStopped();
-        if (_currentOutPipe is null || IsPipelineThread)
+        if (IsPipelineThread)
         {
             base.WriteObject(sendToPipeline, enumerateCollection);
             return;
         }
 
-        _currentOutPipe.Add(new PipelineItem(sendToPipeline, enumerateCollection ? PipelineType.OutputEnumerate : PipelineType.Output), CancelToken);
+        _ = TryQueue(new PipelineItem(
+            sendToPipeline,
+            enumerateCollection ? PipelineType.OutputEnumerate : PipelineType.Output));
     }
 
     /// <summary>Thread-safe error bridge for asynchronous cmdlet code.</summary>
     public new void WriteError(ErrorRecord errorRecord)
     {
+        if (!IsPipelineThread && Volatile.Read(ref _currentOutPipe) is null)
+            return;
+
         ThrowIfStopped();
-        if (_currentOutPipe is null || IsPipelineThread)
+        if (IsPipelineThread)
         {
             base.WriteError(errorRecord);
             return;
         }
 
-        _currentOutPipe.Add(new PipelineItem(errorRecord, PipelineType.Error), CancelToken);
+        _ = TryQueue(new PipelineItem(errorRecord, PipelineType.Error));
     }
 
     /// <summary>Thread-safe terminating-error bridge for asynchronous cmdlet code.</summary>
-    protected new void ThrowTerminatingError(ErrorRecord errorRecord)
+    public new void ThrowTerminatingError(ErrorRecord errorRecord)
     {
         ThrowIfStopped();
-        if (_currentOutPipe is null || IsPipelineThread)
+        if (IsPipelineThread)
         {
             base.ThrowTerminatingError(errorRecord);
             return;
         }
 
-        _currentOutPipe.Add(new PipelineItem(errorRecord, PipelineType.TerminatingError), CancelToken);
+        _ = TryQueue(new PipelineItem(errorRecord, PipelineType.TerminatingError));
         throw new PipelineStoppedException();
     }
 
     /// <summary>Thread-safe warning bridge for asynchronous cmdlet code.</summary>
     public new void WriteWarning(string text)
     {
+        if (!IsPipelineThread && Volatile.Read(ref _currentOutPipe) is null)
+            return;
+
         ThrowIfStopped();
-        if (_currentOutPipe is null || IsPipelineThread)
+        if (IsPipelineThread)
         {
             base.WriteWarning(text);
             return;
         }
 
-        _currentOutPipe.Add(new PipelineItem(text, PipelineType.Warning), CancelToken);
+        _ = TryQueue(new PipelineItem(text, PipelineType.Warning));
     }
 
     /// <summary>Thread-safe verbose bridge for asynchronous cmdlet code.</summary>
     public new void WriteVerbose(string text)
     {
+        if (!IsPipelineThread && Volatile.Read(ref _currentOutPipe) is null)
+            return;
+
         ThrowIfStopped();
-        if (_currentOutPipe is null || IsPipelineThread)
+        if (IsPipelineThread)
         {
             base.WriteVerbose(text);
             return;
         }
 
-        _currentOutPipe.Add(new PipelineItem(text, PipelineType.Verbose), CancelToken);
+        _ = TryQueue(new PipelineItem(text, PipelineType.Verbose));
     }
 
     /// <summary>Thread-safe debug bridge for asynchronous cmdlet code.</summary>
     public new void WriteDebug(string text)
     {
+        if (!IsPipelineThread && Volatile.Read(ref _currentOutPipe) is null)
+            return;
+
         ThrowIfStopped();
-        if (_currentOutPipe is null || IsPipelineThread)
+        if (IsPipelineThread)
         {
             base.WriteDebug(text);
             return;
         }
 
-        _currentOutPipe.Add(new PipelineItem(text, PipelineType.Debug), CancelToken);
+        _ = TryQueue(new PipelineItem(text, PipelineType.Debug));
     }
 
     /// <summary>Thread-safe information bridge for asynchronous cmdlet code.</summary>
     public new void WriteInformation(InformationRecord informationRecord)
     {
+        if (!IsPipelineThread && Volatile.Read(ref _currentOutPipe) is null)
+            return;
+
         ThrowIfStopped();
-        if (_currentOutPipe is null || IsPipelineThread)
+        if (IsPipelineThread)
         {
             base.WriteInformation(informationRecord);
             return;
         }
 
-        _currentOutPipe.Add(new PipelineItem(informationRecord, PipelineType.Information), CancelToken);
+        _ = TryQueue(new PipelineItem(informationRecord, PipelineType.Information));
     }
 
     /// <summary>Thread-safe progress bridge for asynchronous cmdlet code.</summary>
     public new void WriteProgress(ProgressRecord progressRecord)
     {
+        if (!IsPipelineThread && Volatile.Read(ref _currentOutPipe) is null)
+            return;
+
         ThrowIfStopped();
-        if (_currentOutPipe is null || IsPipelineThread)
+        if (IsPipelineThread)
         {
             base.WriteProgress(progressRecord);
             return;
         }
 
-        _currentOutPipe.Add(new PipelineItem(progressRecord, PipelineType.Progress), CancelToken);
+        _ = TryQueue(new PipelineItem(progressRecord, PipelineType.Progress));
     }
 
     /// <summary>Throws when PowerShell has requested cancellation.</summary>
@@ -248,39 +348,89 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
 
     /// <inheritdoc />
     public virtual void Dispose()
-        => _cancelSource.Dispose();
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
+        _cancelSource.Cancel();
+        _cancelSource.Dispose();
+    }
 
     private bool IsPipelineThread
         => _pipelineThreadId != 0 && Environment.CurrentManagedThreadId == _pipelineThreadId;
 
-    private static void GetBlockTaskResult(Task blockTask)
+    private void GetBlockTaskResult(Task blockTask)
     {
         try
         {
             blockTask.GetAwaiter().GetResult();
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (_cancelSource.IsCancellationRequested)
         {
             throw new PipelineStoppedException();
         }
     }
 
+    private object? RequestPipelineReply(object? value, PipelineType type)
+    {
+        ThrowIfStopped();
+        var replyPipe = new BlockingCollection<PipelineReply>(boundedCapacity: 1);
+        if (!TryQueue(new PipelineItem(value, type, replyPipe)))
+            throw new InvalidOperationException("No active PowerShell pipeline is available for the asynchronous request.");
+
+        var reply = replyPipe.Take(CancelToken);
+        replyPipe.Dispose();
+        return reply.Value;
+    }
+
+    private bool TryQueue(PipelineItem item)
+    {
+        var outPipe = Volatile.Read(ref _currentOutPipe);
+        if (outPipe is null)
+            return false;
+
+        try
+        {
+            outPipe.Add(item, CancelToken);
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
     private void RunBlockInAsync(Func<Task> task)
     {
-        using var outPipe = new BlockingCollection<PipelineItem>();
+        var outPipe = new BlockingCollection<PipelineItem>();
         Task blockTask;
+        var deferPipeDisposal = 0;
+        var pipeDisposed = 0;
 
         void ClearPipes()
         {
-            _currentOutPipe = null;
-            _pipelineThreadId = 0;
+            if (ReferenceEquals(Interlocked.CompareExchange(ref _currentOutPipe, null, outPipe), outPipe))
+                _pipelineThreadId = 0;
             CompleteAddingIfNeeded(outPipe);
+        }
+
+        void DisposePipeOnce()
+        {
+            if (Interlocked.Exchange(ref pipeDisposed, 1) == 0)
+                outPipe.Dispose();
         }
 
         static void CompleteAddingIfNeeded<T>(BlockingCollection<T> pipe)
         {
-            if (!pipe.IsAddingCompleted)
-                pipe.CompleteAdding();
+            try
+            {
+                if (!pipe.IsAddingCompleted)
+                    pipe.CompleteAdding();
+            }
+            catch (ObjectDisposedException)
+            {
+                // A deferred worker may race the one-time disposal after a pipeline failure.
+            }
         }
 
         void PumpItem(PipelineItem item)
@@ -314,19 +464,61 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
                 case PipelineType.Progress:
                     base.WriteProgress((ProgressRecord)item.Value!);
                     break;
+                case PipelineType.ShouldProcessTarget:
+                    item.ReplyPipe!.Add(new PipelineReply(base.ShouldProcess((string)item.Value!)));
+                    break;
                 case PipelineType.ShouldProcess:
                     var should = ((string Target, string Action))item.Value!;
-                    item.ReplyPipe!.Add(base.ShouldProcess(should.Target, should.Action), CancelToken);
+                    item.ReplyPipe!.Add(new PipelineReply(base.ShouldProcess(should.Target, should.Action)));
+                    break;
+                case PipelineType.ShouldProcessVerbose:
+                    var verbose = ((string Description, string Warning, string Caption))item.Value!;
+                    item.ReplyPipe!.Add(new PipelineReply(
+                        base.ShouldProcess(verbose.Description, verbose.Warning, verbose.Caption)));
+                    break;
+                case PipelineType.ShouldProcessReason:
+                    var reasonRequest = ((string Description, string Warning, string Caption))item.Value!;
+                    var result = base.ShouldProcess(
+                        reasonRequest.Description,
+                        reasonRequest.Warning,
+                        reasonRequest.Caption,
+                        out var reason);
+                    item.ReplyPipe!.Add(new PipelineReply((result, reason)));
                     break;
                 case PipelineType.ShouldContinue:
                     var shouldContinue = ((string Query, string Caption))item.Value!;
-                    item.ReplyPipe!.Add(base.ShouldContinue(shouldContinue.Query, shouldContinue.Caption), CancelToken);
+                    item.ReplyPipe!.Add(new PipelineReply(
+                        base.ShouldContinue(shouldContinue.Query, shouldContinue.Caption)));
+                    break;
+                case PipelineType.ShouldContinueAll:
+                    var shouldContinueAll =
+                        ((string Query, string Caption, bool YesToAll, bool NoToAll))item.Value!;
+                    var yesToAll = shouldContinueAll.YesToAll;
+                    var noToAll = shouldContinueAll.NoToAll;
+                    var continueAll = base.ShouldContinue(
+                        shouldContinueAll.Query,
+                        shouldContinueAll.Caption,
+                        ref yesToAll,
+                        ref noToAll);
+                    item.ReplyPipe!.Add(new PipelineReply((continueAll, yesToAll, noToAll)));
+                    break;
+                case PipelineType.ShouldContinueSecurity:
+                    var shouldContinueSecurity =
+                        ((string Query, string Caption, bool HasSecurityImpact, bool YesToAll, bool NoToAll))item.Value!;
+                    yesToAll = shouldContinueSecurity.YesToAll;
+                    noToAll = shouldContinueSecurity.NoToAll;
+                    var continueSecurity = base.ShouldContinue(
+                        shouldContinueSecurity.Query,
+                        shouldContinueSecurity.Caption,
+                        shouldContinueSecurity.HasSecurityImpact,
+                        ref yesToAll,
+                        ref noToAll);
+                    item.ReplyPipe!.Add(new PipelineReply((continueSecurity, yesToAll, noToAll)));
                     break;
                 case PipelineType.PromptForCredential:
                     var prompt = ((string Caption, string Message, string UserName, string TargetName))item.Value!;
-                    item.ReplyPipe!.Add(
-                        Host.UI.PromptForCredential(prompt.Caption, prompt.Message, prompt.UserName, prompt.TargetName),
-                        CancelToken);
+                    item.ReplyPipe!.Add(new PipelineReply(
+                        Host.UI.PromptForCredential(prompt.Caption, prompt.Message, prompt.UserName, prompt.TargetName)));
                     break;
             }
         }
@@ -366,6 +558,7 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
             finally
             {
                 ClearPipes();
+                DisposePipeOnce();
             }
 
             GetBlockTaskResult(blockTask);
@@ -373,7 +566,12 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
         }
 
         _ = blockTask.ContinueWith(
-            completed => ClearPipes(),
+            completed =>
+            {
+                ClearPipes();
+                if (Volatile.Read(ref deferPipeDisposal) != 0)
+                    DisposePipeOnce();
+            },
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
@@ -387,23 +585,26 @@ public abstract class AsyncPSCmdlet : PSCmdlet, IDisposable
         }
         catch (Exception pipelineException)
         {
+            var stopRequested = _cancelSource.IsCancellationRequested;
+            Volatile.Write(ref deferPipeDisposal, 1);
             _cancelSource.Cancel();
             CompleteAddingIfNeeded(outPipe);
-            try
-            {
-                blockTask.GetAwaiter().GetResult();
-            }
-            catch (Exception completionException) when (completionException is OperationCanceledException or PipelineStoppedException)
-            {
-                _ = completionException;
-            }
+            if (blockTask.IsCompleted)
+                DisposePipeOnce();
 
-            if (pipelineException is OperationCanceledException)
+            if (pipelineException is OperationCanceledException && stopRequested)
                 throw new PipelineStoppedException();
 
             throw;
         }
 
-        GetBlockTaskResult(blockTask);
+        try
+        {
+            GetBlockTaskResult(blockTask);
+        }
+        finally
+        {
+            DisposePipeOnce();
+        }
     }
 }

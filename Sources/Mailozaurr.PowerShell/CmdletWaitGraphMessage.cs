@@ -57,6 +57,7 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
 
     private GraphMessageListener? _listener;
     private CancellationTokenSource? _timeoutSource;
+    private CancellationTokenSource? _matchSource;
     private CancellationTokenSource? _linkedSource;
 
     /// <inheritdoc />
@@ -72,17 +73,17 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
 
         _listener = new GraphMessageListener(conn.Credential, UserPrincipalName!);
         _listener.MessageArrived += OnMessageArrived;
+        _matchSource = new CancellationTokenSource();
+        _timeoutSource = TimeoutSeconds > 0
+            ? new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds))
+            : null;
+        _linkedSource = _timeoutSource == null
+            ? CancellationTokenSource.CreateLinkedTokenSource(CancelToken, _matchSource.Token)
+            : CancellationTokenSource.CreateLinkedTokenSource(CancelToken, _timeoutSource.Token, _matchSource.Token);
         await _listener.StartAsync(CancelToken);
 
-        CancellationToken token = CancelToken;
-        if (TimeoutSeconds > 0) {
-            _timeoutSource = new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds));
-            _linkedSource = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, _timeoutSource.Token);
-            token = _linkedSource.Token;
-        }
-
         try {
-            await Task.Delay(-1, token);
+            await Task.Delay(-1, _linkedSource.Token);
         } catch (TaskCanceledException) { }
     }
 
@@ -98,7 +99,8 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
                 }
             }
             if (StopOnMatch) {
-                StopProcessing();
+                _listener?.Stop();
+                _matchSource?.Cancel();
             }
         }
     }
@@ -110,24 +112,28 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
             _listener.Dispose();
         }
         _timeoutSource?.Dispose();
+        _matchSource?.Dispose();
         _linkedSource?.Dispose();
         return Task.CompletedTask;
     }
 
     /// <inheritdoc />
-    public new void Dispose() {
+    public override void Dispose() {
         if (_listener != null) {
             _listener.MessageArrived -= OnMessageArrived;
             _listener.Dispose();
         }
         _timeoutSource?.Dispose();
+        _matchSource?.Dispose();
         _linkedSource?.Dispose();
+        base.Dispose();
     }
 
     /// <inheritdoc />
     protected override void StopProcessing() {
         _listener?.Stop();
         _timeoutSource?.Cancel();
+        _matchSource?.Cancel();
         _linkedSource?.Cancel();
         base.StopProcessing();
     }

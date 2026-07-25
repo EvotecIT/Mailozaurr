@@ -73,17 +73,13 @@ public class CmdletImportMailFileTests {
     private static (List<object?> Outputs, List<string> Warnings, List<ErrorRecord> Errors) InvokeAndCapture(
         CmdletImportMailFile cmdlet) {
         var asyncType = typeof(AsyncPSCmdlet);
-        var pipelineType = asyncType.GetNestedType("PipelineType", BindingFlags.NonPublic)!;
-        var tupleType = typeof(ValueTuple<,>).MakeGenericType(typeof(object), pipelineType);
-        var outPipeType = typeof(BlockingCollection<>).MakeGenericType(tupleType);
+        var pipelineItemType = asyncType.GetNestedType("PipelineItem", BindingFlags.NonPublic)!;
+        var outPipeType = typeof(BlockingCollection<>).MakeGenericType(pipelineItemType);
 
         var outPipe = Activator.CreateInstance(outPipeType)!;
-        var replyPipe = new BlockingCollection<object?>();
 
         var outPipeField = asyncType.GetField("_currentOutPipe", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var replyPipeField = asyncType.GetField("_currentReplyPipe", BindingFlags.NonPublic | BindingFlags.Instance)!;
         outPipeField.SetValue(cmdlet, outPipe);
-        replyPipeField.SetValue(cmdlet, replyPipe);
 
         var method = typeof(CmdletImportMailFile).GetMethod("ProcessRecordAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var task = (Task)method.Invoke(cmdlet, null)!;
@@ -93,12 +89,12 @@ public class CmdletImportMailFileTests {
         var warnings = new List<string>();
         var errors = new List<ErrorRecord>();
         var items = (Array)outPipeType.GetMethod("ToArray")!.Invoke(outPipe, null)!;
-        var item1Field = tupleType.GetField("Item1")!;
-        var item2Field = tupleType.GetField("Item2")!;
+        var valueProperty = pipelineItemType.GetProperty("Value")!;
+        var typeProperty = pipelineItemType.GetProperty("Type")!;
 
         foreach (var item in items) {
-            var data = item1Field.GetValue(item);
-            var pipeline = item2Field.GetValue(item)?.ToString();
+            var data = valueProperty.GetValue(item);
+            var pipeline = typeProperty.GetValue(item)?.ToString();
             if (string.Equals(pipeline, "Output", StringComparison.Ordinal) || string.Equals(pipeline, "OutputEnumerate", StringComparison.Ordinal)) {
                 outputs.Add(data);
             } else if (string.Equals(pipeline, "Warning", StringComparison.Ordinal)) {
@@ -109,7 +105,6 @@ public class CmdletImportMailFileTests {
         }
 
         outPipeField.SetValue(cmdlet, null);
-        replyPipeField.SetValue(cmdlet, null);
 
         return (outputs, warnings, errors);
     }
