@@ -73,20 +73,24 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
         }
 
         _listener = new GraphMessageListener(conn.Credential, UserPrincipalName!);
-        _listener.MessageArrived += OnMessageArrived;
-        Volatile.Write(ref _matchSignaled, 0);
-        _matchSource = new CancellationTokenSource();
-        await _listener.StartAsync(CancelToken);
-        _timeoutSource = TimeoutSeconds > 0
-            ? new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds))
-            : null;
-        _linkedSource = _timeoutSource == null
-            ? CancellationTokenSource.CreateLinkedTokenSource(CancelToken, _matchSource.Token)
-            : CancellationTokenSource.CreateLinkedTokenSource(CancelToken, _timeoutSource.Token, _matchSource.Token);
-
         try {
-            await Task.Delay(-1, _linkedSource.Token);
-        } catch (TaskCanceledException) { }
+            _listener.MessageArrived += OnMessageArrived;
+            Volatile.Write(ref _matchSignaled, 0);
+            _matchSource = new CancellationTokenSource();
+            await _listener.StartAsync(CancelToken);
+            _timeoutSource = TimeoutSeconds > 0
+                ? new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds))
+                : null;
+            _linkedSource = _timeoutSource == null
+                ? CancellationTokenSource.CreateLinkedTokenSource(CancelToken, _matchSource.Token)
+                : CancellationTokenSource.CreateLinkedTokenSource(CancelToken, _timeoutSource.Token, _matchSource.Token);
+
+            try {
+                await Task.Delay(-1, _linkedSource.Token);
+            } catch (TaskCanceledException) { }
+        } finally {
+            DisposeRecordResources();
+        }
     }
 
     private void OnMessageArrived(object? sender, System.Collections.Generic.Dictionary<string, object> message) {
@@ -111,26 +115,25 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
 
     /// <inheritdoc />
     protected override Task EndProcessingAsync() {
-        if (_listener != null) {
-            _listener.MessageArrived -= OnMessageArrived;
-            _listener.Dispose();
-        }
-        _timeoutSource?.Dispose();
-        _matchSource?.Dispose();
-        _linkedSource?.Dispose();
+        DisposeRecordResources();
         return Task.CompletedTask;
     }
 
     /// <inheritdoc />
     public override void Dispose() {
-        if (_listener != null) {
-            _listener.MessageArrived -= OnMessageArrived;
-            _listener.Dispose();
-        }
-        _timeoutSource?.Dispose();
-        _matchSource?.Dispose();
-        _linkedSource?.Dispose();
+        DisposeRecordResources();
         base.Dispose();
+    }
+
+    private void DisposeRecordResources() {
+        var listener = Interlocked.Exchange(ref _listener, null);
+        if (listener != null) {
+            listener.MessageArrived -= OnMessageArrived;
+            listener.Dispose();
+        }
+        Interlocked.Exchange(ref _linkedSource, null)?.Dispose();
+        Interlocked.Exchange(ref _timeoutSource, null)?.Dispose();
+        Interlocked.Exchange(ref _matchSource, null)?.Dispose();
     }
 
     /// <inheritdoc />

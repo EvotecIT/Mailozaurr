@@ -50,6 +50,7 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
         Information,
         InformationWithTags,
         Progress,
+        CommandDetail,
         ShouldProcessTarget,
         ShouldProcess,
         ShouldProcessVerbose,
@@ -451,51 +452,67 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     }
 
     /// <summary>Thread-safe warning bridge for asynchronous cmdlet code.</summary>
-    public new void WriteWarning(string text)
+    public new void WriteWarning(string message)
     {
         if (CanAccessPipelineDirectly)
         {
             PrepareDirectPipelineAccess();
-            base.WriteWarning(text);
+            base.WriteWarning(message);
             return;
         }
 
         if (Volatile.Read(ref _currentOutPipe) is null)
             return;
 
-        _ = TryQueue(new PipelineItem(text, PipelineType.Warning));
+        _ = TryQueue(new PipelineItem(message, PipelineType.Warning));
     }
 
     /// <summary>Thread-safe verbose bridge for asynchronous cmdlet code.</summary>
-    public new void WriteVerbose(string text)
+    public new void WriteVerbose(string message)
     {
         if (CanAccessPipelineDirectly)
         {
             PrepareDirectPipelineAccess();
-            base.WriteVerbose(text);
+            base.WriteVerbose(message);
             return;
         }
 
         if (Volatile.Read(ref _currentOutPipe) is null)
             return;
 
-        _ = TryQueue(new PipelineItem(text, PipelineType.Verbose));
+        _ = TryQueue(new PipelineItem(message, PipelineType.Verbose));
     }
 
     /// <summary>Thread-safe debug bridge for asynchronous cmdlet code.</summary>
-    public new void WriteDebug(string text)
+    public new void WriteDebug(string message)
     {
         if (CanAccessPipelineDirectly)
         {
             PrepareDirectPipelineAccess();
-            base.WriteDebug(text);
+            base.WriteDebug(message);
             return;
         }
 
         if (Volatile.Read(ref _currentOutPipe) is null)
             return;
 
-        _ = TryQueue(new PipelineItem(text, PipelineType.Debug));
+        _ = TryQueue(new PipelineItem(message, PipelineType.Debug));
+    }
+
+    /// <summary>Thread-safe command-detail bridge for asynchronous cmdlet code.</summary>
+    public new void WriteCommandDetail(string text)
+    {
+        if (CanAccessPipelineDirectly)
+        {
+            PrepareDirectPipelineAccess();
+            base.WriteCommandDetail(text);
+            return;
+        }
+
+        if (Volatile.Read(ref _currentOutPipe) is null)
+            return;
+
+        _ = TryQueue(new PipelineItem(text, PipelineType.CommandDetail));
     }
 
     /// <summary>Thread-safe information bridge for asynchronous cmdlet code.</summary>

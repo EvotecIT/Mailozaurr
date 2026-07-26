@@ -23,4 +23,51 @@ public class CmdletWaitImapMessageTests {
         var eventField = typeof(ImapIdleListener).GetField("MessageArrived", BindingFlags.NonPublic | BindingFlags.Instance)!;
         Assert.Null(eventField.GetValue(listener));
     }
+
+    [Theory]
+    [InlineData(typeof(CmdletWaitIMAPMessage))]
+    [InlineData(typeof(CmdletWaitPOP3Message))]
+    [InlineData(typeof(CmdletWaitGraphMessage))]
+    public void RecordCleanupDisposesAndClearsCancellationSources(
+        Type cmdletType) {
+
+        object cmdlet = Activator.CreateInstance(cmdletType)!;
+        string[] fieldNames = {
+            "_linkedSource",
+            "_timeoutSource",
+            "_matchSource"
+        };
+        var sources = new List<CancellationTokenSource>();
+        foreach (string fieldName in fieldNames) {
+            var source = new CancellationTokenSource();
+            sources.Add(source);
+            cmdletType.GetField(
+                    fieldName,
+                    BindingFlags.NonPublic |
+                    BindingFlags.Instance)!
+                .SetValue(
+                    cmdlet,
+                    source);
+        }
+
+        MethodInfo cleanup = cmdletType.GetMethod(
+            "DisposeRecordResources",
+            BindingFlags.NonPublic |
+            BindingFlags.Instance)!;
+        cleanup.Invoke(cmdlet, null);
+        cleanup.Invoke(cmdlet, null);
+
+        foreach (string fieldName in fieldNames) {
+            Assert.Null(
+                cmdletType.GetField(
+                        fieldName,
+                        BindingFlags.NonPublic |
+                        BindingFlags.Instance)!
+                    .GetValue(cmdlet));
+        }
+        foreach (CancellationTokenSource source in sources) {
+            Assert.Throws<ObjectDisposedException>(
+                source.Cancel);
+        }
+    }
 }
