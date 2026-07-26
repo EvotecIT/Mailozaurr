@@ -173,6 +173,7 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
 
     private readonly CancellationTokenSource _cancelSource = new();
     private readonly AsyncLocal<long> _hookGeneration = new();
+    private readonly int _constructionThreadId = Environment.CurrentManagedThreadId;
     private readonly object _lifecycleLock = new();
     private static readonly SynchronizationContext HookSynchronizationContext = new AsyncHookSynchronizationContext();
     private static readonly TaskScheduler HookTaskScheduler = new AsyncHookTaskScheduler();
