@@ -63,10 +63,15 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
 
     private sealed class PipelineReply
     {
-        public PipelineReply(object? value)
-            => Value = value;
+        public PipelineReply(object? value, Exception? rejection = null)
+        {
+            Value = value;
+            Rejection = rejection;
+        }
 
         public object? Value { get; }
+
+        public Exception? Rejection { get; }
     }
 
     private sealed class PipelineReplyChannel
@@ -80,13 +85,23 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
             => _pipe.Take(cancellationToken);
 
         public void Publish(Func<object?> createValue)
+            => PublishReply(() => new PipelineReply(createValue()));
+
+        public void Reject()
+            => PublishReply(
+                () => new PipelineReply(
+                    value: null,
+                    new InvalidOperationException(
+                        "The asynchronous PowerShell lifecycle that originated this request is no longer active.")));
+
+        private void PublishReply(Func<PipelineReply> createReply)
         {
             try
             {
                 if (Volatile.Read(ref _requesterOwner) == 0)
                     return;
 
-                var reply = new PipelineReply(createValue());
+                var reply = createReply();
                 try
                 {
                     _pipe.Add(reply);
@@ -147,7 +162,13 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
 
         public PipelineReplyChannel? ReplyPipe { get; }
 
-        public long HookGeneration { get; }
+        public long HookGeneration { get; private set; }
+
+        public void BindToHook(long hookGeneration)
+        {
+            if (HookGeneration == 0)
+                HookGeneration = hookGeneration;
+        }
     }
 
     private readonly CancellationTokenSource _cancelSource = new();

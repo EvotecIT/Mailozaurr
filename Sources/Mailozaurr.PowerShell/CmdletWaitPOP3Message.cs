@@ -46,6 +46,7 @@ public sealed class CmdletWaitPOP3Message : AsyncPSCmdlet, IDisposable {
     private CancellationTokenSource? _timeoutSource;
     private CancellationTokenSource? _matchSource;
     private CancellationTokenSource? _linkedSource;
+    private int _matchSignaled;
 
     /// <inheritdoc />
     /// <summary>
@@ -64,6 +65,7 @@ public sealed class CmdletWaitPOP3Message : AsyncPSCmdlet, IDisposable {
 
         _listener = new Pop3PollListener(conn.Data);
         _listener.MessageArrived += OnMessageArrived;
+        Volatile.Write(ref _matchSignaled, 0);
         _matchSource = new CancellationTokenSource();
         await _listener.StartAsync(CancelToken);
         _timeoutSource = TimeoutSeconds > 0
@@ -81,6 +83,9 @@ public sealed class CmdletWaitPOP3Message : AsyncPSCmdlet, IDisposable {
     private void OnMessageArrived(object? sender, Pop3EmailMessage message) {
         var match = Until == null || LanguagePrimitives.IsTrue(Until.InvokeReturnAsIs(message));
         if (match) {
+            if (StopOnMatch && Interlocked.Exchange(ref _matchSignaled, 1) != 0)
+                return;
+
             WriteObject(message);
             if (Action != null) {
                 try {

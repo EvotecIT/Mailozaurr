@@ -79,7 +79,9 @@ public class CmdletImportMailFileTests {
         var outPipe = Activator.CreateInstance(outPipeType)!;
 
         var outPipeField = asyncType.GetField("_currentOutPipe", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var lifecycleField = asyncType.GetField("_asyncLifecycleStarted", BindingFlags.NonPublic | BindingFlags.Instance)!;
         outPipeField.SetValue(cmdlet, outPipe);
+        lifecycleField.SetValue(cmdlet, 1);
 
         var method = typeof(CmdletImportMailFile).GetMethod("ProcessRecordAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var task = (Task)method.Invoke(cmdlet, null)!;
@@ -105,6 +107,7 @@ public class CmdletImportMailFileTests {
         }
 
         outPipeField.SetValue(cmdlet, null);
+        lifecycleField.SetValue(cmdlet, 0);
 
         return (outputs, warnings, errors);
     }

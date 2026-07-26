@@ -70,6 +70,7 @@ public sealed class CmdletWaitIMAPMessage : AsyncPSCmdlet, System.IDisposable {
     private CancellationTokenSource? _timeoutSource;
     private CancellationTokenSource? _matchSource;
     private CancellationTokenSource? _linkedSource;
+    private int _matchSignaled;
 
     /// <inheritdoc />
     /// <summary>
@@ -96,6 +97,7 @@ public sealed class CmdletWaitIMAPMessage : AsyncPSCmdlet, System.IDisposable {
 
         _listener = new ImapIdleListener(conn.Data, Folder, query);
         _listener.MessageArrived += OnMessageArrived;
+        Volatile.Write(ref _matchSignaled, 0);
         _matchSource = new CancellationTokenSource();
         await _listener.StartAsync(CancelToken);
         _timeoutSource = TimeoutSeconds > 0
@@ -113,6 +115,9 @@ public sealed class CmdletWaitIMAPMessage : AsyncPSCmdlet, System.IDisposable {
     private void OnMessageArrived(object? sender, ImapEmailMessage message) {
         var match = Until == null || LanguagePrimitives.IsTrue(Until.InvokeReturnAsIs(message));
         if (match) {
+            if (StopOnMatch && Interlocked.Exchange(ref _matchSignaled, 1) != 0)
+                return;
+
             WriteObject(message);
             if (Action != null) {
                 try {
@@ -122,7 +127,6 @@ public sealed class CmdletWaitIMAPMessage : AsyncPSCmdlet, System.IDisposable {
                 }
             }
             if (StopOnMatch) {
-                _listener?.Stop();
                 _matchSource?.Cancel();
             }
         }

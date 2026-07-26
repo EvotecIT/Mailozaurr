@@ -59,6 +59,7 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
     private CancellationTokenSource? _timeoutSource;
     private CancellationTokenSource? _matchSource;
     private CancellationTokenSource? _linkedSource;
+    private int _matchSignaled;
 
     /// <inheritdoc />
     /// <summary>
@@ -73,6 +74,7 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
 
         _listener = new GraphMessageListener(conn.Credential, UserPrincipalName!);
         _listener.MessageArrived += OnMessageArrived;
+        Volatile.Write(ref _matchSignaled, 0);
         _matchSource = new CancellationTokenSource();
         await _listener.StartAsync(CancelToken);
         _timeoutSource = TimeoutSeconds > 0
@@ -90,6 +92,9 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
     private void OnMessageArrived(object? sender, System.Collections.Generic.Dictionary<string, object> message) {
         var match = Until == null || LanguagePrimitives.IsTrue(Until.InvokeReturnAsIs(message));
         if (match) {
+            if (StopOnMatch && Interlocked.Exchange(ref _matchSignaled, 1) != 0)
+                return;
+
             WriteObject(message);
             if (Action != null) {
                 try {
