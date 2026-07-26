@@ -288,6 +288,7 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     private readonly AsyncLocal<long> _hookGeneration = new();
     private readonly AsyncLocal<PipelinePumpLease?> _pipelinePumpLease = new();
     private readonly int _constructionThreadId = Environment.CurrentManagedThreadId;
+    private readonly object _hookAdmissionLock = new();
     private readonly object _lifecycleLock = new();
     private static readonly SynchronizationContext HookSynchronizationContext = new AsyncHookSynchronizationContext();
     private static readonly TaskScheduler HookTaskScheduler = new AsyncHookTaskScheduler();
@@ -297,6 +298,8 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     private long _activeHookGeneration;
     private long _acceptingHookWritesGeneration;
     private long _nextHookGeneration;
+    private long _pumpingHookGeneration;
+    private int _cancelSourceCancellationInProgress;
     private bool _cancelSourceDisposed;
     private bool _disposeRequested;
     private int _activeBlocks;
@@ -325,16 +328,7 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
 
     /// <inheritdoc />
     protected override void EndProcessing()
-    {
-        try
-        {
-            RunBlockInAsync(EndProcessingAsync);
-        }
-        finally
-        {
-            Volatile.Write(ref _asyncLifecycleCompleted, 1);
-        }
-    }
+        => RunBlockInAsync(EndProcessingAsync);
 
     /// <summary>Asynchronous end hook.</summary>
     protected virtual Task EndProcessingAsync()
