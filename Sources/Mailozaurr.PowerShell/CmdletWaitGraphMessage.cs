@@ -150,12 +150,35 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
 
     /// <inheritdoc />
     protected override void StopProcessing() {
+        GraphMessageListener? listener;
+        CancellationTokenSource? timeoutSource;
+        CancellationTokenSource? matchSource;
+        CancellationTokenSource? linkedSource;
         lock (_recordResourceLock) {
-            _listener?.Stop();
-            _timeoutSource?.Cancel();
-            _matchSource?.Cancel();
-            _linkedSource?.Cancel();
+            listener = _listener;
+            timeoutSource = _timeoutSource;
+            matchSource = _matchSource;
+            linkedSource = _linkedSource;
         }
+
         base.StopProcessing();
+        try {
+            listener?.Stop();
+        } catch (ObjectDisposedException) {
+            // Disposal can win the stop race after the resources are snapshotted.
+        }
+        CancelRecordSource(timeoutSource);
+        CancelRecordSource(matchSource);
+        CancelRecordSource(linkedSource);
+    }
+
+    private static void CancelRecordSource(CancellationTokenSource? source) {
+        try {
+            source?.Cancel();
+        } catch (ObjectDisposedException) {
+            // Cleanup can dispose a source after StopProcessing snapshots it.
+        } catch (AggregateException) {
+            // A cancellation callback must not prevent the remaining resources from stopping.
+        }
     }
 }
