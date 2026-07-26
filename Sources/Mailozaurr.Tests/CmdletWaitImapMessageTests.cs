@@ -70,4 +70,39 @@ public class CmdletWaitImapMessageTests {
                 source.Cancel);
         }
     }
+
+    [Fact]
+    public async Task GraphStopAndRecordCleanupCanRunConcurrently() {
+        for (var attempt = 0; attempt < 100; attempt++) {
+            var cmdlet = new CmdletWaitGraphMessage();
+            var cmdletType = cmdlet.GetType();
+            foreach (string fieldName in new[] { "_linkedSource", "_timeoutSource", "_matchSource" }) {
+                cmdletType.GetField(
+                        fieldName,
+                        BindingFlags.NonPublic | BindingFlags.Instance)!
+                    .SetValue(cmdlet, new CancellationTokenSource());
+            }
+
+            MethodInfo cleanup = cmdletType.GetMethod(
+                "DisposeRecordResources",
+                BindingFlags.NonPublic | BindingFlags.Instance)!;
+            MethodInfo stop = cmdletType.GetMethod(
+                "StopProcessing",
+                BindingFlags.NonPublic | BindingFlags.Instance)!;
+            using var start = new ManualResetEventSlim();
+
+            Task cleanupTask = Task.Run(() => {
+                start.Wait();
+                cleanup.Invoke(cmdlet, null);
+            });
+            Task stopTask = Task.Run(() => {
+                start.Wait();
+                stop.Invoke(cmdlet, null);
+            });
+            start.Set();
+
+            await Task.WhenAll(cleanupTask, stopTask);
+            cmdlet.Dispose();
+        }
+    }
 }

@@ -59,6 +59,7 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
     private CancellationTokenSource? _timeoutSource;
     private CancellationTokenSource? _matchSource;
     private CancellationTokenSource? _linkedSource;
+    private readonly object _recordResourceLock = new();
     private int _matchSignaled;
 
     /// <inheritdoc />
@@ -108,7 +109,9 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
                 }
             }
             if (StopOnMatch) {
-                _matchSource?.Cancel();
+                lock (_recordResourceLock) {
+                    _matchSource?.Cancel();
+                }
             }
         }
     }
@@ -126,22 +129,33 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
     }
 
     private void DisposeRecordResources() {
-        var listener = Interlocked.Exchange(ref _listener, null);
+        GraphMessageListener? listener;
+        CancellationTokenSource? linkedSource;
+        CancellationTokenSource? timeoutSource;
+        CancellationTokenSource? matchSource;
+        lock (_recordResourceLock) {
+            listener = Interlocked.Exchange(ref _listener, null);
+            linkedSource = Interlocked.Exchange(ref _linkedSource, null);
+            timeoutSource = Interlocked.Exchange(ref _timeoutSource, null);
+            matchSource = Interlocked.Exchange(ref _matchSource, null);
+        }
         if (listener != null) {
             listener.MessageArrived -= OnMessageArrived;
             listener.Dispose();
         }
-        Interlocked.Exchange(ref _linkedSource, null)?.Dispose();
-        Interlocked.Exchange(ref _timeoutSource, null)?.Dispose();
-        Interlocked.Exchange(ref _matchSource, null)?.Dispose();
+        linkedSource?.Dispose();
+        timeoutSource?.Dispose();
+        matchSource?.Dispose();
     }
 
     /// <inheritdoc />
     protected override void StopProcessing() {
-        _listener?.Stop();
-        _timeoutSource?.Cancel();
-        _matchSource?.Cancel();
-        _linkedSource?.Cancel();
+        lock (_recordResourceLock) {
+            _listener?.Stop();
+            _timeoutSource?.Cancel();
+            _matchSource?.Cancel();
+            _linkedSource?.Cancel();
+        }
         base.StopProcessing();
     }
 }
