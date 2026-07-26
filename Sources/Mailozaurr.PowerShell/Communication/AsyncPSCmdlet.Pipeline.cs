@@ -60,10 +60,12 @@ public abstract partial class AsyncPSCmdlet
     private bool IsPipelineThread
         => _pipelineThreadId != 0 && Environment.CurrentManagedThreadId == _pipelineThreadId;
 
+    private bool IsConstructionThreadOutsideAsyncHook
+        => Volatile.Read(ref _currentOutPipe) is null &&
+           Environment.CurrentManagedThreadId == _constructionThreadId;
+
     private bool CanAccessPipelineDirectly
-        => IsPipelineThread ||
-           (Volatile.Read(ref _asyncLifecycleStarted) == 0 &&
-            Environment.CurrentManagedThreadId == _constructionThreadId);
+        => IsPipelineThread || IsConstructionThreadOutsideAsyncHook;
 
     private void PrepareDirectPipelineAccess()
     {
@@ -87,7 +89,9 @@ public abstract partial class AsyncPSCmdlet
 
         var activeGeneration = Volatile.Read(ref _activeHookGeneration);
         var originatingGeneration = _hookGeneration.Value;
-        if (activeGeneration == 0 && originatingGeneration == 0 && IsPipelineThread)
+        if (activeGeneration == 0 &&
+            originatingGeneration == 0 &&
+            (IsPipelineThread || IsConstructionThreadOutsideAsyncHook))
             return;
 
         if (originatingGeneration == 0 || originatingGeneration != activeGeneration)
@@ -197,6 +201,7 @@ public abstract partial class AsyncPSCmdlet
         }
         finally
         {
+            _pipelineThreadId = 0;
             ExitAsyncBlock();
         }
     }
@@ -252,132 +257,141 @@ public abstract partial class AsyncPSCmdlet
                 return;
             }
 
-            switch (item.Type)
+            var priorItemGeneration = _hookGeneration.Value;
+            try
             {
-                case PipelineType.Output:
-                    base.WriteObject(item.Value);
-                    break;
-                case PipelineType.OutputEnumerate:
-                    base.WriteObject(item.Value, enumerateCollection: true);
-                    break;
-                case PipelineType.Error:
-                    base.WriteError((ErrorRecord)item.Value!);
-                    break;
-                case PipelineType.TerminatingError:
-                    base.ThrowTerminatingError((ErrorRecord)item.Value!);
-                    break;
-                case PipelineType.Warning:
-                    base.WriteWarning((string)item.Value!);
-                    break;
-                case PipelineType.Verbose:
-                    base.WriteVerbose((string)item.Value!);
-                    break;
-                case PipelineType.Debug:
-                    base.WriteDebug((string)item.Value!);
-                    break;
-                case PipelineType.Information:
-                    base.WriteInformation((InformationRecord)item.Value!);
-                    break;
-                case PipelineType.InformationWithTags:
-                    var information = ((object MessageData, string[]? Tags))item.Value!;
-                    base.WriteInformation(
-                        information.MessageData,
-                        information.Tags ?? Array.Empty<string>());
-                    break;
-                case PipelineType.Progress:
-                    base.WriteProgress((ProgressRecord)item.Value!);
-                    break;
-                case PipelineType.CommandDetail:
-                    base.WriteCommandDetail((string)item.Value!);
-                    break;
-                case PipelineType.ShouldProcessTarget:
-                    item.ReplyPipe!.Publish(
-                        () => base.ShouldProcess((string)item.Value!));
-                    break;
-                case PipelineType.ShouldProcess:
-                    var should = ((string Target, string Action))item.Value!;
-                    item.ReplyPipe!.Publish(
-                        () => base.ShouldProcess(should.Target, should.Action));
-                    break;
-                case PipelineType.ShouldProcessVerbose:
-                    var verbose = ((string Description, string Warning, string Caption))item.Value!;
-                    item.ReplyPipe!.Publish(
-                        () => base.ShouldProcess(verbose.Description, verbose.Warning, verbose.Caption));
-                    break;
-                case PipelineType.ShouldProcessReason:
-                    var reasonRequest = ((string Description, string Warning, string Caption))item.Value!;
-                    item.ReplyPipe!.Publish(() =>
-                    {
-                        var result = base.ShouldProcess(
-                            reasonRequest.Description,
-                            reasonRequest.Warning,
-                            reasonRequest.Caption,
-                            out var reason);
-                        return (result, reason);
-                    });
-                    break;
-                case PipelineType.ShouldContinue:
-                    var shouldContinue = ((string Query, string Caption))item.Value!;
-                    item.ReplyPipe!.Publish(
-                        () => base.ShouldContinue(shouldContinue.Query, shouldContinue.Caption));
-                    break;
-                case PipelineType.ShouldContinueAll:
-                    var shouldContinueAll =
-                        ((string Query, string Caption, bool YesToAll, bool NoToAll))item.Value!;
-                    item.ReplyPipe!.Publish(() =>
-                    {
-                        var yesToAll = shouldContinueAll.YesToAll;
-                        var noToAll = shouldContinueAll.NoToAll;
-                        var continueAll = base.ShouldContinue(
-                            shouldContinueAll.Query,
-                            shouldContinueAll.Caption,
-                            ref yesToAll,
-                            ref noToAll);
-                        return (continueAll, yesToAll, noToAll);
-                    });
-                    break;
-                case PipelineType.ShouldContinueSecurity:
-                    var shouldContinueSecurity =
-                        ((string Query, string Caption, bool HasSecurityImpact, bool YesToAll, bool NoToAll))item.Value!;
-                    item.ReplyPipe!.Publish(() =>
-                    {
-                        var yesToAll = shouldContinueSecurity.YesToAll;
-                        var noToAll = shouldContinueSecurity.NoToAll;
-                        var continueSecurity = base.ShouldContinue(
-                            shouldContinueSecurity.Query,
-                            shouldContinueSecurity.Caption,
-                            shouldContinueSecurity.HasSecurityImpact,
-                            ref yesToAll,
-                            ref noToAll);
-                        return (continueSecurity, yesToAll, noToAll);
-                    });
-                    break;
-                case PipelineType.PromptForCredential:
-                    var prompt = ((string Caption, string Message, string UserName, string TargetName))item.Value!;
-                    item.ReplyPipe!.Publish(
-                        () => Host.UI.PromptForCredential(
-                            prompt.Caption,
-                            prompt.Message,
-                            prompt.UserName,
-                            prompt.TargetName));
-                    break;
-                case PipelineType.PromptForCredentialOptions:
-                    var promptOptions =
-                        ((string Caption,
-                            string Message,
-                            string UserName,
-                            string TargetName,
-                            PSCredentialTypes AllowedCredentialTypes,
-                            PSCredentialUIOptions Options))item.Value!;
-                    item.ReplyPipe!.Publish(
-                        () => Host.UI.PromptForCredential(
-                            promptOptions.Caption,
-                            promptOptions.Message,
-                            promptOptions.UserName,
-                            promptOptions.TargetName,
-                            promptOptions.AllowedCredentialTypes,
-                            promptOptions.Options));
-                    break;
+                _hookGeneration.Value = item.HookGeneration;
+                switch (item.Type)
+                {
+                    case PipelineType.Output:
+                        base.WriteObject(item.Value);
+                        break;
+                    case PipelineType.OutputEnumerate:
+                        base.WriteObject(item.Value, enumerateCollection: true);
+                        break;
+                    case PipelineType.Error:
+                        base.WriteError((ErrorRecord)item.Value!);
+                        break;
+                    case PipelineType.TerminatingError:
+                        base.ThrowTerminatingError((ErrorRecord)item.Value!);
+                        break;
+                    case PipelineType.Warning:
+                        base.WriteWarning((string)item.Value!);
+                        break;
+                    case PipelineType.Verbose:
+                        base.WriteVerbose((string)item.Value!);
+                        break;
+                    case PipelineType.Debug:
+                        base.WriteDebug((string)item.Value!);
+                        break;
+                    case PipelineType.Information:
+                        base.WriteInformation((InformationRecord)item.Value!);
+                        break;
+                    case PipelineType.InformationWithTags:
+                        var information = ((object MessageData, string[]? Tags))item.Value!;
+                        base.WriteInformation(
+                            information.MessageData,
+                            information.Tags ?? Array.Empty<string>());
+                        break;
+                    case PipelineType.Progress:
+                        base.WriteProgress((ProgressRecord)item.Value!);
+                        break;
+                    case PipelineType.CommandDetail:
+                        base.WriteCommandDetail((string)item.Value!);
+                        break;
+                    case PipelineType.ShouldProcessTarget:
+                        item.ReplyPipe!.Publish(
+                            () => base.ShouldProcess((string)item.Value!));
+                        break;
+                    case PipelineType.ShouldProcess:
+                        var should = ((string Target, string Action))item.Value!;
+                        item.ReplyPipe!.Publish(
+                            () => base.ShouldProcess(should.Target, should.Action));
+                        break;
+                    case PipelineType.ShouldProcessVerbose:
+                        var verbose = ((string Description, string Warning, string Caption))item.Value!;
+                        item.ReplyPipe!.Publish(
+                            () => base.ShouldProcess(verbose.Description, verbose.Warning, verbose.Caption));
+                        break;
+                    case PipelineType.ShouldProcessReason:
+                        var reasonRequest = ((string Description, string Warning, string Caption))item.Value!;
+                        item.ReplyPipe!.Publish(() =>
+                        {
+                            var result = base.ShouldProcess(
+                                reasonRequest.Description,
+                                reasonRequest.Warning,
+                                reasonRequest.Caption,
+                                out var reason);
+                            return (result, reason);
+                        });
+                        break;
+                    case PipelineType.ShouldContinue:
+                        var shouldContinue = ((string Query, string Caption))item.Value!;
+                        item.ReplyPipe!.Publish(
+                            () => base.ShouldContinue(shouldContinue.Query, shouldContinue.Caption));
+                        break;
+                    case PipelineType.ShouldContinueAll:
+                        var shouldContinueAll =
+                            ((string Query, string Caption, bool YesToAll, bool NoToAll))item.Value!;
+                        item.ReplyPipe!.Publish(() =>
+                        {
+                            var yesToAll = shouldContinueAll.YesToAll;
+                            var noToAll = shouldContinueAll.NoToAll;
+                            var continueAll = base.ShouldContinue(
+                                shouldContinueAll.Query,
+                                shouldContinueAll.Caption,
+                                ref yesToAll,
+                                ref noToAll);
+                            return (continueAll, yesToAll, noToAll);
+                        });
+                        break;
+                    case PipelineType.ShouldContinueSecurity:
+                        var shouldContinueSecurity =
+                            ((string Query, string Caption, bool HasSecurityImpact, bool YesToAll, bool NoToAll))item.Value!;
+                        item.ReplyPipe!.Publish(() =>
+                        {
+                            var yesToAll = shouldContinueSecurity.YesToAll;
+                            var noToAll = shouldContinueSecurity.NoToAll;
+                            var continueSecurity = base.ShouldContinue(
+                                shouldContinueSecurity.Query,
+                                shouldContinueSecurity.Caption,
+                                shouldContinueSecurity.HasSecurityImpact,
+                                ref yesToAll,
+                                ref noToAll);
+                            return (continueSecurity, yesToAll, noToAll);
+                        });
+                        break;
+                    case PipelineType.PromptForCredential:
+                        var prompt = ((string Caption, string Message, string UserName, string TargetName))item.Value!;
+                        item.ReplyPipe!.Publish(
+                            () => Host.UI.PromptForCredential(
+                                prompt.Caption,
+                                prompt.Message,
+                                prompt.UserName,
+                                prompt.TargetName));
+                        break;
+                    case PipelineType.PromptForCredentialOptions:
+                        var promptOptions =
+                            ((string Caption,
+                                string Message,
+                                string UserName,
+                                string TargetName,
+                                PSCredentialTypes AllowedCredentialTypes,
+                                PSCredentialUIOptions Options))item.Value!;
+                        item.ReplyPipe!.Publish(
+                            () => Host.UI.PromptForCredential(
+                                promptOptions.Caption,
+                                promptOptions.Message,
+                                promptOptions.UserName,
+                                promptOptions.TargetName,
+                                promptOptions.AllowedCredentialTypes,
+                                promptOptions.Options));
+                        break;
+                }
+            }
+            finally
+            {
+                _hookGeneration.Value = priorItemGeneration;
             }
         }
 
