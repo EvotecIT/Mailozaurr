@@ -96,12 +96,18 @@ public sealed class CmdletWaitIMAPMessage : AsyncPSCmdlet, System.IDisposable {
             }
         }
 
-        _listener = new ImapIdleListener(conn.Data, Folder, query);
+        var listener = new ImapIdleListener(conn.Data, Folder, query);
         try {
-            _listener.MessageArrived += OnMessageArrived;
-            Volatile.Write(ref _matchSignaled, 0);
-            _matchSource = new CancellationTokenSource();
-            await _listener.StartAsync(CancelToken);
+            Task startTask;
+            lock (_recordResourceLock) {
+                ThrowIfStopped();
+                Volatile.Write(ref _matchSignaled, 0);
+                _matchSource = new CancellationTokenSource();
+                listener.MessageArrived += OnMessageArrived;
+                _listener = listener;
+                startTask = listener.StartAsync(CancelToken);
+            }
+            await startTask;
             _timeoutSource = TimeoutSeconds > 0
                 ? new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds))
                 : null;

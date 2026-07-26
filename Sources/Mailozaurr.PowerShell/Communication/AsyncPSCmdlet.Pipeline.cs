@@ -277,17 +277,21 @@ public abstract partial class AsyncPSCmdlet
     {
         item.BindToHook(_hookGeneration.Value);
         var pumpLease = _pipelinePumpLease.Value;
+        var isPumpBound =
+            pumpLease is { IsActive: true } &&
+            item.HookGeneration == pumpLease.Generation;
         lock (_hookAdmissionLock)
         {
             if (item.HookGeneration != 0 &&
                 item.HookGeneration != Volatile.Read(ref _acceptingHookWritesGeneration) &&
-                (pumpLease is null ||
-                 !pumpLease.IsActive ||
-                 item.HookGeneration != pumpLease.Generation))
+                !isPumpBound)
             {
                 item.ReplyPipe?.Reject();
                 return false;
             }
+
+            if (isPumpBound)
+                item.BindToPump();
 
             var outPipe = Volatile.Read(ref _currentOutPipe);
             if (outPipe is null)

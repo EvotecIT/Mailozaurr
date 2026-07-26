@@ -233,11 +233,16 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
 
         public bool DropOnStop { get; }
 
+        public bool IsPumpBound { get; private set; }
+
         public void BindToHook(long hookGeneration)
         {
             if (HookGeneration == 0)
                 HookGeneration = hookGeneration;
         }
+
+        public void BindToPump()
+            => IsPumpBound = true;
     }
 
     private sealed class PipelinePumpLease
@@ -362,16 +367,7 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
 
     /// <inheritdoc />
     protected override void EndProcessing()
-    {
-        try
-        {
-            RunBlockInAsync(EndProcessingAsync);
-        }
-        finally
-        {
-            Volatile.Write(ref _asyncLifecycleCompleted, 1);
-        }
-    }
+        => RunBlockInAsync(EndProcessingAsync);
 
     /// <summary>Asynchronous end hook.</summary>
     protected virtual Task EndProcessingAsync()

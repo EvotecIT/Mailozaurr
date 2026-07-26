@@ -238,14 +238,43 @@ public abstract partial class AsyncPSCmdlet
                 hookGeneration: hookGeneration,
                 dropOnStop: true);
             if (!TryQueue(barrier))
-                return;
+            {
+                ThrowIfStopped();
+                throw new InvalidOperationException(
+                    "No active PowerShell pipeline is available for direct access.");
+            }
 
             while (outPipe.TryTake(out var item))
             {
                 PumpItem(item);
                 if (ReferenceEquals(item, barrier))
+                {
+                    while (HasPumpBoundItems())
+                    {
+                        ThrowIfStopped();
+                        if (!outPipe.TryTake(out var pumpBoundPredecessor))
+                        {
+                            throw new InvalidOperationException(
+                                "The PowerShell pipeline closed while causal records were pending.");
+                        }
+
+                        PumpItem(pumpBoundPredecessor);
+                    }
+
                     return;
+                }
             }
+        }
+
+        bool HasPumpBoundItems()
+        {
+            foreach (var queuedItem in outPipe.ToArray())
+            {
+                if (queuedItem.IsPumpBound)
+                    return true;
+            }
+
+            return false;
         }
 
         Volatile.Write(ref _asyncLifecycleStarted, 1);
@@ -418,7 +447,10 @@ public abstract partial class AsyncPSCmdlet
                 if (item.Type == PipelineType.HookCompleted)
                 {
                     while (outPipe.TryTake(out var pumpBoundItem))
+                    {
+                        ThrowIfStopped();
                         PumpItem(pumpBoundItem);
+                    }
                     break;
                 }
             }
