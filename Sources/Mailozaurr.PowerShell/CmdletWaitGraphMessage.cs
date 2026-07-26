@@ -155,17 +155,20 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
         CancellationTokenSource? matchSource;
         CancellationTokenSource? linkedSource;
         lock (_recordResourceLock) {
-            listener = _listener;
+            listener = Interlocked.Exchange(ref _listener, null);
             timeoutSource = _timeoutSource;
             matchSource = _matchSource;
             linkedSource = _linkedSource;
         }
 
         base.StopProcessing();
-        try {
-            listener?.Stop();
-        } catch (ObjectDisposedException) {
-            // Disposal can win the stop race after the resources are snapshotted.
+        if (listener != null) {
+            listener.MessageArrived -= OnMessageArrived;
+            try {
+                listener.Stop();
+            } finally {
+                listener.Dispose();
+            }
         }
         CancelRecordSource(timeoutSource);
         CancelRecordSource(matchSource);
