@@ -46,6 +46,7 @@ public sealed class CmdletWaitPOP3Message : AsyncPSCmdlet, IDisposable {
     private CancellationTokenSource? _timeoutSource;
     private CancellationTokenSource? _matchSource;
     private CancellationTokenSource? _linkedSource;
+    private readonly object _recordResourceLock = new();
     private int _matchSignaled;
 
     /// <inheritdoc />
@@ -99,7 +100,7 @@ public sealed class CmdletWaitPOP3Message : AsyncPSCmdlet, IDisposable {
                 }
             }
             if (StopOnMatch) {
-                _matchSource?.Cancel();
+                CancelRecordSource(_matchSource);
             }
         }
     }
@@ -117,22 +118,62 @@ public sealed class CmdletWaitPOP3Message : AsyncPSCmdlet, IDisposable {
     }
 
     private void DisposeRecordResources() {
-        var listener = Interlocked.Exchange(ref _listener, null);
+        Pop3PollListener? listener;
+        CancellationTokenSource? linkedSource;
+        CancellationTokenSource? timeoutSource;
+        CancellationTokenSource? matchSource;
+        lock (_recordResourceLock) {
+            listener = Interlocked.Exchange(ref _listener, null);
+            linkedSource = Interlocked.Exchange(ref _linkedSource, null);
+            timeoutSource = Interlocked.Exchange(ref _timeoutSource, null);
+            matchSource = Interlocked.Exchange(ref _matchSource, null);
+        }
         if (listener != null) {
             listener.MessageArrived -= OnMessageArrived;
             listener.Dispose();
         }
-        Interlocked.Exchange(ref _linkedSource, null)?.Dispose();
-        Interlocked.Exchange(ref _timeoutSource, null)?.Dispose();
-        Interlocked.Exchange(ref _matchSource, null)?.Dispose();
+        linkedSource?.Dispose();
+        timeoutSource?.Dispose();
+        matchSource?.Dispose();
     }
 
     /// <inheritdoc />
     protected override void StopProcessing() {
-        _listener?.Stop();
-        _timeoutSource?.Cancel();
-        _matchSource?.Cancel();
-        _linkedSource?.Cancel();
+        Pop3PollListener? listener;
+        CancellationTokenSource? timeoutSource;
+        CancellationTokenSource? matchSource;
+        CancellationTokenSource? linkedSource;
+        lock (_recordResourceLock) {
+            listener = Interlocked.Exchange(ref _listener, null);
+            timeoutSource = _timeoutSource;
+            matchSource = _matchSource;
+            linkedSource = _linkedSource;
+        }
+
         base.StopProcessing();
+        try {
+            if (listener != null) {
+                listener.MessageArrived -= OnMessageArrived;
+                try {
+                    listener.Stop();
+                } finally {
+                    listener.Dispose();
+                }
+            }
+        } finally {
+            CancelRecordSource(timeoutSource);
+            CancelRecordSource(matchSource);
+            CancelRecordSource(linkedSource);
+        }
+    }
+
+    private static void CancelRecordSource(CancellationTokenSource? source) {
+        try {
+            source?.Cancel();
+        } catch (ObjectDisposedException) {
+            // Cleanup can dispose a source after StopProcessing snapshots it.
+        } catch (AggregateException) {
+            // A cancellation callback must not prevent the remaining resources from stopping.
+        }
     }
 }
