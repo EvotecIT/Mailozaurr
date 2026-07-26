@@ -90,7 +90,6 @@ public sealed class CmdletWaitPOP3Message : AsyncPSCmdlet, IDisposable {
                 }
             }
             if (StopOnMatch) {
-                _listener?.Stop();
                 _matchSource?.Cancel();
             }
         }

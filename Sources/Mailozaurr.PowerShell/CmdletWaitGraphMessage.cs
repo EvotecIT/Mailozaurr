@@ -99,7 +99,6 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
                 }
             }
             if (StopOnMatch) {
-                _listener?.Stop();
                 _matchSource?.Cancel();
             }
         }
