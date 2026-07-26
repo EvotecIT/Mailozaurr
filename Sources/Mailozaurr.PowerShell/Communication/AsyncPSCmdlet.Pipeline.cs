@@ -258,7 +258,9 @@ public abstract partial class AsyncPSCmdlet
                     break;
                 case PipelineType.InformationWithTags:
                     var information = ((object MessageData, string[]? Tags))item.Value!;
-                    base.WriteInformation(information.MessageData, information.Tags!);
+                    base.WriteInformation(
+                        information.MessageData,
+                        information.Tags ?? Array.Empty<string>());
                     break;
                 case PipelineType.Progress:
                     base.WriteProgress((ProgressRecord)item.Value!);

@@ -101,19 +101,34 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
                 if (Volatile.Read(ref _requesterOwner) == 0)
                     return;
 
-                var reply = createReply();
+                PipelineReply reply;
                 try
                 {
-                    _pipe.Add(reply);
+                    reply = createReply();
                 }
-                catch (InvalidOperationException)
+                catch (Exception exception)
                 {
-                    // The requester and pipeline can finish concurrently during cancellation.
+                    TryPublish(new PipelineReply(value: null, exception));
+                    throw;
                 }
+
+                TryPublish(reply);
             }
             finally
             {
                 ReleasePipeline();
+            }
+        }
+
+        private void TryPublish(PipelineReply reply)
+        {
+            try
+            {
+                _pipe.Add(reply);
+            }
+            catch (InvalidOperationException)
+            {
+                // The requester and pipeline can finish concurrently during cancellation.
             }
         }
 
@@ -505,7 +520,7 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
         if (CanAccessPipelineDirectly)
         {
             PrepareDirectPipelineAccess();
-            base.WriteInformation(messageData, tags!);
+            base.WriteInformation(messageData, tags ?? Array.Empty<string>());
             return;
         }
 
