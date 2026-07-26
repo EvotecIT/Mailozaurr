@@ -80,8 +80,15 @@ public class CmdletImportMailFileTests {
 
         var outPipeField = asyncType.GetField("_currentOutPipe", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var lifecycleField = asyncType.GetField("_asyncLifecycleStarted", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var activeGenerationField = asyncType.GetField("_activeHookGeneration", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var acceptingGenerationField = asyncType.GetField("_acceptingHookWritesGeneration", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var hookGenerationField = asyncType.GetField("_hookGeneration", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var hookGeneration = (AsyncLocal<long>)hookGenerationField.GetValue(cmdlet)!;
         outPipeField.SetValue(cmdlet, outPipe);
         lifecycleField.SetValue(cmdlet, 1);
+        activeGenerationField.SetValue(cmdlet, 1L);
+        acceptingGenerationField.SetValue(cmdlet, 1L);
+        hookGeneration.Value = 1L;
 
         var method = typeof(CmdletImportMailFile).GetMethod("ProcessRecordAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var task = (Task)method.Invoke(cmdlet, null)!;
@@ -108,6 +115,9 @@ public class CmdletImportMailFileTests {
 
         outPipeField.SetValue(cmdlet, null);
         lifecycleField.SetValue(cmdlet, 0);
+        activeGenerationField.SetValue(cmdlet, 0L);
+        acceptingGenerationField.SetValue(cmdlet, 0L);
+        hookGeneration.Value = 0L;
 
         return (outputs, warnings, errors);
     }
