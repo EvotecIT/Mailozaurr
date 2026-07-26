@@ -57,7 +57,10 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
 
     private GraphMessageListener? _listener;
     private CancellationTokenSource? _timeoutSource;
+    private CancellationTokenSource? _matchSource;
     private CancellationTokenSource? _linkedSource;
+    private readonly object _recordResourceLock = new();
+    private int _matchSignaled;
 
     /// <inheritdoc />
     /// <summary>
@@ -70,25 +73,53 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
             return;
         }
 
-        _listener = new GraphMessageListener(conn.Credential, UserPrincipalName!);
-        _listener.MessageArrived += OnMessageArrived;
-        await _listener.StartAsync(CancelToken);
-
-        CancellationToken token = CancelToken;
-        if (TimeoutSeconds > 0) {
-            _timeoutSource = new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds));
-            _linkedSource = CancellationTokenSource.CreateLinkedTokenSource(CancelToken, _timeoutSource.Token);
-            token = _linkedSource.Token;
-        }
-
+        var listener = new GraphMessageListener(conn.Credential, UserPrincipalName!);
         try {
-            await Task.Delay(-1, token);
-        } catch (TaskCanceledException) { }
+            Task startTask;
+            CancellationTokenSource matchSource;
+            lock (_recordResourceLock) {
+                ThrowIfStopped();
+                Volatile.Write(ref _matchSignaled, 0);
+                matchSource = new CancellationTokenSource();
+                _matchSource = matchSource;
+                listener.MessageArrived += OnMessageArrived;
+                _listener = listener;
+                startTask = listener.StartAsync(CancelToken);
+            }
+            await startTask;
+
+            CancellationToken waitToken;
+            lock (_recordResourceLock) {
+                if (!ReferenceEquals(_listener, listener) ||
+                    !ReferenceEquals(_matchSource, matchSource)) {
+                    return;
+                }
+
+                var timeoutSource = TimeoutSeconds > 0
+                    ? new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds))
+                    : null;
+                var linkedSource = timeoutSource == null
+                    ? CancellationTokenSource.CreateLinkedTokenSource(CancelToken, matchSource.Token)
+                    : CancellationTokenSource.CreateLinkedTokenSource(CancelToken, timeoutSource.Token, matchSource.Token);
+                _timeoutSource = timeoutSource;
+                _linkedSource = linkedSource;
+                waitToken = linkedSource.Token;
+            }
+
+            try {
+                await Task.Delay(-1, waitToken);
+            } catch (TaskCanceledException) { }
+        } finally {
+            DisposeRecordResources();
+        }
     }
 
     private void OnMessageArrived(object? sender, System.Collections.Generic.Dictionary<string, object> message) {
         var match = Until == null || LanguagePrimitives.IsTrue(Until.InvokeReturnAsIs(message));
         if (match) {
+            if (StopOnMatch && Interlocked.Exchange(ref _matchSignaled, 1) != 0)
+                return;
+
             WriteObject(message);
             if (Action != null) {
                 try {
@@ -98,37 +129,79 @@ public sealed class CmdletWaitGraphMessage : AsyncPSCmdlet, IDisposable {
                 }
             }
             if (StopOnMatch) {
-                StopProcessing();
+                lock (_recordResourceLock) {
+                    _matchSource?.Cancel();
+                }
             }
         }
     }
 
     /// <inheritdoc />
     protected override Task EndProcessingAsync() {
-        if (_listener != null) {
-            _listener.MessageArrived -= OnMessageArrived;
-            _listener.Dispose();
-        }
-        _timeoutSource?.Dispose();
-        _linkedSource?.Dispose();
+        DisposeRecordResources();
         return Task.CompletedTask;
     }
 
     /// <inheritdoc />
-    public new void Dispose() {
-        if (_listener != null) {
-            _listener.MessageArrived -= OnMessageArrived;
-            _listener.Dispose();
+    public override void Dispose() {
+        DisposeRecordResources();
+        base.Dispose();
+    }
+
+    private void DisposeRecordResources() {
+        GraphMessageListener? listener;
+        CancellationTokenSource? linkedSource;
+        CancellationTokenSource? timeoutSource;
+        CancellationTokenSource? matchSource;
+        lock (_recordResourceLock) {
+            listener = Interlocked.Exchange(ref _listener, null);
+            linkedSource = Interlocked.Exchange(ref _linkedSource, null);
+            timeoutSource = Interlocked.Exchange(ref _timeoutSource, null);
+            matchSource = Interlocked.Exchange(ref _matchSource, null);
         }
-        _timeoutSource?.Dispose();
-        _linkedSource?.Dispose();
+        if (listener != null) {
+            listener.MessageArrived -= OnMessageArrived;
+            listener.Dispose();
+        }
+        linkedSource?.Dispose();
+        timeoutSource?.Dispose();
+        matchSource?.Dispose();
     }
 
     /// <inheritdoc />
     protected override void StopProcessing() {
-        _listener?.Stop();
-        _timeoutSource?.Cancel();
-        _linkedSource?.Cancel();
+        GraphMessageListener? listener;
+        CancellationTokenSource? timeoutSource;
+        CancellationTokenSource? matchSource;
+        CancellationTokenSource? linkedSource;
+        lock (_recordResourceLock) {
+            listener = Interlocked.Exchange(ref _listener, null);
+            timeoutSource = _timeoutSource;
+            matchSource = _matchSource;
+            linkedSource = _linkedSource;
+        }
+
         base.StopProcessing();
+        if (listener != null) {
+            listener.MessageArrived -= OnMessageArrived;
+            try {
+                listener.Stop();
+            } finally {
+                listener.Dispose();
+            }
+        }
+        CancelRecordSource(timeoutSource);
+        CancelRecordSource(matchSource);
+        CancelRecordSource(linkedSource);
+    }
+
+    private static void CancelRecordSource(CancellationTokenSource? source) {
+        try {
+            source?.Cancel();
+        } catch (ObjectDisposedException) {
+            // Cleanup can dispose a source after StopProcessing snapshots it.
+        } catch (AggregateException) {
+            // A cancellation callback must not prevent the remaining resources from stopping.
+        }
     }
 }

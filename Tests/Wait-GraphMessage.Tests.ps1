@@ -12,13 +12,17 @@ Describe 'Wait-GraphMessage' {
         $cmd.Action = { $script:wasCalled = $true }
         $cmd.Until = { $true }
         $cmd.StopOnMatch = $true
+        $matchSource = [System.Threading.CancellationTokenSource]::new()
+        $matchField = $cmd.GetType().GetField('_matchSource', [System.Reflection.BindingFlags] 'NonPublic, Instance')
+        $matchField.SetValue($cmd, $matchSource)
         $method = $cmd.GetType().GetMethod('OnMessageArrived', [System.Reflection.BindingFlags] 'NonPublic, Instance')
         $msg = [System.Collections.Generic.Dictionary[string,object]]::new()
         $msg.Add('id','1')
         $method.Invoke($cmd, @($null, $msg))
         $wasCalled | Should -Be $true
-        $field = $cmd.GetType().BaseType.GetField('_cancelSource', [System.Reflection.BindingFlags] 'NonPublic, Instance')
-        ($field.GetValue($cmd)).IsCancellationRequested | Should -Be $true
+        $matchSource.IsCancellationRequested | Should -Be $true
+        $stopField = $cmd.GetType().BaseType.GetField('_cancelSource', [System.Reflection.BindingFlags] 'NonPublic, Instance')
+        ($stopField.GetValue($cmd)).IsCancellationRequested | Should -Be $false
     }
 
     It 'Dispose can be called multiple times' {
