@@ -247,17 +247,46 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
 
     private sealed class PipelinePumpLease
     {
-        private int _active = 1;
+        private readonly object _sync = new();
+        private bool _active = true;
+        private int _claims;
 
         public PipelinePumpLease(long generation)
             => Generation = generation;
 
         public long Generation { get; }
 
-        public bool IsActive => Volatile.Read(ref _active) != 0;
+        public bool TryClaim(long generation)
+        {
+            lock (_sync)
+            {
+                if (!_active || generation != Generation)
+                    return false;
 
-        public void Close()
-            => Volatile.Write(ref _active, 0);
+                _claims++;
+                return true;
+            }
+        }
+
+        public void ReleaseClaim()
+        {
+            lock (_sync)
+            {
+                _claims--;
+                if (!_active && _claims == 0)
+                    Monitor.PulseAll(_sync);
+            }
+        }
+
+        public void CloseAndWait()
+        {
+            lock (_sync)
+            {
+                _active = false;
+                while (_claims != 0)
+                    Monitor.Wait(_sync);
+            }
+        }
     }
 
     /// <summary>
@@ -282,7 +311,7 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
 
         /// <summary>Queues an error record for the originating hook.</summary>
         public void WriteError(ErrorRecord errorRecord)
-            => Queue(errorRecord, PipelineType.Error);
+            => Queue(SnapshotErrorRecord(errorRecord), PipelineType.Error);
 
         /// <summary>Queues a warning record for the originating hook.</summary>
         public void WriteWarning(string message)
@@ -329,11 +358,11 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     private readonly int _constructionThreadId = Environment.CurrentManagedThreadId;
     private readonly object _hookAdmissionLock = new();
     private readonly object _lifecycleLock = new();
-    private static readonly SynchronizationContext HookSynchronizationContext = new AsyncHookSynchronizationContext();
     private static readonly TaskScheduler HookTaskScheduler = new AsyncHookTaskScheduler();
     private BlockingCollection<PipelineItem>? _currentOutPipe;
     private Action? _pumpQueuedItems;
     private SynchronizationContext? _pipelineSynchronizationContext;
+    private PipelinePumpLease? _currentPipelinePumpLease;
     private long _activeHookGeneration;
     private long _acceptingHookWritesGeneration;
     private long _nextHookGeneration;
@@ -542,6 +571,9 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe output bridge for asynchronous cmdlet code.</summary>
     public new void WriteObject(object? sendToPipeline, bool enumerateCollection)
     {
+        if (ShouldDropClosedCanceledStreamWrite())
+            return;
+
         ThrowIfStopped();
         var item = new PipelineItem(
             sendToPipeline,
@@ -568,8 +600,11 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe error bridge for asynchronous cmdlet code.</summary>
     public new void WriteError(ErrorRecord errorRecord)
     {
+        if (ShouldDropClosedCanceledStreamWrite())
+            return;
+
         ThrowIfStopped();
-        var item = new PipelineItem(errorRecord, PipelineType.Error);
+        var item = new PipelineItem(SnapshotErrorRecord(errorRecord), PipelineType.Error);
         if (IsPumpingPipelineItem)
         {
             _ = TryQueue(item);
@@ -613,6 +648,9 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe warning bridge for asynchronous cmdlet code.</summary>
     public new void WriteWarning(string message)
     {
+        if (ShouldDropClosedCanceledStreamWrite())
+            return;
+
         ThrowIfStopped();
         var item = new PipelineItem(message, PipelineType.Warning);
         if (IsPumpingPipelineItem)
@@ -637,6 +675,9 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe verbose bridge for asynchronous cmdlet code.</summary>
     public new void WriteVerbose(string message)
     {
+        if (ShouldDropClosedCanceledStreamWrite())
+            return;
+
         ThrowIfStopped();
         var item = new PipelineItem(message, PipelineType.Verbose);
         if (IsPumpingPipelineItem)
@@ -661,6 +702,9 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe debug bridge for asynchronous cmdlet code.</summary>
     public new void WriteDebug(string message)
     {
+        if (ShouldDropClosedCanceledStreamWrite())
+            return;
+
         ThrowIfStopped();
         var item = new PipelineItem(message, PipelineType.Debug);
         if (IsPumpingPipelineItem)
@@ -685,6 +729,9 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe command-detail bridge for asynchronous cmdlet code.</summary>
     public new void WriteCommandDetail(string text)
     {
+        if (ShouldDropClosedCanceledStreamWrite())
+            return;
+
         ThrowIfStopped();
         var item = new PipelineItem(text, PipelineType.CommandDetail);
         if (IsPumpingPipelineItem)
@@ -709,6 +756,9 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe information bridge for asynchronous cmdlet code.</summary>
     public new void WriteInformation(InformationRecord informationRecord)
     {
+        if (ShouldDropClosedCanceledStreamWrite())
+            return;
+
         ThrowIfStopped();
         var item = new PipelineItem(
             SnapshotInformationRecord(informationRecord),
@@ -735,6 +785,9 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     /// <summary>Thread-safe information bridge for asynchronous cmdlet code.</summary>
     public new void WriteInformation(object messageData, string[]? tags)
     {
+        if (ShouldDropClosedCanceledStreamWrite())
+            return;
+
         ThrowIfStopped();
         var item = new PipelineItem(
             (messageData, tags is null ? null : (string[])tags.Clone()),

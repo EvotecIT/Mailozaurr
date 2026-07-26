@@ -99,24 +99,38 @@ public sealed class CmdletWaitIMAPMessage : AsyncPSCmdlet, System.IDisposable {
         var listener = new ImapIdleListener(conn.Data, Folder, query);
         try {
             Task startTask;
+            CancellationTokenSource matchSource;
             lock (_recordResourceLock) {
                 ThrowIfStopped();
                 Volatile.Write(ref _matchSignaled, 0);
-                _matchSource = new CancellationTokenSource();
+                matchSource = new CancellationTokenSource();
+                _matchSource = matchSource;
                 listener.MessageArrived += OnMessageArrived;
                 _listener = listener;
                 startTask = listener.StartAsync(CancelToken);
             }
             await startTask;
-            _timeoutSource = TimeoutSeconds > 0
-                ? new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds))
-                : null;
-            _linkedSource = _timeoutSource == null
-                ? CancellationTokenSource.CreateLinkedTokenSource(CancelToken, _matchSource.Token)
-                : CancellationTokenSource.CreateLinkedTokenSource(CancelToken, _timeoutSource.Token, _matchSource.Token);
+
+            CancellationToken waitToken;
+            lock (_recordResourceLock) {
+                if (!ReferenceEquals(_listener, listener) ||
+                    !ReferenceEquals(_matchSource, matchSource)) {
+                    return;
+                }
+
+                var timeoutSource = TimeoutSeconds > 0
+                    ? new CancellationTokenSource(TimeSpan.FromSeconds(TimeoutSeconds))
+                    : null;
+                var linkedSource = timeoutSource == null
+                    ? CancellationTokenSource.CreateLinkedTokenSource(CancelToken, matchSource.Token)
+                    : CancellationTokenSource.CreateLinkedTokenSource(CancelToken, timeoutSource.Token, matchSource.Token);
+                _timeoutSource = timeoutSource;
+                _linkedSource = linkedSource;
+                waitToken = linkedSource.Token;
+            }
 
             try {
-                await Task.Delay(-1, _linkedSource.Token);
+                await Task.Delay(-1, waitToken);
             } catch (TaskCanceledException) { }
         } finally {
             DisposeRecordResources();

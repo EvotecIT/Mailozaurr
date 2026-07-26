@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Management.Automation;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,6 +13,9 @@ public abstract partial class AsyncPSCmdlet
     /// <summary>Thread-safe progress bridge for asynchronous cmdlet code.</summary>
     public new void WriteProgress(ProgressRecord progressRecord)
     {
+        if (ShouldDropClosedCanceledStreamWrite())
+            return;
+
         ThrowIfStopped();
         var item = new PipelineItem(SnapshotProgressRecord(progressRecord), PipelineType.Progress);
         if (IsPumpingPipelineItem)
@@ -75,11 +79,27 @@ public abstract partial class AsyncPSCmdlet
         return snapshot;
     }
 
+    private static ErrorRecord SnapshotErrorRecord(ErrorRecord errorRecord)
+        => new(errorRecord, errorRecord.Exception);
+
     /// <summary>Throws when PowerShell has requested cancellation.</summary>
     protected internal void ThrowIfStopped()
     {
         if (_cancelSource.IsCancellationRequested)
             throw new PipelineStoppedException();
+    }
+
+    private bool ShouldDropClosedCanceledStreamWrite()
+    {
+        if (!_cancelSource.IsCancellationRequested ||
+            Volatile.Read(ref _currentOutPipe) is not null)
+        {
+            return false;
+        }
+
+        var originatingGeneration = _hookGeneration.Value;
+        return originatingGeneration == 0 ||
+               originatingGeneration != Volatile.Read(ref _activeHookGeneration);
     }
 
     /// <inheritdoc />
@@ -144,8 +164,7 @@ public abstract partial class AsyncPSCmdlet
                 Volatile.Read(ref _pipelineSynchronizationContext));
             try
             {
-                if (!IsPumpingPipelineItem)
-                    Volatile.Read(ref _pumpQueuedItems)?.Invoke();
+                Volatile.Read(ref _pumpQueuedItems)?.Invoke();
                 return pipelineContext;
             }
             catch
@@ -222,8 +241,9 @@ public abstract partial class AsyncPSCmdlet
                 throw new PipelineStoppedException();
             }
 
+            ThrowIfStopped();
             if (reply.Rejection is not null)
-                throw reply.Rejection;
+                ExceptionDispatchInfo.Capture(reply.Rejection).Throw();
 
             return reply.Value;
         }
@@ -277,46 +297,78 @@ public abstract partial class AsyncPSCmdlet
     {
         item.BindToHook(_hookGeneration.Value);
         var pumpLease = _pipelinePumpLease.Value;
-        var isPumpBound =
-            pumpLease is { IsActive: true } &&
-            item.HookGeneration == pumpLease.Generation;
-        lock (_hookAdmissionLock)
+        if (pumpLease is null)
         {
-            if (item.HookGeneration != 0 &&
-                item.HookGeneration != Volatile.Read(ref _acceptingHookWritesGeneration) &&
-                !isPumpBound)
+            var sharedPumpLease =
+                Volatile.Read(ref _currentPipelinePumpLease);
+            if (sharedPumpLease is not null &&
+                (item.HookGeneration == 0 ||
+                 item.HookGeneration == sharedPumpLease.Generation))
             {
-                item.ReplyPipe?.Reject();
-                return false;
+                item.BindToHook(sharedPumpLease.Generation);
+                pumpLease = sharedPumpLease;
             }
+        }
 
+        var isPumpBound = pumpLease?.TryClaim(item.HookGeneration) == true;
+        try
+        {
+            lock (_hookAdmissionLock)
+            {
+                var acceptingGeneration =
+                    Volatile.Read(ref _acceptingHookWritesGeneration);
+                if (item.HookGeneration == 0 &&
+                    !isPumpBound)
+                {
+                    if (acceptingGeneration == 0)
+                    {
+                        item.ReplyPipe?.Reject();
+                        return false;
+                    }
+
+                    item.BindToHook(acceptingGeneration);
+                }
+
+                if (item.HookGeneration != acceptingGeneration &&
+                    !isPumpBound)
+                {
+                    item.ReplyPipe?.Reject();
+                    return false;
+                }
+
+                if (isPumpBound)
+                    item.BindToPump();
+
+                var outPipe = Volatile.Read(ref _currentOutPipe);
+                if (outPipe is null)
+                    return false;
+
+                try
+                {
+                    outPipe.Add(item, CancelToken);
+                    return true;
+                }
+                catch (ObjectDisposedException)
+                {
+                    return false;
+                }
+                catch (InvalidOperationException)
+                {
+                    return false;
+                }
+                catch (OperationCanceledException) when (_cancelSource.IsCancellationRequested)
+                {
+                    if (item.HookGeneration != 0 && !item.DropOnStop)
+                        throw new PipelineStoppedException();
+
+                    return false;
+                }
+            }
+        }
+        finally
+        {
             if (isPumpBound)
-                item.BindToPump();
-
-            var outPipe = Volatile.Read(ref _currentOutPipe);
-            if (outPipe is null)
-                return false;
-
-            try
-            {
-                outPipe.Add(item, CancelToken);
-                return true;
-            }
-            catch (ObjectDisposedException)
-            {
-                return false;
-            }
-            catch (InvalidOperationException)
-            {
-                return false;
-            }
-            catch (OperationCanceledException) when (_cancelSource.IsCancellationRequested)
-            {
-                if (item.HookGeneration != 0 && !item.DropOnStop)
-                    throw new PipelineStoppedException();
-
-                return false;
-            }
+                pumpLease!.ReleaseClaim();
         }
     }
 

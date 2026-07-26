@@ -19,6 +19,8 @@ public abstract partial class AsyncPSCmdlet
         var pipeDisposed = 0;
         var hookGeneration = Interlocked.Increment(ref _nextHookGeneration);
         var synchronizationContext = SynchronizationContext.Current;
+        var hookSynchronizationContext =
+            new AsyncHookSynchronizationContext();
 
         void ClearPipes()
         {
@@ -69,12 +71,17 @@ public abstract partial class AsyncPSCmdlet
 
             var priorItemGeneration = _hookGeneration.Value;
             var priorPumpLease = _pipelinePumpLease.Value;
+            var priorSharedPumpLease =
+                Volatile.Read(ref _currentPipelinePumpLease);
             var pumpLease = new PipelinePumpLease(item.HookGeneration);
             try
             {
                 _ = Interlocked.Increment(ref _pipelinePumpDepth);
                 _hookGeneration.Value = item.HookGeneration;
                 _pipelinePumpLease.Value = pumpLease;
+                Volatile.Write(
+                    ref _currentPipelinePumpLease,
+                    pumpLease);
                 switch (item.Type)
                 {
                     case PipelineType.Output:
@@ -208,10 +215,47 @@ public abstract partial class AsyncPSCmdlet
             }
             finally
             {
-                pumpLease.Close();
+                pumpLease.CloseAndWait();
+                Volatile.Write(
+                    ref _currentPipelinePumpLease,
+                    priorSharedPumpLease);
                 _pipelinePumpLease.Value = priorPumpLease;
                 _hookGeneration.Value = priorItemGeneration;
                 _ = Interlocked.Decrement(ref _pipelinePumpDepth);
+            }
+        }
+
+        void DrainPumpBoundItemsAfterFailure()
+        {
+            while (outPipe.TryTake(out var causalItem))
+            {
+                if (!causalItem.IsPumpBound)
+                {
+                    causalItem.ReplyPipe?.Reject();
+                    continue;
+                }
+
+                try
+                {
+                    PumpItem(causalItem);
+                }
+                catch
+                {
+                    causalItem.ReplyPipe?.Reject();
+                }
+            }
+        }
+
+        void PumpItemPreservingCausalFailureRecords(PipelineItem item)
+        {
+            try
+            {
+                PumpItem(item);
+            }
+            catch
+            {
+                DrainPumpBoundItemsAfterFailure();
+                throw;
             }
         }
 
@@ -224,14 +268,12 @@ public abstract partial class AsyncPSCmdlet
             // item that is currently being pumped can enqueue more work through its flow-local
             // lease, so continue until that causal tail is empty.
             while (outPipe.TryTake(out var item))
-                PumpItem(item);
+                PumpItemPreservingCausalFailureRecords(item);
         }
 
         void PumpThroughDirectAccessBarrier()
         {
-            if (IsPumpingPipelineItem)
-                return;
-
+            PipelineItem? completionMarker = null;
             var barrier = new PipelineItem(
                 value: null,
                 PipelineType.DirectAccessBarrier,
@@ -246,7 +288,13 @@ public abstract partial class AsyncPSCmdlet
 
             while (outPipe.TryTake(out var item))
             {
-                PumpItem(item);
+                if (item.Type == PipelineType.HookCompleted)
+                {
+                    completionMarker = item;
+                    continue;
+                }
+
+                PumpItemPreservingCausalFailureRecords(item);
                 if (ReferenceEquals(item, barrier))
                 {
                     while (HasPumpBoundItems())
@@ -258,7 +306,21 @@ public abstract partial class AsyncPSCmdlet
                                 "The PowerShell pipeline closed while causal records were pending.");
                         }
 
-                        PumpItem(pumpBoundPredecessor);
+                        if (pumpBoundPredecessor.Type ==
+                            PipelineType.HookCompleted)
+                        {
+                            completionMarker =
+                                pumpBoundPredecessor;
+                            continue;
+                        }
+
+                        PumpItemPreservingCausalFailureRecords(pumpBoundPredecessor);
+                    }
+
+                    if (completionMarker is not null)
+                    {
+                        outPipe.Add(
+                            completionMarker);
                     }
 
                     return;
@@ -291,8 +353,10 @@ public abstract partial class AsyncPSCmdlet
         try
         {
             Volatile.Write(ref _pipelineSynchronizationContext, synchronizationContext);
-            SynchronizationContext.SetSynchronizationContext(HookSynchronizationContext);
+            SynchronizationContext.SetSynchronizationContext(
+                hookSynchronizationContext);
             _hookGeneration.Value = hookGeneration;
+            ThrowIfStopped();
             if (TaskScheduler.Current == TaskScheduler.Default)
             {
                 blockTask = task();
@@ -443,13 +507,13 @@ public abstract partial class AsyncPSCmdlet
             while (true)
             {
                 var item = outPipe.Take(CancelToken);
-                PumpItem(item);
+                PumpItemPreservingCausalFailureRecords(item);
                 if (item.Type == PipelineType.HookCompleted)
                 {
                     while (outPipe.TryTake(out var pumpBoundItem))
                     {
                         ThrowIfStopped();
-                        PumpItem(pumpBoundItem);
+                        PumpItemPreservingCausalFailureRecords(pumpBoundItem);
                     }
                     break;
                 }
@@ -473,7 +537,10 @@ public abstract partial class AsyncPSCmdlet
             {
                 CompleteAddingIfNeeded(outPipe);
                 if (blockTask.IsCompleted)
+                {
+                    ClearPipes();
                     DisposePipeOnce();
+                }
                 DeactivateHook();
             }
 
