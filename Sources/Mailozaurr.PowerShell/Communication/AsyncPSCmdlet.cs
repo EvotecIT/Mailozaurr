@@ -107,10 +107,32 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
         private readonly BlockingCollection<PipelineReply> _pipe = new(boundedCapacity: 1);
         private int _owners = 2;
         private int _pipelineOwner = 1;
-        private int _requesterOwner = 1;
+        private int _requesterState = 1;
 
         public PipelineReply Take(CancellationToken cancellationToken)
-            => _pipe.Take(cancellationToken);
+        {
+            try
+            {
+                return _pipe.Take(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                if (Interlocked.CompareExchange(ref _requesterState, 0, 1) == 1)
+                {
+                    Release();
+                    throw;
+                }
+
+                if (Volatile.Read(ref _requesterState) == 2)
+                {
+                    // Once the pipeline claims the request, the host interaction cannot be canceled.
+                    // Keep observing its reply so cancellation cannot abandon an in-flight prompt.
+                    return _pipe.Take(CancellationToken.None);
+                }
+
+                throw;
+            }
+        }
 
         public void Publish(Func<object?> createValue)
             => PublishReply(() => new PipelineReply(createValue()));
@@ -126,7 +148,7 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
         {
             try
             {
-                if (Volatile.Read(ref _requesterOwner) == 0)
+                if (Interlocked.CompareExchange(ref _requesterState, 2, 1) != 1)
                     return;
 
                 PipelineReply reply;
@@ -168,7 +190,7 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
 
         public void ReleaseRequester()
         {
-            if (Interlocked.Exchange(ref _requesterOwner, 0) == 1)
+            if (Interlocked.Exchange(ref _requesterState, 0) != 0)
                 Release();
         }
 

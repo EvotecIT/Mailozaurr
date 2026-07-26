@@ -220,13 +220,10 @@ public abstract partial class AsyncPSCmdlet
             if (IsPumpingPipelineItem)
                 return;
 
-            int queuedAtEntry;
-            lock (_hookAdmissionLock)
-            {
-                queuedAtEntry = outPipe.Count;
-            }
-
-            while (queuedAtEntry-- > 0 && outPipe.TryTake(out var item))
+            // Both callers close ordinary admission before entering this drain. Only a pipeline
+            // item that is currently being pumped can enqueue more work through its flow-local
+            // lease, so continue until that causal tail is empty.
+            while (outPipe.TryTake(out var item))
                 PumpItem(item);
         }
 
@@ -301,6 +298,12 @@ public abstract partial class AsyncPSCmdlet
                 ClearPipes();
                 DeactivateHook();
                 DisposePipeOnce();
+            }
+
+            if (exception is PipelineStoppedException)
+            {
+                CancelSource();
+                throw;
             }
 
             if (exception is OperationCanceledException && _cancelSource.IsCancellationRequested)
