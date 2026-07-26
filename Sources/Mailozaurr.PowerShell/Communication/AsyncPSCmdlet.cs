@@ -23,7 +23,18 @@ public abstract partial class AsyncPSCmdlet : PSCmdlet, IDisposable
     private sealed class AsyncHookSynchronizationContext : SynchronizationContext
     {
         public override void Post(SendOrPostCallback callback, object? state)
-            => ThreadPool.QueueUserWorkItem(_ => callback(state));
+            => ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    callback(state);
+                }
+                catch (PipelineStoppedException)
+                {
+                    // Fire-and-forget callbacks such as Progress<T> can run after StopProcessing.
+                    // Await continuations capture their own exceptions into the hook task.
+                }
+            });
     }
 
     private sealed class AsyncHookTaskScheduler : TaskScheduler

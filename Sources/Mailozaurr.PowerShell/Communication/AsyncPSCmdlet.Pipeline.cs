@@ -510,7 +510,8 @@ public abstract partial class AsyncPSCmdlet
 
         void PumpQueuedItems()
         {
-            while (outPipe.TryTake(out var item))
+            var queuedAtEntry = outPipe.Count;
+            while (queuedAtEntry-- > 0 && outPipe.TryTake(out var item))
                 PumpItem(item);
         }
 
@@ -546,6 +547,11 @@ public abstract partial class AsyncPSCmdlet
         }
         catch (Exception exception)
         {
+            lock (_hookAdmissionLock)
+            {
+                _ = Interlocked.CompareExchange(ref _acceptingHookWritesGeneration, 0, hookGeneration);
+            }
+            SynchronizationContext.SetSynchronizationContext(synchronizationContext);
             try
             {
                 PumpQueuedItems();
@@ -607,10 +613,14 @@ public abstract partial class AsyncPSCmdlet
             _ = blockTask.ContinueWith(
                 completed =>
                 {
+                    var retainedBlockOwned = true;
                     try
                     {
                         if (completed.IsFaulted)
                             _ = completed.Exception;
+
+                        ExitAsyncBlock();
+                        retainedBlockOwned = false;
 
                         lock (_hookAdmissionLock)
                         {
@@ -645,7 +655,8 @@ public abstract partial class AsyncPSCmdlet
                     }
                     finally
                     {
-                        ExitAsyncBlock();
+                        if (retainedBlockOwned)
+                            ExitAsyncBlock();
                     }
                 },
                 CancellationToken.None,
