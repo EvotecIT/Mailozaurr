@@ -71,6 +71,8 @@ public sealed class SmtpSessionRequest {
     public int MaxDelayMilliseconds { get; init; }
     /// <summary>Maximum random jitter added to retry delays in milliseconds.</summary>
     public int JitterMilliseconds { get; init; }
+    /// <summary>Retry non-transient SMTP failures.</summary>
+    public bool RetryAlways { get; init; }
     /// <summary>Skip certificate validation.</summary>
     public bool SkipCertificateValidation { get; init; }
     /// <summary>Skip certificate revocation checks.</summary>
@@ -112,6 +114,7 @@ public static class SmtpSessionService {
         smtp.RetryDelayBackoff = request.RetryDelayBackoff;
         smtp.MaxDelayMilliseconds = request.MaxDelayMilliseconds;
         smtp.JitterMilliseconds = request.JitterMilliseconds;
+        smtp.RetryAlways = request.RetryAlways;
         smtp.SkipCertificateValidation = request.SkipCertificateValidation;
         smtp.CheckCertificateRevocation = !request.SkipCertificateRevocation;
         smtp.DryRun = request.DryRun;

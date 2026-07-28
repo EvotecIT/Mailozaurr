@@ -22,6 +22,8 @@ public sealed class SendGridClient : IDisposable {
     private readonly HttpClient _client;
     private readonly bool _ownsClient;
     private bool _disposed;
+    internal TimeSpan RequestTimeout { get; set; } =
+        TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// Stopwatch to measure the time taken to send an email.
@@ -391,16 +393,23 @@ public sealed class SendGridClient : IDisposable {
                 };
                 request.Headers.Add("Authorization", $"Bearer {apiKey}");
 
-                using var response = await _client.SendAsync(request, cancellationToken).ConfigureAwait(false);
-#if NET5_0_OR_GREATER
-                lastContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-#else
-                lastContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-#endif
+                using var requestTimeout =
+                    CancellationTokenSource.CreateLinkedTokenSource(
+                        cancellationToken);
+                requestTimeout.CancelAfter(RequestTimeout);
+                using var response = await _client.SendAsync(
+                    request,
+                    requestTimeout.Token).ConfigureAwait(false);
+                lastContent = await ProviderResponseParser
+                    .ReadContentAsync(response, cancellationToken)
+                    .ConfigureAwait(false);
                 LogCollector.LogVerbose($"Send-EmailMessage - Sent email to {SentTo} using SendGrid");
 
                 if (response.IsSuccessStatusCode) {
-                    var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, response.StatusCode.ToString());
+                    var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, response.StatusCode.ToString()) {
+                        MessageId = ProviderResponseParser
+                            .GetSendGridMessageId(response)
+                    };
                     await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken).ConfigureAwait(false);
                     return okResult;
                 }
@@ -411,9 +420,10 @@ public sealed class SendGridClient : IDisposable {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - HTTP error during sending using SendGrid: {ex.Message}");
                 if (!HttpRetryPolicy.ShouldRetry(ex, attempts, RetryCount, RetryAlways)) {
-                    var queuedMessageId = HttpRetryPolicy.ShouldQueue(ex, RetryAlways)
-                        ? await QueuePendingMessageAsync(apiKey, cancellationToken).ConfigureAwait(false)
-                        : null;
+                    var queuedMessageId =
+                        await QueuePendingMessageAsync(
+                            apiKey,
+                            cancellationToken).ConfigureAwait(false);
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }
@@ -437,9 +447,10 @@ public sealed class SendGridClient : IDisposable {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Request canceled: {ex.Message}");
                 if (!HttpRetryPolicy.ShouldRetry(ex, attempts, RetryCount, RetryAlways)) {
-                    var queuedMessageId = HttpRetryPolicy.ShouldQueue(ex, RetryAlways)
-                        ? await QueuePendingMessageAsync(apiKey, cancellationToken).ConfigureAwait(false)
-                        : null;
+                    var queuedMessageId =
+                        await QueuePendingMessageAsync(
+                            apiKey,
+                            cancellationToken).ConfigureAwait(false);
                     if (ErrorAction == ActionPreference.Stop && lastException != null) {
                         throw lastException;
                     }

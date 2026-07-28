@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 
 namespace Mailozaurr;
 
@@ -16,6 +17,7 @@ namespace Mailozaurr;
 public class SesClient : IDisposable {
     private readonly HttpClient _client;
     private readonly bool _ownsClient;
+    private int _disposed;
 
     /// <summary>Measures send latency.</summary>
     public readonly Stopwatch Stopwatch;
@@ -271,13 +273,14 @@ public class SesClient : IDisposable {
             try {
                 using HttpRequestMessage request = CreateRequest(body, DateTime.UtcNow);
                 using HttpResponseMessage response = await _client.SendAsync(request, cancellationToken);
-#if NET5_0_OR_GREATER
-                string respContent = await response.Content.ReadAsStringAsync(cancellationToken);
-#else
-                string respContent = await response.Content.ReadAsStringAsync();
-#endif
+                string respContent = await ProviderResponseParser
+                    .ReadContentAsync(response, cancellationToken)
+                    .ConfigureAwait(false);
                 if (response.IsSuccessStatusCode) {
-                    SmtpResult ok = new(true, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, response.StatusCode.ToString());
+                    SmtpResult ok = new(true, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, response.StatusCode.ToString()) {
+                        MessageId = ProviderResponseParser
+                            .GetSesMessageId(respContent)
+                    };
                     await Helpers.PostWebhookAsync(WebhookUrl, ok, cancellationToken, _client);
                     return ok;
                 }
@@ -294,9 +297,11 @@ public class SesClient : IDisposable {
             }
 
             if (!HttpRetryPolicy.ShouldRetry(lastException, attempts, RetryCount, RetryAlways)) {
-                var queuedMessageId = HttpRetryPolicy.ShouldQueue(lastException, RetryAlways)
-                    ? await QueuePendingMessageAsync(message, mimeMessageBase64, cancellationToken).ConfigureAwait(false)
-                    : null;
+                var queuedMessageId =
+                    await QueuePendingMessageAsync(
+                        message,
+                        mimeMessageBase64,
+                        cancellationToken).ConfigureAwait(false);
                 if (ErrorAction == ActionPreference.Stop && lastException != null) {
                     throw lastException;
                 }
@@ -327,6 +332,7 @@ public class SesClient : IDisposable {
     /// Sends the email using Amazon SES.
     /// </summary>
     public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken) {
+        ThrowIfDisposed();
         MimeMessage message = BuildMessage();
         using MemoryStream stream = new();
         await message.WriteToAsync(stream, cancellationToken);
@@ -344,6 +350,7 @@ public class SesClient : IDisposable {
     /// Sends a templated email using Amazon SES.
     /// </summary>
     public async Task<SmtpResult> SendTemplatedEmailAsync(CancellationToken cancellationToken) {
+        ThrowIfDisposed();
         StringBuilder sb = new("Action=SendTemplatedEmail&Version=2010-12-01");
         if (!string.IsNullOrEmpty(TemplateName)) sb.Append("&Template=").Append(Uri.EscapeDataString(TemplateName));
         sb.Append("&Source=").Append(Uri.EscapeDataString(SentFrom));
@@ -372,8 +379,17 @@ public class SesClient : IDisposable {
     /// Releases resources used by the <see cref="SesClient"/> instance.
     /// </summary>
     public void Dispose() {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) {
+            return;
+        }
         if (_ownsClient) {
             _client.Dispose();
+        }
+    }
+
+    private void ThrowIfDisposed() {
+        if (Volatile.Read(ref _disposed) != 0) {
+            throw new ObjectDisposedException(nameof(SesClient));
         }
     }
 }

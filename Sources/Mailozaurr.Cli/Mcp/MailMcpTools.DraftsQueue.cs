@@ -114,7 +114,7 @@ public sealed partial class MailMcpTools {
         return await _application.Send.SendAsync(new SendMessageRequest {
             ProfileId = draft.Message.ProfileId,
             QueueOnFailure = queueOnFailure,
-            Message = CloneDraftMessage(draft.Message)
+            Message = DraftMessageCloner.Clone(draft.Message)
         }, cancellationToken).ConfigureAwait(false);
     }
 
@@ -198,29 +198,6 @@ public sealed partial class MailMcpTools {
         return draft;
     }
 
-    private static DraftMessage CloneDraftMessage(DraftMessage draft) => new() {
-        ProfileId = draft.ProfileId,
-        From = draft.From == null ? null : new MessageRecipient {
-            Name = draft.From.Name,
-            Address = draft.From.Address
-        },
-        To = draft.To.Select(ToRecipientCopy).ToList(),
-        Cc = draft.Cc.Select(ToRecipientCopy).ToList(),
-        Bcc = draft.Bcc.Select(ToRecipientCopy).ToList(),
-        ReplyTo = draft.ReplyTo.Select(ToRecipientCopy).ToList(),
-        Subject = draft.Subject,
-        TextBody = draft.TextBody,
-        HtmlBody = draft.HtmlBody,
-        Headers = new Dictionary<string, string>(draft.Headers, StringComparer.OrdinalIgnoreCase),
-        Attachments = draft.Attachments.Select(attachment => new DraftAttachment {
-            Path = attachment.Path,
-            FileName = attachment.FileName,
-            ContentType = attachment.ContentType,
-            IsInline = attachment.IsInline,
-            ContentId = attachment.ContentId
-        }).ToList()
-    };
-
     private static void AddRecipients(ICollection<MessageRecipient> destination, IEnumerable<string>? addresses) {
         if (addresses == null) {
             return;
@@ -232,11 +209,6 @@ public sealed partial class MailMcpTools {
             });
         }
     }
-
-    private static MessageRecipient ToRecipientCopy(MessageRecipient recipient) => new() {
-        Name = recipient.Name,
-        Address = recipient.Address
-    };
 
     private static MailMessageActionPlanBatchQuery? BuildBatchQuery(IReadOnlyList<string>? planNames, IReadOnlyList<string>? profileIds, IReadOnlyList<string>? actions, string? sortBy, bool descending) {
         var normalizedPlanNames = (planNames ?? Array.Empty<string>())

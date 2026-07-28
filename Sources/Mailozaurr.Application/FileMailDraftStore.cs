@@ -100,34 +100,6 @@ public sealed class FileMailDraftStore : IMailDraftStore {
         Name = draft.Name,
         CreatedAt = draft.CreatedAt,
         UpdatedAt = draft.UpdatedAt,
-        Message = CloneMessage(draft.Message)
+        Message = DraftMessageCloner.Clone(draft.Message)
     };
-
-    private static DraftMessage CloneMessage(DraftMessage message) => new() {
-        ProfileId = message.ProfileId,
-        From = message.From == null ? null : CloneRecipient(message.From),
-        To = message.To.Select(CloneRecipient).ToList(),
-        Cc = message.Cc.Select(CloneRecipient).ToList(),
-        Bcc = message.Bcc.Select(CloneRecipient).ToList(),
-        ReplyTo = message.ReplyTo.Select(CloneRecipient).ToList(),
-        Subject = message.Subject,
-        TextBody = message.TextBody,
-        HtmlBody = message.HtmlBody,
-        Headers = new Dictionary<string, string>(message.Headers, StringComparer.OrdinalIgnoreCase),
-        Attachments = message.Attachments.Select(CloneAttachment).ToList()
-    };
-
-    private static MessageRecipient CloneRecipient(MessageRecipient recipient) => new() {
-        Name = recipient.Name,
-        Address = recipient.Address
-    };
-
-    private static DraftAttachment CloneAttachment(DraftAttachment attachment) => new() {
-        Path = attachment.Path,
-        FileName = attachment.FileName,
-        ContentType = attachment.ContentType,
-        IsInline = attachment.IsInline,
-        ContentId = attachment.ContentId
-    };
-
 }

@@ -40,6 +40,30 @@ public sealed class SendGridSendEmailAsyncTests {
         Assert.Single(handler.Requests);
     }
 
+    [Fact]
+    public async Task SendEmailAsync_ReturnsNativeMessageId() {
+        var response = new HttpResponseMessage(HttpStatusCode.Accepted);
+        response.Headers.Add("X-Message-Id", "sendgrid-123");
+        var handler = new RecordingHandler(response);
+        using var client = CreateClient(handler);
+
+        var result = await client.SendEmailAsync();
+
+        Assert.True(result.Status);
+        Assert.Equal("sendgrid-123", result.MessageId);
+    }
+
+    [Fact]
+    public async Task SendEmailAsync_SharedRequestDeadlineCancelsStalledRequest() {
+        using var client = CreateClient(new BlockingHandler());
+        client.RequestTimeout = TimeSpan.FromMilliseconds(50);
+
+        var result = await client.SendEmailAsync();
+
+        Assert.False(result.Status);
+        Assert.True(client.Stopwatch.Elapsed < TimeSpan.FromSeconds(5));
+    }
+
     private static SendGridClient CreateClient(HttpMessageHandler handler) {
         var client = new SendGridClient(handler) {
             From = "sender@example.com",
@@ -50,5 +74,17 @@ public sealed class SendGridSendEmailAsyncTests {
         };
         client.CreateMessage();
         return client;
+    }
+
+    private sealed class BlockingHandler : HttpMessageHandler {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) {
+
+            await Task.Delay(
+                Timeout.InfiniteTimeSpan,
+                cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.Accepted);
+        }
     }
 }

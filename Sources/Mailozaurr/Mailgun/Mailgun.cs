@@ -376,26 +376,29 @@ public class MailgunClient : IDisposable {
                 };
                 request.Headers.Authorization = new AuthenticationHeaderValue("Basic", auth);
                 using var response = await _client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+                var responseContent = await ProviderResponseParser
+                    .ReadContentAsync(response, cancellationToken)
+                    .ConfigureAwait(false);
                 if (response.IsSuccessStatusCode) {
                     var statusCode = response.StatusCode.ToString();
-                    var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, statusCode, "");
+                    var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, statusCode, "") {
+                        MessageId = ProviderResponseParser
+                            .GetJsonMessageId(responseContent)
+                    };
                     await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken).ConfigureAwait(false);
                     return okResult;
                 }
-#if NET5_0_OR_GREATER
-                var error = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-#else
-                var error = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-#endif
-                throw HttpRetryPolicy.CreateFailure(response.StatusCode, error);
+                throw HttpRetryPolicy.CreateFailure(
+                    response.StatusCode,
+                    responseContent);
             } catch (Exception ex) when (
                 ex is HttpRequestException ||
                 ex is TaskCanceledException && !cancellationToken.IsCancellationRequested) {
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Mailgun: {ex.Message}");
                 if (!HttpRetryPolicy.ShouldRetry(ex, attempts, RetryCount, RetryAlways)) {
-                    var queuedMessageId = HttpRetryPolicy.ShouldQueue(ex, RetryAlways)
-                        ? await QueuePendingMessageAsync(cancellationToken).ConfigureAwait(false)
-                        : null;
+                    var queuedMessageId =
+                        await QueuePendingMessageAsync(
+                            cancellationToken).ConfigureAwait(false);
                     if (ErrorAction == ActionPreference.Stop) throw;
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", ex.Message) {
                         MessageId = queuedMessageId

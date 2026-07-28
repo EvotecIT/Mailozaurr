@@ -143,7 +143,7 @@ public sealed class ProviderPendingMessageTests {
         var repository = new InMemoryPendingMessageRepository();
         client.PendingMessageRepository = repository;
 
-        var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError) {
+        var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest) {
             Content = new StringContent("failure", Encoding.UTF8, "text/plain")
         }));
         var httpClientField = typeof(SendGridClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -248,7 +248,7 @@ public sealed class ProviderPendingMessageTests {
             Text = "body"
         };
 
-        var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadGateway) {
+        var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest) {
             Content = new StringContent("error", Encoding.UTF8, "text/plain")
         }));
         var httpClientField = typeof(MailgunClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -524,7 +524,7 @@ public sealed class ProviderPendingMessageTests {
             Text = "body"
         };
 
-        var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) {
+        var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest) {
             Content = new StringContent("failure", Encoding.UTF8, "text/plain")
         }));
         var httpClientField = typeof(SesClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;

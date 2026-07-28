@@ -25,12 +25,6 @@ internal static class HttpRetryPolicy {
         (retryAlways || Helpers.IsTransient(exception));
 
     /// <summary>
-    /// Determines whether a terminal failure is eligible for deferred retry.
-    /// </summary>
-    internal static bool ShouldQueue(Exception exception, bool retryAlways) =>
-        retryAlways || Helpers.IsTransient(exception);
-
-    /// <summary>
     /// Delays before the next attempt using bounded exponential backoff and jitter.
     /// </summary>
     internal static Task DelayAsync(

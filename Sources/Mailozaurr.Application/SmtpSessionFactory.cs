@@ -54,6 +54,7 @@ public sealed class SmtpSessionFactory : ISmtpSessionFactory {
             RetryDelayBackoff = GetDoubleSetting(profile, MailProfileSettingsKeys.RetryDelayBackoff) ?? 2.0,
             MaxDelayMilliseconds = GetIntSetting(profile, MailProfileSettingsKeys.MaxDelayMilliseconds) ?? 10_000,
             JitterMilliseconds = GetIntSetting(profile, MailProfileSettingsKeys.JitterMilliseconds) ?? 250,
+            RetryAlways = GetBoolSetting(profile, MailProfileSettingsKeys.RetryAlways) ?? false,
             SkipCertificateValidation = GetBoolSetting(profile, MailProfileSettingsKeys.SkipCertificateValidation) ?? false,
             SkipCertificateRevocation = GetBoolSetting(profile, MailProfileSettingsKeys.SkipCertificateRevocation) ?? false,
             Authenticate = authenticationEnabled,

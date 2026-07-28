@@ -15,6 +15,7 @@ public class SmtpSessionServiceTests {
             SecureSocketOptions = SecureSocketOptions.Auto,
             UserName = "user",
             Password = "pass",
+            RetryAlways = true,
             ConnectAsync = (_, _) => Task.FromResult(new SmtpResult(true, EmailAction.Connect, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero)),
             AuthenticateAsync = (_, _) => Task.FromResult(new SmtpResult(true, EmailAction.Authenticate, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero))
         };
@@ -25,6 +26,7 @@ public class SmtpSessionServiceTests {
         Assert.True(result.IsSuccess);
         Assert.Equal(SecureSocketOptions.Auto, result.SecureSocketOptions);
         Assert.Null(result.ErrorCode);
+        Assert.True(smtp.RetryAlways);
     }
 
     [Fact]

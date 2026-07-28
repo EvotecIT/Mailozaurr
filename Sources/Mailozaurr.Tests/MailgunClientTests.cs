@@ -301,6 +301,21 @@ public class MailgunClientTests {
     }
 
     [Fact]
+    public async Task SendEmailAsync_ReturnsNativeMessageId() {
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) {
+                Content = new StringContent(
+                    "{\"id\":\"<mailgun-123@example.com>\",\"message\":\"Queued\"}")
+            });
+        using var client = CreateClient(handler);
+
+        var result = await client.SendEmailAsync();
+
+        Assert.True(result.Status);
+        Assert.Equal("<mailgun-123@example.com>", result.MessageId);
+    }
+
+    [Fact]
     public async Task SendEmailAsync_DisposesResponse_OnFailure() {
         var handler = new TrackingHandler(HttpStatusCode.BadRequest, "bad");
         using var client = CreateClient(handler);

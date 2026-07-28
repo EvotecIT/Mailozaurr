@@ -27,7 +27,8 @@ public sealed class ApplicationSmtpSessionFactoryTests {
                 [MailProfileSettingsKeys.SecureSocketOptions] = SecureSocketOptions.StartTls.ToString(),
                 [MailProfileSettingsKeys.UseSsl] = "true",
                 [MailProfileSettingsKeys.MaxDelayMilliseconds] = "9000",
-                [MailProfileSettingsKeys.JitterMilliseconds] = "175"
+                [MailProfileSettingsKeys.JitterMilliseconds] = "175",
+                [MailProfileSettingsKeys.RetryAlways] = "true"
             }
         });
 
@@ -38,6 +39,7 @@ public sealed class ApplicationSmtpSessionFactoryTests {
         Assert.True(captured.UseSsl);
         Assert.Equal(9000, captured.MaxDelayMilliseconds);
         Assert.Equal(175, captured.JitterMilliseconds);
+        Assert.True(captured.RetryAlways);
         Assert.Equal("sender@example.com", captured.UserName);
         Assert.Equal("super-secret", captured.Password);
         Assert.Equal(ProtocolAuthMode.Basic, captured.AuthMode);
