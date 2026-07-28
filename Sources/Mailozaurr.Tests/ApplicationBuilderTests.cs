@@ -46,6 +46,9 @@ public sealed class ApplicationBuilderTests {
         Assert.Contains(app.SendHandlers, handler => handler.Kind == MailProfileKind.Graph);
         Assert.Contains(app.SendHandlers, handler => handler.Kind == MailProfileKind.Gmail);
         Assert.Contains(app.SendHandlers, handler => handler.Kind == MailProfileKind.Smtp);
+        Assert.Contains(app.SendHandlers, handler => handler.Kind == MailProfileKind.SendGrid);
+        Assert.Contains(app.SendHandlers, handler => handler.Kind == MailProfileKind.Mailgun);
+        Assert.Contains(app.SendHandlers, handler => handler.Kind == MailProfileKind.Ses);
     }
 
     [Fact]
@@ -57,6 +60,9 @@ public sealed class ApplicationBuilderTests {
             EnableGmailReadHandler = false,
             EnableGmailSendHandler = false,
             EnableSmtpSendHandler = false,
+            EnableSendGridSendHandler = false,
+            EnableMailgunSendHandler = false,
+            EnableSesSendHandler = false,
             ProfileStore = new MailProfileStoreOptions { DirectoryPath = CreateTemporaryDirectory() },
             SecretStore = new MailSecretStoreOptions { DirectoryPath = CreateTemporaryDirectory() }
         });
@@ -69,6 +75,9 @@ public sealed class ApplicationBuilderTests {
         Assert.DoesNotContain(app.SendHandlers, handler => handler.Kind == MailProfileKind.Graph);
         Assert.DoesNotContain(app.SendHandlers, handler => handler.Kind == MailProfileKind.Gmail);
         Assert.DoesNotContain(app.SendHandlers, handler => handler.Kind == MailProfileKind.Smtp);
+        Assert.DoesNotContain(app.SendHandlers, handler => handler.Kind == MailProfileKind.SendGrid);
+        Assert.DoesNotContain(app.SendHandlers, handler => handler.Kind == MailProfileKind.Mailgun);
+        Assert.DoesNotContain(app.SendHandlers, handler => handler.Kind == MailProfileKind.Ses);
     }
 
     [Fact]
@@ -80,6 +89,9 @@ public sealed class ApplicationBuilderTests {
             EnableGmailReadHandler = false,
             EnableGmailSendHandler = false,
             EnableSmtpSendHandler = false,
+            EnableSendGridSendHandler = false,
+            EnableMailgunSendHandler = false,
+            EnableSesSendHandler = false,
             ProfileStore = new MailProfileStoreOptions { DirectoryPath = CreateTemporaryDirectory() },
             SecretStore = new MailSecretStoreOptions { DirectoryPath = CreateTemporaryDirectory() }
         });
@@ -256,6 +268,9 @@ public sealed class ApplicationBuilderTests {
             EnableGmailReadHandler = false,
             EnableGmailSendHandler = false,
             EnableSmtpSendHandler = false,
+            EnableSendGridSendHandler = false,
+            EnableMailgunSendHandler = false,
+            EnableSesSendHandler = false,
             ProfileStore = new MailProfileStoreOptions { DirectoryPath = CreateTemporaryDirectory() },
             SecretStore = new MailSecretStoreOptions { DirectoryPath = CreateTemporaryDirectory() }
         });
@@ -275,6 +290,9 @@ public sealed class ApplicationBuilderTests {
             EnableGmailReadHandler = false,
             EnableGmailSendHandler = false,
             EnableSmtpSendHandler = false,
+            EnableSendGridSendHandler = false,
+            EnableMailgunSendHandler = false,
+            EnableSesSendHandler = false,
             ProfileStore = new MailProfileStoreOptions { DirectoryPath = CreateTemporaryDirectory() },
             SecretStore = new MailSecretStoreOptions { DirectoryPath = CreateTemporaryDirectory() }
         });
@@ -313,6 +331,9 @@ public sealed class ApplicationBuilderTests {
             EnableGmailReadHandler = false,
             EnableGmailSendHandler = false,
             EnableSmtpSendHandler = false,
+            EnableSendGridSendHandler = false,
+            EnableMailgunSendHandler = false,
+            EnableSesSendHandler = false,
             SecretStore = new MailSecretStoreOptions { DirectoryPath = Path.Combine(directory, "secrets") }
         }).UseProfileStore(store);
 

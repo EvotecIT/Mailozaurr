@@ -208,7 +208,7 @@ public static partial class CliRunner {
     private static SendMessageRequest CreateSendRequestFromDraft(DraftMessage draft, bool queueOnFailure) =>
         new() {
             ProfileId = draft.ProfileId,
-            Message = CloneDraftMessage(draft),
+            Message = DraftMessageCloner.Clone(draft),
             QueueOnFailure = queueOnFailure
         };
 
@@ -259,34 +259,6 @@ public static partial class CliRunner {
 
         return draft;
     }
-
-    private static DraftMessage CloneDraftMessage(DraftMessage draft) => new() {
-        ProfileId = draft.ProfileId,
-        From = draft.From == null ? null : new MessageRecipient {
-            Name = draft.From.Name,
-            Address = draft.From.Address
-        },
-        To = draft.To.Select(ToRecipientCopy).ToList(),
-        Cc = draft.Cc.Select(ToRecipientCopy).ToList(),
-        Bcc = draft.Bcc.Select(ToRecipientCopy).ToList(),
-        ReplyTo = draft.ReplyTo.Select(ToRecipientCopy).ToList(),
-        Subject = draft.Subject,
-        TextBody = draft.TextBody,
-        HtmlBody = draft.HtmlBody,
-        Headers = new Dictionary<string, string>(draft.Headers, StringComparer.OrdinalIgnoreCase),
-        Attachments = draft.Attachments.Select(attachment => new DraftAttachment {
-            Path = attachment.Path,
-            FileName = attachment.FileName,
-            ContentType = attachment.ContentType,
-            IsInline = attachment.IsInline,
-            ContentId = attachment.ContentId
-        }).ToList()
-    };
-
-    private static MessageRecipient ToRecipientCopy(MessageRecipient recipient) => new() {
-        Name = recipient.Name,
-        Address = recipient.Address
-    };
 
     private static async Task WriteItemAsync<T>(
         TextWriter output,

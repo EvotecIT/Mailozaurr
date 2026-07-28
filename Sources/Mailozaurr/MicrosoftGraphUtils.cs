@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -108,6 +109,40 @@ namespace Mailozaurr {
                 ExpiresOn = authorization.ExpiresOn
             }).ConfigureAwait(false);
         }
+
+        internal static string BuildGraphTokenCacheKey(
+            GraphCredential credential,
+            string tenantDomain,
+            string resource) {
+            if (credential == null) {
+                throw new ArgumentNullException(nameof(credential));
+            }
+
+            string certificateBytesHash = credential.CertificateBytes == null
+                ? string.Empty
+                : ComputeSha256Hex(credential.CertificateBytes);
+            string identity = string.Join(
+                "\n",
+                credential.ClientId ?? string.Empty,
+                tenantDomain ?? string.Empty,
+                resource ?? string.Empty,
+                credential.CertificatePath ?? string.Empty,
+                credential.CertificatePemPath ?? string.Empty,
+                certificateBytesHash,
+                credential.ClientSecret ?? string.Empty);
+
+            return $"v2:{ComputeSha256Hex(Encoding.UTF8.GetBytes(identity))}";
+        }
+
+        private static string ComputeSha256Hex(byte[] value) {
+            using var sha256 = SHA256.Create();
+            byte[] hash = sha256.ComputeHash(value);
+            var builder = new StringBuilder(hash.Length * 2);
+            foreach (byte item in hash) {
+                builder.Append(item.ToString("x2", System.Globalization.CultureInfo.InvariantCulture));
+            }
+            return builder.ToString();
+        }
         /// <summary>
         /// Converts a credential string (username@directory) and secret to a GraphCredential object.
         /// </summary>
@@ -153,7 +188,7 @@ namespace Mailozaurr {
                     : $"Bearer {accessToken}";
             }
 
-            var key = $"{credential.ClientId}|{tenantDomain}|{credential.CertificatePath}|{credential.ClientSecret}|{resource}";
+            string key = BuildGraphTokenCacheKey(credential, tenantDomain, resource);
             if (TokenCache.TryGetValue(key, out var cached) && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
                 return $"{cached.TokenType} {cached.AccessToken}";
             }

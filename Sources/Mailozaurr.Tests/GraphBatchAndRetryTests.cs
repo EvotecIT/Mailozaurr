@@ -11,6 +11,34 @@ namespace Mailozaurr.Tests;
 
 [Collection("GraphCollection")]
 public class GraphBatchAndRetryTests {
+    [Fact]
+    public void BuildGraphTokenCacheKey_DoesNotExposeSecretAndSeparatesCredentials() {
+        var first = new GraphCredential {
+            ClientId = "client",
+            DirectoryId = "tenant",
+            ClientSecret = "first-super-secret"
+        };
+        var second = new GraphCredential {
+            ClientId = "client",
+            DirectoryId = "tenant",
+            ClientSecret = "second-super-secret"
+        };
+
+        string firstKey = MicrosoftGraphUtils.BuildGraphTokenCacheKey(
+            first,
+            first.DirectoryId,
+            "https://graph.microsoft.com");
+        string secondKey = MicrosoftGraphUtils.BuildGraphTokenCacheKey(
+            second,
+            second.DirectoryId,
+            "https://graph.microsoft.com");
+
+        Assert.StartsWith("v2:", firstKey, StringComparison.Ordinal);
+        Assert.DoesNotContain(first.ClientSecret, firstKey, StringComparison.Ordinal);
+        Assert.DoesNotContain(first.ClientId, firstKey, StringComparison.Ordinal);
+        Assert.NotEqual(firstKey, secondKey);
+    }
+
     private class BatchHandler : HttpMessageHandler {
         public HttpRequestMessage? BatchRequest;
         public string? BatchPayload;
@@ -295,7 +323,10 @@ public class GraphBatchAndRetryTests {
 
             Assert.Equal("Bearer token", token);
             Assert.Equal(1, handler.CallCount);
-            var key = "id|tenant||secret|https://graph.microsoft.com";
+            var key = MicrosoftGraphUtils.BuildGraphTokenCacheKey(
+                credential,
+                "tenant",
+                "https://graph.microsoft.com");
             Assert.True(cache.TryGetValue(key, out var authorization));
             Assert.InRange(authorization.ExpiresOn, before.AddSeconds(1100), DateTimeOffset.UtcNow.AddSeconds(1300));
         } finally {

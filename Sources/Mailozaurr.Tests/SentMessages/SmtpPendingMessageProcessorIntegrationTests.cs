@@ -40,6 +40,7 @@ public sealed class SmtpPendingMessageProcessorIntegrationTests {
 
             var sendResult = await smtp.SendAsync(CancellationToken.None);
             Assert.False(sendResult.Status);
+            Assert.True(sendResult.Queued);
 
             var record = Assert.Single(repository.Records);
             Assert.Equal("smtp.integration.test", record.Server);

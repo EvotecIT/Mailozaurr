@@ -1,5 +1,4 @@
 using System.Net;
-using System.Threading;
 
 namespace Mailozaurr;
 
@@ -75,38 +74,11 @@ internal static class GraphRetryHelper {
     /// <summary>
     /// Calculate exponential backoff delay with optional jitter and cap.
     /// </summary>
-    internal static TimeSpan CalculateDelay(GraphSendPolicy policy, int attempt) {
-        if (attempt < 0) attempt = 0;
-        var baseDelay = (double)Math.Max(0, policy.BaseDelayMs);
-        var delay = baseDelay * Math.Pow(2, attempt);
-        var max = Math.Max(0, policy.MaxDelayMs);
-        if (max > 0) {
-            delay = Math.Min(delay, max);
-        }
-
-        var jitterWindow = Math.Max(0, policy.JitterMs);
-        if (jitterWindow > 0) {
-            var jitter = GraphRetryHelperRandom.NextInt(jitterWindow + 1);
-            delay += jitter;
-        }
-
-        return TimeSpan.FromMilliseconds(Math.Max(0, (int)Math.Round(delay)));
-    }
-}
-
-internal static class GraphRetryHelperRandom {
-#if !NET5_0_OR_GREATER
-    [ThreadStatic]
-    private static Random? s_random;
-#endif
-
-    internal static int NextInt(int maxExclusive) {
-        if (maxExclusive <= 1) return 0;
-#if NET5_0_OR_GREATER
-        return System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, maxExclusive);
-#else
-        var rnd = s_random ??= new Random(unchecked(Environment.TickCount * 31 + Thread.CurrentThread.ManagedThreadId));
-        return rnd.Next(0, maxExclusive);
-#endif
-    }
+    internal static TimeSpan CalculateDelay(GraphSendPolicy policy, int attempt) =>
+        RetryDelayCalculator.Calculate(
+            policy.BaseDelayMs,
+            2.0,
+            attempt,
+            policy.MaxDelayMs,
+            policy.JitterMs);
 }

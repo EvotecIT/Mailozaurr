@@ -9,7 +9,10 @@ public sealed class MailProfileService : IMailProfileService {
         MailSecretNames.ClientSecret,
         MailSecretNames.AccessToken,
         MailSecretNames.RefreshToken,
-        MailSecretNames.CertificatePassword
+        MailSecretNames.CertificatePassword,
+        MailSecretNames.ApiKey,
+        MailSecretNames.AccessKeyId,
+        MailSecretNames.SecretAccessKey
     };
     private readonly IMailProfileStore _profileStore;
     private readonly IMailSecretStore? _secretStore;
@@ -179,6 +182,19 @@ public sealed class MailProfileService : IMailProfileService {
                 var hasGmailClientId = HasSetting(profile, MailProfileSettingsKeys.ClientId);
                 if (!hasGmailAccessToken && (!hasGmailRefreshToken || !hasGmailClientId || !hasGmailClientSecret)) {
                     result.Errors.Add("Gmail profiles need an access token or a refresh token with a client id and client secret.");
+                }
+                break;
+            case MailProfileKind.SendGrid:
+            case MailProfileKind.Mailgun:
+                if (!await HasSecretAsync(profile.Id, MailSecretNames.ApiKey, cancellationToken).ConfigureAwait(false)) {
+                    result.Errors.Add($"{profile.Kind} profiles need an API key.");
+                }
+                break;
+            case MailProfileKind.Ses:
+                var hasSesAccessKeyId = await HasSecretAsync(profile.Id, MailSecretNames.AccessKeyId, cancellationToken).ConfigureAwait(false);
+                var hasSesSecretAccessKey = await HasSecretAsync(profile.Id, MailSecretNames.SecretAccessKey, cancellationToken).ConfigureAwait(false);
+                if (!hasSesAccessKeyId || !hasSesSecretAccessKey) {
+                    result.Errors.Add("SES profiles need an access key id and secret access key.");
                 }
                 break;
         }

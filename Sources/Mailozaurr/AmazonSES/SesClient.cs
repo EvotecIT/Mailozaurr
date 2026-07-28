@@ -1,8 +1,7 @@
 using Mailozaurr.Definitions;
 using System.Net.Http;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
+using System.Threading;
 
 namespace Mailozaurr;
 
@@ -15,6 +14,8 @@ namespace Mailozaurr;
 /// </remarks>
 public class SesClient : IDisposable {
     private readonly HttpClient _client;
+    private readonly bool _ownsClient;
+    private int _disposed;
 
     /// <summary>Measures send latency.</summary>
     public readonly Stopwatch Stopwatch;
@@ -44,6 +45,10 @@ public class SesClient : IDisposable {
     public string[]? Attachment { get; set; }
     /// <summary>Paths to inline attachments to include.</summary>
     public string[]? InlineAttachment { get; set; }
+    /// <summary>Structured attachments to include.</summary>
+    public List<AttachmentDescriptor>? Attachments { get; set; }
+    /// <summary>Structured inline attachments to include.</summary>
+    public List<AttachmentDescriptor>? InlineAttachments { get; set; }
 
     /// <summary>Name of the SES template to use.</summary>
     public string? TemplateName { get; set; }
@@ -52,6 +57,8 @@ public class SesClient : IDisposable {
 
     /// <summary>Custom headers to include with the message.</summary>
     public Dictionary<string, string>? Headers { get; set; }
+    /// <summary>Message priority written into the MIME payload.</summary>
+    public MessagePriority Priority { get; set; } = MessagePriority.Normal;
 
     /// <summary>Number of retry attempts on failure.</summary>
     public int RetryCount { get; set; } = 0;
@@ -106,7 +113,7 @@ public class SesClient : IDisposable {
     /// </summary>
     public SesClient() {
         Stopwatch = Stopwatch.StartNew();
-        _client = new HttpClient();
+        _client = Helpers.SharedHttpClient;
     }
 
     /// <summary>
@@ -116,6 +123,7 @@ public class SesClient : IDisposable {
     public SesClient(HttpMessageHandler handler) {
         Stopwatch = Stopwatch.StartNew();
         _client = new HttpClient(handler);
+        _ownsClient = true;
     }
 
     private MimeMessage BuildMessage() {
@@ -128,65 +136,44 @@ public class SesClient : IDisposable {
         smtp.Subject = Subject ?? string.Empty;
         smtp.TextBody = Text;
         smtp.HtmlBody = Html;
+        smtp.Priority = Priority;
         if (Attachment != null) smtp.Attachments = Attachment.Select(path => (AttachmentDescriptor)new FileAttachmentDescriptor(path)).ToList();
         if (InlineAttachment != null) smtp.InlineAttachments = InlineAttachment.Select(path => (AttachmentDescriptor)new FileAttachmentDescriptor(path)).ToList();
+        if (Attachments != null) {
+            smtp.Attachments ??= new List<AttachmentDescriptor>();
+            smtp.Attachments.AddRange(Attachments);
+        }
+        if (InlineAttachments != null) {
+            smtp.InlineAttachments ??= new List<AttachmentDescriptor>();
+            smtp.InlineAttachments.AddRange(InlineAttachments);
+        }
         if (Headers != null) smtp.Headers = Headers;
         smtp.CreateMessage();
         return smtp.Message;
     }
 
-    private static byte[] HmacSha256(byte[] key, string data) {
-        using HMACSHA256 hmac = new(key);
-        return hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
-    }
-
-    private static string Sha256Hex(string data) {
-        using SHA256 sha = SHA256.Create();
-        byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(data));
-        return BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
-    }
-
     private HttpRequestMessage CreateRequest(string content, DateTime utcNow) {
         NetworkCredential net = Credentials as NetworkCredential ?? throw new InvalidCastException("Credentials must be NetworkCredential");
-        string accessKey = net.UserName;
-        string secretKey = net.Password;
-        string service = "ses";
-        string region = Region;
-        string amzDate = utcNow.ToString("yyyyMMdd'T'HHmmss'Z'");
-        string dateStamp = utcNow.ToString("yyyyMMdd");
-        string canonicalHeaders = $"content-type:application/x-www-form-urlencoded\nhost:email.{region}.amazonaws.com\nx-amz-date:{amzDate}\n";
-        string signedHeaders = "content-type;host;x-amz-date";
-        string payloadHash = Sha256Hex(content);
-        string canonicalRequest = $"POST\n/\n\n{canonicalHeaders}\n{signedHeaders}\n{payloadHash}";
-        string credentialScope = $"{dateStamp}/{region}/{service}/aws4_request";
-        string stringToSign = $"AWS4-HMAC-SHA256\n{amzDate}\n{credentialScope}\n{Sha256Hex(canonicalRequest)}";
-        byte[] kDate = HmacSha256(Encoding.UTF8.GetBytes("AWS4" + secretKey), dateStamp);
-        byte[] kRegion = HmacSha256(kDate, region);
-        byte[] kService = HmacSha256(kRegion, service);
-        byte[] kSigning = HmacSha256(kService, "aws4_request");
-        byte[] sigBytes = HmacSha256(kSigning, stringToSign);
-        string signature = BitConverter.ToString(sigBytes).Replace("-", string.Empty).ToLowerInvariant();
-        string authorization = $"AWS4-HMAC-SHA256 Credential={accessKey}/{credentialScope}, SignedHeaders={signedHeaders}, Signature={signature}";
-
-        HttpRequestMessage request = new(HttpMethod.Post, $"https://email.{region}.amazonaws.com/");
-        request.Content = new StringContent(content, Encoding.UTF8, "application/x-www-form-urlencoded");
-        request.Headers.TryAddWithoutValidation("x-amz-date", amzDate);
-        request.Headers.TryAddWithoutValidation("Authorization", authorization);
-        return request;
+        return SesRequestFactory.Create(
+            net.UserName,
+            net.Password,
+            Region,
+            content,
+            utcNow);
     }
 
-    private async Task QueuePendingMessageAsync(MimeMessage? message, string? mimeMessageBase64, CancellationToken cancellationToken) {
+    private async Task<string?> QueuePendingMessageAsync(MimeMessage? message, string? mimeMessageBase64, CancellationToken cancellationToken) {
         if (PendingMessageRepository == null) {
-            return;
+            return null;
         }
 
         if (Credentials is not NetworkCredential net) {
             LogCollector.LogWarning("Send-EmailMessage - Unable to queue SES message because credentials are not network credentials.");
-            return;
+            return null;
         }
 
         if (string.IsNullOrEmpty(net.UserName) || string.IsNullOrEmpty(net.Password)) {
-            return;
+            return null;
         }
 
         var base64 = mimeMessageBase64;
@@ -205,14 +192,14 @@ public class SesClient : IDisposable {
             messageId = message.MessageId!;
         } else {
             if (string.IsNullOrEmpty(base64)) {
-                return;
+                return null;
             }
 
             messageId = Guid.NewGuid().ToString("N");
         }
 
         if (string.IsNullOrEmpty(base64)) {
-            return;
+            return null;
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -234,10 +221,12 @@ public class SesClient : IDisposable {
 
         try {
             await PendingMessageRepository.SaveAsync(record, cancellationToken).ConfigureAwait(false);
+            return record.MessageId;
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Failed to persist SES pending message: {ex.Message}");
+            return null;
         }
     }
 
@@ -248,56 +237,64 @@ public class SesClient : IDisposable {
         }
         int attempts = 0;
         Exception? lastException = null;
-        do {
+        while (true) {
             try {
                 using HttpRequestMessage request = CreateRequest(body, DateTime.UtcNow);
-                HttpResponseMessage response = await _client.SendAsync(request, cancellationToken);
-#if NET5_0_OR_GREATER
-                string respContent = await response.Content.ReadAsStringAsync(cancellationToken);
-#else
-                string respContent = await response.Content.ReadAsStringAsync();
-#endif
+                using HttpResponseMessage response = await _client.SendAsync(request, cancellationToken);
+                string respContent = await ProviderResponseParser
+                    .ReadContentAsync(response, cancellationToken)
+                    .ConfigureAwait(false);
                 if (response.IsSuccessStatusCode) {
-                    SmtpResult ok = new(true, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, response.StatusCode.ToString());
+                    SmtpResult ok = new(true, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, response.StatusCode.ToString()) {
+                        MessageId = ProviderResponseParser
+                            .GetSesMessageId(respContent)
+                    };
                     await Helpers.PostWebhookAsync(WebhookUrl, ok, cancellationToken, _client);
                     return ok;
                 }
 
-                lastException = new HttpRequestException(respContent);
-                LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SES: {respContent}");
+                throw HttpRetryPolicy.CreateFailure(response.StatusCode, respContent);
             } catch (HttpRequestException ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SES: {ex.Message}");
+            } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                throw;
+            } catch (TaskCanceledException ex) {
+                lastException = ex;
+                LogCollector.LogWarning($"Send-EmailMessage - SES request timed out: {ex.Message}");
             }
 
-            if ((!Helpers.IsTransient(lastException) && !RetryAlways) || attempts >= RetryCount) {
-                await QueuePendingMessageAsync(message, mimeMessageBase64, cancellationToken).ConfigureAwait(false);
+            if (!HttpRetryPolicy.ShouldRetry(
+                    lastException,
+                    attempts,
+                    RetryCount,
+                    RetryAlways,
+                    isKnownTransient: lastException is TaskCanceledException)) {
+                var queuedMessageId =
+                    await QueuePendingMessageAsync(
+                        message,
+                        mimeMessageBase64,
+                        cancellationToken).ConfigureAwait(false);
                 if (ErrorAction == ActionPreference.Stop && lastException != null) {
                     throw lastException;
                 }
-                SmtpResult fail = new(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, lastException?.Message);
+                SmtpResult fail = new(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, lastException?.Message) {
+                    MessageId = queuedMessageId,
+                    Queued = queuedMessageId != null
+                };
                 await Helpers.PostWebhookAsync(WebhookUrl, fail, cancellationToken, _client);
                 return fail;
             }
 
-            int delay = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
-            if (MaxDelayMilliseconds > 0 && delay > MaxDelayMilliseconds) {
-                delay = MaxDelayMilliseconds;
-            }
-            if (JitterMilliseconds > 0 && delay > 0) {
-                delay += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
-            }
-            if (delay > 0) {
-                await Task.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken);
-            }
+            await HttpRetryPolicy.DelayAsync(
+                RetryDelayMilliseconds,
+                RetryDelayBackoff,
+                attempts,
+                MaxDelayMilliseconds,
+                JitterMilliseconds,
+                cancellationToken).ConfigureAwait(false);
             attempts++;
         }
-        while (attempts <= RetryCount);
-
-        await QueuePendingMessageAsync(message, mimeMessageBase64, cancellationToken).ConfigureAwait(false);
-        SmtpResult final = new(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, lastException?.Message);
-        await Helpers.PostWebhookAsync(WebhookUrl, final, cancellationToken, _client);
-        return final;
     }
 
     /// <summary>
@@ -309,6 +306,7 @@ public class SesClient : IDisposable {
     /// Sends the email using Amazon SES.
     /// </summary>
     public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken) {
+        ThrowIfDisposed();
         MimeMessage message = BuildMessage();
         using MemoryStream stream = new();
         await message.WriteToAsync(stream, cancellationToken);
@@ -326,6 +324,7 @@ public class SesClient : IDisposable {
     /// Sends a templated email using Amazon SES.
     /// </summary>
     public async Task<SmtpResult> SendTemplatedEmailAsync(CancellationToken cancellationToken) {
+        ThrowIfDisposed();
         StringBuilder sb = new("Action=SendTemplatedEmail&Version=2010-12-01");
         if (!string.IsNullOrEmpty(TemplateName)) sb.Append("&Template=").Append(Uri.EscapeDataString(TemplateName));
         sb.Append("&Source=").Append(Uri.EscapeDataString(SentFrom));
@@ -354,6 +353,17 @@ public class SesClient : IDisposable {
     /// Releases resources used by the <see cref="SesClient"/> instance.
     /// </summary>
     public void Dispose() {
-        _client.Dispose();
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) {
+            return;
+        }
+        if (_ownsClient) {
+            _client.Dispose();
+        }
+    }
+
+    private void ThrowIfDisposed() {
+        if (Volatile.Read(ref _disposed) != 0) {
+            throw new ObjectDisposedException(nameof(SesClient));
+        }
     }
 }

@@ -18,6 +18,8 @@ public class SmtpResult {
     public string SentFrom { get; set; }
     /// <summary>Identifier of the message associated with the result.</summary>
     public string? MessageId { get; set; }
+    /// <summary>Whether the failed send was successfully persisted for later delivery.</summary>
+    public bool Queued { get; set; }
     /// <summary>Optional message returned by the operation.</summary>
     public string? Message { get; set; }
     /// <summary>Time taken to perform the action.</summary>

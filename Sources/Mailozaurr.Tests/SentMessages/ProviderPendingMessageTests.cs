@@ -1,4 +1,5 @@
 using MimeKit;
+using Mailozaurr.Definitions;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -143,7 +144,7 @@ public sealed class ProviderPendingMessageTests {
         var repository = new InMemoryPendingMessageRepository();
         client.PendingMessageRepository = repository;
 
-        var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError) {
+        var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest) {
             Content = new StringContent("failure", Encoding.UTF8, "text/plain")
         }));
         var httpClientField = typeof(SendGridClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -151,11 +152,13 @@ public sealed class ProviderPendingMessageTests {
 
         var result = await client.SendEmailAsync(CancellationToken.None);
         Assert.False(result.Status);
+        Assert.True(result.Queued);
 
         var record = repository.LastSaved;
         Assert.NotNull(record);
         Assert.Equal(EmailProvider.SendGrid, record.Provider);
         Assert.False(string.IsNullOrWhiteSpace(record.MessageId));
+        Assert.Equal(record.MessageId, result.MessageId);
         Assert.True(record.ProviderData.TryGetValue(SendGridPendingMessageSender.MessageJsonKey, out var json));
         Assert.False(string.IsNullOrWhiteSpace(json));
         Assert.True(record.ProviderData.TryGetValue(SendGridPendingMessageSender.ApiKeyProtectedKey, out var apiKeyProtected));
@@ -244,10 +247,11 @@ public sealed class ProviderPendingMessageTests {
             From = "sender@example.com",
             To = new List<object> { "recipient@example.com" },
             Subject = "mailgun",
-            Text = "body"
+            Text = "body",
+            Priority = MessagePriority.High
         };
 
-        var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadGateway) {
+        var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest) {
             Content = new StringContent("error", Encoding.UTF8, "text/plain")
         }));
         var httpClientField = typeof(MailgunClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -255,10 +259,12 @@ public sealed class ProviderPendingMessageTests {
 
         var result = await client.SendEmailAsync(CancellationToken.None);
         Assert.False(result.Status);
+        Assert.True(result.Queued);
 
         var record = repository.LastSaved;
         Assert.NotNull(record);
         Assert.Equal(EmailProvider.Mailgun, record.Provider);
+        Assert.Equal(record.MessageId, result.MessageId);
         Assert.Equal("example.com", record.ProviderData[MailgunPendingMessageSender.DomainKey]);
         Assert.True(record.ProviderData.TryGetValue(MailgunPendingMessageSender.ApiKeyProtectedKey, out var mailgunProtected));
         Assert.False(string.IsNullOrWhiteSpace(mailgunProtected));
@@ -266,6 +272,7 @@ public sealed class ProviderPendingMessageTests {
         Assert.DoesNotContain(MailgunPendingMessageSender.ApiKeyBase64Key, record.ProviderData.Keys);
         var mime = await MimeMessage.LoadAsync(new MemoryStream(Convert.FromBase64String(record.MimeMessage)));
         Assert.Equal("mailgun", mime.Subject);
+        Assert.Equal(MimeKit.MessagePriority.Urgent, mime.Priority);
 
         var successHandler = new TestHandler((request, _) => {
             Assert.Equal(HttpMethod.Post, request.Method);
@@ -283,6 +290,83 @@ public sealed class ProviderPendingMessageTests {
 
         Assert.Equal(1, successHandler.CallCount);
         Assert.Null(await repository.GetByMessageIdAsync(record!.MessageId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task MailgunClient_QueuesEachFileBackedAttachmentOnceAcrossAllInputs() {
+        var file = Path.GetTempFileName();
+        try {
+            var repository = new InMemoryPendingMessageRepository();
+            using var client = new MailgunClient {
+                PendingMessageRepository = repository,
+                Credentials = new NetworkCredential("user", "mailgun-api-key"),
+                From = "sender@example.com",
+                To = new List<object> { "recipient@example.com" },
+                Subject = "mailgun-attachment-dedup",
+                Text = "body",
+                Attachment = new[] { file },
+                InlineAttachment = new[] { file },
+                Attachments = new List<AttachmentDescriptor> {
+                    new FileAttachmentDescriptor(file)
+                },
+                InlineAttachments = new List<AttachmentDescriptor> {
+                    new FileAttachmentDescriptor(file)
+                }
+            };
+            var failureHandler = new TestHandler((_, _) =>
+                Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest) {
+                    Content = new StringContent("error", Encoding.UTF8, "text/plain")
+                }));
+            var httpClientField = typeof(MailgunClient).GetField(
+                "_client",
+                BindingFlags.NonPublic | BindingFlags.Instance)!;
+            httpClientField.SetValue(client, new HttpClient(failureHandler));
+
+            var result = await client.SendEmailAsync(CancellationToken.None);
+
+            Assert.False(result.Status);
+            Assert.True(result.Queued);
+            var record = Assert.IsType<PendingMessageRecord>(repository.LastSaved);
+            var mime = await MimeMessage.LoadAsync(
+                new MemoryStream(Convert.FromBase64String(record.MimeMessage)));
+            var matchingParts = mime.BodyParts
+                .OfType<MimePart>()
+                .Where(part => string.Equals(
+                    part.FileName,
+                    Path.GetFileName(file),
+                    StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            Assert.Single(matchingParts);
+        } finally {
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public async Task MailgunClient_HttpTimeoutQueuesPendingMessage() {
+        var repository = new InMemoryPendingMessageRepository();
+        using var client = new MailgunClient {
+            PendingMessageRepository = repository,
+            RetryCount = 1,
+            RetryDelayMilliseconds = 0,
+            Credentials = new NetworkCredential("user", "mailgun-api-key"),
+            From = "sender@example.com",
+            To = new List<object> { "recipient@example.com" },
+            Subject = "mailgun-timeout",
+            Text = "body"
+        };
+        var timeoutHandler = new TestHandler((_, _) =>
+            Task.FromException<HttpResponseMessage>(new TaskCanceledException("HTTP request timeout")));
+        var httpClientField = typeof(MailgunClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        httpClientField.SetValue(client, new HttpClient(timeoutHandler));
+
+        var result = await client.SendEmailAsync(CancellationToken.None);
+
+        Assert.False(result.Status);
+        Assert.Equal(2, timeoutHandler.CallCount);
+        Assert.NotNull(repository.LastSaved);
+        Assert.Equal(repository.LastSaved!.MessageId, result.MessageId);
+        Assert.Equal(EmailProvider.Mailgun, repository.LastSaved.Provider);
     }
 
     [Fact]
@@ -495,7 +579,7 @@ public sealed class ProviderPendingMessageTests {
             Text = "body"
         };
 
-        var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) {
+        var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest) {
             Content = new StringContent("failure", Encoding.UTF8, "text/plain")
         }));
         var httpClientField = typeof(SesClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -503,10 +587,12 @@ public sealed class ProviderPendingMessageTests {
 
         var result = await client.SendEmailAsync(CancellationToken.None);
         Assert.False(result.Status);
+        Assert.True(result.Queued);
 
         var record = repository.LastSaved;
         Assert.NotNull(record);
         Assert.Equal(EmailProvider.SES, record.Provider);
+        Assert.Equal(record.MessageId, result.MessageId);
         Assert.True(record.ProviderData.TryGetValue(SesPendingMessageSender.AccessKeyIdProtectedKey, out var sesAccessProtected));
         Assert.True(record.ProviderData.TryGetValue(SesPendingMessageSender.SecretAccessKeyProtectedKey, out var sesSecretProtected));
         Assert.Equal("AKIA123", CredentialProtection.UnprotectWithFallback(sesAccessProtected));
@@ -531,6 +617,34 @@ public sealed class ProviderPendingMessageTests {
 
         Assert.Equal(1, successHandler.CallCount);
         Assert.Null(await repository.GetByMessageIdAsync(record!.MessageId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task SesClient_HttpTimeoutQueuesPendingMessage() {
+        var repository = new InMemoryPendingMessageRepository();
+        using var client = new SesClient {
+            PendingMessageRepository = repository,
+            RetryCount = 1,
+            RetryDelayMilliseconds = 0,
+            Credentials = new NetworkCredential("AKIA123", "secret-key"),
+            Region = "us-east-1",
+            From = "sender@example.com",
+            To = new List<object> { "recipient@example.com" },
+            Subject = "ses-timeout",
+            Text = "body"
+        };
+        var timeoutHandler = new TestHandler((_, _) =>
+            Task.FromException<HttpResponseMessage>(new TaskCanceledException("HTTP request timeout")));
+        var httpClientField = typeof(SesClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        httpClientField.SetValue(client, new HttpClient(timeoutHandler));
+
+        var result = await client.SendEmailAsync(CancellationToken.None);
+
+        Assert.False(result.Status);
+        Assert.Equal(2, timeoutHandler.CallCount);
+        Assert.NotNull(repository.LastSaved);
+        Assert.Equal(repository.LastSaved!.MessageId, result.MessageId);
+        Assert.Equal(EmailProvider.SES, repository.LastSaved.Provider);
     }
 
     [Fact]

@@ -147,6 +147,27 @@ public sealed class ApplicationProfileServiceTests {
         Assert.NotNull(await service.GetProfileAsync("team"));
     }
 
+    [Theory]
+    [InlineData(MailSecretNames.ApiKey)]
+    [InlineData(MailSecretNames.AccessKeyId)]
+    [InlineData(MailSecretNames.SecretAccessKey)]
+    public async Task DeleteAsyncRemovesProviderSecretsFromBasicStores(string secretName) {
+        var profileStore = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
+        var secretStore = new BasicSecretStore();
+        var service = new MailProfileService(profileStore, secretStore);
+        await service.SaveAsync(new MailProfile {
+            Id = "provider",
+            DisplayName = "Provider",
+            Kind = MailProfileKind.SendGrid
+        });
+        await secretStore.SetSecretAsync("provider", secretName, "secret");
+
+        var result = await service.DeleteAsync("provider");
+
+        Assert.True(result.Succeeded);
+        Assert.Null(await secretStore.GetSecretAsync("provider", secretName));
+    }
+
     private static string CreateTemporaryFilePath(string fileName) {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -202,5 +223,22 @@ public sealed class ApplicationProfileServiceTests {
 
         public Task RemoveProfileSecretsAsync(string profileId, CancellationToken cancellationToken = default) =>
             Task.FromException(new IOException("Simulated secret cleanup failure."));
+    }
+
+    private sealed class BasicSecretStore : IMailSecretStore {
+        private readonly Dictionary<string, string> _secrets = new(StringComparer.OrdinalIgnoreCase);
+
+        public Task<string?> GetSecretAsync(string profileId, string secretName, CancellationToken cancellationToken = default) {
+            _secrets.TryGetValue($"{profileId}::{secretName}", out var value);
+            return Task.FromResult<string?>(value);
+        }
+
+        public Task SetSecretAsync(string profileId, string secretName, string secretValue, CancellationToken cancellationToken = default) {
+            _secrets[$"{profileId}::{secretName}"] = secretValue;
+            return Task.CompletedTask;
+        }
+
+        public Task<bool> RemoveSecretAsync(string profileId, string secretName, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_secrets.Remove($"{profileId}::{secretName}"));
     }
 }

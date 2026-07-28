@@ -1,4 +1,5 @@
 using Mailozaurr;
+using MimeKit;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,9 +16,29 @@ namespace Mailozaurr.Tests;
 /// </summary>
 public class HelpersTests {
     [Fact]
+    public void IsTransient_DoesNotTreatCallerCancellationAsRetryable() {
+        Assert.False(Helpers.IsTransient(new TaskCanceledException("caller canceled")));
+    }
+
+    [Fact]
     public void GetEmailAddress_ReturnsInputString_WhenStringProvided() {
         var result = Mailozaurr.Helpers.GetEmailAddress("test@example.com");
         Assert.Equal("test@example.com", result);
+    }
+
+    [Fact]
+    public void GetEmailAddress_ReturnsAddressFromNamedMailbox() {
+        var result = Mailozaurr.Helpers.GetEmailAddress(new MailboxAddress("Sender", "sender@example.com"));
+
+        Assert.Equal("sender@example.com", result);
+    }
+
+    [Fact]
+    public void GetEmailAndName_ReturnsStructuredMailboxValues() {
+        var result = Mailozaurr.Helpers.GetEmailAndName(new MailboxAddress("Sender", "sender@example.com"));
+
+        Assert.Equal("sender@example.com", result.Email);
+        Assert.Equal("Sender", result.Name);
     }
 
     [Fact]

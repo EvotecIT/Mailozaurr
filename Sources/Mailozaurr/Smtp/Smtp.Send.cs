@@ -207,19 +207,13 @@ public partial class Smtp {
         return $"{userName}|{_activeSecureSocketOptions}|{_activeUseSsl}";
     }
 
-    private TimeSpan CalculateRetryDelay(int attempt) {
-        if (attempt < 0) attempt = 0;
-        var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempt));
-        if (MaxDelayMilliseconds > 0 && delayMilliseconds > MaxDelayMilliseconds) {
-            delayMilliseconds = MaxDelayMilliseconds;
-        }
-        if (JitterMilliseconds > 0 && delayMilliseconds > 0) {
-            delayMilliseconds += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
-        }
-        return delayMilliseconds > 0
-            ? TimeSpan.FromMilliseconds(delayMilliseconds)
-            : TimeSpan.Zero;
-    }
+    internal TimeSpan CalculateRetryDelay(int attempt) =>
+        RetryDelayCalculator.Calculate(
+            RetryDelayMilliseconds,
+            RetryDelayBackoff,
+            attempt,
+            MaxDelayMilliseconds,
+            JitterMilliseconds);
 
     private string EnsureMessageId() {
         var id = Message.MessageId;
@@ -252,9 +246,9 @@ public partial class Smtp {
         await PendingMessageRepository.RemoveAsync(safeMessageId, cancellationToken);
     }
 
-    private async Task EnqueuePendingMessageAsync(string messageId, ICredentialProtector credentialProtector, CancellationToken cancellationToken) {
+    private async Task<bool> EnqueuePendingMessageAsync(string messageId, ICredentialProtector credentialProtector, CancellationToken cancellationToken) {
         if (PendingMessageRepository == null) {
-            return;
+            return false;
         }
 
         using var ms = new MemoryStream();
@@ -274,6 +268,7 @@ public partial class Smtp {
             ProviderData = CreateProviderDataSnapshot()
         };
         await PendingMessageRepository.SaveAsync(record, cancellationToken);
+        return true;
     }
 
     private async Task<SmtpResult?> EnsureMessageReadyAsync(CancellationToken cancellationToken) {
@@ -471,9 +466,10 @@ public partial class Smtp {
                         throw;
                     }
                     var id = EnsureMessageId();
-                    await EnqueuePendingMessageAsync(id, credentialProtector, cancellationToken);
+                    var queued = await EnqueuePendingMessageAsync(id, credentialProtector, cancellationToken);
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message) {
-                        MessageId = id
+                        MessageId = id,
+                        Queued = queued
                     };
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
                     return failResult;
@@ -488,9 +484,10 @@ public partial class Smtp {
         } while (attempts <= RetryCount);
 
         var finalId = EnsureMessageId();
-        await EnqueuePendingMessageAsync(finalId, credentialProtector, cancellationToken);
+        var finalQueued = await EnqueuePendingMessageAsync(finalId, credentialProtector, cancellationToken);
         var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", lastException?.Message) {
-            MessageId = finalId
+            MessageId = finalId,
+            Queued = finalQueued
         };
         await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken);
         return finalResult;

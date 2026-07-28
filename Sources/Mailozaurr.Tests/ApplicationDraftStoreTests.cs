@@ -13,6 +13,7 @@ public sealed class ApplicationDraftStoreTests {
                 ProfileId = "work-gmail",
                 Subject = "Report",
                 TextBody = "Hello",
+                Priority = MessagePriority.High,
                 To = {
                     new MessageRecipient { Address = "alice@example.com" }
                 }
@@ -26,6 +27,7 @@ public sealed class ApplicationDraftStoreTests {
         Assert.Equal("Quarterly report", saved!.Name);
         Assert.Equal("work-gmail", saved.Message.ProfileId);
         Assert.Equal("alice@example.com", saved.Message.To[0].Address);
+        Assert.Equal(MessagePriority.High, saved.Message.Priority);
         Assert.NotEqual(default, saved.CreatedAt);
         Assert.NotEqual(default, saved.UpdatedAt);
     }

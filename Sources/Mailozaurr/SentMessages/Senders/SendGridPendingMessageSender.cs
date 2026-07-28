@@ -47,7 +47,9 @@ public sealed class SendGridPendingMessageSender : IPendingMessageSender {
 #else
             var error = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
-            throw new HttpRequestException($"SendGrid returned {(int)response.StatusCode} ({response.StatusCode}): {error}");
+            throw HttpRetryPolicy.CreateFailure(
+                response.StatusCode,
+                $"SendGrid returned {(int)response.StatusCode} ({response.StatusCode}): {error}");
         }
     }
 

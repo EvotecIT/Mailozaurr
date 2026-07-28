@@ -1,4 +1,5 @@
 using MimeKit;
+using Mailozaurr.Definitions;
 using System.Collections.Generic;
 using System.Reflection;
 using Xunit;
@@ -33,5 +34,49 @@ public class SesClientTests {
         var message = method!.Invoke(client, null) as MimeMessage;
         Assert.NotNull(message);
         Assert.Equal("123", message!.Headers["X-Test"]);
+    }
+
+    [Fact]
+    public void BuildMessage_WithHighPriority_SetsMimePriority() {
+        using var client = new SesClient {
+            From = "sender@example.com",
+            To = new List<object> { "to@example.com" },
+            Subject = "subject",
+            Priority = MessagePriority.High
+        };
+        MethodInfo? method = typeof(SesClient).GetMethod("BuildMessage", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        var message = Assert.IsType<MimeMessage>(method!.Invoke(client, null));
+
+        Assert.Equal(MimeKit.MessagePriority.Urgent, message.Priority);
+    }
+
+    [Fact]
+    public void BuildMessage_PreservesStructuredAttachmentMetadata() {
+        var file = Path.GetTempFileName();
+        try {
+            using var client = new SesClient {
+                From = "sender@example.com",
+                To = new List<object> { "to@example.com" },
+                Subject = "subject",
+                Attachments = new List<AttachmentDescriptor> {
+                    new FileAttachmentDescriptor(file) {
+                        FileName = "report.pdf",
+                        ContentType = "application/pdf",
+                        ContentId = "report-content"
+                    }
+                }
+            };
+            MethodInfo? method = typeof(SesClient).GetMethod("BuildMessage", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            var message = Assert.IsType<MimeMessage>(method!.Invoke(client, null));
+            var attachment = Assert.IsType<MimePart>(Assert.Single(message.Attachments));
+
+            Assert.Equal("report.pdf", attachment.FileName);
+            Assert.Equal("application/pdf", attachment.ContentType.MimeType);
+            Assert.Equal("report-content", attachment.ContentId);
+        } finally {
+            File.Delete(file);
+        }
     }
 }

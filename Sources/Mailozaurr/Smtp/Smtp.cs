@@ -805,7 +805,21 @@ public partial class Smtp {
     /// <param name="Credentials"></param>
     /// <param name="isOAuth"></param>
     /// <returns></returns>
-    public async Task<SmtpResult> AuthenticateAsync(ICredentials Credentials, bool isOAuth = false) {
+    public Task<SmtpResult> AuthenticateAsync(ICredentials Credentials, bool isOAuth = false) =>
+        AuthenticateAsync(Credentials, isOAuth, CancellationToken.None);
+
+    /// <summary>
+    /// Asynchronously authenticates using the provided credentials.
+    /// </summary>
+    /// <param name="Credentials">Credentials used for authentication.</param>
+    /// <param name="isOAuth">Whether the credentials contain an OAuth token.</param>
+    /// <param name="cancellationToken">Token used to cancel authentication.</param>
+    /// <returns>The authentication result.</returns>
+    public async Task<SmtpResult> AuthenticateAsync(
+        ICredentials Credentials,
+        bool isOAuth,
+        CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
         if (DryRun) {
             LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "Authentication skipped (WhatIf)");
@@ -817,14 +831,16 @@ public partial class Smtp {
                     Credential = networkCredential;
                     var (userName, token) = Helpers.ConvertFromOAuth2Credential(networkCredential);
                     var oauth2 = new SaslMechanismOAuth2(userName, token);
-                    await Client.AuthenticateAsync(oauth2);
+                    await Client.AuthenticateAsync(oauth2, cancellationToken);
                 }
                 LogVerbose($"Send-EmailMessage - Authenticated using oAuth");
             } else {
                 Credential = Credentials as NetworkCredential;
-                await Client.AuthenticateAsync(Credentials);
+                await Client.AuthenticateAsync(Credentials, cancellationToken);
             }
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
         } catch (Exception ex) {
             LogWarning($"Send-EmailMessage - Error during authentication (oAuth): {ex.Message}");
             LogWarning($"Send-EmailMessage - Possible issue: OAuth? ({isOAuth} was used), ICredentials? ({Credentials}, was used).");

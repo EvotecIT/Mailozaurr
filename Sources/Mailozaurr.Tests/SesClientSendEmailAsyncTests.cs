@@ -57,18 +57,23 @@ public class SesClientSendEmailAsyncTests {
 
     [Fact]
     public async Task SendEmailAsync_ComputesSignature() {
-        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") });
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new StringContent(
+                "<SendRawEmailResponse><SendRawEmailResult><MessageId>ses-123</MessageId></SendRawEmailResult></SendRawEmailResponse>")
+        });
         using var client = CreateClient(handler);
         client.WebhookUrl = null;
 
         var result = await client.SendEmailAsync();
 
         Assert.True(result.Status);
+        Assert.Equal("ses-123", result.MessageId);
         var request = Assert.Single(handler.Requests);
         string amzDate = request.Headers.GetValues("x-amz-date").Single();
         string auth = request.Headers.GetValues("Authorization").Single();
         string body = await request.Content!.ReadAsStringAsync();
         string expected = ExpectedAuthorization("AKID", "SECRET", "us-east-1", amzDate, body);
+        Assert.Equal("application/x-www-form-urlencoded", request.Content.Headers.ContentType?.ToString());
         Assert.Equal(expected, auth);
     }
 
@@ -101,6 +106,19 @@ public class SesClientSendEmailAsyncTests {
     }
 
     [Fact]
+    public async Task SendEmailAsync_PermanentFailureDoesNotRetry() {
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent("invalid") });
+        using var client = CreateClient(handler);
+        client.RetryCount = 3;
+
+        var result = await client.SendEmailAsync();
+
+        Assert.False(result.Status);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
     public async Task SendEmailAsync_PostsWebhook_OnSuccess() {
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") });
         using var client = CreateClient(handler);
@@ -123,5 +141,16 @@ public class SesClientSendEmailAsyncTests {
 
         Assert.Equal(2, handler.Requests.Count);
         Assert.Contains(handler.Requests, r => r.RequestUri!.ToString() == "http://localhost/");
+    }
+
+    [Fact]
+    public async Task SendEmailAsync_AfterDispose_ThrowsObjectDisposedException() {
+        var client = CreateClient(new RecordingHandler());
+        client.Dispose();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(
+            () => client.SendEmailAsync());
+        await Assert.ThrowsAsync<ObjectDisposedException>(
+            () => client.SendTemplatedEmailAsync());
     }
 }

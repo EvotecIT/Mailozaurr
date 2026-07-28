@@ -94,4 +94,5 @@ public static class MailProfileValidator {
             result.Errors.Add($"Profile setting '{MailProfileSettingsKeys.Port}' must be a valid TCP port.");
         }
     }
+
 }

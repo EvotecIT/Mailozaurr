@@ -308,6 +308,15 @@ public sealed class MailApplicationBuilder {
         if (_options.EnableSmtpSendHandler && !sendHandlers.Any(handler => handler.Kind == MailProfileKind.Smtp)) {
             sendHandlers.Add(new SmtpMailSendHandler(smtpSessionFactory, draftMimeMessageFactory, pendingMessageRepository));
         }
+        if (_options.EnableSendGridSendHandler && !sendHandlers.Any(handler => handler.Kind == MailProfileKind.SendGrid)) {
+            sendHandlers.Add(new SendGridMailSendHandler(secretStore, pendingMessageRepository));
+        }
+        if (_options.EnableMailgunSendHandler && !sendHandlers.Any(handler => handler.Kind == MailProfileKind.Mailgun)) {
+            sendHandlers.Add(new MailgunMailSendHandler(secretStore, pendingMessageRepository));
+        }
+        if (_options.EnableSesSendHandler && !sendHandlers.Any(handler => handler.Kind == MailProfileKind.Ses)) {
+            sendHandlers.Add(new SesMailSendHandler(secretStore, pendingMessageRepository));
+        }
 
         var availableCapabilities = MailCapabilityCatalog.ForRegisteredHandlers(
             readHandlers,

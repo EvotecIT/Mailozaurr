@@ -20,6 +20,7 @@ public sealed class DraftMimeMessageFactoryTests {
                 Subject = "Hello",
                 TextBody = "plain text",
                 HtmlBody = "<b>html</b>",
+                Priority = MessagePriority.High,
                 To = {
                     new MessageRecipient { Name = "Alice", Address = "alice@example.com" }
                 },
@@ -42,6 +43,7 @@ public sealed class DraftMimeMessageFactoryTests {
         Assert.Equal("Hello", message.Subject);
         Assert.Equal("plain text", message.TextBody);
         Assert.Equal("<b>html</b>", message.HtmlBody);
+        Assert.Equal(MimeKit.MessagePriority.Urgent, message.Priority);
         Assert.Equal("value", message.Headers["X-Test"]);
         Assert.Single(message.Attachments);
     }

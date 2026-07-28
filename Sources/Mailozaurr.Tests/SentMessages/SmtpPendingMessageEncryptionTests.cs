@@ -49,6 +49,7 @@ public sealed class SmtpPendingMessageEncryptionTests {
 
             var result = await smtp.SendAsync(CancellationToken.None);
             Assert.False(result.Status);
+            Assert.True(result.Queued);
 
             var record = Assert.Single(repository.Records);
             Assert.Equal("queued-user", record.UserName);

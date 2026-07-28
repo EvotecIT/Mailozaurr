@@ -34,7 +34,10 @@ public class MicrosoftGraphUtilsPagingTests {
         var tokenCacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
         var tokenCache = (ConcurrentDictionary<string, GraphAuthorization>)tokenCacheField.GetValue(null)!;
         var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", ClientSecret = "secret" };
-        var key = "id|tenant||secret|https://graph.microsoft.com";
+        var key = MicrosoftGraphUtils.BuildGraphTokenCacheKey(
+            cred,
+            "tenant",
+            "https://graph.microsoft.com");
         tokenCache[key] = new GraphAuthorization { AccessToken = "token", TokenType = "Bearer", ExpiresOn = DateTimeOffset.UtcNow.AddHours(1) };
         try {
             var messages = await MicrosoftGraphUtils.GetMailMessagesAsync(cred, "u", limit: 3);
@@ -62,7 +65,10 @@ public class MicrosoftGraphUtilsPagingTests {
         var tokenCacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
         var tokenCache = (ConcurrentDictionary<string, GraphAuthorization>)tokenCacheField.GetValue(null)!;
         var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", ClientSecret = "secret" };
-        var key = "id|tenant||secret|https://graph.microsoft.com";
+        var key = MicrosoftGraphUtils.BuildGraphTokenCacheKey(
+            cred,
+            "tenant",
+            "https://graph.microsoft.com");
         tokenCache[key] = new GraphAuthorization { AccessToken = "token", TokenType = "Bearer", ExpiresOn = DateTimeOffset.UtcNow.AddHours(1) };
         using var cts = new CancellationTokenSource();
         try {
@@ -96,7 +102,10 @@ public class MicrosoftGraphUtilsPagingTests {
         var tokenCacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
         var tokenCache = (ConcurrentDictionary<string, GraphAuthorization>)tokenCacheField.GetValue(null)!;
         var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", ClientSecret = "secret" };
-        var key = "id|tenant||secret|https://graph.microsoft.com";
+        var key = MicrosoftGraphUtils.BuildGraphTokenCacheKey(
+            cred,
+            "tenant",
+            "https://graph.microsoft.com");
         tokenCache[key] = new GraphAuthorization { AccessToken = "token", TokenType = "Bearer", ExpiresOn = DateTimeOffset.UtcNow.AddHours(1) };
         try {
             var attachments = await MicrosoftGraphUtils.GetMailMessageAttachmentsAsync(cred, "u", "m");
@@ -129,7 +138,10 @@ public class MicrosoftGraphUtilsPagingTests {
         var tokenCacheField = typeof(MicrosoftGraphUtils).GetField("TokenCache", BindingFlags.NonPublic | BindingFlags.Static)!;
         var tokenCache = (ConcurrentDictionary<string, GraphAuthorization>)tokenCacheField.GetValue(null)!;
         var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", ClientSecret = "secret" };
-        var key = "id|tenant||secret|https://graph.microsoft.com";
+        var key = MicrosoftGraphUtils.BuildGraphTokenCacheKey(
+            cred,
+            "tenant",
+            "https://graph.microsoft.com");
         tokenCache[key] = new GraphAuthorization { AccessToken = "token", TokenType = "Bearer", ExpiresOn = DateTimeOffset.UtcNow.AddHours(1) };
         try {
             var folders = await MicrosoftGraphUtils.GetMailFoldersAsync(cred, "u");

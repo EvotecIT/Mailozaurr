@@ -43,6 +43,9 @@ public static class MailProfileSettingsKeys {
     /// <summary>Authentication mode identifier.</summary>
     public const string AuthMode = "authMode";
 
+    /// <summary>Whether the transport should authenticate after connecting.</summary>
+    public const string AuthenticationEnabled = "authenticationEnabled";
+
     /// <summary>Secure socket options mode.</summary>
     public const string SecureSocketOptions = "secureSocketOptions";
 
@@ -60,6 +63,21 @@ public static class MailProfileSettingsKeys {
 
     /// <summary>Retry backoff multiplier.</summary>
     public const string RetryDelayBackoff = "retryDelayBackoff";
+
+    /// <summary>Maximum retry delay in milliseconds.</summary>
+    public const string MaxDelayMilliseconds = "maxDelayMilliseconds";
+
+    /// <summary>Random retry jitter window in milliseconds.</summary>
+    public const string JitterMilliseconds = "jitterMilliseconds";
+
+    /// <summary>Whether non-transient failures should also be retried.</summary>
+    public const string RetryAlways = "retryAlways";
+
+    /// <summary>Provider sending domain, where the transport supports an explicit domain.</summary>
+    public const string Domain = "domain";
+
+    /// <summary>Cloud region used by a regional transport such as Amazon SES.</summary>
+    public const string Region = "region";
 
     /// <summary>Whether certificate revocation checks should be skipped.</summary>
     public const string SkipCertificateRevocation = "skipCertificateRevocation";

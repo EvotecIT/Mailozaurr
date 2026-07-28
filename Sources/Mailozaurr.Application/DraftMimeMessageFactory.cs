@@ -21,7 +21,12 @@ public sealed class DraftMimeMessageFactory : IDraftMimeMessageFactory {
         var message = new MimeMessage {
             Subject = draft.Subject ?? string.Empty,
             Date = DateTimeOffset.UtcNow,
-            MessageId = MimeUtils.GenerateMessageId()
+            MessageId = MimeUtils.GenerateMessageId(),
+            Priority = draft.Priority switch {
+                MessagePriority.High => MimeKit.MessagePriority.Urgent,
+                MessagePriority.Low => MimeKit.MessagePriority.NonUrgent,
+                _ => MimeKit.MessagePriority.Normal
+            }
         };
 
         AddSender(message, profile, draft);

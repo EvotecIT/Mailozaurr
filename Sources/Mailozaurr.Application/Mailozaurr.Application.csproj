@@ -20,7 +20,7 @@
         <PackageProjectUrl>https://github.com/EvotecIT/Mailozaurr</PackageProjectUrl>
         <PackageReadmeFile>README.MD</PackageReadmeFile>
         <RepositoryUrl>https://github.com/EvotecIT/Mailozaurr</RepositoryUrl>
-        <PackageTags>Windows;MacOS;Linux;Mail;Email;Graph;Gmail;IMAP;SMTP</PackageTags>
+        <PackageTags>Windows;MacOS;Linux;Mail;Email;Graph;Gmail;IMAP;SMTP;SendGrid;Mailgun;AmazonSES</PackageTags>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(TargetFramework)' == 'net8.0' ">

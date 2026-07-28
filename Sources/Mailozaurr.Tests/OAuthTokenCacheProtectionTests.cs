@@ -14,6 +14,25 @@ public sealed class OAuthTokenCacheProtectionTests {
     }
 
     [Fact]
+    public async Task LoadCacheAsync_RemovesLegacyGraphKeysThatContainClientSecrets() {
+        const string secret = "legacy-client-secret";
+        string legacyKey = $"graph:client|tenant||{secret}|https://graph.microsoft.com";
+        await OAuthTokenCache.SetAsync(legacyKey, new OAuthCredential {
+            UserName = "client",
+            AccessToken = "token",
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
+        });
+
+        OAuthCacheTestHelper.ResetOAuthTokenCache();
+
+        OAuthCredential? loaded = await OAuthTokenCache.GetAsync(legacyKey);
+        string cacheText = OAuthCacheTestHelper.ReadOAuthCacheFileText();
+
+        Assert.Null(loaded);
+        Assert.DoesNotContain(secret, cacheText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task SetAsync_WritesProtectedSecretsToDisk() {
         var cacheKey = "oauth:protected@example.com";
         var credential = new OAuthCredential {
@@ -175,6 +194,65 @@ public sealed class OAuthTokenCacheProtectionTests {
         } finally {
             lockStream.Dispose();
         }
+    }
+
+    [Fact]
+    public async Task SetAsync_ReloadsAndMergesEntriesWrittenByAnotherProcess() {
+        await OAuthTokenCache.SetAsync("local:first", new OAuthCredential {
+            UserName = "first@example.com",
+            AccessToken = "first-token",
+            ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(30)
+        });
+
+        var path = OAuthCacheTestHelper.GetOAuthCacheFilePath();
+        var json = OAuthCacheTestHelper.ReadOAuthCacheFileText();
+        var entries = JsonSerializer.Deserialize(
+            json,
+            MailozaurrJsonContext.Default.DictionaryStringOAuthCredentialCacheEntry)!;
+        entries["external:entry"] = OAuthCredentialCacheEntry.FromCredential(
+            new OAuthCredential {
+                UserName = "external@example.com",
+                AccessToken = "external-token",
+                ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(30)
+            },
+            CredentialProtection.Default);
+        File.WriteAllText(
+            path,
+            JsonSerializer.Serialize(
+                entries,
+                MailozaurrJsonContext.Default.DictionaryStringOAuthCredentialCacheEntry));
+
+        await OAuthTokenCache.SetAsync("local:second", new OAuthCredential {
+            UserName = "second@example.com",
+            AccessToken = "second-token",
+            ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(30)
+        });
+
+        OAuthCacheTestHelper.ResetOAuthTokenCache();
+        Assert.NotNull(await OAuthTokenCache.GetAsync("local:first"));
+        Assert.NotNull(await OAuthTokenCache.GetAsync("local:second"));
+        Assert.NotNull(await OAuthTokenCache.GetAsync("external:entry"));
+    }
+
+    [Fact]
+    public async Task SetAsync_PersistentlyHeldCacheLock_ThrowsIOException() {
+        var lockPath = OAuthCacheTestHelper.GetOAuthCacheFilePath() + ".lock";
+        var directory = Path.GetDirectoryName(lockPath);
+        if (!string.IsNullOrWhiteSpace(directory)) {
+            Directory.CreateDirectory(directory);
+        }
+
+        using var lockStream = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        using var cancellationSource = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+        await Assert.ThrowsAsync<IOException>(() => OAuthTokenCache.SetAsync(
+            "locked:entry",
+            new OAuthCredential {
+                UserName = "locked@example.com",
+                AccessToken = "locked-token",
+                ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(30)
+            },
+            cancellationSource.Token));
     }
 
 }

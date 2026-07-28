@@ -264,6 +264,36 @@ public sealed class ApplicationProfileBootstrapServiceTests {
         Assert.Contains(result.Errors, error => error.IndexOf("Gmail profiles need an access token", StringComparison.Ordinal) >= 0);
     }
 
+    [Theory]
+    [InlineData(MailProfileKind.SendGrid, MailSecretNames.ApiKey, null)]
+    [InlineData(MailProfileKind.Mailgun, MailSecretNames.ApiKey, null)]
+    [InlineData(MailProfileKind.Ses, MailSecretNames.AccessKeyId, MailSecretNames.SecretAccessKey)]
+    public async Task DiagnoseAsyncVerifiesProviderCredentials(
+        MailProfileKind kind,
+        string firstSecret,
+        string? secondSecret) {
+        var profileId = kind.ToString().ToLowerInvariant();
+        var profileStore = new InMemoryProfileStore();
+        var secretStore = new InMemorySecretStore();
+        await profileStore.SaveAsync(new MailProfile {
+            Id = profileId,
+            DisplayName = kind.ToString(),
+            Kind = kind
+        });
+        var service = new MailProfileService(profileStore, secretStore);
+
+        var missing = await service.DiagnoseAsync(profileId);
+        await secretStore.SetSecretAsync(profileId, firstSecret, "first");
+        if (secondSecret != null) {
+            await secretStore.SetSecretAsync(profileId, secondSecret, "second");
+        }
+        var ready = await service.DiagnoseAsync(profileId);
+
+        Assert.False(missing.Succeeded);
+        Assert.Equal("profile_not_ready", missing.Code);
+        Assert.True(ready.Succeeded);
+    }
+
     private sealed class InMemoryProfileStore : IMailProfileStore {
         private readonly Dictionary<string, MailProfile> _profiles = new(StringComparer.OrdinalIgnoreCase);
 

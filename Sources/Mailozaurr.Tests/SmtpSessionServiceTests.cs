@@ -1,11 +1,22 @@
 using MailKit.Security;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
 namespace Mailozaurr.Tests;
 
 public class SmtpSessionServiceTests {
+    [Fact]
+    public void SmtpSessionRequest_PreservesLegacyDelegatePropertyTypes() {
+        Assert.Equal(
+            typeof(Func<Smtp, Task<SmtpResult>>),
+            typeof(SmtpSessionRequest).GetProperty(nameof(SmtpSessionRequest.ConnectAsync))!.PropertyType);
+        Assert.Equal(
+            typeof(Func<Smtp, Task<SmtpResult>>),
+            typeof(SmtpSessionRequest).GetProperty(nameof(SmtpSessionRequest.AuthenticateAsync))!.PropertyType);
+    }
+
     [Fact]
     public async Task ConnectAndAuthenticateAsync_ReturnsSuccess() {
         var request = new SmtpSessionRequest {
@@ -14,6 +25,7 @@ public class SmtpSessionServiceTests {
             SecureSocketOptions = SecureSocketOptions.Auto,
             UserName = "user",
             Password = "pass",
+            RetryAlways = true,
             ConnectAsync = _ => Task.FromResult(new SmtpResult(true, EmailAction.Connect, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero)),
             AuthenticateAsync = _ => Task.FromResult(new SmtpResult(true, EmailAction.Authenticate, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero))
         };
@@ -24,6 +36,40 @@ public class SmtpSessionServiceTests {
         Assert.True(result.IsSuccess);
         Assert.Equal(SecureSocketOptions.Auto, result.SecureSocketOptions);
         Assert.Null(result.ErrorCode);
+        Assert.True(smtp.RetryAlways);
+    }
+
+    [Fact]
+    public async Task ConnectAndAuthenticateAsync_AnonymousRelaySkipsAuthentication() {
+        bool authenticateCalled = false;
+        var request = new SmtpSessionRequest {
+            Server = "relay.example.com",
+            Authenticate = false,
+            ConnectAsync = _ => Task.FromResult(new SmtpResult(
+                true,
+                EmailAction.Connect,
+                string.Empty,
+                string.Empty,
+                "relay.example.com",
+                25,
+                TimeSpan.Zero)),
+            AuthenticateAsync = _ => {
+                authenticateCalled = true;
+                return Task.FromResult(new SmtpResult(
+                    true,
+                    EmailAction.Authenticate,
+                    string.Empty,
+                    string.Empty,
+                    "relay.example.com",
+                    25,
+                    TimeSpan.Zero));
+            }
+        };
+
+        var result = await SmtpSessionService.ConnectAndAuthenticateAsync(new Smtp(), request);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(authenticateCalled);
     }
 
     [Fact]
@@ -65,5 +111,28 @@ public class SmtpSessionServiceTests {
         Assert.Equal("auth_failed", result.ErrorCode);
         Assert.Equal("bad auth", result.Error);
         Assert.False(result.IsTransient);
+    }
+
+    [Fact]
+    public async Task ConnectAndAuthenticateAsync_PropagatesCancellationTokenToBothDelegates() {
+        using var cancellation = new CancellationTokenSource();
+        var request = new SmtpSessionRequest {
+            Server = "smtp.test",
+            ConnectWithCancellationAsync = (_, token) => {
+                Assert.Equal(cancellation.Token, token);
+                return Task.FromResult(new SmtpResult(true, EmailAction.Connect, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero));
+            },
+            AuthenticateWithCancellationAsync = (_, token) => {
+                Assert.Equal(cancellation.Token, token);
+                return Task.FromResult(new SmtpResult(true, EmailAction.Authenticate, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero));
+            }
+        };
+
+        var result = await SmtpSessionService.ConnectAndAuthenticateAsync(
+            new Smtp(),
+            request,
+            cancellation.Token);
+
+        Assert.True(result.IsSuccess);
     }
 }

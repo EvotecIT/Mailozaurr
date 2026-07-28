@@ -184,9 +184,9 @@ public partial class ClientSmtp : SmtpClient {
                 }
 
                 if (descriptor is FileAttachmentDescriptor fileDescriptor && !File.Exists(fileDescriptor.FilePath)) {
-                    LoggingMessages.Logger.WriteWarning(
-                        $"Send-EmailMessage - File not found: {fileDescriptor.FilePath}. Skipping attachment.");
-                    continue;
+                    throw new FileNotFoundException(
+                        $"Attachment '{fileDescriptor.FilePath}' was not found.",
+                        fileDescriptor.FilePath);
                 }
 
                 bodyBuilder.Attachments.Add(descriptor.CreateMimeEntity(inline: false));
@@ -205,9 +205,9 @@ public partial class ClientSmtp : SmtpClient {
                 }
 
                 if (descriptor is FileAttachmentDescriptor fileDescriptor && !File.Exists(fileDescriptor.FilePath)) {
-                    LoggingMessages.Logger.WriteWarning(
-                        $"Send-EmailMessage - File not found: {fileDescriptor.FilePath}. Skipping inline attachment.");
-                    continue;
+                    throw new FileNotFoundException(
+                        $"Inline attachment '{fileDescriptor.FilePath}' was not found.",
+                        fileDescriptor.FilePath);
                 }
 
                 var entity = descriptor.CreateMimeEntity(inline: true);

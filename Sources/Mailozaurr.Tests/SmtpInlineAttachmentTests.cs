@@ -44,7 +44,7 @@ public class SmtpInlineAttachmentTests {
     }
 
     [Fact]
-    public void CreateMessage_MissingInlineAttachment_SkipsResource() {
+    public void CreateMessage_MissingInlineAttachment_Throws() {
         var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         if (File.Exists(path)) File.Delete(path);
         var smtp = new Smtp {
@@ -55,8 +55,7 @@ public class SmtpInlineAttachmentTests {
             InlineAttachments = new List<AttachmentDescriptor> { new FileAttachmentDescriptor(path) }
         };
 
-        smtp.CreateMessage();
-
-        Assert.IsType<TextPart>(smtp.Message.Body);
+        var exception = Assert.Throws<FileNotFoundException>(() => smtp.CreateMessage());
+        Assert.Equal(path, exception.FileName);
     }
 }

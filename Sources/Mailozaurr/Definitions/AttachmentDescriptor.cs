@@ -153,6 +153,8 @@ public sealed class FileAttachmentDescriptor : AttachmentDescriptor {
 public sealed class StreamAttachmentDescriptor : AttachmentDescriptor {
     private readonly Stream _stream;
     private readonly bool _leaveStreamOpen;
+    private readonly object _materializationLock = new();
+    private byte[]? _buffer;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="StreamAttachmentDescriptor"/> class.
@@ -176,27 +178,31 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor {
 
     /// <inheritdoc />
     protected override Stream CreateContentStream() {
-        if (_stream.CanSeek) {
-            _stream.Position = 0;
-        }
+        lock (_materializationLock) {
+            if (_buffer == null) {
+                if (_stream.CanSeek) {
+                    _stream.Position = 0;
+                }
 
-        var memory = new MemoryStream();
-        _stream.CopyTo(memory);
-        memory.Position = 0;
+                using var memory = new MemoryStream();
+                _stream.CopyTo(memory);
+                _buffer = memory.ToArray();
 
-        if (_stream.CanSeek) {
-            try {
-                _stream.Position = 0;
-            } catch (ObjectDisposedException) {
-                // Ignore - stream may have been disposed externally.
+                if (_stream.CanSeek) {
+                    try {
+                        _stream.Position = 0;
+                    } catch (ObjectDisposedException) {
+                        // The immutable copy remains usable when the source was disposed externally.
+                    }
+                }
+
+                if (!_leaveStreamOpen) {
+                    _stream.Dispose();
+                }
             }
-        }
 
-        if (!_leaveStreamOpen) {
-            _stream.Dispose();
+            return new MemoryStream(_buffer, writable: false);
         }
-
-        return memory;
     }
 }
 

@@ -58,6 +58,25 @@ public class SendGridCreateMessageTests {
     }
 
     [Fact]
+    public void CreateMessage_WithHighPriority_IncludesProviderPriorityHeaders() {
+        using var client = new SendGridClient {
+            From = "from@example.com",
+            To = new List<object> { "to@example.com" },
+            Subject = "subject",
+            Text = "text",
+            Credentials = new NetworkCredential("apikey", "test"),
+            Priority = MessagePriority.High
+        };
+
+        client.CreateMessage();
+
+        PropertyInfo? prop = typeof(SendGridClient).GetProperty("MessageJson", BindingFlags.NonPublic | BindingFlags.Instance);
+        var json = Assert.IsType<string>(prop?.GetValue(client));
+        Assert.Contains("\"X-Priority\":\"1\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"Importance\":\"high\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CreateMessage_DuplicateAttachments_IncludedOnce() {
         var tmp = Path.GetTempFileName();
         File.WriteAllText(tmp, "data");

@@ -67,22 +67,34 @@ public sealed class SmtpSessionRequest {
     public int RetryDelayMilliseconds { get; init; }
     /// <summary>Backoff multiplier.</summary>
     public double RetryDelayBackoff { get; init; } = 1.0;
+    /// <summary>Maximum delay between retries in milliseconds.</summary>
+    public int MaxDelayMilliseconds { get; init; }
+    /// <summary>Maximum random jitter added to retry delays in milliseconds.</summary>
+    public int JitterMilliseconds { get; init; }
+    /// <summary>Retry non-transient SMTP failures.</summary>
+    public bool RetryAlways { get; init; }
     /// <summary>Skip certificate validation.</summary>
     public bool SkipCertificateValidation { get; init; }
     /// <summary>Skip certificate revocation checks.</summary>
     public bool SkipCertificateRevocation { get; init; }
     /// <summary>Implements DryRun (no network).</summary>
     public bool DryRun { get; init; }
+    /// <summary>Whether the connected session should authenticate.</summary>
+    public bool Authenticate { get; init; } = true;
     /// <summary>Auth username.</summary>
     public string UserName { get; init; } = string.Empty;
     /// <summary>Auth password.</summary>
     public string Password { get; init; } = string.Empty;
     /// <summary>Protocol auth mode.</summary>
     public ProtocolAuthMode AuthMode { get; init; } = ProtocolAuthMode.Basic;
-    /// <summary>Optional connect delegate used for testing.</summary>
+    /// <summary>Optional connect delegate retained for source and binary compatibility.</summary>
     public Func<Smtp, Task<SmtpResult>>? ConnectAsync { get; init; }
-    /// <summary>Optional authenticate delegate used for testing.</summary>
+    /// <summary>Optional authenticate delegate retained for source and binary compatibility.</summary>
     public Func<Smtp, Task<SmtpResult>>? AuthenticateAsync { get; init; }
+    /// <summary>Optional cancellation-aware connect delegate used in preference to <see cref="ConnectAsync"/>.</summary>
+    public Func<Smtp, CancellationToken, Task<SmtpResult>>? ConnectWithCancellationAsync { get; init; }
+    /// <summary>Optional cancellation-aware authenticate delegate used in preference to <see cref="AuthenticateAsync"/>.</summary>
+    public Func<Smtp, CancellationToken, Task<SmtpResult>>? AuthenticateWithCancellationAsync { get; init; }
 }
 
 /// <summary>
@@ -104,22 +116,40 @@ public static class SmtpSessionService {
         smtp.RetryCount = request.RetryCount;
         smtp.RetryDelayMilliseconds = request.RetryDelayMilliseconds;
         smtp.RetryDelayBackoff = request.RetryDelayBackoff;
+        smtp.MaxDelayMilliseconds = request.MaxDelayMilliseconds;
+        smtp.JitterMilliseconds = request.JitterMilliseconds;
+        smtp.RetryAlways = request.RetryAlways;
         smtp.SkipCertificateValidation = request.SkipCertificateValidation;
         smtp.CheckCertificateRevocation = !request.SkipCertificateRevocation;
         smtp.DryRun = request.DryRun;
 
         var secureOptions = request.SecureSocketOptions;
-        var connectFunc = request.ConnectAsync ?? (_ => smtp.ConnectAsync(request.Server, request.Port, secureOptions, request.UseSsl));
-        var connectResult = await connectFunc(smtp).ConfigureAwait(false);
+        var connectFunc = request.ConnectWithCancellationAsync ??
+            (request.ConnectAsync is { } legacyConnect
+                ? new Func<Smtp, CancellationToken, Task<SmtpResult>>((client, _) => legacyConnect(client))
+                : (_, token) => smtp.ConnectAsync(request.Server, request.Port, secureOptions, request.UseSsl, token));
+        cancellationToken.ThrowIfCancellationRequested();
+        var connectResult = await connectFunc(smtp, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         if (!connectResult.Status) {
             return new SmtpConnectResult(false, secureOptions, "connect_failed", connectResult.Error ?? "Connect failed.", true);
         }
 
-        var authenticateFunc = request.AuthenticateAsync ?? (_ => smtp.AuthenticateAsync(
-            new NetworkCredential(request.UserName, request.Password),
-            request.AuthMode == ProtocolAuthMode.OAuth2));
+        if (!request.Authenticate) {
+            return new SmtpConnectResult(true, secureOptions, null, null, false);
+        }
 
-        var authResult = await authenticateFunc(smtp).ConfigureAwait(false);
+        var authenticateFunc = request.AuthenticateWithCancellationAsync ??
+            (request.AuthenticateAsync is { } legacyAuthenticate
+                ? new Func<Smtp, CancellationToken, Task<SmtpResult>>((client, _) => legacyAuthenticate(client))
+                : (_, token) => smtp.AuthenticateAsync(
+                    new NetworkCredential(request.UserName, request.Password),
+                    request.AuthMode == ProtocolAuthMode.OAuth2,
+                    token));
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var authResult = await authenticateFunc(smtp, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         if (!authResult.Status) {
             return new SmtpConnectResult(false, secureOptions, "auth_failed", authResult.Error ?? "Authentication failed.", false);
         }

@@ -12,7 +12,9 @@ namespace Mailozaurr;
 /// </summary>
 internal static class OAuthTokenCache {
     private static readonly object LockObj = new();
+    private static readonly SemaphoreSlim WriteGate = new(1, 1);
     private const int IoRetryCount = 5;
+    private static readonly TimeSpan FileLockRetryDelay = TimeSpan.FromMilliseconds(25);
     private const string CachePathEnvironmentVariable = "MAILOZAURR_OAUTH_CACHE_PATH";
     private static string CacheFilePath => ResolveCacheFilePath();
 
@@ -20,13 +22,19 @@ internal static class OAuthTokenCache {
 
     private static Dictionary<string, OAuthCredential> ConvertCacheEntries(
         Dictionary<string, OAuthCredentialCacheEntry>? cacheEntries,
-        ICredentialProtector protector) {
+        ICredentialProtector protector,
+        out bool removedUnsafeKeys) {
         var cache = new Dictionary<string, OAuthCredential>(StringComparer.Ordinal);
+        removedUnsafeKeys = false;
         if (cacheEntries == null) {
             return cache;
         }
 
         foreach (var pair in cacheEntries) {
+            if (IsUnsafeLegacyGraphCacheKey(pair.Key)) {
+                removedUnsafeKeys = true;
+                continue;
+            }
             if (pair.Value == null) {
                 continue;
             }
@@ -36,6 +44,11 @@ internal static class OAuthTokenCache {
 
         return cache;
     }
+
+    private static bool IsUnsafeLegacyGraphCacheKey(string key) =>
+        key.StartsWith("graph:", StringComparison.Ordinal) &&
+        !key.StartsWith("graph:v2:", StringComparison.Ordinal) &&
+        key.IndexOf('|') >= 0;
 
     private static Dictionary<string, OAuthCredentialCacheEntry> CreateCacheEntries(
         Dictionary<string, OAuthCredential> cache,
@@ -60,12 +73,13 @@ internal static class OAuthTokenCache {
         }
 
         Dictionary<string, OAuthCredential> cache;
+        bool rewriteSanitizedCache = false;
         if (File.Exists(CacheFilePath)) {
             try {
                 var json = await ReadCacheFileAsync(cancellationToken).ConfigureAwait(false);
                 var protector = CredentialProtection.Default;
                 var cacheEntries = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.DictionaryStringOAuthCredentialCacheEntry);
-                cache = ConvertCacheEntries(cacheEntries, protector);
+                cache = ConvertCacheEntries(cacheEntries, protector, out rewriteSanitizedCache);
             } catch (FileNotFoundException) {
                 cache = new Dictionary<string, OAuthCredential>();
             } catch (DirectoryNotFoundException) {
@@ -79,10 +93,18 @@ internal static class OAuthTokenCache {
             cache = new Dictionary<string, OAuthCredential>();
         }
 
+        bool shouldRewrite;
         lock (LockObj) {
+            shouldRewrite = _cache == null && rewriteSanitizedCache;
             _cache ??= cache;
-            return _cache;
+            cache = _cache;
         }
+
+        if (shouldRewrite) {
+            await MutateAndPersistCacheAsync(static _ => { }, cancellationToken).ConfigureAwait(false);
+        }
+
+        return cache;
     }
 
     /// <summary>
@@ -107,21 +129,79 @@ internal static class OAuthTokenCache {
     /// <param name="credential">Credential to cache.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     public static async Task SetAsync(string key, OAuthCredential credential, CancellationToken cancellationToken = default) {
-        var cache = await LoadCacheAsync(cancellationToken).ConfigureAwait(false);
-        string? dir;
-        string json;
-        lock (LockObj) {
+        await LoadCacheAsync(cancellationToken).ConfigureAwait(false);
+        await MutateAndPersistCacheAsync(
+            cache => cache[key] = credential,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task MutateAndPersistCacheAsync(
+        Action<Dictionary<string, OAuthCredential>> mutation,
+        CancellationToken cancellationToken) {
+        await WriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try {
+            using var fileLock = await AcquireFileLockAsync(cancellationToken).ConfigureAwait(false);
+            var cache = await ReadLatestCacheAsync(cancellationToken).ConfigureAwait(false);
+            mutation(cache);
             cancellationToken.ThrowIfCancellationRequested();
-            cache[key] = credential;
-            dir = Path.GetDirectoryName(CacheFilePath);
-            if (!Directory.Exists(dir)) {
-                Directory.CreateDirectory(dir!);
-            }
+
             var cacheEntries = CreateCacheEntries(cache, CredentialProtection.Default);
-            json = JsonSerializer.Serialize(cacheEntries, MailozaurrJsonContext.Default.DictionaryStringOAuthCredentialCacheEntry);
+            var json = JsonSerializer.Serialize(
+                cacheEntries,
+                MailozaurrJsonContext.Default.DictionaryStringOAuthCredentialCacheEntry);
+            await WriteCacheFileAsync(json, cancellationToken).ConfigureAwait(false);
+
+            lock (LockObj) {
+                _cache = cache;
+            }
+        } finally {
+            WriteGate.Release();
         }
-        cancellationToken.ThrowIfCancellationRequested();
-        await WriteCacheFileAsync(json, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<Dictionary<string, OAuthCredential>> ReadLatestCacheAsync(
+        CancellationToken cancellationToken) {
+        if (!File.Exists(CacheFilePath)) {
+            return new Dictionary<string, OAuthCredential>(StringComparer.Ordinal);
+        }
+
+        try {
+            var json = await ReadCacheFileAsync(cancellationToken).ConfigureAwait(false);
+            var entries = JsonSerializer.Deserialize(
+                json,
+                MailozaurrJsonContext.Default.DictionaryStringOAuthCredentialCacheEntry);
+            return ConvertCacheEntries(entries, CredentialProtection.Default, out _);
+        } catch (FileNotFoundException) {
+            return new Dictionary<string, OAuthCredential>(StringComparer.Ordinal);
+        } catch (DirectoryNotFoundException) {
+            return new Dictionary<string, OAuthCredential>(StringComparer.Ordinal);
+        } catch (JsonException) {
+            return new Dictionary<string, OAuthCredential>(StringComparer.Ordinal);
+        }
+    }
+
+    private static async Task<FileStream> AcquireFileLockAsync(CancellationToken cancellationToken) {
+        var lockPath = CacheFilePath + ".lock";
+        var directory = Path.GetDirectoryName(lockPath);
+        if (string.IsNullOrWhiteSpace(directory)) {
+            throw new InvalidOperationException("OAuth cache path is invalid.");
+        }
+        Directory.CreateDirectory(directory);
+
+        for (var attempt = 0; ; attempt++) {
+            cancellationToken.ThrowIfCancellationRequested();
+            try {
+                return new FileStream(
+                    lockPath,
+                    FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite,
+                    FileShare.None,
+                    1,
+                    FileOptions.None);
+            } catch (IOException) when (attempt < IoRetryCount - 1) {
+                await Task.Delay(FileLockRetryDelay, cancellationToken).ConfigureAwait(false);
+            }
+        }
     }
 
     private static async Task<string> ReadCacheFileAsync(CancellationToken cancellationToken) {

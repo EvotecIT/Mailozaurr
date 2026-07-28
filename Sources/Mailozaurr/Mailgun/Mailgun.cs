@@ -13,6 +13,7 @@ namespace Mailozaurr;
 /// </summary>
 public class MailgunClient : IDisposable {
     private readonly HttpClient _client;
+    private readonly bool _ownsClient;
     private int _disposed;
     /// <summary>Measures total time spent sending.</summary>
     public readonly Stopwatch Stopwatch;
@@ -28,6 +29,9 @@ public class MailgunClient : IDisposable {
     }
     private string EmailDomain {
         get {
+            if (!string.IsNullOrWhiteSpace(Domain)) {
+                return Domain!.Trim();
+            }
             var address = Helpers.GetEmailAddress(From);
             if (!address.Contains('@')) {
                 throw new ArgumentException($"Invalid email address: {address}", nameof(From));
@@ -39,6 +43,8 @@ public class MailgunClient : IDisposable {
     /// <summary>Credentials used to authenticate to the API.</summary>
     /// <remarks>Must be <see cref="NetworkCredential"/>.</remarks>
     public ICredentials Credentials { get; set; } = null!;
+    /// <summary>Optional explicit Mailgun sending domain. Defaults to the sender address domain.</summary>
+    public string? Domain { get; set; }
     /// <summary>Determines how errors are handled.</summary>
     public ActionPreference? ErrorAction { get; set; }
 
@@ -62,9 +68,15 @@ public class MailgunClient : IDisposable {
     public string[]? Attachment { get; set; }
     /// <summary>File paths to include as inline attachments.</summary>
     public string[]? InlineAttachment { get; set; }
+    /// <summary>Structured attachments to include.</summary>
+    public List<AttachmentDescriptor>? Attachments { get; set; }
+    /// <summary>Structured inline attachments to include.</summary>
+    public List<AttachmentDescriptor>? InlineAttachments { get; set; }
 
     /// <summary>Custom headers to include with the message.</summary>
     public Dictionary<string, string>? Headers { get; set; }
+    /// <summary>Message priority propagated as Mailgun message headers.</summary>
+    public MessagePriority Priority { get; set; } = MessagePriority.Normal;
 
     /// <summary>Collector used to store log entries.</summary>
     public LogCollector LogCollector { get; set; } = new();
@@ -115,7 +127,15 @@ public class MailgunClient : IDisposable {
     /// </summary>
     public MailgunClient() {
         Stopwatch = Stopwatch.StartNew();
-        _client = new HttpClient();
+        _client = Helpers.SharedHttpClient;
+    }
+
+    /// <summary>Initializes a client with an isolated HTTP handler.</summary>
+    /// <param name="handler">HTTP handler used for provider requests.</param>
+    public MailgunClient(HttpMessageHandler handler) {
+        Stopwatch = Stopwatch.StartNew();
+        _client = new HttpClient(handler ?? throw new ArgumentNullException(nameof(handler)));
+        _ownsClient = true;
     }
 
     /// <summary>
@@ -143,6 +163,30 @@ public class MailgunClient : IDisposable {
         return streamContent;
     }
 
+    private static StreamContent CreateStreamContent(AttachmentDescriptor descriptor) {
+        Stream stream = descriptor.SourcePath is { Length: > 0 } sourcePath
+            ? new FileStream(
+                sourcePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 8192,
+                options: FileOptions.Asynchronous | FileOptions.SequentialScan)
+            : new MemoryStream(descriptor.GetContentBytes(), writable: false);
+        var streamContent = new StreamContent(stream);
+        var contentTypeSource = string.IsNullOrWhiteSpace(descriptor.FileName)
+            ? descriptor.SourcePath
+            : descriptor.FileName;
+        streamContent.Headers.ContentType = new MediaTypeHeaderValue(
+            string.IsNullOrWhiteSpace(descriptor.ContentType)
+                ? MimeTypes.GetMimeType(contentTypeSource ?? string.Empty)
+                : descriptor.ContentType);
+        if (!string.IsNullOrWhiteSpace(descriptor.ContentId)) {
+            streamContent.Headers.TryAddWithoutValidation("Content-ID", descriptor.ContentId);
+        }
+        return streamContent;
+    }
+
     /// <summary>
     /// Builds the multipart HTTP content used for the Mailgun API request.
     /// </summary>
@@ -159,33 +203,19 @@ public class MailgunClient : IDisposable {
         if (!string.IsNullOrWhiteSpace(Subject)) content.Add(new StringContent(Subject), "subject");
         if (!string.IsNullOrWhiteSpace(Text)) content.Add(new StringContent(Text), "text");
         if (!string.IsNullOrWhiteSpace(Html)) content.Add(new StringContent(Html), "html");
-        var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (Attachment != null) {
-            foreach (var path in Attachment) {
-                if (!files.Add(path)) continue;
-                if (!File.Exists(path)) {
-                    LogCollector.LogWarning($"Send-EmailMessage - Attachment file not found: {path}");
-                    LogCollector.LogWarning($"Send-EmailMessage - Possible issue: Path '{path}' is invalid. Verify the file exists and the path is correct.");
-                    continue;
-                }
-
-                var fileContent = CreateStreamContent(path);
-                content.Add(fileContent, "attachment", Path.GetFileName(path));
-            }
+        if (Priority != MessagePriority.Normal) {
+            content.Add(new StringContent(Priority == MessagePriority.High ? "1" : "5"), "h:X-Priority");
+            content.Add(new StringContent(Priority == MessagePriority.High ? "high" : "low"), "h:Importance");
         }
-        if (InlineAttachment != null) {
-            foreach (var path in InlineAttachment) {
-                if (!files.Add(path)) continue;
-                if (!File.Exists(path)) {
-                    LogCollector.LogWarning($"Send-EmailMessage - Inline attachment file not found: {path}");
-                    LogCollector.LogWarning($"Send-EmailMessage - Possible issue: Path '{path}' is invalid. Verify the file exists and the path is correct.");
-                    continue;
-                }
-
-                var fileContent = CreateStreamContent(path);
-                content.Add(fileContent, "inline", Path.GetFileName(path));
-            }
-        }
+        ForEachUniqueAttachment((descriptor, isInline) => {
+            var fileName = string.IsNullOrWhiteSpace(descriptor.FileName)
+                ? Path.GetFileName(descriptor.SourcePath) ?? "attachment"
+                : descriptor.FileName!;
+            content.Add(
+                CreateStreamContent(descriptor),
+                isInline ? "inline" : "attachment",
+                fileName);
+        });
         if (Headers != null) {
             foreach (var kvp in Headers) {
                 content.Add(new StringContent(kvp.Value), $"h:{kvp.Key}");
@@ -204,21 +234,78 @@ public class MailgunClient : IDisposable {
             Subject = Subject ?? string.Empty,
             TextBody = Text,
             HtmlBody = Html,
-            Headers = Headers
+            Headers = Headers,
+            Priority = Priority
         };
-        if (Attachment != null) {
-            smtp.Attachments = Attachment.Select(path => new FileAttachmentDescriptor(path)).Cast<AttachmentDescriptor>().ToList();
-        }
-        if (InlineAttachment != null) {
-            smtp.InlineAttachments = InlineAttachment.Select(path => new FileAttachmentDescriptor(path)).Cast<AttachmentDescriptor>().ToList();
-        }
+        ForEachUniqueAttachment((descriptor, isInline) => {
+            var target = isInline
+                ? smtp.InlineAttachments ??= new List<AttachmentDescriptor>()
+                : smtp.Attachments ??= new List<AttachmentDescriptor>();
+            target.Add(descriptor);
+        });
         smtp.CreateMessage();
         return smtp.Message;
     }
 
-    private async Task QueuePendingMessageAsync(CancellationToken cancellationToken) {
-        if (PendingMessageRepository == null) {
+    private void ForEachUniqueAttachment(Action<AttachmentDescriptor, bool> add) {
+        var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        AddFileAttachments(Attachment, isInline: false, files, add);
+        AddFileAttachments(InlineAttachment, isInline: true, files, add);
+        AddStructuredAttachments(Attachments, isInline: false, files, add);
+        AddStructuredAttachments(InlineAttachments, isInline: true, files, add);
+    }
+
+    private static void AddFileAttachments(
+        IEnumerable<string>? paths,
+        bool isInline,
+        HashSet<string> files,
+        Action<AttachmentDescriptor, bool> add) {
+        if (paths == null) {
             return;
+        }
+
+        foreach (var path in paths) {
+            AddUniqueAttachment(new FileAttachmentDescriptor(path), isInline, files, add);
+        }
+    }
+
+    private static void AddStructuredAttachments(
+        IEnumerable<AttachmentDescriptor>? attachments,
+        bool isInline,
+        HashSet<string> files,
+        Action<AttachmentDescriptor, bool> add) {
+        if (attachments == null) {
+            return;
+        }
+
+        foreach (var descriptor in attachments) {
+            AddUniqueAttachment(descriptor, isInline, files, add);
+        }
+    }
+
+    private static void AddUniqueAttachment(
+        AttachmentDescriptor descriptor,
+        bool isInline,
+        HashSet<string> files,
+        Action<AttachmentDescriptor, bool> add) {
+        if (descriptor.SourcePath is { Length: > 0 } sourcePath) {
+            var fullPath = Path.GetFullPath(sourcePath);
+            if (!files.Add(fullPath)) {
+                return;
+            }
+            if (descriptor is FileAttachmentDescriptor && !File.Exists(fullPath)) {
+                throw new FileNotFoundException(
+                    $"Attachment '{sourcePath}' was not found.",
+                    fullPath);
+            }
+        }
+
+        add(descriptor, isInline);
+    }
+
+    private async Task<string?> QueuePendingMessageAsync(CancellationToken cancellationToken) {
+        if (PendingMessageRepository == null) {
+            return null;
         }
 
         string apiKey;
@@ -228,11 +315,11 @@ public class MailgunClient : IDisposable {
             domain = EmailDomain;
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Failed to capture Mailgun credentials for retry: {ex.Message}");
-            return;
+            return null;
         }
 
         if (string.IsNullOrEmpty(apiKey)) {
-            return;
+            return null;
         }
 
         MimeMessage message;
@@ -240,7 +327,7 @@ public class MailgunClient : IDisposable {
             message = BuildMimeMessage();
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Failed to serialize Mailgun message for retry: {ex.Message}");
-            return;
+            return null;
         }
 
         var messageId = string.IsNullOrEmpty(message.MessageId)
@@ -266,10 +353,12 @@ public class MailgunClient : IDisposable {
 
         try {
             await PendingMessageRepository.SaveAsync(record, cancellationToken).ConfigureAwait(false);
+            return record.MessageId;
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Failed to persist Mailgun pending message: {ex.Message}");
+            return null;
         }
     }
 
@@ -296,8 +385,7 @@ public class MailgunClient : IDisposable {
         var auth = Convert.ToBase64String(Encoding.ASCII.GetBytes($"api:{ApiKey}"));
 
         int attempts = 0;
-        Exception? lastException = null;
-        do {
+        while (true) {
             try {
                 using var content = await CreateContentAsync(cancellationToken).ConfigureAwait(false);
                 using var request = new HttpRequestMessage(HttpMethod.Post, url) {
@@ -305,43 +393,52 @@ public class MailgunClient : IDisposable {
                 };
                 request.Headers.Authorization = new AuthenticationHeaderValue("Basic", auth);
                 using var response = await _client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+                var responseContent = await ProviderResponseParser
+                    .ReadContentAsync(response, cancellationToken)
+                    .ConfigureAwait(false);
                 if (response.IsSuccessStatusCode) {
                     var statusCode = response.StatusCode.ToString();
-                    var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, statusCode, "");
+                    var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, statusCode, "") {
+                        MessageId = ProviderResponseParser
+                            .GetJsonMessageId(responseContent)
+                    };
                     await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken).ConfigureAwait(false);
                     return okResult;
                 }
-#if NET5_0_OR_GREATER
-                var error = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-#else
-                var error = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-#endif
-                throw new HttpRequestException(error);
-            } catch (HttpRequestException ex) {
-                lastException = ex;
+                throw HttpRetryPolicy.CreateFailure(
+                    response.StatusCode,
+                    responseContent);
+            } catch (Exception ex) when (
+                ex is HttpRequestException ||
+                ex is TaskCanceledException && !cancellationToken.IsCancellationRequested) {
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Mailgun: {ex.Message}");
-                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
-                    await QueuePendingMessageAsync(cancellationToken).ConfigureAwait(false);
+                if (!HttpRetryPolicy.ShouldRetry(
+                        ex,
+                        attempts,
+                        RetryCount,
+                        RetryAlways,
+                        isKnownTransient: ex is TaskCanceledException)) {
+                    var queuedMessageId =
+                        await QueuePendingMessageAsync(
+                            cancellationToken).ConfigureAwait(false);
                     if (ErrorAction == ActionPreference.Stop) throw;
-                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", ex.Message);
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", ex.Message) {
+                        MessageId = queuedMessageId,
+                        Queued = queuedMessageId != null
+                    };
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
                     return failResult;
                 }
-                var delay = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
-                if (MaxDelayMilliseconds > 0 && delay > MaxDelayMilliseconds) {
-                    delay = MaxDelayMilliseconds;
-                }
-                if (JitterMilliseconds > 0 && delay > 0) {
-                    delay += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
-                }
-                if (delay > 0) await Task.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken).ConfigureAwait(false);
+                await HttpRetryPolicy.DelayAsync(
+                    RetryDelayMilliseconds,
+                    RetryDelayBackoff,
+                    attempts,
+                    MaxDelayMilliseconds,
+                    JitterMilliseconds,
+                    cancellationToken).ConfigureAwait(false);
             }
             attempts++;
-        } while (attempts <= RetryCount);
-        await QueuePendingMessageAsync(cancellationToken).ConfigureAwait(false);
-        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", lastException?.Message);
-        await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken).ConfigureAwait(false);
-        return finalResult;
+        }
     }
 
     /// <summary>
@@ -357,7 +454,7 @@ public class MailgunClient : IDisposable {
     /// <param name="disposing">When true, disposes managed resources as well.</param>
     protected virtual void Dispose(bool disposing) {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-        if (disposing) {
+        if (disposing && _ownsClient) {
             _client.Dispose();
         }
     }

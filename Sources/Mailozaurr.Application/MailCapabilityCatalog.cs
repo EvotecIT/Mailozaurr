@@ -60,6 +60,9 @@ public static class MailCapabilityCatalog {
                 | MailCapability.DeleteMessages
                 | MailCapability.SendMessages,
             MailProfileKind.Smtp => MailCapability.SendMessages,
+            MailProfileKind.SendGrid => MailCapability.SendMessages,
+            MailProfileKind.Mailgun => MailCapability.SendMessages,
+            MailProfileKind.Ses => MailCapability.SendMessages,
             _ => MailCapability.None,
         };
 

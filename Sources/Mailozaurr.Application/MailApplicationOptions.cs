@@ -36,4 +36,13 @@ public sealed class MailApplicationOptions {
 
     /// <summary>Whether the built-in SMTP send handler should be registered.</summary>
     public bool EnableSmtpSendHandler { get; set; } = true;
+
+    /// <summary>Whether the built-in SendGrid send handler should be registered.</summary>
+    public bool EnableSendGridSendHandler { get; set; } = true;
+
+    /// <summary>Whether the built-in Mailgun send handler should be registered.</summary>
+    public bool EnableMailgunSendHandler { get; set; } = true;
+
+    /// <summary>Whether the built-in Amazon SES send handler should be registered.</summary>
+    public bool EnableSesSendHandler { get; set; } = true;
 }

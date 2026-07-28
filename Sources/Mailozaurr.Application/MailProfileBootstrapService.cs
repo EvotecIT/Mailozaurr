@@ -9,7 +9,10 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
         MailSecretNames.ClientSecret,
         MailSecretNames.AccessToken,
         MailSecretNames.RefreshToken,
-        MailSecretNames.CertificatePassword
+        MailSecretNames.CertificatePassword,
+        MailSecretNames.ApiKey,
+        MailSecretNames.AccessKeyId,
+        MailSecretNames.SecretAccessKey
     };
     private readonly IMailProfileService _profiles;
     private readonly IMailProfileSecretService _profileSecrets;
