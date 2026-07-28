@@ -6,7 +6,9 @@ using System.Runtime.CompilerServices;
 
 namespace Mailozaurr.Tests;
 
-public sealed class ApplicationProviderMailSendHandlerTests {
+public sealed class ApplicationProviderMailSendHandlerTests : IDisposable {
+    private readonly List<string> _temporaryFiles = new();
+
     [Fact]
     public async Task SendGridHandlerMapsProfileMessageAndSecret() {
         var secrets = new FakeSecretStore(("sendgrid", MailSecretNames.ApiKey, "sg-secret"));
@@ -20,6 +22,7 @@ public sealed class ApplicationProviderMailSendHandlerTests {
             Assert.Equal("Alice", recipient.Name);
             Assert.Equal("alice@example.com", recipient.Email);
             Assert.Equal("Provider test", client.Subject);
+            Assert.Equal(MessagePriority.High, client.Priority);
             Assert.Equal(2, client.RetryCount);
             AssertAttachmentMetadata(Assert.Single(client.Attachments!));
             return Task.FromResult(Succeeded("sendgrid-message"));
@@ -43,6 +46,7 @@ public sealed class ApplicationProviderMailSendHandlerTests {
             var recipient = Assert.IsType<MailboxAddress>(Assert.Single(client.To));
             Assert.Equal("Alice", recipient.Name);
             Assert.Equal("alice@example.com", recipient.Address);
+            Assert.Equal(MessagePriority.High, client.Priority);
             AssertAttachmentMetadata(Assert.Single(client.Attachments!));
             return Task.FromResult(Succeeded("mailgun-message"));
         });
@@ -68,6 +72,7 @@ public sealed class ApplicationProviderMailSendHandlerTests {
             var recipient = Assert.IsType<MailboxAddress>(Assert.Single(client.To));
             Assert.Equal("Alice", recipient.Name);
             Assert.Equal("alice@example.com", recipient.Address);
+            Assert.Equal(MessagePriority.High, client.Priority);
             AssertAttachmentMetadata(Assert.Single(client.Attachments!));
             return Task.FromResult(Succeeded("ses-message"));
         });
@@ -128,6 +133,24 @@ public sealed class ApplicationProviderMailSendHandlerTests {
             handler.SendAsync(CreateProfile("sendgrid", MailProfileKind.SendGrid), request));
 
         Assert.Contains("recipient", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ProviderHandlerRejectsAMissingAttachmentBeforeDispatch() {
+        var secrets = new FakeSecretStore(("sendgrid", MailSecretNames.ApiKey, "sg-secret"));
+        var request = CreateRequest("sendgrid");
+        File.Delete(request.Message.Attachments[0].Path);
+        var dispatched = false;
+        var handler = new SendGridMailSendHandler(secrets, sendAsync: (client, cancellationToken) => {
+            dispatched = true;
+            return Task.FromResult(Succeeded("sendgrid-message"));
+        });
+
+        var exception = await Assert.ThrowsAsync<FileNotFoundException>(() =>
+            handler.SendAsync(CreateProfile("sendgrid", MailProfileKind.SendGrid), request));
+
+        Assert.False(dispatched);
+        Assert.Equal(Path.GetFullPath(request.Message.Attachments[0].Path), exception.FileName);
     }
 
     [Fact]
@@ -223,27 +246,32 @@ public sealed class ApplicationProviderMailSendHandlerTests {
         }
     };
 
-    private static SendMessageRequest CreateRequest(string profileId) => new() {
-        ProfileId = profileId,
-        Message = new DraftMessage {
+    private SendMessageRequest CreateRequest(string profileId) {
+        var path = Path.GetTempFileName();
+        _temporaryFiles.Add(path);
+        return new SendMessageRequest {
             ProfileId = profileId,
-            Subject = "Provider test",
-            TextBody = "Hello",
-            To = {
-                new MessageRecipient { Name = "Alice", Address = "alice@example.com" }
-            },
-            Attachments = {
-                new DraftAttachment {
-                    Path = Path.Combine(Path.GetTempPath(), "mailozaurr-provider-test.bin"),
-                    FileName = "renamed-report.pdf",
-                    ContentType = "application/pdf",
-                    ContentId = "report-content"
+            Message = new DraftMessage {
+                ProfileId = profileId,
+                Subject = "Provider test",
+                TextBody = "Hello",
+                Priority = MessagePriority.High,
+                To = {
+                    new MessageRecipient { Name = "Alice", Address = "alice@example.com" }
+                },
+                Attachments = {
+                    new DraftAttachment {
+                        Path = path,
+                        FileName = "renamed-report.pdf",
+                        ContentType = "application/pdf",
+                        ContentId = "report-content"
+                    }
                 }
             }
-        }
-    };
+        };
+    }
 
-    private static SendMessageRequest CreateRequestWithReplyTo(string profileId) {
+    private SendMessageRequest CreateRequestWithReplyTo(string profileId) {
         var request = CreateRequest(profileId);
         request.Message.ReplyTo.Add(new MessageRecipient { Address = "  " });
         request.Message.ReplyTo.Add(new MessageRecipient { Name = "Reply", Address = "reply@example.com" });
@@ -261,6 +289,15 @@ public sealed class ApplicationProviderMailSendHandlerTests {
         new(true, EmailAction.Send, "alice@example.com", "sender@example.com", "provider", 0, TimeSpan.Zero) {
             MessageId = messageId
         };
+
+    public void Dispose() {
+        foreach (var path in _temporaryFiles) {
+            try {
+                File.Delete(path);
+            } catch (IOException) {
+            }
+        }
+    }
 
     private sealed class FakeSecretStore : IMailSecretStore {
         private readonly Dictionary<string, string> _secrets;

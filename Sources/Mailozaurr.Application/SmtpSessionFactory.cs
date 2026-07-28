@@ -36,9 +36,12 @@ public sealed class SmtpSessionFactory : ISmtpSessionFactory {
     private async Task<SmtpSessionRequest> CreateRequestAsync(MailProfile profile, CancellationToken cancellationToken) {
         var server = RequireSetting(profile, MailProfileSettingsKeys.Server);
         var port = GetIntSetting(profile, MailProfileSettingsKeys.Port) ?? 587;
+        var authenticationEnabled = GetBoolSetting(profile, MailProfileSettingsKeys.AuthenticationEnabled) ?? true;
         var authMode = GetAuthMode(profile);
-        var userName = ResolveUserName(profile);
-        var secret = await ResolveSecretAsync(profile, authMode, cancellationToken).ConfigureAwait(false);
+        var userName = authenticationEnabled ? ResolveUserName(profile) : string.Empty;
+        var secret = authenticationEnabled
+            ? await ResolveSecretAsync(profile, authMode, cancellationToken).ConfigureAwait(false)
+            : string.Empty;
 
         return new SmtpSessionRequest {
             Server = server,
@@ -49,8 +52,11 @@ public sealed class SmtpSessionFactory : ISmtpSessionFactory {
             RetryCount = GetIntSetting(profile, MailProfileSettingsKeys.RetryCount) ?? 3,
             RetryDelayMilliseconds = GetIntSetting(profile, MailProfileSettingsKeys.RetryDelayMilliseconds) ?? 500,
             RetryDelayBackoff = GetDoubleSetting(profile, MailProfileSettingsKeys.RetryDelayBackoff) ?? 2.0,
+            MaxDelayMilliseconds = GetIntSetting(profile, MailProfileSettingsKeys.MaxDelayMilliseconds) ?? 10_000,
+            JitterMilliseconds = GetIntSetting(profile, MailProfileSettingsKeys.JitterMilliseconds) ?? 250,
             SkipCertificateValidation = GetBoolSetting(profile, MailProfileSettingsKeys.SkipCertificateValidation) ?? false,
             SkipCertificateRevocation = GetBoolSetting(profile, MailProfileSettingsKeys.SkipCertificateRevocation) ?? false,
+            Authenticate = authenticationEnabled,
             UserName = userName,
             Password = secret,
             AuthMode = authMode

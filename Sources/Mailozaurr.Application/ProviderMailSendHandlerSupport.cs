@@ -73,13 +73,17 @@ internal static class ProviderMailSendHandlerSupport {
             .ToList();
 
     public static void ApplyRetrySettings(MailProfile profile, Action<int, int, double, int, int, bool> apply) {
-        apply(
-            GetInt(profile, MailProfileSettingsKeys.RetryCount) ?? 0,
-            GetInt(profile, MailProfileSettingsKeys.RetryDelayMilliseconds) ?? 0,
-            GetDouble(profile, MailProfileSettingsKeys.RetryDelayBackoff) ?? 1.0,
-            GetInt(profile, MailProfileSettingsKeys.MaxDelayMilliseconds) ?? 0,
-            GetInt(profile, MailProfileSettingsKeys.JitterMilliseconds) ?? 0,
-            GetBool(profile, MailProfileSettingsKeys.RetryAlways) ?? false);
+        var retryCount = RequireNonNegative(profile, MailProfileSettingsKeys.RetryCount, GetInt(profile, MailProfileSettingsKeys.RetryCount) ?? 0);
+        var retryDelay = RequireNonNegative(profile, MailProfileSettingsKeys.RetryDelayMilliseconds, GetInt(profile, MailProfileSettingsKeys.RetryDelayMilliseconds) ?? 0);
+        var backoff = GetDouble(profile, MailProfileSettingsKeys.RetryDelayBackoff) ?? 1.0;
+        if (double.IsNaN(backoff) || double.IsInfinity(backoff) || backoff < 1.0) {
+            throw new InvalidOperationException(
+                $"Profile '{profile.Id}' setting '{MailProfileSettingsKeys.RetryDelayBackoff}' must be a finite number greater than or equal to 1.");
+        }
+        var maxDelay = RequireNonNegative(profile, MailProfileSettingsKeys.MaxDelayMilliseconds, GetInt(profile, MailProfileSettingsKeys.MaxDelayMilliseconds) ?? 0);
+        var jitter = RequireNonNegative(profile, MailProfileSettingsKeys.JitterMilliseconds, GetInt(profile, MailProfileSettingsKeys.JitterMilliseconds) ?? 0);
+
+        apply(retryCount, retryDelay, backoff, maxDelay, jitter, GetBool(profile, MailProfileSettingsKeys.RetryAlways) ?? false);
     }
 
     public static string? GetSetting(MailProfile profile, string key) =>
@@ -116,7 +120,12 @@ internal static class ProviderMailSendHandlerSupport {
     }
 
     private static AttachmentDescriptor CreateAttachment(DraftAttachment attachment) {
-        var descriptor = new FileAttachmentDescriptor(attachment.Path) {
+        var fullPath = Path.GetFullPath(attachment.Path);
+        if (!File.Exists(fullPath)) {
+            throw new FileNotFoundException($"Attachment '{attachment.Path}' was not found.", fullPath);
+        }
+
+        var descriptor = new FileAttachmentDescriptor(fullPath) {
             ContentDisposition = new ContentDisposition(
                 attachment.IsInline ? ContentDisposition.Inline : ContentDisposition.Attachment)
         };
@@ -154,5 +163,12 @@ internal static class ProviderMailSendHandlerSupport {
         if (value == null) return null;
         if (bool.TryParse(value, out var parsed)) return parsed;
         throw new InvalidOperationException($"Profile '{profile.Id}' has invalid boolean setting '{key}'.");
+    }
+
+    private static int RequireNonNegative(MailProfile profile, string key, int value) {
+        if (value < 0) {
+            throw new InvalidOperationException($"Profile '{profile.Id}' setting '{key}' must not be negative.");
+        }
+        return value;
     }
 }

@@ -40,6 +40,7 @@ public sealed class SendGridMailSendHandler : IMailSendHandler {
             Subject = request.Message.Subject,
             Text = request.Message.TextBody ?? string.Empty,
             Html = request.Message.HtmlBody ?? string.Empty,
+            Priority = request.Message.Priority,
             Headers = request.Message.Headers,
             Attachments = ProviderMailSendHandlerSupport.Attachments(request.Message),
             PendingMessageRepository = request.QueueOnFailure ? _pendingMessageRepository : null

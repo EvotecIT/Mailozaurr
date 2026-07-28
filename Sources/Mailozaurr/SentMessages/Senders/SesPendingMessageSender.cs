@@ -55,7 +55,9 @@ public sealed class SesPendingMessageSender : IPendingMessageSender {
 #else
                 var error = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
-                throw new HttpRequestException($"SES returned {(int)response.StatusCode} ({response.StatusCode}): {error}");
+                throw HttpRetryPolicy.CreateFailure(
+                    response.StatusCode,
+                    $"SES returned {(int)response.StatusCode} ({response.StatusCode}): {error}");
             }
         }
     }

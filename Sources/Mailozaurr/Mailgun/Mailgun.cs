@@ -13,6 +13,7 @@ namespace Mailozaurr;
 /// </summary>
 public class MailgunClient : IDisposable {
     private readonly HttpClient _client;
+    private readonly bool _ownsClient;
     private int _disposed;
     /// <summary>Measures total time spent sending.</summary>
     public readonly Stopwatch Stopwatch;
@@ -74,6 +75,8 @@ public class MailgunClient : IDisposable {
 
     /// <summary>Custom headers to include with the message.</summary>
     public Dictionary<string, string>? Headers { get; set; }
+    /// <summary>Message priority propagated as Mailgun message headers.</summary>
+    public MessagePriority Priority { get; set; } = MessagePriority.Normal;
 
     /// <summary>Collector used to store log entries.</summary>
     public LogCollector LogCollector { get; set; } = new();
@@ -124,7 +127,15 @@ public class MailgunClient : IDisposable {
     /// </summary>
     public MailgunClient() {
         Stopwatch = Stopwatch.StartNew();
-        _client = new HttpClient();
+        _client = Helpers.SharedHttpClient;
+    }
+
+    /// <summary>Initializes a client with an isolated HTTP handler.</summary>
+    /// <param name="handler">HTTP handler used for provider requests.</param>
+    public MailgunClient(HttpMessageHandler handler) {
+        Stopwatch = Stopwatch.StartNew();
+        _client = new HttpClient(handler ?? throw new ArgumentNullException(nameof(handler)));
+        _ownsClient = true;
     }
 
     /// <summary>
@@ -189,14 +200,16 @@ public class MailgunClient : IDisposable {
         if (!string.IsNullOrWhiteSpace(Subject)) content.Add(new StringContent(Subject), "subject");
         if (!string.IsNullOrWhiteSpace(Text)) content.Add(new StringContent(Text), "text");
         if (!string.IsNullOrWhiteSpace(Html)) content.Add(new StringContent(Html), "html");
+        if (Priority != MessagePriority.Normal) {
+            content.Add(new StringContent(Priority == MessagePriority.High ? "1" : "5"), "h:X-Priority");
+            content.Add(new StringContent(Priority == MessagePriority.High ? "high" : "low"), "h:Importance");
+        }
         var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (Attachment != null) {
             foreach (var path in Attachment) {
                 if (!files.Add(path)) continue;
                 if (!File.Exists(path)) {
-                    LogCollector.LogWarning($"Send-EmailMessage - Attachment file not found: {path}");
-                    LogCollector.LogWarning($"Send-EmailMessage - Possible issue: Path '{path}' is invalid. Verify the file exists and the path is correct.");
-                    continue;
+                    throw new FileNotFoundException($"Attachment '{path}' was not found.", path);
                 }
 
                 var fileContent = CreateStreamContent(path);
@@ -207,9 +220,7 @@ public class MailgunClient : IDisposable {
             foreach (var path in InlineAttachment) {
                 if (!files.Add(path)) continue;
                 if (!File.Exists(path)) {
-                    LogCollector.LogWarning($"Send-EmailMessage - Inline attachment file not found: {path}");
-                    LogCollector.LogWarning($"Send-EmailMessage - Possible issue: Path '{path}' is invalid. Verify the file exists and the path is correct.");
-                    continue;
+                    throw new FileNotFoundException($"Inline attachment '{path}' was not found.", path);
                 }
 
                 var fileContent = CreateStreamContent(path);
@@ -233,9 +244,9 @@ public class MailgunClient : IDisposable {
         if (attachments == null) return;
         foreach (var descriptor in attachments) {
             if (descriptor is FileAttachmentDescriptor fileDescriptor && !File.Exists(fileDescriptor.FilePath)) {
-                LogCollector.LogWarning($"Send-EmailMessage - Attachment file not found: {fileDescriptor.FilePath}");
-                LogCollector.LogWarning($"Send-EmailMessage - Possible issue: Path '{fileDescriptor.FilePath}' is invalid. Verify the file exists and the path is correct.");
-                continue;
+                throw new FileNotFoundException(
+                    $"Attachment '{fileDescriptor.FilePath}' was not found.",
+                    fileDescriptor.FilePath);
             }
 
             var fileName = string.IsNullOrWhiteSpace(descriptor.FileName)
@@ -357,8 +368,7 @@ public class MailgunClient : IDisposable {
         var auth = Convert.ToBase64String(Encoding.ASCII.GetBytes($"api:{ApiKey}"));
 
         int attempts = 0;
-        Exception? lastException = null;
-        do {
+        while (true) {
             try {
                 using var content = await CreateContentAsync(cancellationToken).ConfigureAwait(false);
                 using var request = new HttpRequestMessage(HttpMethod.Post, url) {
@@ -377,14 +387,15 @@ public class MailgunClient : IDisposable {
 #else
                 var error = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
-                throw new HttpRequestException(error);
+                throw HttpRetryPolicy.CreateFailure(response.StatusCode, error);
             } catch (Exception ex) when (
                 ex is HttpRequestException ||
                 ex is TaskCanceledException && !cancellationToken.IsCancellationRequested) {
-                lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Mailgun: {ex.Message}");
-                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
-                    var queuedMessageId = await QueuePendingMessageAsync(cancellationToken).ConfigureAwait(false);
+                if (!HttpRetryPolicy.ShouldRetry(ex, attempts, RetryCount, RetryAlways)) {
+                    var queuedMessageId = HttpRetryPolicy.ShouldQueue(ex, RetryAlways)
+                        ? await QueuePendingMessageAsync(cancellationToken).ConfigureAwait(false)
+                        : null;
                     if (ErrorAction == ActionPreference.Stop) throw;
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", ex.Message) {
                         MessageId = queuedMessageId
@@ -392,23 +403,16 @@ public class MailgunClient : IDisposable {
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
                     return failResult;
                 }
-                var delay = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
-                if (MaxDelayMilliseconds > 0 && delay > MaxDelayMilliseconds) {
-                    delay = MaxDelayMilliseconds;
-                }
-                if (JitterMilliseconds > 0 && delay > 0) {
-                    delay += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
-                }
-                if (delay > 0) await Task.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken).ConfigureAwait(false);
+                await HttpRetryPolicy.DelayAsync(
+                    RetryDelayMilliseconds,
+                    RetryDelayBackoff,
+                    attempts,
+                    MaxDelayMilliseconds,
+                    JitterMilliseconds,
+                    cancellationToken).ConfigureAwait(false);
             }
             attempts++;
-        } while (attempts <= RetryCount);
-        var finalQueuedMessageId = await QueuePendingMessageAsync(cancellationToken).ConfigureAwait(false);
-        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", lastException?.Message) {
-            MessageId = finalQueuedMessageId
-        };
-        await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken).ConfigureAwait(false);
-        return finalResult;
+        }
     }
 
     /// <summary>
@@ -424,7 +428,7 @@ public class MailgunClient : IDisposable {
     /// <param name="disposing">When true, disposes managed resources as well.</param>
     protected virtual void Dispose(bool disposing) {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-        if (disposing) {
+        if (disposing && _ownsClient) {
             _client.Dispose();
         }
     }

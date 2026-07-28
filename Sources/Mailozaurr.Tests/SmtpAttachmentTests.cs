@@ -9,7 +9,7 @@ namespace Mailozaurr.Tests;
 
 public class SmtpAttachmentTests {
     [Fact]
-    public void CreateMessage_MissingAttachment_SkipsAttachment() {
+    public void CreateMessage_MissingAttachment_Throws() {
         var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         if (File.Exists(path)) File.Delete(path);
         var smtp = new Smtp {
@@ -20,9 +20,8 @@ public class SmtpAttachmentTests {
             Attachments = new List<AttachmentDescriptor> { new FileAttachmentDescriptor(path) }
         };
 
-        smtp.CreateMessage();
-
-        Assert.IsNotType<Multipart>(smtp.Message.Body);
+        var exception = Assert.Throws<FileNotFoundException>(() => smtp.CreateMessage());
+        Assert.Equal(path, exception.FileName);
     }
 
     [Fact]
@@ -57,6 +56,20 @@ public class SmtpAttachmentTests {
         Assert.Equal(data, extracted.ToArray());
 
         Assert.True(source.CanRead);
+    }
+
+    [Fact]
+    public void StreamAttachmentDescriptor_ClosedSourceRemainsReusable() {
+        var bytes = Encoding.UTF8.GetBytes("repeatable");
+        var source = new MemoryStream(bytes);
+        var descriptor = new StreamAttachmentDescriptor(source, "repeatable.txt", leaveStreamOpen: false);
+
+        var first = descriptor.GetContentBytes();
+        var second = descriptor.GetContentBytes();
+
+        Assert.Equal(bytes, first);
+        Assert.Equal(bytes, second);
+        Assert.False(source.CanRead);
     }
 
     [Fact]

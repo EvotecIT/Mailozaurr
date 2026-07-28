@@ -1,5 +1,6 @@
 using MailKit.Security;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -14,8 +15,8 @@ public class SmtpSessionServiceTests {
             SecureSocketOptions = SecureSocketOptions.Auto,
             UserName = "user",
             Password = "pass",
-            ConnectAsync = _ => Task.FromResult(new SmtpResult(true, EmailAction.Connect, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero)),
-            AuthenticateAsync = _ => Task.FromResult(new SmtpResult(true, EmailAction.Authenticate, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero))
+            ConnectAsync = (_, _) => Task.FromResult(new SmtpResult(true, EmailAction.Connect, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero)),
+            AuthenticateAsync = (_, _) => Task.FromResult(new SmtpResult(true, EmailAction.Authenticate, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero))
         };
 
         var smtp = new Smtp();
@@ -27,6 +28,39 @@ public class SmtpSessionServiceTests {
     }
 
     [Fact]
+    public async Task ConnectAndAuthenticateAsync_AnonymousRelaySkipsAuthentication() {
+        bool authenticateCalled = false;
+        var request = new SmtpSessionRequest {
+            Server = "relay.example.com",
+            Authenticate = false,
+            ConnectAsync = (_, _) => Task.FromResult(new SmtpResult(
+                true,
+                EmailAction.Connect,
+                string.Empty,
+                string.Empty,
+                "relay.example.com",
+                25,
+                TimeSpan.Zero)),
+            AuthenticateAsync = (_, _) => {
+                authenticateCalled = true;
+                return Task.FromResult(new SmtpResult(
+                    true,
+                    EmailAction.Authenticate,
+                    string.Empty,
+                    string.Empty,
+                    "relay.example.com",
+                    25,
+                    TimeSpan.Zero));
+            }
+        };
+
+        var result = await SmtpSessionService.ConnectAndAuthenticateAsync(new Smtp(), request);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(authenticateCalled);
+    }
+
+    [Fact]
     public async Task ConnectAndAuthenticateAsync_FlagsConnectFailures() {
         var request = new SmtpSessionRequest {
             Server = "smtp.test",
@@ -34,7 +68,7 @@ public class SmtpSessionServiceTests {
             SecureSocketOptions = SecureSocketOptions.Auto,
             UserName = "user",
             Password = "pass",
-            ConnectAsync = _ => Task.FromResult(new SmtpResult(false, EmailAction.Connect, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero, error: "nope"))
+            ConnectAsync = (_, _) => Task.FromResult(new SmtpResult(false, EmailAction.Connect, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero, error: "nope"))
         };
 
         var smtp = new Smtp();
@@ -54,8 +88,8 @@ public class SmtpSessionServiceTests {
             SecureSocketOptions = SecureSocketOptions.Auto,
             UserName = "user",
             Password = "pass",
-            ConnectAsync = _ => Task.FromResult(new SmtpResult(true, EmailAction.Connect, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero)),
-            AuthenticateAsync = _ => Task.FromResult(new SmtpResult(false, EmailAction.Authenticate, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero, error: "bad auth"))
+            ConnectAsync = (_, _) => Task.FromResult(new SmtpResult(true, EmailAction.Connect, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero)),
+            AuthenticateAsync = (_, _) => Task.FromResult(new SmtpResult(false, EmailAction.Authenticate, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero, error: "bad auth"))
         };
 
         var smtp = new Smtp();
@@ -65,5 +99,28 @@ public class SmtpSessionServiceTests {
         Assert.Equal("auth_failed", result.ErrorCode);
         Assert.Equal("bad auth", result.Error);
         Assert.False(result.IsTransient);
+    }
+
+    [Fact]
+    public async Task ConnectAndAuthenticateAsync_PropagatesCancellationTokenToBothDelegates() {
+        using var cancellation = new CancellationTokenSource();
+        var request = new SmtpSessionRequest {
+            Server = "smtp.test",
+            ConnectAsync = (_, token) => {
+                Assert.Equal(cancellation.Token, token);
+                return Task.FromResult(new SmtpResult(true, EmailAction.Connect, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero));
+            },
+            AuthenticateAsync = (_, token) => {
+                Assert.Equal(cancellation.Token, token);
+                return Task.FromResult(new SmtpResult(true, EmailAction.Authenticate, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero));
+            }
+        };
+
+        var result = await SmtpSessionService.ConnectAndAuthenticateAsync(
+            new Smtp(),
+            request,
+            cancellation.Token);
+
+        Assert.True(result.IsSuccess);
     }
 }

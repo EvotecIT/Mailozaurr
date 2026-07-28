@@ -15,6 +15,7 @@ namespace Mailozaurr;
 /// </remarks>
 public class SesClient : IDisposable {
     private readonly HttpClient _client;
+    private readonly bool _ownsClient;
 
     /// <summary>Measures send latency.</summary>
     public readonly Stopwatch Stopwatch;
@@ -56,6 +57,8 @@ public class SesClient : IDisposable {
 
     /// <summary>Custom headers to include with the message.</summary>
     public Dictionary<string, string>? Headers { get; set; }
+    /// <summary>Message priority written into the MIME payload.</summary>
+    public MessagePriority Priority { get; set; } = MessagePriority.Normal;
 
     /// <summary>Number of retry attempts on failure.</summary>
     public int RetryCount { get; set; } = 0;
@@ -110,7 +113,7 @@ public class SesClient : IDisposable {
     /// </summary>
     public SesClient() {
         Stopwatch = Stopwatch.StartNew();
-        _client = new HttpClient();
+        _client = Helpers.SharedHttpClient;
     }
 
     /// <summary>
@@ -120,6 +123,7 @@ public class SesClient : IDisposable {
     public SesClient(HttpMessageHandler handler) {
         Stopwatch = Stopwatch.StartNew();
         _client = new HttpClient(handler);
+        _ownsClient = true;
     }
 
     private MimeMessage BuildMessage() {
@@ -132,6 +136,7 @@ public class SesClient : IDisposable {
         smtp.Subject = Subject ?? string.Empty;
         smtp.TextBody = Text;
         smtp.HtmlBody = Html;
+        smtp.Priority = Priority;
         if (Attachment != null) smtp.Attachments = Attachment.Select(path => (AttachmentDescriptor)new FileAttachmentDescriptor(path)).ToList();
         if (InlineAttachment != null) smtp.InlineAttachments = InlineAttachment.Select(path => (AttachmentDescriptor)new FileAttachmentDescriptor(path)).ToList();
         if (Attachments != null) {
@@ -262,10 +267,10 @@ public class SesClient : IDisposable {
         }
         int attempts = 0;
         Exception? lastException = null;
-        do {
+        while (true) {
             try {
                 using HttpRequestMessage request = CreateRequest(body, DateTime.UtcNow);
-                HttpResponseMessage response = await _client.SendAsync(request, cancellationToken);
+                using HttpResponseMessage response = await _client.SendAsync(request, cancellationToken);
 #if NET5_0_OR_GREATER
                 string respContent = await response.Content.ReadAsStringAsync(cancellationToken);
 #else
@@ -277,8 +282,7 @@ public class SesClient : IDisposable {
                     return ok;
                 }
 
-                lastException = new HttpRequestException(respContent);
-                LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SES: {respContent}");
+                throw HttpRetryPolicy.CreateFailure(response.StatusCode, respContent);
             } catch (HttpRequestException ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SES: {ex.Message}");
@@ -289,8 +293,10 @@ public class SesClient : IDisposable {
                 LogCollector.LogWarning($"Send-EmailMessage - SES request timed out: {ex.Message}");
             }
 
-            if ((!Helpers.IsTransient(lastException) && !RetryAlways) || attempts >= RetryCount) {
-                var queuedMessageId = await QueuePendingMessageAsync(message, mimeMessageBase64, cancellationToken).ConfigureAwait(false);
+            if (!HttpRetryPolicy.ShouldRetry(lastException, attempts, RetryCount, RetryAlways)) {
+                var queuedMessageId = HttpRetryPolicy.ShouldQueue(lastException, RetryAlways)
+                    ? await QueuePendingMessageAsync(message, mimeMessageBase64, cancellationToken).ConfigureAwait(false)
+                    : null;
                 if (ErrorAction == ActionPreference.Stop && lastException != null) {
                     throw lastException;
                 }
@@ -301,26 +307,15 @@ public class SesClient : IDisposable {
                 return fail;
             }
 
-            int delay = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
-            if (MaxDelayMilliseconds > 0 && delay > MaxDelayMilliseconds) {
-                delay = MaxDelayMilliseconds;
-            }
-            if (JitterMilliseconds > 0 && delay > 0) {
-                delay += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
-            }
-            if (delay > 0) {
-                await Task.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken);
-            }
+            await HttpRetryPolicy.DelayAsync(
+                RetryDelayMilliseconds,
+                RetryDelayBackoff,
+                attempts,
+                MaxDelayMilliseconds,
+                JitterMilliseconds,
+                cancellationToken).ConfigureAwait(false);
             attempts++;
         }
-        while (attempts <= RetryCount);
-
-        var finalQueuedMessageId = await QueuePendingMessageAsync(message, mimeMessageBase64, cancellationToken).ConfigureAwait(false);
-        SmtpResult final = new(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, lastException?.Message) {
-            MessageId = finalQueuedMessageId
-        };
-        await Helpers.PostWebhookAsync(WebhookUrl, final, cancellationToken, _client);
-        return final;
     }
 
     /// <summary>
@@ -377,6 +372,8 @@ public class SesClient : IDisposable {
     /// Releases resources used by the <see cref="SesClient"/> instance.
     /// </summary>
     public void Dispose() {
-        _client.Dispose();
+        if (_ownsClient) {
+            _client.Dispose();
+        }
     }
 }

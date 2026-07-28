@@ -101,6 +101,19 @@ public class SesClientSendEmailAsyncTests {
     }
 
     [Fact]
+    public async Task SendEmailAsync_PermanentFailureDoesNotRetry() {
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent("invalid") });
+        using var client = CreateClient(handler);
+        client.RetryCount = 3;
+
+        var result = await client.SendEmailAsync();
+
+        Assert.False(result.Status);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
     public async Task SendEmailAsync_PostsWebhook_OnSuccess() {
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") });
         using var client = CreateClient(handler);

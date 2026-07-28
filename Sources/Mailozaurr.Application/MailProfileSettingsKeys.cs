@@ -43,6 +43,9 @@ public static class MailProfileSettingsKeys {
     /// <summary>Authentication mode identifier.</summary>
     public const string AuthMode = "authMode";
 
+    /// <summary>Whether the transport should authenticate after connecting.</summary>
+    public const string AuthenticationEnabled = "authenticationEnabled";
+
     /// <summary>Secure socket options mode.</summary>
     public const string SecureSocketOptions = "secureSocketOptions";
 

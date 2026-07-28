@@ -175,6 +175,11 @@ public static class Helpers {
     /// <returns><c>true</c> if the error is transient; otherwise <c>false</c>.</returns>
     public static bool IsTransient(Exception ex) {
         switch (ex) {
+#if !NET5_0_OR_GREATER
+            case HttpRetryPolicy.ProviderHttpRequestException providerEx:
+                var providerCode = (int)providerEx.StatusCode;
+                return providerCode >= 500 || providerCode == 408 || providerCode == 429;
+#endif
             case HttpRequestException httpEx:
                 // HttpRequestException.StatusCode was introduced in .NET 5.0
 #if NET5_0_OR_GREATER

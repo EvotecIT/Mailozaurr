@@ -21,6 +21,7 @@ public class MailgunClientTests {
         private readonly HttpStatusCode _statusCode;
         private readonly string _content;
         public bool ResponseDisposed { get; private set; }
+        public int Calls { get; private set; }
 
         public TrackingHandler(HttpStatusCode statusCode, string content = "") {
             _statusCode = statusCode;
@@ -28,6 +29,7 @@ public class MailgunClientTests {
         }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            Calls++;
             var response = new HttpResponseMessage(_statusCode) {
                 Content = new TrackingContent(_content, () => ResponseDisposed = true)
             };
@@ -61,6 +63,9 @@ public class MailgunClientTests {
     }
 
     private sealed class DerivedMailgunClient : MailgunClient {
+        public DerivedMailgunClient(HttpMessageHandler handler) : base(handler) {
+        }
+
         public bool Disposed { get; private set; }
 
         protected override void Dispose(bool disposing) {
@@ -106,6 +111,24 @@ public class MailgunClientTests {
         string body = await content.ReadAsStringAsync();
         Assert.Contains("h:X-Test", body, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("123", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateContentAsync_WithHighPriority_IncludesPriorityHeaders() {
+        using var client = new MailgunClient {
+            From = "sender@example.com",
+            To = new List<object> { "to@example.com" },
+            Priority = MessagePriority.High
+        };
+        MethodInfo? method = typeof(MailgunClient).GetMethod("CreateContentAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        var task = (Task<MultipartFormDataContent>)method!.Invoke(client, new object[] { default(CancellationToken) })!;
+        using var content = await task;
+        string body = await content.ReadAsStringAsync();
+
+        Assert.Contains("h:X-Priority", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("h:Importance", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("high", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -243,7 +266,7 @@ public class MailgunClientTests {
     }
 
     [Fact]
-    public async Task CreateContentAsync_SkipsMissingStructuredFileAttachment() {
+    public async Task CreateContentAsync_RejectsMissingStructuredFileAttachment() {
         string missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
         using var client = new MailgunClient {
             From = "sender@example.com",
@@ -252,10 +275,9 @@ public class MailgunClientTests {
         };
 
         MethodInfo? method = typeof(MailgunClient).GetMethod("CreateContentAsync", BindingFlags.NonPublic | BindingFlags.Instance);
-        var task = (Task<MultipartFormDataContent>)method!.Invoke(client, new object[] { default(CancellationToken) })!;
-        using var content = await task;
-
-        Assert.DoesNotContain(content, part => part.Headers.ContentDisposition?.Name?.Trim('"') == "attachment");
+        var exception = Assert.Throws<TargetInvocationException>(() =>
+            method!.Invoke(client, new object[] { default(CancellationToken) }));
+        Assert.IsType<FileNotFoundException>(exception.InnerException);
     }
 
     [Fact]
@@ -288,16 +310,50 @@ public class MailgunClientTests {
     }
 
     [Fact]
+    public async Task SendEmailAsync_PermanentFailureDoesNotRetry() {
+        var handler = new TrackingHandler(HttpStatusCode.BadRequest, "invalid request");
+        using var client = CreateClient(handler);
+        client.RetryCount = 3;
+
+        var result = await client.SendEmailAsync();
+
+        Assert.False(result.Status);
+        Assert.Equal(1, handler.Calls);
+    }
+
+    [Fact]
+    public async Task SendEmailAsync_StreamAttachmentCanBeReadAcrossRetries() {
+        var contentBytes = System.Text.Encoding.UTF8.GetBytes("repeatable-content");
+        var source = new NonSeekableReadStream(contentBytes);
+        var handler = new SequencedHandler(
+            HttpStatusCode.InternalServerError,
+            HttpStatusCode.OK);
+        using var client = new MailgunClient(handler) {
+            From = "sender@example.com",
+            To = new List<object> { "to@example.com" },
+            Credentials = new NetworkCredential(string.Empty, "key"),
+            RetryCount = 1,
+            Attachments = new List<AttachmentDescriptor> {
+                new StreamAttachmentDescriptor(source, "report.bin", leaveStreamOpen: false)
+            }
+        };
+
+        var result = await client.SendEmailAsync();
+
+        Assert.True(result.Status);
+        Assert.Equal(2, handler.RequestBodies.Count);
+        Assert.All(handler.RequestBodies, body => Assert.Contains("repeatable-content", body, StringComparison.Ordinal));
+        Assert.False(source.CanRead);
+    }
+
+    [Fact]
     public void Dispose_DerivedType_DisposesHttpClient() {
         var handler = new DisposingHandler();
-        var httpClient = new HttpClient(handler);
-        var client = new DerivedMailgunClient {
+        var client = new DerivedMailgunClient(handler) {
             From = "sender@example.com",
             To = new List<object> { "to@example.com" },
             Credentials = new NetworkCredential(string.Empty, "key")
         };
-        var field = typeof(MailgunClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance);
-        field!.SetValue(client, httpClient);
 
         client.Dispose();
 
@@ -319,14 +375,58 @@ public class MailgunClientTests {
     }
 
     private static MailgunClient CreateClient(HttpMessageHandler handler) {
-        var httpClient = new HttpClient(handler);
-        var client = new MailgunClient {
+        return new MailgunClient(handler) {
             From = "sender@example.com",
             To = new List<object> { "to@example.com" },
             Credentials = new NetworkCredential(string.Empty, "key")
         };
-        var field = typeof(MailgunClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance);
-        field!.SetValue(client, httpClient);
-        return client;
+    }
+
+    private sealed class SequencedHandler : HttpMessageHandler {
+        private readonly Queue<HttpStatusCode> _statuses;
+
+        public SequencedHandler(params HttpStatusCode[] statuses) {
+            _statuses = new Queue<HttpStatusCode>(statuses);
+        }
+
+        public List<string> RequestBodies { get; } = new();
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) {
+            RequestBodies.Add(await request.Content!.ReadAsStringAsync());
+            return new HttpResponseMessage(_statuses.Dequeue()) {
+                Content = new StringContent("response")
+            };
+        }
+    }
+
+    private sealed class NonSeekableReadStream : Stream {
+        private readonly MemoryStream _inner;
+
+        public NonSeekableReadStream(byte[] bytes) {
+            _inner = new MemoryStream(bytes, writable: false);
+        }
+
+        public override bool CanRead => _inner.CanRead;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+        public override void Flush() => _inner.Flush();
+        public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing) {
+            if (disposing) {
+                _inner.Dispose();
+            }
+            base.Dispose(disposing);
+        }
     }
 }

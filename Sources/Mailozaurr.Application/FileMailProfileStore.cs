@@ -25,7 +25,7 @@ public sealed class FileMailProfileStore : IMailProfileStore, IMailProfileMainte
 
     /// <inheritdoc />
     public Task<IReadOnlyList<MailProfile>> GetAllAsync(CancellationToken cancellationToken = default) =>
-        _store.ReadAsync(document => CloneProfiles(document.Profiles), cancellationToken);
+        _store.ReadAsync(document => MailProfileCloner.CloneAll(document.Profiles), cancellationToken);
 
     /// <inheritdoc />
     public Task<MailProfile?> GetByIdAsync(string profileId, CancellationToken cancellationToken = default) {
@@ -36,17 +36,17 @@ public sealed class FileMailProfileStore : IMailProfileStore, IMailProfileMainte
         return _store.ReadAsync(document => {
             MailProfile? profile = document.Profiles.FirstOrDefault(p =>
                 string.Equals(p.Id, profileId, StringComparison.OrdinalIgnoreCase));
-            return profile == null ? null : CloneProfile(profile);
+            return profile == null ? null : MailProfileCloner.Clone(profile);
         }, cancellationToken);
     }
 
     /// <inheritdoc />
     public async Task SaveAsync(MailProfile profile, CancellationToken cancellationToken = default) {
-        ValidateProfile(profile);
+        MailProfileCloner.Validate(profile);
 
         await _store.UpdateAsync(document => {
             var existingIndex = document.Profiles.FindIndex(p => string.Equals(p.Id, profile.Id, StringComparison.OrdinalIgnoreCase));
-            var profileToStore = CloneProfile(profile);
+            var profileToStore = MailProfileCloner.Clone(profile);
 
             if (profileToStore.IsDefault) {
                 foreach (var existing in document.Profiles) {
@@ -86,36 +86,5 @@ public sealed class FileMailProfileStore : IMailProfileStore, IMailProfileMainte
             return operation(profileIds, cancellationToken);
         }, cancellationToken);
     }
-
-    private static void ValidateProfile(MailProfile? profile) {
-        if (profile == null) {
-            throw new ArgumentNullException(nameof(profile));
-        }
-
-        if (string.IsNullOrWhiteSpace(profile.Id)) {
-            throw new InvalidOperationException("Profile id is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(profile.DisplayName)) {
-            throw new InvalidOperationException("Profile display name is required.");
-        }
-    }
-
-    private static IReadOnlyList<MailProfile> CloneProfiles(IEnumerable<MailProfile> profiles) =>
-        profiles.Select(CloneProfile).ToArray();
-
-    private static MailProfile CloneProfile(MailProfile profile) => new() {
-        Id = profile.Id,
-        DisplayName = profile.DisplayName,
-        Description = profile.Description,
-        Kind = profile.Kind,
-        DefaultSender = profile.DefaultSender,
-        DefaultMailbox = profile.DefaultMailbox,
-        IsDefault = profile.IsDefault,
-        Settings = new Dictionary<string, string>(profile.Settings, StringComparer.OrdinalIgnoreCase),
-        Capabilities = profile.Capabilities == null
-            ? null
-            : new ProfileCapabilities(profile.Capabilities.Kind, profile.Capabilities.Capabilities)
-    };
 
 }

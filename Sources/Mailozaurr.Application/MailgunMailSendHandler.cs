@@ -27,6 +27,7 @@ public sealed class MailgunMailSendHandler : IMailSendHandler {
         ProviderMailSendHandlerSupport.Validate(profile, request, Kind);
         var apiKey = await ProviderMailSendHandlerSupport.RequireSecretAsync(
             _secretStore, profile, MailSecretNames.ApiKey, cancellationToken).ConfigureAwait(false);
+        var attachments = ProviderMailSendHandlerSupport.Attachments(request.Message);
 
         using var client = new MailgunClient {
             Credentials = new NetworkCredential("api", apiKey),
@@ -42,10 +43,11 @@ public sealed class MailgunMailSendHandler : IMailSendHandler {
             Subject = request.Message.Subject,
             Text = request.Message.TextBody ?? string.Empty,
             Html = request.Message.HtmlBody ?? string.Empty,
+            Priority = request.Message.Priority,
             Headers = request.Message.Headers,
-            Attachments = ProviderMailSendHandlerSupport.Attachments(request.Message).Where(attachment =>
+            Attachments = attachments.Where(attachment =>
                 !string.Equals(attachment.ContentDisposition?.Disposition, ContentDisposition.Inline, StringComparison.OrdinalIgnoreCase)).ToList(),
-            InlineAttachments = ProviderMailSendHandlerSupport.Attachments(request.Message).Where(attachment =>
+            InlineAttachments = attachments.Where(attachment =>
                 string.Equals(attachment.ContentDisposition?.Disposition, ContentDisposition.Inline, StringComparison.OrdinalIgnoreCase)).ToList(),
             PendingMessageRepository = request.QueueOnFailure ? _pendingMessageRepository : null
         };

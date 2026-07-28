@@ -20,6 +20,7 @@ public sealed class SendGridClient : IDisposable {
     /// The HttpClient used to send HTTP requests.
     /// </summary>
     private readonly HttpClient _client;
+    private readonly bool _ownsClient;
     private bool _disposed;
 
     /// <summary>
@@ -169,9 +170,19 @@ public sealed class SendGridClient : IDisposable {
     /// </summary>
     public SendGridClient() {
         Stopwatch = Stopwatch.StartNew();
-        _client = new HttpClient {
+        _client = Helpers.SharedHttpClient;
+    }
+
+    /// <summary>
+    /// Initializes a client with an isolated HTTP handler.
+    /// </summary>
+    /// <param name="handler">HTTP handler used for provider requests.</param>
+    public SendGridClient(HttpMessageHandler handler) {
+        Stopwatch = Stopwatch.StartNew();
+        _client = new HttpClient(handler ?? throw new ArgumentNullException(nameof(handler))) {
             Timeout = TimeSpan.FromSeconds(30)
         };
+        _ownsClient = true;
     }
 
     /// <summary>
@@ -242,8 +253,9 @@ public sealed class SendGridClient : IDisposable {
                 }
 
                 if (descriptor is FileAttachmentDescriptor fileDescriptor && !File.Exists(fileDescriptor.FilePath)) {
-                    logger.LogWarning($"Send-EmailMessage - File not found: {fileDescriptor.FilePath}. Skipping attachment.");
-                    continue;
+                    throw new FileNotFoundException(
+                        $"Attachment '{fileDescriptor.FilePath}' was not found.",
+                        fileDescriptor.FilePath);
                 }
             }
 
@@ -317,6 +329,14 @@ public sealed class SendGridClient : IDisposable {
 
         var fromAddress = ConvertToEmailObject(From) ?? throw new InvalidOperationException("From address is required.");
 
+        var headers = Headers == null
+            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(Headers, StringComparer.OrdinalIgnoreCase);
+        if (Priority != MessagePriority.Normal) {
+            headers["X-Priority"] = Priority == MessagePriority.High ? "1" : "5";
+            headers["Importance"] = Priority == MessagePriority.High ? "high" : "low";
+        }
+
         var message = new SendGridMessage {
             Personalizations = personalizations,
             From = fromAddress,
@@ -324,7 +344,7 @@ public sealed class SendGridClient : IDisposable {
             Content = content,
             ReplyTo = ConvertToEmailObject(ReplyTo),
             Attachments = attachments,
-            Headers = Headers
+            Headers = headers.Count == 0 ? null : headers
         };
 
         MessageJson = JsonSerializer.Serialize(message, MailozaurrJsonContext.Default.SendGridMessage);
@@ -364,7 +384,7 @@ public sealed class SendGridClient : IDisposable {
         int attempts = 0;
         Exception? lastException = null;
         string? lastContent = null;
-        do {
+        while (true) {
             try {
                 using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.sendgrid.com/v3/mail/send") {
                     Content = new StringContent(MessageJson, Encoding.UTF8, "application/json")
@@ -386,40 +406,40 @@ public sealed class SendGridClient : IDisposable {
                 }
 
                 var message = $"Status code {response.StatusCode}: {lastContent}";
-                lastException = new HttpRequestException(message);
-                LogCollector.LogWarning($"Send-EmailMessage - Error during sending using SendGrid: {message}");
+                throw HttpRetryPolicy.CreateFailure(response.StatusCode, message);
             } catch (HttpRequestException ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - HTTP error during sending using SendGrid: {ex.Message}");
-                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
-                    var queuedMessageId = await QueuePendingMessageAsync(apiKey, cancellationToken).ConfigureAwait(false);
-                    if (ErrorAction == ActionPreference.Stop && lastException != null) {
-                        throw lastException;
+                if (!HttpRetryPolicy.ShouldRetry(ex, attempts, RetryCount, RetryAlways)) {
+                    var queuedMessageId = HttpRetryPolicy.ShouldQueue(ex, RetryAlways)
+                        ? await QueuePendingMessageAsync(apiKey, cancellationToken).ConfigureAwait(false)
+                        : null;
+                    if (ErrorAction == ActionPreference.Stop) {
+                        throw;
                     }
-                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message) {
+                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, ex.Message) {
                         MessageId = queuedMessageId
                     };
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
                     return failResult;
                 }
 
-                var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
-                if (MaxDelayMilliseconds > 0 && delayMilliseconds > MaxDelayMilliseconds) {
-                    delayMilliseconds = MaxDelayMilliseconds;
-                }
-                if (JitterMilliseconds > 0 && delayMilliseconds > 0) {
-                    delayMilliseconds += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
-                }
-                if (delayMilliseconds > 0) {
-                    await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), cancellationToken).ConfigureAwait(false);
-                }
+                await HttpRetryPolicy.DelayAsync(
+                    RetryDelayMilliseconds,
+                    RetryDelayBackoff,
+                    attempts,
+                    MaxDelayMilliseconds,
+                    JitterMilliseconds,
+                    cancellationToken).ConfigureAwait(false);
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 throw;
             } catch (TaskCanceledException ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Request canceled: {ex.Message}");
-                if ((!Helpers.IsTransient(ex) && !RetryAlways) || attempts >= RetryCount) {
-                    var queuedMessageId = await QueuePendingMessageAsync(apiKey, cancellationToken).ConfigureAwait(false);
+                if (!HttpRetryPolicy.ShouldRetry(ex, attempts, RetryCount, RetryAlways)) {
+                    var queuedMessageId = HttpRetryPolicy.ShouldQueue(ex, RetryAlways)
+                        ? await QueuePendingMessageAsync(apiKey, cancellationToken).ConfigureAwait(false)
+                        : null;
                     if (ErrorAction == ActionPreference.Stop && lastException != null) {
                         throw lastException;
                     }
@@ -429,26 +449,16 @@ public sealed class SendGridClient : IDisposable {
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
                     return failResult;
                 }
-                var delayMs = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
-                if (MaxDelayMilliseconds > 0 && delayMs > MaxDelayMilliseconds) {
-                    delayMs = MaxDelayMilliseconds;
-                }
-                if (JitterMilliseconds > 0 && delayMs > 0) {
-                    delayMs += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
-                }
-                if (delayMs > 0) {
-                    await Task.Delay(TimeSpan.FromMilliseconds(delayMs), cancellationToken).ConfigureAwait(false);
-                }
+                await HttpRetryPolicy.DelayAsync(
+                    RetryDelayMilliseconds,
+                    RetryDelayBackoff,
+                    attempts,
+                    MaxDelayMilliseconds,
+                    JitterMilliseconds,
+                    cancellationToken).ConfigureAwait(false);
             }
             attempts++;
-        } while (attempts <= RetryCount);
-
-        var finalQueuedMessageId = await QueuePendingMessageAsync(apiKey, cancellationToken).ConfigureAwait(false);
-        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message) {
-            MessageId = finalQueuedMessageId
-        };
-        await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken).ConfigureAwait(false);
-        return finalResult;
+        }
     }
 
     private async Task<string?> QueuePendingMessageAsync(string apiKey, CancellationToken cancellationToken) {
@@ -507,7 +517,7 @@ public sealed class SendGridClient : IDisposable {
             return;
         }
 
-        if (disposing) {
+        if (disposing && _ownsClient) {
             _client.Dispose();
         }
 

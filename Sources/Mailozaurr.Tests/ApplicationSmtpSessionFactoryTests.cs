@@ -25,7 +25,9 @@ public sealed class ApplicationSmtpSessionFactoryTests {
                 [MailProfileSettingsKeys.Server] = "smtp.example.com",
                 [MailProfileSettingsKeys.Port] = "1587",
                 [MailProfileSettingsKeys.SecureSocketOptions] = SecureSocketOptions.StartTls.ToString(),
-                [MailProfileSettingsKeys.UseSsl] = "true"
+                [MailProfileSettingsKeys.UseSsl] = "true",
+                [MailProfileSettingsKeys.MaxDelayMilliseconds] = "9000",
+                [MailProfileSettingsKeys.JitterMilliseconds] = "175"
             }
         });
 
@@ -34,6 +36,8 @@ public sealed class ApplicationSmtpSessionFactoryTests {
         Assert.Equal(1587, captured.Port);
         Assert.Equal(SecureSocketOptions.StartTls, captured.SecureSocketOptions);
         Assert.True(captured.UseSsl);
+        Assert.Equal(9000, captured.MaxDelayMilliseconds);
+        Assert.Equal(175, captured.JitterMilliseconds);
         Assert.Equal("sender@example.com", captured.UserName);
         Assert.Equal("super-secret", captured.Password);
         Assert.Equal(ProtocolAuthMode.Basic, captured.AuthMode);
@@ -65,6 +69,31 @@ public sealed class ApplicationSmtpSessionFactoryTests {
         Assert.Equal(ProtocolAuthMode.OAuth2, captured!.AuthMode);
         Assert.Equal("oauth-token", captured.Password);
         Assert.Equal("user@gmail.com", captured.UserName);
+    }
+
+    [Fact]
+    public async Task FactorySupportsAnonymousSmtpWithoutCredentials() {
+        SmtpSessionRequest? captured = null;
+        var factory = new SmtpSessionFactory(null, (request, _) => {
+            captured = request;
+            return Task.FromResult(new Smtp());
+        });
+
+        await factory.ConnectAsync(new MailProfile {
+            Id = "anonymous-relay",
+            DisplayName = "Anonymous relay",
+            Kind = MailProfileKind.Smtp,
+            DefaultSender = "sender@example.com",
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Server] = "relay.example.com",
+                [MailProfileSettingsKeys.AuthenticationEnabled] = "false"
+            }
+        });
+
+        Assert.NotNull(captured);
+        Assert.False(captured!.Authenticate);
+        Assert.Equal(string.Empty, captured.UserName);
+        Assert.Equal(string.Empty, captured.Password);
     }
 
     private sealed class InMemorySecretStore : IMailSecretStore {

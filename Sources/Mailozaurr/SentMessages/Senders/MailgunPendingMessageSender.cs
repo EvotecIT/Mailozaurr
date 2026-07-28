@@ -57,7 +57,9 @@ public sealed class MailgunPendingMessageSender : IPendingMessageSender {
 #else
             var error = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
-            throw new HttpRequestException($"Mailgun returned {(int)response.StatusCode} ({response.StatusCode}): {error}");
+            throw HttpRetryPolicy.CreateFailure(
+                response.StatusCode,
+                $"Mailgun returned {(int)response.StatusCode} ({response.StatusCode}): {error}");
         }
     }
 

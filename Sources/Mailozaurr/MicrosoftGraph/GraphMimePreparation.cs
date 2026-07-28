@@ -111,6 +111,11 @@ public static class GraphMimePreparation {
             Cc = ConvertRecipients(message.Cc),
             Bcc = ConvertRecipients(message.Bcc),
             ReplyTo = ConvertRecipients(message.ReplyTo),
+            Importance = message.Priority switch {
+                MimeKit.MessagePriority.Urgent => "high",
+                MimeKit.MessagePriority.NonUrgent => "low",
+                _ => "normal"
+            },
             InternetMessageHeaders = headers.Count == 0 ? null : headers,
             Attachments = attachments
         };

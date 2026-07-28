@@ -31,6 +31,9 @@ public sealed class DraftMessage {
     /// <summary>HTML body.</summary>
     public string? HtmlBody { get; set; }
 
+    /// <summary>Message priority shared by all delivery providers.</summary>
+    public MessagePriority Priority { get; set; } = MessagePriority.Normal;
+
     /// <summary>Attachments included with the draft.</summary>
     public List<DraftAttachment> Attachments { get; set; } = new();
 

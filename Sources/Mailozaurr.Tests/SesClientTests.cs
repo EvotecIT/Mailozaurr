@@ -37,6 +37,21 @@ public class SesClientTests {
     }
 
     [Fact]
+    public void BuildMessage_WithHighPriority_SetsMimePriority() {
+        using var client = new SesClient {
+            From = "sender@example.com",
+            To = new List<object> { "to@example.com" },
+            Subject = "subject",
+            Priority = MessagePriority.High
+        };
+        MethodInfo? method = typeof(SesClient).GetMethod("BuildMessage", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        var message = Assert.IsType<MimeMessage>(method!.Invoke(client, null));
+
+        Assert.Equal(MimeKit.MessagePriority.Urgent, message.Priority);
+    }
+
+    [Fact]
     public void BuildMessage_PreservesStructuredAttachmentMetadata() {
         var file = Path.GetTempFileName();
         try {

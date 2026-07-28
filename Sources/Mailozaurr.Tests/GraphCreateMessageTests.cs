@@ -65,6 +65,21 @@ public class GraphCreateMessageTests {
     }
 
     [Fact]
+    public void GraphMimePreparation_MapsMimePriorityToImportance() {
+        var message = new MimeMessage {
+            Subject = "priority",
+            Body = new TextPart("plain") { Text = "body" },
+            Priority = MimeKit.MessagePriority.Urgent
+        };
+        message.From.Add(MailboxAddress.Parse("from@example.com"));
+        message.To.Add(MailboxAddress.Parse("to@example.com"));
+
+        var graphMessage = GraphMimePreparation.ConvertToGraphMessage(message);
+
+        Assert.Equal("high", graphMessage.Importance);
+    }
+
+    [Fact]
     public void CreateMessage_WithoutExplicitContentType_DefaultsToHtml() {
         using var graph = new Graph {
             From = "from@example.com",
