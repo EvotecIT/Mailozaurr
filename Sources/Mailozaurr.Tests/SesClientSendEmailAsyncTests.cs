@@ -73,6 +73,7 @@ public class SesClientSendEmailAsyncTests {
         string auth = request.Headers.GetValues("Authorization").Single();
         string body = await request.Content!.ReadAsStringAsync();
         string expected = ExpectedAuthorization("AKID", "SECRET", "us-east-1", amzDate, body);
+        Assert.Equal("application/x-www-form-urlencoded", request.Content.Headers.ContentType?.ToString());
         Assert.Equal(expected, auth);
     }
 

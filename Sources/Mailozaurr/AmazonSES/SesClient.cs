@@ -1,7 +1,5 @@
 using Mailozaurr.Definitions;
 using System.Net.Http;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 
@@ -154,44 +152,14 @@ public class SesClient : IDisposable {
         return smtp.Message;
     }
 
-    private static byte[] HmacSha256(byte[] key, string data) {
-        using HMACSHA256 hmac = new(key);
-        return hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
-    }
-
-    private static string Sha256Hex(string data) {
-        using SHA256 sha = SHA256.Create();
-        byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(data));
-        return BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
-    }
-
     private HttpRequestMessage CreateRequest(string content, DateTime utcNow) {
         NetworkCredential net = Credentials as NetworkCredential ?? throw new InvalidCastException("Credentials must be NetworkCredential");
-        string accessKey = net.UserName;
-        string secretKey = net.Password;
-        string service = "ses";
-        string region = Region;
-        string amzDate = utcNow.ToString("yyyyMMdd'T'HHmmss'Z'");
-        string dateStamp = utcNow.ToString("yyyyMMdd");
-        string canonicalHeaders = $"content-type:application/x-www-form-urlencoded\nhost:email.{region}.amazonaws.com\nx-amz-date:{amzDate}\n";
-        string signedHeaders = "content-type;host;x-amz-date";
-        string payloadHash = Sha256Hex(content);
-        string canonicalRequest = $"POST\n/\n\n{canonicalHeaders}\n{signedHeaders}\n{payloadHash}";
-        string credentialScope = $"{dateStamp}/{region}/{service}/aws4_request";
-        string stringToSign = $"AWS4-HMAC-SHA256\n{amzDate}\n{credentialScope}\n{Sha256Hex(canonicalRequest)}";
-        byte[] kDate = HmacSha256(Encoding.UTF8.GetBytes("AWS4" + secretKey), dateStamp);
-        byte[] kRegion = HmacSha256(kDate, region);
-        byte[] kService = HmacSha256(kRegion, service);
-        byte[] kSigning = HmacSha256(kService, "aws4_request");
-        byte[] sigBytes = HmacSha256(kSigning, stringToSign);
-        string signature = BitConverter.ToString(sigBytes).Replace("-", string.Empty).ToLowerInvariant();
-        string authorization = $"AWS4-HMAC-SHA256 Credential={accessKey}/{credentialScope}, SignedHeaders={signedHeaders}, Signature={signature}";
-
-        HttpRequestMessage request = new(HttpMethod.Post, $"https://email.{region}.amazonaws.com/");
-        request.Content = new StringContent(content, Encoding.UTF8, "application/x-www-form-urlencoded");
-        request.Headers.TryAddWithoutValidation("x-amz-date", amzDate);
-        request.Headers.TryAddWithoutValidation("Authorization", authorization);
-        return request;
+        return SesRequestFactory.Create(
+            net.UserName,
+            net.Password,
+            Region,
+            content,
+            utcNow);
     }
 
     private async Task<string?> QueuePendingMessageAsync(MimeMessage? message, string? mimeMessageBase64, CancellationToken cancellationToken) {

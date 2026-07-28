@@ -1,4 +1,5 @@
 using MimeKit;
+using Mailozaurr.Definitions;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -289,6 +290,56 @@ public sealed class ProviderPendingMessageTests {
 
         Assert.Equal(1, successHandler.CallCount);
         Assert.Null(await repository.GetByMessageIdAsync(record!.MessageId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task MailgunClient_QueuesEachFileBackedAttachmentOnceAcrossAllInputs() {
+        var file = Path.GetTempFileName();
+        try {
+            var repository = new InMemoryPendingMessageRepository();
+            using var client = new MailgunClient {
+                PendingMessageRepository = repository,
+                Credentials = new NetworkCredential("user", "mailgun-api-key"),
+                From = "sender@example.com",
+                To = new List<object> { "recipient@example.com" },
+                Subject = "mailgun-attachment-dedup",
+                Text = "body",
+                Attachment = new[] { file },
+                InlineAttachment = new[] { file },
+                Attachments = new List<AttachmentDescriptor> {
+                    new FileAttachmentDescriptor(file)
+                },
+                InlineAttachments = new List<AttachmentDescriptor> {
+                    new FileAttachmentDescriptor(file)
+                }
+            };
+            var failureHandler = new TestHandler((_, _) =>
+                Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest) {
+                    Content = new StringContent("error", Encoding.UTF8, "text/plain")
+                }));
+            var httpClientField = typeof(MailgunClient).GetField(
+                "_client",
+                BindingFlags.NonPublic | BindingFlags.Instance)!;
+            httpClientField.SetValue(client, new HttpClient(failureHandler));
+
+            var result = await client.SendEmailAsync(CancellationToken.None);
+
+            Assert.False(result.Status);
+            Assert.True(result.Queued);
+            var record = Assert.IsType<PendingMessageRecord>(repository.LastSaved);
+            var mime = await MimeMessage.LoadAsync(
+                new MemoryStream(Convert.FromBase64String(record.MimeMessage)));
+            var matchingParts = mime.BodyParts
+                .OfType<MimePart>()
+                .Where(part => string.Equals(
+                    part.FileName,
+                    Path.GetFileName(file),
+                    StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            Assert.Single(matchingParts);
+        } finally {
+            File.Delete(file);
+        }
     }
 
     [Fact]

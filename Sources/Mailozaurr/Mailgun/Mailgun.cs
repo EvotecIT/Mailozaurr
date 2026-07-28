@@ -207,63 +207,21 @@ public class MailgunClient : IDisposable {
             content.Add(new StringContent(Priority == MessagePriority.High ? "1" : "5"), "h:X-Priority");
             content.Add(new StringContent(Priority == MessagePriority.High ? "high" : "low"), "h:Importance");
         }
-        var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (Attachment != null) {
-            foreach (var path in Attachment) {
-                var fullPath = Path.GetFullPath(path);
-                if (!files.Add(fullPath)) continue;
-                if (!File.Exists(fullPath)) {
-                    throw new FileNotFoundException($"Attachment '{path}' was not found.", fullPath);
-                }
-
-                var fileContent = CreateStreamContent(fullPath);
-                content.Add(fileContent, "attachment", Path.GetFileName(fullPath));
-            }
-        }
-        if (InlineAttachment != null) {
-            foreach (var path in InlineAttachment) {
-                var fullPath = Path.GetFullPath(path);
-                if (!files.Add(fullPath)) continue;
-                if (!File.Exists(fullPath)) {
-                    throw new FileNotFoundException($"Inline attachment '{path}' was not found.", fullPath);
-                }
-
-                var fileContent = CreateStreamContent(fullPath);
-                content.Add(fileContent, "inline", Path.GetFileName(fullPath));
-            }
-        }
-        AddStructuredAttachments(content, Attachments, "attachment", files);
-        AddStructuredAttachments(content, InlineAttachments, "inline", files);
+        ForEachUniqueAttachment((descriptor, isInline) => {
+            var fileName = string.IsNullOrWhiteSpace(descriptor.FileName)
+                ? Path.GetFileName(descriptor.SourcePath) ?? "attachment"
+                : descriptor.FileName!;
+            content.Add(
+                CreateStreamContent(descriptor),
+                isInline ? "inline" : "attachment",
+                fileName);
+        });
         if (Headers != null) {
             foreach (var kvp in Headers) {
                 content.Add(new StringContent(kvp.Value), $"h:{kvp.Key}");
             }
         }
         return Task.FromResult(content);
-    }
-
-    private void AddStructuredAttachments(
-        MultipartFormDataContent content,
-        IEnumerable<AttachmentDescriptor>? attachments,
-        string fieldName,
-        HashSet<string> files) {
-        if (attachments == null) return;
-        foreach (var descriptor in attachments) {
-            if (descriptor.SourcePath is { Length: > 0 } sourcePath) {
-                var fullPath = Path.GetFullPath(sourcePath);
-                if (!files.Add(fullPath)) continue;
-                if (descriptor is FileAttachmentDescriptor && !File.Exists(fullPath)) {
-                    throw new FileNotFoundException(
-                        $"Attachment '{sourcePath}' was not found.",
-                        fullPath);
-                }
-            }
-
-            var fileName = string.IsNullOrWhiteSpace(descriptor.FileName)
-                ? Path.GetFileName(descriptor.SourcePath) ?? "attachment"
-                : descriptor.FileName!;
-            content.Add(CreateStreamContent(descriptor), fieldName, fileName);
-        }
     }
 
     private MimeMessage BuildMimeMessage() {
@@ -279,22 +237,70 @@ public class MailgunClient : IDisposable {
             Headers = Headers,
             Priority = Priority
         };
-        if (Attachment != null) {
-            smtp.Attachments = Attachment.Select(path => new FileAttachmentDescriptor(path)).Cast<AttachmentDescriptor>().ToList();
-        }
-        if (InlineAttachment != null) {
-            smtp.InlineAttachments = InlineAttachment.Select(path => new FileAttachmentDescriptor(path)).Cast<AttachmentDescriptor>().ToList();
-        }
-        if (Attachments != null) {
-            smtp.Attachments ??= new List<AttachmentDescriptor>();
-            smtp.Attachments.AddRange(Attachments);
-        }
-        if (InlineAttachments != null) {
-            smtp.InlineAttachments ??= new List<AttachmentDescriptor>();
-            smtp.InlineAttachments.AddRange(InlineAttachments);
-        }
+        ForEachUniqueAttachment((descriptor, isInline) => {
+            var target = isInline
+                ? smtp.InlineAttachments ??= new List<AttachmentDescriptor>()
+                : smtp.Attachments ??= new List<AttachmentDescriptor>();
+            target.Add(descriptor);
+        });
         smtp.CreateMessage();
         return smtp.Message;
+    }
+
+    private void ForEachUniqueAttachment(Action<AttachmentDescriptor, bool> add) {
+        var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        AddFileAttachments(Attachment, isInline: false, files, add);
+        AddFileAttachments(InlineAttachment, isInline: true, files, add);
+        AddStructuredAttachments(Attachments, isInline: false, files, add);
+        AddStructuredAttachments(InlineAttachments, isInline: true, files, add);
+    }
+
+    private static void AddFileAttachments(
+        IEnumerable<string>? paths,
+        bool isInline,
+        HashSet<string> files,
+        Action<AttachmentDescriptor, bool> add) {
+        if (paths == null) {
+            return;
+        }
+
+        foreach (var path in paths) {
+            AddUniqueAttachment(new FileAttachmentDescriptor(path), isInline, files, add);
+        }
+    }
+
+    private static void AddStructuredAttachments(
+        IEnumerable<AttachmentDescriptor>? attachments,
+        bool isInline,
+        HashSet<string> files,
+        Action<AttachmentDescriptor, bool> add) {
+        if (attachments == null) {
+            return;
+        }
+
+        foreach (var descriptor in attachments) {
+            AddUniqueAttachment(descriptor, isInline, files, add);
+        }
+    }
+
+    private static void AddUniqueAttachment(
+        AttachmentDescriptor descriptor,
+        bool isInline,
+        HashSet<string> files,
+        Action<AttachmentDescriptor, bool> add) {
+        if (descriptor.SourcePath is { Length: > 0 } sourcePath) {
+            var fullPath = Path.GetFullPath(sourcePath);
+            if (!files.Add(fullPath)) {
+                return;
+            }
+            if (descriptor is FileAttachmentDescriptor && !File.Exists(fullPath)) {
+                throw new FileNotFoundException(
+                    $"Attachment '{sourcePath}' was not found.",
+                    fullPath);
+            }
+        }
+
+        add(descriptor, isInline);
     }
 
     private async Task<string?> QueuePendingMessageAsync(CancellationToken cancellationToken) {

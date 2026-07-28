@@ -330,8 +330,12 @@ public partial class Graph {
                 delay = TimeSpan.FromMilliseconds(policy.MaxDelayMs);
             }
         } else {
-            var delayMs = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempts));
-            if (delayMs > 0) delay = TimeSpan.FromMilliseconds(delayMs);
+            delay = RetryDelayCalculator.Calculate(
+                RetryDelayMilliseconds,
+                RetryDelayBackoff,
+                attempts,
+                0,
+                0);
         }
 
         if (delay > TimeSpan.Zero) {

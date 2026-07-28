@@ -82,10 +82,15 @@ internal static class ConnectionRetrier {
                 if ((!Helpers.IsTransient(ex)) || attempts >= retryCount) {
                     throw;
                 }
-                var delay = (int)Math.Round(retryDelayMilliseconds * Math.Pow(retryDelayBackoff, attempts));
-                if (delay > 0) {
+                var delay = RetryDelayCalculator.Calculate(
+                    retryDelayMilliseconds,
+                    retryDelayBackoff,
+                    attempts,
+                    0,
+                    0);
+                if (delay > TimeSpan.Zero) {
                     if (delayAsync != null) {
-                        await delayAsync(delay, cancellationToken).ConfigureAwait(false);
+                        await delayAsync((int)delay.TotalMilliseconds, cancellationToken).ConfigureAwait(false);
                     } else {
                         await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                     }

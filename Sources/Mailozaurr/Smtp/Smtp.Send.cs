@@ -207,19 +207,13 @@ public partial class Smtp {
         return $"{userName}|{_activeSecureSocketOptions}|{_activeUseSsl}";
     }
 
-    private TimeSpan CalculateRetryDelay(int attempt) {
-        if (attempt < 0) attempt = 0;
-        var delayMilliseconds = (int)Math.Round(RetryDelayMilliseconds * Math.Pow(RetryDelayBackoff, attempt));
-        if (MaxDelayMilliseconds > 0 && delayMilliseconds > MaxDelayMilliseconds) {
-            delayMilliseconds = MaxDelayMilliseconds;
-        }
-        if (JitterMilliseconds > 0 && delayMilliseconds > 0) {
-            delayMilliseconds += GraphRetryHelperRandom.NextInt(JitterMilliseconds + 1);
-        }
-        return delayMilliseconds > 0
-            ? TimeSpan.FromMilliseconds(delayMilliseconds)
-            : TimeSpan.Zero;
-    }
+    internal TimeSpan CalculateRetryDelay(int attempt) =>
+        RetryDelayCalculator.Calculate(
+            RetryDelayMilliseconds,
+            RetryDelayBackoff,
+            attempt,
+            MaxDelayMilliseconds,
+            JitterMilliseconds);
 
     private string EnsureMessageId() {
         var id = Message.MessageId;
