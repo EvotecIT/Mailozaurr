@@ -311,7 +311,8 @@ public class SesClient : IDisposable {
                     throw lastException;
                 }
                 SmtpResult fail = new(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, lastException?.Message) {
-                    MessageId = queuedMessageId
+                    MessageId = queuedMessageId,
+                    Queued = queuedMessageId != null
                 };
                 await Helpers.PostWebhookAsync(WebhookUrl, fail, cancellationToken, _client);
                 return fail;

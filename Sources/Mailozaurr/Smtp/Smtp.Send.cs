@@ -252,9 +252,9 @@ public partial class Smtp {
         await PendingMessageRepository.RemoveAsync(safeMessageId, cancellationToken);
     }
 
-    private async Task EnqueuePendingMessageAsync(string messageId, ICredentialProtector credentialProtector, CancellationToken cancellationToken) {
+    private async Task<bool> EnqueuePendingMessageAsync(string messageId, ICredentialProtector credentialProtector, CancellationToken cancellationToken) {
         if (PendingMessageRepository == null) {
-            return;
+            return false;
         }
 
         using var ms = new MemoryStream();
@@ -274,6 +274,7 @@ public partial class Smtp {
             ProviderData = CreateProviderDataSnapshot()
         };
         await PendingMessageRepository.SaveAsync(record, cancellationToken);
+        return true;
     }
 
     private async Task<SmtpResult?> EnsureMessageReadyAsync(CancellationToken cancellationToken) {
@@ -471,9 +472,10 @@ public partial class Smtp {
                         throw;
                     }
                     var id = EnsureMessageId();
-                    await EnqueuePendingMessageAsync(id, credentialProtector, cancellationToken);
+                    var queued = await EnqueuePendingMessageAsync(id, credentialProtector, cancellationToken);
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", ex.Message) {
-                        MessageId = id
+                        MessageId = id,
+                        Queued = queued
                     };
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
                     return failResult;
@@ -488,9 +490,10 @@ public partial class Smtp {
         } while (attempts <= RetryCount);
 
         var finalId = EnsureMessageId();
-        await EnqueuePendingMessageAsync(finalId, credentialProtector, cancellationToken);
+        var finalQueued = await EnqueuePendingMessageAsync(finalId, credentialProtector, cancellationToken);
         var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", lastException?.Message) {
-            MessageId = finalId
+            MessageId = finalId,
+            Queued = finalQueued
         };
         await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken);
         return finalResult;

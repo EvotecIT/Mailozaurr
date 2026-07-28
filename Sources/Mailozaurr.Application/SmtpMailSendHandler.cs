@@ -59,20 +59,17 @@ public sealed class SmtpMailSendHandler : IMailSendHandler {
                 };
             }
 
-            if (queueEnabled) {
+            if (providerResult.Queued) {
                 var queuedId = providerResult.MessageId ?? message.MessageId;
                 if (!string.IsNullOrWhiteSpace(queuedId)) {
-                    var queued = await _pendingMessageRepository!.GetByMessageIdAsync(queuedId!, cancellationToken).ConfigureAwait(false);
-                    if (queued != null) {
-                        return new SendResult {
-                            Succeeded = true,
-                            ProfileId = profile.Id,
-                            ProfileKind = profile.Kind,
-                            Queued = true,
-                            QueueMessageId = queued.MessageId,
-                            Message = $"Message queued after send failure: {providerResult.Error ?? providerResult.Message ?? "SMTP send failed."}"
-                        };
-                    }
+                    return new SendResult {
+                        Succeeded = true,
+                        ProfileId = profile.Id,
+                        ProfileKind = profile.Kind,
+                        Queued = true,
+                        QueueMessageId = queuedId,
+                        Message = $"Message queued after send failure: {providerResult.Error ?? providerResult.Message ?? "SMTP send failed."}"
+                    };
                 }
             }
 

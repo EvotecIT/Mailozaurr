@@ -94,19 +94,10 @@ internal static class ProviderMailSendHandlerSupport {
             ? value.Trim()
             : null;
 
-    public static async Task<SendResult> ToResultAsync(
-        MailProfile profile,
-        SmtpResult result,
-        IPendingMessageRepository? pendingMessageRepository,
-        CancellationToken cancellationToken) {
-        var queued = false;
-        if (!result.Status &&
-            pendingMessageRepository != null &&
-            !string.IsNullOrWhiteSpace(result.MessageId)) {
-            queued = await pendingMessageRepository
-                .GetByMessageIdAsync(result.MessageId!, cancellationToken)
-                .ConfigureAwait(false) != null;
-        }
+    public static SendResult ToResult(MailProfile profile, SmtpResult result) {
+        var queued = !result.Status &&
+                     result.Queued &&
+                     !string.IsNullOrWhiteSpace(result.MessageId);
         return new SendResult {
             Succeeded = result.Status || queued,
             ProfileId = profile.Id,

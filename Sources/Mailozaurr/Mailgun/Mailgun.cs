@@ -210,28 +210,30 @@ public class MailgunClient : IDisposable {
         var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (Attachment != null) {
             foreach (var path in Attachment) {
-                if (!files.Add(path)) continue;
-                if (!File.Exists(path)) {
-                    throw new FileNotFoundException($"Attachment '{path}' was not found.", path);
+                var fullPath = Path.GetFullPath(path);
+                if (!files.Add(fullPath)) continue;
+                if (!File.Exists(fullPath)) {
+                    throw new FileNotFoundException($"Attachment '{path}' was not found.", fullPath);
                 }
 
-                var fileContent = CreateStreamContent(path);
-                content.Add(fileContent, "attachment", Path.GetFileName(path));
+                var fileContent = CreateStreamContent(fullPath);
+                content.Add(fileContent, "attachment", Path.GetFileName(fullPath));
             }
         }
         if (InlineAttachment != null) {
             foreach (var path in InlineAttachment) {
-                if (!files.Add(path)) continue;
-                if (!File.Exists(path)) {
-                    throw new FileNotFoundException($"Inline attachment '{path}' was not found.", path);
+                var fullPath = Path.GetFullPath(path);
+                if (!files.Add(fullPath)) continue;
+                if (!File.Exists(fullPath)) {
+                    throw new FileNotFoundException($"Inline attachment '{path}' was not found.", fullPath);
                 }
 
-                var fileContent = CreateStreamContent(path);
-                content.Add(fileContent, "inline", Path.GetFileName(path));
+                var fileContent = CreateStreamContent(fullPath);
+                content.Add(fileContent, "inline", Path.GetFileName(fullPath));
             }
         }
-        AddStructuredAttachments(content, Attachments, "attachment");
-        AddStructuredAttachments(content, InlineAttachments, "inline");
+        AddStructuredAttachments(content, Attachments, "attachment", files);
+        AddStructuredAttachments(content, InlineAttachments, "inline", files);
         if (Headers != null) {
             foreach (var kvp in Headers) {
                 content.Add(new StringContent(kvp.Value), $"h:{kvp.Key}");
@@ -243,13 +245,18 @@ public class MailgunClient : IDisposable {
     private void AddStructuredAttachments(
         MultipartFormDataContent content,
         IEnumerable<AttachmentDescriptor>? attachments,
-        string fieldName) {
+        string fieldName,
+        HashSet<string> files) {
         if (attachments == null) return;
         foreach (var descriptor in attachments) {
-            if (descriptor is FileAttachmentDescriptor fileDescriptor && !File.Exists(fileDescriptor.FilePath)) {
-                throw new FileNotFoundException(
-                    $"Attachment '{fileDescriptor.FilePath}' was not found.",
-                    fileDescriptor.FilePath);
+            if (descriptor.SourcePath is { Length: > 0 } sourcePath) {
+                var fullPath = Path.GetFullPath(sourcePath);
+                if (!files.Add(fullPath)) continue;
+                if (descriptor is FileAttachmentDescriptor && !File.Exists(fullPath)) {
+                    throw new FileNotFoundException(
+                        $"Attachment '{sourcePath}' was not found.",
+                        fullPath);
+                }
             }
 
             var fileName = string.IsNullOrWhiteSpace(descriptor.FileName)
@@ -410,7 +417,8 @@ public class MailgunClient : IDisposable {
                             cancellationToken).ConfigureAwait(false);
                     if (ErrorAction == ActionPreference.Stop) throw;
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "MailgunApi", 0, Stopwatch.Elapsed, "", ex.Message) {
-                        MessageId = queuedMessageId
+                        MessageId = queuedMessageId,
+                        Queued = queuedMessageId != null
                     };
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
                     return failResult;

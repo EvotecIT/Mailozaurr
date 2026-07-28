@@ -385,7 +385,8 @@ public partial class Graph : IDisposable {
                 : $"{current.Error} | SMTP fallback error: {fallbackError}";
             return new SmtpResult(current.Status, current.EmailAction, current.SentTo, current.SentFrom, current.Server, current.Port, current.TimeToExecute, current.Message, mergedError) {
                 GraphError = current.GraphError,
-                MessageId = current.MessageId
+                MessageId = current.MessageId,
+                Queued = current.Queued
             };
         }
     }

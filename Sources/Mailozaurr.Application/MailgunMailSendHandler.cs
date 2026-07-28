@@ -61,11 +61,7 @@ public sealed class MailgunMailSendHandler : IMailSendHandler {
         });
 
         var result = await _sendAsync(client, cancellationToken).ConfigureAwait(false);
-        return await ProviderMailSendHandlerSupport.ToResultAsync(
-            profile,
-            result,
-            request.QueueOnFailure ? _pendingMessageRepository : null,
-            cancellationToken).ConfigureAwait(false);
+        return ProviderMailSendHandlerSupport.ToResult(profile, result);
     }
 
     private static Task<SmtpResult> DefaultSendAsync(MailgunClient client, CancellationToken cancellationToken) =>

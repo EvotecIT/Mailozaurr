@@ -133,6 +133,7 @@ public sealed class SmtpPendingMessageTests {
         var result = await smtp.SendAsync();
 
         Assert.False(result.Status);
+        Assert.True(result.Queued);
         Assert.NotNull(result.MessageId);
         Assert.Single(repo.Saved);
         Assert.Equal(result.MessageId, repo.Saved[0].MessageId);
@@ -178,6 +179,7 @@ public sealed class SmtpPendingMessageTests {
         var result = await smtp.SendAsync();
 
         Assert.True(result.Status);
+        Assert.False(result.Queued);
         Assert.Single(repo.Removed);
         Assert.Equal("msg-1", repo.Removed[0]);
     }

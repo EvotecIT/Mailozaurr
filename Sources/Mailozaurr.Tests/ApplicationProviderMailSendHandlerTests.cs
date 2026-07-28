@@ -84,12 +84,13 @@ public sealed class ApplicationProviderMailSendHandlerTests : IDisposable {
     }
 
     [Fact]
-    public async Task ProviderHandlerReportsAQueuedFailure() {
+    public async Task ProviderHandlerPreservesConfirmedQueueAfterRecordIsConsumed() {
         var secrets = new FakeSecretStore(("sendgrid", MailSecretNames.ApiKey, "sg-secret"));
-        var pending = new FakePendingMessageRepository(new PendingMessageRecord { MessageId = "queued-message" });
+        var pending = new FakePendingMessageRepository();
         var handler = new SendGridMailSendHandler(secrets, pending, sendAsync: (client, cancellationToken) =>
             Task.FromResult(new SmtpResult(false, EmailAction.Send, "alice@example.com", "sender@example.com", "SendGridApi", 0, TimeSpan.Zero, error: "temporary failure") {
-                MessageId = "queued-message"
+                MessageId = "queued-message",
+                Queued = true
             }));
 
         var request = CreateRequest("sendgrid");
@@ -107,7 +108,8 @@ public sealed class ApplicationProviderMailSendHandlerTests : IDisposable {
         var pending = new FakePendingMessageRepository();
         var handler = new SendGridMailSendHandler(secrets, pending, sendAsync: (client, cancellationToken) =>
             Task.FromResult(new SmtpResult(false, EmailAction.Send, "alice@example.com", "sender@example.com", "SendGridApi", 0, TimeSpan.Zero, error: "temporary failure") {
-                MessageId = "not-persisted"
+                MessageId = "not-persisted",
+                Queued = false
             }));
 
         var request = CreateRequest("sendgrid");

@@ -428,7 +428,8 @@ public sealed class SendGridClient : IDisposable {
                         throw;
                     }
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, ex.Message) {
-                        MessageId = queuedMessageId
+                        MessageId = queuedMessageId,
+                        Queued = queuedMessageId != null
                     };
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
                     return failResult;
@@ -460,7 +461,8 @@ public sealed class SendGridClient : IDisposable {
                         throw lastException;
                     }
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message) {
-                        MessageId = queuedMessageId
+                        MessageId = queuedMessageId,
+                        Queued = queuedMessageId != null
                     };
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
                     return failResult;

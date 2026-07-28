@@ -46,7 +46,7 @@ public sealed class ApplicationSmtpMailSendHandlerTests {
     }
 
     [Fact]
-    public async Task HandlerReturnsQueuedResultWhenRepositoryCapturesFailedSend() {
+    public async Task HandlerPreservesConfirmedQueueAfterRecordIsConsumed() {
         var repository = new FilePendingMessageRepository(new PendingMessageRepositoryOptions {
             DirectoryPath = CreateTemporaryDirectory()
         });
@@ -62,9 +62,11 @@ public sealed class ApplicationSmtpMailSendHandlerTests {
                     Provider = EmailProvider.None,
                     MimeMessage = Convert.ToBase64String(Array.Empty<byte>())
                 }, cancellationToken).ConfigureAwait(false);
+                await repository.RemoveAsync(message.MessageId ?? "queued-1", cancellationToken).ConfigureAwait(false);
 
                 return new SmtpResult(false, EmailAction.Send, "alice@example.com", "sender@example.com", "smtp.example.com", 587, TimeSpan.Zero, error: "temporary smtp failure") {
-                    MessageId = message.MessageId ?? "queued-1"
+                    MessageId = message.MessageId ?? "queued-1",
+                    Queued = true
                 };
             });
 

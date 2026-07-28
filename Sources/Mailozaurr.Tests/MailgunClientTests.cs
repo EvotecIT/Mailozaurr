@@ -194,6 +194,32 @@ public class MailgunClientTests {
     }
 
     [Fact]
+    public async Task CreateContentAsync_DuplicatePathsAcrossLegacyAndStructuredCollections_SkipsDuplicates() {
+        var legacyFile = Path.GetTempFileName();
+        var structuredFile = Path.GetTempFileName();
+        try {
+            using var client = new MailgunClient {
+                From = "sender@example.com",
+                To = new List<object> { "to@example.com" },
+                Attachment = new[] { legacyFile },
+                Attachments = new List<AttachmentDescriptor> {
+                    new FileAttachmentDescriptor(Path.GetFullPath(legacyFile)),
+                    new FileAttachmentDescriptor(structuredFile),
+                    new FileAttachmentDescriptor(Path.GetFullPath(structuredFile))
+                }
+            };
+            MethodInfo? method = typeof(MailgunClient).GetMethod("CreateContentAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+            var task = (Task<MultipartFormDataContent>)method!.Invoke(client, new object[] { default(CancellationToken) })!;
+            using var content = await task;
+            var parts = content.Count(c => c.Headers.ContentDisposition?.Name?.Trim('"') == "attachment");
+            Assert.Equal(2, parts);
+        } finally {
+            File.Delete(legacyFile);
+            File.Delete(structuredFile);
+        }
+    }
+
+    [Fact]
     public async Task CreateContentAsync_UsesStreamContentForFiles() {
         var attachment = Path.GetTempFileName();
         var inline = Path.GetTempFileName();

@@ -151,6 +151,7 @@ public sealed class ProviderPendingMessageTests {
 
         var result = await client.SendEmailAsync(CancellationToken.None);
         Assert.False(result.Status);
+        Assert.True(result.Queued);
 
         var record = repository.LastSaved;
         Assert.NotNull(record);
@@ -257,6 +258,7 @@ public sealed class ProviderPendingMessageTests {
 
         var result = await client.SendEmailAsync(CancellationToken.None);
         Assert.False(result.Status);
+        Assert.True(result.Queued);
 
         var record = repository.LastSaved;
         Assert.NotNull(record);
@@ -534,6 +536,7 @@ public sealed class ProviderPendingMessageTests {
 
         var result = await client.SendEmailAsync(CancellationToken.None);
         Assert.False(result.Status);
+        Assert.True(result.Queued);
 
         var record = repository.LastSaved;
         Assert.NotNull(record);
