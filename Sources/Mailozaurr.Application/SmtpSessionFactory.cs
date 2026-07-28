@@ -86,17 +86,21 @@ public sealed class SmtpSessionFactory : ISmtpSessionFactory {
         return secret!;
     }
 
-    private static async Task<Smtp> DefaultConnectAsync(SmtpSessionRequest request, CancellationToken cancellationToken) {
+    internal static async Task<Smtp> DefaultConnectAsync(SmtpSessionRequest request, CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
 
         var smtp = new Smtp();
-        var result = await SmtpSessionService.ConnectAndAuthenticateAsync(smtp, request, cancellationToken).ConfigureAwait(false);
-        if (result.IsSuccess) {
-            return smtp;
-        }
+        try {
+            var result = await SmtpSessionService.ConnectAndAuthenticateAsync(smtp, request, cancellationToken).ConfigureAwait(false);
+            if (result.IsSuccess) {
+                return smtp;
+            }
 
-        SmtpSessionService.DisposeQuietly(smtp);
-        throw new InvalidOperationException($"SMTP connection/authentication failed ({result.ErrorCode}): {result.Error}");
+            throw new InvalidOperationException($"SMTP connection/authentication failed ({result.ErrorCode}): {result.Error}");
+        } catch {
+            SmtpSessionService.DisposeQuietly(smtp);
+            throw;
+        }
     }
 
     private static string ResolveUserName(MailProfile profile) {

@@ -188,7 +188,7 @@ internal static class OAuthTokenCache {
         }
         Directory.CreateDirectory(directory);
 
-        while (true) {
+        for (var attempt = 0; ; attempt++) {
             cancellationToken.ThrowIfCancellationRequested();
             try {
                 return new FileStream(
@@ -198,7 +198,7 @@ internal static class OAuthTokenCache {
                     FileShare.None,
                     1,
                     FileOptions.None);
-            } catch (IOException) {
+            } catch (IOException) when (attempt < IoRetryCount - 1) {
                 await Task.Delay(FileLockRetryDelay, cancellationToken).ConfigureAwait(false);
             }
         }

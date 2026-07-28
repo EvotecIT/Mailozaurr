@@ -234,4 +234,25 @@ public sealed class OAuthTokenCacheProtectionTests {
         Assert.NotNull(await OAuthTokenCache.GetAsync("external:entry"));
     }
 
+    [Fact]
+    public async Task SetAsync_PersistentlyHeldCacheLock_ThrowsIOException() {
+        var lockPath = OAuthCacheTestHelper.GetOAuthCacheFilePath() + ".lock";
+        var directory = Path.GetDirectoryName(lockPath);
+        if (!string.IsNullOrWhiteSpace(directory)) {
+            Directory.CreateDirectory(directory);
+        }
+
+        using var lockStream = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        using var cancellationSource = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+        await Assert.ThrowsAsync<IOException>(() => OAuthTokenCache.SetAsync(
+            "locked:entry",
+            new OAuthCredential {
+                UserName = "locked@example.com",
+                AccessToken = "locked-token",
+                ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(30)
+            },
+            cancellationSource.Token));
+    }
+
 }

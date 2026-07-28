@@ -98,6 +98,48 @@ public sealed class ApplicationSmtpSessionFactoryTests {
         Assert.Equal(string.Empty, captured.Password);
     }
 
+    [Fact]
+    public async Task DefaultConnectAsync_CancellationAfterConnect_DisposesOwnedSession() {
+        var previousFactory = Smtp.ClientFactory;
+        var trackingClient = new TrackingClientSmtp();
+        Smtp.ClientFactory = _ => trackingClient;
+        try {
+            using var cancellationSource = new CancellationTokenSource();
+            var request = new SmtpSessionRequest {
+                Server = "smtp.example.com",
+                Authenticate = false,
+                ConnectWithCancellationAsync = (_, _) => {
+                    cancellationSource.Cancel();
+                    return Task.FromResult(new SmtpResult(
+                        true,
+                        default,
+                        string.Empty,
+                        string.Empty,
+                        "smtp.example.com",
+                        587,
+                        TimeSpan.Zero));
+                }
+            };
+
+            await Assert.ThrowsAsync<OperationCanceledException>(
+                () => SmtpSessionFactory.DefaultConnectAsync(request, cancellationSource.Token));
+
+            Assert.True(trackingClient.IsDisposed);
+        } finally {
+            Smtp.ClientFactory = previousFactory;
+            trackingClient.Dispose();
+        }
+    }
+
+    private sealed class TrackingClientSmtp : ClientSmtp {
+        public bool IsDisposed { get; private set; }
+
+        protected override void Dispose(bool disposing) {
+            IsDisposed = true;
+            base.Dispose(disposing);
+        }
+    }
+
     private sealed class InMemorySecretStore : IMailSecretStore {
         private readonly Dictionary<string, string> _values = new(StringComparer.OrdinalIgnoreCase);
 
