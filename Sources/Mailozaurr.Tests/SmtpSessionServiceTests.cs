@@ -8,6 +8,16 @@ namespace Mailozaurr.Tests;
 
 public class SmtpSessionServiceTests {
     [Fact]
+    public void SmtpSessionRequest_PreservesLegacyDelegatePropertyTypes() {
+        Assert.Equal(
+            typeof(Func<Smtp, Task<SmtpResult>>),
+            typeof(SmtpSessionRequest).GetProperty(nameof(SmtpSessionRequest.ConnectAsync))!.PropertyType);
+        Assert.Equal(
+            typeof(Func<Smtp, Task<SmtpResult>>),
+            typeof(SmtpSessionRequest).GetProperty(nameof(SmtpSessionRequest.AuthenticateAsync))!.PropertyType);
+    }
+
+    [Fact]
     public async Task ConnectAndAuthenticateAsync_ReturnsSuccess() {
         var request = new SmtpSessionRequest {
             Server = "smtp.test",
@@ -16,8 +26,8 @@ public class SmtpSessionServiceTests {
             UserName = "user",
             Password = "pass",
             RetryAlways = true,
-            ConnectAsync = (_, _) => Task.FromResult(new SmtpResult(true, EmailAction.Connect, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero)),
-            AuthenticateAsync = (_, _) => Task.FromResult(new SmtpResult(true, EmailAction.Authenticate, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero))
+            ConnectAsync = _ => Task.FromResult(new SmtpResult(true, EmailAction.Connect, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero)),
+            AuthenticateAsync = _ => Task.FromResult(new SmtpResult(true, EmailAction.Authenticate, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero))
         };
 
         var smtp = new Smtp();
@@ -35,7 +45,7 @@ public class SmtpSessionServiceTests {
         var request = new SmtpSessionRequest {
             Server = "relay.example.com",
             Authenticate = false,
-            ConnectAsync = (_, _) => Task.FromResult(new SmtpResult(
+            ConnectAsync = _ => Task.FromResult(new SmtpResult(
                 true,
                 EmailAction.Connect,
                 string.Empty,
@@ -43,7 +53,7 @@ public class SmtpSessionServiceTests {
                 "relay.example.com",
                 25,
                 TimeSpan.Zero)),
-            AuthenticateAsync = (_, _) => {
+            AuthenticateAsync = _ => {
                 authenticateCalled = true;
                 return Task.FromResult(new SmtpResult(
                     true,
@@ -70,7 +80,7 @@ public class SmtpSessionServiceTests {
             SecureSocketOptions = SecureSocketOptions.Auto,
             UserName = "user",
             Password = "pass",
-            ConnectAsync = (_, _) => Task.FromResult(new SmtpResult(false, EmailAction.Connect, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero, error: "nope"))
+            ConnectAsync = _ => Task.FromResult(new SmtpResult(false, EmailAction.Connect, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero, error: "nope"))
         };
 
         var smtp = new Smtp();
@@ -90,8 +100,8 @@ public class SmtpSessionServiceTests {
             SecureSocketOptions = SecureSocketOptions.Auto,
             UserName = "user",
             Password = "pass",
-            ConnectAsync = (_, _) => Task.FromResult(new SmtpResult(true, EmailAction.Connect, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero)),
-            AuthenticateAsync = (_, _) => Task.FromResult(new SmtpResult(false, EmailAction.Authenticate, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero, error: "bad auth"))
+            ConnectAsync = _ => Task.FromResult(new SmtpResult(true, EmailAction.Connect, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero)),
+            AuthenticateAsync = _ => Task.FromResult(new SmtpResult(false, EmailAction.Authenticate, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero, error: "bad auth"))
         };
 
         var smtp = new Smtp();
@@ -108,11 +118,11 @@ public class SmtpSessionServiceTests {
         using var cancellation = new CancellationTokenSource();
         var request = new SmtpSessionRequest {
             Server = "smtp.test",
-            ConnectAsync = (_, token) => {
+            ConnectWithCancellationAsync = (_, token) => {
                 Assert.Equal(cancellation.Token, token);
                 return Task.FromResult(new SmtpResult(true, EmailAction.Connect, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero));
             },
-            AuthenticateAsync = (_, token) => {
+            AuthenticateWithCancellationAsync = (_, token) => {
                 Assert.Equal(cancellation.Token, token);
                 return Task.FromResult(new SmtpResult(true, EmailAction.Authenticate, string.Empty, string.Empty, "smtp.test", 587, TimeSpan.Zero));
             }

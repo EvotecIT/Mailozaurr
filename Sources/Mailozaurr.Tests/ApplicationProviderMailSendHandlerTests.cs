@@ -221,6 +221,24 @@ public sealed class ApplicationProviderMailSendHandlerTests : IDisposable {
     }
 
     [Fact]
+    public async Task ProviderHandlerFallsBackToDefaultMailboxWhenDefaultSenderIsMissing() {
+        var secrets = new FakeSecretStore(("sendgrid", MailSecretNames.ApiKey, "sg-secret"));
+        var request = CreateRequest("sendgrid");
+        request.Message.From = null;
+        var profile = CreateProfile("sendgrid", MailProfileKind.SendGrid);
+        profile.DefaultSender = null;
+        profile.DefaultMailbox = "Mailbox Sender <mailbox@example.com>";
+        var handler = new SendGridMailSendHandler(secrets, sendAsync: (client, cancellationToken) => {
+            var sender = Assert.IsType<SendGridEmailAddress>(client.From);
+            Assert.Equal("Mailbox Sender", sender.Name);
+            Assert.Equal("mailbox@example.com", sender.Email);
+            return Task.FromResult(Succeeded("sendgrid-message"));
+        });
+
+        await handler.SendAsync(profile, request);
+    }
+
+    [Fact]
     public async Task ProviderInlineAttachmentGetsAUsableContentIdWhenNoOverrideIsProvided() {
         var secrets = new FakeSecretStore(("sendgrid", MailSecretNames.ApiKey, "sg-secret"));
         var request = CreateRequest("sendgrid");

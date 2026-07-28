@@ -87,10 +87,14 @@ public sealed class SmtpSessionRequest {
     public string Password { get; init; } = string.Empty;
     /// <summary>Protocol auth mode.</summary>
     public ProtocolAuthMode AuthMode { get; init; } = ProtocolAuthMode.Basic;
-    /// <summary>Optional connect delegate used for testing.</summary>
-    public Func<Smtp, CancellationToken, Task<SmtpResult>>? ConnectAsync { get; init; }
-    /// <summary>Optional authenticate delegate used for testing.</summary>
-    public Func<Smtp, CancellationToken, Task<SmtpResult>>? AuthenticateAsync { get; init; }
+    /// <summary>Optional connect delegate retained for source and binary compatibility.</summary>
+    public Func<Smtp, Task<SmtpResult>>? ConnectAsync { get; init; }
+    /// <summary>Optional authenticate delegate retained for source and binary compatibility.</summary>
+    public Func<Smtp, Task<SmtpResult>>? AuthenticateAsync { get; init; }
+    /// <summary>Optional cancellation-aware connect delegate used in preference to <see cref="ConnectAsync"/>.</summary>
+    public Func<Smtp, CancellationToken, Task<SmtpResult>>? ConnectWithCancellationAsync { get; init; }
+    /// <summary>Optional cancellation-aware authenticate delegate used in preference to <see cref="AuthenticateAsync"/>.</summary>
+    public Func<Smtp, CancellationToken, Task<SmtpResult>>? AuthenticateWithCancellationAsync { get; init; }
 }
 
 /// <summary>
@@ -120,9 +124,13 @@ public static class SmtpSessionService {
         smtp.DryRun = request.DryRun;
 
         var secureOptions = request.SecureSocketOptions;
-        var connectFunc = request.ConnectAsync ?? ((_, token) =>
-            smtp.ConnectAsync(request.Server, request.Port, secureOptions, request.UseSsl, token));
+        var connectFunc = request.ConnectWithCancellationAsync ??
+            (request.ConnectAsync is { } legacyConnect
+                ? new Func<Smtp, CancellationToken, Task<SmtpResult>>((client, _) => legacyConnect(client))
+                : (_, token) => smtp.ConnectAsync(request.Server, request.Port, secureOptions, request.UseSsl, token));
+        cancellationToken.ThrowIfCancellationRequested();
         var connectResult = await connectFunc(smtp, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         if (!connectResult.Status) {
             return new SmtpConnectResult(false, secureOptions, "connect_failed", connectResult.Error ?? "Connect failed.", true);
         }
@@ -131,12 +139,17 @@ public static class SmtpSessionService {
             return new SmtpConnectResult(true, secureOptions, null, null, false);
         }
 
-        var authenticateFunc = request.AuthenticateAsync ?? ((_, token) => smtp.AuthenticateAsync(
-            new NetworkCredential(request.UserName, request.Password),
-            request.AuthMode == ProtocolAuthMode.OAuth2,
-            token));
+        var authenticateFunc = request.AuthenticateWithCancellationAsync ??
+            (request.AuthenticateAsync is { } legacyAuthenticate
+                ? new Func<Smtp, CancellationToken, Task<SmtpResult>>((client, _) => legacyAuthenticate(client))
+                : (_, token) => smtp.AuthenticateAsync(
+                    new NetworkCredential(request.UserName, request.Password),
+                    request.AuthMode == ProtocolAuthMode.OAuth2,
+                    token));
 
+        cancellationToken.ThrowIfCancellationRequested();
         var authResult = await authenticateFunc(smtp, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         if (!authResult.Status) {
             return new SmtpConnectResult(false, secureOptions, "auth_failed", authResult.Error ?? "Authentication failed.", false);
         }

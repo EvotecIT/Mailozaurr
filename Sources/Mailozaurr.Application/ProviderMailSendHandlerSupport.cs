@@ -36,10 +36,13 @@ internal static class ProviderMailSendHandlerSupport {
 
     public static MessageRecipient ResolveSender(MailProfile profile, DraftMessage message) {
         if (message.From is { } sender && HasAddress(sender)) return sender;
-        if (string.IsNullOrWhiteSpace(profile.DefaultSender)) {
+        var profileSender = !string.IsNullOrWhiteSpace(profile.DefaultSender)
+            ? profile.DefaultSender
+            : profile.DefaultMailbox;
+        if (string.IsNullOrWhiteSpace(profileSender)) {
             throw new InvalidOperationException($"Profile '{profile.Id}' requires a default sender or message sender.");
         }
-        var parsed = MailboxAddress.Parse(profile.DefaultSender!.Trim());
+        var parsed = MailboxAddress.Parse(profileSender!.Trim());
         return new MessageRecipient { Name = parsed.Name, Address = parsed.Address };
     }
 
