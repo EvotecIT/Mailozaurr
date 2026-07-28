@@ -174,9 +174,12 @@ public class MailgunClient : IDisposable {
                 options: FileOptions.Asynchronous | FileOptions.SequentialScan)
             : new MemoryStream(descriptor.GetContentBytes(), writable: false);
         var streamContent = new StreamContent(stream);
+        var contentTypeSource = string.IsNullOrWhiteSpace(descriptor.FileName)
+            ? descriptor.SourcePath
+            : descriptor.FileName;
         streamContent.Headers.ContentType = new MediaTypeHeaderValue(
             string.IsNullOrWhiteSpace(descriptor.ContentType)
-                ? "application/octet-stream"
+                ? MimeTypes.GetMimeType(contentTypeSource ?? string.Empty)
                 : descriptor.ContentType);
         if (!string.IsNullOrWhiteSpace(descriptor.ContentId)) {
             streamContent.Headers.TryAddWithoutValidation("Content-ID", descriptor.ContentId);
@@ -266,7 +269,8 @@ public class MailgunClient : IDisposable {
             Subject = Subject ?? string.Empty,
             TextBody = Text,
             HtmlBody = Html,
-            Headers = Headers
+            Headers = Headers,
+            Priority = Priority
         };
         if (Attachment != null) {
             smtp.Attachments = Attachment.Select(path => new FileAttachmentDescriptor(path)).Cast<AttachmentDescriptor>().ToList();
@@ -395,7 +399,12 @@ public class MailgunClient : IDisposable {
                 ex is HttpRequestException ||
                 ex is TaskCanceledException && !cancellationToken.IsCancellationRequested) {
                 LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Mailgun: {ex.Message}");
-                if (!HttpRetryPolicy.ShouldRetry(ex, attempts, RetryCount, RetryAlways)) {
+                if (!HttpRetryPolicy.ShouldRetry(
+                        ex,
+                        attempts,
+                        RetryCount,
+                        RetryAlways,
+                        isKnownTransient: ex is TaskCanceledException)) {
                     var queuedMessageId =
                         await QueuePendingMessageAsync(
                             cancellationToken).ConfigureAwait(false);

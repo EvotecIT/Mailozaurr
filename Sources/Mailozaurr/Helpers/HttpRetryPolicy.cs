@@ -20,9 +20,14 @@ internal static class HttpRetryPolicy {
     /// <summary>
     /// Determines whether another attempt is allowed.
     /// </summary>
-    internal static bool ShouldRetry(Exception exception, int attempt, int retryCount, bool retryAlways) =>
+    internal static bool ShouldRetry(
+        Exception exception,
+        int attempt,
+        int retryCount,
+        bool retryAlways,
+        bool isKnownTransient = false) =>
         attempt < Math.Max(0, retryCount) &&
-        (retryAlways || Helpers.IsTransient(exception));
+        (retryAlways || isKnownTransient || Helpers.IsTransient(exception));
 
     /// <summary>
     /// Delays before the next attempt using bounded exponential backoff and jitter.

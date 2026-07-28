@@ -446,7 +446,12 @@ public sealed class SendGridClient : IDisposable {
             } catch (TaskCanceledException ex) {
                 lastException = ex;
                 LogCollector.LogWarning($"Send-EmailMessage - Request canceled: {ex.Message}");
-                if (!HttpRetryPolicy.ShouldRetry(ex, attempts, RetryCount, RetryAlways)) {
+                if (!HttpRetryPolicy.ShouldRetry(
+                        ex,
+                        attempts,
+                        RetryCount,
+                        RetryAlways,
+                        isKnownTransient: true)) {
                     var queuedMessageId =
                         await QueuePendingMessageAsync(
                             apiKey,

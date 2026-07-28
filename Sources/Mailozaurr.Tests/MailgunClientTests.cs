@@ -266,6 +266,28 @@ public class MailgunClientTests {
     }
 
     [Fact]
+    public async Task CreateContentAsync_InfersStructuredAttachmentContentTypeFromFileName() {
+        using var client = new MailgunClient {
+            From = "sender@example.com",
+            To = new List<object> { "to@example.com" },
+            Attachments = new List<AttachmentDescriptor> {
+                new ByteArrayAttachmentDescriptor(new byte[] { 1, 2, 3 }, "report.pdf")
+            }
+        };
+        MethodInfo? method = typeof(MailgunClient).GetMethod(
+            "CreateContentAsync",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+
+        using var content = await (Task<MultipartFormDataContent>)method!.Invoke(
+            client,
+            new object[] { CancellationToken.None })!;
+        var attachment = Assert.Single(content, item =>
+            item.Headers.ContentDisposition?.Name?.Trim('"') == "attachment");
+
+        Assert.Equal("application/pdf", attachment.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task CreateContentAsync_RejectsMissingStructuredFileAttachment() {
         string missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
         using var client = new MailgunClient {

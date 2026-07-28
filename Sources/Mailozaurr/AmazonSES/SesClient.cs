@@ -296,7 +296,12 @@ public class SesClient : IDisposable {
                 LogCollector.LogWarning($"Send-EmailMessage - SES request timed out: {ex.Message}");
             }
 
-            if (!HttpRetryPolicy.ShouldRetry(lastException, attempts, RetryCount, RetryAlways)) {
+            if (!HttpRetryPolicy.ShouldRetry(
+                    lastException,
+                    attempts,
+                    RetryCount,
+                    RetryAlways,
+                    isKnownTransient: lastException is TaskCanceledException)) {
                 var queuedMessageId =
                     await QueuePendingMessageAsync(
                         message,

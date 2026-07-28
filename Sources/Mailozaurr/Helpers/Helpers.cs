@@ -194,8 +194,6 @@ public static class Helpers {
                 return smtpCode >= 400 && smtpCode < 500;
             case SmtpProtocolException:
                 return true;
-            case TaskCanceledException:
-                return true;
             default:
                 return false;
         }

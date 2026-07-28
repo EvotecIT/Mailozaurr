@@ -16,6 +16,11 @@ namespace Mailozaurr.Tests;
 /// </summary>
 public class HelpersTests {
     [Fact]
+    public void IsTransient_DoesNotTreatCallerCancellationAsRetryable() {
+        Assert.False(Helpers.IsTransient(new TaskCanceledException("caller canceled")));
+    }
+
+    [Fact]
     public void GetEmailAddress_ReturnsInputString_WhenStringProvided() {
         var result = Mailozaurr.Helpers.GetEmailAddress("test@example.com");
         Assert.Equal("test@example.com", result);

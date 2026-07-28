@@ -245,7 +245,8 @@ public sealed class ProviderPendingMessageTests {
             From = "sender@example.com",
             To = new List<object> { "recipient@example.com" },
             Subject = "mailgun",
-            Text = "body"
+            Text = "body",
+            Priority = MessagePriority.High
         };
 
         var failureHandler = new TestHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest) {
@@ -268,6 +269,7 @@ public sealed class ProviderPendingMessageTests {
         Assert.DoesNotContain(MailgunPendingMessageSender.ApiKeyBase64Key, record.ProviderData.Keys);
         var mime = await MimeMessage.LoadAsync(new MemoryStream(Convert.FromBase64String(record.MimeMessage)));
         Assert.Equal("mailgun", mime.Subject);
+        Assert.Equal(MimeKit.MessagePriority.Urgent, mime.Priority);
 
         var successHandler = new TestHandler((request, _) => {
             Assert.Equal(HttpMethod.Post, request.Method);
