@@ -11,7 +11,7 @@ Retrieves calendar events using Microsoft Graph.
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Get-GraphEvent -UserPrincipalName <string> [-Connection <GraphConnectionInfo>] [-Property <string[]>] [-Filter <string>] [-Limit <int>] [-TimeoutSeconds <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [<CommonParameters>]
+Get-GraphEvent -UserPrincipalName <string> [-Connection <GraphConnectionInfo>] [-Property <string[]>] [-Filter <string>] [-Limit <Int32>] [-TimeoutSeconds <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -63,7 +63,7 @@ Accept wildcard characters: False
 Maximum number of events to return.
 
 ```yaml
-Type: Nullable`1
+Type: Int32
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:

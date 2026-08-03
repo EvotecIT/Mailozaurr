@@ -99,10 +99,10 @@ Accept wildcard characters: False
 Optional well-known Outlook folder role.
 
 ```yaml
-Type: Nullable`1
+Type: EmailStoreSpecialFolderKind
 Parameter Sets: __AllParameterSets
 Aliases: None
-Possible values:
+Possible values: Unknown, Root, IpmSubtree, Inbox, Outbox, SentItems, DeletedItems, Drafts, Calendar, Contacts, Tasks, Notes, Journal, JunkEmail, SearchRoot, CommonViews, PersonalViews, Archive, SyncIssues, Conflicts, LocalFailures, ServerFailures, RssFeeds, Reminders, ToDo
 
 Required: False
 Position: named

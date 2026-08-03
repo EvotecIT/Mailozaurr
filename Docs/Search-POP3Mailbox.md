@@ -11,7 +11,7 @@ Searches a POP3 mailbox and returns matching messages.
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Search-POP3Mailbox [-Client <PopConnectionInfo>] [-Subject <string>] [-FromContains <string>] [-ToContains <string>] [-BodyContains <string>] [-Priority <MessagePriority>] [-Since <datetime>] [-Before <datetime>] [-HasAttachment] [-Query <string>] [-Count <int>] [<CommonParameters>]
+Search-POP3Mailbox [-Client <PopConnectionInfo>] [-Subject <string>] [-FromContains <string>] [-ToContains <string>] [-BodyContains <string>] [-Priority <MessagePriority>] [-Since <DateTime>] [-Before <DateTime>] [-HasAttachment] [-Query <string>] [-Count <int>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -21,7 +21,7 @@ Searches a POP3 mailbox and returns matching messages.
 
 ### EXAMPLE 1
 ```powershell
-Search-POP3Mailbox -Before 'Value'
+Search-POP3Mailbox -Before '2000-01-01'
 ```
 
 
@@ -31,7 +31,7 @@ Search-POP3Mailbox -Before 'Value'
 Only return messages sent before this date.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
@@ -127,10 +127,10 @@ Accept wildcard characters: False
 Filters messages by priority.
 
 ```yaml
-Type: Nullable`1
+Type: MessagePriority
 Parameter Sets: __AllParameterSets
 Aliases: None
-Possible values:
+Possible values: High, Low, Normal
 
 Required: False
 Position: named
@@ -159,7 +159,7 @@ Accept wildcard characters: False
 Only return messages sent since this date.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:

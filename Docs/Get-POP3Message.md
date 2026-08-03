@@ -13,7 +13,7 @@ The Get-POP3Message cmdlet fetches messages from a POP3 mailbox using the provid
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Get-POP3Message [[-Client] <PopConnectionInfo>] [[-Index] <int>] [[-Count] <int>] [-All] [-Subject <string>] [-FromContains <string>] [-ToContains <string>] [-Priority <MessagePriority>] [-Since <datetime>] [-Before <datetime>] [-HasAttachment] [-Delete] [-WhatIf] [-Confirm] [<CommonParameters>]
+Get-POP3Message [[-Client] <PopConnectionInfo>] [[-Index] <int>] [[-Count] <int>] [-All] [-Subject <string>] [-FromContains <string>] [-ToContains <string>] [-Priority <MessagePriority>] [-Since <DateTime>] [-Before <DateTime>] [-HasAttachment] [-Delete] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -51,7 +51,7 @@ Accept wildcard characters: False
 Return messages delivered on or before this date.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
@@ -163,10 +163,10 @@ Accept wildcard characters: False
 Only return messages with the specified priority.
 
 ```yaml
-Type: Nullable`1
+Type: MessagePriority
 Parameter Sets: __AllParameterSets
 Aliases: None
-Possible values:
+Possible values: High, Low, Normal
 
 Required: False
 Position: named
@@ -179,7 +179,7 @@ Accept wildcard characters: False
 Return messages delivered on or after this date.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:

@@ -13,12 +13,12 @@ The Get-EmailGraphMessage cmdlet fetches messages for the specified user princip
 ## SYNTAX
 ### Graph
 ```powershell
-Get-EmailGraphMessage -UserPrincipalName <string> [-Connection <GraphConnectionInfo>] [-Property <string[]>] [-Filter <string>] [-Limit <int>] [-Subject <string>] [-FromContains <string>] [-ToContains <string>] [-Priority <MessagePriority>] [-Since <datetime>] [-Before <datetime>] [-HasAttachment] [-All] [-Delete] [-TimeoutSeconds <int>] [-MaxConcurrentRequests <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-WhatIf] [-Confirm] [<CommonParameters>]
+Get-EmailGraphMessage -UserPrincipalName <string> [-Connection <GraphConnectionInfo>] [-Property <string[]>] [-Filter <string>] [-Limit <Int32>] [-Subject <string>] [-FromContains <string>] [-ToContains <string>] [-Priority <MessagePriority>] [-Since <DateTime>] [-Before <DateTime>] [-HasAttachment] [-All] [-Delete] [-TimeoutSeconds <int>] [-MaxConcurrentRequests <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ### MgGraphRequest
 ```powershell
-Get-EmailGraphMessage -UserPrincipalName <string> -MgGraphRequest [-Property <string[]>] [-Filter <string>] [-Limit <int>] [-Subject <string>] [-FromContains <string>] [-ToContains <string>] [-Priority <MessagePriority>] [-Since <datetime>] [-Before <datetime>] [-HasAttachment] [-All] [-Delete] [-TimeoutSeconds <int>] [-MaxConcurrentRequests <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-WhatIf] [-Confirm] [<CommonParameters>]
+Get-EmailGraphMessage -UserPrincipalName <string> -MgGraphRequest [-Property <string[]>] [-Filter <string>] [-Limit <Int32>] [-Subject <string>] [-FromContains <string>] [-ToContains <string>] [-Priority <MessagePriority>] [-Since <DateTime>] [-Before <DateTime>] [-HasAttachment] [-All] [-Delete] [-TimeoutSeconds <int>] [-MaxConcurrentRequests <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -62,7 +62,7 @@ Accept wildcard characters: False
 Retrieves messages received before this date.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: Graph, MgGraphRequest
 Aliases: None
 Possible values:
@@ -158,7 +158,7 @@ Accept wildcard characters: False
 Limits the number of returned messages.
 
 ```yaml
-Type: Nullable`1
+Type: Int32
 Parameter Sets: Graph, MgGraphRequest
 Aliases: None
 Possible values:
@@ -206,10 +206,10 @@ Accept wildcard characters: False
 Filters messages by importance.
 
 ```yaml
-Type: Nullable`1
+Type: MessagePriority
 Parameter Sets: Graph, MgGraphRequest
 Aliases: None
-Possible values:
+Possible values: High, Low, Normal
 
 Required: False
 Position: named
@@ -270,7 +270,7 @@ Accept wildcard characters: False
 Retrieves messages received since this date.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: Graph, MgGraphRequest
 Aliases: None
 Possible values:

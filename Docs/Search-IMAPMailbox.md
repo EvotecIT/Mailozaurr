@@ -11,7 +11,7 @@ Searches an IMAP mailbox and returns matching messages.
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Search-IMAPMailbox [-Client <ImapConnectionInfo>] [-Folder <string>] [-SearchQuery <SearchQuery[]>] [-Query <string>] [-Subject <string>] [-FromContains <string>] [-ToContains <string>] [-BodyContains <string>] [-Priority <MessagePriority>] [-Since <datetime>] [-Before <datetime>] [-HasAttachment] [-Count <int>] [<CommonParameters>]
+Search-IMAPMailbox [-Client <ImapConnectionInfo>] [-Folder <string>] [-SearchQuery <SearchQuery[]>] [-Query <string>] [-Subject <string>] [-FromContains <string>] [-ToContains <string>] [-BodyContains <string>] [-Priority <MessagePriority>] [-Since <DateTime>] [-Before <DateTime>] [-HasAttachment] [-Count <int>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -21,7 +21,7 @@ Searches an IMAP mailbox and returns matching messages.
 
 ### EXAMPLE 1
 ```powershell
-Search-IMAPMailbox -Before 'Value'
+Search-IMAPMailbox -Before '2000-01-01'
 ```
 
 
@@ -31,7 +31,7 @@ Search-IMAPMailbox -Before 'Value'
 Only messages received before this date are returned.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
@@ -143,10 +143,10 @@ Accept wildcard characters: False
 Filters messages by priority.
 
 ```yaml
-Type: Nullable`1
+Type: MessagePriority
 Parameter Sets: __AllParameterSets
 Aliases: None
-Possible values:
+Possible values: High, Low, Normal
 
 Required: False
 Position: named
@@ -191,7 +191,7 @@ Accept wildcard characters: False
 Only messages received since this date are returned.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:

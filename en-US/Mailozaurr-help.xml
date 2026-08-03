@@ -8044,9 +8044,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <maml:description>
             <maml:para>Only reports before this time are returned.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -8146,9 +8146,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <maml:description>
             <maml:para>Only reports since this time are returned.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -8173,9 +8173,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <maml:description>
           <maml:para>Only reports before this time are returned.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -8275,9 +8275,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <maml:description>
           <maml:para>Only reports since this time are returned.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -8347,9 +8347,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <maml:description>
             <maml:para>Only reports before this time are returned.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -8437,9 +8437,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <maml:description>
             <maml:para>Only reports since this time are returned.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -8464,9 +8464,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <maml:description>
           <maml:para>Only reports before this time are returned.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -8554,9 +8554,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <maml:description>
           <maml:para>Only reports since this time are returned.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -8626,9 +8626,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <maml:description>
             <maml:para>Only reports before this time are returned.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -8740,9 +8740,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <maml:description>
             <maml:para>Only reports since this time are returned.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -8767,9 +8767,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <maml:description>
           <maml:para>Only reports before this time are returned.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -8881,9 +8881,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <maml:description>
           <maml:para>Only reports since this time are returned.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -9262,9 +9262,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <maml:description>
             <maml:para>Retrieves messages received before this date.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -9334,9 +9334,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <maml:description>
             <maml:para>Limits the number of returned messages.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -9358,9 +9358,14 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <maml:description>
             <maml:para>Filters messages by importance.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">MessagePriority</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">High</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Low</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Normal</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>MessagePriority</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -9406,9 +9411,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <maml:description>
             <maml:para>Retrieves messages received since this date.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -9481,9 +9486,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <maml:description>
             <maml:para>Retrieves messages received before this date.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -9541,9 +9546,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <maml:description>
             <maml:para>Limits the number of returned messages.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -9577,9 +9582,14 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <maml:description>
             <maml:para>Filters messages by importance.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">MessagePriority</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">High</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Low</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Normal</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>MessagePriority</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -9625,9 +9635,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <maml:description>
             <maml:para>Retrieves messages received since this date.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -9700,9 +9710,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <maml:description>
           <maml:para>Retrieves messages received before this date.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -9772,9 +9782,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <maml:description>
           <maml:para>Limits the number of returned messages.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -9808,9 +9818,14 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <maml:description>
           <maml:para>Filters messages by importance.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">MessagePriority</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">High</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Low</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Normal</command:parameterValue>
+        </command:parameterValueGroup>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>MessagePriority</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -9856,9 +9871,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <maml:description>
           <maml:para>Retrieves messages received since this date.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -10605,9 +10620,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <maml:description>
             <maml:para>Maximum number of messages to return when listing.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -10707,9 +10722,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <maml:description>
           <maml:para>Maximum number of messages to return when listing.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -10808,9 +10823,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <maml:description>
             <maml:para>Maximum number of threads to return when listing.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -10910,9 +10925,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <maml:description>
           <maml:para>Maximum number of threads to return when listing.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -11016,9 +11031,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <maml:description>
             <maml:para>Maximum number of events to return.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -11115,9 +11130,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <maml:description>
           <maml:para>Maximum number of events to return.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -12146,9 +12161,9 @@ message and folder counts as well as attachment sizes.</maml:para>
           <maml:description>
             <maml:para>Return messages delivered on or before this date.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -12223,9 +12238,14 @@ message and folder counts as well as attachment sizes.</maml:para>
           <maml:description>
             <maml:para>Only return messages with the specified priority.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">MessagePriority</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">High</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Low</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Normal</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>MessagePriority</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -12247,9 +12267,9 @@ message and folder counts as well as attachment sizes.</maml:para>
           <maml:description>
             <maml:para>Specifies the ending sequence number of messages to retrieve. If not provided, only SequenceStart is fetched.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -12259,9 +12279,9 @@ message and folder counts as well as attachment sizes.</maml:para>
           <maml:description>
             <maml:para>Specifies the starting sequence number of messages to retrieve.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Int32</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -12271,9 +12291,9 @@ message and folder counts as well as attachment sizes.</maml:para>
           <maml:description>
             <maml:para>Return messages delivered on or after this date.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -12322,9 +12342,9 @@ message and folder counts as well as attachment sizes.</maml:para>
           <maml:description>
             <maml:para>Return messages delivered on or before this date.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -12399,9 +12419,14 @@ message and folder counts as well as attachment sizes.</maml:para>
           <maml:description>
             <maml:para>Only return messages with the specified priority.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">MessagePriority</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">High</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Low</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Normal</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>MessagePriority</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -12423,9 +12448,9 @@ message and folder counts as well as attachment sizes.</maml:para>
           <maml:description>
             <maml:para>Return messages delivered on or after this date.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -12459,9 +12484,9 @@ message and folder counts as well as attachment sizes.</maml:para>
           <maml:description>
             <maml:para>Specifies the ending UID of messages to retrieve. If not provided, only UidStart is fetched.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">UInt32</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>UInt32</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -12471,9 +12496,9 @@ message and folder counts as well as attachment sizes.</maml:para>
           <maml:description>
             <maml:para>Specifies the starting UID of messages to retrieve.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">UInt32</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>UInt32</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -12498,9 +12523,9 @@ message and folder counts as well as attachment sizes.</maml:para>
         <maml:description>
           <maml:para>Return messages delivered on or before this date.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -12575,9 +12600,14 @@ message and folder counts as well as attachment sizes.</maml:para>
         <maml:description>
           <maml:para>Only return messages with the specified priority.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">MessagePriority</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">High</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Low</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Normal</command:parameterValue>
+        </command:parameterValueGroup>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>MessagePriority</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -12599,9 +12629,9 @@ message and folder counts as well as attachment sizes.</maml:para>
         <maml:description>
           <maml:para>Specifies the ending sequence number of messages to retrieve. If not provided, only SequenceStart is fetched.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -12611,9 +12641,9 @@ message and folder counts as well as attachment sizes.</maml:para>
         <maml:description>
           <maml:para>Specifies the starting sequence number of messages to retrieve.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>Int32</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -12623,9 +12653,9 @@ message and folder counts as well as attachment sizes.</maml:para>
         <maml:description>
           <maml:para>Return messages delivered on or after this date.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -12659,9 +12689,9 @@ message and folder counts as well as attachment sizes.</maml:para>
         <maml:description>
           <maml:para>Specifies the ending UID of messages to retrieve. If not provided, only UidStart is fetched.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">UInt32</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>UInt32</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -12671,9 +12701,9 @@ message and folder counts as well as attachment sizes.</maml:para>
         <maml:description>
           <maml:para>Specifies the starting UID of messages to retrieve.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">UInt32</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>UInt32</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -12791,9 +12821,36 @@ message and folder counts as well as attachment sizes.</maml:para>
           <maml:description>
             <maml:para>Optional well-known Outlook folder role.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">EmailStoreSpecialFolderKind</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Unknown</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Root</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">IpmSubtree</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Inbox</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Outbox</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SentItems</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">DeletedItems</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Drafts</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Calendar</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Contacts</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Tasks</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Notes</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Journal</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">JunkEmail</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SearchRoot</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">CommonViews</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PersonalViews</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Archive</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SyncIssues</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Conflicts</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">LocalFailures</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ServerFailures</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">RssFeeds</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Reminders</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">ToDo</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>EmailStoreSpecialFolderKind</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -12854,9 +12911,36 @@ message and folder counts as well as attachment sizes.</maml:para>
         <maml:description>
           <maml:para>Optional well-known Outlook folder role.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">EmailStoreSpecialFolderKind</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">Unknown</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Root</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">IpmSubtree</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Inbox</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Outbox</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">SentItems</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DeletedItems</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Drafts</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Calendar</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Contacts</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Tasks</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Notes</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Journal</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">JunkEmail</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">SearchRoot</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">CommonViews</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">PersonalViews</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Archive</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">SyncIssues</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Conflicts</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">LocalFailures</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ServerFailures</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">RssFeeds</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Reminders</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">ToDo</command:parameterValue>
+        </command:parameterValueGroup>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>EmailStoreSpecialFolderKind</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -12974,9 +13058,9 @@ message and folder counts as well as attachment sizes.</maml:para>
           <maml:description>
             <maml:para>Optional per-item bound for decoded MAPI property bytes.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Int64</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -13108,9 +13192,9 @@ message and folder counts as well as attachment sizes.</maml:para>
         <maml:description>
           <maml:para>Optional per-item bound for decoded MAPI property bytes.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>Int64</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -13317,9 +13401,9 @@ message and folder counts as well as attachment sizes.</maml:para>
           <maml:description>
             <maml:para>Return messages delivered on or before this date.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -13401,9 +13485,14 @@ message and folder counts as well as attachment sizes.</maml:para>
           <maml:description>
             <maml:para>Only return messages with the specified priority.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">MessagePriority</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">High</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Low</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Normal</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>MessagePriority</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -13413,9 +13502,9 @@ message and folder counts as well as attachment sizes.</maml:para>
           <maml:description>
             <maml:para>Return messages delivered on or after this date.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -13464,9 +13553,9 @@ message and folder counts as well as attachment sizes.</maml:para>
         <maml:description>
           <maml:para>Return messages delivered on or before this date.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -13548,9 +13637,14 @@ message and folder counts as well as attachment sizes.</maml:para>
         <maml:description>
           <maml:para>Only return messages with the specified priority.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">MessagePriority</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">High</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Low</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Normal</command:parameterValue>
+        </command:parameterValueGroup>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>MessagePriority</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -13560,9 +13654,9 @@ message and folder counts as well as attachment sizes.</maml:para>
         <maml:description>
           <maml:para>Return messages delivered on or after this date.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -13797,9 +13891,17 @@ executed for each update.</maml:para>
           <maml:description>
             <maml:para>Optional expected owner for ambiguous or extension-free input.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">EmailDataArtifactKind</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Unknown</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">EmailDocument</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Calendar</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Contact</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Store</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OfflineAddressBook</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>EmailDataArtifactKind</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -13884,9 +13986,17 @@ executed for each update.</maml:para>
         <maml:description>
           <maml:para>Optional expected owner for ambiguous or extension-free input.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">EmailDataArtifactKind</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">Unknown</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">EmailDocument</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Calendar</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Contact</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Store</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">OfflineAddressBook</command:parameterValue>
+        </command:parameterValueGroup>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>EmailDataArtifactKind</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -16406,9 +16516,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>End time of the event.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -16430,9 +16540,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Start time of the event.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -16505,9 +16615,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
         <maml:description>
           <maml:para>End time of the event.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -16529,9 +16639,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
         <maml:description>
           <maml:para>Start time of the event.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -18435,9 +18545,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Only messages delivered before this date are matched.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -18531,9 +18641,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Only messages delivered after this date are matched.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -18618,9 +18728,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
         <maml:description>
           <maml:para>Only messages delivered before this date are matched.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -18714,9 +18824,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
         <maml:description>
           <maml:para>Only messages delivered after this date are matched.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -23503,9 +23613,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Only messages received before this date are returned.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -23587,9 +23697,14 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Filters messages by priority.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">MessagePriority</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">High</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Low</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Normal</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>MessagePriority</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -23623,9 +23738,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Only messages received since this date are returned.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -23662,9 +23777,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
         <maml:description>
           <maml:para>Only messages received before this date are returned.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -23746,9 +23861,14 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
         <maml:description>
           <maml:para>Filters messages by priority.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">MessagePriority</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">High</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Low</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Normal</command:parameterValue>
+        </command:parameterValueGroup>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>MessagePriority</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -23782,9 +23902,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
         <maml:description>
           <maml:para>Only messages received since this date are returned.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -23839,7 +23959,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Search-IMAPMailbox -Before 'Value'</dev:code>
+        <dev:code>Search-IMAPMailbox -Before '2000-01-01'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -23869,9 +23989,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Exclusive upper timestamp bound.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTimeOffset</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTimeOffset</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -23893,9 +24013,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Optional declared attachment-presence filter.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Boolean</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Boolean</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -23953,9 +24073,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Optional read-state filter.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Boolean</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Boolean</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -23965,9 +24085,19 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Optional typed Outlook item classification.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">OutlookItemKind</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Unknown</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Message</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Appointment</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Contact</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Task</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Journal</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Note</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">DistributionList</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>OutlookItemKind</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -24013,9 +24143,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Inclusive lower timestamp bound.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTimeOffset</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTimeOffset</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -24040,9 +24170,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Exclusive upper timestamp bound.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTimeOffset</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTimeOffset</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -24088,9 +24218,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Optional declared attachment-presence filter.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Boolean</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Boolean</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -24148,9 +24278,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Optional read-state filter.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Boolean</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>Boolean</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -24160,9 +24290,19 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Optional typed Outlook item classification.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">OutlookItemKind</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Unknown</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Message</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Appointment</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Contact</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Task</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Journal</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Note</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">DistributionList</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>OutlookItemKind</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -24248,9 +24388,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Inclusive lower timestamp bound.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTimeOffset</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTimeOffset</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -24299,9 +24439,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
         <maml:description>
           <maml:para>Exclusive upper timestamp bound.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTimeOffset</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTimeOffset</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -24347,9 +24487,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
         <maml:description>
           <maml:para>Optional declared attachment-presence filter.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">Boolean</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>Boolean</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -24407,9 +24547,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
         <maml:description>
           <maml:para>Optional read-state filter.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">Boolean</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>Boolean</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -24419,9 +24559,19 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
         <maml:description>
           <maml:para>Optional typed Outlook item classification.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">OutlookItemKind</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">Unknown</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Message</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Appointment</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Contact</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Task</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Journal</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Note</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DistributionList</command:parameterValue>
+        </command:parameterValueGroup>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>OutlookItemKind</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -24507,9 +24657,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
         <maml:description>
           <maml:para>Inclusive lower timestamp bound.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTimeOffset</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTimeOffset</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -24618,9 +24768,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Only return messages sent before this date.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -24690,9 +24840,14 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Filters messages by priority.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">MessagePriority</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">High</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Low</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Normal</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>MessagePriority</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -24714,9 +24869,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Only return messages sent since this date.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DateTime</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -24753,9 +24908,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
         <maml:description>
           <maml:para>Only return messages sent before this date.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -24825,9 +24980,14 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
         <maml:description>
           <maml:para>Filters messages by priority.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">MessagePriority</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">High</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Low</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Normal</command:parameterValue>
+        </command:parameterValueGroup>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>MessagePriority</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -24849,9 +25009,9 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
         <maml:description>
           <maml:para>Only return messages sent since this date.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DateTime</command:parameterValue>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DateTime</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -24906,7 +25066,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Search-POP3Mailbox -Before 'Value'</dev:code>
+        <dev:code>Search-POP3Mailbox -Before '2000-01-01'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -25065,9 +25225,14 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:description>
             <maml:para>Specifies the delivery status notification type. Options are Full, HeadersOnly, Unspecified.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DeliveryStatusNotificationType</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Unspecified</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Full</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">HeadersOnly</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DeliveryStatusNotificationType</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -25775,9 +25940,14 @@ StartTls to be used automatically.</maml:para>
           <maml:description>
             <maml:para>Specifies the delivery status notification type. Options are Full, HeadersOnly, Unspecified.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DeliveryStatusNotificationType</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Unspecified</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Full</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">HeadersOnly</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DeliveryStatusNotificationType</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -26492,9 +26662,14 @@ StartTls to be used automatically.</maml:para>
           <maml:description>
             <maml:para>Specifies the delivery status notification type. Options are Full, HeadersOnly, Unspecified.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DeliveryStatusNotificationType</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Unspecified</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Full</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">HeadersOnly</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DeliveryStatusNotificationType</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -27185,9 +27360,14 @@ StartTls to be used automatically.</maml:para>
           <maml:description>
             <maml:para>Specifies the delivery status notification type. Options are Full, HeadersOnly, Unspecified.</maml:para>
           </maml:description>
-          <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">DeliveryStatusNotificationType</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Unspecified</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Full</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">HeadersOnly</command:parameterValue>
+          </command:parameterValueGroup>
           <dev:type>
-            <maml:name>Nullable`1</maml:name>
+            <maml:name>DeliveryStatusNotificationType</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -29667,9 +29847,14 @@ type. Without this switch, only transient errors are retried.</maml:para>
         <maml:description>
           <maml:para>Specifies the delivery status notification type. Options are Full, HeadersOnly, Unspecified.</maml:para>
         </maml:description>
-        <command:parameterValue required="false" variableLength="false">Nullable`1</command:parameterValue>
+        <command:parameterValue required="false" variableLength="false">DeliveryStatusNotificationType</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">Unspecified</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Full</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">HeadersOnly</command:parameterValue>
+        </command:parameterValueGroup>
         <dev:type>
-          <maml:name>Nullable`1</maml:name>
+          <maml:name>DeliveryStatusNotificationType</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>

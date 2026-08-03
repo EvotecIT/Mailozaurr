@@ -11,7 +11,7 @@ Creates a GraphEventBuilder instance.
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-New-GraphEventBuilder [-Subject <string>] [-Start <datetime>] [-StartTimeZone <string>] [-End <datetime>] [-EndTimeZone <string>] [-Body <string>] [-BodyType <string>] [-Attendees <string[]>] [<CommonParameters>]
+New-GraphEventBuilder [-Subject <string>] [-Start <DateTime>] [-StartTimeZone <string>] [-End <DateTime>] [-EndTimeZone <string>] [-Body <string>] [-BodyType <string>] [-Attendees <string[]>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -79,7 +79,7 @@ Accept wildcard characters: False
 End time of the event.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
@@ -111,7 +111,7 @@ Accept wildcard characters: False
 Start time of the event.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:

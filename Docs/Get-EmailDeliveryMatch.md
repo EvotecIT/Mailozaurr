@@ -13,7 +13,7 @@ The Get-EmailDeliveryMatch cmdlet searches for non-delivery reports and uses a S
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Get-EmailDeliveryMatch -Protocol <EmailProtocol> -Resolver <SendLogResolver> [-Recipient <string>] [-MessageId <string>] [-Since <datetime>] [-Before <datetime>] [-Count <int>] [-Folder <string>] [-UserPrincipalName <string>] [<CommonParameters>]
+Get-EmailDeliveryMatch -Protocol <EmailProtocol> -Resolver <SendLogResolver> [-Recipient <string>] [-MessageId <string>] [-Since <DateTime>] [-Before <DateTime>] [-Count <int>] [-Folder <string>] [-UserPrincipalName <string>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -35,7 +35,7 @@ Get-EmailDeliveryMatch -Protocol 'Value' -Resolver 'Value'
 Only reports before this time are returned.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
@@ -147,7 +147,7 @@ Accept wildcard characters: False
 Only reports since this time are returned.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:

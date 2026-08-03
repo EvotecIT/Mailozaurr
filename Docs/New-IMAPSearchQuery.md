@@ -11,7 +11,7 @@ Creates a Mailozaurr IMAP search query without requiring callers to construct Ma
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-New-IMAPSearchQuery [-Subject <string>] [-FromContains <string>] [-ToContains <string>] [-BodyContains <string>] [-MessageContains <string[]>] [-HeaderName <string>] [-HeaderValue <string>] [-Since <datetime>] [-Before <datetime>] [-Unseen] [-Seen] [-Answered] [-Unanswered] [-Flagged] [-Unflagged] [<CommonParameters>]
+New-IMAPSearchQuery [-Subject <string>] [-FromContains <string>] [-ToContains <string>] [-BodyContains <string>] [-MessageContains <string[]>] [-HeaderName <string>] [-HeaderValue <string>] [-Since <DateTime>] [-Before <DateTime>] [-Unseen] [-Seen] [-Answered] [-Unanswered] [-Flagged] [-Unflagged] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -47,7 +47,7 @@ Accept wildcard characters: False
 Only messages delivered before this date are matched.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
@@ -175,7 +175,7 @@ Accept wildcard characters: False
 Only messages delivered after this date are matched.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:

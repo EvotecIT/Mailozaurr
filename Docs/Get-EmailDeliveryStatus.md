@@ -13,7 +13,7 @@ The Get-EmailDeliveryStatus cmdlet queries IMAP, POP3, Microsoft Graph, or Gmail
 ## SYNTAX
 ### GmailApi
 ```powershell
-Get-EmailDeliveryStatus -Protocol <EmailProtocol> -GmailAccount <string> -Credential <pscredential> [-Recipient <string>] [-MessageId <string>] [-Since <datetime>] [-Before <datetime>] [-Count <int>] [-Folder <string>] [-UserPrincipalName <string>] [-ParallelDownloadLimit <int>] [<CommonParameters>]
+Get-EmailDeliveryStatus -Protocol <EmailProtocol> -GmailAccount <string> -Credential <pscredential> [-Recipient <string>] [-MessageId <string>] [-Since <DateTime>] [-Before <DateTime>] [-Count <int>] [-Folder <string>] [-UserPrincipalName <string>] [-ParallelDownloadLimit <int>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -35,7 +35,7 @@ Get-EmailDeliveryStatus -Protocol 'Value' -GmailAccount 'Value' -Credential Get-
 Only reports before this time are returned.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: GmailApi
 Aliases: None
 Possible values:
@@ -179,7 +179,7 @@ Accept wildcard characters: False
 Only reports since this time are returned.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: GmailApi
 Aliases: None
 Possible values:

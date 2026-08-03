@@ -318,10 +318,10 @@ Accept wildcard characters: False
 Specifies the delivery status notification type. Options are Full, HeadersOnly, Unspecified.
 
 ```yaml
-Type: Nullable`1
+Type: DeliveryStatusNotificationType
 Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
 Aliases: None
-Possible values:
+Possible values: Unspecified, Full, HeadersOnly
 
 Required: False
 Position: named

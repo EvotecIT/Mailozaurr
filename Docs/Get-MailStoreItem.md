@@ -13,7 +13,7 @@ Returns lightweight OfficeIMO.Email item references by default. Use Read to proj
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Get-MailStoreItem [-InputObject] <Object> [-FolderId <string>] [-IncludeDescendants] [-IncludeAssociatedItems] [-IncludeOrphanedItems] [-MaxItems <int>] [-Read] [-Parts <EmailStoreItemReadParts>] [-MaxDecodedPropertyBytes <long>] [-PreferStreamingAttachmentContent] [<CommonParameters>]
+Get-MailStoreItem [-InputObject] <Object> [-FolderId <string>] [-IncludeDescendants] [-IncludeAssociatedItems] [-IncludeOrphanedItems] [-MaxItems <int>] [-Read] [-Parts <EmailStoreItemReadParts>] [-MaxDecodedPropertyBytes <Int64>] [-PreferStreamingAttachmentContent] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -115,7 +115,7 @@ Accept wildcard characters: False
 Optional per-item bound for decoded MAPI property bytes.
 
 ```yaml
-Type: Nullable`1
+Type: Int64
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:

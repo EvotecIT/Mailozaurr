@@ -11,7 +11,7 @@ Retrieves Gmail threads using the Gmail API.
 ## SYNTAX
 ### List
 ```powershell
-Get-GmailThread -GmailAccount <string> -Credential <pscredential> [-Query <string>] [-MaxResults <int>] [<CommonParameters>]
+Get-GmailThread -GmailAccount <string> -Credential <pscredential> [-Query <string>] [-MaxResults <Int32>] [<CommonParameters>]
 ```
 
 ### Id
@@ -90,7 +90,7 @@ Accept wildcard characters: False
 Maximum number of threads to return when listing.
 
 ```yaml
-Type: Nullable`1
+Type: Int32
 Parameter Sets: List
 Aliases: None
 Possible values:

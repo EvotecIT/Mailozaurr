@@ -13,12 +13,12 @@ Uses OfficeIMO.Email bounded summary search by default. Supplying Term enables r
 ## SYNTAX
 ### Metadata (Default)
 ```powershell
-Search-MailStore [-InputObject] <Object> [-FolderId <string>] [-IncludeDescendants] [-IncludeAssociatedItems] [-IncludeOrphanedItems] [-ItemKind <OutlookItemKind>] [-SubjectContains <string>] [-SenderContains <string>] [-Since <DateTimeOffset>] [-Before <DateTimeOffset>] [-HasAttachments <bool>] [-IsRead <bool>] [-MaxItemsScanned <int>] [-MaxResults <int>] [<CommonParameters>]
+Search-MailStore [-InputObject] <Object> [-FolderId <string>] [-IncludeDescendants] [-IncludeAssociatedItems] [-IncludeOrphanedItems] [-ItemKind <OutlookItemKind>] [-SubjectContains <string>] [-SenderContains <string>] [-Since <DateTimeOffset>] [-Before <DateTimeOffset>] [-HasAttachments <Boolean>] [-IsRead <Boolean>] [-MaxItemsScanned <int>] [-MaxResults <int>] [<CommonParameters>]
 ```
 
 ### Content
 ```powershell
-Search-MailStore [-InputObject] <Object> -Term <string[]> [-FolderId <string>] [-IncludeDescendants] [-IncludeAssociatedItems] [-IncludeOrphanedItems] [-ItemKind <OutlookItemKind>] [-SubjectContains <string>] [-SenderContains <string>] [-Since <DateTimeOffset>] [-Before <DateTimeOffset>] [-HasAttachments <bool>] [-IsRead <bool>] [-MaxItemsScanned <int>] [-MaxResults <int>] [-Fields <EmailStoreContentSearchFields>] [-MatchMode <EmailStoreContentMatchMode>] [-SnippetCharacters <int>] [-ResumeFrom <EmailStoreContentSearchCheckpoint>] [-ResultsOnly] [<CommonParameters>]
+Search-MailStore [-InputObject] <Object> -Term <string[]> [-FolderId <string>] [-IncludeDescendants] [-IncludeAssociatedItems] [-IncludeOrphanedItems] [-ItemKind <OutlookItemKind>] [-SubjectContains <string>] [-SenderContains <string>] [-Since <DateTimeOffset>] [-Before <DateTimeOffset>] [-HasAttachments <Boolean>] [-IsRead <Boolean>] [-MaxItemsScanned <int>] [-MaxResults <int>] [-Fields <EmailStoreContentSearchFields>] [-MatchMode <EmailStoreContentMatchMode>] [-SnippetCharacters <int>] [-ResumeFrom <EmailStoreContentSearchCheckpoint>] [-ResultsOnly] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -46,7 +46,7 @@ Search-MailStore -Term @('Value')
 Exclusive upper timestamp bound.
 
 ```yaml
-Type: Nullable`1
+Type: DateTimeOffset
 Parameter Sets: Metadata, Content
 Aliases: None
 Possible values:
@@ -94,7 +94,7 @@ Accept wildcard characters: False
 Optional declared attachment-presence filter.
 
 ```yaml
-Type: Nullable`1
+Type: Boolean
 Parameter Sets: Metadata, Content
 Aliases: None
 Possible values:
@@ -174,7 +174,7 @@ Accept wildcard characters: False
 Optional read-state filter.
 
 ```yaml
-Type: Nullable`1
+Type: Boolean
 Parameter Sets: Metadata, Content
 Aliases: None
 Possible values:
@@ -190,10 +190,10 @@ Accept wildcard characters: False
 Optional typed Outlook item classification.
 
 ```yaml
-Type: Nullable`1
+Type: OutlookItemKind
 Parameter Sets: Metadata, Content
 Aliases: None
-Possible values:
+Possible values: Unknown, Message, Appointment, Contact, Task, Journal, Note, DistributionList
 
 Required: False
 Position: named
@@ -302,7 +302,7 @@ Accept wildcard characters: False
 Inclusive lower timestamp bound.
 
 ```yaml
-Type: Nullable`1
+Type: DateTimeOffset
 Parameter Sets: Metadata, Content
 Aliases: None
 Possible values:

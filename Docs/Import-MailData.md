@@ -83,10 +83,10 @@ Accept wildcard characters: False
 Optional expected owner for ambiguous or extension-free input.
 
 ```yaml
-Type: Nullable`1
+Type: EmailDataArtifactKind
 Parameter Sets: __AllParameterSets
 Aliases: None
-Possible values:
+Possible values: Unknown, EmailDocument, Calendar, Contact, Store, OfflineAddressBook
 
 Required: False
 Position: named

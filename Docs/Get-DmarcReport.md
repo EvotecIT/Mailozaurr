@@ -13,7 +13,7 @@ The Get-DmarcReport cmdlet queries IMAP, POP3, Microsoft Graph, or Gmail API to 
 ## SYNTAX
 ### GmailApi
 ```powershell
-Get-DmarcReport -Protocol <EmailProtocol> -GmailAccount <string> -Credential <pscredential> [-Domain <string>] [-Since <datetime>] [-Before <datetime>] [-Count <int>] [-Folder <string>] [-UserPrincipalName <string>] [-ParallelDownloadLimit <int>] [<CommonParameters>]
+Get-DmarcReport -Protocol <EmailProtocol> -GmailAccount <string> -Credential <pscredential> [-Domain <string>] [-Since <DateTime>] [-Before <DateTime>] [-Count <int>] [-Folder <string>] [-UserPrincipalName <string>] [-ParallelDownloadLimit <int>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -35,7 +35,7 @@ Get-DmarcReport -Protocol 'Value' -GmailAccount 'Value' -Credential Get-Credenti
 Only reports before this time are returned.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: GmailApi
 Aliases: None
 Possible values:
@@ -163,7 +163,7 @@ Accept wildcard characters: False
 Only reports since this time are returned.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: GmailApi
 Aliases: None
 Possible values:

@@ -13,12 +13,12 @@ The Get-IMAPMessage cmdlet fetches messages from the current IMAP folder associa
 ## SYNTAX
 ### Sequence (Default)
 ```powershell
-Get-IMAPMessage [[-Client] <ImapConnectionInfo>] [[-FolderAccess] <FolderAccess>] [[-SequenceStart] <int>] [[-SequenceEnd] <int>] [-SearchQuery <SearchQuery[]>] [-Subject <string>] [-FromContains <string>] [-ToContains <string>] [-Priority <MessagePriority>] [-HasAttachment] [-All] [-Delete] [-Since <datetime>] [-Before <datetime>] [-WhatIf] [-Confirm] [<CommonParameters>]
+Get-IMAPMessage [[-Client] <ImapConnectionInfo>] [[-FolderAccess] <FolderAccess>] [[-SequenceStart] <Int32>] [[-SequenceEnd] <Int32>] [-SearchQuery <SearchQuery[]>] [-Subject <string>] [-FromContains <string>] [-ToContains <string>] [-Priority <MessagePriority>] [-HasAttachment] [-All] [-Delete] [-Since <DateTime>] [-Before <DateTime>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ### Uid
 ```powershell
-Get-IMAPMessage [[-Client] <ImapConnectionInfo>] [[-FolderAccess] <FolderAccess>] [[-UidStart] <uint>] [[-UidEnd] <uint>] [-SearchQuery <SearchQuery[]>] [-Subject <string>] [-FromContains <string>] [-ToContains <string>] [-Priority <MessagePriority>] [-HasAttachment] [-All] [-Delete] [-Since <datetime>] [-Before <datetime>] [-WhatIf] [-Confirm] [<CommonParameters>]
+Get-IMAPMessage [[-Client] <ImapConnectionInfo>] [[-FolderAccess] <FolderAccess>] [[-UidStart] <UInt32>] [[-UidEnd] <UInt32>] [-SearchQuery <SearchQuery[]>] [-Subject <string>] [-FromContains <string>] [-ToContains <string>] [-Priority <MessagePriority>] [-HasAttachment] [-All] [-Delete] [-Since <DateTime>] [-Before <DateTime>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -56,7 +56,7 @@ Accept wildcard characters: False
 Return messages delivered on or before this date.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: Sequence, Uid
 Aliases: None
 Possible values:
@@ -152,10 +152,10 @@ Accept wildcard characters: False
 Only return messages with the specified priority.
 
 ```yaml
-Type: Nullable`1
+Type: MessagePriority
 Parameter Sets: Sequence, Uid
 Aliases: None
-Possible values:
+Possible values: High, Low, Normal
 
 Required: False
 Position: named
@@ -184,7 +184,7 @@ Accept wildcard characters: False
 Specifies the ending sequence number of messages to retrieve. If not provided, only SequenceStart is fetched.
 
 ```yaml
-Type: Nullable`1
+Type: Int32
 Parameter Sets: Sequence
 Aliases: None
 Possible values:
@@ -200,7 +200,7 @@ Accept wildcard characters: False
 Specifies the starting sequence number of messages to retrieve.
 
 ```yaml
-Type: Nullable`1
+Type: Int32
 Parameter Sets: Sequence
 Aliases: None
 Possible values:
@@ -216,7 +216,7 @@ Accept wildcard characters: False
 Return messages delivered on or after this date.
 
 ```yaml
-Type: Nullable`1
+Type: DateTime
 Parameter Sets: Sequence, Uid
 Aliases: None
 Possible values:
@@ -264,7 +264,7 @@ Accept wildcard characters: False
 Specifies the ending UID of messages to retrieve. If not provided, only UidStart is fetched.
 
 ```yaml
-Type: Nullable`1
+Type: UInt32
 Parameter Sets: Uid
 Aliases: None
 Possible values:
@@ -280,7 +280,7 @@ Accept wildcard characters: False
 Specifies the starting UID of messages to retrieve.
 
 ```yaml
-Type: Nullable`1
+Type: UInt32
 Parameter Sets: Uid
 Aliases: None
 Possible values:
