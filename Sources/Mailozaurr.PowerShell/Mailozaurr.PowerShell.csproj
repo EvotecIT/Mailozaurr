@@ -80,7 +80,7 @@
 
     <ItemGroup>
         <!-- This is needed for XmlDoc2CmdletDoc to generate a PowerShell documentation file. -->
-        <PackageReference Include="MatejKafka.XmlDoc2CmdletDoc" Version="0.7.0" GeneratePathProperty="true">
+        <PackageReference Include="MatejKafka.XmlDoc2CmdletDoc" Version="0.8.0" GeneratePathProperty="true">
             <PrivateAssets>all</PrivateAssets>
             <ExcludeAssets>build;buildTransitive</ExcludeAssets>
         </PackageReference>
