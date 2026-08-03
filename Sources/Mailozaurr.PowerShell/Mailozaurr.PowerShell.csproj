@@ -69,7 +69,7 @@
     </ItemGroup>
 
     <PropertyGroup>
-        <!-- This is needed for XmlDoc2CmdletDoc to generate a PowerShell documentation file. -->
+        <!-- PowerForge enriches module help from the compiler XML documentation file. -->
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 
@@ -78,29 +78,4 @@
         <None Include="..\..\README.MD" Pack="true" PackagePath="\" />
     </ItemGroup>
 
-    <ItemGroup>
-        <!-- This is needed for XmlDoc2CmdletDoc to generate a PowerShell documentation file. -->
-        <PackageReference Include="MatejKafka.XmlDoc2CmdletDoc" Version="0.8.0" GeneratePathProperty="true">
-            <PrivateAssets>all</PrivateAssets>
-            <ExcludeAssets>build;buildTransitive</ExcludeAssets>
-        </PackageReference>
-    </ItemGroup>
-
-    <!-- XmlDoc2CmdletDoc help is only needed for the hostable PowerShell builds.
-    Skipping netstandard2.0 avoids duplicate standalone-build help generation and file locking. -->
-    <Target Name="XmlDoc2CmdletDoc"
-        BeforeTargets="PostBuildEvent"
-        Inputs="$(TargetPath)"
-        Outputs="$(TargetPath)-Help.xml"
-        Condition="'$(IsCrossTargetingBuild)' != 'true' and '$(TargetFramework)' != 'netstandard2.0'">
-        <Exec Command='dotnet --roll-forward Major "$(PkgMatejKafka_XmlDoc2CmdletDoc)\tools\MatejKafka.XmlDoc2CmdletDoc.dll" $(XmlDoc2CmdletDocArguments) "$(TargetPath)"'
-            IgnoreExitCode="true" />
-    </Target>
-
-    <!-- Copy help documentation to publish output after publish -->
-    <Target Name="CopyHelpDocumentationToPublishOutput" AfterTargets="Publish">
-        <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll-Help.xml"
-            DestinationFiles="$(PublishDir)$(AssemblyName).dll-Help.xml"
-            Condition="Exists('$(OutputPath)$(AssemblyName).dll-Help.xml')" />
-    </Target>
 </Project>
