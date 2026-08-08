@@ -53,8 +53,9 @@ public static class EmailMessageContentExtensions {
         client.Html = content.HtmlBody;
         client.Text = content.TextBody;
         var attachments = Copy(content.Attachments);
-        attachments.AddRange(content.InlineAttachments.Select(AsInline));
+        var inlineAttachments = Copy(content.InlineAttachments);
         client.Attachments = attachments.Count == 0 ? null : attachments;
+        client.InlineAttachments = inlineAttachments.Count == 0 ? null : inlineAttachments;
         client.Headers = CopyHeaders(content);
         return client;
     }
@@ -68,6 +69,8 @@ public static class EmailMessageContentExtensions {
         client.Text = content.TextBody;
         client.Attachments = Copy(content.Attachments);
         client.InlineAttachments = Copy(content.InlineAttachments);
+        client.Attachment = null;
+        client.InlineAttachment = null;
         client.Headers = CopyHeaders(content);
         return client;
     }
@@ -81,6 +84,8 @@ public static class EmailMessageContentExtensions {
         client.Text = content.TextBody;
         client.Attachments = Copy(content.Attachments);
         client.InlineAttachments = Copy(content.InlineAttachments);
+        client.Attachment = null;
+        client.InlineAttachment = null;
         client.Headers = CopyHeaders(content);
         return client;
     }
@@ -98,23 +103,4 @@ public static class EmailMessageContentExtensions {
             ? null
             : new Dictionary<string, string>(content.Headers, StringComparer.OrdinalIgnoreCase);
 
-    private static AttachmentDescriptor AsInline(AttachmentDescriptor descriptor) {
-        if (descriptor.ContentDisposition != null &&
-            string.Equals(descriptor.ContentDisposition.Disposition, ContentDisposition.Inline, StringComparison.OrdinalIgnoreCase)) {
-            return descriptor;
-        }
-
-        return new ByteArrayAttachmentDescriptor(
-            descriptor.GetContentBytes(),
-            string.IsNullOrWhiteSpace(descriptor.FileName) ? "inline-attachment" : descriptor.FileName!) {
-            ContentType = descriptor.ContentType,
-            ContentId = descriptor.ContentId,
-            ContentDescription = descriptor.ContentDescription,
-            ContentDisposition = new ContentDisposition(ContentDisposition.Inline),
-            TransferEncoding = descriptor.TransferEncoding,
-            Headers = descriptor.Headers == null
-                ? null
-                : new Dictionary<string, string>(descriptor.Headers, StringComparer.OrdinalIgnoreCase)
-        };
-    }
 }

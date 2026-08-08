@@ -105,10 +105,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         if (Text != null) sendGrid.Text = string.Join("", Text);
         if (HTML != null) sendGrid.Html = string.Join("", HTML);
         sendGrid.Priority = Priority;
-        var sendGridAttachments = MergeAttachmentDescriptors(Attachment, InlineAttachment);
-        if (sendGridAttachments != null) {
-            sendGrid.Attachments = sendGridAttachments;
-        }
+        sendGrid.Attachments = ConvertToAttachmentDescriptors(Attachment);
+        sendGrid.InlineAttachments = ConvertToAttachmentDescriptors(InlineAttachment);
         if (Headers != null) sendGrid.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         sendGrid.SeparateTo = SeparateTo;
         sendGrid.ErrorAction = errorAction;
@@ -769,18 +767,6 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
                 _ => throw new ArgumentException($"Unsupported attachment type: {entry.GetType().Name}")
             })
             .ToList();
-    }
-
-    private static List<AttachmentDescriptor>? MergeAttachmentDescriptors(object[]? attachments, object[]? inlineAttachments) {
-        var merged = ConvertToAttachmentDescriptors(attachments) ?? new List<AttachmentDescriptor>();
-        var inline = ConvertToAttachmentDescriptors(inlineAttachments);
-        if (inline != null) {
-            foreach (var descriptor in inline) {
-                descriptor.ContentDisposition ??= new MimeKit.ContentDisposition(MimeKit.ContentDisposition.Inline);
-                merged.Add(descriptor);
-            }
-        }
-        return merged.Count == 0 ? null : merged;
     }
 
     private static object[]? MergeGraphAttachments(object[]? attachments, object[]? inlineAttachments) {

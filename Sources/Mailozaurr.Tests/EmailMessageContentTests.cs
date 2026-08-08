@@ -84,7 +84,7 @@ public class EmailMessageContentTests {
     }
 
     [Fact]
-    public void WithContent_MarksSendGridInlineResourcesWithoutMutatingTheSourceDescriptor() {
+    public void WithContent_RoutesSendGridInlineResourcesWithoutMutatingTheSourceDescriptor() {
         var descriptor = new ByteArrayAttachmentDescriptor(new byte[] { 1, 2 }, "chart.png") {
             ContentType = "image/png",
             ContentId = "chart"
@@ -94,9 +94,35 @@ public class EmailMessageContentTests {
 
         using var sendGrid = new SendGridClient().WithContent(content);
 
-        var mapped = Assert.Single(sendGrid.Attachments!);
-        Assert.Equal(ContentDisposition.Inline, mapped.ContentDisposition?.Disposition);
+        Assert.Null(sendGrid.Attachments);
+        var mapped = Assert.Single(sendGrid.InlineAttachments!);
+        Assert.Same(descriptor, mapped);
         Assert.Null(descriptor.ContentDisposition);
+    }
+
+    [Fact]
+    public void WithContent_ReplacesLegacyMailgunAndSesAttachmentPaths() {
+        var content = new EmailMessageContent();
+        content.Attachments.Add(new ByteArrayAttachmentDescriptor(new byte[] { 1 }, "current.txt"));
+        content.InlineAttachments.Add(new ByteArrayAttachmentDescriptor(new byte[] { 2 }, "current.png"));
+
+        using var mailgun = new MailgunClient {
+            Attachment = new[] { "stale.txt" },
+            InlineAttachment = new[] { "stale.png" }
+        }.WithContent(content);
+        using var ses = new SesClient {
+            Attachment = new[] { "stale.txt" },
+            InlineAttachment = new[] { "stale.png" }
+        }.WithContent(content);
+
+        Assert.Null(mailgun.Attachment);
+        Assert.Null(mailgun.InlineAttachment);
+        Assert.Single(mailgun.Attachments!);
+        Assert.Single(mailgun.InlineAttachments!);
+        Assert.Null(ses.Attachment);
+        Assert.Null(ses.InlineAttachment);
+        Assert.Single(ses.Attachments!);
+        Assert.Single(ses.InlineAttachments!);
     }
 
     private sealed class FakeRenderResult {

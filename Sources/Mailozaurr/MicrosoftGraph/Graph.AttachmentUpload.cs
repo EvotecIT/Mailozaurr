@@ -18,14 +18,34 @@ public partial class Graph {
     /// </param>
     /// <returns>The placeholder representing the attachment.</returns>
     public Task<GraphAttachmentPlaceHolder> CreateGraphAttachment(string attachmentPath, CancellationToken cancellationToken = default, bool preloadContent = true) {
+        return CreateGraphAttachment(
+            new GraphFileAttachmentSource(attachmentPath, descriptor: null),
+            cancellationToken,
+            preloadContent);
+    }
+
+    private Task<GraphAttachmentPlaceHolder> CreateGraphAttachment(
+        GraphFileAttachmentSource source,
+        CancellationToken cancellationToken = default,
+        bool preloadContent = true) {
+        string attachmentPath = source.Path;
         if (!File.Exists(attachmentPath)) {
             LogMissingAttachmentWarning(attachmentPath);
             throw new FileNotFoundException($"Send-EmailMessage - Attachment file not found: {attachmentPath}", attachmentPath);
         }
-        var fileName = Path.GetFileName(attachmentPath);
+        var fileName = string.IsNullOrWhiteSpace(source.Descriptor?.FileName)
+            ? Path.GetFileName(attachmentPath)
+            : source.Descriptor!.FileName!;
         var fileSize = new FileInfo(attachmentPath).Length;
 
-        var attachmentItem = new GraphAttachmentItem("file", fileName, fileSize);
+        var attachmentItem = new GraphAttachmentItem("file", fileName, fileSize) {
+            ContentType = string.IsNullOrWhiteSpace(source.Descriptor?.ContentType)
+                ? null
+                : source.Descriptor!.ContentType,
+            ContentId = string.IsNullOrWhiteSpace(source.Descriptor?.ContentId)
+                ? null
+                : source.Descriptor!.ContentId
+        };
 
         var attachmentItemWrapper = new GraphAttachmentItemWrapper(attachmentItem);
         var attachmentItemJson = JsonSerializer.Serialize(attachmentItemWrapper, MailozaurrJsonContext.Default.GraphAttachmentItemWrapper);
@@ -140,9 +160,9 @@ public partial class Graph {
     /// <param name="draftMessage">The draft message to attach the files to.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     public async Task UploadAttachmentsAsync(GraphMessage draftMessage, CancellationToken cancellationToken = default) {
-        foreach (var path in EnumerateAttachmentPaths()) {
+        foreach (var source in EnumerateFileAttachmentSources()) {
             try {
-                await UploadAttachmentWithRetryAsync(draftMessage, path, cancellationToken);
+                await UploadAttachmentWithRetryAsync(draftMessage, source, cancellationToken);
             } catch (FileNotFoundException) {
                 // Already logged by CreateGraphAttachment.
             }
@@ -154,9 +174,9 @@ public partial class Graph {
     /// </summary>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     public async Task PrepareAttachments(CancellationToken cancellationToken = default) {
-        foreach (var path in EnumerateAttachmentPaths()) {
+        foreach (var source in EnumerateFileAttachmentSources()) {
             try {
-                var attachmentItemJson = await CreateGraphAttachment(path, cancellationToken);
+                var attachmentItemJson = await CreateGraphAttachment(source, cancellationToken);
                 AttachmentsPlaceHolders.Add(attachmentItemJson);
             } catch (FileNotFoundException) {
                 // Already logged by CreateGraphAttachment.
@@ -243,14 +263,14 @@ public partial class Graph {
         }
     }
 
-    private async Task UploadAttachmentWithRetryAsync(GraphMessage draftMessage, string path, CancellationToken cancellationToken) {
+    private async Task UploadAttachmentWithRetryAsync(GraphMessage draftMessage, GraphFileAttachmentSource source, CancellationToken cancellationToken) {
         var policy = SendPolicy ?? MailozaurrOptions.DefaultGraphPolicy;
         int attempts = 0;
         Exception? lastException = null;
         var maxRetries = policy?.MaxRetries ?? RetryCount;
         do {
             try {
-                var attachmentItemJson = await CreateGraphAttachment(path, cancellationToken, preloadContent: false);
+                var attachmentItemJson = await CreateGraphAttachment(source, cancellationToken, preloadContent: false);
                 var uploadUrl = await CreateUploadSession(draftMessage, attachmentItemJson.Json, cancellationToken);
                 await SendFileChunks(uploadUrl, attachmentItemJson.FilePath, attachmentItemJson.FileSize, cancellationToken);
                 return;

@@ -71,6 +71,8 @@ public class GraphDraftTests {
         using var graph = new Graph {
             Attachments = new object[] {
                 new FileAttachmentDescriptor(tmp) {
+                    FileName = "quarterly-report.bin",
+                    ContentType = "application/x-quarterly-report",
                     ContentDisposition = new ContentDisposition(ContentDisposition.Attachment)
                 }
             }
@@ -86,7 +88,9 @@ public class GraphDraftTests {
         Assert.True(graph.IsLargerAttachment);
         Assert.Empty(graph.ConvertedAttachments);
         var placeholder = Assert.Single(graph.AttachmentsPlaceHolders);
-        Assert.Equal(Path.GetFileName(tmp), placeholder.FileName);
+        Assert.Equal("quarterly-report.bin", placeholder.FileName);
+        Assert.Contains("quarterly-report.bin", placeholder.Json, StringComparison.Ordinal);
+        Assert.Contains("application/x-quarterly-report", placeholder.Json, StringComparison.Ordinal);
     }
 
     [Fact]

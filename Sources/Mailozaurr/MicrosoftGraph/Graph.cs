@@ -374,8 +374,8 @@ public partial class Graph : IDisposable {
             }
             if (IsLargerAttachment) {
                 smtp.Attachments ??= new List<Definitions.AttachmentDescriptor>();
-                foreach (var path in EnumerateAttachmentPaths()) {
-                    smtp.Attachments.Add(new Definitions.FileAttachmentDescriptor(path));
+                foreach (var source in EnumerateFileAttachmentSources()) {
+                    smtp.Attachments.Add(source.Descriptor ?? new Definitions.FileAttachmentDescriptor(source.Path));
                 }
             }
 

@@ -106,17 +106,14 @@ public class SendGridCreateMessageTests {
     public void CreateMessage_InlineFileWithoutContentId_UsesFileName() {
         var tmp = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
         File.WriteAllBytes(tmp, new byte[] { 1, 2, 3 });
+        var descriptor = new FileAttachmentDescriptor(tmp);
         using var client = new SendGridClient {
             From = "from@example.com",
             To = new List<object> { "to@example.com" },
             Subject = "subject",
             Html = $"<img src=\"cid:{Path.GetFileName(tmp)}\">",
             Credentials = new NetworkCredential("apikey", "test"),
-            Attachments = new List<AttachmentDescriptor> {
-                new FileAttachmentDescriptor(tmp) {
-                    ContentDisposition = new MimeKit.ContentDisposition(MimeKit.ContentDisposition.Inline)
-                }
-            }
+            InlineAttachments = new List<AttachmentDescriptor> { descriptor }
         };
 
         try {
@@ -127,6 +124,21 @@ public class SendGridCreateMessageTests {
             var attachment = Assert.Single(doc.RootElement.GetProperty("Attachments").EnumerateArray());
             Assert.Equal("inline", attachment.GetProperty("Disposition").GetString());
             Assert.Equal(Path.GetFileName(tmp), attachment.GetProperty("ContentId").GetString());
+            Assert.Null(descriptor.ContentDisposition);
+
+            using var regularClient = new SendGridClient {
+                From = "from@example.com",
+                To = new List<object> { "to@example.com" },
+                Subject = "subject",
+                Text = "body",
+                Credentials = new NetworkCredential("apikey", "test"),
+                Attachments = new List<AttachmentDescriptor> { descriptor }
+            };
+            regularClient.CreateMessage();
+            var regularJson = Assert.IsType<string>(prop?.GetValue(regularClient));
+            using var regularDoc = System.Text.Json.JsonDocument.Parse(regularJson);
+            var regularAttachment = Assert.Single(regularDoc.RootElement.GetProperty("Attachments").EnumerateArray());
+            Assert.Equal("attachment", regularAttachment.GetProperty("Disposition").GetString());
         } finally {
             File.Delete(tmp);
         }

@@ -94,7 +94,7 @@ public partial class Graph {
         return !string.IsNullOrWhiteSpace(path);
     }
 
-    private IEnumerable<string> EnumerateAttachmentPaths() {
+    private IEnumerable<GraphFileAttachmentSource> EnumerateFileAttachmentSources() {
         if (Attachments == null || Attachments.Length == 0) {
             yield break;
         }
@@ -105,14 +105,24 @@ public partial class Graph {
             }
             if (item is Definitions.AttachmentDescriptor descriptor) {
                 if (!IsInlineDescriptor(descriptor) && descriptor.SourcePath is string descriptorPath) {
-                    yield return descriptorPath;
+                    yield return new GraphFileAttachmentSource(descriptorPath, descriptor);
                 }
                 continue;
             }
             if (TryGetAttachmentPath(item, out var path)) {
-                yield return path;
+                yield return new GraphFileAttachmentSource(path, descriptor: null);
             }
         }
+    }
+
+    private sealed class GraphFileAttachmentSource {
+        internal GraphFileAttachmentSource(string path, Definitions.AttachmentDescriptor? descriptor) {
+            Path = path;
+            Descriptor = descriptor;
+        }
+
+        internal string Path { get; }
+        internal Definitions.AttachmentDescriptor? Descriptor { get; }
     }
 
     private static long EstimateTotalSize(IEnumerable<GraphAttachment> attachments) {
