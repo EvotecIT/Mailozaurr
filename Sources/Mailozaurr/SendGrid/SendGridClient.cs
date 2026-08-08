@@ -247,8 +247,8 @@ public sealed class SendGridClient : IDisposable {
         LogCollector logger) {
         var result = new List<SendGridAttachment>();
 
-        AddAttachments(attachments, inline: false, result, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
-        AddAttachments(inlineAttachments, inline: true, result, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        AddAttachments(attachments, inline: false, result, AttachmentPathIdentity.CreateSet());
+        AddAttachments(inlineAttachments, inline: true, result, AttachmentPathIdentity.CreateSet());
         return result;
     }
 
@@ -268,7 +268,7 @@ public sealed class SendGridClient : IDisposable {
 
             var path = descriptor.SourcePath;
             if (!string.IsNullOrWhiteSpace(path)) {
-                if (!seen.Add(path!)) {
+                if (!AttachmentPathIdentity.Add(seen, path!)) {
                     continue;
                 }
 

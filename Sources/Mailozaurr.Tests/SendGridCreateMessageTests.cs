@@ -103,6 +103,35 @@ public class SendGridCreateMessageTests {
     }
 
     [Fact]
+    public void CreateMessage_RelativeAndAbsoluteAttachmentPaths_IncludedOnce() {
+        var fileName = $"mailozaurr-sendgrid-{Guid.NewGuid():N}.tmp";
+        var absolutePath = Path.Combine(Environment.CurrentDirectory, fileName);
+        File.WriteAllText(absolutePath, "data");
+        using var client = new SendGridClient {
+            From = "from@example.com",
+            To = new List<object> { "to@example.com" },
+            Subject = "subject",
+            Text = "text",
+            Credentials = new NetworkCredential("apikey", "test"),
+            Attachments = new List<AttachmentDescriptor> {
+                new FileAttachmentDescriptor(fileName),
+                new FileAttachmentDescriptor(absolutePath),
+            },
+        };
+
+        try {
+            client.CreateMessage();
+            PropertyInfo? property = typeof(SendGridClient).GetProperty("MessageJson", BindingFlags.NonPublic | BindingFlags.Instance);
+            var json = Assert.IsType<string>(property?.GetValue(client));
+            using var document = System.Text.Json.JsonDocument.Parse(json);
+
+            Assert.Single(document.RootElement.GetProperty("Attachments").EnumerateArray());
+        } finally {
+            File.Delete(absolutePath);
+        }
+    }
+
+    [Fact]
     public void CreateMessage_InlineFileWithoutContentId_UsesFileName() {
         var tmp = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
         File.WriteAllBytes(tmp, new byte[] { 1, 2, 3 });

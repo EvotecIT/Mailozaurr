@@ -170,7 +170,7 @@ public class MailgunClientTests {
     }
 
     [Fact]
-    public async Task CreateContentAsync_AttachmentAndInlineDuplicatePaths_SkipsDuplicates() {
+    public async Task CreateContentAsync_SamePathAcrossRoles_PreservesBothAndDeduplicatesWithinEachRole() {
         var file1 = Path.GetTempFileName();
         var file2 = Path.GetTempFileName();
         try {
@@ -186,10 +186,31 @@ public class MailgunClientTests {
             var attachments = content.Count(c => c.Headers.ContentDisposition?.Name?.Trim('"') == "attachment");
             var inlines = content.Count(c => c.Headers.ContentDisposition?.Name?.Trim('"') == "inline");
             Assert.Equal(1, attachments);
-            Assert.Equal(1, inlines);
+            Assert.Equal(2, inlines);
         } finally {
             File.Delete(file1);
             File.Delete(file2);
+        }
+    }
+
+    [Fact]
+    public async Task CreateContentAsync_SameStructuredPathAcrossRoles_PreservesBoth() {
+        var file = Path.GetTempFileName();
+        try {
+            using var client = new MailgunClient {
+                From = "sender@example.com",
+                To = new List<object> { "to@example.com" },
+                Attachments = new List<AttachmentDescriptor> { new FileAttachmentDescriptor(file) },
+                InlineAttachments = new List<AttachmentDescriptor> { new FileAttachmentDescriptor(file) }
+            };
+            MethodInfo? method = typeof(MailgunClient).GetMethod("CreateContentAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+            var task = (Task<MultipartFormDataContent>)method!.Invoke(client, new object[] { default(CancellationToken) })!;
+            using var content = await task;
+
+            Assert.Single(content, c => c.Headers.ContentDisposition?.Name?.Trim('"') == "attachment");
+            Assert.Single(content, c => c.Headers.ContentDisposition?.Name?.Trim('"') == "inline");
+        } finally {
+            File.Delete(file);
         }
     }
 

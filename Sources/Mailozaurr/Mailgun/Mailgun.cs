@@ -248,11 +248,12 @@ public class MailgunClient : IDisposable {
     }
 
     private void ForEachUniqueAttachment(Action<AttachmentDescriptor, bool> add) {
-        var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        AddFileAttachments(Attachment, isInline: false, files, add);
-        AddFileAttachments(InlineAttachment, isInline: true, files, add);
-        AddStructuredAttachments(Attachments, isInline: false, files, add);
-        AddStructuredAttachments(InlineAttachments, isInline: true, files, add);
+        var regularFiles = AttachmentPathIdentity.CreateSet();
+        var inlineFiles = AttachmentPathIdentity.CreateSet();
+        AddFileAttachments(Attachment, isInline: false, regularFiles, add);
+        AddStructuredAttachments(Attachments, isInline: false, regularFiles, add);
+        AddFileAttachments(InlineAttachment, isInline: true, inlineFiles, add);
+        AddStructuredAttachments(InlineAttachments, isInline: true, inlineFiles, add);
     }
 
     private static void AddFileAttachments(
@@ -290,7 +291,7 @@ public class MailgunClient : IDisposable {
         Action<AttachmentDescriptor, bool> add) {
         if (descriptor.SourcePath is { Length: > 0 } sourcePath) {
             var fullPath = Path.GetFullPath(sourcePath);
-            if (!files.Add(fullPath)) {
+            if (!AttachmentPathIdentity.Add(files, sourcePath)) {
                 return;
             }
             if (descriptor is FileAttachmentDescriptor && !File.Exists(fullPath)) {
