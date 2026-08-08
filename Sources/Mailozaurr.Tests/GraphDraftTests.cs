@@ -3,6 +3,8 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Mailozaurr.Definitions;
+using MimeKit;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -58,6 +60,31 @@ public class GraphDraftTests {
         }
 
         Assert.True(graph.IsLargerAttachment);
+        var placeholder = Assert.Single(graph.AttachmentsPlaceHolders);
+        Assert.Equal(Path.GetFileName(tmp), placeholder.FileName);
+    }
+
+    [Fact]
+    public async Task PrepareAttachments_LargeFileDescriptor_UsesUploadSessionPath() {
+        string tmp = Path.GetTempFileName();
+        File.WriteAllBytes(tmp, new byte[4_100_000]);
+        using var graph = new Graph {
+            Attachments = new object[] {
+                new FileAttachmentDescriptor(tmp) {
+                    ContentDisposition = new ContentDisposition(ContentDisposition.Attachment)
+                }
+            }
+        };
+
+        try {
+            graph.CreateAttachments();
+            await graph.PrepareAttachments();
+        } finally {
+            File.Delete(tmp);
+        }
+
+        Assert.True(graph.IsLargerAttachment);
+        Assert.Empty(graph.ConvertedAttachments);
         var placeholder = Assert.Single(graph.AttachmentsPlaceHolders);
         Assert.Equal(Path.GetFileName(tmp), placeholder.FileName);
     }

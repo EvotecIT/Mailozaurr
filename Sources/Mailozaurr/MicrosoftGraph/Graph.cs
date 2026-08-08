@@ -350,7 +350,7 @@ public partial class Graph : IDisposable {
             smtp.Bcc = this.Bcc;
             smtp.ReplyTo = string.IsNullOrWhiteSpace(this.ReplyTo) ? null : this.ReplyTo;
             smtp.Subject = this.Subject;
-            smtp.HtmlBody = this.HTML;
+            ApplyBodyToSmtpFallback(smtp);
             smtp.Headers = this.Headers;
             smtp.WebhookUrl = this.WebhookUrl;
             smtp.Priority = this.Priority;
@@ -372,6 +372,12 @@ public partial class Graph : IDisposable {
                 if (attachments.Count > 0) smtp.Attachments = attachments;
                 if (inline.Count > 0) smtp.InlineAttachments = inline;
             }
+            if (IsLargerAttachment) {
+                smtp.Attachments ??= new List<Definitions.AttachmentDescriptor>();
+                foreach (var path in EnumerateAttachmentPaths()) {
+                    smtp.Attachments.Add(new Definitions.FileAttachmentDescriptor(path));
+                }
+            }
 
             await smtp.CreateMessageAsync(cancellationToken).ConfigureAwait(false);
             LogCollector.LogVerbose("Send-EmailMessage - Sending via SMTP fallback after Graph failure.");
@@ -388,6 +394,18 @@ public partial class Graph : IDisposable {
                 MessageId = current.MessageId,
                 Queued = current.Queued
             };
+        }
+    }
+
+    internal void ApplyBodyToSmtpFallback(Smtp smtp) {
+        if (smtp == null) throw new ArgumentNullException(nameof(smtp));
+
+        if (string.Equals(ContentType, "Text", StringComparison.OrdinalIgnoreCase)) {
+            smtp.TextBody = HTML;
+            smtp.HtmlBody = string.Empty;
+        } else {
+            smtp.HtmlBody = HTML;
+            smtp.TextBody = string.Empty;
         }
     }
 

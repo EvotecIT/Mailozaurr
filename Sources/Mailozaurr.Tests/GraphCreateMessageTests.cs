@@ -1,4 +1,5 @@
 using MimeKit;
+using Mailozaurr.Definitions;
 using System;
 using System.IO;
 using Xunit;
@@ -101,6 +102,20 @@ public class GraphCreateMessageTests {
     }
 
     [Fact]
+    public void ApplyBodyToSmtpFallback_PreservesPlainTextContentType() {
+        using var graph = new Graph {
+            HTML = "Use <literal> & text",
+            ContentType = "Text"
+        };
+        var smtp = new Smtp();
+
+        graph.ApplyBodyToSmtpFallback(smtp);
+
+        Assert.Equal("Use <literal> & text", smtp.TextBody);
+        Assert.Empty(smtp.HtmlBody);
+    }
+
+    [Fact]
     public void CreateAttachments_WithMissingFile_SkipsAttachment() {
         using var graph = new Graph {
             Attachments = new object[] { "missing.file" }
@@ -108,6 +123,30 @@ public class GraphCreateMessageTests {
         graph.CreateAttachments();
 
         Assert.Empty(graph.ConvertedAttachments);
+    }
+
+    [Fact]
+    public void CreateAttachments_SmallFileDescriptor_PreservesMetadata() {
+        string tmp = Path.GetTempFileName();
+        File.WriteAllBytes(tmp, new byte[] { 1, 2, 3 });
+        using var graph = new Graph {
+            Attachments = new object[] {
+                new FileAttachmentDescriptor(tmp) {
+                    FileName = "renamed.bin",
+                    ContentType = "application/x-workflow"
+                }
+            }
+        };
+
+        try {
+            graph.CreateAttachments();
+        } finally {
+            File.Delete(tmp);
+        }
+
+        var attachment = Assert.Single(graph.ConvertedAttachments);
+        Assert.Equal("renamed.bin", attachment.Name);
+        Assert.Equal("application/x-workflow", attachment.ContentType);
     }
 
     [Fact]

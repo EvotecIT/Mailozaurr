@@ -17,7 +17,7 @@ public partial class Graph {
         _inlineAttachmentSizeBytes = 0;
         _fileAttachmentCount = 0;
         if (Attachments != null && Attachments.Any()) {
-            var fileAttachments = new List<string>();
+            var fileAttachments = new List<KeyValuePair<string, Definitions.AttachmentDescriptor?>>();
             long fileTotalBytes = 0;
             long inMemoryTotalBytes = 0;
 
@@ -28,22 +28,15 @@ public partial class Graph {
                     var size = EstimateAttachmentSize(ga);
                     inMemoryTotalBytes += size;
                 } else if (item is Definitions.AttachmentDescriptor descriptor) {
-                    var converted = GraphAttachment.FromDescriptor(descriptor);
-                    ConvertedAttachments.Add(converted);
-                    inMemoryTotalBytes += EstimateAttachmentSize(converted);
+                    if (!IsInlineDescriptor(descriptor) && descriptor.SourcePath is string descriptorPath) {
+                        TrackFileAttachment(descriptorPath, descriptor, fileAttachments, ref fileTotalBytes);
+                    } else {
+                        var converted = GraphAttachment.FromDescriptor(descriptor);
+                        ConvertedAttachments.Add(converted);
+                        inMemoryTotalBytes += EstimateAttachmentSize(converted);
+                    }
                 } else if (TryGetAttachmentPath(item, out var path)) {
-                    if (!File.Exists(path)) {
-                        LogMissingAttachmentWarning(path);
-                        continue;
-                    }
-                    fileAttachments.Add(path);
-                    try {
-                        var length = new FileInfo(path).Length;
-                        fileTotalBytes += length;
-                        _fileAttachmentCount++;
-                    } catch (Exception ex) {
-                        LogCollector.LogError($"Send-EmailMessage - Failed to read attachment '{path}': {ex.Message}");
-                    }
+                    TrackFileAttachment(path, null, fileAttachments, ref fileTotalBytes);
                 }
             }
 
@@ -53,8 +46,10 @@ public partial class Graph {
 
             // Only load file attachments into memory when they fit in a simple send payload.
             if (!IsLargerAttachment && fileAttachments.Count > 0) {
-                foreach (var path in fileAttachments) {
-                    ConvertedAttachments.Add(GraphAttachment.FromFile(path));
+                foreach (var source in fileAttachments) {
+                    ConvertedAttachments.Add(source.Value == null
+                        ? GraphAttachment.FromFile(source.Key)
+                        : GraphAttachment.FromDescriptor(source.Value));
                 }
             }
 
@@ -63,6 +58,31 @@ public partial class Graph {
             }
         }
     }
+
+    private void TrackFileAttachment(
+        string path,
+        Definitions.AttachmentDescriptor? descriptor,
+        ICollection<KeyValuePair<string, Definitions.AttachmentDescriptor?>> fileAttachments,
+        ref long fileTotalBytes) {
+        if (!File.Exists(path)) {
+            LogMissingAttachmentWarning(path);
+            return;
+        }
+
+        try {
+            fileAttachments.Add(new KeyValuePair<string, Definitions.AttachmentDescriptor?>(path, descriptor));
+            fileTotalBytes += new FileInfo(path).Length;
+            _fileAttachmentCount++;
+        } catch (Exception ex) {
+            LogCollector.LogError($"Send-EmailMessage - Failed to read attachment '{path}': {ex.Message}");
+        }
+    }
+
+    private static bool IsInlineDescriptor(Definitions.AttachmentDescriptor descriptor) =>
+        string.Equals(
+            descriptor.ContentDisposition?.Disposition,
+            MimeKit.ContentDisposition.Inline,
+            StringComparison.OrdinalIgnoreCase);
 
     private static bool TryGetAttachmentPath(object? item, out string path) {
         path = item switch {
@@ -80,7 +100,13 @@ public partial class Graph {
         }
 
         foreach (var item in Attachments) {
-            if (item is GraphAttachment || item is Definitions.AttachmentDescriptor) {
+            if (item is GraphAttachment) {
+                continue;
+            }
+            if (item is Definitions.AttachmentDescriptor descriptor) {
+                if (!IsInlineDescriptor(descriptor) && descriptor.SourcePath is string descriptorPath) {
+                    yield return descriptorPath;
+                }
                 continue;
             }
             if (TryGetAttachmentPath(item, out var path)) {

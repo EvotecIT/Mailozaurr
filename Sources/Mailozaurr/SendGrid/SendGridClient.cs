@@ -285,8 +285,13 @@ public sealed class SendGridClient : IDisposable {
         }
 
         var disposition = descriptor.ContentDisposition?.Disposition ?? "attachment";
+        var contentId = descriptor.ContentId;
+        if (string.Equals(disposition, ContentDisposition.Inline, StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrWhiteSpace(contentId)) {
+            contentId = fileName;
+        }
         var bytes = descriptor.GetContentBytes();
-        return new SendGridAttachment(fileName, bytes, contentType, disposition, descriptor.ContentId);
+        return new SendGridAttachment(fileName, bytes, contentType, disposition, contentId);
     }
 
     /// <summary>
