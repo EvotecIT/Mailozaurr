@@ -94,6 +94,36 @@ public class GraphDraftTests {
     }
 
     [Fact]
+    public async Task PrepareAttachments_LargeInlineFileDescriptor_PreservesInlineMetadata() {
+        string tmp = Path.GetTempFileName();
+        File.WriteAllBytes(tmp, new byte[4_100_000]);
+        using var graph = new Graph {
+            Attachments = new object[] {
+                new FileAttachmentDescriptor(tmp) {
+                    FileName = "dashboard.png",
+                    ContentType = "image/png",
+                    ContentId = "dashboard-image",
+                    ContentDisposition = new ContentDisposition(ContentDisposition.Inline)
+                }
+            }
+        };
+
+        try {
+            graph.CreateAttachments();
+            await graph.PrepareAttachments();
+        } finally {
+            File.Delete(tmp);
+        }
+
+        Assert.True(graph.IsLargerAttachment);
+        Assert.Empty(graph.ConvertedAttachments);
+        var placeholder = Assert.Single(graph.AttachmentsPlaceHolders);
+        Assert.Contains("\"isInline\":true", placeholder.Json, StringComparison.Ordinal);
+        Assert.Contains("\"contentId\":\"dashboard-image\"", placeholder.Json, StringComparison.Ordinal);
+        Assert.Contains("\"contentType\":\"image/png\"", placeholder.Json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CreateGraphAttachment_MissingFile_ThrowsAndLogsWarning() {
         string missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
         using var graph = new Graph();

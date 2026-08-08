@@ -37,13 +37,15 @@ public partial class Graph {
             ? Path.GetFileName(attachmentPath)
             : source.Descriptor!.FileName!;
         var fileSize = new FileInfo(attachmentPath).Length;
+        var isInline = source.Descriptor != null && IsInlineDescriptor(source.Descriptor);
 
         var attachmentItem = new GraphAttachmentItem("file", fileName, fileSize) {
             ContentType = string.IsNullOrWhiteSpace(source.Descriptor?.ContentType)
                 ? null
                 : source.Descriptor!.ContentType,
+            IsInline = isInline ? true : null,
             ContentId = string.IsNullOrWhiteSpace(source.Descriptor?.ContentId)
-                ? null
+                ? (isInline ? fileName : null)
                 : source.Descriptor!.ContentId
         };
 

@@ -150,6 +150,21 @@ public class GraphCreateMessageTests {
     }
 
     [Fact]
+    public void CreateSmtpFallbackAttachment_PreservesExplicitContentType() {
+        var graphAttachment = new GraphAttachment {
+            Name = "workflow",
+            ContentType = "application/x-workflow",
+            ContentBytes = Convert.ToBase64String(new byte[] { 1, 2, 3 })
+        };
+
+        var descriptor = Graph.CreateSmtpFallbackAttachment(graphAttachment);
+
+        Assert.Equal("workflow", descriptor.FileName);
+        Assert.Equal("application/x-workflow", descriptor.ContentType);
+        Assert.Equal(new byte[] { 1, 2, 3 }, descriptor.GetContentBytes());
+    }
+
+    [Fact]
     public void CreateMessage_WithLargeAttachment_DoesNotIncludeAttachment() {
         string tmp = Path.GetTempFileName();
         File.WriteAllBytes(tmp, new byte[4000001]);

@@ -15,42 +15,42 @@ Authentication can be provided via credentials, OAuth2, or provider-specific tok
 ## SYNTAX
 ### Compatibility (Default)
 ```powershell
-Send-EmailMessage -Server <string> -From <Object> [-Port <int>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-Encoding <string>] [-DeliveryNotificationOption <DeliveryNotification[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-SkipCertificateRevocation] [-SkipCertificateValidation] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-Timeout <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-MimeMessagePath <string>] [-LocalDomain <string>] [-SignOrEncrypt <EmailActionEncryption>] [-CertificatePath <string>] [-CertificatePassword <string>] [-CertificatePasswordAsSecureString <bool>] [-CertificateThumbprint <string>] [-Certificate <X509Certificate2>] [-PublicKeyPath <string>] [-PrivateKeyPath <string>] [-PrivateKeyPassword <string>] [-PrivateKeyPasswordAsSecureString <bool>] [-WhatIf] [-Confirm] [<CommonParameters>]
-```
-
-### SecureString
-```powershell
-Send-EmailMessage -Server <string> -From <Object> [-Port <int>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-Encoding <string>] [-DeliveryNotificationOption <DeliveryNotification[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>] [-Username <string>] [-Password <string>] [-AuthenticationMechanism <AuthenticationMechanism>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-SkipCertificateRevocation] [-SkipCertificateValidation] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-Timeout <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-AsSecureString] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-MimeMessagePath <string>] [-LocalDomain <string>] [-SignOrEncrypt <EmailActionEncryption>] [-CertificatePath <string>] [-CertificatePassword <string>] [-CertificatePasswordAsSecureString <bool>] [-CertificateThumbprint <string>] [-Certificate <X509Certificate2>] [-PublicKeyPath <string>] [-PrivateKeyPath <string>] [-PrivateKeyPassword <string>] [-PrivateKeyPasswordAsSecureString <bool>] [-WhatIf] [-Confirm] [<CommonParameters>]
-```
-
-### oAuth
-```powershell
-Send-EmailMessage -Server <string> -From <Object> -Credential <pscredential> [-Port <int>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-Encoding <string>] [-DeliveryNotificationOption <DeliveryNotification[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-SkipCertificateRevocation] [-SkipCertificateValidation] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-Timeout <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-OAuth2] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-MimeMessagePath <string>] [-LocalDomain <string>] [-SignOrEncrypt <EmailActionEncryption>] [-CertificatePath <string>] [-CertificatePassword <string>] [-CertificatePasswordAsSecureString <bool>] [-CertificateThumbprint <string>] [-Certificate <X509Certificate2>] [-PublicKeyPath <string>] [-PrivateKeyPath <string>] [-PrivateKeyPassword <string>] [-PrivateKeyPasswordAsSecureString <bool>] [-WhatIf] [-Confirm] [<CommonParameters>]
+Send-EmailMessage -Server <string> -From <Object> [-Content <Object>] [-Port <int>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-Encoding <string>] [-DeliveryNotificationOption <DeliveryNotification[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-SkipCertificateRevocation] [-SkipCertificateValidation] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-Timeout <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-MimeMessagePath <string>] [-LocalDomain <string>] [-SignOrEncrypt <EmailActionEncryption>] [-CertificatePath <string>] [-CertificatePassword <string>] [-CertificatePasswordAsSecureString <bool>] [-CertificateThumbprint <string>] [-Certificate <X509Certificate2>] [-PublicKeyPath <string>] [-PrivateKeyPath <string>] [-PrivateKeyPassword <string>] [-PrivateKeyPasswordAsSecureString <bool>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ### DefaultCredentials
 ```powershell
-Send-EmailMessage -Server <string> -From <Object> [-Port <int>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-Encoding <string>] [-DeliveryNotificationOption <DeliveryNotification[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-SkipCertificateRevocation] [-SkipCertificateValidation] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-Timeout <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-MimeMessagePath <string>] [-LocalDomain <string>] [-UseDefaultCredentials <bool>] [-SignOrEncrypt <EmailActionEncryption>] [-CertificatePath <string>] [-CertificatePassword <string>] [-CertificatePasswordAsSecureString <bool>] [-CertificateThumbprint <string>] [-Certificate <X509Certificate2>] [-PublicKeyPath <string>] [-PrivateKeyPath <string>] [-PrivateKeyPassword <string>] [-PrivateKeyPasswordAsSecureString <bool>] [-WhatIf] [-Confirm] [<CommonParameters>]
+Send-EmailMessage -Server <string> -From <Object> [-Content <Object>] [-Port <int>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-Encoding <string>] [-DeliveryNotificationOption <DeliveryNotification[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-SkipCertificateRevocation] [-SkipCertificateValidation] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-Timeout <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-MimeMessagePath <string>] [-LocalDomain <string>] [-UseDefaultCredentials <bool>] [-SignOrEncrypt <EmailActionEncryption>] [-CertificatePath <string>] [-CertificatePassword <string>] [-CertificatePasswordAsSecureString <bool>] [-CertificateThumbprint <string>] [-Certificate <X509Certificate2>] [-PublicKeyPath <string>] [-PrivateKeyPath <string>] [-PrivateKeyPassword <string>] [-PrivateKeyPasswordAsSecureString <bool>] [-WhatIf] [-Confirm] [<CommonParameters>]
+```
+
+### SecureString
+```powershell
+Send-EmailMessage -Server <string> -From <Object> [-Content <Object>] [-Port <int>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-Encoding <string>] [-DeliveryNotificationOption <DeliveryNotification[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>] [-Username <string>] [-Password <string>] [-AuthenticationMechanism <AuthenticationMechanism>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-SkipCertificateRevocation] [-SkipCertificateValidation] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-Timeout <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-AsSecureString] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-MimeMessagePath <string>] [-LocalDomain <string>] [-SignOrEncrypt <EmailActionEncryption>] [-CertificatePath <string>] [-CertificatePassword <string>] [-CertificatePasswordAsSecureString <bool>] [-CertificateThumbprint <string>] [-Certificate <X509Certificate2>] [-PublicKeyPath <string>] [-PrivateKeyPath <string>] [-PrivateKeyPassword <string>] [-PrivateKeyPasswordAsSecureString <bool>] [-WhatIf] [-Confirm] [<CommonParameters>]
+```
+
+### oAuth
+```powershell
+Send-EmailMessage -Server <string> -From <Object> -Credential <pscredential> [-Content <Object>] [-Port <int>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-Encoding <string>] [-DeliveryNotificationOption <DeliveryNotification[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-SkipCertificateRevocation] [-SkipCertificateValidation] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-Timeout <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-OAuth2] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-MimeMessagePath <string>] [-LocalDomain <string>] [-SignOrEncrypt <EmailActionEncryption>] [-CertificatePath <string>] [-CertificatePassword <string>] [-CertificatePasswordAsSecureString <bool>] [-CertificateThumbprint <string>] [-Certificate <X509Certificate2>] [-PublicKeyPath <string>] [-PrivateKeyPath <string>] [-PrivateKeyPassword <string>] [-PrivateKeyPasswordAsSecureString <bool>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ### Graph
 ```powershell
-Send-EmailMessage -From <Object> -Credential <pscredential> [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-Headers <hashtable>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-GraphMaxConcurrency <int>] [-EnableSmtpFallback] [-ChunkSize <int>] [-RequestReadReceipt] [-RequestDeliveryReceipt] [-Graph] [-DoNotSaveToSentItems] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-WhatIf] [-Confirm] [<CommonParameters>]
+Send-EmailMessage -From <Object> -Credential <pscredential> [-Content <Object>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-GraphMaxConcurrency <int>] [-EnableSmtpFallback] [-ChunkSize <int>] [-RequestReadReceipt] [-RequestDeliveryReceipt] [-Graph] [-DoNotSaveToSentItems] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ### MgGraphRequest
 ```powershell
-Send-EmailMessage -From <Object> [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-Headers <hashtable>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-GraphMaxConcurrency <int>] [-ChunkSize <int>] [-RequestReadReceipt] [-RequestDeliveryReceipt] [-Graph] [-MgGraphRequest] [-DoNotSaveToSentItems] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-WhatIf] [-Confirm] [<CommonParameters>]
+Send-EmailMessage -From <Object> [-Content <Object>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-GraphMaxConcurrency <int>] [-ChunkSize <int>] [-RequestReadReceipt] [-RequestDeliveryReceipt] [-Graph] [-MgGraphRequest] [-DoNotSaveToSentItems] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ### SendGrid
 ```powershell
-Send-EmailMessage -From <Object> -Credential <pscredential> [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-Headers <hashtable>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-SendGrid] [-SeparateTo] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-WhatIf] [-Confirm] [<CommonParameters>]
+Send-EmailMessage -From <Object> -Credential <pscredential> [-Content <Object>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-SendGrid] [-SeparateTo] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ### EmailProviders
 ```powershell
-Send-EmailMessage -From <Object> -Credential <pscredential> -EmailProvider <EmailProvider> [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-Headers <hashtable>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-Region <string>] [-GmailAccount <string>] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-WhatIf] [-Confirm] [<CommonParameters>]
+Send-EmailMessage -From <Object> -Credential <pscredential> -EmailProvider <EmailProvider> [-Content <Object>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-Region <string>] [-GmailAccount <string>] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -111,7 +111,7 @@ Specifies file paths to attach to the email message. Alias: Attachments.
 
 ```yaml
 Type: Object[]
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: Attachments
 Possible values:
 
@@ -143,7 +143,7 @@ Specifies the email addresses that receive a blind carbon copy (BCC) of the emai
 
 ```yaml
 Type: Object[]
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -159,7 +159,7 @@ Specifies the email addresses to which a carbon copy (CC) of the email message i
 
 ```yaml
 Type: Object[]
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -175,7 +175,7 @@ Provides a certificate object used for S/MIME operations.
 
 ```yaml
 Type: X509Certificate2
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values:
 
@@ -191,7 +191,7 @@ Specifies the password for the certificate used in signing or encrypting the ema
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values:
 
@@ -207,7 +207,7 @@ Indicates that the certificate password is provided as a SecureString.
 
 ```yaml
 Type: Boolean
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values:
 
@@ -223,7 +223,7 @@ Specifies the path to the certificate used for signing or encrypting the email.
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values:
 
@@ -239,7 +239,7 @@ Specifies the thumbprint of the certificate used for signing or encrypting the e
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values:
 
@@ -271,7 +271,7 @@ Maximum number of connections to keep in the pool.
 
 ```yaml
 Type: Int32
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -279,6 +279,24 @@ Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Content
+Specifies transport-neutral content created by Mailozaurr or returned by a compatible renderer.
+
+Explicit Subject, HTML, Text, Headers, Attachment, and InlineAttachment parameters override or extend this content.
+
+```yaml
+Type: Object
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
+Aliases: EmailContent, RenderResult
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: True (ByValue)
 Accept wildcard characters: False
 ```
 
@@ -303,7 +321,7 @@ Specifies the delivery notification options for the email message. Multiple opti
 
 ```yaml
 Type: DeliveryNotification[]
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values: None, Delay, Never, OnFailure, OnSuccess
 
@@ -319,7 +337,7 @@ Specifies the delivery status notification type. Options are Full, HeadersOnly, 
 
 ```yaml
 Type: DeliveryStatusNotificationType
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values: Unspecified, Full, HeadersOnly
 
@@ -385,7 +403,7 @@ Acceptable values: ASCII, BigEndianUnicode, Default, Unicode, UTF32, UTF7, UTF8.
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values: ASCII, BigEndianUnicode, Default, Unicode, UTF32, UTF7, UTF8
 
@@ -401,7 +419,7 @@ Specifies the sender's email address. Can be a string or a hashtable with Name a
 
 ```yaml
 Type: Object
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -465,7 +483,7 @@ Custom message headers to include with the email.
 
 ```yaml
 Type: Hashtable
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -481,7 +499,7 @@ Specifies the HTML body of the email message. Use for rich content emails. Alias
 
 ```yaml
 Type: String[]
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: Body, HtmlBody
 Possible values:
 
@@ -497,7 +515,7 @@ Specifies inline attachments for the email message.
 
 ```yaml
 Type: Object[]
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: InlineAttachments
 Possible values:
 
@@ -513,7 +531,7 @@ Jitter window in milliseconds added to each retry delay. 0 disables jitter. Appl
 
 ```yaml
 Type: Int32
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -529,7 +547,7 @@ Specifies the local domain name for the SMTP client.
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values:
 
@@ -545,7 +563,7 @@ Sets the log prefix for the client.
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -561,7 +579,7 @@ Enables logging of communication with the server to the console.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -577,7 +595,7 @@ Enables logging of communication with the server to an object as a message prope
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -593,7 +611,7 @@ Overwrites the existing log file when using -LogPath.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -609,7 +627,7 @@ Specifies the path to save the communication log with the server.
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -625,7 +643,7 @@ Includes secrets in the log output.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -641,7 +659,7 @@ Sets the log prefix for the server.
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -657,7 +675,7 @@ Enables timestamps in the log output.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -673,7 +691,7 @@ Specifies the format for timestamps in the log file.
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -689,7 +707,7 @@ Maximum delay in milliseconds between retries. 0 disables capping. Applies to al
 
 ```yaml
 Type: Int32
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -721,7 +739,7 @@ Saves the email message to a file for troubleshooting purposes.
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values:
 
@@ -769,7 +787,7 @@ Specifies the port to use on the SMTP server. The default is 587.
 
 ```yaml
 Type: Int32
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values:
 
@@ -785,7 +803,7 @@ Specifies the priority of the email message. Acceptable values are Normal, High,
 
 ```yaml
 Type: MessagePriority
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: Importance
 Possible values: High, Low, Normal
 
@@ -801,7 +819,7 @@ Password for the private key when required.
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values:
 
@@ -817,7 +835,7 @@ Indicates that PrivateKeyPassword is provided as a secure string.
 
 ```yaml
 Type: Boolean
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values:
 
@@ -833,7 +851,7 @@ Path to the sender's private key used for PGP signing.
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values:
 
@@ -849,7 +867,7 @@ Path to the recipient's public key used for PGP operations.
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values:
 
@@ -881,7 +899,7 @@ Specifies the reply-to address for the email. If not set, defaults to the From a
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -930,7 +948,7 @@ type. Without this switch, only transient errors are retried.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -946,7 +964,7 @@ Specifies how many times the cmdlet should retry sending the message when an err
 
 ```yaml
 Type: Int32
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -962,7 +980,7 @@ Multiplicative backoff applied to the retry delay. Value of 1 disables backoff.
 
 ```yaml
 Type: Double
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -978,7 +996,7 @@ Delay in milliseconds between retry attempts.
 
 ```yaml
 Type: Int32
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -994,7 +1012,7 @@ Specifies the secure socket options for SMTP connection. Options: None, Auto, St
 
 ```yaml
 Type: SecureSocketOptions
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values: None, Auto, SslOnConnect, StartTls, StartTlsWhenAvailable
 
@@ -1026,7 +1044,7 @@ Specifies the path used to persist sent message metadata (opt-in).
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -1058,7 +1076,7 @@ Specifies the SMTP server to use for sending the email message. Required for SMT
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: SmtpServer
 Possible values:
 
@@ -1074,7 +1092,7 @@ Specifies whether to sign or encrypt the email message. Requires certificate par
 
 ```yaml
 Type: EmailActionEncryption
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values: None, SMIMESign, SMIMESignPkcs7, SMIMEEncrypt, SMIMESignAndEncrypt, PGPSign, PGPEncrypt, PGPSignAndEncrypt
 
@@ -1090,7 +1108,7 @@ Skips certificate revocation check during SMTP connection.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values:
 
@@ -1106,7 +1124,7 @@ Skips certificate validation. Useful for self-signed certificates or IP-based SM
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: SkipCertificateValidatation
 Possible values:
 
@@ -1122,7 +1140,7 @@ Specifies the subject of the email message.
 
 ```yaml
 Type: String
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -1138,7 +1156,7 @@ Suppresses output of the summary object.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid
 Aliases: None
 Possible values:
 
@@ -1154,7 +1172,7 @@ Specifies the plain text body of the email message. Alias: TextBody.
 
 ```yaml
 Type: String[]
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: TextBody
 Possible values:
 
@@ -1170,7 +1188,7 @@ Specifies the maximum time (in milliseconds) to wait for the SMTP operation to c
 
 ```yaml
 Type: Int32
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values:
 
@@ -1186,7 +1204,7 @@ Specifies the recipient email addresses. Accepts a single address or an array of
 
 ```yaml
 Type: Object[]
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -1202,7 +1220,7 @@ Enables reuse of SMTP connections via a connection pool.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials, Graph, MgGraphRequest, SendGrid, EmailProviders
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth, Graph, MgGraphRequest, SendGrid, EmailProviders
 Aliases: None
 Possible values:
 
@@ -1252,7 +1270,7 @@ StartTls to be used automatically.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Compatibility, SecureString, oAuth, DefaultCredentials
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values:
 
@@ -1268,7 +1286,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-- `None`
+- `System.Object`
 
 ## OUTPUTS
 

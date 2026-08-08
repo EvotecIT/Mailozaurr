@@ -94,30 +94,42 @@ public sealed partial class CmdletSendEmailMessage {
         ReadValue(source, names)?.ToString() ?? string.Empty;
 
     private static void AddResources(object? resources, IList<AttachmentDescriptor> destination, bool inline) {
-        if (resources is not IEnumerable enumerable || resources is string) return;
+        if (resources == null || resources is string) return;
+
+        var adaptedResources = PSObject.AsPSObject(resources);
+        if (adaptedResources.BaseObject is AttachmentDescriptor || HasProperty(adaptedResources, "Data", "Bytes")) {
+            AddResource(resources, destination, inline);
+            return;
+        }
+
+        if (resources is not IEnumerable enumerable) return;
 
         foreach (var resource in enumerable) {
             if (resource == null) continue;
-            var adapted = PSObject.AsPSObject(resource);
-            if (adapted.BaseObject is AttachmentDescriptor descriptor) {
-                destination.Add(descriptor);
-                continue;
-            }
-
-            var data = ReadValue(adapted, "Data", "Bytes") as byte[];
-            if (data == null) continue;
-            var contentId = ReadString(adapted, "ContentId");
-            var fileName = ReadString(adapted, "FileName", "Name");
-            if (string.IsNullOrWhiteSpace(fileName)) {
-                fileName = inline && !string.IsNullOrWhiteSpace(contentId) ? contentId : "attachment";
-            }
-            var mimeType = ReadString(adapted, "MimeType", "ContentType");
-            destination.Add(new ByteArrayAttachmentDescriptor(data, fileName) {
-                ContentType = string.IsNullOrWhiteSpace(mimeType) ? "application/octet-stream" : mimeType,
-                ContentId = string.IsNullOrWhiteSpace(contentId) ? null : contentId,
-                ContentDisposition = new ContentDisposition(inline ? ContentDisposition.Inline : ContentDisposition.Attachment)
-            });
+            AddResource(resource, destination, inline);
         }
+    }
+
+    private static void AddResource(object resource, IList<AttachmentDescriptor> destination, bool inline) {
+        var adapted = PSObject.AsPSObject(resource);
+        if (adapted.BaseObject is AttachmentDescriptor descriptor) {
+            destination.Add(descriptor);
+            return;
+        }
+
+        var data = ReadValue(adapted, "Data", "Bytes") as byte[];
+        if (data == null) return;
+        var contentId = ReadString(adapted, "ContentId");
+        var fileName = ReadString(adapted, "FileName", "Name");
+        if (string.IsNullOrWhiteSpace(fileName)) {
+            fileName = inline && !string.IsNullOrWhiteSpace(contentId) ? contentId : "attachment";
+        }
+        var mimeType = ReadString(adapted, "MimeType", "ContentType");
+        destination.Add(new ByteArrayAttachmentDescriptor(data, fileName) {
+            ContentType = string.IsNullOrWhiteSpace(mimeType) ? "application/octet-stream" : mimeType,
+            ContentId = string.IsNullOrWhiteSpace(contentId) ? null : contentId,
+            ContentDisposition = new ContentDisposition(inline ? ContentDisposition.Inline : ContentDisposition.Attachment)
+        });
     }
 
     private static void AddHeaders(object? headers, IDictionary<string, string> destination) {

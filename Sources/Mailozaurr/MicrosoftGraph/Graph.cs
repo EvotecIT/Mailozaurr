@@ -361,9 +361,7 @@ public partial class Graph : IDisposable {
                 foreach (var a in this.ConvertedAttachments) {
                     if (string.IsNullOrWhiteSpace(a.ContentBytes)) continue;
                     try {
-                        var bytes = Convert.FromBase64String(a.ContentBytes);
-                        var d = new Definitions.ByteArrayAttachmentDescriptor(bytes, string.IsNullOrWhiteSpace(a.Name) ? DefaultAttachmentName : a.Name);
-                        if (!string.IsNullOrWhiteSpace(a.ContentId)) d.ContentId = a.ContentId;
+                        var d = CreateSmtpFallbackAttachment(a);
                         if (a.IsInline) inline.Add(d); else attachments.Add(d);
                     } catch (FormatException fex) {
                         LogCollector.LogWarning($"Send-EmailMessage - SMTP fallback skipped invalid base64 attachment '{(a?.Name ?? "(unnamed)")}' : {fex.Message}");
@@ -395,6 +393,20 @@ public partial class Graph : IDisposable {
                 Queued = current.Queued
             };
         }
+    }
+
+    /// <summary>Maps an in-memory Graph attachment to the transport-neutral descriptor used by SMTP fallback.</summary>
+    internal static Definitions.ByteArrayAttachmentDescriptor CreateSmtpFallbackAttachment(GraphAttachment attachment) {
+        var bytes = Convert.FromBase64String(attachment.ContentBytes);
+        var descriptor = new Definitions.ByteArrayAttachmentDescriptor(
+            bytes,
+            string.IsNullOrWhiteSpace(attachment.Name) ? DefaultAttachmentName : attachment.Name) {
+            ContentType = attachment.ContentType
+        };
+        if (!string.IsNullOrWhiteSpace(attachment.ContentId)) {
+            descriptor.ContentId = attachment.ContentId;
+        }
+        return descriptor;
     }
 
     internal void ApplyBodyToSmtpFallback(Smtp smtp) {

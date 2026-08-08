@@ -28,7 +28,7 @@ public partial class Graph {
                     var size = EstimateAttachmentSize(ga);
                     inMemoryTotalBytes += size;
                 } else if (item is Definitions.AttachmentDescriptor descriptor) {
-                    if (!IsInlineDescriptor(descriptor) && descriptor.SourcePath is string descriptorPath) {
+                    if (descriptor.SourcePath is string descriptorPath) {
                         TrackFileAttachment(descriptorPath, descriptor, fileAttachments, ref fileTotalBytes);
                     } else {
                         var converted = GraphAttachment.FromDescriptor(descriptor);
@@ -104,7 +104,7 @@ public partial class Graph {
                 continue;
             }
             if (item is Definitions.AttachmentDescriptor descriptor) {
-                if (!IsInlineDescriptor(descriptor) && descriptor.SourcePath is string descriptorPath) {
+                if (descriptor.SourcePath is string descriptorPath) {
                     yield return new GraphFileAttachmentSource(descriptorPath, descriptor);
                 }
                 continue;

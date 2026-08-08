@@ -89,4 +89,45 @@ Describe 'Send-EmailMessage - MgGraphRequest attachments' {
         $message.message.body.content | Should -Be 'Only the plain-text alternative'
         $message.message.internetMessageHeaders.name | Should -Contain 'X-Workflow'
     }
+
+    It 'maps a singleton PSCustomObject attachment from transport-neutral content' {
+        $script:mgGraphRequestCalls = [System.Collections.Generic.List[object]]::new()
+
+        function global:Invoke-MgGraphRequest {
+            param(
+                [string] $Method,
+                [string] $Uri,
+                [string] $ContentType,
+                [object] $Body,
+                [hashtable] $Headers
+            )
+
+            $script:mgGraphRequestCalls.Add([pscustomobject] @{
+                    Method = $Method
+                    Uri    = $Uri
+                    Body   = $Body
+                })
+            return @{}
+        }
+
+        try {
+            $content = [pscustomobject] @{
+                Subject     = 'Attachment report'
+                Html        = '<p>Attached</p>'
+                Attachments = [pscustomobject] @{
+                    Data     = [byte[]] (1, 2, 3)
+                    FileName = 'report.bin'
+                    MimeType = 'application/x-report'
+                }
+            }
+            Send-EmailMessage -From 'from@example.com' -To 'to@example.com' -MgGraphRequest -Content $content -Confirm:$false | Out-Null
+        } finally {
+            Remove-Item -Path function:global:Invoke-MgGraphRequest -ErrorAction SilentlyContinue
+        }
+
+        $message = $script:mgGraphRequestCalls[0].Body | ConvertFrom-Json
+        $message.message.attachments.name | Should -Be 'report.bin'
+        $message.message.attachments.contentType | Should -Be 'application/x-report'
+        $message.message.attachments.contentBytes | Should -Be 'AQID'
+    }
 }
