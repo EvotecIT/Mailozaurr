@@ -3,7 +3,7 @@
     <PropertyGroup>
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
-        <VersionPrefix>2.0.0</VersionPrefix>
+        <VersionPrefix>2.1.0</VersionPrefix>
         <AssemblyName>Mailozaurr.Application</AssemblyName>
         <PackageId>Mailozaurr.Application</PackageId>
         <Description>Reusable provider-neutral application services for Mailozaurr profiles, mailbox operations, drafts, queues, and delivery.</Description>

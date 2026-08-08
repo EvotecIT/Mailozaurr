@@ -33,6 +33,7 @@ Import-Module Mailozaurr -Force
 `$mailKitAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$query.GetType().Assembly)
 `$smtp = [Mailozaurr.Smtp]::new()
 `$expectedAllowedTypes = @(
+    'Mailozaurr.Definitions.EmailMessageContent'
     'Mailozaurr.EmailEncryption'
     'Mailozaurr.EmailMessage'
     'Mailozaurr.EmailProvider'
@@ -174,8 +175,8 @@ try {
         $result.SearchQueryALC | Should -Be 'Mailozaurr'
         $result.SearchQueryALCIsDefault | Should -BeFalse
         $result.SmtpCreated | Should -BeTrue
-        $result.AllowedTypeCount | Should -Be 40
-        $result.ActualAllowedTypeCount | Should -Be 40
+        $result.AllowedTypeCount | Should -Be 41
+        $result.ActualAllowedTypeCount | Should -Be 41
         @($result.MissingAllowedTypes).Count | Should -Be 0
         @($result.UnexpectedAllowedTypes).Count | Should -Be 0
         @($result.WrongAllowedTypeContexts).Count | Should -Be 0
