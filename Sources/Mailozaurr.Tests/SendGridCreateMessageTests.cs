@@ -144,6 +144,36 @@ public class SendGridCreateMessageTests {
         }
     }
 
+    [Fact]
+    public void CreateMessage_SameFileInRegularAndInlineRoles_PreservesBothDispositions() {
+        var tmp = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
+        File.WriteAllBytes(tmp, new byte[] { 1, 2, 3 });
+        using var client = new SendGridClient {
+            From = "from@example.com",
+            To = new List<object> { "to@example.com" },
+            Subject = "subject",
+            Html = $"<img src=\"cid:{Path.GetFileName(tmp)}\">",
+            Credentials = new NetworkCredential("apikey", "test"),
+            Attachments = new List<AttachmentDescriptor> { new FileAttachmentDescriptor(tmp) },
+            InlineAttachments = new List<AttachmentDescriptor> { new FileAttachmentDescriptor(tmp) }
+        };
+
+        try {
+            client.CreateMessage();
+            PropertyInfo? prop = typeof(SendGridClient).GetProperty("MessageJson", BindingFlags.NonPublic | BindingFlags.Instance);
+            var json = Assert.IsType<string>(prop?.GetValue(client));
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var attachments = doc.RootElement.GetProperty("Attachments");
+
+            Assert.Equal(2, attachments.GetArrayLength());
+            Assert.Equal("attachment", attachments[0].GetProperty("Disposition").GetString());
+            Assert.Equal("inline", attachments[1].GetProperty("Disposition").GetString());
+            Assert.Equal(Path.GetFileName(tmp), attachments[1].GetProperty("ContentId").GetString());
+        } finally {
+            File.Delete(tmp);
+        }
+    }
+
     [Theory]
     [InlineData("", "<b>body</b>", "text/html")]
     [InlineData("text", "", "text/plain")]

@@ -246,10 +246,9 @@ public sealed class SendGridClient : IDisposable {
         IEnumerable<AttachmentDescriptor>? inlineAttachments,
         LogCollector logger) {
         var result = new List<SendGridAttachment>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        AddAttachments(attachments, inline: false, result, seen);
-        AddAttachments(inlineAttachments, inline: true, result, seen);
+        AddAttachments(attachments, inline: false, result, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        AddAttachments(inlineAttachments, inline: true, result, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
         return result;
     }
 
