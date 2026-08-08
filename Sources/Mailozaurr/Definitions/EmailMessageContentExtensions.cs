@@ -1,0 +1,120 @@
+namespace Mailozaurr;
+
+using Mailozaurr.Definitions;
+using MimeKit;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+/// <summary>
+/// Applies transport-neutral rendered message content to Mailozaurr transport clients.
+/// Envelope, authentication, retry, and provider settings remain owned by the caller.
+/// </summary>
+public static class EmailMessageContentExtensions {
+    /// <summary>Applies rendered content to an SMTP client.</summary>
+    public static Smtp WithContent(this Smtp client, EmailMessageContent content) {
+        if (client == null) throw new ArgumentNullException(nameof(client));
+        ValidateContent(content);
+        client.Subject = content.Subject;
+        client.HtmlBody = content.HtmlBody;
+        client.TextBody = content.TextBody;
+        client.Attachments = Copy(content.Attachments);
+        client.InlineAttachments = Copy(content.InlineAttachments);
+        client.Headers = CopyHeaders(content);
+        return client;
+    }
+
+    /// <summary>Applies rendered content to a Microsoft Graph client.</summary>
+    public static Graph WithContent(this Graph client, EmailMessageContent content) {
+        if (client == null) throw new ArgumentNullException(nameof(client));
+        ValidateContent(content);
+        client.Subject = content.Subject;
+        if (!string.IsNullOrEmpty(content.HtmlBody)) {
+            client.HTML = content.HtmlBody;
+            client.ContentType = "HTML";
+        } else {
+            client.HTML = content.TextBody;
+            client.ContentType = "Text";
+        }
+
+        var attachments = content.Attachments.Cast<object>().ToList();
+        attachments.AddRange(content.InlineAttachments.Select(descriptor =>
+            (object)GraphAttachment.FromDescriptor(descriptor, inline: true)));
+        client.Attachments = attachments.Count == 0 ? null : attachments.ToArray();
+        client.Headers = CopyHeaders(content);
+        return client;
+    }
+
+    /// <summary>Applies rendered content to a SendGrid client.</summary>
+    public static SendGridClient WithContent(this SendGridClient client, EmailMessageContent content) {
+        if (client == null) throw new ArgumentNullException(nameof(client));
+        ValidateContent(content);
+        client.Subject = content.Subject;
+        client.Html = content.HtmlBody;
+        client.Text = content.TextBody;
+        var attachments = Copy(content.Attachments);
+        attachments.AddRange(content.InlineAttachments.Select(AsInline));
+        client.Attachments = attachments.Count == 0 ? null : attachments;
+        client.Headers = CopyHeaders(content);
+        return client;
+    }
+
+    /// <summary>Applies rendered content to a Mailgun client.</summary>
+    public static MailgunClient WithContent(this MailgunClient client, EmailMessageContent content) {
+        if (client == null) throw new ArgumentNullException(nameof(client));
+        ValidateContent(content);
+        client.Subject = content.Subject;
+        client.Html = content.HtmlBody;
+        client.Text = content.TextBody;
+        client.Attachments = Copy(content.Attachments);
+        client.InlineAttachments = Copy(content.InlineAttachments);
+        client.Headers = CopyHeaders(content);
+        return client;
+    }
+
+    /// <summary>Applies rendered content to an Amazon SES client.</summary>
+    public static SesClient WithContent(this SesClient client, EmailMessageContent content) {
+        if (client == null) throw new ArgumentNullException(nameof(client));
+        ValidateContent(content);
+        client.Subject = content.Subject;
+        client.Html = content.HtmlBody;
+        client.Text = content.TextBody;
+        client.Attachments = Copy(content.Attachments);
+        client.InlineAttachments = Copy(content.InlineAttachments);
+        client.Headers = CopyHeaders(content);
+        return client;
+    }
+
+    private static void ValidateContent(EmailMessageContent content) {
+        if (content == null) throw new ArgumentNullException(nameof(content));
+    }
+
+    private static List<AttachmentDescriptor> Copy(IEnumerable<AttachmentDescriptor> attachments) =>
+        attachments?.Where(item => item != null).ToList()
+        ?? new List<AttachmentDescriptor>();
+
+    private static Dictionary<string, string>? CopyHeaders(EmailMessageContent content) =>
+        content.Headers.Count == 0
+            ? null
+            : new Dictionary<string, string>(content.Headers, StringComparer.OrdinalIgnoreCase);
+
+    private static AttachmentDescriptor AsInline(AttachmentDescriptor descriptor) {
+        if (descriptor.ContentDisposition != null &&
+            string.Equals(descriptor.ContentDisposition.Disposition, ContentDisposition.Inline, StringComparison.OrdinalIgnoreCase)) {
+            return descriptor;
+        }
+
+        return new ByteArrayAttachmentDescriptor(
+            descriptor.GetContentBytes(),
+            string.IsNullOrWhiteSpace(descriptor.FileName) ? "inline-attachment" : descriptor.FileName!) {
+            ContentType = descriptor.ContentType,
+            ContentId = descriptor.ContentId,
+            ContentDescription = descriptor.ContentDescription,
+            ContentDisposition = new ContentDisposition(ContentDisposition.Inline),
+            TransferEncoding = descriptor.TransferEncoding,
+            Headers = descriptor.Headers == null
+                ? null
+                : new Dictionary<string, string>(descriptor.Headers, StringComparer.OrdinalIgnoreCase)
+        };
+    }
+}

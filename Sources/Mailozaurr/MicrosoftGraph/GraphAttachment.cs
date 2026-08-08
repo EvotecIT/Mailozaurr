@@ -62,4 +62,35 @@ public class GraphAttachment {
             ContentBytes = fileContentBase64
         };
     }
+
+    /// <summary>
+    /// Creates a Graph attachment from a transport-neutral attachment descriptor.
+    /// </summary>
+    /// <param name="descriptor">Attachment content and MIME metadata.</param>
+    /// <param name="inline">Optional override indicating whether the attachment is inline.</param>
+    /// <returns>The created Graph attachment.</returns>
+    public static GraphAttachment FromDescriptor(Definitions.AttachmentDescriptor descriptor, bool? inline = null) {
+        if (descriptor == null) {
+            throw new ArgumentNullException(nameof(descriptor));
+        }
+
+        var fileName = descriptor.FileName;
+        if (string.IsNullOrWhiteSpace(fileName) && descriptor.SourcePath is string sourcePath) {
+            fileName = Path.GetFileName(sourcePath);
+        }
+        fileName ??= "attachment";
+
+        var isInline = inline ?? string.Equals(
+            descriptor.ContentDisposition?.Disposition,
+            MimeKit.ContentDisposition.Inline,
+            StringComparison.OrdinalIgnoreCase);
+
+        return new GraphAttachment {
+            Name = fileName,
+            ContentType = string.IsNullOrWhiteSpace(descriptor.ContentType) ? MimeKit.MimeTypes.GetMimeType(fileName) : descriptor.ContentType,
+            ContentBytes = Convert.ToBase64String(descriptor.GetContentBytes()),
+            IsInline = isInline,
+            ContentId = string.IsNullOrWhiteSpace(descriptor.ContentId) ? (isInline ? fileName : null) : descriptor.ContentId
+        };
+    }
 }

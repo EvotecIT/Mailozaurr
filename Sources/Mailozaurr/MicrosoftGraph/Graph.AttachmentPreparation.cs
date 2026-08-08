@@ -27,6 +27,10 @@ public partial class Graph {
                     ConvertedAttachments.Add(ga);
                     var size = EstimateAttachmentSize(ga);
                     inMemoryTotalBytes += size;
+                } else if (item is Definitions.AttachmentDescriptor descriptor) {
+                    var converted = GraphAttachment.FromDescriptor(descriptor);
+                    ConvertedAttachments.Add(converted);
+                    inMemoryTotalBytes += EstimateAttachmentSize(converted);
                 } else if (TryGetAttachmentPath(item, out var path)) {
                     if (!File.Exists(path)) {
                         LogMissingAttachmentWarning(path);
@@ -76,7 +80,7 @@ public partial class Graph {
         }
 
         foreach (var item in Attachments) {
-            if (item is GraphAttachment) {
+            if (item is GraphAttachment || item is Definitions.AttachmentDescriptor) {
                 continue;
             }
             if (TryGetAttachmentPath(item, out var path)) {

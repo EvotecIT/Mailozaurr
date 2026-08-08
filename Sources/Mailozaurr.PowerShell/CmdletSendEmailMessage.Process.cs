@@ -59,6 +59,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
     /// Process the record.
     /// </summary>
     protected override void ProcessRecord() {
+        ApplyContent();
         Attachment = FilterExistingPaths(Attachment, nameof(Attachment));
         InlineAttachment = FilterExistingPaths(InlineAttachment, nameof(InlineAttachment));
         var (fromEmailRaw, fromNameRaw) = Helpers.GetEmailAndName(From);
@@ -104,7 +105,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         if (Text != null) sendGrid.Text = string.Join("", Text);
         if (HTML != null) sendGrid.Html = string.Join("", HTML);
         sendGrid.Priority = Priority;
-        var sendGridAttachments = ConvertToAttachmentDescriptors(Attachment);
+        var sendGridAttachments = MergeAttachmentDescriptors(Attachment, InlineAttachment);
         if (sendGridAttachments != null) {
             sendGrid.Attachments = sendGridAttachments;
         }
@@ -143,12 +144,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         mailgun.Subject = Subject ?? string.Empty;
         if (Text != null) mailgun.Text = string.Join("", Text);
         if (HTML != null) mailgun.Html = string.Join("", HTML);
-        if (Attachment != null) {
-            mailgun.Attachment = Attachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
-        }
-        if (InlineAttachment != null) {
-            mailgun.InlineAttachment = InlineAttachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
-        }
+        mailgun.Attachments = ConvertToAttachmentDescriptors(Attachment);
+        mailgun.InlineAttachments = ConvertToAttachmentDescriptors(InlineAttachment);
         if (Headers != null) mailgun.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         mailgun.ErrorAction = errorAction;
         mailgun.RetryCount = RetryCount;
@@ -182,12 +179,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         ses.Subject = Subject ?? string.Empty;
         if (Text != null) ses.Text = string.Join("", Text);
         if (HTML != null) ses.Html = string.Join("", HTML);
-        if (Attachment != null) {
-            ses.Attachment = Attachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
-        }
-        if (InlineAttachment != null) {
-            ses.InlineAttachment = InlineAttachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
-        }
+        ses.Attachments = ConvertToAttachmentDescriptors(Attachment);
+        ses.InlineAttachments = ConvertToAttachmentDescriptors(InlineAttachment);
         if (Headers != null) ses.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         ses.ErrorAction = errorAction;
         ses.RetryCount = RetryCount;
@@ -256,6 +249,17 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         }
     }
 
+    private void ApplyGraphBody(Graph graph) {
+        if (HTML != null) {
+            graph.HTML = string.Join("", HTML);
+            graph.ContentType = "HTML";
+            return;
+        }
+
+        graph.HTML = string.Join("", Text ?? Array.Empty<string>());
+        graph.ContentType = "Text";
+    }
+
     private void ProcessGraph(string fromEmail, string fromName) {
         if (Credential == null) {
             throw new InvalidOperationException("Credential is required for Graph processing.");
@@ -277,9 +281,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         graph.RetryAlways = RetryAlways.IsPresent;
         graph.RequestReadReceipt = RequestReadReceipt;
         graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
-        graph.HTML = string.Join("", HTML ?? Array.Empty<string>());
-        graph.ContentType = "HTML";
-        graph.Attachments = Attachment;
+        ApplyGraphBody(graph);
+        graph.Attachments = MergeGraphAttachments(Attachment, InlineAttachment);
         if (Headers != null) graph.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         // Apply optional Graph policy without introducing new cmdlets
         var applyPolicy = MailozaurrOptions.DefaultGraphPolicy != null
@@ -380,9 +383,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         graph.RetryDelayBackoff = RetryDelayBackoff;
         graph.RequestReadReceipt = RequestReadReceipt;
         graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
-        graph.HTML = string.Join("", HTML ?? Array.Empty<string>());
-        graph.ContentType = "HTML";
-        graph.Attachments = Attachment;
+        ApplyGraphBody(graph);
+        graph.Attachments = MergeGraphAttachments(Attachment, InlineAttachment);
         if (Headers != null) graph.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         graph.CreateAttachments();
         long size = graph.TotalAttachmentSizeBytes;
@@ -767,6 +769,29 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
                 _ => throw new ArgumentException($"Unsupported attachment type: {entry.GetType().Name}")
             })
             .ToList();
+    }
+
+    private static List<AttachmentDescriptor>? MergeAttachmentDescriptors(object[]? attachments, object[]? inlineAttachments) {
+        var merged = ConvertToAttachmentDescriptors(attachments) ?? new List<AttachmentDescriptor>();
+        var inline = ConvertToAttachmentDescriptors(inlineAttachments);
+        if (inline != null) {
+            foreach (var descriptor in inline) {
+                descriptor.ContentDisposition ??= new MimeKit.ContentDisposition(MimeKit.ContentDisposition.Inline);
+                merged.Add(descriptor);
+            }
+        }
+        return merged.Count == 0 ? null : merged;
+    }
+
+    private static object[]? MergeGraphAttachments(object[]? attachments, object[]? inlineAttachments) {
+        var merged = attachments?.Where(item => item != null).ToList() ?? new List<object>();
+        var inline = ConvertToAttachmentDescriptors(inlineAttachments);
+        if (inline != null) {
+            foreach (var descriptor in inline) {
+                merged.Add(GraphAttachment.FromDescriptor(descriptor, inline: true));
+            }
+        }
+        return merged.Count == 0 ? null : merged.ToArray();
     }
 
     private object[]? FilterExistingPaths(object[]? paths, string parameterName) {

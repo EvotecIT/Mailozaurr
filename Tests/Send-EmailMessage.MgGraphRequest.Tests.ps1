@@ -50,4 +50,43 @@ Describe 'Send-EmailMessage - MgGraphRequest attachments' {
         $script:mgGraphRequestCalls[2].Headers['Content-Range'].ToString() | Should -Match '^bytes 0-'
         $script:mgGraphRequestCalls[3].Uri | Should -Be "https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/send"
     }
+
+    It 'maps PSCustomObject text-only content to a Graph text body' {
+        $script:mgGraphRequestCalls = [System.Collections.Generic.List[object]]::new()
+
+        function global:Invoke-MgGraphRequest {
+            param(
+                [string] $Method,
+                [string] $Uri,
+                [string] $ContentType,
+                [object] $Body,
+                [hashtable] $Headers
+            )
+
+            $script:mgGraphRequestCalls.Add([pscustomobject] @{
+                    Method = $Method
+                    Uri    = $Uri
+                    Body   = $Body
+                })
+            return @{}
+        }
+
+        try {
+            $content = [pscustomobject] @{
+                Subject   = 'Text report'
+                PlainText = 'Only the plain-text alternative'
+                Headers   = [pscustomobject] @{ 'X-Workflow' = 'text-report' }
+            }
+            Send-EmailMessage -From 'from@example.com' -To 'to@example.com' -MgGraphRequest -Content $content -Confirm:$false | Out-Null
+        } finally {
+            Remove-Item -Path function:global:Invoke-MgGraphRequest -ErrorAction SilentlyContinue
+        }
+
+        $script:mgGraphRequestCalls.Count | Should -Be 1
+        $message = $script:mgGraphRequestCalls[0].Body | ConvertFrom-Json
+        $message.message.subject | Should -Be 'Text report'
+        $message.message.body.contentType | Should -Be 'Text'
+        $message.message.body.content | Should -Be 'Only the plain-text alternative'
+        $message.message.internetMessageHeaders.name | Should -Contain 'X-Workflow'
+    }
 }
