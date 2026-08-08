@@ -93,4 +93,22 @@ public class GraphAttachment {
             ContentId = string.IsNullOrWhiteSpace(descriptor.ContentId) ? (isInline ? fileName : null) : descriptor.ContentId
         };
     }
+
+    internal static object PrepareInlineDescriptor(Definitions.AttachmentDescriptor descriptor) {
+        if (descriptor is not Definitions.FileAttachmentDescriptor fileDescriptor) {
+            return FromDescriptor(descriptor, inline: true);
+        }
+
+        return new Definitions.FileAttachmentDescriptor(fileDescriptor.FilePath) {
+            FileName = fileDescriptor.FileName,
+            ContentType = fileDescriptor.ContentType,
+            ContentId = fileDescriptor.ContentId,
+            ContentDescription = fileDescriptor.ContentDescription,
+            ContentDisposition = new MimeKit.ContentDisposition(MimeKit.ContentDisposition.Inline),
+            TransferEncoding = fileDescriptor.TransferEncoding,
+            Headers = fileDescriptor.Headers == null
+                ? null
+                : new Dictionary<string, string>(fileDescriptor.Headers, StringComparer.OrdinalIgnoreCase)
+        };
+    }
 }

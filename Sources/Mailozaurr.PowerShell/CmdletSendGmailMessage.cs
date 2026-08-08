@@ -87,7 +87,7 @@ public sealed class CmdletSendGmailMessage : AsyncPSCmdlet {
             Subject = Subject ?? string.Empty,
             HtmlBody = HtmlBody is null ? string.Empty : string.Join(System.Environment.NewLine, HtmlBody),
             TextBody = TextBody is null ? string.Empty : string.Join(System.Environment.NewLine, TextBody),
-            Attachments = ConvertAttachments(Attachment)
+            Attachments = AttachmentInputConverter.Convert(Attachment)
         };
         if (Headers != null) {
             smtp.Headers = Headers.Cast<DictionaryEntry>()
@@ -105,33 +105,5 @@ public sealed class CmdletSendGmailMessage : AsyncPSCmdlet {
         } finally {
             smtp.Dispose();
         }
-    }
-    private static List<AttachmentDescriptor>? ConvertAttachments(object[]? attachments) {
-        if (attachments == null) {
-            return null;
-        }
-
-        var result = new List<AttachmentDescriptor>();
-        foreach (var entry in attachments) {
-            if (entry == null) {
-                continue;
-            }
-
-            switch (entry) {
-                case AttachmentDescriptor descriptor:
-                    result.Add(descriptor);
-                    break;
-                case string path:
-                    result.Add(new FileAttachmentDescriptor(path));
-                    break;
-                case System.IO.FileInfo fileInfo:
-                    result.Add(new FileAttachmentDescriptor(fileInfo.FullName));
-                    break;
-                default:
-                    throw new ArgumentException($"Unsupported attachment type: {entry.GetType().Name}");
-            }
-        }
-
-        return result;
     }
 }

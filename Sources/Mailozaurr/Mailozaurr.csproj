@@ -112,5 +112,8 @@
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
             <_Parameter1>Mailozaurr.Tests</_Parameter1>
         </AssemblyAttribute>
+        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+            <_Parameter1>Mailozaurr.PowerShell</_Parameter1>
+        </AssemblyAttribute>
     </ItemGroup>
 </Project>

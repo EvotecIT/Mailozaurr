@@ -101,6 +101,37 @@ public class EmailMessageContentTests {
     }
 
     [Fact]
+    public async Task WithContent_PreservesFileBackedInlineResourceForGraphUploadSession() {
+        var path = Path.GetTempFileName();
+        File.WriteAllBytes(path, new byte[4_100_000]);
+        var descriptor = new FileAttachmentDescriptor(path) {
+            FileName = "dashboard.png",
+            ContentType = "image/png",
+            ContentId = "dashboard-image"
+        };
+        var content = new EmailMessageContent();
+        content.InlineAttachments.Add(descriptor);
+        using var graph = new Graph().WithContent(content);
+
+        try {
+            var preparedDescriptor = Assert.IsType<FileAttachmentDescriptor>(Assert.Single(graph.Attachments!));
+            Assert.NotSame(descriptor, preparedDescriptor);
+            Assert.Equal(ContentDisposition.Inline, preparedDescriptor.ContentDisposition?.Disposition);
+            Assert.Null(descriptor.ContentDisposition);
+
+            graph.CreateAttachments();
+            await graph.PrepareAttachments();
+
+            Assert.True(graph.IsLargerAttachment);
+            var placeholder = Assert.Single(graph.AttachmentsPlaceHolders);
+            Assert.Contains("\"isInline\":true", placeholder.Json, StringComparison.Ordinal);
+            Assert.Contains("\"contentId\":\"dashboard-image\"", placeholder.Json, StringComparison.Ordinal);
+        } finally {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void WithContent_ReplacesLegacyMailgunAndSesAttachmentPaths() {
         var content = new EmailMessageContent();
         content.Attachments.Add(new ByteArrayAttachmentDescriptor(new byte[] { 1 }, "current.txt"));

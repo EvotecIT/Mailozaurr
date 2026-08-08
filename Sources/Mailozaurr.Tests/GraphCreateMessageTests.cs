@@ -165,6 +165,28 @@ public class GraphCreateMessageTests {
     }
 
     [Fact]
+    public void AddFileAttachmentSourcesToSmtpFallback_PreservesInlineDisposition() {
+        string tmp = Path.GetTempFileName();
+        var inlineDescriptor = new FileAttachmentDescriptor(tmp) {
+            ContentDisposition = new ContentDisposition(ContentDisposition.Inline),
+            ContentId = "workflow-image"
+        };
+        using var graph = new Graph {
+            Attachments = new object[] { inlineDescriptor }
+        };
+        var smtp = new Smtp();
+
+        try {
+            graph.AddFileAttachmentSourcesToSmtpFallback(smtp);
+        } finally {
+            File.Delete(tmp);
+        }
+
+        Assert.Empty(smtp.Attachments!);
+        Assert.Same(inlineDescriptor, Assert.Single(smtp.InlineAttachments!));
+    }
+
+    [Fact]
     public void CreateMessage_WithLargeAttachment_DoesNotIncludeAttachment() {
         string tmp = Path.GetTempFileName();
         File.WriteAllBytes(tmp, new byte[4000001]);
@@ -181,6 +203,73 @@ public class GraphCreateMessageTests {
         File.Delete(tmp);
         Assert.True(graph.IsLargerAttachment);
         Assert.Null(graph.MessageContainer.Message.Attachments);
+    }
+
+    [Fact]
+    public void CreateAttachments_RelativeAndAbsoluteAliases_AreIncludedOnce() {
+        var fileName = $"mailozaurr-graph-{Guid.NewGuid():N}.tmp";
+        var absolutePath = Path.Combine(Environment.CurrentDirectory, fileName);
+        File.WriteAllBytes(absolutePath, new byte[] { 1, 2, 3 });
+        using var graph = new Graph {
+            Attachments = new object[] { fileName, absolutePath }
+        };
+
+        try {
+            graph.CreateAttachments();
+        } finally {
+            File.Delete(absolutePath);
+        }
+
+        Assert.Single(graph.ConvertedAttachments);
+        Assert.Equal(3, graph.TotalAttachmentSizeBytes);
+    }
+
+    [Fact]
+    public void CreateAttachments_SameFileAcrossRegularAndInlineRoles_PreservesBoth() {
+        var path = Path.GetTempFileName();
+        File.WriteAllBytes(path, new byte[] { 1, 2, 3 });
+        var regular = new FileAttachmentDescriptor(path);
+        var inline = new FileAttachmentDescriptor(path) {
+            ContentDisposition = new ContentDisposition(ContentDisposition.Inline),
+            ContentId = "shared-inline"
+        };
+        using var graph = new Graph {
+            Attachments = new object[] { regular, inline }
+        };
+
+        try {
+            graph.CreateAttachments();
+        } finally {
+            File.Delete(path);
+        }
+
+        Assert.Equal(2, graph.ConvertedAttachments.Count);
+        Assert.Contains(graph.ConvertedAttachments, attachment => !attachment.IsInline);
+        Assert.Contains(graph.ConvertedAttachments, attachment => attachment.IsInline && attachment.ContentId == "shared-inline");
+        Assert.Equal(6, graph.TotalAttachmentSizeBytes);
+    }
+
+    [Fact]
+    public void AddFileAttachmentSourcesToSmtpFallback_SameFileAcrossRoles_PreservesBoth() {
+        var path = Path.GetTempFileName();
+        var regular = new FileAttachmentDescriptor(path);
+        var inline = new FileAttachmentDescriptor(path) {
+            ContentDisposition = new ContentDisposition(ContentDisposition.Inline),
+            ContentId = "shared-inline"
+        };
+        using var graph = new Graph {
+            Attachments = new object[] { regular, inline }
+        };
+        var smtp = new Smtp();
+
+        try {
+            graph.AddFileAttachmentSourcesToSmtpFallback(smtp);
+        } finally {
+            File.Delete(path);
+        }
+
+        Assert.Same(regular, Assert.Single(smtp.Attachments!));
+        Assert.Same(inline, Assert.Single(smtp.InlineAttachments!));
     }
 
     [Fact]

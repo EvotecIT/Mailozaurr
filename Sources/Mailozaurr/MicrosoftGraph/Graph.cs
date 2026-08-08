@@ -371,10 +371,7 @@ public partial class Graph : IDisposable {
                 if (inline.Count > 0) smtp.InlineAttachments = inline;
             }
             if (IsLargerAttachment) {
-                smtp.Attachments ??= new List<Definitions.AttachmentDescriptor>();
-                foreach (var source in EnumerateFileAttachmentSources()) {
-                    smtp.Attachments.Add(source.Descriptor ?? new Definitions.FileAttachmentDescriptor(source.Path));
-                }
+                AddFileAttachmentSourcesToSmtpFallback(smtp);
             }
 
             await smtp.CreateMessageAsync(cancellationToken).ConfigureAwait(false);
@@ -392,6 +389,19 @@ public partial class Graph : IDisposable {
                 MessageId = current.MessageId,
                 Queued = current.Queued
             };
+        }
+    }
+
+    internal void AddFileAttachmentSourcesToSmtpFallback(Smtp smtp) {
+        foreach (var source in EnumerateFileAttachmentSources()) {
+            var descriptor = source.Descriptor ?? new Definitions.FileAttachmentDescriptor(source.Path);
+            if (source.Descriptor != null && IsInlineDescriptor(source.Descriptor)) {
+                smtp.InlineAttachments ??= new List<Definitions.AttachmentDescriptor>();
+                smtp.InlineAttachments.Add(descriptor);
+            } else {
+                smtp.Attachments ??= new List<Definitions.AttachmentDescriptor>();
+                smtp.Attachments.Add(descriptor);
+            }
         }
     }
 

@@ -47,6 +47,53 @@ public class GraphDraftTests {
     }
 
     [Fact]
+    public async Task PrepareAttachments_RelativeAndAbsoluteAliases_CreateOnePlaceholder() {
+        var fileName = $"mailozaurr-graph-large-{Guid.NewGuid():N}.tmp";
+        var absolutePath = Path.Combine(Environment.CurrentDirectory, fileName);
+        File.WriteAllBytes(absolutePath, new byte[4_100_000]);
+        using var graph = new Graph {
+            Attachments = new object[] { fileName, absolutePath }
+        };
+
+        try {
+            graph.CreateAttachments();
+            await graph.PrepareAttachments();
+        } finally {
+            File.Delete(absolutePath);
+        }
+
+        Assert.True(graph.IsLargerAttachment);
+        Assert.Single(graph.AttachmentsPlaceHolders);
+    }
+
+    [Fact]
+    public async Task PrepareAttachments_SameLargeFileAcrossRoles_CreatesBothPlaceholders() {
+        var path = Path.GetTempFileName();
+        File.WriteAllBytes(path, new byte[4_100_000]);
+        using var graph = new Graph {
+            Attachments = new object[] {
+                new FileAttachmentDescriptor(path),
+                new FileAttachmentDescriptor(path) {
+                    ContentDisposition = new ContentDisposition(ContentDisposition.Inline),
+                    ContentId = "shared-inline"
+                }
+            }
+        };
+
+        try {
+            graph.CreateAttachments();
+            await graph.PrepareAttachments();
+        } finally {
+            File.Delete(path);
+        }
+
+        Assert.True(graph.IsLargerAttachment);
+        Assert.Equal(2, graph.AttachmentsPlaceHolders.Count);
+        Assert.Contains(graph.AttachmentsPlaceHolders, placeholder => !placeholder.Json.Contains("\"isInline\":true", StringComparison.Ordinal));
+        Assert.Contains(graph.AttachmentsPlaceHolders, placeholder => placeholder.Json.Contains("\"isInline\":true", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task PrepareAttachments_FileInfo_CreatePlaceholders() {
         string tmp = Path.GetTempFileName();
         File.WriteAllBytes(tmp, new byte[4_100_000]);

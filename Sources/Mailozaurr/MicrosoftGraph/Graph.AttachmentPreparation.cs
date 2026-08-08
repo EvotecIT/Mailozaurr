@@ -18,6 +18,8 @@ public partial class Graph {
         _fileAttachmentCount = 0;
         if (Attachments != null && Attachments.Any()) {
             var fileAttachments = new List<KeyValuePair<string, Definitions.AttachmentDescriptor?>>();
+            var regularFilePaths = Definitions.AttachmentPathIdentity.CreateSet();
+            var inlineFilePaths = Definitions.AttachmentPathIdentity.CreateSet();
             long fileTotalBytes = 0;
             long inMemoryTotalBytes = 0;
 
@@ -29,14 +31,15 @@ public partial class Graph {
                     inMemoryTotalBytes += size;
                 } else if (item is Definitions.AttachmentDescriptor descriptor) {
                     if (descriptor.SourcePath is string descriptorPath) {
-                        TrackFileAttachment(descriptorPath, descriptor, fileAttachments, ref fileTotalBytes);
+                        var seenPaths = IsInlineDescriptor(descriptor) ? inlineFilePaths : regularFilePaths;
+                        TrackFileAttachment(descriptorPath, descriptor, fileAttachments, seenPaths, ref fileTotalBytes);
                     } else {
                         var converted = GraphAttachment.FromDescriptor(descriptor);
                         ConvertedAttachments.Add(converted);
                         inMemoryTotalBytes += EstimateAttachmentSize(converted);
                     }
                 } else if (TryGetAttachmentPath(item, out var path)) {
-                    TrackFileAttachment(path, null, fileAttachments, ref fileTotalBytes);
+                    TrackFileAttachment(path, null, fileAttachments, regularFilePaths, ref fileTotalBytes);
                 }
             }
 
@@ -63,6 +66,7 @@ public partial class Graph {
         string path,
         Definitions.AttachmentDescriptor? descriptor,
         ICollection<KeyValuePair<string, Definitions.AttachmentDescriptor?>> fileAttachments,
+        ISet<string> seenFilePaths,
         ref long fileTotalBytes) {
         if (!File.Exists(path)) {
             LogMissingAttachmentWarning(path);
@@ -70,6 +74,9 @@ public partial class Graph {
         }
 
         try {
+            if (!Definitions.AttachmentPathIdentity.Add(seenFilePaths, path)) {
+                return;
+            }
             fileAttachments.Add(new KeyValuePair<string, Definitions.AttachmentDescriptor?>(path, descriptor));
             fileTotalBytes += new FileInfo(path).Length;
             _fileAttachmentCount++;
@@ -99,18 +106,25 @@ public partial class Graph {
             yield break;
         }
 
+        var regularFilePaths = Definitions.AttachmentPathIdentity.CreateSet();
+        var inlineFilePaths = Definitions.AttachmentPathIdentity.CreateSet();
         foreach (var item in Attachments) {
             if (item is GraphAttachment) {
                 continue;
             }
             if (item is Definitions.AttachmentDescriptor descriptor) {
                 if (descriptor.SourcePath is string descriptorPath) {
-                    yield return new GraphFileAttachmentSource(descriptorPath, descriptor);
+                    var seenPaths = IsInlineDescriptor(descriptor) ? inlineFilePaths : regularFilePaths;
+                    if (Definitions.AttachmentPathIdentity.Add(seenPaths, descriptorPath)) {
+                        yield return new GraphFileAttachmentSource(descriptorPath, descriptor);
+                    }
                 }
                 continue;
             }
             if (TryGetAttachmentPath(item, out var path)) {
-                yield return new GraphFileAttachmentSource(path, descriptor: null);
+                if (Definitions.AttachmentPathIdentity.Add(regularFilePaths, path)) {
+                    yield return new GraphFileAttachmentSource(path, descriptor: null);
+                }
             }
         }
     }

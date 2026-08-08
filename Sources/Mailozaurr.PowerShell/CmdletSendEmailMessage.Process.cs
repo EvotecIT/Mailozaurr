@@ -105,8 +105,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         if (Text != null) sendGrid.Text = string.Join("", Text);
         if (HTML != null) sendGrid.Html = string.Join("", HTML);
         sendGrid.Priority = Priority;
-        sendGrid.Attachments = ConvertToAttachmentDescriptors(Attachment);
-        sendGrid.InlineAttachments = ConvertToAttachmentDescriptors(InlineAttachment);
+        sendGrid.Attachments = AttachmentInputConverter.Convert(Attachment);
+        sendGrid.InlineAttachments = AttachmentInputConverter.Convert(InlineAttachment);
         if (Headers != null) sendGrid.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         sendGrid.SeparateTo = SeparateTo;
         sendGrid.ErrorAction = errorAction;
@@ -142,8 +142,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         mailgun.Subject = Subject ?? string.Empty;
         if (Text != null) mailgun.Text = string.Join("", Text);
         if (HTML != null) mailgun.Html = string.Join("", HTML);
-        mailgun.Attachments = ConvertToAttachmentDescriptors(Attachment);
-        mailgun.InlineAttachments = ConvertToAttachmentDescriptors(InlineAttachment);
+        mailgun.Attachments = AttachmentInputConverter.Convert(Attachment);
+        mailgun.InlineAttachments = AttachmentInputConverter.Convert(InlineAttachment);
         if (Headers != null) mailgun.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         mailgun.ErrorAction = errorAction;
         mailgun.RetryCount = RetryCount;
@@ -177,8 +177,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         ses.Subject = Subject ?? string.Empty;
         if (Text != null) ses.Text = string.Join("", Text);
         if (HTML != null) ses.Html = string.Join("", HTML);
-        ses.Attachments = ConvertToAttachmentDescriptors(Attachment);
-        ses.InlineAttachments = ConvertToAttachmentDescriptors(InlineAttachment);
+        ses.Attachments = AttachmentInputConverter.Convert(Attachment);
+        ses.InlineAttachments = AttachmentInputConverter.Convert(InlineAttachment);
         if (Headers != null) ses.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         ses.ErrorAction = errorAction;
         ses.RetryCount = RetryCount;
@@ -211,8 +211,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         smtp.Subject = Subject ?? string.Empty;
         if (Text != null) smtp.TextBody = string.Join("", Text);
         if (HTML != null) smtp.HtmlBody = string.Join("", HTML);
-        smtp.Attachments = ConvertToAttachmentDescriptors(Attachment);
-        smtp.InlineAttachments = ConvertToAttachmentDescriptors(InlineAttachment);
+        smtp.Attachments = AttachmentInputConverter.Convert(Attachment);
+        smtp.InlineAttachments = AttachmentInputConverter.Convert(InlineAttachment);
         smtp.Priority = Priority;
         if (Headers != null) smtp.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         smtp.CreateMessage(CancellationToken.None);
@@ -464,8 +464,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         if (HTML != null) smtpClient.HtmlBody = string.Join("", HTML);
         if (Text != null) smtpClient.TextBody = string.Join("", Text);
 
-        smtpClient.Attachments = ConvertToAttachmentDescriptors(Attachment);
-        smtpClient.InlineAttachments = ConvertToAttachmentDescriptors(InlineAttachment);
+        smtpClient.Attachments = AttachmentInputConverter.Convert(Attachment);
+        smtpClient.InlineAttachments = AttachmentInputConverter.Convert(InlineAttachment);
         if (Headers != null) smtpClient.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         smtpClient.Timeout = Timeout;
 
@@ -752,29 +752,12 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         return !string.IsNullOrEmpty(value);
     }
 
-    private static List<AttachmentDescriptor>? ConvertToAttachmentDescriptors(object[]? attachments) {
-        if (attachments == null) {
-            return null;
-        }
-
-        return attachments
-            .Where(entry => entry != null)
-            .Select(entry => entry!)
-            .Select(entry => entry switch {
-                AttachmentDescriptor descriptor => descriptor,
-                string path => new FileAttachmentDescriptor(path),
-                FileInfo fileInfo => new FileAttachmentDescriptor(fileInfo.FullName),
-                _ => throw new ArgumentException($"Unsupported attachment type: {entry.GetType().Name}")
-            })
-            .ToList();
-    }
-
     private static object[]? MergeGraphAttachments(object[]? attachments, object[]? inlineAttachments) {
         var merged = attachments?.Where(item => item != null).ToList() ?? new List<object>();
-        var inline = ConvertToAttachmentDescriptors(inlineAttachments);
+        var inline = AttachmentInputConverter.Convert(inlineAttachments);
         if (inline != null) {
             foreach (var descriptor in inline) {
-                merged.Add(GraphAttachment.FromDescriptor(descriptor, inline: true));
+                merged.Add(GraphAttachment.PrepareInlineDescriptor(descriptor));
             }
         }
         return merged.Count == 0 ? null : merged.ToArray();
@@ -788,11 +771,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         List<object> valid = new();
 
         foreach (var item in paths) {
-            string? path = item switch {
-                string s => s,
-                FileInfo fi => fi.FullName,
-                _ => null
-            };
+            string? path = AttachmentInputConverter.GetPath(item);
 
             if (path != null) {
                 if (path.IndexOfAny(new[] { '*', '?' }) >= 0) {

@@ -39,7 +39,7 @@ public static class EmailMessageContentExtensions {
 
         var attachments = content.Attachments.Cast<object>().ToList();
         attachments.AddRange(content.InlineAttachments.Select(descriptor =>
-            (object)GraphAttachment.FromDescriptor(descriptor, inline: true)));
+            GraphAttachment.PrepareInlineDescriptor(descriptor)));
         client.Attachments = attachments.Count == 0 ? null : attachments.ToArray();
         client.Headers = CopyHeaders(content);
         return client;

@@ -1,5 +1,6 @@
 using Mailozaurr.Definitions;
 using System.IO;
+using System.Runtime.InteropServices;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -10,7 +11,9 @@ public class AttachmentPathIdentityTests {
         var paths = AttachmentPathIdentity.CreateSet();
 
         Assert.True(paths.Add("attachment.tmp"));
-        Assert.Equal(Path.DirectorySeparatorChar != '\\', paths.Add("ATTACHMENT.TMP"));
+        var caseSensitive = !RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
+            !RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+        Assert.Equal(caseSensitive, paths.Add("ATTACHMENT.TMP"));
     }
 
     [Fact]
