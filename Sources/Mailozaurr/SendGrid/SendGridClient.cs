@@ -65,6 +65,11 @@ public sealed class SendGridClient : IDisposable {
     /// </summary>
     public List<AttachmentDescriptor>? Attachments { get; set; }
 
+    /// <summary>
+    /// Gets or sets inline attachments referenced from the message body.
+    /// </summary>
+    public List<AttachmentDescriptor>? InlineAttachments { get; set; }
+
     /// <summary>Custom headers to include with the message.</summary>
     public Dictionary<string, string>? Headers { get; set; }
 
@@ -233,15 +238,28 @@ public sealed class SendGridClient : IDisposable {
     /// Converts a collection of attachment descriptors to <see cref="SendGridAttachment"/> objects.
     /// </summary>
     /// <param name="attachments">Attachments to convert.</param>
+    /// <param name="inlineAttachments">Inline attachments to convert.</param>
     /// <param name="logger">Logger used to emit warnings.</param>
     /// <returns>List of converted attachments.</returns>
-    private static List<SendGridAttachment> ConvertAttachments(IEnumerable<AttachmentDescriptor>? attachments, LogCollector logger) {
+    private static List<SendGridAttachment> ConvertAttachments(
+        IEnumerable<AttachmentDescriptor>? attachments,
+        IEnumerable<AttachmentDescriptor>? inlineAttachments,
+        LogCollector logger) {
         var result = new List<SendGridAttachment>();
-        if (attachments == null) {
-            return result;
-        }
 
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        AddAttachments(attachments, inline: false, result, AttachmentPathIdentity.CreateSet());
+        AddAttachments(inlineAttachments, inline: true, result, AttachmentPathIdentity.CreateSet());
+        return result;
+    }
+
+    private static void AddAttachments(
+        IEnumerable<AttachmentDescriptor>? attachments,
+        bool inline,
+        ICollection<SendGridAttachment> result,
+        ISet<string> seen) {
+        if (attachments == null) {
+            return;
+        }
 
         foreach (var descriptor in attachments) {
             if (descriptor == null) {
@@ -250,7 +268,7 @@ public sealed class SendGridClient : IDisposable {
 
             var path = descriptor.SourcePath;
             if (!string.IsNullOrWhiteSpace(path)) {
-                if (!seen.Add(path!)) {
+                if (!AttachmentPathIdentity.Add(seen, path!)) {
                     continue;
                 }
 
@@ -261,13 +279,11 @@ public sealed class SendGridClient : IDisposable {
                 }
             }
 
-            result.Add(CreateSendGridAttachment(descriptor));
+            result.Add(CreateSendGridAttachment(descriptor, inline));
         }
-
-        return result;
     }
 
-    private static SendGridAttachment CreateSendGridAttachment(AttachmentDescriptor descriptor) {
+    private static SendGridAttachment CreateSendGridAttachment(AttachmentDescriptor descriptor, bool inline) {
         if (descriptor is MimeEntityAttachmentDescriptor) {
             throw new ArgumentException("SendGrid attachments do not support MimeEntity descriptors.", nameof(descriptor));
         }
@@ -284,9 +300,16 @@ public sealed class SendGridClient : IDisposable {
             contentType = MimeTypes.GetMimeType(fileName);
         }
 
-        var disposition = descriptor.ContentDisposition?.Disposition ?? "attachment";
+        var disposition = inline
+            ? ContentDisposition.Inline
+            : descriptor.ContentDisposition?.Disposition ?? ContentDisposition.Attachment;
+        var contentId = descriptor.ContentId;
+        if (string.Equals(disposition, ContentDisposition.Inline, StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrWhiteSpace(contentId)) {
+            contentId = fileName;
+        }
         var bytes = descriptor.GetContentBytes();
-        return new SendGridAttachment(fileName, bytes, contentType, disposition, descriptor.ContentId);
+        return new SendGridAttachment(fileName, bytes, contentType, disposition, contentId);
     }
 
     /// <summary>
@@ -295,7 +318,7 @@ public sealed class SendGridClient : IDisposable {
     public void CreateMessage() {
         ThrowIfDisposed();
 
-        var attachments = ConvertAttachments(Attachments, LogCollector);
+        var attachments = ConvertAttachments(Attachments, InlineAttachments, LogCollector);
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 

@@ -18,4 +18,8 @@ public class GraphAttachmentPlaceHolder {
     public long FileSize { get; set; }
     /// <summary>Name of the file.</summary>
     public string FileName { get; set; } = string.Empty;
+    /// <summary>
+    /// Serialized file attachment payload used when the file is too small for an upload session.
+    /// </summary>
+    public string DirectAttachmentJson { get; set; } = string.Empty;
 }

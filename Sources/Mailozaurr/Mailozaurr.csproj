@@ -3,7 +3,7 @@
     <PropertyGroup>
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
-        <VersionPrefix>2.0.13</VersionPrefix>
+        <VersionPrefix>2.1.7</VersionPrefix>
         <OfficeIMOVersion>3.0.3</OfficeIMOVersion>
         <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
         <AssemblyName>Mailozaurr</AssemblyName>
@@ -111,6 +111,9 @@
     <ItemGroup>
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
             <_Parameter1>Mailozaurr.Tests</_Parameter1>
+        </AssemblyAttribute>
+        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+            <_Parameter1>Mailozaurr.PowerShell</_Parameter1>
         </AssemblyAttribute>
     </ItemGroup>
 </Project>

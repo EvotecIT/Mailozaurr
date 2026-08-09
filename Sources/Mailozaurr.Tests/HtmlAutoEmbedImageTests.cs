@@ -52,6 +52,43 @@ public class HtmlAutoEmbedImageTests {
     }
 
     [Fact]
+    public void Graph_CreateMessage_RebuildsAutoEmbeddedImagesIdempotentlyAndAcrossToggle() {
+        var tmp = Path.GetTempFileName();
+        File.WriteAllBytes(tmp, new byte[] { 1, 2, 3, 4 });
+        var originalHtml = $"<img src=\"{tmp}\">";
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "subject",
+            HTML = originalHtml,
+            ContentType = "HTML",
+            AutoEmbedImages = true
+        };
+
+        try {
+            graph.CreateMessage();
+            graph.CreateMessage();
+
+            var attachment = Assert.Single(graph.MessageContainer.Message.Attachments!);
+            Assert.True(attachment.IsInline);
+            Assert.Equal(Path.GetFileName(tmp), attachment.ContentId);
+            Assert.Equal(Convert.ToBase64String(new byte[] { 1, 2, 3, 4 }), attachment.ContentBytes);
+
+            graph.AutoEmbedImages = false;
+            graph.CreateMessage();
+            Assert.Equal(originalHtml, graph.HTML);
+            Assert.Null(graph.MessageContainer.Message.Attachments);
+
+            graph.AutoEmbedImages = true;
+            graph.CreateMessage();
+            Assert.Single(graph.MessageContainer.Message.Attachments!);
+            Assert.Contains("cid:" + Path.GetFileName(tmp), graph.HTML, StringComparison.Ordinal);
+        } finally {
+            File.Delete(tmp);
+        }
+    }
+
+    [Fact]
     public void Smtp_CreateMessage_EmbedsRemoteImages() {
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) {
             Content = new ByteArrayContent(new byte[] { 1, 2, 3 }) {

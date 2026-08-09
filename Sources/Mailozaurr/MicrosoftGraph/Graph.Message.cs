@@ -12,19 +12,7 @@ public partial class Graph {
     /// </summary>
     public void CreateMessage() {
         CreateAttachments();
-        if (AutoEmbedImages) {
-            var (html, paths) = HtmlUtils.ExtractLocalImagePaths(HTML);
-            HTML = html;
-            foreach (var p in paths) {
-                var att = GraphAttachment.FromFile(p);
-                att.IsInline = true;
-                att.ContentId = Path.GetFileName(p);
-                ConvertedAttachments.Add(att);
-                var size = EstimateAttachmentSize(att);
-                _inlineAttachmentSizeBytes += size;
-                TotalAttachmentSizeBytes += size;
-            }
-        }
+        PrepareAutoEmbeddedImages();
         if (From is null) {
             throw new InvalidOperationException("From address must be specified.");
         }
@@ -50,12 +38,6 @@ public partial class Graph {
             },
             SaveToSentItems = !DoNotSaveToSentItems
         };
-        if (_inlineAttachmentSizeBytes > GraphPayloadLimitBytes) {
-            throw new InvalidOperationException("In-memory attachments exceed the 4MB Graph payload limit. Use file path attachments or reduce attachment size.");
-        }
-        if (!IsLargerAttachment && TotalAttachmentSizeBytes > GraphPayloadLimitBytes && _fileAttachmentCount > 0) {
-            throw new InvalidOperationException("Total attachment payload exceeds the 4MB Graph limit after embedding images. Use file attachments or reduce attachment size.");
-        }
         if (ConvertedAttachments.Count > 0) {
             MessageContainer.Message.Attachments = ConvertedAttachments;
         }
@@ -64,7 +46,53 @@ public partial class Graph {
         }
 
         MessageJson = JsonSerializer.Serialize(MessageContainer, MailozaurrJsonContext.Default.GraphMessageContainer);
+        if (Encoding.UTF8.GetByteCount(MessageJson) > GraphPayloadLimitBytes) {
+            TryRouteConvertedFileAttachmentsThroughUploadSession();
+            TryRouteEligibleAttachments(() => Encoding.UTF8.GetByteCount(MessageJson) > GraphPayloadLimitBytes);
+            if (Encoding.UTF8.GetByteCount(MessageJson) > GraphPayloadLimitBytes) {
+                throw new InvalidOperationException("The complete serialized Graph request exceeds the 4MB payload limit after draft attachments were removed. Reduce the message body, recipients, or headers.");
+            }
+        }
         //LoggingMessages.Logger.WriteVerbose(MessageJson);
+    }
+
+    private void PrepareAutoEmbeddedImages() {
+        if (!AutoEmbedImages) {
+            if (_autoEmbedRenderedHtml != null &&
+                string.Equals(HTML, _autoEmbedRenderedHtml, StringComparison.Ordinal)) {
+                HTML = _autoEmbedOriginalHtml ?? HTML;
+            }
+            ClearAutoEmbeddedImageState();
+            return;
+        }
+
+        var sourceHtml = _autoEmbedRenderedHtml != null &&
+                         string.Equals(HTML, _autoEmbedRenderedHtml, StringComparison.Ordinal)
+            ? _autoEmbedOriginalHtml ?? HTML
+            : HTML;
+        var (renderedHtml, paths) = HtmlUtils.ExtractLocalImagePaths(sourceHtml);
+        _autoEmbedOriginalHtml = sourceHtml;
+        _autoEmbedRenderedHtml = renderedHtml;
+        _autoEmbeddedImagePaths.Clear();
+        _autoEmbeddedImagePaths.AddRange(paths);
+        HTML = renderedHtml;
+
+        foreach (var path in _autoEmbeddedImagePaths) {
+            var attachment = GraphAttachment.FromFile(path);
+            attachment.IsInline = true;
+            attachment.ContentId = Path.GetFileName(path);
+            ConvertedAttachments.Add(attachment);
+            var size = EstimateAttachmentSize(attachment);
+            _inlineAttachmentSizeBytes += size;
+            TotalAttachmentSizeBytes += size;
+            RawAttachmentSizeBytes += EstimateRawAttachmentSize(attachment);
+        }
+    }
+
+    private void ClearAutoEmbeddedImageState() {
+        _autoEmbedOriginalHtml = null;
+        _autoEmbedRenderedHtml = null;
+        _autoEmbeddedImagePaths.Clear();
     }
 
     /// <summary>

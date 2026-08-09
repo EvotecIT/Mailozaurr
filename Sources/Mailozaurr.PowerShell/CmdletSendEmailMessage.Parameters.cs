@@ -262,7 +262,11 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
     [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
+    [Parameter(Mandatory = false, ParameterSetName = "Graph")]
+    [Parameter(Mandatory = false, ParameterSetName = "MgGraphRequest")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
+    [Parameter(Mandatory = false, ParameterSetName = "SendGrid")]
+    [Parameter(Mandatory = false, ParameterSetName = "EmailProviders")]
     [Alias("InlineAttachments")]
     public object[]? InlineAttachment { get; set; }
 

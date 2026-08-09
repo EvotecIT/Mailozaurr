@@ -59,6 +59,32 @@ public class SmtpAttachmentTests {
     }
 
     [Fact]
+    public void CreateMessage_RelativeAndAbsoluteAttachmentPaths_AddsFileOnce() {
+        var fileName = $"mailozaurr-smtp-{System.Guid.NewGuid():N}.tmp";
+        var absolutePath = Path.Combine(System.Environment.CurrentDirectory, fileName);
+        File.WriteAllText(absolutePath, "data");
+        var smtp = new Smtp {
+            From = "a@b.com",
+            To = new object[] { "c@d.com" },
+            Subject = "test",
+            TextBody = "body",
+            Attachments = new List<AttachmentDescriptor> {
+                new FileAttachmentDescriptor(fileName),
+                new FileAttachmentDescriptor(absolutePath),
+            },
+        };
+
+        try {
+            smtp.CreateMessage();
+            var multipart = Assert.IsType<Multipart>(smtp.Message.Body);
+
+            Assert.Single(multipart.OfType<MimePart>(), part => part.IsAttachment);
+        } finally {
+            File.Delete(absolutePath);
+        }
+    }
+
+    [Fact]
     public void StreamAttachmentDescriptor_ClosedSourceRemainsReusable() {
         var bytes = Encoding.UTF8.GetBytes("repeatable");
         var source = new MemoryStream(bytes);

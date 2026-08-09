@@ -59,6 +59,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
     /// Process the record.
     /// </summary>
     protected override void ProcessRecord() {
+        ApplyContent();
         Attachment = FilterExistingPaths(Attachment, nameof(Attachment));
         InlineAttachment = FilterExistingPaths(InlineAttachment, nameof(InlineAttachment));
         var (fromEmailRaw, fromNameRaw) = Helpers.GetEmailAndName(From);
@@ -104,10 +105,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         if (Text != null) sendGrid.Text = string.Join("", Text);
         if (HTML != null) sendGrid.Html = string.Join("", HTML);
         sendGrid.Priority = Priority;
-        var sendGridAttachments = ConvertToAttachmentDescriptors(Attachment);
-        if (sendGridAttachments != null) {
-            sendGrid.Attachments = sendGridAttachments;
-        }
+        sendGrid.Attachments = AttachmentInputConverter.Convert(Attachment);
+        sendGrid.InlineAttachments = AttachmentInputConverter.Convert(InlineAttachment);
         if (Headers != null) sendGrid.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         sendGrid.SeparateTo = SeparateTo;
         sendGrid.ErrorAction = errorAction;
@@ -143,12 +142,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         mailgun.Subject = Subject ?? string.Empty;
         if (Text != null) mailgun.Text = string.Join("", Text);
         if (HTML != null) mailgun.Html = string.Join("", HTML);
-        if (Attachment != null) {
-            mailgun.Attachment = Attachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
-        }
-        if (InlineAttachment != null) {
-            mailgun.InlineAttachment = InlineAttachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
-        }
+        mailgun.Attachments = AttachmentInputConverter.Convert(Attachment);
+        mailgun.InlineAttachments = AttachmentInputConverter.Convert(InlineAttachment);
         if (Headers != null) mailgun.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         mailgun.ErrorAction = errorAction;
         mailgun.RetryCount = RetryCount;
@@ -182,12 +177,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         ses.Subject = Subject ?? string.Empty;
         if (Text != null) ses.Text = string.Join("", Text);
         if (HTML != null) ses.Html = string.Join("", HTML);
-        if (Attachment != null) {
-            ses.Attachment = Attachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
-        }
-        if (InlineAttachment != null) {
-            ses.InlineAttachment = InlineAttachment.Select(a => a?.ToString() ?? string.Empty).ToArray();
-        }
+        ses.Attachments = AttachmentInputConverter.Convert(Attachment);
+        ses.InlineAttachments = AttachmentInputConverter.Convert(InlineAttachment);
         if (Headers != null) ses.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         ses.ErrorAction = errorAction;
         ses.RetryCount = RetryCount;
@@ -220,8 +211,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         smtp.Subject = Subject ?? string.Empty;
         if (Text != null) smtp.TextBody = string.Join("", Text);
         if (HTML != null) smtp.HtmlBody = string.Join("", HTML);
-        smtp.Attachments = ConvertToAttachmentDescriptors(Attachment);
-        smtp.InlineAttachments = ConvertToAttachmentDescriptors(InlineAttachment);
+        smtp.Attachments = AttachmentInputConverter.Convert(Attachment);
+        smtp.InlineAttachments = AttachmentInputConverter.Convert(InlineAttachment);
         smtp.Priority = Priority;
         if (Headers != null) smtp.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         smtp.CreateMessage(CancellationToken.None);
@@ -256,6 +247,17 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         }
     }
 
+    private void ApplyGraphBody(Graph graph) {
+        if (HTML != null) {
+            graph.HTML = string.Join("", HTML);
+            graph.ContentType = "HTML";
+            return;
+        }
+
+        graph.HTML = string.Join("", Text ?? Array.Empty<string>());
+        graph.ContentType = "Text";
+    }
+
     private void ProcessGraph(string fromEmail, string fromName) {
         if (Credential == null) {
             throw new InvalidOperationException("Credential is required for Graph processing.");
@@ -277,9 +279,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         graph.RetryAlways = RetryAlways.IsPresent;
         graph.RequestReadReceipt = RequestReadReceipt;
         graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
-        graph.HTML = string.Join("", HTML ?? Array.Empty<string>());
-        graph.ContentType = "HTML";
-        graph.Attachments = Attachment;
+        ApplyGraphBody(graph);
+        graph.Attachments = MergeGraphAttachments(Attachment, InlineAttachment);
         if (Headers != null) graph.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         // Apply optional Graph policy without introducing new cmdlets
         var applyPolicy = MailozaurrOptions.DefaultGraphPolicy != null
@@ -312,7 +313,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
             graph.WithSendPolicy(p);
         }
         graph.CreateAttachments();
-        long graphSize = graph.TotalAttachmentSizeBytes;
+        long graphSize = graph.RawAttachmentSizeBytes;
         if (graphSize > GraphAttachmentLimitBytes) {
             WriteError(new ErrorRecord(
                 new ArgumentException("Attachments exceed Graph limit of 150MB."),
@@ -380,12 +381,11 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         graph.RetryDelayBackoff = RetryDelayBackoff;
         graph.RequestReadReceipt = RequestReadReceipt;
         graph.RequestDeliveryReceipt = RequestDeliveryReceipt;
-        graph.HTML = string.Join("", HTML ?? Array.Empty<string>());
-        graph.ContentType = "HTML";
-        graph.Attachments = Attachment;
+        ApplyGraphBody(graph);
+        graph.Attachments = MergeGraphAttachments(Attachment, InlineAttachment);
         if (Headers != null) graph.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         graph.CreateAttachments();
-        long size = graph.TotalAttachmentSizeBytes;
+        long size = graph.RawAttachmentSizeBytes;
         if (size > GraphAttachmentLimitBytes) {
             WriteError(new ErrorRecord(
                 new ArgumentException("Attachments exceed Graph limit of 150MB."),
@@ -395,6 +395,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
             LogEmitter.EmitLogs(graph.LogCollector, this);
             return;
         }
+        // Finalize serialized routing before choosing simple send versus draft.
+        // CreateMessage may move file attachments out of an oversized complete request.
+        graph.CreateMessage();
         if (!ShouldProcess(graph.SentTo, "Sending email message via Graph (MgGraphRequest)")) {
             LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
             if (!Suppress) {
@@ -404,7 +407,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
             return;
         }
         if (graph.IsLargerAttachment) {
-            var json = graph.CreateDraftForMg();
+            var json = graph.CreatePreparedDraft();
             var draftMessageId = InvokeMgGraphRequestPOST1($"v1.0/users/{graph.SentFrom}/mailfolders/drafts/messages", EmailAction.SendDraftMessage, json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
             if (draftMessageId == string.Empty) {
                 LogEmitter.EmitLogs(graph.LogCollector, this);
@@ -412,6 +415,15 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
             }
             await graph.PrepareAttachments();
             foreach (var attachment in graph.AttachmentsPlaceHolders) {
+                if (!string.IsNullOrEmpty(attachment.DirectAttachmentJson)) {
+                    var attachmentUri = GraphDraftMessageUris.Attachments(graph.SentFrom, draftMessageId);
+                    if (!InvokeMgGraphRequestAttachmentPOST(attachmentUri, attachment.DirectAttachmentJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed)) {
+                        LogEmitter.EmitLogs(graph.LogCollector, this);
+                        return;
+                    }
+                    continue;
+                }
+
                 var uploadSessionUri = GraphDraftMessageUris.CreateUploadSession(graph.SentFrom, draftMessageId);
                 var uploadUrl = InvokeMgGraphRequestPOST(uploadSessionUri, EmailAction.SendAttachment, attachment.Json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
                 if (uploadUrl != string.Empty) {
@@ -430,7 +442,6 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
             InvokeMgGraphRequest(sendUri, EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
             LogEmitter.EmitLogs(graph.LogCollector, this);
         } else {
-            graph.CreateMessage();
             InvokeMgGraphRequest($"v1.0/users/{fromEmail}/sendMail", EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
             LogEmitter.EmitLogs(graph.LogCollector, this);
         }
@@ -464,8 +475,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         if (HTML != null) smtpClient.HtmlBody = string.Join("", HTML);
         if (Text != null) smtpClient.TextBody = string.Join("", Text);
 
-        smtpClient.Attachments = ConvertToAttachmentDescriptors(Attachment);
-        smtpClient.InlineAttachments = ConvertToAttachmentDescriptors(InlineAttachment);
+        smtpClient.Attachments = AttachmentInputConverter.Convert(Attachment);
+        smtpClient.InlineAttachments = AttachmentInputConverter.Convert(InlineAttachment);
         if (Headers != null) smtpClient.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         smtpClient.Timeout = Timeout;
 
@@ -741,6 +752,33 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         return "";
     }
 
+    private bool InvokeMgGraphRequestAttachmentPOST(string uri, string jsonBody, string sentFrom, string sentTo, TimeSpan elapsed) {
+        var parameters = new Hashtable {
+            { "Method", "POST" },
+            { "Uri", uri },
+            { "ContentType", "application/json; charset=UTF-8"},
+            { "Body", jsonBody }
+        };
+        using var powerShell = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
+        powerShell.AddCommand("Invoke-MgGraphRequest");
+        powerShell.AddParameters(parameters);
+        try {
+            powerShell.Invoke();
+            return true;
+        } catch (RuntimeException ex) {
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error while adding a Graph draft attachment (MgGraphRequest): {ex.Message}");
+            if (errorAction == ActionPreference.Stop) {
+                throw;
+            }
+            if (!Suppress) {
+                WriteObject(new SmtpResult(false, EmailAction.SendAttachment, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
+                    GraphError = GraphApiErrorParser.Parse(ex.Message)
+                });
+            }
+            return false;
+        }
+    }
+
     private static bool TryGetPowerShellResultValue(PSObject result, string propertyName, out string value) {
         value = string.Empty;
         if (result.BaseObject is IDictionary dictionary) {
@@ -752,21 +790,15 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         return !string.IsNullOrEmpty(value);
     }
 
-    private static List<AttachmentDescriptor>? ConvertToAttachmentDescriptors(object[]? attachments) {
-        if (attachments == null) {
-            return null;
+    private static object[]? MergeGraphAttachments(object[]? attachments, object[]? inlineAttachments) {
+        var merged = attachments?.Where(item => item != null).ToList() ?? new List<object>();
+        var inline = AttachmentInputConverter.Convert(inlineAttachments);
+        if (inline != null) {
+            foreach (var descriptor in inline) {
+                merged.Add(GraphAttachment.PrepareInlineDescriptor(descriptor));
+            }
         }
-
-        return attachments
-            .Where(entry => entry != null)
-            .Select(entry => entry!)
-            .Select(entry => entry switch {
-                AttachmentDescriptor descriptor => descriptor,
-                string path => new FileAttachmentDescriptor(path),
-                FileInfo fileInfo => new FileAttachmentDescriptor(fileInfo.FullName),
-                _ => throw new ArgumentException($"Unsupported attachment type: {entry.GetType().Name}")
-            })
-            .ToList();
+        return merged.Count == 0 ? null : merged.ToArray();
     }
 
     private object[]? FilterExistingPaths(object[]? paths, string parameterName) {
@@ -777,11 +809,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         List<object> valid = new();
 
         foreach (var item in paths) {
-            string? path = item switch {
-                string s => s,
-                FileInfo fi => fi.FullName,
-                _ => null
-            };
+            string? path = AttachmentInputConverter.GetPath(item);
 
             if (path != null) {
                 if (path.IndexOfAny(new[] { '*', '?' }) >= 0) {

@@ -25201,6 +25201,19 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="EmailContent,RenderResult">
+          <maml:name>Content</maml:name>
+          <maml:description>
+            <maml:para>Specifies transport-neutral content created by Mailozaurr or returned by a compatible renderer.</maml:para>
+            <maml:para>Explicit Subject, HTML, Text, Headers, Attachment, and InlineAttachment parameters override or extend this content.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>DeliveryNotificationOption</maml:name>
           <maml:description>
@@ -25777,6 +25790,717 @@ StartTls to be used automatically.</maml:para>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
       </command:syntaxItem>
+      <command:syntaxItem parameterSetName="DefaultCredentials">
+        <maml:name>Send-EmailMessage</maml:name>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="Attachments">
+          <maml:name>Attachment</maml:name>
+          <maml:description>
+            <maml:para>Specifies file paths to attach to the email message. Alias: Attachments.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object[]</command:parameterValue>
+          <dev:type>
+            <maml:name>Object[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Bcc</maml:name>
+          <maml:description>
+            <maml:para>Specifies the email addresses that receive a blind carbon copy (BCC) of the email message.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object[]</command:parameterValue>
+          <dev:type>
+            <maml:name>Object[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Cc</maml:name>
+          <maml:description>
+            <maml:para>Specifies the email addresses to which a carbon copy (CC) of the email message is sent.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object[]</command:parameterValue>
+          <dev:type>
+            <maml:name>Object[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Certificate</maml:name>
+          <maml:description>
+            <maml:para>Provides a certificate object used for S/MIME operations.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">X509Certificate2</command:parameterValue>
+          <dev:type>
+            <maml:name>X509Certificate2</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CertificatePassword</maml:name>
+          <maml:description>
+            <maml:para>Specifies the password for the certificate used in signing or encrypting the email.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CertificatePasswordAsSecureString</maml:name>
+          <maml:description>
+            <maml:para>Indicates that the certificate password is provided as a SecureString.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Boolean</command:parameterValue>
+          <dev:type>
+            <maml:name>Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CertificatePath</maml:name>
+          <maml:description>
+            <maml:para>Specifies the path to the certificate used for signing or encrypting the email.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CertificateThumbprint</maml:name>
+          <maml:description>
+            <maml:para>Specifies the thumbprint of the certificate used for signing or encrypting the email.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>ConnectionPoolSize</maml:name>
+          <maml:description>
+            <maml:para>Maximum number of connections to keep in the pool.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="EmailContent,RenderResult">
+          <maml:name>Content</maml:name>
+          <maml:description>
+            <maml:para>Specifies transport-neutral content created by Mailozaurr or returned by a compatible renderer.</maml:para>
+            <maml:para>Explicit Subject, HTML, Text, Headers, Attachment, and InlineAttachment parameters override or extend this content.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>DeliveryNotificationOption</maml:name>
+          <maml:description>
+            <maml:para>Specifies the delivery notification options for the email message. Multiple options can be chosen.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">DeliveryNotification[]</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">None</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Delay</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Never</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OnFailure</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">OnSuccess</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>DeliveryNotification[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>DeliveryStatusNotificationType</maml:name>
+          <maml:description>
+            <maml:para>Specifies the delivery status notification type. Options are Full, HeadersOnly, Unspecified.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">DeliveryStatusNotificationType</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Unspecified</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Full</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">HeadersOnly</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>DeliveryStatusNotificationType</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Encoding</maml:name>
+          <maml:description>
+            <maml:para>Specifies the encoding for the email message. Recommended to leave as default.</maml:para>
+            <maml:para>Acceptable values: ASCII, BigEndianUnicode, Default, Unicode, UTF32, UTF7, UTF8.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">ASCII</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">BigEndianUnicode</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Default</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Unicode</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">UTF32</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">UTF7</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">UTF8</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>From</maml:name>
+          <maml:description>
+            <maml:para>Specifies the sender's email address. Can be a string or a hashtable with Name and Email keys.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Headers</maml:name>
+          <maml:description>
+            <maml:para>Custom message headers to include with the email.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Hashtable</command:parameterValue>
+          <dev:type>
+            <maml:name>Hashtable</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="Body,HtmlBody">
+          <maml:name>HTML</maml:name>
+          <maml:description>
+            <maml:para>Specifies the HTML body of the email message. Use for rich content emails. Alias: Body, HtmlBody.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+          <dev:type>
+            <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="InlineAttachments">
+          <maml:name>InlineAttachment</maml:name>
+          <maml:description>
+            <maml:para>Specifies inline attachments for the email message.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object[]</command:parameterValue>
+          <dev:type>
+            <maml:name>Object[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>JitterMilliseconds</maml:name>
+          <maml:description>
+            <maml:para>Jitter window in milliseconds added to each retry delay. 0 disables jitter. Applies to all providers.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>LocalDomain</maml:name>
+          <maml:description>
+            <maml:para>Specifies the local domain name for the SMTP client.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>LogClientPrefix</maml:name>
+          <maml:description>
+            <maml:para>Sets the log prefix for the client.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>LogConsole</maml:name>
+          <maml:description>
+            <maml:para>Enables logging of communication with the server to the console.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>LogObject</maml:name>
+          <maml:description>
+            <maml:para>Enables logging of communication with the server to an object as a message property.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>LogOverwrite</maml:name>
+          <maml:description>
+            <maml:para>Overwrites the existing log file when using -LogPath.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>LogPath</maml:name>
+          <maml:description>
+            <maml:para>Specifies the path to save the communication log with the server.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>LogSecrets</maml:name>
+          <maml:description>
+            <maml:para>Includes secrets in the log output.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>LogServerPrefix</maml:name>
+          <maml:description>
+            <maml:para>Sets the log prefix for the server.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>LogTimestamps</maml:name>
+          <maml:description>
+            <maml:para>Enables timestamps in the log output.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>LogTimeStampsFormat</maml:name>
+          <maml:description>
+            <maml:para>Specifies the format for timestamps in the log file.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaxDelayMilliseconds</maml:name>
+          <maml:description>
+            <maml:para>Maximum delay in milliseconds between retries. 0 disables capping. Applies to all providers.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MimeMessagePath</maml:name>
+          <maml:description>
+            <maml:para>Saves the email message to a file for troubleshooting purposes.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Port</maml:name>
+          <maml:description>
+            <maml:para>Specifies the port to use on the SMTP server. The default is 587.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="Importance">
+          <maml:name>Priority</maml:name>
+          <maml:description>
+            <maml:para>Specifies the priority of the email message. Acceptable values are Normal, High, and Low.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">MessagePriority</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">High</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Low</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Normal</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>MessagePriority</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>PrivateKeyPassword</maml:name>
+          <maml:description>
+            <maml:para>Password for the private key when required.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>PrivateKeyPasswordAsSecureString</maml:name>
+          <maml:description>
+            <maml:para>Indicates that PrivateKeyPassword is provided as a secure string.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Boolean</command:parameterValue>
+          <dev:type>
+            <maml:name>Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>PrivateKeyPath</maml:name>
+          <maml:description>
+            <maml:para>Path to the sender's private key used for PGP signing.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>PublicKeyPath</maml:name>
+          <maml:description>
+            <maml:para>Path to the recipient's public key used for PGP operations.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>ReplyTo</maml:name>
+          <maml:description>
+            <maml:para>Specifies the reply-to address for the email. If not set, defaults to the From address.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>RetryAlways</maml:name>
+          <maml:description>
+            <maml:para>When specified, retries are attempted regardless of the error&#xD;
+type. Without this switch, only transient errors are retried.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>RetryCount</maml:name>
+          <maml:description>
+            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries).</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>RetryDelayBackoff</maml:name>
+          <maml:description>
+            <maml:para>Multiplicative backoff applied to the retry delay. Value of 1 disables backoff.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Double</command:parameterValue>
+          <dev:type>
+            <maml:name>Double</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>RetryDelayMilliseconds</maml:name>
+          <maml:description>
+            <maml:para>Delay in milliseconds between retry attempts.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SecureSocketOptions</maml:name>
+          <maml:description>
+            <maml:para>Specifies the secure socket options for SMTP connection. Options: None, Auto, StartTls, StartTlsWhenAvailable, SslOnConnect. Default is Auto.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SecureSocketOptions</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">None</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Auto</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SslOnConnect</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">StartTls</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">StartTlsWhenAvailable</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>SecureSocketOptions</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SentLogPath</maml:name>
+          <maml:description>
+            <maml:para>Specifies the path used to persist sent message metadata (opt-in).</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="SmtpServer">
+          <maml:name>Server</maml:name>
+          <maml:description>
+            <maml:para>Specifies the SMTP server to use for sending the email message. Required for SMTP scenarios.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SignOrEncrypt</maml:name>
+          <maml:description>
+            <maml:para>Specifies whether to sign or encrypt the email message. Requires certificate parameters.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">EmailActionEncryption</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">None</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SMIMESign</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SMIMESignPkcs7</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SMIMEEncrypt</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">SMIMESignAndEncrypt</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PGPSign</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PGPEncrypt</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">PGPSignAndEncrypt</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>EmailActionEncryption</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SkipCertificateRevocation</maml:name>
+          <maml:description>
+            <maml:para>Skips certificate revocation check during SMTP connection.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="SkipCertificateValidatation">
+          <maml:name>SkipCertificateValidation</maml:name>
+          <maml:description>
+            <maml:para>Skips certificate validation. Useful for self-signed certificates or IP-based SMTP servers.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Subject</maml:name>
+          <maml:description>
+            <maml:para>Specifies the subject of the email message.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Suppress</maml:name>
+          <maml:description>
+            <maml:para>Suppresses output of the summary object.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="TextBody">
+          <maml:name>Text</maml:name>
+          <maml:description>
+            <maml:para>Specifies the plain text body of the email message. Alias: TextBody.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+          <dev:type>
+            <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Timeout</maml:name>
+          <maml:description>
+            <maml:para>Specifies the maximum time (in milliseconds) to wait for the SMTP operation to complete. Default is 12000.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>To</maml:name>
+          <maml:description>
+            <maml:para>Specifies the recipient email addresses. Accepts a single address or an array of addresses.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object[]</command:parameterValue>
+          <dev:type>
+            <maml:name>Object[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>UseConnectionPool</maml:name>
+          <maml:description>
+            <maml:para>Enables reuse of SMTP connections via a connection pool.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>UseDefaultCredentials</maml:name>
+          <maml:description>
+            <maml:para>Enables the use of default credentials for SMTP authentication.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Boolean</command:parameterValue>
+          <dev:type>
+            <maml:name>Boolean</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>UseSsl</maml:name>
+          <maml:description>
+            <maml:para>Enables the use of SSL/TLS for the SMTP connection. If&#xD;
+SecureSocketOptions remains Auto, this switch causes&#xD;
+StartTls to be used automatically.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
       <command:syntaxItem parameterSetName="SecureString">
         <maml:name>Send-EmailMessage</maml:name>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
@@ -25912,6 +26636,19 @@ StartTls to be used automatically.</maml:para>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
             <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="EmailContent,RenderResult">
+          <maml:name>Content</maml:name>
+          <maml:description>
+            <maml:para>Specifies transport-neutral content created by Mailozaurr or returned by a compatible renderer.</maml:para>
+            <maml:para>Explicit Subject, HTML, Text, Headers, Attachment, and InlineAttachment parameters override or extend this content.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -26626,6 +27363,19 @@ StartTls to be used automatically.</maml:para>
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="EmailContent,RenderResult">
+          <maml:name>Content</maml:name>
+          <maml:description>
+            <maml:para>Specifies transport-neutral content created by Mailozaurr or returned by a compatible renderer.</maml:para>
+            <maml:para>Explicit Subject, HTML, Text, Headers, Attachment, and InlineAttachment parameters override or extend this content.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Credential</maml:name>
           <maml:description>
@@ -27226,704 +27976,6 @@ StartTls to be used automatically.</maml:para>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
       </command:syntaxItem>
-      <command:syntaxItem parameterSetName="DefaultCredentials">
-        <maml:name>Send-EmailMessage</maml:name>
-        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="Attachments">
-          <maml:name>Attachment</maml:name>
-          <maml:description>
-            <maml:para>Specifies file paths to attach to the email message. Alias: Attachments.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">Object[]</command:parameterValue>
-          <dev:type>
-            <maml:name>Object[]</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>Bcc</maml:name>
-          <maml:description>
-            <maml:para>Specifies the email addresses that receive a blind carbon copy (BCC) of the email message.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">Object[]</command:parameterValue>
-          <dev:type>
-            <maml:name>Object[]</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>Cc</maml:name>
-          <maml:description>
-            <maml:para>Specifies the email addresses to which a carbon copy (CC) of the email message is sent.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">Object[]</command:parameterValue>
-          <dev:type>
-            <maml:name>Object[]</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>Certificate</maml:name>
-          <maml:description>
-            <maml:para>Provides a certificate object used for S/MIME operations.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">X509Certificate2</command:parameterValue>
-          <dev:type>
-            <maml:name>X509Certificate2</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>CertificatePassword</maml:name>
-          <maml:description>
-            <maml:para>Specifies the password for the certificate used in signing or encrypting the email.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
-          <dev:type>
-            <maml:name>String</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>CertificatePasswordAsSecureString</maml:name>
-          <maml:description>
-            <maml:para>Indicates that the certificate password is provided as a SecureString.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">Boolean</command:parameterValue>
-          <dev:type>
-            <maml:name>Boolean</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>CertificatePath</maml:name>
-          <maml:description>
-            <maml:para>Specifies the path to the certificate used for signing or encrypting the email.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
-          <dev:type>
-            <maml:name>String</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>CertificateThumbprint</maml:name>
-          <maml:description>
-            <maml:para>Specifies the thumbprint of the certificate used for signing or encrypting the email.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
-          <dev:type>
-            <maml:name>String</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>ConnectionPoolSize</maml:name>
-          <maml:description>
-            <maml:para>Maximum number of connections to keep in the pool.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
-          <dev:type>
-            <maml:name>Int32</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>DeliveryNotificationOption</maml:name>
-          <maml:description>
-            <maml:para>Specifies the delivery notification options for the email message. Multiple options can be chosen.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">DeliveryNotification[]</command:parameterValue>
-          <command:parameterValueGroup>
-            <command:parameterValue required="false" variableLength="false">None</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">Delay</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">Never</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">OnFailure</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">OnSuccess</command:parameterValue>
-          </command:parameterValueGroup>
-          <dev:type>
-            <maml:name>DeliveryNotification[]</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>DeliveryStatusNotificationType</maml:name>
-          <maml:description>
-            <maml:para>Specifies the delivery status notification type. Options are Full, HeadersOnly, Unspecified.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">DeliveryStatusNotificationType</command:parameterValue>
-          <command:parameterValueGroup>
-            <command:parameterValue required="false" variableLength="false">Unspecified</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">Full</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">HeadersOnly</command:parameterValue>
-          </command:parameterValueGroup>
-          <dev:type>
-            <maml:name>DeliveryStatusNotificationType</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>Encoding</maml:name>
-          <maml:description>
-            <maml:para>Specifies the encoding for the email message. Recommended to leave as default.</maml:para>
-            <maml:para>Acceptable values: ASCII, BigEndianUnicode, Default, Unicode, UTF32, UTF7, UTF8.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
-          <command:parameterValueGroup>
-            <command:parameterValue required="false" variableLength="false">ASCII</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">BigEndianUnicode</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">Default</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">Unicode</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">UTF32</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">UTF7</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">UTF8</command:parameterValue>
-          </command:parameterValueGroup>
-          <dev:type>
-            <maml:name>String</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>From</maml:name>
-          <maml:description>
-            <maml:para>Specifies the sender's email address. Can be a string or a hashtable with Name and Email keys.</maml:para>
-          </maml:description>
-          <command:parameterValue required="true" variableLength="false">Object</command:parameterValue>
-          <dev:type>
-            <maml:name>Object</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>Headers</maml:name>
-          <maml:description>
-            <maml:para>Custom message headers to include with the email.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">Hashtable</command:parameterValue>
-          <dev:type>
-            <maml:name>Hashtable</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="Body,HtmlBody">
-          <maml:name>HTML</maml:name>
-          <maml:description>
-            <maml:para>Specifies the HTML body of the email message. Use for rich content emails. Alias: Body, HtmlBody.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
-          <dev:type>
-            <maml:name>String[]</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="InlineAttachments">
-          <maml:name>InlineAttachment</maml:name>
-          <maml:description>
-            <maml:para>Specifies inline attachments for the email message.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">Object[]</command:parameterValue>
-          <dev:type>
-            <maml:name>Object[]</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>JitterMilliseconds</maml:name>
-          <maml:description>
-            <maml:para>Jitter window in milliseconds added to each retry delay. 0 disables jitter. Applies to all providers.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
-          <dev:type>
-            <maml:name>Int32</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>LocalDomain</maml:name>
-          <maml:description>
-            <maml:para>Specifies the local domain name for the SMTP client.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
-          <dev:type>
-            <maml:name>String</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>LogClientPrefix</maml:name>
-          <maml:description>
-            <maml:para>Sets the log prefix for the client.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
-          <dev:type>
-            <maml:name>String</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>LogConsole</maml:name>
-          <maml:description>
-            <maml:para>Enables logging of communication with the server to the console.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
-          <dev:type>
-            <maml:name>SwitchParameter</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>LogObject</maml:name>
-          <maml:description>
-            <maml:para>Enables logging of communication with the server to an object as a message property.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
-          <dev:type>
-            <maml:name>SwitchParameter</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>LogOverwrite</maml:name>
-          <maml:description>
-            <maml:para>Overwrites the existing log file when using -LogPath.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
-          <dev:type>
-            <maml:name>SwitchParameter</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>LogPath</maml:name>
-          <maml:description>
-            <maml:para>Specifies the path to save the communication log with the server.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
-          <dev:type>
-            <maml:name>String</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>LogSecrets</maml:name>
-          <maml:description>
-            <maml:para>Includes secrets in the log output.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
-          <dev:type>
-            <maml:name>SwitchParameter</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>LogServerPrefix</maml:name>
-          <maml:description>
-            <maml:para>Sets the log prefix for the server.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
-          <dev:type>
-            <maml:name>String</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>LogTimestamps</maml:name>
-          <maml:description>
-            <maml:para>Enables timestamps in the log output.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
-          <dev:type>
-            <maml:name>SwitchParameter</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>LogTimeStampsFormat</maml:name>
-          <maml:description>
-            <maml:para>Specifies the format for timestamps in the log file.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
-          <dev:type>
-            <maml:name>String</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>MaxDelayMilliseconds</maml:name>
-          <maml:description>
-            <maml:para>Maximum delay in milliseconds between retries. 0 disables capping. Applies to all providers.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
-          <dev:type>
-            <maml:name>Int32</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>MimeMessagePath</maml:name>
-          <maml:description>
-            <maml:para>Saves the email message to a file for troubleshooting purposes.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
-          <dev:type>
-            <maml:name>String</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>Port</maml:name>
-          <maml:description>
-            <maml:para>Specifies the port to use on the SMTP server. The default is 587.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
-          <dev:type>
-            <maml:name>Int32</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="Importance">
-          <maml:name>Priority</maml:name>
-          <maml:description>
-            <maml:para>Specifies the priority of the email message. Acceptable values are Normal, High, and Low.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">MessagePriority</command:parameterValue>
-          <command:parameterValueGroup>
-            <command:parameterValue required="false" variableLength="false">High</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">Low</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">Normal</command:parameterValue>
-          </command:parameterValueGroup>
-          <dev:type>
-            <maml:name>MessagePriority</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>PrivateKeyPassword</maml:name>
-          <maml:description>
-            <maml:para>Password for the private key when required.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
-          <dev:type>
-            <maml:name>String</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>PrivateKeyPasswordAsSecureString</maml:name>
-          <maml:description>
-            <maml:para>Indicates that PrivateKeyPassword is provided as a secure string.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">Boolean</command:parameterValue>
-          <dev:type>
-            <maml:name>Boolean</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>PrivateKeyPath</maml:name>
-          <maml:description>
-            <maml:para>Path to the sender's private key used for PGP signing.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
-          <dev:type>
-            <maml:name>String</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>PublicKeyPath</maml:name>
-          <maml:description>
-            <maml:para>Path to the recipient's public key used for PGP operations.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
-          <dev:type>
-            <maml:name>String</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>ReplyTo</maml:name>
-          <maml:description>
-            <maml:para>Specifies the reply-to address for the email. If not set, defaults to the From address.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
-          <dev:type>
-            <maml:name>String</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>RetryAlways</maml:name>
-          <maml:description>
-            <maml:para>When specified, retries are attempted regardless of the error&#xD;
-type. Without this switch, only transient errors are retried.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
-          <dev:type>
-            <maml:name>SwitchParameter</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>RetryCount</maml:name>
-          <maml:description>
-            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries).</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
-          <dev:type>
-            <maml:name>Int32</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>RetryDelayBackoff</maml:name>
-          <maml:description>
-            <maml:para>Multiplicative backoff applied to the retry delay. Value of 1 disables backoff.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">Double</command:parameterValue>
-          <dev:type>
-            <maml:name>Double</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>RetryDelayMilliseconds</maml:name>
-          <maml:description>
-            <maml:para>Delay in milliseconds between retry attempts.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
-          <dev:type>
-            <maml:name>Int32</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>SecureSocketOptions</maml:name>
-          <maml:description>
-            <maml:para>Specifies the secure socket options for SMTP connection. Options: None, Auto, StartTls, StartTlsWhenAvailable, SslOnConnect. Default is Auto.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">SecureSocketOptions</command:parameterValue>
-          <command:parameterValueGroup>
-            <command:parameterValue required="false" variableLength="false">None</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">Auto</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">SslOnConnect</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">StartTls</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">StartTlsWhenAvailable</command:parameterValue>
-          </command:parameterValueGroup>
-          <dev:type>
-            <maml:name>SecureSocketOptions</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>SentLogPath</maml:name>
-          <maml:description>
-            <maml:para>Specifies the path used to persist sent message metadata (opt-in).</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
-          <dev:type>
-            <maml:name>String</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="SmtpServer">
-          <maml:name>Server</maml:name>
-          <maml:description>
-            <maml:para>Specifies the SMTP server to use for sending the email message. Required for SMTP scenarios.</maml:para>
-          </maml:description>
-          <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
-          <dev:type>
-            <maml:name>String</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>SignOrEncrypt</maml:name>
-          <maml:description>
-            <maml:para>Specifies whether to sign or encrypt the email message. Requires certificate parameters.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">EmailActionEncryption</command:parameterValue>
-          <command:parameterValueGroup>
-            <command:parameterValue required="false" variableLength="false">None</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">SMIMESign</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">SMIMESignPkcs7</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">SMIMEEncrypt</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">SMIMESignAndEncrypt</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">PGPSign</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">PGPEncrypt</command:parameterValue>
-            <command:parameterValue required="false" variableLength="false">PGPSignAndEncrypt</command:parameterValue>
-          </command:parameterValueGroup>
-          <dev:type>
-            <maml:name>EmailActionEncryption</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>SkipCertificateRevocation</maml:name>
-          <maml:description>
-            <maml:para>Skips certificate revocation check during SMTP connection.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
-          <dev:type>
-            <maml:name>SwitchParameter</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="SkipCertificateValidatation">
-          <maml:name>SkipCertificateValidation</maml:name>
-          <maml:description>
-            <maml:para>Skips certificate validation. Useful for self-signed certificates or IP-based SMTP servers.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
-          <dev:type>
-            <maml:name>SwitchParameter</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>Subject</maml:name>
-          <maml:description>
-            <maml:para>Specifies the subject of the email message.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
-          <dev:type>
-            <maml:name>String</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>Suppress</maml:name>
-          <maml:description>
-            <maml:para>Suppresses output of the summary object.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
-          <dev:type>
-            <maml:name>SwitchParameter</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="TextBody">
-          <maml:name>Text</maml:name>
-          <maml:description>
-            <maml:para>Specifies the plain text body of the email message. Alias: TextBody.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
-          <dev:type>
-            <maml:name>String[]</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>Timeout</maml:name>
-          <maml:description>
-            <maml:para>Specifies the maximum time (in milliseconds) to wait for the SMTP operation to complete. Default is 12000.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
-          <dev:type>
-            <maml:name>Int32</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>To</maml:name>
-          <maml:description>
-            <maml:para>Specifies the recipient email addresses. Accepts a single address or an array of addresses.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">Object[]</command:parameterValue>
-          <dev:type>
-            <maml:name>Object[]</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>UseConnectionPool</maml:name>
-          <maml:description>
-            <maml:para>Enables reuse of SMTP connections via a connection pool.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
-          <dev:type>
-            <maml:name>SwitchParameter</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>UseDefaultCredentials</maml:name>
-          <maml:description>
-            <maml:para>Enables the use of default credentials for SMTP authentication.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">Boolean</command:parameterValue>
-          <dev:type>
-            <maml:name>Boolean</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
-          <maml:name>UseSsl</maml:name>
-          <maml:description>
-            <maml:para>Enables the use of SSL/TLS for the SMTP connection. If&#xD;
-SecureSocketOptions remains Auto, this switch causes&#xD;
-StartTls to be used automatically.</maml:para>
-          </maml:description>
-          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
-          <dev:type>
-            <maml:name>SwitchParameter</maml:name>
-            <maml:uri />
-          </dev:type>
-          <dev:defaultValue>None</dev:defaultValue>
-        </command:parameter>
-      </command:syntaxItem>
       <command:syntaxItem parameterSetName="Graph">
         <maml:name>Send-EmailMessage</maml:name>
         <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="Attachments">
@@ -27982,6 +28034,19 @@ StartTls to be used automatically.</maml:para>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
             <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="EmailContent,RenderResult">
+          <maml:name>Content</maml:name>
+          <maml:description>
+            <maml:para>Specifies transport-neutral content created by Mailozaurr or returned by a compatible renderer.</maml:para>
+            <maml:para>Explicit Subject, HTML, Text, Headers, Attachment, and InlineAttachment parameters override or extend this content.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -28078,6 +28143,18 @@ StartTls to be used automatically.</maml:para>
           <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
           <dev:type>
             <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="InlineAttachments">
+          <maml:name>InlineAttachment</maml:name>
+          <maml:description>
+            <maml:para>Specifies inline attachments for the email message.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object[]</command:parameterValue>
+          <dev:type>
+            <maml:name>Object[]</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -28451,6 +28528,19 @@ type. Without this switch, only transient errors are retried.</maml:para>
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="EmailContent,RenderResult">
+          <maml:name>Content</maml:name>
+          <maml:description>
+            <maml:para>Specifies transport-neutral content created by Mailozaurr or returned by a compatible renderer.</maml:para>
+            <maml:para>Explicit Subject, HTML, Text, Headers, Attachment, and InlineAttachment parameters override or extend this content.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>DoNotSaveToSentItems</maml:name>
           <maml:description>
@@ -28519,6 +28609,18 @@ type. Without this switch, only transient errors are retried.</maml:para>
           <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
           <dev:type>
             <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="InlineAttachments">
+          <maml:name>InlineAttachment</maml:name>
+          <maml:description>
+            <maml:para>Specifies inline attachments for the email message.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object[]</command:parameterValue>
+          <dev:type>
+            <maml:name>Object[]</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -28892,6 +28994,19 @@ type. Without this switch, only transient errors are retried.</maml:para>
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="EmailContent,RenderResult">
+          <maml:name>Content</maml:name>
+          <maml:description>
+            <maml:para>Specifies transport-neutral content created by Mailozaurr or returned by a compatible renderer.</maml:para>
+            <maml:para>Explicit Subject, HTML, Text, Headers, Attachment, and InlineAttachment parameters override or extend this content.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Credential</maml:name>
           <maml:description>
@@ -28936,6 +29051,18 @@ type. Without this switch, only transient errors are retried.</maml:para>
           <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
           <dev:type>
             <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="InlineAttachments">
+          <maml:name>InlineAttachment</maml:name>
+          <maml:description>
+            <maml:para>Specifies inline attachments for the email message.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object[]</command:parameterValue>
+          <dev:type>
+            <maml:name>Object[]</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -29297,6 +29424,19 @@ type. Without this switch, only transient errors are retried.</maml:para>
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="EmailContent,RenderResult">
+          <maml:name>Content</maml:name>
+          <maml:description>
+            <maml:para>Specifies transport-neutral content created by Mailozaurr or returned by a compatible renderer.</maml:para>
+            <maml:para>Explicit Subject, HTML, Text, Headers, Attachment, and InlineAttachment parameters override or extend this content.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Credential</maml:name>
           <maml:description>
@@ -29373,6 +29513,18 @@ type. Without this switch, only transient errors are retried.</maml:para>
           <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
           <dev:type>
             <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="InlineAttachments">
+          <maml:name>InlineAttachment</maml:name>
+          <maml:description>
+            <maml:para>Specifies inline attachments for the email message.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Object[]</command:parameterValue>
+          <dev:type>
+            <maml:name>Object[]</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -29807,6 +29959,19 @@ type. Without this switch, only transient errors are retried.</maml:para>
         <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
         <dev:type>
           <maml:name>Int32</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="EmailContent,RenderResult">
+        <maml:name>Content</maml:name>
+        <maml:description>
+          <maml:para>Specifies transport-neutral content created by Mailozaurr or returned by a compatible renderer.</maml:para>
+          <maml:para>Explicit Subject, HTML, Text, Headers, Attachment, and InlineAttachment parameters override or extend this content.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Object</command:parameterValue>
+        <dev:type>
+          <maml:name>Object</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -30602,7 +30767,7 @@ StartTls to be used automatically.</maml:para>
     <command:inputTypes>
       <command:inputType>
         <dev:type>
-          <maml:name>None</maml:name>
+          <maml:name>System.Object</maml:name>
         </dev:type>
       </command:inputType>
     </command:inputTypes>

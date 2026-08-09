@@ -19,6 +19,11 @@ public partial class Graph : IDisposable {
     /// Maximum size of an attachment chunk when uploading large files (4 MiB).
     /// </summary>
     public const int MaxChunkSize = 4 * 1024 * 1024;
+    /// <summary>
+    /// Minimum file size accepted by Microsoft Graph attachment upload sessions (3 MB).
+    /// Smaller draft attachments must be added with the direct attachments endpoint.
+    /// </summary>
+    public const int MinimumUploadSessionAttachmentSize = 3_000_000;
     private const long GraphPayloadLimitBytes = 4_000_000;
     private int _chunkSize = MaxChunkSize;
     /// <summary>
@@ -40,12 +45,22 @@ public partial class Graph : IDisposable {
     public bool IsLargerAttachment { get; set; }
 
     /// <summary>
-    /// Total size of all attachments in bytes (including file paths and in-memory attachments).
+    /// Estimated serialized size of all attachments in the Graph JSON request.
     /// </summary>
     public long TotalAttachmentSizeBytes { get; private set; }
 
+    /// <summary>
+    /// Total decoded size of all attachment content. Use this value for Graph's 150 MB attachment limit.
+    /// </summary>
+    public long RawAttachmentSizeBytes { get; private set; }
+
     private long _inlineAttachmentSizeBytes;
     private int _fileAttachmentCount;
+    private int _convertedFileAttachmentStartIndex = -1;
+    private string? _autoEmbedOriginalHtml;
+    private string? _autoEmbedRenderedHtml;
+    private readonly List<string> _autoEmbeddedImagePaths = new();
+    private readonly List<GraphAttachment> _deferredGraphAttachments = new();
 
     /// <summary>
     /// List of GraphAttachment objects created from the file paths in the Attachments property.
@@ -350,20 +365,18 @@ public partial class Graph : IDisposable {
             smtp.Bcc = this.Bcc;
             smtp.ReplyTo = string.IsNullOrWhiteSpace(this.ReplyTo) ? null : this.ReplyTo;
             smtp.Subject = this.Subject;
-            smtp.HtmlBody = this.HTML;
+            ApplyBodyToSmtpFallback(smtp);
             smtp.Headers = this.Headers;
             smtp.WebhookUrl = this.WebhookUrl;
             smtp.Priority = this.Priority;
 
-            if (this.ConvertedAttachments != null && this.ConvertedAttachments.Count > 0) {
+            if ((this.ConvertedAttachments != null && this.ConvertedAttachments.Count > 0) || _deferredGraphAttachments.Count > 0) {
                 var attachments = new List<Definitions.AttachmentDescriptor>();
                 var inline = new List<Definitions.AttachmentDescriptor>();
-                foreach (var a in this.ConvertedAttachments) {
+                foreach (var a in (this.ConvertedAttachments ?? new List<GraphAttachment>()).Concat(_deferredGraphAttachments)) {
                     if (string.IsNullOrWhiteSpace(a.ContentBytes)) continue;
                     try {
-                        var bytes = Convert.FromBase64String(a.ContentBytes);
-                        var d = new Definitions.ByteArrayAttachmentDescriptor(bytes, string.IsNullOrWhiteSpace(a.Name) ? DefaultAttachmentName : a.Name);
-                        if (!string.IsNullOrWhiteSpace(a.ContentId)) d.ContentId = a.ContentId;
+                        var d = CreateSmtpFallbackAttachment(a);
                         if (a.IsInline) inline.Add(d); else attachments.Add(d);
                     } catch (FormatException fex) {
                         LogCollector.LogWarning($"Send-EmailMessage - SMTP fallback skipped invalid base64 attachment '{(a?.Name ?? "(unnamed)")}' : {fex.Message}");
@@ -371,6 +384,9 @@ public partial class Graph : IDisposable {
                 }
                 if (attachments.Count > 0) smtp.Attachments = attachments;
                 if (inline.Count > 0) smtp.InlineAttachments = inline;
+            }
+            if (IsLargerAttachment) {
+                AddFileAttachmentSourcesToSmtpFallback(smtp);
             }
 
             await smtp.CreateMessageAsync(cancellationToken).ConfigureAwait(false);
@@ -388,6 +404,45 @@ public partial class Graph : IDisposable {
                 MessageId = current.MessageId,
                 Queued = current.Queued
             };
+        }
+    }
+
+    internal void AddFileAttachmentSourcesToSmtpFallback(Smtp smtp) {
+        foreach (var source in EnumerateFileAttachmentSources()) {
+            var descriptor = source.Descriptor ?? new Definitions.FileAttachmentDescriptor(source.Path);
+            if (source.Descriptor != null && IsInlineDescriptor(source.Descriptor)) {
+                smtp.InlineAttachments ??= new List<Definitions.AttachmentDescriptor>();
+                smtp.InlineAttachments.Add(descriptor);
+            } else {
+                smtp.Attachments ??= new List<Definitions.AttachmentDescriptor>();
+                smtp.Attachments.Add(descriptor);
+            }
+        }
+    }
+
+    /// <summary>Maps an in-memory Graph attachment to the transport-neutral descriptor used by SMTP fallback.</summary>
+    internal static Definitions.ByteArrayAttachmentDescriptor CreateSmtpFallbackAttachment(GraphAttachment attachment) {
+        var bytes = Convert.FromBase64String(attachment.ContentBytes);
+        var descriptor = new Definitions.ByteArrayAttachmentDescriptor(
+            bytes,
+            string.IsNullOrWhiteSpace(attachment.Name) ? DefaultAttachmentName : attachment.Name) {
+            ContentType = attachment.ContentType
+        };
+        if (!string.IsNullOrWhiteSpace(attachment.ContentId)) {
+            descriptor.ContentId = attachment.ContentId;
+        }
+        return descriptor;
+    }
+
+    internal void ApplyBodyToSmtpFallback(Smtp smtp) {
+        if (smtp == null) throw new ArgumentNullException(nameof(smtp));
+
+        if (string.Equals(ContentType, "Text", StringComparison.OrdinalIgnoreCase)) {
+            smtp.TextBody = HTML;
+            smtp.HtmlBody = string.Empty;
+        } else {
+            smtp.HtmlBody = HTML;
+            smtp.TextBody = string.Empty;
         }
     }
 

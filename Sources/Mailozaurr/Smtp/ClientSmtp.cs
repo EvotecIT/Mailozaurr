@@ -172,14 +172,14 @@ public partial class ClientSmtp : SmtpClient {
             bodyBuilder.TextBody = TextBody;
         }
         if (Attachments != null) {
-            var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seenPaths = AttachmentPathIdentity.CreateSet();
             foreach (var descriptor in Attachments) {
                 if (descriptor == null) {
                     continue;
                 }
 
                 var path = descriptor.SourcePath;
-                if (!string.IsNullOrWhiteSpace(path) && !seenPaths.Add(path!)) {
+                if (!string.IsNullOrWhiteSpace(path) && !AttachmentPathIdentity.Add(seenPaths, path!)) {
                     continue;
                 }
 
@@ -193,14 +193,14 @@ public partial class ClientSmtp : SmtpClient {
             }
         }
         if (InlineAttachments != null) {
-            var seenInline = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seenInline = AttachmentPathIdentity.CreateSet();
             foreach (var descriptor in InlineAttachments) {
                 if (descriptor == null) {
                     continue;
                 }
 
                 var path = descriptor.SourcePath;
-                if (!string.IsNullOrWhiteSpace(path) && !seenInline.Add(path!)) {
+                if (!string.IsNullOrWhiteSpace(path) && !AttachmentPathIdentity.Add(seenInline, path!)) {
                     continue;
                 }
 

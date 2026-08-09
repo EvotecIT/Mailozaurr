@@ -19,6 +19,10 @@ public partial class Graph {
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph send.");
             return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
         }
+        if (IsLargerAttachment) {
+            LogCollector.LogVerbose("Send-EmailMessage - Serialized attachment payload exceeds the Graph simple-send limit; using a draft upload session.");
+            return await SendMessageDraftAsync(messagePrepared: true, cancellationToken);
+        }
         LogCollector.LogVerbose("Send-EmailMessage - Sending email via Graph API");
         // Create the request URI outside the loop.
         var requestUri = MicrosoftGraphUtils.BuildGraphUri(
@@ -104,21 +108,37 @@ public partial class Graph {
     /// </summary>
     /// <returns>The result of the send operation.</returns>
     public async Task<SmtpResult> SendMessageDraftAsync(CancellationToken cancellationToken = default) {
+        return await SendMessageDraftAsync(messagePrepared: false, cancellationToken);
+    }
+
+    private async Task<SmtpResult> SendMessageDraftAsync(bool messagePrepared, CancellationToken cancellationToken) {
         var operationStopwatch = StartOperationTimer();
         if (DryRun) {
-            CreateMessage();
+            if (!messagePrepared) {
+                CreateMessage();
+            }
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph draft send.");
             return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
         }
-        // Create the draft message using the new method
-        var draftMessage = await CreateDraftMessageAsync(cancellationToken);
-
-        // Upload attachments to the draft message
-        await UploadAttachmentsAsync(draftMessage, cancellationToken);
-
         var policyDraft = SendPolicy ?? MailozaurrOptions.DefaultGraphPolicy;
         if (policyDraft != null && policyDraft.MaxConcurrency > 0) {
             MicrosoftGraphUtils.MaxConcurrentRequests = policyDraft.MaxConcurrency;
+        }
+
+        GraphMessage draftMessage;
+        try {
+            draftMessage = await CreateDraftMessageAsync(messagePrepared, cancellationToken);
+            await UploadAttachmentsAsync(draftMessage, cancellationToken);
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
+        } catch (Exception ex) {
+            LogCollector.LogWarning($"Send-EmailMessage - Error while creating the Graph draft or adding attachments: {ex.Message}");
+            if (ErrorAction == ActionPreference.Stop) {
+                throw;
+            }
+            var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, ex.Message);
+            await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
+            return await TrySmtpFallbackAsync(policyDraft, failResult, ex, cancellationToken);
         }
 
         int attempts = 0;
@@ -229,14 +249,26 @@ public partial class Graph {
             ClientSecret = ApplicationKey,
             DirectoryId = TenantDomain
         };
-        var bodyObj = JsonSerializer.Deserialize(MessageJson, MailozaurrJsonContext.Default.JsonElement);
-        var request = new GraphBatchRequest {
-            Id = "1",
-            Method = GraphHttpMethod.POST,
-            Url = $"/users/{MessageContainer.Message.From!.Email.Address}/sendMail",
-            Headers = new Dictionary<string, string> { ["Content-Type"] = "application/json" },
-            Body = bodyObj
-        };
+        var request = CreateBatchSendRequest();
+        if (GetBatchPayloadSize(request) > GraphPayloadLimitBytes) {
+            TryRouteConvertedFileAttachmentsThroughUploadSession();
+            request = CreateBatchSendRequest();
+            TryRouteEligibleAttachments(() => GetBatchPayloadSize(CreateBatchSendRequest()) > GraphPayloadLimitBytes);
+            request = CreateBatchSendRequest();
+            if (GetBatchPayloadSize(request) > GraphPayloadLimitBytes) {
+                throw new InvalidOperationException("The complete serialized Graph batch request exceeds the 4MB payload limit after draft attachments were removed. Reduce the message body, recipients, or headers.");
+            }
+        }
+        if (IsLargerAttachment) {
+            LogCollector.LogVerbose("Send-EmailMessage - Serialized request exceeds the Graph batch payload limit; using a draft upload session.");
+            if (string.IsNullOrWhiteSpace(AccessToken) || string.IsNullOrWhiteSpace(TokenType)) {
+                var connection = await ConnectO365GraphAsync(cancellationToken);
+                if (!connection.Status) {
+                    return connection;
+                }
+            }
+            return await SendMessageDraftAsync(messagePrepared: true, cancellationToken);
+        }
         var results = await MicrosoftGraphUtils.SendBatchAsync(credential, new[] { request }, cancellationToken);
         var response = results.FirstOrDefault();
         var success = response != null && response.Status >= 200 && response.Status < 300;
@@ -252,13 +284,48 @@ public partial class Graph {
             success ? string.Empty : response?.Body.ToString());
     }
 
+    private GraphBatchRequest CreateBatchSendRequest() {
+        var bodyObj = JsonSerializer.Deserialize(MessageJson, MailozaurrJsonContext.Default.JsonElement);
+        return new GraphBatchRequest {
+            Id = "1",
+            Method = GraphHttpMethod.POST,
+            Url = $"/users/{MessageContainer.Message.From!.Email.Address}/sendMail",
+            Headers = new Dictionary<string, string> { ["Content-Type"] = "application/json" },
+            Body = bodyObj
+        };
+    }
+
+    private static int GetBatchPayloadSize(GraphBatchRequest request) {
+        var payload = new GraphBatchPayload {
+            Requests = new List<GraphBatchRequestPayload> {
+                new() {
+                    Id = request.Id,
+                    Method = request.Method.ToString(),
+                    Url = request.Url.TrimStart('/'),
+                    Headers = request.Headers,
+                    Body = request.Body
+                }
+            }
+        };
+        return JsonSerializer.SerializeToUtf8Bytes(payload, MailozaurrJsonContext.Default.GraphBatchPayload).Length;
+    }
+
     /// <summary>
     /// Creates a draft message on the server and returns the resulting <see cref="GraphMessage"/>.
     /// </summary>
     /// <returns>The created draft message.</returns>
     public async Task<GraphMessage> CreateDraftMessageAsync(CancellationToken cancellationToken = default) {
-        // Create the draft message
-        CreateMessage();
+        return await CreateDraftMessageAsync(messagePrepared: false, cancellationToken);
+    }
+
+    private async Task<GraphMessage> CreateDraftMessageAsync(bool messagePrepared, CancellationToken cancellationToken) {
+        if (!messagePrepared) {
+            CreateMessage();
+        }
+        // This entry point always completes through the draft attachment endpoints.
+        // Remove any file-backed attachments that happened to fit the simple payload
+        // so UploadAttachmentsAsync can add each file exactly once.
+        TryRouteConvertedFileAttachmentsThroughUploadSession();
 
         //var options = new JsonSerializerOptions() {
         //    WriteIndented = true
@@ -267,7 +334,7 @@ public partial class Graph {
         //// Serialize only the GraphMessage to a JSON string, excluding the SaveToSentItems property
         //var messageJson = JsonSerializer.Serialize(MessageContainer.Message, options);
 
-        var messageJson = CreateDraft();
+        var messageJson = JsonSerializer.Serialize(MessageContainer.Message, MailozaurrJsonContext.Default.GraphMessage);
 
         var draftRequestUri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
@@ -317,10 +384,19 @@ public partial class Graph {
     /// </summary>
     /// <returns>The JSON payload for the draft message.</returns>
     public string CreateDraftForMg() {
-        // Create the draft message
-        CreateMessage();
-        var messageJson = CreateDraft();
-        return messageJson;
+        return CreateDraft();
+    }
+
+    /// <summary>
+    /// Serializes the current, already prepared Graph message for a draft request.
+    /// </summary>
+    /// <remarks>
+    /// Call <see cref="CreateMessage"/> first. This avoids rebuilding state after
+    /// automatic inline-image conversion has rewritten local image references to CIDs.
+    /// </remarks>
+    /// <returns>The JSON payload for the prepared draft message.</returns>
+    public string CreatePreparedDraft() {
+        return JsonSerializer.Serialize(MessageContainer.Message, MailozaurrJsonContext.Default.GraphMessage);
     }
 
     /// <summary>
@@ -329,9 +405,6 @@ public partial class Graph {
     /// <returns>The JSON representation of the message.</returns>
     public string CreateDraft() {
         CreateMessage();
-
-        // Serialize only the GraphMessage to a JSON string, excluding the SaveToSentItems property
-        var messageJson = JsonSerializer.Serialize(MessageContainer.Message, MailozaurrJsonContext.Default.GraphMessage);
-        return messageJson;
+        return CreatePreparedDraft();
     }
 }

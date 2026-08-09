@@ -14,6 +14,12 @@ public static class GraphDraftMessageUris {
         BuildDraftActionUri(userPrincipalName, draftMessageId, "attachments/createUploadSession");
 
     /// <summary>
+    /// Builds the URI used to add a small file attachment directly to a draft message.
+    /// </summary>
+    public static string Attachments(string userPrincipalName, string draftMessageId) =>
+        BuildDraftActionUri(userPrincipalName, draftMessageId, "attachments");
+
+    /// <summary>
     /// Builds the URI used to send an existing draft message.
     /// </summary>
     /// <param name="userPrincipalName">Mailbox user principal name or SMTP address.</param>

@@ -104,6 +104,7 @@ Build-Module -ModuleName 'Mailozaurr' {
         NETAssemblyLoadContext            = $true
         NETAssemblyTypeAcceleratorMode    = 'AllowList'
         NETAssemblyTypeAccelerators       = @(
+            'Mailozaurr.Definitions.EmailMessageContent'
             'Mailozaurr.EmailEncryption'
             'Mailozaurr.EmailMessage'
             'Mailozaurr.EmailProvider'

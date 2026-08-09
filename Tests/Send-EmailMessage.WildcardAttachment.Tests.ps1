@@ -15,4 +15,40 @@ Describe 'Send-EmailMessage - Wildcard Attachments' {
         ($result | ForEach-Object { $_.FullName }) | Should -Contain $f1
         ($result | ForEach-Object { $_.FullName }) | Should -Contain $f2
     }
+
+    It 'Converts Resolve-Path results to file attachment descriptors' {
+        $file = Join-Path $TestDrive 'resolved.txt'
+        'content' | Set-Content -LiteralPath $file
+        $resolved = Resolve-Path -LiteralPath $file
+        $converter = [Mailozaurr.PowerShell.CmdletSendEmailMessage].Assembly.GetType('Mailozaurr.PowerShell.AttachmentInputConverter', $true)
+        $method = $converter.GetMethod('Convert', [System.Reflection.BindingFlags] 'NonPublic, Static')
+        $arguments = [object[]]::new(1)
+        $arguments[0] = [object[]] @($resolved)
+
+        $result = $method.Invoke($null, $arguments)
+
+        $result | Should -HaveCount 1
+        $result[0].FilePath | Should -Be $resolved.ProviderPath
+    }
+
+    It 'Keeps file-backed Graph inline attachments eligible for upload sessions' {
+        $file = Join-Path $TestDrive 'inline.png'
+        'content' | Set-Content -LiteralPath $file
+        $descriptorType = [Mailozaurr.EmailMessage].Assembly.GetType('Mailozaurr.Definitions.FileAttachmentDescriptor', $true)
+        $descriptor = [Activator]::CreateInstance($descriptorType, $file)
+        $cmdlet = [Mailozaurr.PowerShell.CmdletSendEmailMessage]::new()
+        $method = $cmdlet.GetType().GetMethod('MergeGraphAttachments', [System.Reflection.BindingFlags] 'NonPublic, Static')
+        $arguments = [object[]]::new(2)
+        $arguments[0] = $null
+        $arguments[1] = [object[]] @($descriptor)
+
+        $result = $method.Invoke($null, $arguments)
+
+        $result | Should -HaveCount 1
+        $mapped = $result[0]
+        $mapped.GetType() | Should -Be $descriptorType
+        $mapped | Should -Not -Be $descriptor
+        $mapped.ContentDisposition.Disposition | Should -Be 'inline'
+        $descriptor.ContentDisposition | Should -BeNullOrEmpty
+    }
 }
