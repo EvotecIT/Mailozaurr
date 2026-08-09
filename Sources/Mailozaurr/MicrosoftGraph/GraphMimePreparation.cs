@@ -37,44 +37,62 @@ public static class GraphMimePreparation {
         }
 
         var inlineAttachments = new List<GraphAttachment>();
+        var inlineDecodedAttachments = new List<DecodedMimeAttachment>();
         var uploadAttachments = new List<DecodedMimeAttachment>();
         var inlineBytes = 0L;
 
-        foreach (var entity in message.Attachments) {
-            if (entity is not MimePart part) {
-                continue;
-            }
-
-            var decoded = DecodedMimeAttachment.DecodeToTempFile(part);
-            if (decoded.Length <= maxInlineAttachmentBytes &&
-                inlineBytes + decoded.Length <= maxInlineAttachmentBytes) {
-                byte[] bytes;
-                try {
-                    bytes = decoded.ReadAllBytes();
-                } finally {
-                    decoded.Dispose();
+        try {
+            foreach (var entity in message.Attachments) {
+                if (entity is not MimePart part) {
+                    continue;
                 }
 
-                inlineBytes += bytes.Length;
-                inlineAttachments.Add(new GraphAttachment {
-                    ODataType = "#microsoft.graph.fileAttachment",
-                    Name = decoded.Name,
-                    ContentType = decoded.ContentType,
-                    ContentBytes = Convert.ToBase64String(bytes),
-                    IsInline = decoded.IsInline,
-                    ContentId = decoded.IsInline ? decoded.ContentId : null
-                });
-            } else {
-                uploadAttachments.Add(decoded);
+                var decoded = DecodedMimeAttachment.DecodeToTempFile(part);
+                if (decoded.Length <= maxInlineAttachmentBytes &&
+                    inlineBytes + decoded.Length <= maxInlineAttachmentBytes) {
+                    inlineBytes += decoded.Length;
+                    inlineDecodedAttachments.Add(decoded);
+                    inlineAttachments.Add(decoded.ToGraphAttachment());
+                } else {
+                    uploadAttachments.Add(decoded);
+                }
             }
-        }
 
-        var graphMessage = ConvertToGraphMessage(
-            message,
-            inlineAttachments.Count == 0 ? null : inlineAttachments,
-            idempotencyHeaderName);
-        return new GraphPreparedMessage(graphMessage, uploadAttachments);
+            var graphMessage = ConvertToGraphMessage(
+                message,
+                inlineAttachments.Count == 0 ? null : inlineAttachments,
+                idempotencyHeaderName);
+
+            while (GetSerializedMessageSize(graphMessage) > 4_000_000 && inlineAttachments.Count > 0) {
+                var last = inlineAttachments.Count - 1;
+                inlineAttachments.RemoveAt(last);
+                uploadAttachments.Insert(0, inlineDecodedAttachments[last]);
+                inlineDecodedAttachments.RemoveAt(last);
+                graphMessage.Attachments = inlineAttachments.Count == 0 ? null : inlineAttachments;
+            }
+
+            if (GetSerializedMessageSize(graphMessage) > 4_000_000) {
+                throw new InvalidOperationException("The serialized Graph draft exceeds the 4MB request limit without attachments. Reduce the message body, recipients, or headers.");
+            }
+
+            foreach (var decoded in inlineDecodedAttachments) {
+                decoded.Dispose();
+            }
+            inlineDecodedAttachments.Clear();
+            return new GraphPreparedMessage(graphMessage, uploadAttachments);
+        } catch {
+            foreach (var decoded in inlineDecodedAttachments) {
+                decoded.Dispose();
+            }
+            foreach (var decoded in uploadAttachments) {
+                decoded.Dispose();
+            }
+            throw;
+        }
     }
+
+    private static int GetSerializedMessageSize(GraphMessage message) =>
+        System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(message, MailozaurrJsonContext.Default.GraphMessage).Length;
 
     /// <summary>
     /// Converts a MIME message to Graph message payload.
@@ -267,6 +285,18 @@ public sealed class DecodedMimeAttachment : IDisposable {
     /// </summary>
     public byte[] ReadAllBytes() {
         return File.ReadAllBytes(_tempPath);
+    }
+
+    /// <summary>Creates a Graph file-attachment payload from the decoded MIME content.</summary>
+    public GraphAttachment ToGraphAttachment() {
+        return new GraphAttachment {
+            ODataType = "#microsoft.graph.fileAttachment",
+            Name = Name,
+            ContentType = ContentType,
+            ContentBytes = Convert.ToBase64String(ReadAllBytes()),
+            IsInline = IsInline,
+            ContentId = IsInline ? ContentId : null
+        };
     }
 
     /// <inheritdoc />

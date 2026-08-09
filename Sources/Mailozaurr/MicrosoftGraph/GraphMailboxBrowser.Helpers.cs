@@ -111,6 +111,14 @@ public sealed partial class GraphMailboxBrowser {
                 $"Graph upload failed: attachment '{attachment.Name}' length is {attachment.Length.ToString(CultureInfo.InvariantCulture)}.");
         }
 
+        if (attachment.Length < Graph.MinimumUploadSessionAttachmentSize) {
+            await _graph.AddAttachmentAsync(
+                messageId,
+                attachment.ToGraphAttachment(),
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         var uploadSession = await _graph.CreateAttachmentUploadSessionAsync(
             messageId,
             BuildAttachmentItem(attachment),

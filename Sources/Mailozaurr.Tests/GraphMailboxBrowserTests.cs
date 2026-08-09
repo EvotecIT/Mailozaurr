@@ -138,12 +138,10 @@ public class GraphMailboxBrowserTests {
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task ImportMessageAsync_UploadsLargeAttachmentsThroughUploadSession() {
+    public async System.Threading.Tasks.Task ImportMessageAsync_AddsSmallRoutedAttachmentsDirectly() {
         var createJson = "{\"id\":\"created-id\"}";
-        var uploadSessionJson = "{\"uploadUrl\":\"https://upload.test/session\"}";
         var handler = new RecordingHandler(
             new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent(createJson) },
-            new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent(uploadSessionJson) },
             new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent(string.Empty) });
         var client = CreateClient(handler);
         var browser = new GraphMailboxBrowser(client);
@@ -167,18 +165,12 @@ public class GraphMailboxBrowserTests {
         Assert.Equal("created-id", result.NativeId);
         Assert.Equal("upload@example.test", result.MessageId);
 
-        Assert.Equal(3, handler.Requests.Count);
+        Assert.Equal(2, handler.Requests.Count);
         Assert.Contains("/me/mailFolders/sentitems/messages", handler.Requests[0].RequestUri!.ToString());
-        Assert.Contains("/me/messages/created-id/attachments/createUploadSession", handler.Requests[1].RequestUri!.ToString());
-        Assert.Equal("https://upload.test/session", handler.Requests[2].RequestUri!.ToString());
+        Assert.Contains("/me/messages/created-id/attachments", handler.Requests[1].RequestUri!.ToString());
         var uploadBody = await handler.Requests[1].Content!.ReadAsStringAsync();
         Assert.Contains("\"name\":\"notes.txt\"", uploadBody, StringComparison.Ordinal);
-        Assert.Contains("\"size\":11", uploadBody, StringComparison.Ordinal);
-        var range = handler.Requests[2].Content!.Headers.ContentRange;
-        Assert.NotNull(range);
-        Assert.Equal(0L, range!.From);
-        Assert.Equal(10L, range.To);
-        Assert.Equal(11L, range.Length);
+        Assert.Contains("\"contentBytes\":\"aGVsbG8gd29ybGQ=\"", uploadBody, StringComparison.Ordinal);
     }
 
     [Fact]

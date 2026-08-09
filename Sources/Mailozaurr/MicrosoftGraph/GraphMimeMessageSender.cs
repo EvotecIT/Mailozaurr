@@ -53,6 +53,15 @@ public static class GraphMimeMessageSender {
         }
 
         foreach (var attachment in attachments) {
+            if (attachment.Length < Graph.MinimumUploadSessionAttachmentSize) {
+                await client.AddAttachmentAsync(
+                    draft.Id!,
+                    attachment.ToGraphAttachment(),
+                    userId,
+                    cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+
             var uploadSession = await client.CreateAttachmentUploadSessionAsync(
                 draft.Id!,
                 new GraphAttachmentItem("file", attachment.Name, attachment.Length) {

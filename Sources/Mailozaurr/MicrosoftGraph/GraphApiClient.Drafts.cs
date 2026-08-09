@@ -149,6 +149,42 @@ public sealed partial class GraphApiClient {
     }
 
     /// <summary>
+    /// Adds a file attachment directly to an existing draft message.
+    /// Use this endpoint for files smaller than <see cref="Graph.MinimumUploadSessionAttachmentSize"/>.
+    /// </summary>
+    public async Task AddAttachmentAsync(
+        string messageId,
+        GraphAttachment attachment,
+        string userId = "me",
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(messageId)) {
+            throw new ArgumentException("messageId is required.", nameof(messageId));
+        }
+        if (attachment == null) {
+            throw new ArgumentNullException(nameof(attachment));
+        }
+
+        var userSegment = BuildUserSegment(userId);
+        var selector = Uri.EscapeDataString(messageId.Trim());
+        var payload = JsonSerializer.Serialize(attachment, MailozaurrJsonContext.Default.GraphAttachment);
+        using var req = new HttpRequestMessage(HttpMethod.Post, userSegment + "/messages/" + selector + "/attachments") {
+            Content = new StringContent(payload, Encoding.UTF8, "application/json")
+        };
+        ApplyAuthHeader(req);
+        using var resp = await _client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
+#if NET5_0_OR_GREATER
+        var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+        var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+        if (!resp.IsSuccessStatusCode) {
+            throw new GraphApiException(resp.StatusCode, $"Graph attachment create failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
+        }
+    }
+
+    /// <summary>
     /// Uploads one attachment chunk to a Graph upload session URL.
     /// </summary>
     public async Task UploadAttachmentChunkAsync(

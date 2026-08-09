@@ -19,6 +19,11 @@ public partial class Graph : IDisposable {
     /// Maximum size of an attachment chunk when uploading large files (4 MiB).
     /// </summary>
     public const int MaxChunkSize = 4 * 1024 * 1024;
+    /// <summary>
+    /// Minimum file size accepted by Microsoft Graph attachment upload sessions (3 MB).
+    /// Smaller draft attachments must be added with the direct attachments endpoint.
+    /// </summary>
+    public const int MinimumUploadSessionAttachmentSize = 3_000_000;
     private const long GraphPayloadLimitBytes = 4_000_000;
     private int _chunkSize = MaxChunkSize;
     /// <summary>
@@ -40,9 +45,14 @@ public partial class Graph : IDisposable {
     public bool IsLargerAttachment { get; set; }
 
     /// <summary>
-    /// Total size of all attachments in bytes (including file paths and in-memory attachments).
+    /// Estimated serialized size of all attachments in the Graph JSON request.
     /// </summary>
     public long TotalAttachmentSizeBytes { get; private set; }
+
+    /// <summary>
+    /// Total decoded size of all attachment content. Use this value for Graph's 150 MB attachment limit.
+    /// </summary>
+    public long RawAttachmentSizeBytes { get; private set; }
 
     private long _inlineAttachmentSizeBytes;
     private int _fileAttachmentCount;

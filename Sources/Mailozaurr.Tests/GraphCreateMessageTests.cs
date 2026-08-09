@@ -81,6 +81,28 @@ public class GraphCreateMessageTests {
     }
 
     [Fact]
+    public void GraphMimePreparation_RoutesAttachmentWhenSerializedDraftWouldExceedLimit() {
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse("from@example.com"));
+        message.To.Add(MailboxAddress.Parse("to@example.com"));
+        message.Subject = "serialized routing";
+        var builder = new BodyBuilder { TextBody = new string('x', 1_000_000) };
+        builder.Attachments.Add("small.bin", new byte[2_300_000]);
+        message.Body = builder.ToMessageBody();
+
+        var prepared = GraphMimePreparation.PrepareMessage(message);
+        try {
+            Assert.Null(prepared.Message.Attachments);
+            var attachment = Assert.Single(prepared.UploadAttachments);
+            Assert.Equal(2_300_000, attachment.Length);
+        } finally {
+            foreach (var attachment in prepared.UploadAttachments) {
+                attachment.Dispose();
+            }
+        }
+    }
+
+    [Fact]
     public void CreateMessage_WithoutExplicitContentType_DefaultsToHtml() {
         using var graph = new Graph {
             From = "from@example.com",
@@ -264,6 +286,7 @@ public class GraphCreateMessageTests {
         }
 
         Assert.True(graph.TotalAttachmentSizeBytes > 4_000_000);
+        Assert.Equal(3_100_000, graph.RawAttachmentSizeBytes);
         Assert.True(graph.IsLargerAttachment);
         Assert.Empty(graph.ConvertedAttachments);
     }
@@ -282,6 +305,7 @@ public class GraphCreateMessageTests {
         graph.CreateAttachments();
 
         Assert.True(graph.TotalAttachmentSizeBytes > 4_000_000);
+        Assert.Equal(3_100_000, graph.RawAttachmentSizeBytes);
         Assert.True(graph.IsLargerAttachment);
     }
 

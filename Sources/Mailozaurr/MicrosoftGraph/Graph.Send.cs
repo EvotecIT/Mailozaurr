@@ -114,15 +114,25 @@ public partial class Graph {
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph draft send.");
             return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
         }
-        // Create the draft message using the new method
-        var draftMessage = await CreateDraftMessageAsync(cancellationToken);
-
-        // Upload attachments to the draft message
-        await UploadAttachmentsAsync(draftMessage, cancellationToken);
-
         var policyDraft = SendPolicy ?? MailozaurrOptions.DefaultGraphPolicy;
         if (policyDraft != null && policyDraft.MaxConcurrency > 0) {
             MicrosoftGraphUtils.MaxConcurrentRequests = policyDraft.MaxConcurrency;
+        }
+
+        GraphMessage draftMessage;
+        try {
+            draftMessage = await CreateDraftMessageAsync(cancellationToken);
+            await UploadAttachmentsAsync(draftMessage, cancellationToken);
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
+        } catch (Exception ex) {
+            LogCollector.LogWarning($"Send-EmailMessage - Error while creating the Graph draft or adding attachments: {ex.Message}");
+            if (ErrorAction == ActionPreference.Stop) {
+                throw;
+            }
+            var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, ex.Message);
+            await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
+            return await TrySmtpFallbackAsync(policyDraft, failResult, ex, cancellationToken);
         }
 
         int attempts = 0;
@@ -299,6 +309,10 @@ public partial class Graph {
     public async Task<GraphMessage> CreateDraftMessageAsync(CancellationToken cancellationToken = default) {
         // Create the draft message
         CreateMessage();
+        // This entry point always completes through the draft attachment endpoints.
+        // Remove any file-backed attachments that happened to fit the simple payload
+        // so UploadAttachmentsAsync can add each file exactly once.
+        TryRouteConvertedFileAttachmentsThroughUploadSession();
 
         //var options = new JsonSerializerOptions() {
         //    WriteIndented = true
@@ -307,7 +321,7 @@ public partial class Graph {
         //// Serialize only the GraphMessage to a JSON string, excluding the SaveToSentItems property
         //var messageJson = JsonSerializer.Serialize(MessageContainer.Message, options);
 
-        var messageJson = CreateDraft();
+        var messageJson = JsonSerializer.Serialize(MessageContainer.Message, MailozaurrJsonContext.Default.GraphMessage);
 
         var draftRequestUri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,

@@ -1,5 +1,10 @@
-$env:MAILOZAURR_DEVELOPMENT = '1'
-Import-Module (Resolve-Path "$PSScriptRoot/../Mailozaurr.psd1") -Force
+if ($env:MAILOZAURR_TEST_MODULE_PATH) {
+    Remove-Item Env:MAILOZAURR_DEVELOPMENT -ErrorAction SilentlyContinue
+    Import-Module $env:MAILOZAURR_TEST_MODULE_PATH -Force
+} else {
+    $env:MAILOZAURR_DEVELOPMENT = '1'
+    Import-Module (Resolve-Path "$PSScriptRoot/../Mailozaurr.psd1") -Force
+}
 
 Describe 'Send-EmailMessage - MgGraphRequest attachments' {
     It 'Uploads large attachments to the draft before sending' {
@@ -49,6 +54,47 @@ Describe 'Send-EmailMessage - MgGraphRequest attachments' {
         $script:mgGraphRequestCalls[2].Uri | Should -Be 'https://upload.example/session'
         $script:mgGraphRequestCalls[2].Headers['Content-Range'].ToString() | Should -Match '^bytes 0-'
         $script:mgGraphRequestCalls[3].Uri | Should -Be "https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/send"
+    }
+
+    It 'adds a sub-3MB file directly when the complete request requires a draft' {
+        $script:mgGraphRequestCalls = [System.Collections.Generic.List[object]]::new()
+
+        function global:Invoke-MgGraphRequest {
+            param(
+                [string] $Method,
+                [string] $Uri,
+                [string] $ContentType,
+                [object] $Body,
+                [hashtable] $Headers
+            )
+
+            $script:mgGraphRequestCalls.Add([pscustomobject] @{
+                    Method = $Method
+                    Uri    = $Uri
+                    Body   = $Body
+                })
+
+            if ($Uri -like '*/mailfolders/drafts/messages') {
+                return @{ id = 'draft-id' }
+            }
+            return @{}
+        }
+
+        $file = Join-Path $TestDrive 'small.bin'
+        [System.IO.File]::WriteAllBytes($file, (New-Object byte[] 2300000))
+
+        try {
+            Send-EmailMessage -From 'from@example.com' -To 'to@example.com' -Subject 's' -Body ('x' * 1000000) -MgGraphRequest -Attachment $file -Confirm:$false | Out-Null
+        } finally {
+            Remove-Item -Path function:global:Invoke-MgGraphRequest -ErrorAction SilentlyContinue
+        }
+
+        $script:mgGraphRequestCalls.Count | Should -Be 3
+        $script:mgGraphRequestCalls.Uri | Should -Not -Contain "https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/attachments/createUploadSession"
+        $script:mgGraphRequestCalls[0].Body | Should -Not -Match '"attachments"'
+        $script:mgGraphRequestCalls[1].Uri | Should -Be "https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/attachments"
+        $script:mgGraphRequestCalls[1].Body | Should -Match '"contentBytes"'
+        $script:mgGraphRequestCalls[2].Uri | Should -Be "https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/send"
     }
 
     It 'maps PSCustomObject text-only content to a Graph text body' {

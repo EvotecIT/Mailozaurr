@@ -313,7 +313,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
             graph.WithSendPolicy(p);
         }
         graph.CreateAttachments();
-        long graphSize = graph.TotalAttachmentSizeBytes;
+        long graphSize = graph.RawAttachmentSizeBytes;
         if (graphSize > GraphAttachmentLimitBytes) {
             WriteError(new ErrorRecord(
                 new ArgumentException("Attachments exceed Graph limit of 150MB."),
@@ -385,7 +385,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         graph.Attachments = MergeGraphAttachments(Attachment, InlineAttachment);
         if (Headers != null) graph.Headers = Headers.Cast<DictionaryEntry>().ToDictionary(d => d.Key?.ToString() ?? string.Empty, d => d.Value?.ToString() ?? string.Empty);
         graph.CreateAttachments();
-        long size = graph.TotalAttachmentSizeBytes;
+        long size = graph.RawAttachmentSizeBytes;
         if (size > GraphAttachmentLimitBytes) {
             WriteError(new ErrorRecord(
                 new ArgumentException("Attachments exceed Graph limit of 150MB."),
@@ -395,6 +395,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
             LogEmitter.EmitLogs(graph.LogCollector, this);
             return;
         }
+        // Finalize serialized routing before choosing simple send versus draft.
+        // CreateMessage may move file attachments out of an oversized complete request.
+        graph.CreateMessage();
         if (!ShouldProcess(graph.SentTo, "Sending email message via Graph (MgGraphRequest)")) {
             LoggingMessages.Logger.WriteVerbose("Send-EmailMessage - Skipping authentication");
             if (!Suppress) {
@@ -412,6 +415,15 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
             }
             await graph.PrepareAttachments();
             foreach (var attachment in graph.AttachmentsPlaceHolders) {
+                if (!string.IsNullOrEmpty(attachment.DirectAttachmentJson)) {
+                    var attachmentUri = GraphDraftMessageUris.Attachments(graph.SentFrom, draftMessageId);
+                    if (!InvokeMgGraphRequestAttachmentPOST(attachmentUri, attachment.DirectAttachmentJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed)) {
+                        LogEmitter.EmitLogs(graph.LogCollector, this);
+                        return;
+                    }
+                    continue;
+                }
+
                 var uploadSessionUri = GraphDraftMessageUris.CreateUploadSession(graph.SentFrom, draftMessageId);
                 var uploadUrl = InvokeMgGraphRequestPOST(uploadSessionUri, EmailAction.SendAttachment, attachment.Json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
                 if (uploadUrl != string.Empty) {
@@ -430,7 +442,6 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
             InvokeMgGraphRequest(sendUri, EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
             LogEmitter.EmitLogs(graph.LogCollector, this);
         } else {
-            graph.CreateMessage();
             InvokeMgGraphRequest($"v1.0/users/{fromEmail}/sendMail", EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
             LogEmitter.EmitLogs(graph.LogCollector, this);
         }
@@ -739,6 +750,33 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         }
 
         return "";
+    }
+
+    private bool InvokeMgGraphRequestAttachmentPOST(string uri, string jsonBody, string sentFrom, string sentTo, TimeSpan elapsed) {
+        var parameters = new Hashtable {
+            { "Method", "POST" },
+            { "Uri", uri },
+            { "ContentType", "application/json; charset=UTF-8"},
+            { "Body", jsonBody }
+        };
+        using var powerShell = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
+        powerShell.AddCommand("Invoke-MgGraphRequest");
+        powerShell.AddParameters(parameters);
+        try {
+            powerShell.Invoke();
+            return true;
+        } catch (RuntimeException ex) {
+            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error while adding a Graph draft attachment (MgGraphRequest): {ex.Message}");
+            if (errorAction == ActionPreference.Stop) {
+                throw;
+            }
+            if (!Suppress) {
+                WriteObject(new SmtpResult(false, EmailAction.SendAttachment, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
+                    GraphError = GraphApiErrorParser.Parse(ex.Message)
+                });
+            }
+            return false;
+        }
     }
 
     private static bool TryGetPowerShellResultValue(PSObject result, string propertyName, out string value) {

@@ -23,6 +23,7 @@ public partial class Graph {
                 var size = EstimateAttachmentSize(att);
                 _inlineAttachmentSizeBytes += size;
                 TotalAttachmentSizeBytes += size;
+                RawAttachmentSizeBytes += EstimateRawAttachmentSize(att);
             }
         }
         if (From is null) {

@@ -13,6 +13,7 @@ public partial class Graph {
     public void CreateAttachments() {
         ConvertedAttachments.Clear();
         TotalAttachmentSizeBytes = 0;
+        RawAttachmentSizeBytes = 0;
         IsLargerAttachment = false;
         _inlineAttachmentSizeBytes = 0;
         _fileAttachmentCount = 0;
@@ -23,6 +24,7 @@ public partial class Graph {
             var inlineFilePaths = Definitions.AttachmentPathIdentity.CreateSet();
             long fileTotalBytes = 0;
             long inMemoryTotalBytes = 0;
+            long rawAttachmentBytes = 0;
 
             // First pass: compute total size without loading file contents.
             foreach (var item in Attachments) {
@@ -30,22 +32,25 @@ public partial class Graph {
                     ConvertedAttachments.Add(ga);
                     var size = EstimateAttachmentSize(ga);
                     inMemoryTotalBytes += size;
+                    rawAttachmentBytes += EstimateRawAttachmentSize(ga);
                 } else if (item is Definitions.AttachmentDescriptor descriptor) {
                     if (descriptor.SourcePath is string descriptorPath) {
                         var seenPaths = IsInlineDescriptor(descriptor) ? inlineFilePaths : regularFilePaths;
-                        TrackFileAttachment(descriptorPath, descriptor, fileAttachments, seenPaths, ref fileTotalBytes);
+                        TrackFileAttachment(descriptorPath, descriptor, fileAttachments, seenPaths, ref fileTotalBytes, ref rawAttachmentBytes);
                     } else {
                         var converted = GraphAttachment.FromDescriptor(descriptor);
                         ConvertedAttachments.Add(converted);
                         inMemoryTotalBytes += EstimateAttachmentSize(converted);
+                        rawAttachmentBytes += EstimateRawAttachmentSize(converted);
                     }
                 } else if (TryGetAttachmentPath(item, out var path)) {
-                    TrackFileAttachment(path, null, fileAttachments, regularFilePaths, ref fileTotalBytes);
+                    TrackFileAttachment(path, null, fileAttachments, regularFilePaths, ref fileTotalBytes, ref rawAttachmentBytes);
                 }
             }
 
             _inlineAttachmentSizeBytes = inMemoryTotalBytes;
             TotalAttachmentSizeBytes = fileTotalBytes + inMemoryTotalBytes;
+            RawAttachmentSizeBytes = rawAttachmentBytes;
             IsLargerAttachment = TotalAttachmentSizeBytes > GraphPayloadLimitBytes;
 
             // Only load file attachments into memory when they fit in a simple send payload.
@@ -69,7 +74,8 @@ public partial class Graph {
         Definitions.AttachmentDescriptor? descriptor,
         ICollection<KeyValuePair<string, Definitions.AttachmentDescriptor?>> fileAttachments,
         ISet<string> seenFilePaths,
-        ref long fileTotalBytes) {
+        ref long fileTotalBytes,
+        ref long rawAttachmentBytes) {
         if (!File.Exists(path)) {
             LogMissingAttachmentWarning(path);
             return;
@@ -81,6 +87,7 @@ public partial class Graph {
             }
             fileAttachments.Add(new KeyValuePair<string, Definitions.AttachmentDescriptor?>(path, descriptor));
             fileTotalBytes += EstimateFileAttachmentSize(path, descriptor);
+            rawAttachmentBytes += new FileInfo(path).Length;
             _fileAttachmentCount++;
         } catch (Exception ex) {
             LogCollector.LogError($"Send-EmailMessage - Failed to read attachment '{path}': {ex.Message}");
@@ -164,6 +171,28 @@ public partial class Graph {
             attachment.ContentType,
             attachment.ContentId,
             attachment.ODataType);
+    }
+
+    private static long EstimateRawAttachmentSize(GraphAttachment attachment) {
+        if (string.IsNullOrWhiteSpace(attachment.ContentBytes)) {
+            return 0;
+        }
+
+        long encodedCharacters = 0;
+        var paddingCharacters = 0;
+        foreach (var character in attachment.ContentBytes) {
+            if (char.IsWhiteSpace(character)) {
+                continue;
+            }
+            encodedCharacters++;
+            if (character == '=') {
+                paddingCharacters++;
+            }
+        }
+
+        return encodedCharacters == 0 || encodedCharacters % 4 != 0
+            ? 0
+            : encodedCharacters / 4 * 3 - Math.Min(paddingCharacters, 2);
     }
 
     private static long EstimateFileAttachmentSize(string path, Definitions.AttachmentDescriptor? descriptor) {

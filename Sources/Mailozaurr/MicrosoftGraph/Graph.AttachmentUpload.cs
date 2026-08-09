@@ -28,6 +28,7 @@ public partial class Graph {
         GraphFileAttachmentSource source,
         CancellationToken cancellationToken = default,
         bool preloadContent = true) {
+        cancellationToken.ThrowIfCancellationRequested();
         string attachmentPath = source.Path;
         if (!File.Exists(attachmentPath)) {
             LogMissingAttachmentWarning(attachmentPath);
@@ -51,8 +52,15 @@ public partial class Graph {
 
         var attachmentItemWrapper = new GraphAttachmentItemWrapper(attachmentItem);
         var attachmentItemJson = JsonSerializer.Serialize(attachmentItemWrapper, MailozaurrJsonContext.Default.GraphAttachmentItemWrapper);
+        var directAttachmentJson = string.Empty;
+        if (fileSize < MinimumUploadSessionAttachmentSize) {
+            var directAttachment = source.Descriptor == null
+                ? GraphAttachment.FromFile(attachmentPath)
+                : GraphAttachment.FromDescriptor(source.Descriptor);
+            directAttachmentJson = JsonSerializer.Serialize(directAttachment, MailozaurrJsonContext.Default.GraphAttachment);
+        }
 
-        List<StreamContent> content = preloadContent
+        List<StreamContent> content = preloadContent && fileSize >= MinimumUploadSessionAttachmentSize
             ? PrepareByteArrayContentForUpload(attachmentPath, ChunkSize, cancellationToken)
             : new List<StreamContent>();
 
@@ -61,7 +69,8 @@ public partial class Graph {
             Content = content,
             FilePath = attachmentPath,
             FileSize = fileSize,
-            FileName = fileName
+            FileName = fileName,
+            DirectAttachmentJson = directAttachmentJson
         };
 
         return Task.FromResult(placeholder);
@@ -105,6 +114,39 @@ public partial class Graph {
             }
 
             return ParseUploadSessionResult(uploadSessionContent);
+        }
+    }
+
+    private async Task AddDirectAttachmentAsync(GraphMessage draftMessage, string attachmentJson, CancellationToken cancellationToken) {
+        var attachmentUrl = GraphDraftMessageUris.Attachments(SentFrom, draftMessage.Id!);
+        using var request = new HttpRequestMessage(HttpMethod.Post, attachmentUrl) {
+            Content = new StringContent(attachmentJson, Encoding.UTF8, "application/json")
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue(TokenType, AccessToken);
+        await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
+        HttpResponseMessage response;
+        try {
+            response = await _client.SendAsync(request, cancellationToken);
+        } finally {
+            MicrosoftGraphUtils.ConcurrencySemaphore.Release();
+        }
+
+        using (response) {
+            if (response.IsSuccessStatusCode) {
+                return;
+            }
+
+            var responseContent = await response.Content.ReadAsStringAsync();
+            GraphApiError? error = null;
+            try {
+                error = JsonSerializer.Deserialize(responseContent, MailozaurrJsonContext.Default.GraphApiError);
+            } catch (JsonException) {
+                // Non-JSON error response; fall back to raw content.
+            }
+            var errorMessage = error?.Error == null
+                ? $"Unknown error: {responseContent}"
+                : $"Error code: {error.Error.Code}, message: {error.Error.Message}";
+            throw new GraphApiException(response.StatusCode, errorMessage, responseContent, ParseRetryAfter(response));
         }
     }
 
@@ -266,13 +308,20 @@ public partial class Graph {
     }
 
     private async Task UploadAttachmentWithRetryAsync(GraphMessage draftMessage, GraphFileAttachmentSource source, CancellationToken cancellationToken) {
+        var attachmentItemJson = await CreateGraphAttachment(source, cancellationToken, preloadContent: false);
+        if (!string.IsNullOrEmpty(attachmentItemJson.DirectAttachmentJson)) {
+            // A direct attachment POST is not idempotent. An ambiguous timeout may mean
+            // Graph committed the attachment, so retrying could duplicate it.
+            await AddDirectAttachmentAsync(draftMessage, attachmentItemJson.DirectAttachmentJson, cancellationToken);
+            return;
+        }
+
         var policy = SendPolicy ?? MailozaurrOptions.DefaultGraphPolicy;
         int attempts = 0;
         Exception? lastException = null;
         var maxRetries = policy?.MaxRetries ?? RetryCount;
         do {
             try {
-                var attachmentItemJson = await CreateGraphAttachment(source, cancellationToken, preloadContent: false);
                 var uploadUrl = await CreateUploadSession(draftMessage, attachmentItemJson.Json, cancellationToken);
                 await SendFileChunks(uploadUrl, attachmentItemJson.FilePath, attachmentItemJson.FileSize, cancellationToken);
                 return;
