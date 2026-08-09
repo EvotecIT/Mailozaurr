@@ -77,9 +77,11 @@ public sealed class EmailMessageContent {
         property?.GetValue(source)?.ToString() ?? string.Empty;
 
     private static void AddResources(object? resources, IList<AttachmentDescriptor> destination, bool inline) {
-        if (resources is not IEnumerable enumerable || resources is string) {
+        if (resources == null || resources is string) {
             return;
         }
+
+        var enumerable = resources as IEnumerable ?? new object[] { resources };
 
         foreach (var resource in enumerable) {
             if (resource == null) {

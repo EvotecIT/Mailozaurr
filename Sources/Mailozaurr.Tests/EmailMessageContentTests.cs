@@ -35,6 +35,42 @@ public class EmailMessageContentTests {
     }
 
     [Fact]
+    public void FromRenderResult_TreatsScalarAttachmentDescriptorsAsSingleResources() {
+        var inline = new ByteArrayAttachmentDescriptor(new byte[] { 1, 2, 3 }, "chart.png") {
+            ContentType = "image/png",
+            ContentId = "chart"
+        };
+        var attachment = new ByteArrayAttachmentDescriptor(new byte[] { 4, 5 }, "report.xlsx");
+        var source = new {
+            Html = "<p><img src=\"cid:chart\"></p>",
+            InlineResources = inline,
+            Attachments = attachment
+        };
+
+        var content = EmailMessageContent.FromRenderResult(source);
+
+        Assert.Same(inline, Assert.Single(content.InlineAttachments));
+        Assert.Same(attachment, Assert.Single(content.Attachments));
+    }
+
+    [Fact]
+    public void FromRenderResult_TreatsScalarForeignResourcesAsSingleResources() {
+        var source = new {
+            Html = "<p><img src=\"cid:chart\"></p>",
+            InlineResources = new FakeInlineResource("chart", "image/png", new byte[] { 1, 2, 3 }, "chart.png"),
+            Attachments = new FakeAttachment("report.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[] { 4, 5 })
+        };
+
+        var content = EmailMessageContent.FromRenderResult(source);
+
+        var inline = Assert.IsType<ByteArrayAttachmentDescriptor>(Assert.Single(content.InlineAttachments));
+        Assert.Equal("chart", inline.ContentId);
+        Assert.Equal("chart.png", inline.FileName);
+        var attachment = Assert.IsType<ByteArrayAttachmentDescriptor>(Assert.Single(content.Attachments));
+        Assert.Equal("report.xlsx", attachment.FileName);
+    }
+
+    [Fact]
     public void GraphAttachment_FromDescriptor_PreservesInlineMetadataAndBytes() {
         var descriptor = new ByteArrayAttachmentDescriptor(new byte[] { 10, 20, 30 }, "chart.svg") {
             ContentType = "image/svg+xml",
