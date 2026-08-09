@@ -136,6 +136,83 @@ Describe 'Send-EmailMessage - MgGraphRequest attachments' {
         $message.message.internetMessageHeaders.name | Should -Contain 'X-Workflow'
     }
 
+    It 'maps generic key-value header collections without exposing collection properties' {
+        $script:mgGraphRequestCalls = [System.Collections.Generic.List[object]]::new()
+
+        function global:Invoke-MgGraphRequest {
+            param(
+                [string] $Method,
+                [string] $Uri,
+                [string] $ContentType,
+                [object] $Body,
+                [hashtable] $Headers
+            )
+
+            $script:mgGraphRequestCalls.Add([pscustomobject] @{
+                    Method = $Method
+                    Uri    = $Uri
+                    Body   = $Body
+                })
+            return @{}
+        }
+
+        try {
+            $headers = [System.Collections.Generic.List[System.Collections.Generic.KeyValuePair[string, string]]]::new()
+            $headers.Add([System.Collections.Generic.KeyValuePair[string, string]]::new('X-Workflow', 'generic-list'))
+            $content = [pscustomobject] @{
+                Subject   = 'Generic headers'
+                PlainText = 'body'
+                Headers   = [System.Management.Automation.PSObject]::AsPSObject($headers)
+            }
+            Send-EmailMessage -From 'from@example.com' -To 'to@example.com' -MgGraphRequest -Content $content -Confirm:$false | Out-Null
+        } finally {
+            Remove-Item -Path function:global:Invoke-MgGraphRequest -ErrorAction SilentlyContinue
+        }
+
+        $message = $script:mgGraphRequestCalls[0].Body | ConvertFrom-Json
+        $header = $message.message.internetMessageHeaders | Where-Object name -eq 'X-Workflow'
+        $header.value | Should -Be 'generic-list'
+        $message.message.internetMessageHeaders.name | Should -Not -Contain 'Count'
+    }
+
+    It 'keeps explicitly bound headers ahead of generic content headers' {
+        $script:mgGraphRequestCalls = [System.Collections.Generic.List[object]]::new()
+
+        function global:Invoke-MgGraphRequest {
+            param(
+                [string] $Method,
+                [string] $Uri,
+                [string] $ContentType,
+                [object] $Body,
+                [hashtable] $Headers
+            )
+
+            $script:mgGraphRequestCalls.Add([pscustomobject] @{
+                    Method = $Method
+                    Uri    = $Uri
+                    Body   = $Body
+                })
+            return @{}
+        }
+
+        try {
+            $headers = [System.Collections.Generic.List[System.Collections.Generic.KeyValuePair[string, string]]]::new()
+            $headers.Add([System.Collections.Generic.KeyValuePair[string, string]]::new('X-Workflow', 'content'))
+            $content = [pscustomobject] @{
+                Subject   = 'Header override'
+                PlainText = 'body'
+                Headers   = $headers
+            }
+            Send-EmailMessage -From 'from@example.com' -To 'to@example.com' -MgGraphRequest -Content $content -Headers @{ 'X-Workflow' = 'explicit' } -Confirm:$false | Out-Null
+        } finally {
+            Remove-Item -Path function:global:Invoke-MgGraphRequest -ErrorAction SilentlyContinue
+        }
+
+        $message = $script:mgGraphRequestCalls[0].Body | ConvertFrom-Json
+        $header = $message.message.internetMessageHeaders | Where-Object name -eq 'X-Workflow'
+        $header.value | Should -Be 'explicit'
+    }
+
     It 'maps a singleton PSCustomObject attachment from transport-neutral content' {
         $script:mgGraphRequestCalls = [System.Collections.Generic.List[object]]::new()
 

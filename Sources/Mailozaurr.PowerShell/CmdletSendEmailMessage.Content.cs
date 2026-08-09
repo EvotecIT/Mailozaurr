@@ -133,16 +133,40 @@ public sealed partial class CmdletSendEmailMessage {
     }
 
     private static void AddHeaders(object? headers, IDictionary<string, string> destination) {
-        if (headers is IDictionary dictionary) {
+        if (headers == null) return;
+
+        var adaptedHeaders = PSObject.AsPSObject(headers);
+        var baseHeaders = adaptedHeaders.BaseObject;
+        if (baseHeaders is IDictionary dictionary) {
             foreach (DictionaryEntry entry in dictionary) {
                 var key = entry.Key?.ToString();
                 if (!string.IsNullOrWhiteSpace(key) && entry.Value != null) destination[key!] = entry.Value.ToString() ?? string.Empty;
             }
             return;
         }
-        if (headers == null) return;
 
-        foreach (var property in PSObject.AsPSObject(headers).Properties) {
+        if (baseHeaders is IEnumerable enumerable && baseHeaders is not string) {
+            foreach (var item in enumerable) {
+                if (item == null) continue;
+                if (item is DictionaryEntry entry) {
+                    var dictionaryKey = entry.Key?.ToString();
+                    if (!string.IsNullOrWhiteSpace(dictionaryKey) && entry.Value != null) {
+                        destination[dictionaryKey!] = entry.Value.ToString() ?? string.Empty;
+                    }
+                    continue;
+                }
+
+                var adaptedEntry = PSObject.AsPSObject(item);
+                var key = ReadValue(adaptedEntry, "Key")?.ToString();
+                var value = ReadValue(adaptedEntry, "Value");
+                if (!string.IsNullOrWhiteSpace(key) && value != null) {
+                    destination[key!] = value.ToString() ?? string.Empty;
+                }
+            }
+            return;
+        }
+
+        foreach (var property in adaptedHeaders.Properties) {
             if (!string.IsNullOrWhiteSpace(property.Name) && property.Value != null) {
                 destination[property.Name] = property.Value.ToString() ?? string.Empty;
             }

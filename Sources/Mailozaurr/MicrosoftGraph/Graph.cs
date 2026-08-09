@@ -60,6 +60,7 @@ public partial class Graph : IDisposable {
     private string? _autoEmbedOriginalHtml;
     private string? _autoEmbedRenderedHtml;
     private readonly List<string> _autoEmbeddedImagePaths = new();
+    private readonly List<GraphAttachment> _deferredGraphAttachments = new();
 
     /// <summary>
     /// List of GraphAttachment objects created from the file paths in the Attachments property.
@@ -369,10 +370,10 @@ public partial class Graph : IDisposable {
             smtp.WebhookUrl = this.WebhookUrl;
             smtp.Priority = this.Priority;
 
-            if (this.ConvertedAttachments != null && this.ConvertedAttachments.Count > 0) {
+            if ((this.ConvertedAttachments != null && this.ConvertedAttachments.Count > 0) || _deferredGraphAttachments.Count > 0) {
                 var attachments = new List<Definitions.AttachmentDescriptor>();
                 var inline = new List<Definitions.AttachmentDescriptor>();
-                foreach (var a in this.ConvertedAttachments) {
+                foreach (var a in (this.ConvertedAttachments ?? new List<GraphAttachment>()).Concat(_deferredGraphAttachments)) {
                     if (string.IsNullOrWhiteSpace(a.ContentBytes)) continue;
                     try {
                         var d = CreateSmtpFallbackAttachment(a);

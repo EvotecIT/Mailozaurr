@@ -12,6 +12,8 @@ public partial class Graph {
     /// </summary>
     public void CreateAttachments() {
         ConvertedAttachments.Clear();
+        AttachmentsPlaceHolders.Clear();
+        _deferredGraphAttachments.Clear();
         TotalAttachmentSizeBytes = 0;
         RawAttachmentSizeBytes = 0;
         IsLargerAttachment = false;
@@ -254,5 +256,24 @@ public partial class Graph {
         MessageContainer.Message.Attachments = ConvertedAttachments.Count == 0 ? null : ConvertedAttachments;
         MessageJson = JsonSerializer.Serialize(MessageContainer, MailozaurrJsonContext.Default.GraphMessageContainer);
         return true;
+    }
+
+    private bool TryRouteEligibleAttachments(Func<bool> exceedsPayloadLimit) {
+        var changed = false;
+        for (var index = ConvertedAttachments.Count - 1;
+             index >= 0 && exceedsPayloadLimit();
+             index--) {
+            var attachment = ConvertedAttachments[index];
+            ConvertedAttachments.RemoveAt(index);
+            _deferredGraphAttachments.Insert(0, attachment);
+            MessageContainer.Message.Attachments = ConvertedAttachments.Count == 0 ? null : ConvertedAttachments;
+            MessageJson = JsonSerializer.Serialize(MessageContainer, MailozaurrJsonContext.Default.GraphMessageContainer);
+            changed = true;
+        }
+
+        if (changed) {
+            IsLargerAttachment = true;
+        }
+        return changed;
     }
 }

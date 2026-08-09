@@ -38,12 +38,6 @@ public partial class Graph {
             },
             SaveToSentItems = !DoNotSaveToSentItems
         };
-        if (_inlineAttachmentSizeBytes > GraphPayloadLimitBytes) {
-            throw new InvalidOperationException("In-memory attachments exceed the 4MB Graph payload limit. Use file path attachments or reduce attachment size.");
-        }
-        if (!IsLargerAttachment && TotalAttachmentSizeBytes > GraphPayloadLimitBytes && _fileAttachmentCount > 0) {
-            throw new InvalidOperationException("Total attachment payload exceeds the 4MB Graph limit after embedding images. Use file attachments or reduce attachment size.");
-        }
         if (ConvertedAttachments.Count > 0) {
             MessageContainer.Message.Attachments = ConvertedAttachments;
         }
@@ -54,8 +48,9 @@ public partial class Graph {
         MessageJson = JsonSerializer.Serialize(MessageContainer, MailozaurrJsonContext.Default.GraphMessageContainer);
         if (Encoding.UTF8.GetByteCount(MessageJson) > GraphPayloadLimitBytes) {
             TryRouteConvertedFileAttachmentsThroughUploadSession();
+            TryRouteEligibleAttachments(() => Encoding.UTF8.GetByteCount(MessageJson) > GraphPayloadLimitBytes);
             if (Encoding.UTF8.GetByteCount(MessageJson) > GraphPayloadLimitBytes) {
-                throw new InvalidOperationException("The complete serialized Graph request exceeds the 4MB payload limit after file attachments were removed. Reduce the message body, recipients, headers, or in-memory attachments.");
+                throw new InvalidOperationException("The complete serialized Graph request exceeds the 4MB payload limit after draft attachments were removed. Reduce the message body, recipients, or headers.");
             }
         }
         //LoggingMessages.Logger.WriteVerbose(MessageJson);

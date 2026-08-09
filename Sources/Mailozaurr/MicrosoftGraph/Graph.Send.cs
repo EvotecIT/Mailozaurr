@@ -253,8 +253,10 @@ public partial class Graph {
         if (GetBatchPayloadSize(request) > GraphPayloadLimitBytes) {
             TryRouteConvertedFileAttachmentsThroughUploadSession();
             request = CreateBatchSendRequest();
+            TryRouteEligibleAttachments(() => GetBatchPayloadSize(CreateBatchSendRequest()) > GraphPayloadLimitBytes);
+            request = CreateBatchSendRequest();
             if (GetBatchPayloadSize(request) > GraphPayloadLimitBytes) {
-                throw new InvalidOperationException("The complete serialized Graph batch request exceeds the 4MB payload limit after file attachments were removed. Reduce the message body, recipients, headers, or in-memory attachments.");
+                throw new InvalidOperationException("The complete serialized Graph batch request exceeds the 4MB payload limit after draft attachments were removed. Reduce the message body, recipients, or headers.");
             }
         }
         if (IsLargerAttachment) {

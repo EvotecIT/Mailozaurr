@@ -210,6 +210,118 @@ public class GraphDraftTests {
     }
 
     [Fact]
+    public async Task SendMessageAsync_LargeCompleteRequest_DefersByteAndStreamAttachmentsDirectly() {
+        var byteContent = new byte[1_000_000];
+        using var stream = new MemoryStream(new byte[1_000_000], writable: false);
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("{\"id\":\"draft-id\"}") },
+            new HttpResponseMessage(HttpStatusCode.Created),
+            new HttpResponseMessage(HttpStatusCode.Created),
+            new HttpResponseMessage(HttpStatusCode.Accepted));
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "large body with memory attachments",
+            HTML = new string('x', 2_000_000),
+            ContentType = "HTML",
+            Attachments = new object[] {
+                new ByteArrayAttachmentDescriptor(byteContent, "bytes.bin"),
+                new StreamAttachmentDescriptor(stream, "stream.bin") {
+                    ContentDisposition = new ContentDisposition(ContentDisposition.Inline),
+                    ContentId = "stream-inline"
+                }
+            },
+            AccessToken = "token",
+            TokenType = "Bearer"
+        };
+        SetHttpClient(graph, handler);
+
+        var result = await graph.SendMessageAsync();
+
+        Assert.True(result.Status);
+        Assert.True(graph.IsLargerAttachment);
+        var draftRequest = Assert.Single(handler.Requests, request =>
+            request.RequestUri!.AbsolutePath.Contains("/mailfolders/drafts/messages", StringComparison.OrdinalIgnoreCase));
+        var draftBody = await draftRequest.Content!.ReadAsStringAsync();
+        Assert.Contains("\"name\":\"bytes.bin\"", draftBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"name\":\"stream.bin\"", draftBody, StringComparison.Ordinal);
+        var attachmentRequests = handler.Requests.Where(request =>
+            request.RequestUri!.AbsolutePath.EndsWith("/messages/draft-id/attachments", StringComparison.OrdinalIgnoreCase)).ToArray();
+        Assert.Single(attachmentRequests);
+        var attachmentBodies = await Task.WhenAll(attachmentRequests.Select(request => request.Content!.ReadAsStringAsync()));
+        Assert.Contains(attachmentBodies, body => body.Contains("\"name\":\"stream.bin\"", StringComparison.Ordinal) &&
+                                                   body.Contains("\"isInline\":true", StringComparison.OrdinalIgnoreCase) &&
+                                                   body.Contains("\"contentId\":\"stream-inline\"", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(handler.Requests, request =>
+            request.RequestUri!.AbsolutePath.EndsWith("/createUploadSession", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task SendMessageAsync_LargeInMemoryAttachmentUsesUploadSessionAndPreservesInlineMetadata() {
+        var bytes = new byte[3_100_000];
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("{\"id\":\"draft-id\"}") },
+            new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("{\"uploadUrl\":\"https://upload.example/session\"}") },
+            new HttpResponseMessage(HttpStatusCode.Accepted),
+            new HttpResponseMessage(HttpStatusCode.Accepted));
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "large in-memory inline attachment",
+            HTML = "<img src=\"cid:memory-inline\">",
+            ContentType = "HTML",
+            Attachments = new object[] {
+                new ByteArrayAttachmentDescriptor(bytes, "memory.bin") {
+                    ContentType = "application/x-memory",
+                    ContentDisposition = new ContentDisposition(ContentDisposition.Inline),
+                    ContentId = "memory-inline"
+                }
+            },
+            AccessToken = "token",
+            TokenType = "Bearer"
+        };
+        SetHttpClient(graph, handler);
+
+        var result = await graph.SendMessageAsync();
+
+        Assert.True(result.Status);
+        Assert.True(graph.IsLargerAttachment);
+        Assert.DoesNotContain(handler.Requests, request =>
+            request.RequestUri!.AbsolutePath.EndsWith("/messages/draft-id/attachments", StringComparison.OrdinalIgnoreCase));
+        var sessionRequest = Assert.Single(handler.Requests, request =>
+            request.RequestUri!.AbsolutePath.EndsWith("/createUploadSession", StringComparison.OrdinalIgnoreCase));
+        var sessionBody = await sessionRequest.Content!.ReadAsStringAsync();
+        Assert.Contains("\"name\":\"memory.bin\"", sessionBody, StringComparison.Ordinal);
+        Assert.Contains("\"contentType\":\"application/x-memory\"", sessionBody, StringComparison.Ordinal);
+        Assert.Contains("\"isInline\":true", sessionBody, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("\"contentId\":\"memory-inline\"", sessionBody, StringComparison.OrdinalIgnoreCase);
+        var uploadRequest = Assert.Single(handler.Requests, request => request.Method == HttpMethod.Put);
+        Assert.NotNull(uploadRequest.Content!.Headers.ContentRange);
+    }
+
+    [Fact]
+    public async Task PrepareAttachments_LargeInMemoryAttachmentCreatesUploadPlaceholder() {
+        var bytes = new byte[3_100_000];
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "large in-memory placeholder",
+            HTML = "body",
+            ContentType = "HTML",
+            Attachments = new object[] { new ByteArrayAttachmentDescriptor(bytes, "memory.bin") }
+        };
+
+        graph.CreateMessage();
+        await graph.PrepareAttachments();
+
+        var placeholder = Assert.Single(graph.AttachmentsPlaceHolders);
+        Assert.Equal("memory.bin", placeholder.FileName);
+        Assert.Equal(3_100_000, placeholder.FileSize);
+        Assert.Empty(placeholder.DirectAttachmentJson);
+        Assert.NotEmpty(placeholder.Content);
+    }
+
+    [Fact]
     public async Task SendMessageDraftAsync_SmallFileAddsItExactlyOnceAfterDraftCreation() {
         var path = Path.GetTempFileName();
         File.WriteAllBytes(path, new byte[] { 1, 2, 3, 4 });
@@ -380,6 +492,52 @@ public class GraphDraftTests {
         } finally {
             File.Delete(path);
         }
+    }
+
+    [Fact]
+    public async Task SendMessageBatchAsync_BatchEnvelopeOverflowDefersInMemoryAttachmentExactlyOnce() {
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("{\"id\":\"draft-id\"}") },
+            new HttpResponseMessage(HttpStatusCode.Created),
+            new HttpResponseMessage(HttpStatusCode.Accepted));
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "batch envelope boundary",
+            HTML = string.Empty,
+            ContentType = "HTML",
+            Attachments = new object[] { new ByteArrayAttachmentDescriptor(new byte[512], "memory.bin") },
+            AccessToken = "token",
+            TokenType = "Bearer"
+        };
+        SetHttpClient(graph, handler);
+
+        graph.CreateMessage();
+        var emptyBodyMessageSize = System.Text.Encoding.UTF8.GetByteCount(graph.MessageJson);
+        var createBatchRequest = typeof(Graph).GetMethod("CreateBatchSendRequest", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var getBatchPayloadSize = typeof(Graph).GetMethod("GetBatchPayloadSize", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var emptyBodyRequest = createBatchRequest.Invoke(graph, null)!;
+        var batchOverhead = (int)getBatchPayloadSize.Invoke(null, new[] { emptyBodyRequest })! - emptyBodyMessageSize;
+        var targetMessageSize = 4_000_000 - Math.Max(1, batchOverhead / 2);
+        graph.HTML = new string('x', targetMessageSize - emptyBodyMessageSize);
+        graph.CreateMessage();
+
+        var messageSize = System.Text.Encoding.UTF8.GetByteCount(graph.MessageJson);
+        var boundaryRequest = createBatchRequest.Invoke(graph, null)!;
+        var batchSize = (int)getBatchPayloadSize.Invoke(null, new[] { boundaryRequest })!;
+        Assert.True(messageSize < 4_000_000);
+        Assert.True(batchSize > 4_000_000);
+
+        var result = await graph.SendMessageBatchAsync();
+
+        Assert.True(result.Status);
+        Assert.DoesNotContain(handler.Requests, request => request.RequestUri!.AbsolutePath == "/v1.0/$batch");
+        Assert.Single(handler.Requests, request =>
+            request.RequestUri!.AbsolutePath.Contains("/mailfolders/drafts/messages", StringComparison.OrdinalIgnoreCase));
+        Assert.Single(handler.Requests, request =>
+            request.RequestUri!.AbsolutePath.EndsWith("/messages/draft-id/attachments", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(handler.Requests, request =>
+            request.RequestUri!.AbsolutePath.EndsWith("/createUploadSession", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
