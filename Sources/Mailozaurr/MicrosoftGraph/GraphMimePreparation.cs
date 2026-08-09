@@ -42,11 +42,7 @@ public static class GraphMimePreparation {
         var inlineBytes = 0L;
 
         try {
-            foreach (var entity in message.Attachments) {
-                if (entity is not MimePart part) {
-                    continue;
-                }
-
+            foreach (var part in EnumerateAttachmentParts(message)) {
                 var decoded = DecodedMimeAttachment.DecodeToTempFile(part);
                 if (decoded.Length <= maxInlineAttachmentBytes &&
                     inlineBytes + decoded.Length <= maxInlineAttachmentBytes) {
@@ -88,6 +84,18 @@ public static class GraphMimePreparation {
                 decoded.Dispose();
             }
             throw;
+        }
+    }
+
+    private static IEnumerable<MimePart> EnumerateAttachmentParts(MimeMessage message) {
+        foreach (var part in message.BodyParts.OfType<MimePart>()) {
+            var isInline = string.Equals(
+                part.ContentDisposition?.Disposition,
+                ContentDisposition.Inline,
+                StringComparison.OrdinalIgnoreCase);
+            if (part.IsAttachment || isInline && part is not TextPart) {
+                yield return part;
+            }
         }
     }
 

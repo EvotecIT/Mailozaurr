@@ -407,7 +407,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
             return;
         }
         if (graph.IsLargerAttachment) {
-            var json = graph.CreateDraftForMg();
+            var json = graph.CreatePreparedDraft();
             var draftMessageId = InvokeMgGraphRequestPOST1($"v1.0/users/{graph.SentFrom}/mailfolders/drafts/messages", EmailAction.SendDraftMessage, json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
             if (draftMessageId == string.Empty) {
                 LogEmitter.EmitLogs(graph.LogCollector, this);

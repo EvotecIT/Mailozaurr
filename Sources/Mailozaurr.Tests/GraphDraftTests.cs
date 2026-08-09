@@ -125,6 +125,48 @@ public class GraphDraftTests {
     }
 
     [Fact]
+    public async Task SendMessageAsync_AutoEmbeddedImageSurvivesDraftRouting() {
+        var imagePath = Path.GetTempFileName();
+        var attachmentPath = Path.GetTempFileName();
+        File.WriteAllBytes(imagePath, new byte[] { 1, 2, 3, 4 });
+        File.WriteAllBytes(attachmentPath, new byte[3_100_000]);
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("{\"id\":\"draft-id\"}") },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"uploadUrl\":\"https://upload.test/session\"}") },
+            new HttpResponseMessage(HttpStatusCode.Created),
+            new HttpResponseMessage(HttpStatusCode.Accepted));
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "auto embedded draft",
+            HTML = $"<img src=\"{imagePath}\">",
+            ContentType = "HTML",
+            AutoEmbedImages = true,
+            Attachments = new object[] { attachmentPath },
+            AccessToken = "token",
+            TokenType = "Bearer"
+        };
+        SetHttpClient(graph, handler);
+
+        try {
+            var result = await graph.SendMessageAsync();
+
+            Assert.True(result.Status);
+            var draftRequest = Assert.Single(handler.Requests, request =>
+                request.RequestUri!.AbsolutePath.Contains("/mailfolders/drafts/messages", StringComparison.OrdinalIgnoreCase));
+            var draftBody = await draftRequest.Content!.ReadAsStringAsync();
+            Assert.Contains("cid:" + Path.GetFileName(imagePath), draftBody, StringComparison.Ordinal);
+            Assert.Contains("\"isInline\":true", draftBody, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("\"contentId\":\"" + Path.GetFileName(imagePath) + "\"", draftBody, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(handler.Requests, request =>
+                request.RequestUri!.AbsolutePath.EndsWith("/createUploadSession", StringComparison.OrdinalIgnoreCase));
+        } finally {
+            File.Delete(imagePath);
+            File.Delete(attachmentPath);
+        }
+    }
+
+    [Fact]
     public async Task SendMessageAsync_LargeCompleteRequest_AddsSubThresholdFileDirectlyToDraft() {
         var path = Path.GetTempFileName();
         File.WriteAllBytes(path, new byte[2_300_000]);
@@ -341,6 +383,47 @@ public class GraphDraftTests {
     }
 
     [Fact]
+    public async Task SendMessageBatchAsync_AutoEmbeddedImageSurvivesDraftRouting() {
+        var imagePath = Path.GetTempFileName();
+        var attachmentPath = Path.GetTempFileName();
+        File.WriteAllBytes(imagePath, new byte[] { 1, 2, 3, 4 });
+        File.WriteAllBytes(attachmentPath, new byte[3_100_000]);
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("{\"id\":\"draft-id\"}") },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"uploadUrl\":\"https://upload.test/session\"}") },
+            new HttpResponseMessage(HttpStatusCode.Created),
+            new HttpResponseMessage(HttpStatusCode.Accepted));
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "batch auto embedded draft",
+            HTML = $"<img src=\"{imagePath}\">",
+            ContentType = "HTML",
+            AutoEmbedImages = true,
+            Attachments = new object[] { attachmentPath },
+            AccessToken = "token",
+            TokenType = "Bearer"
+        };
+        SetHttpClient(graph, handler);
+
+        try {
+            var result = await graph.SendMessageBatchAsync();
+
+            Assert.True(result.Status);
+            var draftRequest = Assert.Single(handler.Requests, request =>
+                request.RequestUri!.AbsolutePath.Contains("/mailfolders/drafts/messages", StringComparison.OrdinalIgnoreCase));
+            var draftBody = await draftRequest.Content!.ReadAsStringAsync();
+            Assert.Contains("cid:" + Path.GetFileName(imagePath), draftBody, StringComparison.Ordinal);
+            Assert.Contains("\"isInline\":true", draftBody, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(handler.Requests, request =>
+                request.RequestUri!.AbsolutePath.EndsWith("/createUploadSession", StringComparison.OrdinalIgnoreCase));
+        } finally {
+            File.Delete(imagePath);
+            File.Delete(attachmentPath);
+        }
+    }
+
+    [Fact]
     public async Task PrepareAttachments_RelativeAndAbsoluteAliases_CreateOnePlaceholder() {
         var fileName = $"mailozaurr-graph-large-{Guid.NewGuid():N}.tmp";
         var absolutePath = Path.Combine(Environment.CurrentDirectory, fileName);
@@ -517,6 +600,31 @@ public class GraphDraftTests {
 
         string json = graph.CreateDraft();
         Assert.Contains("\"importance\":\"high\"", json, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CreatePreparedDraft_PreservesAutoEmbeddedInlineAttachment() {
+        var imagePath = Path.GetTempFileName();
+        File.WriteAllBytes(imagePath, new byte[] { 1, 2, 3, 4 });
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "prepared draft",
+            HTML = $"<img src=\"{imagePath}\">",
+            ContentType = "HTML",
+            AutoEmbedImages = true
+        };
+
+        try {
+            graph.CreateMessage();
+            var json = graph.CreatePreparedDraft();
+
+            Assert.Contains("cid:" + Path.GetFileName(imagePath), json, StringComparison.Ordinal);
+            Assert.Contains("\"isInline\":true", json, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("\"contentId\":\"" + Path.GetFileName(imagePath) + "\"", json, StringComparison.OrdinalIgnoreCase);
+        } finally {
+            File.Delete(imagePath);
+        }
     }
 
     [Fact]

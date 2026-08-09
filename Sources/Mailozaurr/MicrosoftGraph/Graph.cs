@@ -57,6 +57,9 @@ public partial class Graph : IDisposable {
     private long _inlineAttachmentSizeBytes;
     private int _fileAttachmentCount;
     private int _convertedFileAttachmentStartIndex = -1;
+    private string? _autoEmbedOriginalHtml;
+    private string? _autoEmbedRenderedHtml;
+    private readonly List<string> _autoEmbeddedImagePaths = new();
 
     /// <summary>
     /// List of GraphAttachment objects created from the file paths in the Attachments property.

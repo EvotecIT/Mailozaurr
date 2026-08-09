@@ -21,7 +21,7 @@ public partial class Graph {
         }
         if (IsLargerAttachment) {
             LogCollector.LogVerbose("Send-EmailMessage - Serialized attachment payload exceeds the Graph simple-send limit; using a draft upload session.");
-            return await SendMessageDraftAsync(cancellationToken);
+            return await SendMessageDraftAsync(messagePrepared: true, cancellationToken);
         }
         LogCollector.LogVerbose("Send-EmailMessage - Sending email via Graph API");
         // Create the request URI outside the loop.
@@ -108,9 +108,15 @@ public partial class Graph {
     /// </summary>
     /// <returns>The result of the send operation.</returns>
     public async Task<SmtpResult> SendMessageDraftAsync(CancellationToken cancellationToken = default) {
+        return await SendMessageDraftAsync(messagePrepared: false, cancellationToken);
+    }
+
+    private async Task<SmtpResult> SendMessageDraftAsync(bool messagePrepared, CancellationToken cancellationToken) {
         var operationStopwatch = StartOperationTimer();
         if (DryRun) {
-            CreateMessage();
+            if (!messagePrepared) {
+                CreateMessage();
+            }
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph draft send.");
             return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
         }
@@ -121,7 +127,7 @@ public partial class Graph {
 
         GraphMessage draftMessage;
         try {
-            draftMessage = await CreateDraftMessageAsync(cancellationToken);
+            draftMessage = await CreateDraftMessageAsync(messagePrepared, cancellationToken);
             await UploadAttachmentsAsync(draftMessage, cancellationToken);
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
@@ -259,7 +265,7 @@ public partial class Graph {
                     return connection;
                 }
             }
-            return await SendMessageDraftAsync(cancellationToken);
+            return await SendMessageDraftAsync(messagePrepared: true, cancellationToken);
         }
         var results = await MicrosoftGraphUtils.SendBatchAsync(credential, new[] { request }, cancellationToken);
         var response = results.FirstOrDefault();
@@ -307,8 +313,13 @@ public partial class Graph {
     /// </summary>
     /// <returns>The created draft message.</returns>
     public async Task<GraphMessage> CreateDraftMessageAsync(CancellationToken cancellationToken = default) {
-        // Create the draft message
-        CreateMessage();
+        return await CreateDraftMessageAsync(messagePrepared: false, cancellationToken);
+    }
+
+    private async Task<GraphMessage> CreateDraftMessageAsync(bool messagePrepared, CancellationToken cancellationToken) {
+        if (!messagePrepared) {
+            CreateMessage();
+        }
         // This entry point always completes through the draft attachment endpoints.
         // Remove any file-backed attachments that happened to fit the simple payload
         // so UploadAttachmentsAsync can add each file exactly once.
@@ -371,10 +382,19 @@ public partial class Graph {
     /// </summary>
     /// <returns>The JSON payload for the draft message.</returns>
     public string CreateDraftForMg() {
-        // Create the draft message
-        CreateMessage();
-        var messageJson = CreateDraft();
-        return messageJson;
+        return CreateDraft();
+    }
+
+    /// <summary>
+    /// Serializes the current, already prepared Graph message for a draft request.
+    /// </summary>
+    /// <remarks>
+    /// Call <see cref="CreateMessage"/> first. This avoids rebuilding state after
+    /// automatic inline-image conversion has rewritten local image references to CIDs.
+    /// </remarks>
+    /// <returns>The JSON payload for the prepared draft message.</returns>
+    public string CreatePreparedDraft() {
+        return JsonSerializer.Serialize(MessageContainer.Message, MailozaurrJsonContext.Default.GraphMessage);
     }
 
     /// <summary>
@@ -383,9 +403,6 @@ public partial class Graph {
     /// <returns>The JSON representation of the message.</returns>
     public string CreateDraft() {
         CreateMessage();
-
-        // Serialize only the GraphMessage to a JSON string, excluding the SaveToSentItems property
-        var messageJson = JsonSerializer.Serialize(MessageContainer.Message, MailozaurrJsonContext.Default.GraphMessage);
-        return messageJson;
+        return CreatePreparedDraft();
     }
 }

@@ -174,6 +174,32 @@ public class GraphMailboxBrowserTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task ImportMessageAsync_AddsLinkedInlineResourceWithCidMetadata() {
+        var createJson = "{\"id\":\"created-id\"}";
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent(createJson) },
+            new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent(string.Empty) });
+        var client = CreateClient(handler);
+        var browser = new GraphMailboxBrowser(client);
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse("sender@example.test"));
+        message.To.Add(MailboxAddress.Parse("recipient@example.test"));
+        message.Subject = "Inline image";
+        var builder = new BodyBuilder { HtmlBody = "<img src=\"cid:inline-logo\">" };
+        var resource = builder.LinkedResources.Add("logo.png", new byte[] { 1, 2, 3, 4 });
+        resource.ContentId = "inline-logo";
+        message.Body = builder.ToMessageBody();
+
+        await browser.ImportMessageAsync(message, folder: "Sent Items", maxInlineAttachmentBytes: 0);
+
+        Assert.Equal(2, handler.Requests.Count);
+        var uploadBody = await handler.Requests[1].Content!.ReadAsStringAsync();
+        Assert.Contains("\"isInline\":true", uploadBody, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("\"contentId\":\"inline-logo\"", uploadBody, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("\"contentBytes\":\"AQIDBA==\"", uploadBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task SendMessageAsync_CreatesDraftAndSendsIt() {
         var createJson = "{\"id\":\"draft-id\"}";
         var handler = new RecordingHandler(

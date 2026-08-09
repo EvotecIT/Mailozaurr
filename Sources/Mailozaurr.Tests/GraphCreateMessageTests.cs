@@ -103,6 +103,49 @@ public class GraphCreateMessageTests {
     }
 
     [Fact]
+    public void GraphMimePreparation_PreservesSmallLinkedInlineResource() {
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse("from@example.com"));
+        message.To.Add(MailboxAddress.Parse("to@example.com"));
+        var builder = new BodyBuilder { HtmlBody = "<img src=\"cid:logo-image\">" };
+        var resource = builder.LinkedResources.Add("logo.png", new byte[] { 1, 2, 3, 4 });
+        resource.ContentId = "logo-image";
+        message.Body = builder.ToMessageBody();
+
+        var prepared = GraphMimePreparation.PrepareMessage(message);
+
+        var attachment = Assert.Single(prepared.Message.Attachments!);
+        Assert.True(attachment.IsInline);
+        Assert.Equal("logo-image", attachment.ContentId);
+        Assert.Equal(Convert.ToBase64String(new byte[] { 1, 2, 3, 4 }), attachment.ContentBytes);
+        Assert.Empty(prepared.UploadAttachments);
+    }
+
+    [Fact]
+    public void GraphMimePreparation_RoutesLargeLinkedInlineResourceWithCidMetadata() {
+        var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse("from@example.com"));
+        message.To.Add(MailboxAddress.Parse("to@example.com"));
+        var builder = new BodyBuilder { HtmlBody = "<img src=\"cid:large-inline\">" };
+        var resource = builder.LinkedResources.Add("large.png", new byte[3_200_000]);
+        resource.ContentId = "large-inline";
+        message.Body = builder.ToMessageBody();
+
+        var prepared = GraphMimePreparation.PrepareMessage(message);
+        try {
+            Assert.Null(prepared.Message.Attachments);
+            var attachment = Assert.Single(prepared.UploadAttachments);
+            Assert.True(attachment.IsInline);
+            Assert.Equal("large-inline", attachment.ContentId);
+            Assert.Equal(3_200_000, attachment.Length);
+        } finally {
+            foreach (var attachment in prepared.UploadAttachments) {
+                attachment.Dispose();
+            }
+        }
+    }
+
+    [Fact]
     public void CreateMessage_WithoutExplicitContentType_DefaultsToHtml() {
         using var graph = new Graph {
             From = "from@example.com",
