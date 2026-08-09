@@ -1,5 +1,6 @@
 using Mailozaurr.Definitions;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Xunit;
 
@@ -11,8 +12,7 @@ public class AttachmentPathIdentityTests {
         var paths = AttachmentPathIdentity.CreateSet();
 
         Assert.True(paths.Add("attachment.tmp"));
-        var caseSensitive = !RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
-            !RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+        var caseSensitive = !RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
         Assert.Equal(caseSensitive, paths.Add("ATTACHMENT.TMP"));
     }
 
@@ -24,5 +24,28 @@ public class AttachmentPathIdentityTests {
 
         Assert.True(AttachmentPathIdentity.Add(paths, fileName));
         Assert.False(AttachmentPathIdentity.Add(paths, absolutePath));
+    }
+
+    [Fact]
+    public void Add_FollowsActualFileSystemCaseSemantics() {
+        var directory = Path.Combine(Path.GetTempPath(), $"mailozaurr-case-{System.Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var lower = Path.Combine(directory, "report.txt");
+        var upper = Path.Combine(directory, "REPORT.TXT");
+
+        try {
+            File.WriteAllText(lower, "lower");
+            File.WriteAllText(upper, "upper");
+            var distinctEntries = Directory.EnumerateFiles(directory)
+                .Select(Path.GetFileName)
+                .Distinct(System.StringComparer.Ordinal)
+                .Count() == 2;
+            var paths = AttachmentPathIdentity.CreateSet();
+
+            Assert.True(AttachmentPathIdentity.Add(paths, lower));
+            Assert.Equal(distinctEntries, AttachmentPathIdentity.Add(paths, upper));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 }

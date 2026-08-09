@@ -1,6 +1,9 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Mailozaurr.Definitions;
@@ -10,6 +13,11 @@ using Xunit;
 namespace Mailozaurr.Tests;
 
 public class GraphDraftTests {
+    private static void SetHttpClient(Graph graph, HttpMessageHandler handler) {
+        var field = typeof(Graph).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(graph, new HttpClient(handler));
+    }
+
     [Fact]
     public void CreateDraft_LargeAttachments_ExcludesAttachments() {
         string tmp = Path.GetTempFileName();
@@ -44,6 +52,75 @@ public class GraphDraftTests {
         Assert.True(graph.IsLargerAttachment);
         Assert.Equal(2, graph.AttachmentsPlaceHolders.Count);
         Assert.All(graph.AttachmentsPlaceHolders, p => Assert.False(string.IsNullOrWhiteSpace(p.FileName)));
+    }
+
+    [Fact]
+    public async Task SendMessageAsync_Base64ExpandedFile_UsesDraftUploadSession() {
+        var path = Path.GetTempFileName();
+        File.WriteAllBytes(path, new byte[3_100_000]);
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("{\"id\":\"draft-id\"}") },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"uploadUrl\":\"https://upload.test/session\"}") },
+            new HttpResponseMessage(HttpStatusCode.Created),
+            new HttpResponseMessage(HttpStatusCode.Accepted));
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "serialized size",
+            HTML = "body",
+            ContentType = "HTML",
+            Attachments = new object[] { path },
+            AccessToken = "token",
+            TokenType = "Bearer"
+        };
+        SetHttpClient(graph, handler);
+
+        try {
+            var result = await graph.SendMessageAsync();
+
+            Assert.True(result.Status);
+            Assert.DoesNotContain(handler.Requests, request => request.RequestUri!.AbsolutePath.EndsWith("/sendMail", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(handler.Requests, request => request.RequestUri!.AbsolutePath.Contains("/mailfolders/drafts/messages", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(handler.Requests, request => request.RequestUri!.AbsolutePath.EndsWith("/createUploadSession", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(handler.Requests, request => request.Method == HttpMethod.Put && request.RequestUri!.Host == "upload.test");
+            Assert.Contains(handler.Requests, request => request.RequestUri!.AbsolutePath.EndsWith("/messages/draft-id/send", StringComparison.OrdinalIgnoreCase));
+        } finally {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task SendMessageBatchAsync_LargeFile_AuthenticatesBeforeDraftUploadSession() {
+        var path = Path.GetTempFileName();
+        File.WriteAllBytes(path, new byte[3_100_000]);
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"access_token\":\"token\",\"token_type\":\"Bearer\"}") },
+            new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("{\"id\":\"draft-id\"}") },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"uploadUrl\":\"https://upload.test/session\"}") },
+            new HttpResponseMessage(HttpStatusCode.Created),
+            new HttpResponseMessage(HttpStatusCode.Accepted));
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "batch upload",
+            HTML = "body",
+            ContentType = "HTML",
+            Attachments = new object[] { path }
+        };
+        graph.Authenticate(new NetworkCredential("client@tenant", "secret"));
+        SetHttpClient(graph, handler);
+
+        try {
+            var result = await graph.SendMessageBatchAsync();
+
+            Assert.True(result.Status);
+            Assert.Contains(handler.Requests, request => request.RequestUri!.Host == "login.microsoftonline.com");
+            Assert.DoesNotContain(handler.Requests, request => request.RequestUri!.AbsolutePath == "/v1.0/$batch");
+            Assert.Contains(handler.Requests, request => request.RequestUri!.AbsolutePath.EndsWith("/createUploadSession", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(handler.Requests, request => request.RequestUri!.AbsolutePath.EndsWith("/messages/draft-id/send", StringComparison.OrdinalIgnoreCase));
+        } finally {
+            File.Delete(path);
+        }
     }
 
     [Fact]

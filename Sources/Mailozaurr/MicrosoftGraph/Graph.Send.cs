@@ -19,6 +19,10 @@ public partial class Graph {
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph send.");
             return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
         }
+        if (IsLargerAttachment) {
+            LogCollector.LogVerbose("Send-EmailMessage - Serialized attachment payload exceeds the Graph simple-send limit; using a draft upload session.");
+            return await SendMessageDraftAsync(cancellationToken);
+        }
         LogCollector.LogVerbose("Send-EmailMessage - Sending email via Graph API");
         // Create the request URI outside the loop.
         var requestUri = MicrosoftGraphUtils.BuildGraphUri(
@@ -229,14 +233,24 @@ public partial class Graph {
             ClientSecret = ApplicationKey,
             DirectoryId = TenantDomain
         };
-        var bodyObj = JsonSerializer.Deserialize(MessageJson, MailozaurrJsonContext.Default.JsonElement);
-        var request = new GraphBatchRequest {
-            Id = "1",
-            Method = GraphHttpMethod.POST,
-            Url = $"/users/{MessageContainer.Message.From!.Email.Address}/sendMail",
-            Headers = new Dictionary<string, string> { ["Content-Type"] = "application/json" },
-            Body = bodyObj
-        };
+        var request = CreateBatchSendRequest();
+        if (GetBatchPayloadSize(request) > GraphPayloadLimitBytes) {
+            TryRouteConvertedFileAttachmentsThroughUploadSession();
+            request = CreateBatchSendRequest();
+            if (GetBatchPayloadSize(request) > GraphPayloadLimitBytes) {
+                throw new InvalidOperationException("The complete serialized Graph batch request exceeds the 4MB payload limit after file attachments were removed. Reduce the message body, recipients, headers, or in-memory attachments.");
+            }
+        }
+        if (IsLargerAttachment) {
+            LogCollector.LogVerbose("Send-EmailMessage - Serialized request exceeds the Graph batch payload limit; using a draft upload session.");
+            if (string.IsNullOrWhiteSpace(AccessToken) || string.IsNullOrWhiteSpace(TokenType)) {
+                var connection = await ConnectO365GraphAsync(cancellationToken);
+                if (!connection.Status) {
+                    return connection;
+                }
+            }
+            return await SendMessageDraftAsync(cancellationToken);
+        }
         var results = await MicrosoftGraphUtils.SendBatchAsync(credential, new[] { request }, cancellationToken);
         var response = results.FirstOrDefault();
         var success = response != null && response.Status >= 200 && response.Status < 300;
@@ -250,6 +264,32 @@ public partial class Graph {
             operationStopwatch.Elapsed,
             response?.Status.ToString() ?? string.Empty,
             success ? string.Empty : response?.Body.ToString());
+    }
+
+    private GraphBatchRequest CreateBatchSendRequest() {
+        var bodyObj = JsonSerializer.Deserialize(MessageJson, MailozaurrJsonContext.Default.JsonElement);
+        return new GraphBatchRequest {
+            Id = "1",
+            Method = GraphHttpMethod.POST,
+            Url = $"/users/{MessageContainer.Message.From!.Email.Address}/sendMail",
+            Headers = new Dictionary<string, string> { ["Content-Type"] = "application/json" },
+            Body = bodyObj
+        };
+    }
+
+    private static int GetBatchPayloadSize(GraphBatchRequest request) {
+        var payload = new GraphBatchPayload {
+            Requests = new List<GraphBatchRequestPayload> {
+                new() {
+                    Id = request.Id,
+                    Method = request.Method.ToString(),
+                    Url = request.Url.TrimStart('/'),
+                    Headers = request.Headers,
+                    Body = request.Body
+                }
+            }
+        };
+        return JsonSerializer.SerializeToUtf8Bytes(payload, MailozaurrJsonContext.Default.GraphBatchPayload).Length;
     }
 
     /// <summary>

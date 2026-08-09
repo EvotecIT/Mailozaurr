@@ -16,6 +16,7 @@ public partial class Graph {
         IsLargerAttachment = false;
         _inlineAttachmentSizeBytes = 0;
         _fileAttachmentCount = 0;
+        _convertedFileAttachmentStartIndex = -1;
         if (Attachments != null && Attachments.Any()) {
             var fileAttachments = new List<KeyValuePair<string, Definitions.AttachmentDescriptor?>>();
             var regularFilePaths = Definitions.AttachmentPathIdentity.CreateSet();
@@ -49,6 +50,7 @@ public partial class Graph {
 
             // Only load file attachments into memory when they fit in a simple send payload.
             if (!IsLargerAttachment && fileAttachments.Count > 0) {
+                _convertedFileAttachmentStartIndex = ConvertedAttachments.Count;
                 foreach (var source in fileAttachments) {
                     ConvertedAttachments.Add(source.Value == null
                         ? GraphAttachment.FromFile(source.Key)
@@ -78,7 +80,7 @@ public partial class Graph {
                 return;
             }
             fileAttachments.Add(new KeyValuePair<string, Definitions.AttachmentDescriptor?>(path, descriptor));
-            fileTotalBytes += new FileInfo(path).Length;
+            fileTotalBytes += EstimateFileAttachmentSize(path, descriptor);
             _fileAttachmentCount++;
         } catch (Exception ex) {
             LogCollector.LogError($"Send-EmailMessage - Failed to read attachment '{path}': {ex.Message}");
@@ -155,13 +157,73 @@ public partial class Graph {
         if (value.Length == 0) {
             return 0;
         }
-        var padding = 0;
-        if (value.EndsWith("==", StringComparison.Ordinal)) {
-            padding = 2;
-        } else if (value.EndsWith("=", StringComparison.Ordinal)) {
-            padding = 1;
+
+        return EstimateSerializedAttachmentSize(
+            value.Length,
+            attachment.Name,
+            attachment.ContentType,
+            attachment.ContentId,
+            attachment.ODataType);
+    }
+
+    private static long EstimateFileAttachmentSize(string path, Definitions.AttachmentDescriptor? descriptor) {
+        var fileLength = new FileInfo(path).Length;
+        var encodedLength = fileLength > (long.MaxValue - 2) / 4 * 3
+            ? long.MaxValue
+            : ((fileLength + 2) / 3) * 4;
+        var fileName = string.IsNullOrWhiteSpace(descriptor?.FileName)
+            ? Path.GetFileName(path)
+            : descriptor!.FileName!;
+        var contentType = string.IsNullOrWhiteSpace(descriptor?.ContentType)
+            ? MimeKit.MimeTypes.GetMimeType(fileName)
+            : descriptor!.ContentType;
+        var isInline = descriptor != null && IsInlineDescriptor(descriptor);
+        var contentId = string.IsNullOrWhiteSpace(descriptor?.ContentId)
+            ? (isInline ? fileName : null)
+            : descriptor!.ContentId;
+        return EstimateSerializedAttachmentSize(
+            encodedLength,
+            fileName,
+            contentType,
+            contentId,
+            "#microsoft.graph.fileAttachment");
+    }
+
+    private static long EstimateSerializedAttachmentSize(
+        long encodedContentLength,
+        string? name,
+        string? contentType,
+        string? contentId,
+        string? oDataType) {
+        if (encodedContentLength == long.MaxValue) {
+            return long.MaxValue;
         }
-        var bytes = (long)value.Length * 3 / 4 - padding;
-        return bytes < 0 ? 0 : bytes;
+
+        // Include JSON names, punctuation, boolean fields, and the escaped UTF-8 metadata.
+        const long jsonStructuralOverhead = 128;
+        return encodedContentLength + jsonStructuralOverhead +
+               EstimateJsonStringLength(name) +
+               EstimateJsonStringLength(contentType) +
+               EstimateJsonStringLength(contentId) +
+               EstimateJsonStringLength(oDataType);
+    }
+
+    private static int EstimateJsonStringLength(string? value) =>
+        string.IsNullOrEmpty(value)
+            ? 0
+            : System.Text.Json.JsonEncodedText.Encode(value!).EncodedUtf8Bytes.Length;
+
+    private bool TryRouteConvertedFileAttachmentsThroughUploadSession() {
+        if (_convertedFileAttachmentStartIndex < 0 || _fileAttachmentCount <= 0 ||
+            _convertedFileAttachmentStartIndex + _fileAttachmentCount > ConvertedAttachments.Count) {
+            return false;
+        }
+
+        ConvertedAttachments.RemoveRange(_convertedFileAttachmentStartIndex, _fileAttachmentCount);
+        _convertedFileAttachmentStartIndex = -1;
+        IsLargerAttachment = true;
+        MessageContainer.Message.Attachments = ConvertedAttachments.Count == 0 ? null : ConvertedAttachments;
+        MessageJson = JsonSerializer.Serialize(MessageContainer, MailozaurrJsonContext.Default.GraphMessageContainer);
+        return true;
     }
 }

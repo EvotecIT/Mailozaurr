@@ -221,7 +221,8 @@ public class GraphCreateMessageTests {
         }
 
         Assert.Single(graph.ConvertedAttachments);
-        Assert.Equal(3, graph.TotalAttachmentSizeBytes);
+        Assert.True(graph.TotalAttachmentSizeBytes > 3);
+        Assert.False(graph.IsLargerAttachment);
     }
 
     [Fact]
@@ -246,7 +247,81 @@ public class GraphCreateMessageTests {
         Assert.Equal(2, graph.ConvertedAttachments.Count);
         Assert.Contains(graph.ConvertedAttachments, attachment => !attachment.IsInline);
         Assert.Contains(graph.ConvertedAttachments, attachment => attachment.IsInline && attachment.ContentId == "shared-inline");
-        Assert.Equal(6, graph.TotalAttachmentSizeBytes);
+        Assert.True(graph.TotalAttachmentSizeBytes > 6);
+        Assert.False(graph.IsLargerAttachment);
+    }
+
+    [Fact]
+    public void CreateAttachments_RoutesBase64ExpandedFileThroughUploadSession() {
+        var path = Path.GetTempFileName();
+        File.WriteAllBytes(path, new byte[3_100_000]);
+        using var graph = new Graph { Attachments = new object[] { path } };
+
+        try {
+            graph.CreateAttachments();
+        } finally {
+            File.Delete(path);
+        }
+
+        Assert.True(graph.TotalAttachmentSizeBytes > 4_000_000);
+        Assert.True(graph.IsLargerAttachment);
+        Assert.Empty(graph.ConvertedAttachments);
+    }
+
+    [Fact]
+    public void CreateAttachments_RoutesBase64ExpandedInMemoryAttachmentAwayFromSimpleSend() {
+        using var graph = new Graph {
+            Attachments = new object[] {
+                new GraphAttachment {
+                    Name = "expanded.bin",
+                    ContentBytes = Convert.ToBase64String(new byte[3_100_000])
+                }
+            }
+        };
+
+        graph.CreateAttachments();
+
+        Assert.True(graph.TotalAttachmentSizeBytes > 4_000_000);
+        Assert.True(graph.IsLargerAttachment);
+    }
+
+    [Fact]
+    public void CreateMessage_RoutesFileWhenCompleteSerializedRequestExceedsLimit() {
+        var path = Path.GetTempFileName();
+        File.WriteAllBytes(path, new byte[2_300_000]);
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "complete payload",
+            HTML = new string('x', 1_000_000),
+            ContentType = "HTML",
+            Attachments = new object[] { path }
+        };
+
+        try {
+            graph.CreateMessage();
+        } finally {
+            File.Delete(path);
+        }
+
+        Assert.True(graph.IsLargerAttachment);
+        Assert.Null(graph.MessageContainer.Message.Attachments);
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(graph.MessageJson) < 4_000_000);
+    }
+
+    [Fact]
+    public void CreateMessage_RejectsCompleteSerializedRequestThatCannotUseFileUpload() {
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "oversized body",
+            HTML = new string('x', 4_000_000),
+            ContentType = "HTML"
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => graph.CreateMessage());
+
+        Assert.Contains("complete serialized Graph request", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

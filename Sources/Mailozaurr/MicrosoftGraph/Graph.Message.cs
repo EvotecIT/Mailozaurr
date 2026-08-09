@@ -64,6 +64,12 @@ public partial class Graph {
         }
 
         MessageJson = JsonSerializer.Serialize(MessageContainer, MailozaurrJsonContext.Default.GraphMessageContainer);
+        if (Encoding.UTF8.GetByteCount(MessageJson) > GraphPayloadLimitBytes) {
+            TryRouteConvertedFileAttachmentsThroughUploadSession();
+            if (Encoding.UTF8.GetByteCount(MessageJson) > GraphPayloadLimitBytes) {
+                throw new InvalidOperationException("The complete serialized Graph request exceeds the 4MB payload limit after file attachments were removed. Reduce the message body, recipients, headers, or in-memory attachments.");
+            }
+        }
         //LoggingMessages.Logger.WriteVerbose(MessageJson);
     }
 
