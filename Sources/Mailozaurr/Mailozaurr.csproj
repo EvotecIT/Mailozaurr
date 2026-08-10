@@ -4,7 +4,7 @@
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
         <VersionPrefix>2.1.7</VersionPrefix>
-        <OfficeIMOVersion>3.0.3</OfficeIMOVersion>
+        <OfficeIMOVersion>3.2.0</OfficeIMOVersion>
         <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
         <AssemblyName>Mailozaurr</AssemblyName>
         <Description>Email transport, mailbox, message-file, and offline mail-store library for .NET with SMTP, IMAP, POP3, Microsoft Graph, Gmail, SendGrid, Mailgun, Amazon SES, PST/OST, OLM, Mbox, EMLX, and Maildir support.</Description>
@@ -58,6 +58,7 @@
 
     <ItemGroup Condition=" '$(UseOfficeIMOProjectReferences)' != 'true' ">
         <PackageReference Include="OfficeIMO.Email" Version="$(OfficeIMOVersion)" />
+        <PackageReference Include="OfficeIMO.Security" Version="$(OfficeIMOVersion)" />
     </ItemGroup>
 
     <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
