@@ -1,4 +1,5 @@
 using OfficeIMO.Email;
+using OfficeIMO.Security;
 using System.Security.Cryptography.X509Certificates;
 
 namespace Mailozaurr;
@@ -7,6 +8,7 @@ internal static class MailFileSignatureProjection {
     internal static MailFileSignatureInfo Evaluate(EmailDocument document, EmailReaderOptions contentReaderOptions) {
         EmailSmimeVerificationResult verification = EmailSmime.Verify(
             document,
+            OfficeSecurityProvider.Default,
             contentReaderOptions: contentReaderOptions);
         var signer = verification.Cryptography?.Signers.FirstOrDefault();
         return signer == null
