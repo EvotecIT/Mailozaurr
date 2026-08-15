@@ -1,4 +1,5 @@
 using OfficeIMO.Email;
+using OfficeIMO.Security;
 
 namespace Mailozaurr;
 
@@ -12,6 +13,8 @@ public sealed class MailFileReaderOptions {
     public bool IncludeHeaders { get; set; }
     /// <summary>Optional immutable OfficeIMO bounded-reader policy.</summary>
     public EmailReaderOptions? OfficeReaderOptions { get; set; }
-    /// <summary>Verifies retained EML, MSG, or TNEF S/MIME signatures through OfficeIMO.Security when true.</summary>
+    /// <summary>Verifies retained EML, MSG, or TNEF S/MIME signatures through <see cref="SecurityProvider"/> when true.</summary>
     public bool VerifySignature { get; set; }
+    /// <summary>Cryptographic provider used when <see cref="VerifySignature"/> is true.</summary>
+    public IOfficeSecurityProvider? SecurityProvider { get; set; }
 }

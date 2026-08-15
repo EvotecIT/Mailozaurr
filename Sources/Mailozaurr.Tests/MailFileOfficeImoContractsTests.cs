@@ -7,20 +7,24 @@ namespace Mailozaurr.Tests;
 
 public sealed class MailFileOfficeImoContractsTests {
     [Fact]
-    public void MailFileApisLiveInMainAssemblyWithoutLegacyMsgDependencyForest() {
+    public void MailFileApisAvoidConcreteSecurityAndLegacyMsgDependencies() {
         Assembly assembly = typeof(MailFileReader).Assembly;
         Assert.Same(assembly, typeof(MimeKitUtils).Assembly);
 
         string[] references = assembly.GetReferencedAssemblies().Select(item => item.Name!).ToArray();
         Assert.Contains("OfficeIMO.Email", references);
-        Assert.Contains("OfficeIMO.Security", references);
         Assert.Contains("MimeKit", references);
+        Assert.DoesNotContain("OfficeIMO.Security", references);
         Assert.DoesNotContain("Mailozaurr.Msg", references);
         Assert.DoesNotContain("MsgKit", references);
         Assert.DoesNotContain("MsgReader", references);
         Assert.DoesNotContain("OpenMcdf", references);
         Assert.DoesNotContain("RtfPipe", references);
         Assert.DoesNotContain("OfficeIMO.Shared", references);
+
+        string[] powerShellReferences = typeof(Mailozaurr.PowerShell.CmdletImportMailFile).Assembly
+            .GetReferencedAssemblies().Select(item => item.Name!).ToArray();
+        Assert.Contains("OfficeIMO.Security", powerShellReferences);
     }
 
     [Fact]
@@ -257,6 +261,7 @@ public sealed class MailFileOfficeImoContractsTests {
             using MailFileMessage result = MailFileReader.Read(path,
                 new MailFileReaderOptions {
                     VerifySignature = true,
+                    SecurityProvider = OfficeIMO.Security.OfficeSecurityProvider.Default,
                     OfficeReaderOptions = new EmailReaderOptions(includeAttachmentContent: false)
                 });
 
@@ -269,6 +274,21 @@ public sealed class MailFileOfficeImoContractsTests {
             Assert.Equal("signed.bin", signedAttachment.FileName);
             Assert.Equal(4, signedAttachment.Length);
             Assert.Null(signedAttachment.Content);
+        } finally {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public void SignatureVerificationRequiresAnExplicitSecurityProvider() {
+        string directory = CreateTempDirectory();
+        try {
+            string path = WriteEml(directory, "provider-required.eml", "Provider required", "Body");
+
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                MailFileReader.Read(path, new MailFileReaderOptions { VerifySignature = true }));
+
+            Assert.Contains("IOfficeSecurityProvider", exception.Message, StringComparison.Ordinal);
         } finally {
             Directory.Delete(directory, true);
         }
@@ -369,13 +389,110 @@ public sealed class MailFileOfficeImoContractsTests {
             Content = null
         });
 
+        MailFileMimeMessageConversionResult syncConversion =
+            MailFileMimeAdapter.ConvertToMimeMessage(document);
+        MailFileMimeMessageConversionResult asyncConversion =
+            await MailFileMimeAdapter.ConvertToMimeMessageAsync(document);
         InvalidDataException syncError = Assert.Throws<InvalidDataException>(
             () => MailFileMimeAdapter.ToMimeMessage(document));
         InvalidDataException asyncError = await Assert.ThrowsAsync<InvalidDataException>(
             () => MailFileMimeAdapter.ToMimeMessageAsync(document));
 
+        Assert.True(syncConversion.HasErrors);
+        Assert.Null(syncConversion.Message);
+        Assert.Contains(syncConversion.Diagnostics,
+            item => item.Code == "EMAIL_ATTACHMENT_CONTENT_UNAVAILABLE");
+        Assert.True(asyncConversion.HasErrors);
+        Assert.Null(asyncConversion.Message);
+        Assert.Contains(asyncConversion.Diagnostics,
+            item => item.Code == "EMAIL_ATTACHMENT_CONTENT_UNAVAILABLE");
         Assert.Contains("EMAIL_ATTACHMENT_CONTENT_UNAVAILABLE", syncError.Message, StringComparison.Ordinal);
         Assert.Contains("EMAIL_ATTACHMENT_CONTENT_UNAVAILABLE", asyncError.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MimeMessageConvertsToFileBackedOfficeDocumentWithOwnedLifetime() {
+        byte[] content = Enumerable.Range(0, 1024 * 1024).Select(index => (byte)(index % 251)).ToArray();
+        using var message = new MimeMessage();
+        message.From.Add(new MailboxAddress("Alice", "alice@example.com"));
+        message.To.Add(new MailboxAddress("Bob", "bob@example.com"));
+        message.Subject = "Mime to OfficeIMO";
+        message.Headers.Add("X-Trace-ID", "mime-officeimo-bridge");
+        message.Body = new Multipart("mixed") {
+            new TextPart("plain") { Text = "Bridge body" },
+            new MimePart("application", "octet-stream") {
+                Content = new MimeContent(new MemoryStream(content, writable: false)),
+                ContentTransferEncoding = ContentEncoding.Base64,
+                ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+                FileName = "payload.bin"
+            }
+        };
+
+        MailFileEmailDocumentConversionResult conversion =
+            MailFileMimeAdapter.ConvertToEmailDocument(message);
+        EmailAttachment attachment = Assert.Single(conversion.Document.Attachments);
+
+        Assert.False(conversion.HasErrors);
+        Assert.Equal(EmailFileFormat.Eml, conversion.Document.Format);
+        Assert.Equal("Mime to OfficeIMO", conversion.Document.Subject);
+        Assert.Equal("Bridge body", conversion.Document.Body.Text);
+        Assert.Contains(conversion.Document.Headers,
+            item => item.Name == "X-Trace-ID" && item.Value == "mime-officeimo-bridge");
+        Assert.True(conversion.UsesFileBackedContent);
+        Assert.Null(attachment.Content);
+        Assert.NotNull(attachment.ContentSource);
+        using (Stream stream = attachment.OpenContentStream()) {
+            Assert.Equal(content.Length, stream.Length);
+            Assert.Equal(content[1024], ReadByteAt(stream, 1024));
+        }
+
+        conversion.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => attachment.OpenContentStream());
+    }
+
+    [Fact]
+    public async Task MimeMessageConvertsAsynchronouslyToMaterializedOfficeDocument() {
+        using var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse("alice@example.com"));
+        message.To.Add(MailboxAddress.Parse("bob@example.com"));
+        message.Subject = "Async Mime to OfficeIMO";
+        message.Body = new Multipart("mixed") {
+            new TextPart("plain") { Text = "Async bridge body" },
+            new MimePart("application", "octet-stream") {
+                Content = new MimeContent(new MemoryStream(new byte[] { 9, 8, 7, 6 }, writable: false)),
+                ContentTransferEncoding = ContentEncoding.Base64,
+                ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+                FileName = "async.bin"
+            }
+        };
+
+        using MailFileEmailDocumentConversionResult conversion =
+            await MailFileMimeAdapter.ConvertToEmailDocumentAsync(message, useFileBackedContent: false);
+        EmailAttachment attachment = Assert.Single(conversion.Document.Attachments);
+
+        Assert.False(conversion.HasErrors);
+        Assert.False(conversion.UsesFileBackedContent);
+        Assert.Equal("Async bridge body", conversion.Document.Body.Text);
+        Assert.Equal(new byte[] { 9, 8, 7, 6 }, attachment.Content);
+        Assert.Null(attachment.ContentSource);
+    }
+
+    [Fact]
+    public async Task MimeMessageConversionEnforcesOfficeImoInputLimitBeforeParsing() {
+        using var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse("alice@example.com"));
+        message.To.Add(MailboxAddress.Parse("bob@example.com"));
+        message.Subject = "Bounded conversion";
+        message.Body = new TextPart("plain") { Text = new string('x', 8192) };
+        var options = new EmailReaderOptions(maxInputBytes: 1024);
+
+        EmailLimitExceededException syncError = Assert.Throws<EmailLimitExceededException>(() =>
+            MailFileMimeAdapter.ConvertToEmailDocument(message, options));
+        EmailLimitExceededException asyncError = await Assert.ThrowsAsync<EmailLimitExceededException>(() =>
+            MailFileMimeAdapter.ConvertToEmailDocumentAsync(message, options));
+
+        Assert.Equal(nameof(EmailReaderOptions.MaxInputBytes), syncError.LimitName);
+        Assert.Equal(nameof(EmailReaderOptions.MaxInputBytes), asyncError.LimitName);
     }
 
     [Fact]
@@ -426,5 +543,10 @@ public sealed class MailFileOfficeImoContractsTests {
             body
         }));
         return path;
+    }
+
+    private static int ReadByteAt(Stream stream, long offset) {
+        stream.Position = offset;
+        return stream.ReadByte();
     }
 }

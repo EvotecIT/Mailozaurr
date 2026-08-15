@@ -92,10 +92,14 @@ public static class MailFileReader {
         MailFileReaderOptions options, EmailReaderOptions officeOptions) {
         EmailDocument document = result.Document;
         MailFileSignatureInfo signature = options.VerifySignature
-            ? MailFileSignatureProjection.Evaluate(document, officeOptions)
+            ? MailFileSignatureProjection.Evaluate(document, ResolveSecurityProvider(options), officeOptions)
             : default;
         return new MailFileMessage(path, format, result, signature, options);
     }
+
+    private static OfficeIMO.Security.IOfficeSecurityProvider ResolveSecurityProvider(
+        MailFileReaderOptions options) => options.SecurityProvider ?? throw new InvalidOperationException(
+        "Mail-file signature verification requires an explicit IOfficeSecurityProvider.");
 
     private static EmailReaderOptions ResolveOfficeOptions(MailFileReaderOptions options) =>
         options.OfficeReaderOptions ?? new EmailReaderOptions(

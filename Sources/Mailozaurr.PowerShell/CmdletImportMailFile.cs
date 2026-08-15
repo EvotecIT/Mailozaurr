@@ -1,4 +1,5 @@
 using OfficeIMO.Email;
+using OfficeIMO.Security;
 using System.Management.Automation;
 using System.Threading.Tasks;
 
@@ -63,7 +64,8 @@ public sealed class CmdletImportMailFile : AsyncPSCmdlet {
             IncludeAttachments = !ExcludeAttachments.IsPresent,
             IncludeAttachmentContent = !ExcludeAttachmentContent.IsPresent,
             IncludeHeaders = IncludeHeaders.IsPresent,
-            VerifySignature = this.VerifySignature.IsPresent
+            VerifySignature = this.VerifySignature.IsPresent,
+            SecurityProvider = this.VerifySignature.IsPresent ? OfficeSecurityProvider.Default : null
         };
         MailFileMessage? message = null;
         try {

@@ -19,8 +19,22 @@
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     </PropertyGroup>
 
+    <PropertyGroup>
+        <OfficeIMOVersion Condition=" '$(OfficeIMOVersion)' == '' ">3.2.0</OfficeIMOVersion>
+        <OfficeIMORoot Condition=" '$(OfficeIMORoot)' == '' ">..\..\..\OfficeIMO</OfficeIMORoot>
+        <UseOfficeIMOProjectReferences Condition=" '$(UseOfficeIMOProjectReferences)' == '' ">false</UseOfficeIMOProjectReferences>
+    </PropertyGroup>
+
     <ItemGroup>
         <ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
+    </ItemGroup>
+
+    <ItemGroup Condition=" '$(UseOfficeIMOProjectReferences)' == 'true' ">
+        <ProjectReference Include="$(OfficeIMORoot)\OfficeIMO.Security\OfficeIMO.Security.csproj" />
+    </ItemGroup>
+
+    <ItemGroup Condition=" '$(UseOfficeIMOProjectReferences)' != 'true' ">
+        <PackageReference Include="OfficeIMO.Security" Version="$(OfficeIMOVersion)" />
     </ItemGroup>
 
     <ItemGroup>

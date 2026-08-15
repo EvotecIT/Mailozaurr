@@ -58,7 +58,6 @@
 
     <ItemGroup Condition=" '$(UseOfficeIMOProjectReferences)' != 'true' ">
         <PackageReference Include="OfficeIMO.Email" Version="$(OfficeIMOVersion)" />
-        <PackageReference Include="OfficeIMO.Security" Version="$(OfficeIMOVersion)" />
     </ItemGroup>
 
     <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">

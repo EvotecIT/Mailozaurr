@@ -5,10 +5,12 @@ using System.Security.Cryptography.X509Certificates;
 namespace Mailozaurr;
 
 internal static class MailFileSignatureProjection {
-    internal static MailFileSignatureInfo Evaluate(EmailDocument document, EmailReaderOptions contentReaderOptions) {
+    internal static MailFileSignatureInfo Evaluate(EmailDocument document, IOfficeSecurityProvider securityProvider,
+        EmailReaderOptions contentReaderOptions) {
+        if (securityProvider == null) throw new ArgumentNullException(nameof(securityProvider));
         EmailSmimeVerificationResult verification = EmailSmime.Verify(
             document,
-            OfficeSecurityProvider.Default,
+            securityProvider,
             contentReaderOptions: contentReaderOptions);
         var signer = verification.Cryptography?.Signers.FirstOrDefault();
         return signer == null

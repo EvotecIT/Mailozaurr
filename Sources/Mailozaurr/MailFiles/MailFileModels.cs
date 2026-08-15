@@ -213,9 +213,18 @@ public sealed partial class MailFileMessage : IDisposable {
     /// <summary>Creates a MimeKit message from the current OfficeIMO owner document.</summary>
     public MimeMessage ToMimeMessage() => MailFileMimeAdapter.ToMimeMessage(OfficeDocument);
 
+    /// <summary>Creates a MimeKit message while retaining OfficeIMO preservation and fidelity diagnostics.</summary>
+    public MailFileMimeMessageConversionResult ConvertToMimeMessage(EmailWriterOptions? options = null) =>
+        MailFileMimeAdapter.ConvertToMimeMessage(OfficeDocument, options);
+
     /// <summary>Asynchronously creates a MimeKit message from the current OfficeIMO owner document.</summary>
     public Task<MimeMessage> ToMimeMessageAsync(CancellationToken cancellationToken = default) =>
         MailFileMimeAdapter.ToMimeMessageAsync(OfficeDocument, cancellationToken);
+
+    /// <summary>Asynchronously creates a MimeKit message while retaining OfficeIMO diagnostics.</summary>
+    public Task<MailFileMimeMessageConversionResult> ConvertToMimeMessageAsync(
+        EmailWriterOptions? options = null, CancellationToken cancellationToken = default) =>
+        MailFileMimeAdapter.ConvertToMimeMessageAsync(OfficeDocument, options, cancellationToken);
 
     /// <summary>Attempts to expose the protected MSG payload as a MimeKit entity.</summary>
     public bool TryGetProtectedMimeEntity(out MimeEntity? entity) =>
