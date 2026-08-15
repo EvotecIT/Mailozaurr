@@ -38,7 +38,7 @@ public sealed partial class GraphApiClient {
         var url = trimmedFolderId == null
             ? userSegment + "/messages"
             : userSegment + "/mailFolders/" + Uri.EscapeDataString(trimmedFolderId) + "/messages";
-        var payload = JsonSerializer.Serialize(message, MailozaurrJsonContext.Default.GraphMessage);
+        var payload = JsonSerializer.Serialize(message, GraphJsonContext.Default.GraphMessage);
         using var req = new HttpRequestMessage(HttpMethod.Post, url) {
             Content = new StringContent(payload, Encoding.UTF8, "application/json")
         };
@@ -56,7 +56,7 @@ public sealed partial class GraphApiClient {
 
         GraphMessage? created;
         try {
-            created = JsonSerializer.Deserialize(body, MailozaurrJsonContext.Default.GraphMessage);
+            created = JsonSerializer.Deserialize(body, GraphJsonContext.Default.GraphMessage);
         } catch (JsonException ex) {
             throw new InvalidDataException("Failed to parse Graph message create response.", ex);
         }
@@ -138,7 +138,7 @@ public sealed partial class GraphApiClient {
 
         GraphUploadSessionResult? result;
         try {
-            result = JsonSerializer.Deserialize(body, MailozaurrJsonContext.Default.GraphUploadSessionResult);
+            result = JsonSerializer.Deserialize(body, GraphJsonContext.Default.GraphUploadSessionResult);
         } catch (JsonException ex) {
             throw new InvalidDataException("Failed to parse Graph upload session response.", ex);
         }
@@ -167,7 +167,7 @@ public sealed partial class GraphApiClient {
 
         var userSegment = BuildUserSegment(userId);
         var selector = Uri.EscapeDataString(messageId.Trim());
-        var payload = JsonSerializer.Serialize(attachment, MailozaurrJsonContext.Default.GraphAttachment);
+        var payload = JsonSerializer.Serialize(attachment, GraphJsonContext.Default.GraphAttachment);
         using var req = new HttpRequestMessage(HttpMethod.Post, userSegment + "/messages/" + selector + "/attachments") {
             Content = new StringContent(payload, Encoding.UTF8, "application/json")
         };

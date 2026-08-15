@@ -42,7 +42,8 @@ public sealed class NativeMailboxThreadingMetadataOperationsTests {
             }
         };
 
-        var metadata = NativeMailboxThreadingMetadataOperations.Normalize(graph);
+        var metadata = NativeMailboxThreadingMetadataOperations.Normalize(
+            graph.MessageId, graph.ReplyTo, graph.Cc, graph.InReplyTo, graph.References);
 
         Assert.Equal("graph@example.test", metadata.MessageId);
         Assert.Equal("graph-reply@example.test", metadata.ReplyTo);
@@ -66,7 +67,8 @@ public sealed class NativeMailboxThreadingMetadataOperationsTests {
             }
         };
 
-        var metadata = NativeMailboxThreadingMetadataOperations.Normalize(gmail);
+        var metadata = NativeMailboxThreadingMetadataOperations.Normalize(
+            gmail.MessageId, gmail.ReplyTo, gmail.Cc, gmail.InReplyTo, gmail.References);
 
         Assert.Equal("gmail@example.test", metadata.MessageId);
         Assert.Equal("gmail-reply@example.test", metadata.ReplyTo);

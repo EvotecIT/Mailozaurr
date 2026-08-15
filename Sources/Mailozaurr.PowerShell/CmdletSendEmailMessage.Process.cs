@@ -626,7 +626,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
                     throw;
                 }
                 if (!Suppress) {
-                    var result = new SmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
+                    var result = new GraphSmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
                         GraphError = GraphApiErrorParser.Parse(ex.Message)
                     };
                     WriteObject(result);
@@ -661,7 +661,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
                     }
 
                     if (!Suppress) {
-                        var result = new SmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
+                        var result = new GraphSmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
                             GraphError = GraphApiErrorParser.Parse(ex.Message)
                         };
                         WriteObject(result);
@@ -703,7 +703,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
                     throw;
                 }
                 if (!Suppress) {
-                    var result = new SmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
+                    var result = new GraphSmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
                         GraphError = GraphApiErrorParser.Parse(ex.Message)
                     };
                     WriteObject(result);
@@ -741,7 +741,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
                     throw;
                 }
                 if (!Suppress) {
-                    var result = new SmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
+                    var result = new GraphSmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
                         GraphError = GraphApiErrorParser.Parse(ex.Message)
                     };
                     WriteObject(result);
@@ -771,7 +771,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
                 throw;
             }
             if (!Suppress) {
-                WriteObject(new SmtpResult(false, EmailAction.SendAttachment, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
+                WriteObject(new GraphSmtpResult(false, EmailAction.SendAttachment, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
                     GraphError = GraphApiErrorParser.Parse(ex.Message)
                 });
             }

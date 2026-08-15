@@ -28,5 +28,6 @@ public sealed class GmailDmarcReportService : DmarcReportServiceBase {
         string? domain,
         int maxResults,
         CancellationToken cancellationToken) =>
-        MailboxSearcher.SearchDmarcReportsAsync(client, userId, since, before, domain, maxResults, cancellationToken: cancellationToken);
+        GmailMailboxSearcher.SearchDmarcReportsAsync(client, userId, since, before, domain, maxResults,
+            cancellationToken: cancellationToken);
 }

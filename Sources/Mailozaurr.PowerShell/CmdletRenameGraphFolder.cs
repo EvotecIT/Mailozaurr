@@ -119,7 +119,7 @@ public class CmdletRenameGraphFolder : AsyncPSCmdlet {
             $"/users/{UserPrincipalName}/mailFolders/{FolderId}");
         var body = JsonSerializer.Serialize(
             new GraphFolderRenameRequest { DisplayName = NewName },
-            MailozaurrJsonContext.Default.GraphFolderRenameRequest);
+            GraphJsonContext.Default.GraphFolderRenameRequest);
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "PATCH")

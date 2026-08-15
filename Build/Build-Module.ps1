@@ -17,7 +17,7 @@ Import-Module PSPublishModule -Force -ErrorAction Stop
 Build-Module -ModuleName 'Mailozaurr' {
     # Usual defaults as per standard module
     $Manifest = [ordered] @{
-        ModuleVersion        = '2.1.X'
+        ModuleVersion        = '3.0.X'
         # Supported PSEditions
         CompatiblePSEditions = @('Desktop', 'Core')
         # ID used to uniquely identify this module

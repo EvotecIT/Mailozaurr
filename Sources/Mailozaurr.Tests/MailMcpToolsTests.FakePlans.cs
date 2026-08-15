@@ -1,5 +1,5 @@
 #if NET8_0_OR_GREATER
-using Mailozaurr.Application;
+using Mailozaurr.Hosting;
 using Mailozaurr.Cli.Mcp;
 
 namespace Mailozaurr.Tests;

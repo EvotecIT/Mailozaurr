@@ -45,7 +45,7 @@ public partial class Graph {
             MessageContainer.Message.InternetMessageHeaders = Headers.Select(kvp => new GraphInternetMessageHeader { Name = kvp.Key, Value = kvp.Value }).ToList();
         }
 
-        MessageJson = JsonSerializer.Serialize(MessageContainer, MailozaurrJsonContext.Default.GraphMessageContainer);
+        MessageJson = JsonSerializer.Serialize(MessageContainer, GraphJsonContext.Default.GraphMessageContainer);
         if (Encoding.UTF8.GetByteCount(MessageJson) > GraphPayloadLimitBytes) {
             TryRouteConvertedFileAttachmentsThroughUploadSession();
             TryRouteEligibleAttachments(() => Encoding.UTF8.GetByteCount(MessageJson) > GraphPayloadLimitBytes);
@@ -158,11 +158,11 @@ public partial class Graph {
     /// Authenticates to Microsoft Graph using client credentials and obtains an access token.
     /// </summary>
     /// <returns>The result of the connection attempt.</returns>
-    public async Task<SmtpResult> ConnectO365GraphAsync(CancellationToken cancellationToken = default) {
+    public async Task<GraphSmtpResult> ConnectO365GraphAsync(CancellationToken cancellationToken = default) {
         var operationStopwatch = StartOperationTimer();
         if (DryRun) {
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph authentication.");
-            return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, "Connection skipped (WhatIf)");
+            return new GraphSmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, "Connection skipped (WhatIf)");
         }
         string resource = "https://graph.microsoft.com";
         var body = new Dictionary<string, string> {
@@ -183,13 +183,13 @@ public partial class Graph {
                     if (ErrorAction == ActionPreference.Stop) {
                         response.EnsureSuccessStatusCode();
                     }
-                    return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, content, content);
+                    return CreateGraphFailureResult(operationStopwatch, content, content);
                 }
 
-                var authorization = JsonSerializer.Deserialize(content, MailozaurrJsonContext.Default.GraphAuthorization);
+                var authorization = JsonSerializer.Deserialize(content, GraphJsonContext.Default.GraphAuthorization);
                 AccessToken = authorization?.AccessToken ?? string.Empty;
                 TokenType = authorization?.TokenType ?? string.Empty;
-                return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, "", "");
+                return new GraphSmtpResult(true, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, "", "");
             } finally {
                 MicrosoftGraphUtils.ConcurrencySemaphore.Release();
             }
@@ -197,13 +197,17 @@ public partial class Graph {
             throw;
         } catch (TaskCanceledException ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Connection to Graph API cancelled: {ex.Message}");
-            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, ex.Message);
+            return new GraphSmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, ex.Message) {
+                GraphError = GraphApiErrorParser.Parse(ex.Message)
+            };
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Error during connection using Graph API: {ex.Message}");
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
-            return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, ex.Message);
+            return new GraphSmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, ex.Message) {
+                GraphError = GraphApiErrorParser.Parse(ex.Message)
+            };
         }
     }
 }

@@ -8,13 +8,19 @@ namespace Mailozaurr.Tests;
 public sealed class MailFileOfficeImoContractsTests {
     [Fact]
     public void MailFileApisAvoidConcreteSecurityAndLegacyMsgDependencies() {
-        Assembly assembly = typeof(MailFileReader).Assembly;
-        Assert.Same(assembly, typeof(MimeKitUtils).Assembly);
+        Assembly artifactAssembly = typeof(MailFileReader).Assembly;
+        Assembly internetAssembly = typeof(MimeKitUtils).Assembly;
+        Assert.Equal("Mailozaurr.Artifacts", artifactAssembly.GetName().Name);
+        Assert.Equal("Mailozaurr.Internet", internetAssembly.GetName().Name);
+        Assert.NotSame(artifactAssembly, internetAssembly);
 
-        string[] references = assembly.GetReferencedAssemblies().Select(item => item.Name!).ToArray();
+        string[] references = artifactAssembly.GetReferencedAssemblies().Select(item => item.Name!).ToArray();
         Assert.Contains("OfficeIMO.Email", references);
         Assert.Contains("MimeKit", references);
         Assert.DoesNotContain("OfficeIMO.Security", references);
+        Assert.DoesNotContain("Mailozaurr.Internet", references);
+        Assert.DoesNotContain("Google.Apis.Auth", references);
+        Assert.DoesNotContain("Microsoft.Identity.Client", references);
         Assert.DoesNotContain("Mailozaurr.Msg", references);
         Assert.DoesNotContain("MsgKit", references);
         Assert.DoesNotContain("MsgReader", references);
@@ -24,6 +30,10 @@ public sealed class MailFileOfficeImoContractsTests {
 
         string[] powerShellReferences = typeof(Mailozaurr.PowerShell.CmdletImportMailFile).Assembly
             .GetReferencedAssemblies().Select(item => item.Name!).ToArray();
+        Assert.Contains("Mailozaurr.Artifacts", powerShellReferences);
+        Assert.Contains("Mailozaurr.Internet", powerShellReferences);
+        Assert.Contains("Mailozaurr.MicrosoftGraph", powerShellReferences);
+        Assert.Contains("Mailozaurr.Gmail", powerShellReferences);
         Assert.Contains("OfficeIMO.Security", powerShellReferences);
     }
 
@@ -448,6 +458,37 @@ public sealed class MailFileOfficeImoContractsTests {
 
         conversion.Dispose();
         Assert.Throws<ObjectDisposedException>(() => attachment.OpenContentStream());
+    }
+
+    [Fact]
+    public void FileBackedProtectedMimePayloadCanBeReopenedAsMimeKitEntity() {
+        byte[] cms = { 0x30, 0x03, 0x02, 0x01, 0x01 };
+        using var message = new MimeMessage();
+        message.From.Add(MailboxAddress.Parse("alice@example.com"));
+        message.To.Add(MailboxAddress.Parse("bob@example.com"));
+        message.Subject = "Protected MIME bridge";
+        var protectedPart = new MimePart("application", "pkcs7-mime") {
+            Content = new MimeContent(new MemoryStream(cms, writable: false)),
+            ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+            ContentTransferEncoding = ContentEncoding.Base64,
+            FileName = "smime.p7m"
+        };
+        protectedPart.ContentType.Parameters["smime-type"] = "enveloped-data";
+        message.Body = protectedPart;
+
+        using MailFileEmailDocumentConversionResult conversion =
+            MailFileMimeAdapter.ConvertToEmailDocument(message);
+        EmailAttachment payload = Assert.IsType<EmailAttachment>(
+            conversion.Document.Protection.PayloadAttachment);
+
+        Assert.Equal(EmailProtectionKind.SmimeOpaque, conversion.Document.Protection.Kind);
+        Assert.Null(payload.Content);
+        Assert.NotNull(payload.ContentSource);
+        Assert.True(MailFileMimeAdapter.TryGetProtectedMimeEntity(
+            conversion.Document, out MimeEntity? entity));
+        Assert.NotNull(entity);
+        Assert.Equal("application/pkcs7-mime", entity!.ContentType.MimeType);
+        entity.Dispose();
     }
 
     [Fact]

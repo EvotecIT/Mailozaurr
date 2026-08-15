@@ -125,7 +125,7 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
             case EmailProtocol.Graph: {
                     var conn = DefaultSessions.GraphSession;
                     if (conn != null && conn.Credential != null && !string.IsNullOrWhiteSpace(UserPrincipalName)) {
-                        var reports = await MailboxSearcher.SearchDmarcReportsAsync(
+                        var reports = await GraphMailboxSearcher.SearchDmarcReportsAsync(
                             conn.Credential,
                             UserPrincipalName!,
                             Since,
@@ -149,7 +149,7 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
                         var net = Credential.GetNetworkCredential();
                         var oauth = new OAuthCredential { UserName = net.UserName, AccessToken = net.Password, ExpiresOn = DateTimeOffset.MaxValue };
                         var client = new GmailApiClient(oauth);
-                        var reports = await MailboxSearcher.SearchDmarcReportsAsync(
+                        var reports = await GmailMailboxSearcher.SearchDmarcReportsAsync(
                             client,
                             GmailAccount!,
                             Since,

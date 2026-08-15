@@ -1,14 +1,19 @@
 using OfficeIMO.Email;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 
 namespace Mailozaurr;
 
 internal static class MailFileMimeTemporaryStorage {
-    internal static FileStream Create(bool asynchronous) {
-        string path = Path.Combine(Path.GetTempPath(),
+    internal static FileStream Create(bool asynchronous) => Create(asynchronous, out _);
+
+    internal static FileStream Create(bool asynchronous, out string path) {
+        path = Path.Combine(Path.GetTempPath(),
             string.Concat("mailozaurr-mime-", Guid.NewGuid().ToString("N"), ".tmp"));
         FileOptions options = FileOptions.DeleteOnClose | FileOptions.SequentialScan;
         if (asynchronous) options |= FileOptions.Asynchronous;
 #if NET8_0_OR_GREATER
+        if (!OperatingSystem.IsWindows()) return CreateUnixOwnerOnly(path, asynchronous);
         var streamOptions = new FileStreamOptions {
             Mode = FileMode.CreateNew,
             Access = FileAccess.ReadWrite,
@@ -16,15 +21,70 @@ internal static class MailFileMimeTemporaryStorage {
             BufferSize = 81920,
             Options = options
         };
-        if (!OperatingSystem.IsWindows()) {
-            streamOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-        }
         return new FileStream(path, streamOptions);
 #else
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
+            return CreateUnixOwnerOnly(path, asynchronous);
+        }
         return new FileStream(path, FileMode.CreateNew, FileAccess.ReadWrite,
             FileShare.None, 81920, options);
 #endif
     }
+
+    private static FileStream CreateUnixOwnerOnly(string path, bool asynchronous) {
+        int descriptor = OpenFile(path, GetExclusiveCreateFlags(), 0x180U);
+        if (descriptor < 0) {
+            throw new IOException(
+                "Unable to create an owner-only MIME staging file (OS error "
+                + Marshal.GetLastWin32Error() + ").");
+        }
+
+        var handle = new SafeFileHandle(new IntPtr(descriptor), ownsHandle: true);
+        try {
+            if (ChangeDescriptorMode(descriptor, 0x180U) != 0) {
+                throw new IOException(
+                    "Unable to secure the owner-only MIME staging file (OS error "
+                    + Marshal.GetLastWin32Error() + ").");
+            }
+            FileOptions options = FileOptions.DeleteOnClose | FileOptions.SequentialScan;
+            if (asynchronous) options |= FileOptions.Asynchronous;
+            var stream = new FileStream(path, FileMode.Open, FileAccess.ReadWrite,
+                FileShare.None, 81920, options);
+            handle.Dispose();
+            handle = null!;
+            return stream;
+        } catch {
+            handle?.Dispose();
+            TryDelete(path);
+            throw;
+        }
+    }
+
+    private static int GetExclusiveCreateFlags() {
+        const int openReadWrite = 0x0002;
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
+            const int openCreate = 0x0200;
+            const int openExclusive = 0x0800;
+            return openReadWrite | openCreate | openExclusive;
+        }
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
+            const int openCreate = 0x0040;
+            const int openExclusive = 0x0080;
+            return openReadWrite | openCreate | openExclusive;
+        }
+        throw new PlatformNotSupportedException(
+            "This Unix platform does not expose a supported exclusive-create flag layout.");
+    }
+
+    private static void TryDelete(string path) {
+        try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+    }
+
+    [DllImport("libc", EntryPoint = "open", SetLastError = true)]
+    private static extern int OpenFile(string path, int flags, uint mode);
+
+    [DllImport("libc", EntryPoint = "fchmod", SetLastError = true)]
+    private static extern int ChangeDescriptorMode(int descriptor, uint mode);
 }
 
 internal sealed class MailFileBoundedWriteStream : Stream {

@@ -254,7 +254,7 @@ public partial class Graph {
         _convertedFileAttachmentStartIndex = -1;
         IsLargerAttachment = true;
         MessageContainer.Message.Attachments = ConvertedAttachments.Count == 0 ? null : ConvertedAttachments;
-        MessageJson = JsonSerializer.Serialize(MessageContainer, MailozaurrJsonContext.Default.GraphMessageContainer);
+        MessageJson = JsonSerializer.Serialize(MessageContainer, GraphJsonContext.Default.GraphMessageContainer);
         return true;
     }
 
@@ -267,7 +267,7 @@ public partial class Graph {
             ConvertedAttachments.RemoveAt(index);
             _deferredGraphAttachments.Insert(0, attachment);
             MessageContainer.Message.Attachments = ConvertedAttachments.Count == 0 ? null : ConvertedAttachments;
-            MessageJson = JsonSerializer.Serialize(MessageContainer, MailozaurrJsonContext.Default.GraphMessageContainer);
+            MessageJson = JsonSerializer.Serialize(MessageContainer, GraphJsonContext.Default.GraphMessageContainer);
             changed = true;
         }
 

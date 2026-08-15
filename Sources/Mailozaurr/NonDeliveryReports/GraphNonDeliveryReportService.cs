@@ -31,5 +31,6 @@ public sealed class GraphNonDeliveryReportService : NonDeliveryReportServiceBase
         string? messageId,
         int maxResults,
         CancellationToken cancellationToken) =>
-        MailboxSearcher.SearchNonDeliveryReportsAsync(credential, userPrincipalName, since, before, recipientContains, messageId, maxResults, cancellationToken: cancellationToken);
+        GraphMailboxSearcher.SearchNonDeliveryReportsAsync(credential, userPrincipalName, since, before,
+            recipientContains, messageId, maxResults, cancellationToken: cancellationToken);
 }

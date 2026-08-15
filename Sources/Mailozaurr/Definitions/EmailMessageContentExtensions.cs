@@ -24,27 +24,6 @@ public static class EmailMessageContentExtensions {
         return client;
     }
 
-    /// <summary>Applies rendered content to a Microsoft Graph client.</summary>
-    public static Graph WithContent(this Graph client, EmailMessageContent content) {
-        if (client == null) throw new ArgumentNullException(nameof(client));
-        ValidateContent(content);
-        client.Subject = content.Subject;
-        if (!string.IsNullOrEmpty(content.HtmlBody)) {
-            client.HTML = content.HtmlBody;
-            client.ContentType = "HTML";
-        } else {
-            client.HTML = content.TextBody;
-            client.ContentType = "Text";
-        }
-
-        var attachments = content.Attachments.Cast<object>().ToList();
-        attachments.AddRange(content.InlineAttachments.Select(descriptor =>
-            GraphAttachment.PrepareInlineDescriptor(descriptor)));
-        client.Attachments = attachments.Count == 0 ? null : attachments.ToArray();
-        client.Headers = CopyHeaders(content);
-        return client;
-    }
-
     /// <summary>Applies rendered content to a SendGrid client.</summary>
     public static SendGridClient WithContent(this SendGridClient client, EmailMessageContent content) {
         if (client == null) throw new ArgumentNullException(nameof(client));

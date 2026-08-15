@@ -3,7 +3,7 @@
     <PropertyGroup>
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
-        <VersionPrefix>2.1.0</VersionPrefix>
+        <VersionPrefix>3.0.0</VersionPrefix>
         <PackageId>Mailozaurr.Cli</PackageId>
         <Description>Command-line and MCP host for Mailozaurr profiles, mailbox operations, drafts, queues, and delivery.</Description>
         <Copyright>(c) 2011 - 2026 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
@@ -28,7 +28,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Mailozaurr.Application\Mailozaurr.Application.csproj" />
+        <ProjectReference Include="..\Mailozaurr.Host\Mailozaurr.Host.csproj" />
+        <ProjectReference Include="..\Mailozaurr\Mailozaurr.Internet.csproj" />
+        <ProjectReference Include="..\Mailozaurr.MicrosoftGraph\Mailozaurr.MicrosoftGraph.csproj" />
+        <ProjectReference Include="..\Mailozaurr.Gmail\Mailozaurr.Gmail.csproj" />
+        <ProjectReference Include="..\Mailozaurr.Artifacts\Mailozaurr.Artifacts.csproj" />
     </ItemGroup>
 
     <ItemGroup>

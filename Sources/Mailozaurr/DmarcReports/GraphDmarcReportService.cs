@@ -28,5 +28,6 @@ public sealed class GraphDmarcReportService : DmarcReportServiceBase {
         string? domain,
         int maxResults,
         CancellationToken cancellationToken) =>
-        MailboxSearcher.SearchDmarcReportsAsync(credential, userPrincipalName, since, before, domain, maxResults, cancellationToken: cancellationToken);
+        GraphMailboxSearcher.SearchDmarcReportsAsync(credential, userPrincipalName, since, before, domain,
+            maxResults, cancellationToken: cancellationToken);
 }

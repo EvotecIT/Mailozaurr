@@ -79,7 +79,11 @@ public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
             () => DateTimeOffset.UtcNow);
 
         var observer = new CmdletPendingMessageObserver(this);
-        var senderFactory = SenderFactoryProvider?.Invoke() ?? new PendingMessageSenderFactory();
+        var senderFactory = SenderFactoryProvider?.Invoke() ?? new PendingMessageSenderFactory(
+            new Dictionary<EmailProvider, IPendingMessageSender> {
+                [EmailProvider.Gmail] = new GmailPendingMessageSender(),
+                [EmailProvider.Graph] = new GraphPendingMessageSender()
+            });
         var processor = new PendingMessageProcessor(repositoryView, senderFactory, logger: logger, observer: observer);
         await processor.ProcessAsync(CancelToken).ConfigureAwait(false);
     }

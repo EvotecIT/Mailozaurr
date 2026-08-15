@@ -96,10 +96,10 @@ public static class MailFileMimeAdapter {
         entity = null;
         EmailAttachment? payload = document.Protection.PayloadAttachment;
         string? contentTypeValue = payload?.ContentType;
-        if (payload?.Content == null || string.IsNullOrWhiteSpace(contentTypeValue)) return false;
+        if (payload == null || string.IsNullOrWhiteSpace(contentTypeValue)) return false;
         try {
             ContentType contentType = ContentType.Parse(contentTypeValue!);
-            using var stream = new MemoryStream(payload.Content, writable: false);
+            using Stream stream = payload.OpenContentStream();
             entity = MimeEntity.Load(contentType, stream);
             return true;
         } catch (ParseException) {

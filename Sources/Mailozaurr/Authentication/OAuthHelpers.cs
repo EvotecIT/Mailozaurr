@@ -1,7 +1,3 @@
-using Google.Apis.Auth.OAuth2;
-using Google.Apis.Auth.OAuth2.Flows;
-using Google.Apis.Auth.OAuth2.Responses;
-using Google.Apis.Util.Store;
 using Microsoft.Identity.Client;
 using System;
 using System.Collections.Generic;
@@ -40,10 +36,6 @@ public static class OAuthHelpers {
         return $"o365:{login!.Trim()}|{clientId.Trim()}|{tenantId.Trim()}|{redirectUri.Trim()}|{scopeKey}";
     }
 
-    private static string BuildGoogleLegacyCacheKey(string gmailAccount) => $"google:{gmailAccount}";
-
-    private static string BuildGoogleCacheKey(string gmailAccount, string clientId) => $"google:{clientId}:{gmailAccount}";
-
     private static async Task PersistO365CredentialAsync(
         OAuthCredential credential,
         string clientId,
@@ -64,23 +56,6 @@ public static class OAuthHelpers {
         if (compositeKey != null) {
             await OAuthTokenCache.SetAsync(compositeKey, credential).ConfigureAwait(false);
         }
-    }
-
-    private static async Task PersistGoogleCredentialAsync(
-        OAuthCredential credential,
-        string gmailAccount,
-        string clientId) {
-        if (credential == null) {
-            throw new ArgumentNullException(nameof(credential));
-        }
-        if (string.IsNullOrWhiteSpace(gmailAccount) && string.IsNullOrWhiteSpace(credential.UserName)) {
-            return;
-        }
-
-        var account = string.IsNullOrWhiteSpace(gmailAccount) ? credential.UserName : gmailAccount.Trim();
-        credential.ClientId = clientId;
-        await OAuthTokenCache.SetAsync(BuildGoogleLegacyCacheKey(account), credential).ConfigureAwait(false);
-        await OAuthTokenCache.SetAsync(BuildGoogleCacheKey(account, clientId), credential).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -184,47 +159,6 @@ public static class OAuthHelpers {
     }
 
     /// <summary>
-    /// Acquires an OAuth token for a Gmail account using an interactive browser flow.
-    /// </summary>
-    /// <param name="gmailAccount">The Gmail account to authenticate.</param>
-    /// <param name="clientId">The OAuth client identifier.</param>
-    /// <param name="clientSecret">The OAuth client secret.</param>
-    /// <param name="scopes">The scopes to request for the token.</param>
-    /// <returns>A credential containing the access token.</returns>
-    public static async Task<OAuthCredential> AcquireGoogleTokenInteractiveAsync(
-        string gmailAccount,
-        string clientId,
-        string clientSecret,
-        IEnumerable<string> scopes) {
-        var clientSecrets = new ClientSecrets {
-            ClientId = clientId,
-            ClientSecret = clientSecret
-        };
-        var initializer = new GoogleAuthorizationCodeFlow.Initializer {
-            ClientSecrets = clientSecrets,
-            Scopes = scopes,
-            DataStore = new FileDataStore("CredentialCacheFolder", false)
-        };
-        var codeFlow = new GoogleAuthorizationCodeFlow(initializer);
-        var codeReceiver = new LocalServerCodeReceiver();
-        var authCode = new AuthorizationCodeInstalledApp(codeFlow, codeReceiver);
-        var credential = await authCode.AuthorizeAsync(gmailAccount, System.Threading.CancellationToken.None);
-        if (credential.Token.IsStale) {
-            await credential.RefreshTokenAsync(System.Threading.CancellationToken.None);
-        }
-        var cred = new OAuthCredential {
-            UserName = credential.UserId,
-            AccessToken = credential.Token.AccessToken,
-            RefreshToken = credential.Token.RefreshToken,
-            ExpiresOn = credential.Token.IssuedUtc + TimeSpan.FromSeconds(credential.Token.ExpiresInSeconds ?? 0),
-            ClientId = clientId,
-            ClientSecret = clientSecret
-        };
-        await PersistGoogleCredentialAsync(cred, gmailAccount, clientId).ConfigureAwait(false);
-        return cred;
-    }
-
-    /// <summary>
     /// Attempts to retrieve a cached Office 365 token or acquire a new one if necessary.
     /// </summary>
     public static async Task<OAuthCredential> AcquireO365TokenCachedAsync(
@@ -275,78 +209,6 @@ public static class OAuthHelpers {
         }
 
         return credential;
-    }
-
-    /// <summary>
-    /// Attempts to retrieve a cached Google token or acquire a new one if necessary.
-    /// </summary>
-    public static async Task<OAuthCredential> AcquireGoogleTokenCachedAsync(
-        string gmailAccount,
-        string clientId,
-        string clientSecret,
-        IEnumerable<string> scopes) {
-        // Prefer a cache key that includes client id to avoid token confusion across apps.
-        var compositeKey = BuildGoogleCacheKey(gmailAccount, clientId);
-        var legacyKey = BuildGoogleLegacyCacheKey(gmailAccount);
-
-        bool loadedFromLegacy = false;
-        var cached = await OAuthTokenCache.GetAsync(compositeKey).ConfigureAwait(false);
-        if (cached is null) {
-            cached = await OAuthTokenCache.GetAsync(legacyKey).ConfigureAwait(false);
-            loadedFromLegacy = cached != null;
-        }
-
-        if (cached != null) {
-            // Validate that cached token belongs to the same app/client.
-            if (!string.IsNullOrEmpty(cached.ClientId) && !string.Equals(cached.ClientId, clientId, StringComparison.Ordinal)) {
-                LoggingMessages.Logger.WriteWarning("OAuth cache entry for {0} was created with a different ClientId. Ignoring cached token.", gmailAccount);
-                cached = null;
-            } else {
-                // Fill blanks, but do not override mismatched values.
-                cached.ClientId ??= clientId;
-                if (string.IsNullOrEmpty(cached.ClientSecret)) {
-                    cached.ClientSecret = clientSecret;
-                } else if (!string.Equals(cached.ClientSecret, clientSecret, StringComparison.Ordinal)) {
-                    LoggingMessages.Logger.WriteWarning("OAuth cache entry for {0} contains a different ClientSecret than provided. Proceeding to refresh with provided secret.", gmailAccount);
-                }
-            }
-        }
-
-        if (cached != null && cached.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
-            // Migrate legacy entries to composite key to prevent cross-app confusion.
-            if (loadedFromLegacy) {
-                await PersistGoogleCredentialAsync(cached, gmailAccount, clientId).ConfigureAwait(false);
-            }
-            return cached;
-        }
-
-        if (cached != null && !string.IsNullOrWhiteSpace(cached.RefreshToken)) {
-            var clientSecrets = new ClientSecrets { ClientId = clientId, ClientSecret = clientSecret };
-            var initializer = new GoogleAuthorizationCodeFlow.Initializer {
-                ClientSecrets = clientSecrets,
-                Scopes = scopes,
-                DataStore = new FileDataStore("CredentialCacheFolder", false)
-            };
-            var flow = new GoogleAuthorizationCodeFlow(initializer);
-            var token = new Google.Apis.Auth.OAuth2.Responses.TokenResponse { RefreshToken = cached.RefreshToken };
-            var userCred = new UserCredential(flow, gmailAccount, token);
-            var refreshed = await userCred.RefreshTokenAsync(System.Threading.CancellationToken.None);
-            if (refreshed) {
-                var newCred = new OAuthCredential {
-                    UserName = gmailAccount,
-                    AccessToken = userCred.Token.AccessToken,
-                    RefreshToken = userCred.Token.RefreshToken,
-                    ExpiresOn = userCred.Token.IssuedUtc + TimeSpan.FromSeconds(userCred.Token.ExpiresInSeconds ?? 0),
-                    ClientId = clientId,
-                    ClientSecret = clientSecret
-                };
-                await PersistGoogleCredentialAsync(newCred, gmailAccount, clientId).ConfigureAwait(false);
-                return newCred;
-            }
-        }
-
-        var cred = await AcquireGoogleTokenInteractiveAsync(gmailAccount, clientId, clientSecret, scopes).ConfigureAwait(false);
-        return cred;
     }
 
     /// <summary>

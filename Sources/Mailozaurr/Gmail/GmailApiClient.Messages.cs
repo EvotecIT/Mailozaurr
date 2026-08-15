@@ -79,7 +79,7 @@ public sealed partial class GmailApiClient {
 #endif
         GmailListResponse? list;
         try {
-            list = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailListResponse);
+            list = JsonSerializer.Deserialize(json, GmailJsonContext.Default.GmailListResponse);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API list response.", json, ex);
         }
@@ -151,7 +151,7 @@ public sealed partial class GmailApiClient {
 #endif
         GmailMessage? message;
         try {
-            message = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailMessage);
+            message = JsonSerializer.Deserialize(json, GmailJsonContext.Default.GmailMessage);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API message response.", json, ex);
         }
@@ -215,7 +215,7 @@ public sealed partial class GmailApiClient {
 #endif
         GmailMessage? message;
         try {
-            message = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailMessage);
+            message = JsonSerializer.Deserialize(json, GmailJsonContext.Default.GmailMessage);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API message response.", json, ex);
         }
@@ -295,7 +295,7 @@ public sealed partial class GmailApiClient {
             Raw = raw.Trim(),
             LabelIds = labelIds is null || labelIds.Count == 0 ? null : new List<string>(labelIds)
         };
-        var jsonRequest = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GmailImportMessageRequest);
+        var jsonRequest = JsonSerializer.Serialize(request, GmailJsonContext.Default.GmailImportMessageRequest);
         using var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
         using var response = await _client.PostAsync(url.ToString(), content, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
@@ -307,7 +307,7 @@ public sealed partial class GmailApiClient {
 #endif
         GmailMessage? message;
         try {
-            message = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailMessage);
+            message = JsonSerializer.Deserialize(json, GmailJsonContext.Default.GmailMessage);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API import response.", json, ex);
         }
@@ -348,7 +348,7 @@ public sealed partial class GmailApiClient {
 #endif
         GmailMessage? message;
         try {
-            message = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailMessage);
+            message = JsonSerializer.Deserialize(json, GmailJsonContext.Default.GmailMessage);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API trash response.", json, ex);
         }
@@ -375,7 +375,7 @@ public sealed partial class GmailApiClient {
             AddLabelIds = addLabelIds ?? Array.Empty<string>(),
             RemoveLabelIds = removeLabelIds ?? Array.Empty<string>()
         };
-        var jsonRequest = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GmailModifyLabelsRequest);
+        var jsonRequest = JsonSerializer.Serialize(request, GmailJsonContext.Default.GmailModifyLabelsRequest);
         using var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
         using var response = await _client.PostAsync($"users/{userId}/messages/{id}/modify", content, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
@@ -387,7 +387,7 @@ public sealed partial class GmailApiClient {
 #endif
         GmailMessage? message;
         try {
-            message = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailMessage);
+            message = JsonSerializer.Deserialize(json, GmailJsonContext.Default.GmailMessage);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API message modify response.", json, ex);
         }
@@ -421,7 +421,7 @@ public sealed partial class GmailApiClient {
             AddLabelIds = addLabelIds ?? Array.Empty<string>(),
             RemoveLabelIds = removeLabelIds ?? Array.Empty<string>()
         };
-        var jsonRequest = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GmailBatchModifyRequest);
+        var jsonRequest = JsonSerializer.Serialize(request, GmailJsonContext.Default.GmailBatchModifyRequest);
         using var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
         using var response = await _client.PostAsync($"users/{userId}/messages/batchModify", content, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
@@ -443,7 +443,7 @@ public sealed partial class GmailApiClient {
             return;
         }
         var request = new GmailBatchDeleteRequest { Ids = ids };
-        var jsonRequest = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GmailBatchDeleteRequest);
+        var jsonRequest = JsonSerializer.Serialize(request, GmailJsonContext.Default.GmailBatchDeleteRequest);
         using var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
         using var response = await _client.PostAsync($"users/{userId}/messages/batchDelete", content, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
@@ -465,7 +465,7 @@ public sealed partial class GmailApiClient {
 #endif
         GmailLabelListResponse? list;
         try {
-            list = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailLabelListResponse);
+            list = JsonSerializer.Deserialize(json, GmailJsonContext.Default.GmailLabelListResponse);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API labels response.", json, ex);
         }

@@ -51,13 +51,13 @@ public partial class Graph {
         };
 
         var attachmentItemWrapper = new GraphAttachmentItemWrapper(attachmentItem);
-        var attachmentItemJson = JsonSerializer.Serialize(attachmentItemWrapper, MailozaurrJsonContext.Default.GraphAttachmentItemWrapper);
+        var attachmentItemJson = JsonSerializer.Serialize(attachmentItemWrapper, GraphJsonContext.Default.GraphAttachmentItemWrapper);
         var directAttachmentJson = string.Empty;
         if (fileSize < MinimumUploadSessionAttachmentSize) {
             var directAttachment = source.Descriptor == null
                 ? GraphAttachment.FromFile(attachmentPath)
                 : GraphAttachment.FromDescriptor(source.Descriptor);
-            directAttachmentJson = JsonSerializer.Serialize(directAttachment, MailozaurrJsonContext.Default.GraphAttachment);
+            directAttachmentJson = JsonSerializer.Serialize(directAttachment, GraphJsonContext.Default.GraphAttachment);
         }
 
         List<StreamContent> content = preloadContent && fileSize >= MinimumUploadSessionAttachmentSize
@@ -93,14 +93,14 @@ public partial class Graph {
         var wrapper = new GraphAttachmentItemWrapper(attachmentItem);
 
         return new GraphAttachmentPlaceHolder {
-            Json = JsonSerializer.Serialize(wrapper, MailozaurrJsonContext.Default.GraphAttachmentItemWrapper),
+            Json = JsonSerializer.Serialize(wrapper, GraphJsonContext.Default.GraphAttachmentItemWrapper),
             Content = preloadContent && bytes.Length >= MinimumUploadSessionAttachmentSize
                 ? PrepareByteArrayContentForUpload(bytes, ChunkSize, cancellationToken)
                 : new List<StreamContent>(),
             FileSize = bytes.LongLength,
             FileName = fileName,
             DirectAttachmentJson = bytes.Length < MinimumUploadSessionAttachmentSize
-                ? JsonSerializer.Serialize(attachment, MailozaurrJsonContext.Default.GraphAttachment)
+                ? JsonSerializer.Serialize(attachment, GraphJsonContext.Default.GraphAttachment)
                 : string.Empty
         };
     }
@@ -139,7 +139,7 @@ public partial class Graph {
             if (!uploadSessionResponse.IsSuccessStatusCode) {
                 GraphApiError? error = null;
                 try {
-                    error = JsonSerializer.Deserialize(uploadSessionContent, MailozaurrJsonContext.Default.GraphApiError);
+                    error = JsonSerializer.Deserialize(uploadSessionContent, GraphJsonContext.Default.GraphApiError);
                 } catch (JsonException) {
                     // Non-JSON error response; fall back to raw content.
                 }
@@ -176,7 +176,7 @@ public partial class Graph {
             var responseContent = await response.Content.ReadAsStringAsync();
             GraphApiError? error = null;
             try {
-                error = JsonSerializer.Deserialize(responseContent, MailozaurrJsonContext.Default.GraphApiError);
+                error = JsonSerializer.Deserialize(responseContent, GraphJsonContext.Default.GraphApiError);
             } catch (JsonException) {
                 // Non-JSON error response; fall back to raw content.
             }
@@ -188,7 +188,7 @@ public partial class Graph {
     }
 
     private static string ParseUploadSessionResult(string uploadSessionContent) {
-        var uploadSessionResult = JsonSerializer.Deserialize(uploadSessionContent, MailozaurrJsonContext.Default.GraphUploadSessionResult)
+        var uploadSessionResult = JsonSerializer.Deserialize(uploadSessionContent, GraphJsonContext.Default.GraphUploadSessionResult)
             ?? throw new InvalidOperationException("Failed to deserialize the upload session response.");
 
         if (string.IsNullOrEmpty(uploadSessionResult.UploadUrl)) {
@@ -465,7 +465,7 @@ public partial class Graph {
                 var responseContent = await uploadChunkResponse.Content.ReadAsStringAsync();
                 GraphApiError? error = null;
                 try {
-                    error = JsonSerializer.Deserialize(responseContent, MailozaurrJsonContext.Default.GraphApiError);
+                    error = JsonSerializer.Deserialize(responseContent, GraphJsonContext.Default.GraphApiError);
                 } catch (JsonException) {
                     // Non-JSON error response; fall back to raw content.
                 }

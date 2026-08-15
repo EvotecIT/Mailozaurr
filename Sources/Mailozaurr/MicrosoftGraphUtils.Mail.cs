@@ -201,7 +201,7 @@ public static partial class MicrosoftGraphUtils {
             });
         }
 
-        var body = JsonSerializer.Serialize(searchPayload, MailozaurrJsonContext.Default.GraphSearchPayload);
+        var body = JsonSerializer.Serialize(searchPayload, GraphJsonContext.Default.GraphSearchPayload);
         var searchUri = BuildGraphUri(GraphEndpoint.V1, "/search/query");
         var doc = await InvokeGraphApiAsync("POST", searchUri, headers, body).ConfigureAwait(false);
 
@@ -253,13 +253,13 @@ public static partial class MicrosoftGraphUtils {
                 if (string.IsNullOrWhiteSpace(destinationFolderId)) throw new ArgumentNullException(nameof(destinationFolderId));
                 method = "POST";
                 uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages/{messageId}/move");
-                body = JsonSerializer.Serialize(new GraphDestinationRequest { DestinationId = destinationFolderId }, MailozaurrJsonContext.Default.GraphDestinationRequest);
+                body = JsonSerializer.Serialize(new GraphDestinationRequest { DestinationId = destinationFolderId }, GraphJsonContext.Default.GraphDestinationRequest);
                 break;
             case GraphMessageAction.Copy:
                 if (string.IsNullOrWhiteSpace(destinationFolderId)) throw new ArgumentNullException(nameof(destinationFolderId));
                 method = "POST";
                 uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages/{messageId}/copy");
-                body = JsonSerializer.Serialize(new GraphDestinationRequest { DestinationId = destinationFolderId }, MailozaurrJsonContext.Default.GraphDestinationRequest);
+                body = JsonSerializer.Serialize(new GraphDestinationRequest { DestinationId = destinationFolderId }, GraphJsonContext.Default.GraphDestinationRequest);
                 break;
             case GraphMessageAction.Delete:
                 method = "DELETE";
@@ -312,7 +312,7 @@ public static partial class MicrosoftGraphUtils {
         var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
         headers["Authorization"] = token;
         var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages/{messageId}");
-        var body = JsonSerializer.Serialize(new GraphMarkReadRequest { IsRead = isRead }, MailozaurrJsonContext.Default.GraphMarkReadRequest);
+        var body = JsonSerializer.Serialize(new GraphMarkReadRequest { IsRead = isRead }, GraphJsonContext.Default.GraphMarkReadRequest);
         await InvokeGraphApiAsync("PATCH", uri, headers, body).ConfigureAwait(false);
     }
 

@@ -347,7 +347,10 @@ public partial class Graph : IDisposable {
 
 
 
-    private async Task<SmtpResult> TrySmtpFallbackAsync(GraphSendPolicy? policy, SmtpResult current, Exception? lastException, CancellationToken cancellationToken) {
+    private async Task<GraphSmtpResult> TrySmtpFallbackAsync(GraphSendPolicy? policy, GraphSmtpResult current, Exception? lastException, CancellationToken cancellationToken) {
+        if (current.GraphError == null && lastException != null) {
+            current.GraphError = GraphApiErrorParser.Parse(lastException.Message);
+        }
         if (policy == null || !policy.EnableSmtpFallback) {
             return current;
         }
@@ -391,7 +394,10 @@ public partial class Graph : IDisposable {
 
             await smtp.CreateMessageAsync(cancellationToken).ConfigureAwait(false);
             LogCollector.LogVerbose("Send-EmailMessage - Sending via SMTP fallback after Graph failure.");
-            return await smtp.SendAsync(cancellationToken).ConfigureAwait(false);
+            SmtpResult fallbackResult = await smtp.SendAsync(cancellationToken).ConfigureAwait(false);
+            return new GraphSmtpResult(fallbackResult, fallbackResult.Error) {
+                GraphError = current.GraphError
+            };
         } catch (Exception ex) {
             LogCollector.LogWarning($"Send-EmailMessage - SMTP fallback failed: {ex.Message}");
             // Preserve original Graph failure, but add fallback context to Error for diagnostics
@@ -399,11 +405,7 @@ public partial class Graph : IDisposable {
             var mergedError = string.IsNullOrWhiteSpace(current.Error)
                 ? $"Graph failed; SMTP fallback error: {fallbackError}"
                 : $"{current.Error} | SMTP fallback error: {fallbackError}";
-            return new SmtpResult(current.Status, current.EmailAction, current.SentTo, current.SentFrom, current.Server, current.Port, current.TimeToExecute, current.Message, mergedError) {
-                GraphError = current.GraphError,
-                MessageId = current.MessageId,
-                Queued = current.Queued
-            };
+            return new GraphSmtpResult(current, mergedError);
         }
     }
 

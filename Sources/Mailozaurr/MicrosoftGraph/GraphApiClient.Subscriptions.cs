@@ -35,7 +35,7 @@ public sealed partial class GraphApiClient {
             throw new ArgumentException("ExpirationDateTime is required.", nameof(request));
         }
 
-        var json = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GraphCreateSubscriptionRequest);
+        var json = JsonSerializer.Serialize(request, GraphJsonContext.Default.GraphCreateSubscriptionRequest);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
         using var req = new HttpRequestMessage(HttpMethod.Post, "subscriptions") { Content = content };
         ApplyAuthHeader(req);
@@ -52,7 +52,7 @@ public sealed partial class GraphApiClient {
 
         GraphSubscription? result;
         try {
-            result = JsonSerializer.Deserialize(body, MailozaurrJsonContext.Default.GraphSubscription);
+            result = JsonSerializer.Deserialize(body, GraphJsonContext.Default.GraphSubscription);
         } catch (JsonException ex) {
             throw new InvalidDataException("Failed to parse Graph subscription create response.", ex);
         }
@@ -73,7 +73,7 @@ public sealed partial class GraphApiClient {
 
         var encodedId = Uri.EscapeDataString(subscriptionId.Trim());
         var request = new GraphRenewSubscriptionRequest { ExpirationDateTime = expirationDateTime };
-        var json = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GraphRenewSubscriptionRequest);
+        var json = JsonSerializer.Serialize(request, GraphJsonContext.Default.GraphRenewSubscriptionRequest);
         var requestUri = _client.BaseAddress != null
             ? new Uri(_client.BaseAddress, $"subscriptions/{encodedId}")
             : new Uri($"subscriptions/{encodedId}", UriKind.Relative);
@@ -94,7 +94,7 @@ public sealed partial class GraphApiClient {
 
         GraphSubscription? result;
         try {
-            result = JsonSerializer.Deserialize(body, MailozaurrJsonContext.Default.GraphSubscription);
+            result = JsonSerializer.Deserialize(body, GraphJsonContext.Default.GraphSubscription);
         } catch (JsonException ex) {
             throw new InvalidDataException("Failed to parse Graph subscription renew response.", ex);
         }
@@ -146,7 +146,7 @@ public sealed partial class GraphApiClient {
         }
         GraphSubscriptionListResponse? result;
         try {
-            result = JsonSerializer.Deserialize(body, MailozaurrJsonContext.Default.GraphSubscriptionListResponse);
+            result = JsonSerializer.Deserialize(body, GraphJsonContext.Default.GraphSubscriptionListResponse);
         } catch (JsonException ex) {
             throw new InvalidDataException("Failed to parse Graph subscriptions list response.", ex);
         }

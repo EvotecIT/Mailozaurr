@@ -224,7 +224,7 @@ public sealed partial class GmailApiClient : IDisposable {
             .Replace('+', '-')
             .Replace('/', '_')
             .Replace("=", string.Empty);
-        var json = JsonSerializer.Serialize(new GmailRawRequest(raw), MailozaurrJsonContext.Default.GmailRawRequest);
+        var json = JsonSerializer.Serialize(new GmailRawRequest(raw), GmailJsonContext.Default.GmailRawRequest);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
         using var response = await _client.PostAsync($"users/{userId}/messages/send", content, cancellationToken).ConfigureAwait(false);
         var queued = false;
@@ -268,7 +268,7 @@ public sealed partial class GmailApiClient : IDisposable {
 #endif
         GmailMessage? result;
         try {
-            result = JsonSerializer.Deserialize(resultJson, MailozaurrJsonContext.Default.GmailMessage);
+            result = JsonSerializer.Deserialize(resultJson, GmailJsonContext.Default.GmailMessage);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API send response.", resultJson, ex);
         }

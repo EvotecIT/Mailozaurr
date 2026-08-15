@@ -97,7 +97,7 @@ public sealed class CmdletSetGraphInboxRule : AsyncPSCmdlet {
         int attempts = 0;
         Exception? lastException = null;
         var rulePayload = Rule ?? throw new PSArgumentNullException(nameof(Rule), "Rule has to be provided or built.");
-        var obj = RuleObject ?? JsonSerializer.Deserialize(JsonSerializer.Serialize(rulePayload, MailozaurrJsonContext.Default.Object), MailozaurrJsonContext.Default.GraphInboxRule);
+        var obj = RuleObject ?? JsonSerializer.Deserialize(JsonSerializer.Serialize(rulePayload, MailozaurrJsonContext.Default.Object), GraphJsonContext.Default.GraphInboxRule);
         if (obj is null) {
             throw new PSArgumentException("Graph inbox rule definition cannot be null.");
         }
@@ -138,14 +138,14 @@ public sealed class CmdletSetGraphInboxRule : AsyncPSCmdlet {
             GraphEndpoint.V1,
             $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules/{RuleId}");
         var rulePayload = Rule ?? throw new PSArgumentNullException(nameof(Rule), "Rule has to be provided or built.");
-        var bodyObj = RuleObject ?? JsonSerializer.Deserialize(JsonSerializer.Serialize(rulePayload, MailozaurrJsonContext.Default.Object), MailozaurrJsonContext.Default.GraphInboxRule);
+        var bodyObj = RuleObject ?? JsonSerializer.Deserialize(JsonSerializer.Serialize(rulePayload, MailozaurrJsonContext.Default.Object), GraphJsonContext.Default.GraphInboxRule);
         if (bodyObj is null) {
             throw new PSArgumentException("Graph inbox rule definition cannot be null.");
         }
         if (bodyObj is null) {
             throw new PSArgumentException("Graph inbox rule definition cannot be null.");
         }
-        var body = JsonSerializer.Serialize(bodyObj, MailozaurrJsonContext.Default.GraphInboxRule);
+        var body = JsonSerializer.Serialize(bodyObj, GraphJsonContext.Default.GraphInboxRule);
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "PATCH")

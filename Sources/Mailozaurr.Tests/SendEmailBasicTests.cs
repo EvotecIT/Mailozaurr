@@ -222,6 +222,7 @@ namespace Mailozaurr.Tests {
 
             var result = await graph.SendMessageAsync();
 
+            Assert.IsType<GraphSmtpResult>(result);
             Assert.True(result.Status, $"Graph send failed: {result.Error}");
             Assert.Single(handler.Requests);
         }

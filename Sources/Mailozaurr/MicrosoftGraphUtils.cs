@@ -419,7 +419,7 @@ namespace Mailozaurr {
                     Body = r.Body
                 }).ToList()
             };
-            var jsonBody = JsonSerializer.Serialize(batchPayload, MailozaurrJsonContext.Default.GraphBatchPayload);
+            var jsonBody = JsonSerializer.Serialize(batchPayload, GraphJsonContext.Default.GraphBatchPayload);
             var batchUri = BuildGraphUri(GraphEndpoint.V1, "/$batch");
             var doc = await InvokeGraphApiAsync("POST", batchUri, headers, jsonBody, cancellationToken).ConfigureAwait(false);
             var results = new List<GraphBatchResult>();

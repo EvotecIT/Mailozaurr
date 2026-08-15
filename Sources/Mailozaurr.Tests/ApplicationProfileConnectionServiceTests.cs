@@ -1,6 +1,6 @@
 using MailKit.Net.Imap;
 using Mailozaurr;
-using Mailozaurr.Application;
+using Mailozaurr.Hosting;
 
 namespace Mailozaurr.Tests;
 

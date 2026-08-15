@@ -453,7 +453,10 @@ public class GraphDraftTests {
         try {
             var result = await graph.SendMessageDraftAsync();
 
+            Assert.IsType<GraphSmtpResult>(result);
             Assert.False(result.Status);
+            Assert.NotNull(result.GraphError);
+            Assert.Equal(result.Error, result.GraphError!.Raw);
             Assert.Equal(1, handler.AttachmentPostCount);
         } finally {
             File.Delete(path);

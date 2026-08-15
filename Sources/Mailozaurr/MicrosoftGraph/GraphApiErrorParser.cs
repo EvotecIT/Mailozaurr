@@ -52,7 +52,7 @@ public static class GraphApiErrorParser {
                 if (line.StartsWith("{", StringComparison.Ordinal)) {
                     var body = string.Join(Environment.NewLine, lines, index, lines.Length - index);
                     try {
-                        var error = JsonSerializer.Deserialize(body, MailozaurrJsonContext.Default.GraphApiError);
+                        var error = JsonSerializer.Deserialize(body, GraphJsonContext.Default.GraphApiError);
                         response.Error = error?.Error;
                     } catch {
                         // ignore
@@ -87,7 +87,7 @@ public static class GraphApiErrorParser {
                         break;
                     case "x-ms-ags-diagnostic":
                         try {
-                            response.Headers.Diagnostic = JsonSerializer.Deserialize(value, MailozaurrJsonContext.Default.GraphApiDiagnostic);
+                            response.Headers.Diagnostic = JsonSerializer.Deserialize(value, GraphJsonContext.Default.GraphApiDiagnostic);
                         } catch {
                             // ignore
                         }

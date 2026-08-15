@@ -57,14 +57,23 @@ public sealed class PendingMessageSenderFactoryTests {
     [InlineData(EmailProvider.SendGrid, typeof(SendGridPendingMessageSender))]
     [InlineData(EmailProvider.Mailgun, typeof(MailgunPendingMessageSender))]
     [InlineData(EmailProvider.SES, typeof(SesPendingMessageSender))]
-    [InlineData(EmailProvider.Gmail, typeof(GmailPendingMessageSender))]
-    [InlineData(EmailProvider.Graph, typeof(GraphPendingMessageSender))]
-    public void Resolve_ReturnsDefaultSenderForKnownProviders(EmailProvider provider, Type expectedType) {
+    public void Resolve_ReturnsDefaultInternetSenderForKnownProviders(EmailProvider provider, Type expectedType) {
         var factory = new PendingMessageSenderFactory();
 
         var result = factory.Resolve(provider);
 
         Assert.IsType(expectedType, result);
+    }
+
+    [Fact]
+    public void Resolve_ReturnsExplicitProviderLeafSenders() {
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            [EmailProvider.Gmail] = new GmailPendingMessageSender(),
+            [EmailProvider.Graph] = new GraphPendingMessageSender()
+        });
+
+        Assert.IsType<GmailPendingMessageSender>(factory.Resolve(EmailProvider.Gmail));
+        Assert.IsType<GraphPendingMessageSender>(factory.Resolve(EmailProvider.Graph));
     }
 
     [Fact]

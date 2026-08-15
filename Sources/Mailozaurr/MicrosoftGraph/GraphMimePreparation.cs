@@ -100,7 +100,7 @@ public static class GraphMimePreparation {
     }
 
     private static int GetSerializedMessageSize(GraphMessage message) =>
-        System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(message, MailozaurrJsonContext.Default.GraphMessage).Length;
+        System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(message, GraphJsonContext.Default.GraphMessage).Length;
 
     /// <summary>
     /// Converts a MIME message to Graph message payload.

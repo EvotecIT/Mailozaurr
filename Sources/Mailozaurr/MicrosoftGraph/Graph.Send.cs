@@ -11,13 +11,13 @@ public partial class Graph {
     /// Sends the prepared message via the Graph API.
     /// </summary>
     /// <returns>The result of the send operation.</returns>
-    public async Task<SmtpResult> SendMessageAsync(CancellationToken cancellationToken = default) {
+    public async Task<GraphSmtpResult> SendMessageAsync(CancellationToken cancellationToken = default) {
         var operationStopwatch = StartOperationTimer();
         // create message
         CreateMessage();
         if (DryRun) {
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph send.");
-            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
+            return new GraphSmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
         }
         if (IsLargerAttachment) {
             LogCollector.LogVerbose("Send-EmailMessage - Serialized attachment payload exceeds the Graph simple-send limit; using a draft upload session.");
@@ -53,11 +53,11 @@ public partial class Graph {
                     using var response = await _client.SendAsync(request, cancellationToken);
                     var content = await response.Content.ReadAsStringAsync();
                     if (response.IsSuccessStatusCode) {
-                        var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, response.StatusCode.ToString(), "");
+                        var okResult = new GraphSmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, response.StatusCode.ToString(), "");
                         await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken);
                         return okResult;
                     }
-                    var error = JsonSerializer.Deserialize(content, MailozaurrJsonContext.Default.GraphApiError);
+                    var error = JsonSerializer.Deserialize(content, GraphJsonContext.Default.GraphApiError);
                     var errorMessage = (error == null || error.Error == null || error.Error.InnerError == null)
                         ? $"Unknown error: {content}"
                         : $"Error code: {error.Error.Code}, message: {error.Error.Message}, request ID: {error.Error.InnerError.RequestId}, date: {error.Error.InnerError.Date}";
@@ -74,7 +74,7 @@ public partial class Graph {
                 var maxRetries = policy?.MaxRetries ?? RetryCount;
                 var shouldRetry = (policy?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
                 if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
-                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, ex.Message);
+                    var failResult = CreateGraphFailureResult(operationStopwatch, ex.Message);
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
                     return await TrySmtpFallbackAsync(policy, failResult, ex, cancellationToken);
                 }
@@ -88,7 +88,7 @@ public partial class Graph {
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }
-                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, "", ex.Message);
+                    var failResult = CreateGraphFailureResult(operationStopwatch, ex.Message);
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
                     return await TrySmtpFallbackAsync(policy, failResult, ex, cancellationToken);
                 }
@@ -98,7 +98,7 @@ public partial class Graph {
             attempts++;
         } while (attempts <= (policy?.MaxRetries ?? RetryCount));
 
-        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, "", lastException?.Message);
+        var finalResult = CreateGraphFailureResult(operationStopwatch, lastException?.Message);
         await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken);
         return await TrySmtpFallbackAsync(policy, finalResult, lastException, cancellationToken);
     }
@@ -107,18 +107,18 @@ public partial class Graph {
     /// Sends a message by first creating a draft and then uploading attachments.
     /// </summary>
     /// <returns>The result of the send operation.</returns>
-    public async Task<SmtpResult> SendMessageDraftAsync(CancellationToken cancellationToken = default) {
+    public async Task<GraphSmtpResult> SendMessageDraftAsync(CancellationToken cancellationToken = default) {
         return await SendMessageDraftAsync(messagePrepared: false, cancellationToken);
     }
 
-    private async Task<SmtpResult> SendMessageDraftAsync(bool messagePrepared, CancellationToken cancellationToken) {
+    private async Task<GraphSmtpResult> SendMessageDraftAsync(bool messagePrepared, CancellationToken cancellationToken) {
         var operationStopwatch = StartOperationTimer();
         if (DryRun) {
             if (!messagePrepared) {
                 CreateMessage();
             }
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph draft send.");
-            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
+            return new GraphSmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
         }
         var policyDraft = SendPolicy ?? MailozaurrOptions.DefaultGraphPolicy;
         if (policyDraft != null && policyDraft.MaxConcurrency > 0) {
@@ -136,7 +136,7 @@ public partial class Graph {
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
-            var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, ex.Message);
+            var failResult = CreateGraphFailureResult(operationStopwatch, ex.Message);
             await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
             return await TrySmtpFallbackAsync(policyDraft, failResult, ex, cancellationToken);
         }
@@ -154,7 +154,7 @@ public partial class Graph {
                 var maxRetries = policyDraft?.MaxRetries ?? RetryCount;
                 var shouldRetry = (policyDraft?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
                 if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
-                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, ex.Message);
+                    var failResult = CreateGraphFailureResult(operationStopwatch, ex.Message);
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
                     return await TrySmtpFallbackAsync(policyDraft, failResult, ex, cancellationToken);
                 }
@@ -168,7 +168,7 @@ public partial class Graph {
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }
-                    var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, "", ex.Message);
+                    var failResult = CreateGraphFailureResult(operationStopwatch, ex.Message);
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
                     return await TrySmtpFallbackAsync(policyDraft, failResult, ex, cancellationToken);
                 }
@@ -178,7 +178,7 @@ public partial class Graph {
             attempts++;
         } while (attempts <= (policyDraft?.MaxRetries ?? RetryCount));
 
-        var finalResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, "", lastException?.Message);
+        var finalResult = CreateGraphFailureResult(operationStopwatch, lastException?.Message);
         await Helpers.PostWebhookAsync(WebhookUrl, finalResult, cancellationToken);
         return await TrySmtpFallbackAsync(policyDraft, finalResult, lastException, cancellationToken);
     }
@@ -189,11 +189,11 @@ public partial class Graph {
     /// <param name="draftMessage">The draft message to send.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     /// <returns>The result of the send operation.</returns>
-    public async Task<SmtpResult> SendDraftMessage(GraphMessage draftMessage, CancellationToken cancellationToken = default) {
+    public async Task<GraphSmtpResult> SendDraftMessage(GraphMessage draftMessage, CancellationToken cancellationToken = default) {
         var operationStopwatch = StartOperationTimer();
         if (DryRun) {
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph draft send.");
-            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
+            return new GraphSmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
         }
         // Send the draft message
         var sendRequestUri = MicrosoftGraphUtils.BuildGraphUri(
@@ -211,14 +211,14 @@ public partial class Graph {
 
             // If the status code indicates success, return a successful result
             if (sendResponse.IsSuccessStatusCode) {
-                var okResult = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, sendResponse.StatusCode.ToString(), "");
+                var okResult = new GraphSmtpResult(true, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, sendResponse.StatusCode.ToString(), "");
                 await Helpers.PostWebhookAsync(WebhookUrl, okResult, cancellationToken);
                 return okResult;
             }
 
             // If the status code indicates an error, throw an exception with the content
             var sendContent = await sendResponse.Content.ReadAsStringAsync();
-            var sendError = JsonSerializer.Deserialize(sendContent, MailozaurrJsonContext.Default.GraphApiError);
+            var sendError = JsonSerializer.Deserialize(sendContent, GraphJsonContext.Default.GraphApiError);
             var sendErrorMessage = (sendError == null || sendError.Error == null || sendError.Error.InnerError == null)
                 ? $"Unknown error: {sendContent}"
                 : $"Error code: {sendError.Error.Code}, message: {sendError.Error.Message}, request ID: {sendError.Error.InnerError.RequestId}, date: {sendError.Error.InnerError.Date}";
@@ -226,7 +226,7 @@ public partial class Graph {
             throw new GraphApiException(sendResponse.StatusCode, sendErrorMessage, sendContent, retryAfter);
         } catch (GraphApiException ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
-            var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, ex.ResponseContent, ex.Message);
+            var failResult = CreateGraphFailureResult(operationStopwatch, ex.Message, ex.ResponseContent);
             await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken);
             throw;
         } finally {
@@ -237,12 +237,12 @@ public partial class Graph {
     /// <summary>
     /// Sends the current message using Microsoft Graph batch requests.
     /// </summary>
-    public async Task<SmtpResult> SendMessageBatchAsync(CancellationToken cancellationToken = default) {
+    public async Task<GraphSmtpResult> SendMessageBatchAsync(CancellationToken cancellationToken = default) {
         var operationStopwatch = StartOperationTimer();
         CreateMessage();
         if (DryRun) {
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph batch send.");
-            return new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
+            return new GraphSmtpResult(false, EmailAction.Send, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)");
         }
         var credential = new GraphCredential {
             ClientId = ApplicationID,
@@ -272,8 +272,12 @@ public partial class Graph {
         var results = await MicrosoftGraphUtils.SendBatchAsync(credential, new[] { request }, cancellationToken);
         var response = results.FirstOrDefault();
         var success = response != null && response.Status >= 200 && response.Status < 300;
-        return new SmtpResult(
-            success,
+        if (!success) {
+            return CreateGraphFailureResult(operationStopwatch, response?.Body.ToString(),
+                response?.Status.ToString() ?? string.Empty);
+        }
+        return new GraphSmtpResult(
+            true,
             EmailAction.Send,
             SentTo,
             SentFrom,
@@ -281,8 +285,15 @@ public partial class Graph {
             0,
             operationStopwatch.Elapsed,
             response?.Status.ToString() ?? string.Empty,
-            success ? string.Empty : response?.Body.ToString());
+            string.Empty);
     }
+
+    private GraphSmtpResult CreateGraphFailureResult(Stopwatch operationStopwatch,
+        string? error, string? outputMessage = null) => new(false, EmailAction.Send,
+        SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed,
+        outputMessage ?? string.Empty, error) {
+        GraphError = GraphApiErrorParser.Parse(error)
+    };
 
     private GraphBatchRequest CreateBatchSendRequest() {
         var bodyObj = JsonSerializer.Deserialize(MessageJson, MailozaurrJsonContext.Default.JsonElement);
@@ -307,7 +318,7 @@ public partial class Graph {
                 }
             }
         };
-        return JsonSerializer.SerializeToUtf8Bytes(payload, MailozaurrJsonContext.Default.GraphBatchPayload).Length;
+        return JsonSerializer.SerializeToUtf8Bytes(payload, GraphJsonContext.Default.GraphBatchPayload).Length;
     }
 
     /// <summary>
@@ -334,7 +345,7 @@ public partial class Graph {
         //// Serialize only the GraphMessage to a JSON string, excluding the SaveToSentItems property
         //var messageJson = JsonSerializer.Serialize(MessageContainer.Message, options);
 
-        var messageJson = JsonSerializer.Serialize(MessageContainer.Message, MailozaurrJsonContext.Default.GraphMessage);
+        var messageJson = JsonSerializer.Serialize(MessageContainer.Message, GraphJsonContext.Default.GraphMessage);
 
         var draftRequestUri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
@@ -360,7 +371,7 @@ public partial class Graph {
             var draftContent = await draftResponse.Content.ReadAsStringAsync();
 
             if (!draftResponse.IsSuccessStatusCode) {
-                var error = JsonSerializer.Deserialize(draftContent, MailozaurrJsonContext.Default.GraphApiError);
+                var error = JsonSerializer.Deserialize(draftContent, GraphJsonContext.Default.GraphApiError);
                 var errorMessage = (error == null || error.Error == null)
                     ? $"Unknown error: {draftContent}"
                     : $"Error code: {error.Error.Code}, message: {error.Error.Message}";
@@ -369,7 +380,7 @@ public partial class Graph {
             }
 
             // Deserialize the draft message
-            var draftMessage = JsonSerializer.Deserialize(draftContent, MailozaurrJsonContext.Default.GraphMessage);
+            var draftMessage = JsonSerializer.Deserialize(draftContent, GraphJsonContext.Default.GraphMessage);
 
             if (draftMessage == null) {
                 throw new InvalidOperationException("Failed to create draft message.");
@@ -396,7 +407,7 @@ public partial class Graph {
     /// </remarks>
     /// <returns>The JSON payload for the prepared draft message.</returns>
     public string CreatePreparedDraft() {
-        return JsonSerializer.Serialize(MessageContainer.Message, MailozaurrJsonContext.Default.GraphMessage);
+        return JsonSerializer.Serialize(MessageContainer.Message, GraphJsonContext.Default.GraphMessage);
     }
 
     /// <summary>

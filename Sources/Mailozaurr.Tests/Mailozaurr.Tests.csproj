@@ -33,8 +33,8 @@
 
   <ItemGroup>
         <ProjectReference Include="..\Mailozaurr.Cli\Mailozaurr.Cli.csproj" Condition=" '$(TargetFramework)' == 'net8.0' " />
-        <ProjectReference Include="..\Mailozaurr.Application\Mailozaurr.Application.csproj" />
-        <ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
+        <ProjectReference Include="..\Mailozaurr.Host\Mailozaurr.Host.csproj" />
+        <ProjectReference Include="..\Mailozaurr.Meta\Mailozaurr.csproj" />
         <ProjectReference Include="..\Mailozaurr.PowerShell\Mailozaurr.PowerShell.csproj" />
         <ProjectReference Include="..\Mailozaurr.Examples\Mailozaurr.Examples.csproj" Condition=" '$(TargetFramework)' == 'net8.0' " />
   </ItemGroup>

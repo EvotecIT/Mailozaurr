@@ -312,7 +312,7 @@ public class SearchNonDeliveryReportsTests {
         handlerField.SetValue(client, handler);
         try {
             var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", ClientSecret = "secret" };
-            var reports = await MailboxSearcher.SearchNonDeliveryReportsAsync(
+            var reports = await GraphMailboxSearcher.SearchNonDeliveryReportsAsync(
                 cred,
                 "user@example.com",
                 cancellationToken: CancellationToken.None);
@@ -341,7 +341,7 @@ public class SearchNonDeliveryReportsTests {
         handlerField.SetValue(client, handler);
         try {
             var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", ClientSecret = "secret" };
-            var reports = await MailboxSearcher.SearchNonDeliveryReportsAsync(
+            var reports = await GraphMailboxSearcher.SearchNonDeliveryReportsAsync(
                 cred,
                 "user@example.com",
                 maxResults: 1,
@@ -368,7 +368,7 @@ public class SearchNonDeliveryReportsTests {
             var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", ClientSecret = "secret" };
 
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-                MailboxSearcher.SearchNonDeliveryReportsAsync(
+                GraphMailboxSearcher.SearchNonDeliveryReportsAsync(
                     cred,
                     "user@example.com",
                     cancellationToken: cts.Token));
@@ -386,7 +386,7 @@ public class SearchNonDeliveryReportsTests {
         var handler = new MultiRecipientGmailHandler();
         var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/") };
         using var client = new GmailApiClient(httpClient);
-        var reports = await MailboxSearcher.SearchNonDeliveryReportsAsync(
+        var reports = await GmailMailboxSearcher.SearchNonDeliveryReportsAsync(
             client,
             "me",
             maxResults: 1,

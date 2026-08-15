@@ -32,7 +32,7 @@ public sealed partial class GmailApiClient {
             AddLabelIds = addLabelIds ?? Array.Empty<string>(),
             RemoveLabelIds = removeLabelIds ?? Array.Empty<string>()
         };
-        var jsonRequest = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GmailModifyLabelsRequest);
+        var jsonRequest = JsonSerializer.Serialize(request, GmailJsonContext.Default.GmailModifyLabelsRequest);
         using var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
         using var response = await _client.PostAsync($"users/{userId}/threads/{id}/modify", content, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
@@ -44,7 +44,7 @@ public sealed partial class GmailApiClient {
 #endif
         GmailThread? thread;
         try {
-            thread = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailThread);
+            thread = JsonSerializer.Deserialize(json, GmailJsonContext.Default.GmailThread);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API thread modify response.", json, ex);
         }
@@ -72,7 +72,7 @@ public sealed partial class GmailApiClient {
 #endif
         GmailThread? thread;
         try {
-            thread = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailThread);
+            thread = JsonSerializer.Deserialize(json, GmailJsonContext.Default.GmailThread);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API thread trash response.", json, ex);
         }
@@ -110,7 +110,7 @@ public sealed partial class GmailApiClient {
 #endif
         GmailProfile? profile;
         try {
-            profile = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailProfile);
+            profile = JsonSerializer.Deserialize(json, GmailJsonContext.Default.GmailProfile);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API profile response.", json, ex);
         }
@@ -145,7 +145,7 @@ public sealed partial class GmailApiClient {
             request.LabelFilterAction = "include";
         }
 
-        var body = JsonSerializer.Serialize(request, MailozaurrJsonContext.Default.GmailWatchRequest);
+        var body = JsonSerializer.Serialize(request, GmailJsonContext.Default.GmailWatchRequest);
         using var content = new StringContent(body, Encoding.UTF8, "application/json");
         using var response = await _client.PostAsync($"users/{userId}/watch", content, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
@@ -157,7 +157,7 @@ public sealed partial class GmailApiClient {
 #endif
         GmailWatchResponse? watch;
         try {
-            watch = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailWatchResponse);
+            watch = JsonSerializer.Deserialize(json, GmailJsonContext.Default.GmailWatchResponse);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API watch response.", json, ex);
         }
@@ -238,7 +238,7 @@ public sealed partial class GmailApiClient {
 #endif
         GmailHistoryListResponse? history;
         try {
-            history = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailHistoryListResponse);
+            history = JsonSerializer.Deserialize(json, GmailJsonContext.Default.GmailHistoryListResponse);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API history response.", json, ex);
         }
@@ -274,7 +274,7 @@ public sealed partial class GmailApiClient {
 #endif
             GmailThreadListResponse? list;
             try {
-                list = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailThreadListResponse);
+                list = JsonSerializer.Deserialize(json, GmailJsonContext.Default.GmailThreadListResponse);
             } catch (JsonException ex) {
                 throw new GmailApiException("Failed to parse Gmail API thread list response.", json, ex);
             }
@@ -302,7 +302,7 @@ public sealed partial class GmailApiClient {
 #endif
         GmailThread? thread;
         try {
-            thread = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailThread);
+            thread = JsonSerializer.Deserialize(json, GmailJsonContext.Default.GmailThread);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API thread response.", json, ex);
         }
@@ -345,7 +345,7 @@ public sealed partial class GmailApiClient {
 #endif
         GmailThread? thread;
         try {
-            thread = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailThread);
+            thread = JsonSerializer.Deserialize(json, GmailJsonContext.Default.GmailThread);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API thread response.", json, ex);
         }
@@ -391,7 +391,7 @@ public sealed partial class GmailApiClient {
 #endif
         AttachmentResponse? result;
         try {
-            result = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.AttachmentResponse);
+            result = JsonSerializer.Deserialize(json, GmailJsonContext.Default.AttachmentResponse);
         } catch (JsonException ex) {
             throw new GmailApiException("Failed to parse Gmail API attachment response.", json, ex);
         }

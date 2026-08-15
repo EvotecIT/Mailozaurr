@@ -9,14 +9,12 @@ public static class EmailMessage {
     public static IEnumerable<EmlConversionResult> ConvertEmlToMsg(string[] emlFile, string outputFolder,
         bool force) {
         if (emlFile == null) throw new ArgumentNullException(nameof(emlFile));
-        LoggingMessages.Logger.WriteVerbose($"Converting {emlFile.Length} EML file(s) to MSG file(s)...");
         return ConvertFiles(emlFile, outputFolder, ".msg", ConvertEmlToMsg, force);
     }
 
     /// <summary>Converts one EML file to MSG format.</summary>
     public static EmlConversionResult ConvertEmlToMsg(FileInfo emlFile, FileInfo msgFile, bool force) {
         if (!File.Exists(emlFile.FullName)) return MissingEml(emlFile, msgFile);
-        LoggingMessages.Logger.WriteVerbose("Processing EML file: {0}", emlFile);
         EnsureOutputDirectory(msgFile);
         string tempFile = CreateTempOutputPath(msgFile);
         try {
@@ -29,7 +27,6 @@ public static class EmailMessage {
                 ? new EmlConversionResult { EmlFile = emlFile.FullName, MsgFile = msgFile.FullName, Status = true }
                 : new EmlConversionResult { EmlFile = emlFile.FullName, MsgFile = msgFile.FullName, Error = error };
         } catch (Exception ex) {
-            LoggingMessages.Logger.WriteWarning("Error converting EML to MSG: {0}", ex.Message);
             return new EmlConversionResult {
                 EmlFile = emlFile.FullName,
                 MsgFile = msgFile.FullName,
@@ -44,7 +41,6 @@ public static class EmailMessage {
     public static async Task<EmlConversionResult> ConvertEmlToMsgAsync(FileInfo emlFile, FileInfo msgFile,
         bool force, CancellationToken cancellationToken = default) {
         if (!File.Exists(emlFile.FullName)) return MissingEml(emlFile, msgFile);
-        LoggingMessages.Logger.WriteVerbose("Processing EML file: {0}", emlFile);
         EnsureOutputDirectory(msgFile);
         string tempFile = CreateTempOutputPath(msgFile);
         try {
@@ -63,7 +59,6 @@ public static class EmailMessage {
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
         } catch (Exception ex) {
-            LoggingMessages.Logger.WriteWarning("Error converting EML to MSG: {0}", ex.Message);
             return new EmlConversionResult {
                 EmlFile = emlFile.FullName,
                 MsgFile = msgFile.FullName,
@@ -78,14 +73,12 @@ public static class EmailMessage {
     public static IEnumerable<MsgConversionResult> ConvertMsgToEml(string[] msgFile, string outputFolder,
         bool force) {
         if (msgFile == null) throw new ArgumentNullException(nameof(msgFile));
-        LoggingMessages.Logger.WriteVerbose($"Converting {msgFile.Length} MSG file(s) to EML file(s)...");
         return ConvertFiles(msgFile, outputFolder, ".eml", ConvertMsgToEml, force);
     }
 
     /// <summary>Converts one MSG file to EML format.</summary>
     public static MsgConversionResult ConvertMsgToEml(FileInfo msgFile, FileInfo emlFile, bool force) {
         if (!File.Exists(msgFile.FullName)) return MissingMsg(msgFile, emlFile);
-        LoggingMessages.Logger.WriteVerbose("Processing MSG file: {0}", msgFile);
         EnsureOutputDirectory(emlFile);
         string tempFile = CreateTempOutputPath(emlFile);
         try {
@@ -97,7 +90,6 @@ public static class EmailMessage {
                 ? new MsgConversionResult { MsgFile = msgFile.FullName, EmlFile = emlFile.FullName, Status = true }
                 : new MsgConversionResult { MsgFile = msgFile.FullName, EmlFile = emlFile.FullName, Error = error };
         } catch (Exception ex) {
-            LoggingMessages.Logger.WriteWarning("Error converting MSG to EML: {0}", ex.Message);
             return new MsgConversionResult {
                 MsgFile = msgFile.FullName,
                 EmlFile = emlFile.FullName,
@@ -112,7 +104,6 @@ public static class EmailMessage {
     public static async Task<MsgConversionResult> ConvertMsgToEmlAsync(FileInfo msgFile, FileInfo emlFile,
         bool force, CancellationToken cancellationToken = default) {
         if (!File.Exists(msgFile.FullName)) return MissingMsg(msgFile, emlFile);
-        LoggingMessages.Logger.WriteVerbose("Processing MSG file: {0}", msgFile);
         EnsureOutputDirectory(emlFile);
         string tempFile = CreateTempOutputPath(emlFile);
         try {
@@ -128,7 +119,6 @@ public static class EmailMessage {
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
         } catch (Exception ex) {
-            LoggingMessages.Logger.WriteWarning("Error converting MSG to EML: {0}", ex.Message);
             return new MsgConversionResult {
                 MsgFile = msgFile.FullName,
                 EmlFile = emlFile.FullName,

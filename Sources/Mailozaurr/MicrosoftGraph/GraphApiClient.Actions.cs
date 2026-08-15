@@ -117,7 +117,7 @@ public sealed partial class GraphApiClient {
 
         var userSegment = BuildUserSegment(userId);
         var selector = Uri.EscapeDataString(messageId.Trim());
-        var json = JsonSerializer.Serialize(new GraphDestinationRequest { DestinationId = destinationId.Trim() }, MailozaurrJsonContext.Default.GraphDestinationRequest);
+        var json = JsonSerializer.Serialize(new GraphDestinationRequest { DestinationId = destinationId.Trim() }, GraphJsonContext.Default.GraphDestinationRequest);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
         using var req = new HttpRequestMessage(HttpMethod.Post, userSegment + "/messages/" + selector + "/move") { Content = content };
         ApplyAuthHeader(req);
@@ -171,7 +171,7 @@ public sealed partial class GraphApiClient {
         }
         var userSegment = BuildUserSegment(userId);
         var selector = Uri.EscapeDataString(messageId.Trim());
-        var json = JsonSerializer.Serialize(new GraphMarkReadRequest { IsRead = isRead }, MailozaurrJsonContext.Default.GraphMarkReadRequest);
+        var json = JsonSerializer.Serialize(new GraphMarkReadRequest { IsRead = isRead }, GraphJsonContext.Default.GraphMarkReadRequest);
         using var req = new HttpRequestMessage(new HttpMethod("PATCH"), userSegment + "/messages/" + selector) {
             Content = new StringContent(json, Encoding.UTF8, "application/json")
         };
@@ -205,7 +205,7 @@ public sealed partial class GraphApiClient {
         var status = flagged ? "flagged" : "notFlagged";
         var json = JsonSerializer.Serialize(
             new GraphSetFlagRequest { Flag = new GraphSetFlagRequestFlag { FlagStatus = status } },
-            MailozaurrJsonContext.Default.GraphSetFlagRequest);
+            GraphJsonContext.Default.GraphSetFlagRequest);
         using var req = new HttpRequestMessage(new HttpMethod("PATCH"), userSegment + "/messages/" + selector) {
             Content = new StringContent(json, Encoding.UTF8, "application/json")
         };
@@ -248,7 +248,7 @@ public sealed partial class GraphApiClient {
         var batch = ClampInt(batchSize, 1, 20);
         var payloadJson = JsonSerializer.Serialize(
             new GraphDestinationRequest { DestinationId = destinationFolderId.Trim() },
-            MailozaurrJsonContext.Default.GraphDestinationRequest);
+            GraphJsonContext.Default.GraphDestinationRequest);
         using var bodyDoc = JsonDocument.Parse(payloadJson);
         var body = bodyDoc.RootElement.Clone();
 
@@ -317,7 +317,7 @@ public sealed partial class GraphApiClient {
         var batch = ClampInt(batchSize, 1, 20);
         var payloadJson = JsonSerializer.Serialize(
             new GraphMarkReadRequest { IsRead = isRead },
-            MailozaurrJsonContext.Default.GraphMarkReadRequest);
+            GraphJsonContext.Default.GraphMarkReadRequest);
         using var bodyDoc = JsonDocument.Parse(payloadJson);
         var body = bodyDoc.RootElement.Clone();
 
@@ -356,7 +356,7 @@ public sealed partial class GraphApiClient {
         var batch = ClampInt(batchSize, 1, 20);
         var payloadJson = JsonSerializer.Serialize(
             new GraphSetFlagRequest { Flag = new GraphSetFlagRequestFlag { FlagStatus = flagged ? "flagged" : "notFlagged" } },
-            MailozaurrJsonContext.Default.GraphSetFlagRequest);
+            GraphJsonContext.Default.GraphSetFlagRequest);
         using var bodyDoc = JsonDocument.Parse(payloadJson);
         var body = bodyDoc.RootElement.Clone();
 
@@ -529,7 +529,7 @@ public sealed partial class GraphApiClient {
             });
         }
 
-        var json = JsonSerializer.Serialize(payload, MailozaurrJsonContext.Default.GraphBatchPayload);
+        var json = JsonSerializer.Serialize(payload, GraphJsonContext.Default.GraphBatchPayload);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
         using var req = new HttpRequestMessage(HttpMethod.Post, "$batch") { Content = content };
         ApplyAuthHeader(req);

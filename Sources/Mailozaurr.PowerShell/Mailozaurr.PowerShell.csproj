@@ -3,7 +3,7 @@
     <PropertyGroup>
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
-        <VersionPrefix>2.0.4</VersionPrefix>
+        <VersionPrefix>3.0.0</VersionPrefix>
         <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
         <AssemblyName>Mailozaurr.PowerShell</AssemblyName>
         <Description>PowerShell cmdlet host for Mailozaurr email, mailbox, message-file, offline mail-store, and cryptography workflows.</Description>
@@ -20,13 +20,16 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <OfficeIMOVersion Condition=" '$(OfficeIMOVersion)' == '' ">3.2.0</OfficeIMOVersion>
+        <OfficeIMOVersion Condition=" '$(OfficeIMOVersion)' == '' ">3.2.2</OfficeIMOVersion>
         <OfficeIMORoot Condition=" '$(OfficeIMORoot)' == '' ">..\..\..\OfficeIMO</OfficeIMORoot>
         <UseOfficeIMOProjectReferences Condition=" '$(UseOfficeIMOProjectReferences)' == '' ">false</UseOfficeIMOProjectReferences>
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
+        <ProjectReference Include="..\Mailozaurr\Mailozaurr.Internet.csproj" />
+        <ProjectReference Include="..\Mailozaurr.MicrosoftGraph\Mailozaurr.MicrosoftGraph.csproj" />
+        <ProjectReference Include="..\Mailozaurr.Gmail\Mailozaurr.Gmail.csproj" />
+        <ProjectReference Include="..\Mailozaurr.Artifacts\Mailozaurr.Artifacts.csproj" />
     </ItemGroup>
 
     <ItemGroup Condition=" '$(UseOfficeIMOProjectReferences)' == 'true' ">

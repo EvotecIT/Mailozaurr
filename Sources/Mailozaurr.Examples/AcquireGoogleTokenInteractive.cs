@@ -16,7 +16,7 @@ public static class AcquireGoogleTokenInteractive {
 
         // === EXAMPLE ===
         try {
-            var cred = await OAuthHelpers.AcquireGoogleTokenInteractiveAsync(
+            var cred = await GmailOAuthHelpers.AcquireTokenInteractiveAsync(
                 gmailAccount,
                 clientId,
                 clientSecret,
