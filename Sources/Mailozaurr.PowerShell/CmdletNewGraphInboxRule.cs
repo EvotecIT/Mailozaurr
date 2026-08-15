@@ -228,13 +228,13 @@ public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
         var rulePayload = Rule ?? throw new PSArgumentNullException(nameof(Rule), "Rule has to be provided or built.");
         var bodyObj = RuleBuilder != null
             ? RuleBuilder.Build()
-            : RuleObject ?? JsonSerializer.Deserialize(JsonSerializer.Serialize(rulePayload, MailozaurrJsonContext.Default.Object), MailozaurrJsonContext.Default.GraphInboxRule);
+            : RuleObject ?? JsonSerializer.Deserialize(JsonSerializer.Serialize(rulePayload, MailozaurrJsonContext.Default.Object), GraphJsonContext.Default.GraphInboxRule);
 
         if (bodyObj is null) {
             throw new PSArgumentException("Graph inbox rule definition cannot be null.");
         }
 
-        var body = JsonSerializer.Serialize(bodyObj, MailozaurrJsonContext.Default.GraphInboxRule);
+        var body = JsonSerializer.Serialize(bodyObj, GraphJsonContext.Default.GraphInboxRule);
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "POST")

@@ -8,7 +8,7 @@
     Description          = 'PowerShell email toolkit for SMTP, IMAP, POP3, Microsoft Graph, Gmail, SendGrid, Mailgun, and Amazon SES, with message-file, PST/OST archive, signing, and encryption workflows.'
     FunctionsToExport    = @()
     GUID                 = '2b0ea9f1-3ff1-4300-b939-106d5da608fa'
-    ModuleVersion        = '2.1.7'
+    ModuleVersion        = '3.0.0'
     PowerShellVersion    = '5.1'
     PrivateData          = @{
         PSData = @{

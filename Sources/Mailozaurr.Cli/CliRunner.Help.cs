@@ -1,4 +1,4 @@
-using Mailozaurr.Application;
+using Mailozaurr;
 
 namespace Mailozaurr.Cli;
 

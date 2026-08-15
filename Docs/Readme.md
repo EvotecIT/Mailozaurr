@@ -2,7 +2,7 @@
 Module Name: Mailozaurr
 Module Guid: 2b0ea9f1-3ff1-4300-b939-106d5da608fa
 Download Help Link: https://github.com/EvotecIT/MailoZaurr
-Help Version: 2.1.7
+Help Version: 3.0.0
 Locale: en-US
 ---
 # Mailozaurr Module

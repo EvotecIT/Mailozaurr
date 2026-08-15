@@ -35,7 +35,7 @@ public class OAuthHelpersGoogleCachedTokenTests {
         await OAuthTokenCache.SetAsync(compositeKey, composite);
         await OAuthTokenCache.SetAsync(legacyKey, legacy);
 
-        var result = await OAuthHelpers.AcquireGoogleTokenCachedAsync(account, clientId, "secret", Array.Empty<string>());
+        var result = await GmailOAuthHelpers.AcquireTokenCachedAsync(account, clientId, "secret", Array.Empty<string>());
 
         Assert.Equal("composite-token", result.AccessToken);
         Assert.Equal(clientId, result.ClientId);
@@ -55,7 +55,7 @@ public class OAuthHelpersGoogleCachedTokenTests {
         };
         await OAuthTokenCache.SetAsync(legacyKey, legacy);
 
-        var result = await OAuthHelpers.AcquireGoogleTokenCachedAsync(account, clientId, "top-secret", Array.Empty<string>());
+        var result = await GmailOAuthHelpers.AcquireTokenCachedAsync(account, clientId, "top-secret", Array.Empty<string>());
 
         Assert.Equal("legacy-token", result.AccessToken);
         Assert.Equal(clientId, result.ClientId);
@@ -95,7 +95,8 @@ public class OAuthHelpersGoogleCachedTokenTests {
         OAuthCredential credential,
         string gmailAccount,
         string clientId) {
-        var method = typeof(OAuthHelpers).GetMethod("PersistGoogleCredentialAsync", BindingFlags.Static | BindingFlags.NonPublic);
+        var method = typeof(GmailOAuthHelpers).GetMethod("PersistCredentialAsync",
+            BindingFlags.Static | BindingFlags.NonPublic);
         var task = (Task)method!.Invoke(null, new object[] { credential, gmailAccount, clientId })!;
         await task.ConfigureAwait(false);
     }

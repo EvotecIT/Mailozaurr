@@ -5,7 +5,7 @@ namespace Mailozaurr.Tests;
 public sealed class NativeSentMailboxOperationsTests {
     [Fact]
     public void ResolveGraphSentFolderName_PrefersRequestedFolder() {
-        var folder = NativeSentMailboxOperations.ResolveGraphSentFolderName(
+        var folder = GraphNativeMailboxOperations.ResolveSentFolderName(
             requestedSentFolder: " Team/Sent ",
             configuredSentFolder: "ConfigSent");
 
@@ -14,7 +14,7 @@ public sealed class NativeSentMailboxOperationsTests {
 
     [Fact]
     public void ResolveGraphSentFolderName_UsesConfiguredWhenRequestedMissing() {
-        var folder = NativeSentMailboxOperations.ResolveGraphSentFolderName(
+        var folder = GraphNativeMailboxOperations.ResolveSentFolderName(
             requestedSentFolder: null,
             configuredSentFolder: " ConfigSent ");
 
@@ -23,16 +23,16 @@ public sealed class NativeSentMailboxOperationsTests {
 
     [Fact]
     public void ResolveGraphSentFolderName_UsesFallbackWhenOverridesMissing() {
-        var folder = NativeSentMailboxOperations.ResolveGraphSentFolderName(
+        var folder = GraphNativeMailboxOperations.ResolveSentFolderName(
             requestedSentFolder: null,
             configuredSentFolder: null);
 
-        Assert.Equal(NativeSentMailboxOperations.DefaultGraphSentFolder, folder);
+        Assert.Equal(GraphNativeMailboxOperations.DefaultSentFolder, folder);
     }
 
     [Fact]
     public void ResolveGraphSentFolderSelector_UsesGraphFolderSelectorRules() {
-        var selector = NativeSentMailboxOperations.ResolveGraphSentFolderSelector(
+        var selector = GraphNativeMailboxOperations.ResolveSentFolderSelector(
             requestedSentFolder: null,
             configuredSentFolder: "Sent Items");
 
@@ -41,27 +41,27 @@ public sealed class NativeSentMailboxOperationsTests {
 
     [Fact]
     public void ResolveGmailSentLabelId_IsAlwaysSystemSentLabel() {
-        var label = NativeSentMailboxOperations.ResolveGmailSentLabelId(
+        var label = GmailNativeMailboxOperations.ResolveSentLabelId(
             requestedSentFolder: "CustomSent",
             configuredSentFolder: "ConfiguredSent");
 
-        Assert.Equal(NativeSentMailboxOperations.DefaultGmailSentLabelId, label);
+        Assert.Equal(GmailNativeMailboxOperations.DefaultSentLabelId, label);
     }
 
     [Fact]
     public void ResolveGmailSentFolderName_PrefersRequestedThenConfiguredThenFallback() {
-        var requested = NativeSentMailboxOperations.ResolveGmailSentFolderName(
+        var requested = GmailNativeMailboxOperations.ResolveSentFolderName(
             requestedSentFolder: " Requested ",
             configuredSentFolder: "Configured");
-        var configured = NativeSentMailboxOperations.ResolveGmailSentFolderName(
+        var configured = GmailNativeMailboxOperations.ResolveSentFolderName(
             requestedSentFolder: null,
             configuredSentFolder: " Configured ");
-        var fallback = NativeSentMailboxOperations.ResolveGmailSentFolderName(
+        var fallback = GmailNativeMailboxOperations.ResolveSentFolderName(
             requestedSentFolder: null,
             configuredSentFolder: null);
 
         Assert.Equal("Requested", requested);
         Assert.Equal("Configured", configured);
-        Assert.Equal(NativeSentMailboxOperations.DefaultGmailSentLabelId, fallback);
+        Assert.Equal(GmailNativeMailboxOperations.DefaultSentLabelId, fallback);
     }
 }

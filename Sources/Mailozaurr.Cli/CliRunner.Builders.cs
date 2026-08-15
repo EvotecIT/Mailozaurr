@@ -1,4 +1,4 @@
-using Mailozaurr.Application;
+using Mailozaurr;
 using Mailozaurr.Cli.Mcp;
 using System.IO;
 using System.Text.Json;

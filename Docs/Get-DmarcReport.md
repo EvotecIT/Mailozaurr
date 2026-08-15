@@ -13,7 +13,7 @@ The Get-DmarcReport cmdlet queries IMAP, POP3, Microsoft Graph, or Gmail API to 
 ## SYNTAX
 ### GmailApi
 ```powershell
-Get-DmarcReport -Protocol <EmailProtocol> -GmailAccount <string> -Credential <pscredential> [-Domain <string>] [-Since <DateTime>] [-Before <DateTime>] [-Count <int>] [-Folder <string>] [-UserPrincipalName <string>] [-ParallelDownloadLimit <int>] [<CommonParameters>]
+Get-DmarcReport -Protocol <EmailProtocol> -GmailAccount <string> -Credential <pscredential> [-Domain <string>] [-Since <DateTime>] [-Before <DateTime>] [-Count <int>] [-Folder <string>] [-UserPrincipalName <string>] [-ParallelDownloadLimit <int>] [-MaxUncompressedSize <long>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -121,6 +121,22 @@ Aliases: None
 Possible values:
 
 Required: True
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaxUncompressedSize
+Maximum uncompressed attachment size to inspect, in bytes.
+
+```yaml
+Type: Int64
+Parameter Sets: GmailApi
+Aliases: None
+Possible values:
+
+Required: False
 Position: named
 Default value: None
 Accept pipeline input: False

@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -244,6 +245,17 @@ public class HelpersTests {
         }
     }
 
+    private sealed class CapturingHandler : HttpMessageHandler {
+        public string? Body { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            Body = request.Content == null
+                ? null
+                : await request.Content.ReadAsStringAsync().ConfigureAwait(false);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        }
+    }
+
     [Fact]
     public async Task PostWebhookAsync_CancellationRequested_ThrowsAsync() {
         using var cts = new CancellationTokenSource();
@@ -297,6 +309,24 @@ public class HelpersTests {
         } finally {
             Mailozaurr.Helpers.SharedHttpClient = new HttpClient();
         }
+    }
+
+    [Fact]
+    public async Task PostWebhookAsync_WithProviderMetadata_PreservesGraphError() {
+        var handler = new CapturingHandler();
+        using var client = new HttpClient(handler);
+        var result = new GraphSmtpResult(false, EmailAction.Send, string.Empty, string.Empty,
+            "GraphAPI", 0, TimeSpan.Zero, error: "send failed") {
+            GraphError = new GraphApiErrorResponse { Raw = "raw graph response" }
+        };
+
+        await Mailozaurr.Helpers.PostWebhookAsync("http://localhost", result,
+            GraphJsonContext.Default.GraphSmtpResult, default, client);
+
+        Assert.NotNull(handler.Body);
+        using JsonDocument json = JsonDocument.Parse(handler.Body!);
+        Assert.Equal("raw graph response",
+            json.RootElement.GetProperty("GraphError").GetProperty("Raw").GetString());
     }
 
     private class DisposeTrackingHandler : HttpMessageHandler {

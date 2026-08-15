@@ -54,6 +54,28 @@ For OAuth2 support, Mailozaurr also bundles:
 - [Google.Apis.Core](https://www.nuget.org/packages/Google.Apis.Core)
 - [Google.Apis.Auth](https://www.nuget.org/packages/Google.Apis.Auth)
 
+## Choosing a .NET package (3.0 and later)
+
+Install `Mailozaurr` when the application needs the complete Mailozaurr library surface. It contains the reusable profile, routing, draft, queue, and message-action workflows and brings the four implementation packages together without adding CLI, MCP, PowerShell, or OfficeIMO.Security hosting dependencies:
+
+```shell
+dotnet add package Mailozaurr
+```
+
+Applications with a narrower job can avoid unrelated provider stacks:
+
+| Use case | Package | What it avoids |
+| --- | --- | --- |
+| SMTP, IMAP, POP3, MIME, SendGrid, Mailgun, or SES | `Mailozaurr.Internet` | Microsoft and Google auth; OfficeIMO |
+| Microsoft Graph mail | `Mailozaurr.MicrosoftGraph` | Google auth; OfficeIMO |
+| Gmail API mail | `Mailozaurr.Gmail` | Microsoft auth; OfficeIMO |
+| `EmailDocument` and `MimeMessage` interoperability, EML/MSG/OFT/TNEF | `Mailozaurr.Artifacts` | Internet protocols and provider auth |
+| Local email and Outlook artifacts without MimeKit | `OfficeIMO.Email` | Every Mailozaurr package |
+
+Graph and Gmail depend on `Mailozaurr.Internet`, so those packages also include the common MIME and protocol foundation. `Mailozaurr.Artifacts` is independent of Internet and depends only on MimeKit and OfficeIMO.Email. Add `OfficeIMO.Security` explicitly in C# when artifact verification or decryption needs its concrete provider.
+
+The PowerShell module remains one batteries-included installation. It consumes the complete `Mailozaurr` package and includes OfficeIMO.Security; PowerShell users do not select NuGet leaves.
+
 ## EML, MSG, OFT, and TNEF files
 
 Mailozaurr keeps transport, mailbox access, MimeKit message composition, PGP, DKIM, ARC, and outbound S/MIME workflows. OfficeIMO.Email owns local EML, MSG, OFT, and TNEF artifact reading, writing, and projection, including typed Outlook items, RTF-backed bodies, embedded items, retained MAPI properties, and bounded S/MIME verification through OfficeIMO.Security.
@@ -625,7 +647,7 @@ You can also utilize Examples which should help to understand use cases. Of cour
 - `Examples/Example-AcquireO365TokenInteractive.ps1` – demonstrates `Connect-OAuthO365`, `ConvertFrom-OAuth2Credential`, and using the token with `Send-EmailMessage`, IMAP, and POP3.
 - `Examples/Example-AcquireGoogleTokenInteractive.ps1` – demonstrates `Connect-OAuthGoogle`, `ConvertFrom-OAuth2Credential`, and using the token with `Send-EmailMessage`, IMAP, and POP3.
 - `Sources/Mailozaurr.Examples/AcquireO365TokenInteractive.cs` – C# sample for `OAuthHelpers.AcquireO365TokenInteractiveAsync`.
-- `Sources/Mailozaurr.Examples/AcquireGoogleTokenInteractive.cs` – C# sample for `OAuthHelpers.AcquireGoogleTokenInteractiveAsync`.
+- `Sources/Mailozaurr.Examples/AcquireGoogleTokenInteractive.cs` – C# sample for `GmailOAuthHelpers.AcquireTokenInteractiveAsync`.
 - `Sources/Mailozaurr.Examples/SendEmailAttachments.cs` – C# sample demonstrating attachments and inline resources.
 
 ### Choosing between `-Graph` and `-MgGraphRequest`

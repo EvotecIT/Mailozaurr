@@ -1,0 +1,103 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Company>Evotec</Company>
+    <Authors>Przemyslaw Klys</Authors>
+    <VersionPrefix>3.0.0</VersionPrefix>
+    <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
+    <AssemblyName>Mailozaurr.Internet</AssemblyName>
+    <RootNamespace>Mailozaurr</RootNamespace>
+    <PackageId>Mailozaurr.Internet</PackageId>
+    <Description>Internet email protocols and provider-neutral delivery for .NET, including SMTP, IMAP, POP3, MIME, SendGrid, Mailgun, and Amazon SES.</Description>
+    <Copyright>(c) 2011 - 2026 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsPackable>true</IsPackable>
+    <PackageIcon>Mailozaurr.png</PackageIcon>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/EvotecIT/Mailozaurr</PackageProjectUrl>
+    <PackageReadmeFile>README.MD</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/EvotecIT/Mailozaurr</RepositoryUrl>
+    <PackageTags>Windows;MacOS;Linux;Mail;Email;SMTP;IMAP;POP3;MIME;SendGrid;Mailgun;AmazonSES;DMARC;DKIM</PackageTags>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/artifacts/**;**/Artifacts/**</DefaultItemExcludes>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(TargetFramework)' == 'net8.0' ">
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Gmail\**\*.cs;MicrosoftGraph\**\*.cs;MailFiles\**\*.cs" />
+    <Compile Remove="Enums\GraphEndpoint.cs;Enums\GraphImportance.cs;Enums\GraphMailboxRole.cs" />
+    <Compile Remove="EmailGraphMessage.cs;GraphCredential.cs;GraphEmailMessage.cs;MicrosoftGraphUtils*.cs;NativeMailboxBrowserSessions.cs;MailozaurrOptions.cs" />
+    <Compile Remove="Authentication\OAuthHelpers.cs;Authentication\TokenCacheHelper.cs" />
+    <Compile Remove="Receive\GraphMessageListener.cs" />
+    <Compile Remove="DmarcReports\GmailDmarcReportService.cs;DmarcReports\GraphDmarcReportService.cs" />
+    <Compile Remove="NonDeliveryReports\GmailNonDeliveryReportService.cs;NonDeliveryReports\GraphNonDeliveryReportService.cs" />
+    <Compile Remove="SentMessages\Senders\GmailPendingMessageSender.cs;SentMessages\Senders\GraphPendingMessageSender.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="MailKit" />
+    <Using Include="MailKit.Net.Smtp" />
+    <Using Include="MailKit.Security" />
+    <Using Include="MailKit.Net.Pop3" />
+    <Using Include="MailKit.Net.Imap" />
+    <Using Include="MailKit.Net" />
+    <Using Include="MimeKit" />
+    <Using Include="MimeKit.Cryptography" />
+    <Using Include="System.Net" />
+    <Using Include="System.Net.Http" />
+    <Using Include="System.Diagnostics" />
+    <Using Include="System.Text" />
+    <Using Include="System.Collections" />
+    <Using Include="System.Text.Json" />
+    <Using Include="System.Text.Json.Serialization" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="EmailValidation" Version="1.3.0" />
+    <PackageReference Include="MailKit" Version="4.17.0" />
+    <PackageReference Include="MimeKit" Version="4.17.0" />
+    <PackageReference Include="NSspi" Version="0.3.1" />
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.7.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'netstandard2.0' ">
+    <PackageReference Include="System.Text.Json" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'net8.0' ">
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.10" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
+    <Reference Include="System.IO.Compression" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\Mailozaurr.png" Pack="true" PackagePath="\" />
+    <None Include="..\..\README.MD" Pack="true" PackagePath="\" />
+    <EmbeddedResource Include="Resources\disposable_email_blocklist.conf" />
+    <EmbeddedResource Include="Resources\allowlist.conf" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Mailozaurr.Tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Mailozaurr.PowerShell</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Mailozaurr.MicrosoftGraph</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Mailozaurr.Gmail</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

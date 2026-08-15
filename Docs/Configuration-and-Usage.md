@@ -26,10 +26,10 @@ A profile contains:
 
 The shared model is implemented in:
 
-- [MailProfile.cs](../Sources/Mailozaurr.Application/MailProfile.cs)
-- [MailProfileKind.cs](../Sources/Mailozaurr.Application/MailProfileKind.cs)
-- [MailProfileSettingsKeys.cs](../Sources/Mailozaurr.Application/MailProfileSettingsKeys.cs)
-- [MailSecretNames.cs](../Sources/Mailozaurr.Application/MailSecretNames.cs)
+- [MailProfile.cs](../Sources/Mailozaurr/MailProfile.cs)
+- [MailProfileKind.cs](../Sources/Mailozaurr/MailProfileKind.cs)
+- [MailProfileSettingsKeys.cs](../Sources/Mailozaurr/MailProfileSettingsKeys.cs)
+- [MailSecretNames.cs](../Sources/Mailozaurr/MailSecretNames.cs)
 
 ## Supported profile kinds
 
@@ -48,7 +48,7 @@ Current shared profile kinds are:
 
 Mailozaurr does not pretend every provider supports the same operations.
 
-Default capabilities are defined in [MailCapabilityCatalog.cs](../Sources/Mailozaurr.Application/MailCapabilityCatalog.cs).
+Default capabilities are defined in [MailCapabilityCatalog.cs](../Sources/Mailozaurr/MailCapabilityCatalog.cs).
 
 In practice:
 
@@ -93,7 +93,7 @@ Common secret names include:
 
 ## Minimum provider guidance
 
-The shared validator lives in [MailProfileValidator.cs](../Sources/Mailozaurr.Application/MailProfileValidator.cs).
+The shared validator lives in [MailProfileValidator.cs](../Sources/Mailozaurr/MailProfileValidator.cs).
 
 The practical minimum shape by provider is:
 
@@ -147,7 +147,7 @@ These are send-only profiles. The exact provider-specific settings are still bes
 
 By default, the application layer stores reusable state under a `Mailozaurr` directory inside local application data.
 
-The path resolver is implemented in [MailApplicationPaths.cs](../Sources/Mailozaurr.Application/MailApplicationPaths.cs).
+The path resolver is implemented in [MailApplicationPaths.cs](../Sources/Mailozaurr/MailApplicationPaths.cs).
 
 Default subdirectories are:
 
@@ -172,8 +172,7 @@ The CLI also supports per-run overrides:
 
 ## CLI usage overview
 
-The executable is built from [Mailozaurr.Cli](../Sources/Mailozaurr.Cli).
-The Application and CLI package definitions are release-ready but are not published yet. Until a public release exists, use project references for `Mailozaurr.Application` and run the CLI from this checkout or from a locally built PowerForge artifact.
+The executable is built from [Mailozaurr.Cli](../Sources/Mailozaurr.Cli). It is a thin command and MCP surface over reusable workflows in the public `Mailozaurr` assembly. Until the CLI package is publicly released, run it from this checkout or from a locally built PowerForge artifact.
 
 To inspect current commands:
 

@@ -1,4 +1,4 @@
-using Mailozaurr.Application;
+using Mailozaurr;
 using Mailozaurr.Definitions;
 using MimeKit;
 using System.Net;

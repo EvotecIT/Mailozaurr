@@ -1,6 +1,6 @@
 #if NET8_0_OR_GREATER
 using System.Text.Json;
-using Mailozaurr.Application;
+using Mailozaurr;
 using Mailozaurr.Cli;
 
 namespace Mailozaurr.Tests;

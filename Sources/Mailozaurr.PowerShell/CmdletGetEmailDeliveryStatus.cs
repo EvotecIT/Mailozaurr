@@ -140,7 +140,7 @@ public sealed class CmdletGetEmailDeliveryStatus : AsyncPSCmdlet {
             case EmailProtocol.Graph: {
                     var conn = DefaultSessions.GraphSession;
                     if (conn != null && conn.Credential != null && !string.IsNullOrWhiteSpace(UserPrincipalName)) {
-                        var reports = await MailboxSearcher.SearchNonDeliveryReportsAsync(
+                        var reports = await GraphMailboxSearcher.SearchNonDeliveryReportsAsync(
                             conn.Credential,
                             UserPrincipalName!,
                             Since,
@@ -168,7 +168,7 @@ public sealed class CmdletGetEmailDeliveryStatus : AsyncPSCmdlet {
                         var net = Credential.GetNetworkCredential();
                         var oauth = new OAuthCredential { UserName = net.UserName, AccessToken = net.Password, ExpiresOn = DateTimeOffset.MaxValue };
                         var client = new GmailApiClient(oauth);
-                        var reports = await MailboxSearcher.SearchNonDeliveryReportsAsync(
+                        var reports = await GmailMailboxSearcher.SearchNonDeliveryReportsAsync(
                             client,
                             GmailAccount!,
                             Since,

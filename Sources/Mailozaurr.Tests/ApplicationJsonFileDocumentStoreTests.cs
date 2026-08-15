@@ -1,4 +1,4 @@
-using Mailozaurr.Application;
+using Mailozaurr;
 using System.Diagnostics;
 
 namespace Mailozaurr.Tests;

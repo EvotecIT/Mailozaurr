@@ -1,5 +1,5 @@
 using MailKit.Net.Imap;
-using Mailozaurr.Application;
+using Mailozaurr;
 
 namespace Mailozaurr.Tests;
 

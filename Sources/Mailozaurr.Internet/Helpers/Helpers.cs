@@ -1,0 +1,234 @@
+﻿using System;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Security;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
+using System.Threading;
+using MimeKit;
+
+namespace Mailozaurr;
+
+/// <summary>
+/// Utility methods used throughout the library.
+/// </summary>
+public static class Helpers {
+    private static HttpClient s_sharedHttpClient = new HttpClient();
+
+    internal static HttpClient SharedHttpClient {
+        get => Volatile.Read(ref s_sharedHttpClient);
+        set {
+            if (value is null) {
+                throw new ArgumentNullException(nameof(value));
+            }
+
+            var old = Interlocked.Exchange(ref s_sharedHttpClient, value);
+            if (!ReferenceEquals(old, value)) {
+                old.Dispose();
+            }
+        }
+    }
+    /// <summary>Converts a credential into an OAuth token tuple.</summary>
+    /// <param name="credential">The credential containing the token.</param>
+    /// <returns>The username and token.</returns>
+    public static (string UserName, string Token) ConvertFromOAuth2Credential(NetworkCredential credential) {
+        if (credential is null) {
+            throw new ArgumentNullException(nameof(credential));
+        }
+        return (credential.UserName, credential.Password);
+    }
+
+    /// <summary>Creates a <see cref="NetworkCredential"/> from plain text.</summary>
+    /// <param name="userName">The user name.</param>
+    /// <param name="password">The password.</param>
+    /// <returns>The resulting credential.</returns>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when <paramref name="userName"/> or <paramref name="password"/> is <see langword="null"/>.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="userName"/> or <paramref name="password"/> is empty.
+    /// </exception>
+    public static NetworkCredential ConvertFromPlainText(string userName, string password) {
+        if (userName is null) {
+            throw new ArgumentNullException(nameof(userName));
+        }
+
+        if (userName.Length == 0) {
+            throw new ArgumentException("Value cannot be empty.", nameof(userName));
+        }
+
+        if (password is null) {
+            throw new ArgumentNullException(nameof(password));
+        }
+
+        if (password.Length == 0) {
+            throw new ArgumentException("Value cannot be empty.", nameof(password));
+        }
+
+        var secStringPassword = new SecureString();
+        foreach (char c in password) {
+            secStringPassword.AppendChar(c);
+        }
+        secStringPassword.MakeReadOnly();
+        return new NetworkCredential(userName, secStringPassword);
+    }
+
+    /// <summary>Extracts the API key from a credential object.</summary>
+    /// <param name="credentials">Credential containing the key.</param>
+    /// <returns>The API key.</returns>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="credentials"/> is not a <see cref="NetworkCredential"/>.
+    /// </exception>
+    public static string CredentialToApiKey(ICredentials credentials) {
+        if (credentials is NetworkCredential networkCredential) {
+            return networkCredential.Password;
+        }
+        throw new ArgumentException("Credential must be of type NetworkCredential", nameof(credentials));
+    }
+
+    /// <summary>Retrieves the email address string from various types of objects.</summary>
+    /// <param name="from">String or dictionary representation.</param>
+    /// <returns>The email address.</returns>
+    public static string GetEmailAddress(object from) {
+        if (from is string s) {
+            return s;
+        }
+        if (from is MailboxAddress mailboxAddress) {
+            return mailboxAddress.Address;
+        }
+        if (from is SendGridEmailAddress sendGridAddress) {
+            return sendGridAddress.Email;
+        }
+        if (from is IDictionary<string, object> dict) {
+            if (dict.TryGetValue("Email", out var emailObj)) {
+                return emailObj?.ToString() ?? string.Empty;
+            }
+            return string.Empty;
+        }
+        return from?.ToString() ?? string.Empty;
+    }
+
+    /// <summary>Creates an object representing the sender.</summary>
+    /// <param name="email">Email address.</param>
+    /// <param name="name">Display name.</param>
+    /// <returns>The object to be used as sender.</returns>
+    public static object GetFromObject(string email, string name) {
+        if (!string.IsNullOrWhiteSpace(name)) {
+            return new Dictionary<string, object> { { "Name", name }, { "Email", email } };
+        }
+        return email;
+    }
+
+    /// <summary>Parses an object into an email and optional name.</summary>
+    /// <param name="from">String or dictionary representation.</param>
+    /// <returns>Tuple containing the email and name.</returns>
+    public static (string? Email, string? Name) GetEmailAndName(object? from) {
+        if (from is string s) {
+            return (s, null);
+        }
+        if (from is MailboxAddress mailboxAddress) {
+            return (mailboxAddress.Address, mailboxAddress.Name);
+        }
+        if (from is SendGridEmailAddress sendGridAddress) {
+            return (sendGridAddress.Email, sendGridAddress.Name);
+        }
+        if (from is IDictionary dict) {
+            var email = dict.Contains("Email") ? dict["Email"]?.ToString() : null;
+            var name = dict.Contains("Name") ? dict["Name"]?.ToString() : null;
+            return (email, name);
+        }
+        return (from?.ToString(), null);
+    }
+
+    /// <summary>
+    /// Enumerates unique address objects based on email value using a hash set to track already yielded addresses.
+    /// </summary>
+    /// <param name="addresses">Collection of address objects.</param>
+    /// <param name="seen">Optional hash set tracking emails that were already yielded. If <see langword="null"/> a new set is created.</param>
+    /// <returns>Unique address objects.</returns>
+    public static IEnumerable<object> UniqueAddresses(IEnumerable<object>? addresses, HashSet<string>? seen) {
+        if (addresses == null) yield break;
+
+        seen ??= new HashSet<string>();
+
+        foreach (var address in addresses) {
+            var email = GetEmailAddress(address);
+            if (string.IsNullOrWhiteSpace(email)) {
+                continue;
+            }
+
+            var normalized = string
+                .Concat(email.Where(c => !char.IsWhiteSpace(c)))
+                .ToLowerInvariant();
+            if (seen.Add(normalized)) {
+                yield return address;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Determines whether the specified exception represents a transient error
+    /// that can be retried safely.
+    /// </summary>
+    /// <param name="ex">The exception to inspect.</param>
+    /// <returns><c>true</c> if the error is transient; otherwise <c>false</c>.</returns>
+    public static bool IsTransient(Exception ex) {
+        switch (ex) {
+#if !NET5_0_OR_GREATER
+            case HttpRetryPolicy.ProviderHttpRequestException providerEx:
+                var providerCode = (int)providerEx.StatusCode;
+                return providerCode >= 500 || providerCode == 408 || providerCode == 429;
+#endif
+            case HttpRequestException httpEx:
+                // HttpRequestException.StatusCode was introduced in .NET 5.0
+#if NET5_0_OR_GREATER
+                if (httpEx.StatusCode.HasValue) {
+                    var code = (int)httpEx.StatusCode.Value;
+                    return code >= 500 || code == 408 || code == 429;
+                }
+#endif
+                return true;
+            case SmtpCommandException smtpEx:
+                var smtpCode = (int)smtpEx.StatusCode;
+                return smtpCode >= 400 && smtpCode < 500;
+            case SmtpProtocolException:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
+    /// Posts the provided <see cref="SmtpResult"/> to a webhook endpoint.
+    /// </summary>
+    /// <param name="url">Destination webhook URL.</param>
+    /// <param name="result">Result object describing the send operation.</param>
+    /// <param name="cancellationToken">Token used to cancel the request.</param>
+    /// <param name="client">Optional HTTP client to reuse.</param>
+    public static async Task PostWebhookAsync(string? url, SmtpResult result, CancellationToken cancellationToken = default, HttpClient? client = null) {
+        await PostWebhookAsync(url, result, MailozaurrJsonContext.Default.SmtpResult, cancellationToken, client).ConfigureAwait(false);
+    }
+
+    internal static async Task PostWebhookAsync<T>(string? url, T result, JsonTypeInfo<T> jsonTypeInfo,
+        CancellationToken cancellationToken = default, HttpClient? client = null) {
+        if (string.IsNullOrWhiteSpace(url)) {
+            return;
+        }
+
+        client ??= SharedHttpClient;
+
+        try {
+            var json = JsonSerializer.Serialize(result, jsonTypeInfo);
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var response = await client.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode) {
+                LoggingMessages.Logger.WriteWarning(
+                    $"Failed to post webhook: {(int)response.StatusCode} {response.ReasonPhrase}");
+            }
+        } catch (HttpRequestException ex) {
+            LoggingMessages.Logger.WriteWarning($"Failed to post webhook: {ex.Message}");
+        }
+    }
+}

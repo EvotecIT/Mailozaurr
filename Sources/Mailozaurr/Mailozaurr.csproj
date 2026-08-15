@@ -1,120 +1,50 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Company>Evotec</Company>
+    <Authors>Przemyslaw Klys</Authors>
+    <VersionPrefix>3.0.0</VersionPrefix>
+    <AssemblyName>Mailozaurr</AssemblyName>
+    <PackageId>Mailozaurr</PackageId>
+    <Description>All Mailozaurr email transports, provider integrations, artifact interoperability, and reusable mail workflows for .NET.</Description>
+    <Copyright>(c) 2011 - 2026 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
+    <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsPackable>true</IsPackable>
+    <PackageIcon>Mailozaurr.png</PackageIcon>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/EvotecIT/Mailozaurr</PackageProjectUrl>
+    <PackageReadmeFile>README.MD</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/EvotecIT/Mailozaurr</RepositoryUrl>
+    <PackageTags>Windows;MacOS;Linux;Mail;Email;SMTP;IMAP;POP3;Graph;Gmail;PST;OST;OLM;Mbox;EMLX;Maildir</PackageTags>
+  </PropertyGroup>
 
-    <PropertyGroup>
-        <Company>Evotec</Company>
-        <Authors>Przemyslaw Klys</Authors>
-        <VersionPrefix>2.1.7</VersionPrefix>
-        <OfficeIMOVersion>3.2.0</OfficeIMOVersion>
-        <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
-        <AssemblyName>Mailozaurr</AssemblyName>
-        <Description>Email transport, mailbox, message-file, and offline mail-store library for .NET with SMTP, IMAP, POP3, Microsoft Graph, Gmail, SendGrid, Mailgun, Amazon SES, PST/OST, OLM, Mbox, EMLX, and Maildir support.</Description>
-        <Copyright>(c) 2011 - 2026 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
-        <LangVersion>latest</LangVersion>
-        <PackageIcon>Mailozaurr.png</PackageIcon>
-        <PackageLicenseExpression>MIT</PackageLicenseExpression>
-        <PackageProjectUrl>https://github.com/EvotecIT/Mailozaurr</PackageProjectUrl>
-        <PackageReadmeFile>README.MD</PackageReadmeFile>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-        <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <!-- Keep local build artifacts from being treated as SDK default items/references. -->
-        <DefaultItemExcludes>$(DefaultItemExcludes);**/artifacts/**;**/Artifacts/**</DefaultItemExcludes>
-        <!-- Required for pointer operations in Helpers/SecureStringHelper.cs -->
-        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-        <RepositoryUrl>https://github.com/EvotecIT/Mailozaurr</RepositoryUrl>
-        <PackageTags>
-            Windows;MacOS;Linux;Mail;Email;MX;SPF;DMARC;DKIM;GraphApi;SendGrid;Graph;IMAP;POP3;PST;OST;OLM;Mbox;EMLX;Maildir</PackageTags>
-    </PropertyGroup>
+  <PropertyGroup Condition=" '$(TargetFramework)' == 'net8.0' ">
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
 
-    <PropertyGroup>
-        <OfficeIMORoot Condition=" '$(OfficeIMORoot)' == '' ">..\..\..\OfficeIMO</OfficeIMORoot>
-        <UseOfficeIMOProjectReferences Condition=" '$(UseOfficeIMOProjectReferences)' == '' ">false</UseOfficeIMOProjectReferences>
-    </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Mailozaurr.Internet\Mailozaurr.Internet.csproj" />
+    <ProjectReference Include="..\Mailozaurr.MicrosoftGraph\Mailozaurr.MicrosoftGraph.csproj" />
+    <ProjectReference Include="..\Mailozaurr.Gmail\Mailozaurr.Gmail.csproj" />
+    <ProjectReference Include="..\Mailozaurr.Artifacts\Mailozaurr.Artifacts.csproj" />
+  </ItemGroup>
 
-    <PropertyGroup Condition=" '$(TargetFramework)' == 'net8.0' ">
-        <IsAotCompatible>true</IsAotCompatible>
-    </PropertyGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Mailozaurr.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 
-    <!-- Include referenced assemblies alongside output -->
-    <PropertyGroup>
-        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    </PropertyGroup>
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'netstandard2.0' ">
+    <PackageReference Include="System.Text.Json" Version="10.0.10" />
+  </ItemGroup>
 
-    <ItemGroup>
-
-        <PackageReference Include="EmailValidation" Version="1.3.0" />
-        <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
-        <PackageReference Include="MailKit" Version="4.17.0" />
-        <PackageReference Include="MimeKit" Version="4.17.0" />
-        <PackageReference Include="Microsoft.Identity.Client" Version="4.87.0" />
-        <PackageReference Include="NSspi" Version="0.3.1" />
-        <PackageReference Include="BouncyCastle.Cryptography" Version="2.7.0" />
-    </ItemGroup>
-
-    <ItemGroup Condition=" '$(UseOfficeIMOProjectReferences)' == 'true' ">
-        <ProjectReference Include="$(OfficeIMORoot)\OfficeIMO.Email\OfficeIMO.Email.csproj" />
-    </ItemGroup>
-
-    <ItemGroup Condition=" '$(UseOfficeIMOProjectReferences)' != 'true' ">
-        <PackageReference Include="OfficeIMO.Email" Version="$(OfficeIMOVersion)" />
-        <PackageReference Include="OfficeIMO.Security" Version="$(OfficeIMOVersion)" />
-    </ItemGroup>
-
-    <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
-        <PackageReference Include="System.Text.Json" Version="10.0.10" />
-    </ItemGroup>
-    <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' ">
-        <PackageReference Include="System.Text.Json" Version="10.0.10" />
-    </ItemGroup>
-
-    <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'net8.0' ">
-        <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.10" />
-    </ItemGroup>
-
-    <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
-        <Reference Include="System.IO.Compression" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <None Include="..\..\Mailozaurr.png" Pack="true" PackagePath="\" />
-        <None Include="..\..\README.MD" Pack="true" PackagePath="\" />
-    </ItemGroup>
-
-
-    <ItemGroup>
-        <Using Include="MailKit" />
-        <Using Include="MailKit.Net.Smtp" />
-        <Using Include="MailKit.Security" />
-        <Using Include="MailKit.Net.Pop3" />
-        <Using Include="MailKit.Net.Imap" />
-        <Using Include="MailKit.Net" />
-        <Using Include="MimeKit" />
-        <Using Include="MimeKit.Cryptography" />
-        <Using Include="System" />
-        <Using Include="System.Net" />
-        <Using Include="System.Net.Http" />
-        <Using Include="System.Text" />
-        <Using Include="System.Text.Json" />
-        <Using Include="System.Text.Json.Serialization" />
-        <Using Include="System.Collections" />
-        <Using Include="System.Collections.Generic" />
-        <Using Include="System.IO" />
-        <Using Include="System.Linq" />
-        <Using Include="System.Diagnostics" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <EmbeddedResource Include="Resources\disposable_email_blocklist.conf" />
-        <EmbeddedResource Include="Resources\allowlist.conf" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-            <_Parameter1>Mailozaurr.Tests</_Parameter1>
-        </AssemblyAttribute>
-        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-            <_Parameter1>Mailozaurr.PowerShell</_Parameter1>
-        </AssemblyAttribute>
-    </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\Mailozaurr.png" Pack="true" PackagePath="\" />
+    <None Include="..\..\README.MD" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>

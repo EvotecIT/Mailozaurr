@@ -1,0 +1,34 @@
+using System.Text.Json.Serialization;
+
+namespace Mailozaurr;
+
+/// <summary>Source-generated Gmail JSON metadata.</summary>
+[JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+[JsonSerializable(typeof(GmailMessage))]
+[JsonSerializable(typeof(GmailMessagePayload))]
+[JsonSerializable(typeof(GmailMessageHeader))]
+[JsonSerializable(typeof(GmailMessageBody))]
+[JsonSerializable(typeof(GmailThread))]
+[JsonSerializable(typeof(GmailThreadInfo))]
+[JsonSerializable(typeof(GmailAttachmentInfo))]
+[JsonSerializable(typeof(GmailLabel))]
+[JsonSerializable(typeof(GmailRawRequest))]
+[JsonSerializable(typeof(GmailApiClient.AttachmentResponse))]
+[JsonSerializable(typeof(GmailApiClient.GmailListResponse))]
+[JsonSerializable(typeof(GmailApiClient.GmailThreadListResponse))]
+[JsonSerializable(typeof(GmailApiClient.GmailLabelListResponse))]
+[JsonSerializable(typeof(GmailApiClient.GmailModifyLabelsRequest))]
+[JsonSerializable(typeof(GmailApiClient.GmailBatchModifyRequest))]
+[JsonSerializable(typeof(GmailApiClient.GmailBatchDeleteRequest))]
+[JsonSerializable(typeof(GmailApiClient.GmailImportMessageRequest))]
+[JsonSerializable(typeof(GmailApiClient.GmailWatchRequest))]
+[JsonSerializable(typeof(GmailApiClient.GmailWatchResponse))]
+[JsonSerializable(typeof(GmailApiClient.GmailProfile))]
+[JsonSerializable(typeof(GmailApiClient.GmailHistoryListResponse))]
+[JsonSerializable(typeof(GmailApiClient.GmailHistoryRecord))]
+[JsonSerializable(typeof(GmailApiClient.GmailHistoryMessageAdded))]
+[JsonSerializable(typeof(GmailApiClient.GmailHistoryMessageDeleted))]
+[JsonSerializable(typeof(GmailApiClient.GmailHistoryLabelAdded))]
+[JsonSerializable(typeof(GmailApiClient.GmailHistoryLabelRemoved))]
+[JsonSerializable(typeof(GmailApiClient.GmailHistoryMessageRef))]
+internal partial class GmailJsonContext : JsonSerializerContext;

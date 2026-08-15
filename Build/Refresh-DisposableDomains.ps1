@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$OutputPath = (Join-Path $PSScriptRoot '..\Sources\Mailozaurr\Resources')
+    [string]$OutputPath = (Join-Path $PSScriptRoot '..\Sources\Mailozaurr.Internet\Resources')
 )
 
 $lists = @{

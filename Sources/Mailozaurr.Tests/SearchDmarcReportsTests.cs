@@ -270,7 +270,7 @@ public class SearchDmarcReportsTests {
         try {
             var cred = new GraphCredential { ClientId = "id", DirectoryId = "tenant", ClientSecret = "secret" };
             using var cts = new CancellationTokenSource();
-            var searchTask = MailboxSearcher.SearchDmarcReportsAsync(
+            var searchTask = GraphMailboxSearcher.SearchDmarcReportsAsync(
                 cred,
                 "user@example.com",
                 cancellationToken: cts.Token);

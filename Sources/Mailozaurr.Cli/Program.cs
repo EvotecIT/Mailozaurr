@@ -1,4 +1,4 @@
-using Mailozaurr.Application;
+using Mailozaurr;
 using Mailozaurr.Cli;
 
 return await CliRunner.RunAsync(

@@ -14,8 +14,8 @@ public class SerializationContextTests {
     [Fact]
     public void ShouldSerializeAndDeserializeGmailMessage() {
         var message = new GmailMessage { Id = "id", ThreadId = "tid", Snippet = "hi" };
-        var json = JsonSerializer.Serialize(message, MailozaurrJsonContext.Default.GmailMessage);
-        var roundtrip = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GmailMessage);
+        var json = JsonSerializer.Serialize(message, GmailJsonContext.Default.GmailMessage);
+        var roundtrip = JsonSerializer.Deserialize(json, GmailJsonContext.Default.GmailMessage);
         Assert.NotNull(roundtrip);
         Assert.Equal(message.Id, roundtrip!.Id);
         Assert.Equal(message.ThreadId, roundtrip.ThreadId);
@@ -45,7 +45,7 @@ public class SerializationContextTests {
     public void ShouldDeserializeGraphAuthorizationExpiresOnFromUnixSeconds() {
         const long unixSeconds = 1700000000;
         var json = $"{{\"token_type\":\"Bearer\",\"access_token\":\"abc\",\"expires_on\":\"{unixSeconds}\"}}";
-        var auth = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GraphAuthorization);
+        var auth = JsonSerializer.Deserialize(json, GraphJsonContext.Default.GraphAuthorization);
         Assert.NotNull(auth);
         Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(unixSeconds), auth!.ExpiresOn);
     }
@@ -54,7 +54,7 @@ public class SerializationContextTests {
     public void ShouldDeserializeGraphAuthorizationExpiresOnFromUnixSecondsNumber() {
         const long unixSeconds = 1700000000;
         var json = $"{{\"token_type\":\"Bearer\",\"access_token\":\"abc\",\"expires_on\":{unixSeconds}}}";
-        var auth = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GraphAuthorization);
+        var auth = JsonSerializer.Deserialize(json, GraphJsonContext.Default.GraphAuthorization);
         Assert.NotNull(auth);
         Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(unixSeconds), auth!.ExpiresOn);
     }
@@ -63,7 +63,7 @@ public class SerializationContextTests {
     public void ShouldDeserializeGraphAuthorizationExpiresOnFromUnixMilliseconds() {
         const long unixMilliseconds = 1700000000000;
         var json = $"{{\"token_type\":\"Bearer\",\"access_token\":\"abc\",\"expires_on\":{unixMilliseconds}}}";
-        var auth = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GraphAuthorization);
+        var auth = JsonSerializer.Deserialize(json, GraphJsonContext.Default.GraphAuthorization);
         Assert.NotNull(auth);
         Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(unixMilliseconds), auth!.ExpiresOn);
     }
@@ -72,7 +72,7 @@ public class SerializationContextTests {
     public void ShouldDeserializeGraphAuthorizationExpiresOnFromIsoString() {
         const string iso = "2023-11-14T22:13:20.000Z";
         var json = $"{{\"token_type\":\"Bearer\",\"access_token\":\"abc\",\"expires_on\":\"{iso}\"}}";
-        var auth = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GraphAuthorization);
+        var auth = JsonSerializer.Deserialize(json, GraphJsonContext.Default.GraphAuthorization);
         Assert.NotNull(auth);
         Assert.Equal(DateTimeOffset.Parse(iso), auth!.ExpiresOn);
     }
@@ -81,7 +81,7 @@ public class SerializationContextTests {
     public void ShouldDeserializeGraphAuthorizationExpiresOnFromUnixSecondsDouble() {
         const long unixSeconds = 1700000000;
         var json = $"{{\"token_type\":\"Bearer\",\"access_token\":\"abc\",\"expires_on\":{unixSeconds}.5}}";
-        var auth = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GraphAuthorization);
+        var auth = JsonSerializer.Deserialize(json, GraphJsonContext.Default.GraphAuthorization);
         Assert.NotNull(auth);
         Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(unixSeconds), auth!.ExpiresOn);
     }
@@ -90,7 +90,7 @@ public class SerializationContextTests {
     public void ShouldDeserializeGraphAuthorizationExpiresOnFromUnixSecondsDoubleString() {
         const long unixSeconds = 1700000000;
         var json = $"{{\"token_type\":\"Bearer\",\"access_token\":\"abc\",\"expires_on\":\"{unixSeconds}.5\"}}";
-        var auth = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GraphAuthorization);
+        var auth = JsonSerializer.Deserialize(json, GraphJsonContext.Default.GraphAuthorization);
         Assert.NotNull(auth);
         Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(unixSeconds), auth!.ExpiresOn);
     }
@@ -98,12 +98,12 @@ public class SerializationContextTests {
     [Fact]
     public void ShouldHandleGraphAuthorizationExpiresOnNullOrEmpty() {
         var jsonNull = "{\"token_type\":\"Bearer\",\"access_token\":\"abc\",\"expires_on\":null}";
-        var authNull = JsonSerializer.Deserialize(jsonNull, MailozaurrJsonContext.Default.GraphAuthorization);
+        var authNull = JsonSerializer.Deserialize(jsonNull, GraphJsonContext.Default.GraphAuthorization);
         Assert.NotNull(authNull);
         Assert.Equal(DateTimeOffset.MinValue, authNull!.ExpiresOn);
 
         var jsonEmpty = "{\"token_type\":\"Bearer\",\"access_token\":\"abc\",\"expires_on\":\"\"}";
-        var authEmpty = JsonSerializer.Deserialize(jsonEmpty, MailozaurrJsonContext.Default.GraphAuthorization);
+        var authEmpty = JsonSerializer.Deserialize(jsonEmpty, GraphJsonContext.Default.GraphAuthorization);
         Assert.NotNull(authEmpty);
         Assert.Equal(DateTimeOffset.MinValue, authEmpty!.ExpiresOn);
     }
@@ -111,7 +111,7 @@ public class SerializationContextTests {
     [Fact]
     public void ShouldHandleGraphAuthorizationExpiresOnInvalid() {
         var json = "{\"token_type\":\"Bearer\",\"access_token\":\"abc\",\"expires_on\":\"not-a-date\"}";
-        var auth = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.GraphAuthorization);
+        var auth = JsonSerializer.Deserialize(json, GraphJsonContext.Default.GraphAuthorization);
         Assert.NotNull(auth);
         Assert.Equal(DateTimeOffset.MinValue, auth!.ExpiresOn);
     }

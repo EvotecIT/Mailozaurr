@@ -1,4 +1,4 @@
-using Mailozaurr.Application;
+using Mailozaurr;
 using System.Text.Json.Serialization;
 
 namespace Mailozaurr.Cli;

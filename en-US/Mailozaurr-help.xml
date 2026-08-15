@@ -8112,6 +8112,18 @@ ensure credentials are disposed and not kept in memory.</maml:para>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaxUncompressedSize</maml:name>
+          <maml:description>
+            <maml:para>Maximum uncompressed attachment size to inspect, in bytes.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
+          <dev:type>
+            <maml:name>Int64</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>ParallelDownloadLimit</maml:name>
           <maml:description>
             <maml:para>Maximum concurrent MIME downloads; set to 1 to disable parallelism.</maml:para>
@@ -8236,6 +8248,18 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
         <dev:type>
           <maml:name>String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>MaxUncompressedSize</maml:name>
+        <maml:description>
+          <maml:para>Maximum uncompressed attachment size to inspect, in bytes.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Int64</command:parameterValue>
+        <dev:type>
+          <maml:name>Int64</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>

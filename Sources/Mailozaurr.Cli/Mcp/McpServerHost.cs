@@ -1,4 +1,4 @@
-using Mailozaurr.Application;
+using Mailozaurr;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 

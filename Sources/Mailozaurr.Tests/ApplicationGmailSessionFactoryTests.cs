@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http;
-using Mailozaurr.Application;
+using Mailozaurr;
 
 namespace Mailozaurr.Tests;
 
