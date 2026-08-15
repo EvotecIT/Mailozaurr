@@ -74,7 +74,7 @@ public partial class Graph {
                 var maxRetries = policy?.MaxRetries ?? RetryCount;
                 var shouldRetry = (policy?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
                 if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
-                    var failResult = CreateGraphFailureResult(operationStopwatch, ex.Message);
+                    var failResult = CreateGraphFailureResult(operationStopwatch, ex);
                     await PostGraphWebhookAsync(failResult, cancellationToken);
                     return await TrySmtpFallbackAsync(policy, failResult, ex, cancellationToken);
                 }
@@ -88,7 +88,7 @@ public partial class Graph {
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }
-                    var failResult = CreateGraphFailureResult(operationStopwatch, ex.Message);
+                    var failResult = CreateGraphFailureResult(operationStopwatch, ex);
                     await PostGraphWebhookAsync(failResult, cancellationToken);
                     return await TrySmtpFallbackAsync(policy, failResult, ex, cancellationToken);
                 }
@@ -98,7 +98,7 @@ public partial class Graph {
             attempts++;
         } while (attempts <= (policy?.MaxRetries ?? RetryCount));
 
-        var finalResult = CreateGraphFailureResult(operationStopwatch, lastException?.Message);
+        var finalResult = CreateGraphFailureResult(operationStopwatch, lastException);
         await PostGraphWebhookAsync(finalResult, cancellationToken);
         return await TrySmtpFallbackAsync(policy, finalResult, lastException, cancellationToken);
     }
@@ -136,7 +136,7 @@ public partial class Graph {
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
-            var failResult = CreateGraphFailureResult(operationStopwatch, ex.Message);
+            var failResult = CreateGraphFailureResult(operationStopwatch, ex);
             await PostGraphWebhookAsync(failResult, cancellationToken);
             return await TrySmtpFallbackAsync(policyDraft, failResult, ex, cancellationToken);
         }
@@ -154,7 +154,7 @@ public partial class Graph {
                 var maxRetries = policyDraft?.MaxRetries ?? RetryCount;
                 var shouldRetry = (policyDraft?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
                 if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
-                    var failResult = CreateGraphFailureResult(operationStopwatch, ex.Message);
+                    var failResult = CreateGraphFailureResult(operationStopwatch, ex);
                     await PostGraphWebhookAsync(failResult, cancellationToken);
                     return await TrySmtpFallbackAsync(policyDraft, failResult, ex, cancellationToken);
                 }
@@ -168,7 +168,7 @@ public partial class Graph {
                     if (ErrorAction == ActionPreference.Stop) {
                         throw;
                     }
-                    var failResult = CreateGraphFailureResult(operationStopwatch, ex.Message);
+                    var failResult = CreateGraphFailureResult(operationStopwatch, ex);
                     await PostGraphWebhookAsync(failResult, cancellationToken);
                     return await TrySmtpFallbackAsync(policyDraft, failResult, ex, cancellationToken);
                 }
@@ -178,7 +178,7 @@ public partial class Graph {
             attempts++;
         } while (attempts <= (policyDraft?.MaxRetries ?? RetryCount));
 
-        var finalResult = CreateGraphFailureResult(operationStopwatch, lastException?.Message);
+        var finalResult = CreateGraphFailureResult(operationStopwatch, lastException);
         await PostGraphWebhookAsync(finalResult, cancellationToken);
         return await TrySmtpFallbackAsync(policyDraft, finalResult, lastException, cancellationToken);
     }
@@ -226,7 +226,8 @@ public partial class Graph {
             throw new GraphApiException(sendResponse.StatusCode, sendErrorMessage, sendContent, retryAfter);
         } catch (GraphApiException ex) {
             LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
-            var failResult = CreateGraphFailureResult(operationStopwatch, ex.Message, ex.ResponseContent);
+            var failResult = CreateGraphFailureResult(operationStopwatch, ex.Message,
+                ex.ResponseContent, ex.ResponseContent, ex.StatusCode);
             await PostGraphWebhookAsync(failResult, cancellationToken);
             throw;
         } finally {
@@ -274,7 +275,8 @@ public partial class Graph {
         var success = response != null && response.Status >= 200 && response.Status < 300;
         if (!success) {
             return CreateGraphFailureResult(operationStopwatch, response?.Body.ToString(),
-                response?.Status.ToString() ?? string.Empty);
+                response?.Status.ToString() ?? string.Empty, response?.Body.ToString(),
+                response == null ? null : (HttpStatusCode?)response.Status);
         }
         return new GraphSmtpResult(
             true,
@@ -289,11 +291,20 @@ public partial class Graph {
     }
 
     private GraphSmtpResult CreateGraphFailureResult(Stopwatch operationStopwatch,
-        string? error, string? outputMessage = null) => new(false, EmailAction.Send,
+        string? error, string? outputMessage = null, string? structuredError = null,
+        HttpStatusCode? statusCode = null, EmailAction emailAction = EmailAction.Send) => new(false, emailAction,
         SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed,
         outputMessage ?? string.Empty, error) {
-        GraphError = GraphApiErrorParser.Parse(error)
+        GraphError = GraphApiErrorParser.Parse(structuredError ?? error, statusCode)
     };
+
+    private GraphSmtpResult CreateGraphFailureResult(Stopwatch operationStopwatch,
+        Exception? exception) {
+        var graphException = exception as GraphApiException;
+        return CreateGraphFailureResult(operationStopwatch, exception?.Message,
+            structuredError: graphException?.ResponseContent,
+            statusCode: graphException?.StatusCode);
+    }
 
     private GraphBatchRequest CreateBatchSendRequest() {
         var bodyObj = JsonSerializer.Deserialize(MessageJson, MailozaurrJsonContext.Default.JsonElement);

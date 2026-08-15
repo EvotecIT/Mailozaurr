@@ -15,13 +15,17 @@ public static class GraphApiErrorParser {
     /// Parses a raw error string returned by Graph API.
     /// </summary>
     /// <param name="message">Raw error message.</param>
+    /// <param name="statusCode">HTTP status code supplied separately from the response body, when available.</param>
     /// <returns>Parsed <see cref="GraphApiErrorResponse"/> or <c>null</c> if input is empty.</returns>
-    public static GraphApiErrorResponse? Parse(string? message) {
+    public static GraphApiErrorResponse? Parse(string? message, HttpStatusCode? statusCode = null) {
         if (string.IsNullOrWhiteSpace(message)) {
             return null;
         }
 
-        var response = new GraphApiErrorResponse { Raw = message! };
+        var response = new GraphApiErrorResponse {
+            Raw = message!,
+            StatusCode = statusCode ?? default
+        };
 
         try {
             var lines = message!.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
@@ -34,6 +38,7 @@ public static class GraphApiErrorParser {
             var first = lines[index++];
             var firstParts = first.Split(new[] { ' ' }, 2);
             if (firstParts.Length != 2 || !Enum.TryParse<GraphHttpMethod>(firstParts[0], true, out var method)) {
+                TryParseJsonBody(response, message);
                 return response;
             }
             response.Method = method;
@@ -51,12 +56,7 @@ public static class GraphApiErrorParser {
                 var line = lines[index];
                 if (line.StartsWith("{", StringComparison.Ordinal)) {
                     var body = string.Join(Environment.NewLine, lines, index, lines.Length - index);
-                    try {
-                        var error = JsonSerializer.Deserialize(body, GraphJsonContext.Default.GraphApiError);
-                        response.Error = error?.Error;
-                    } catch {
-                        // ignore
-                    }
+                    TryParseJsonBody(response, body);
                     break;
                 }
 
@@ -107,5 +107,20 @@ public static class GraphApiErrorParser {
         }
 
         return response;
+    }
+
+    private static void TryParseJsonBody(GraphApiErrorResponse response, string value) {
+        var jsonStart = value.IndexOf('{');
+        if (jsonStart < 0) {
+            return;
+        }
+
+        try {
+            var error = JsonSerializer.Deserialize(
+                value.Substring(jsonStart), GraphJsonContext.Default.GraphApiError);
+            response.Error = error?.Error;
+        } catch {
+            // Preserve the raw response when the body is not valid Graph error JSON.
+        }
     }
 }

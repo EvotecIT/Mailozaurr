@@ -23,7 +23,7 @@ internal static class GraphRetryHelper {
             if ((int)gex.StatusCode == StatusTooManyRequests) {
                 return true;
             }
-            var parsed = GraphApiErrorParser.Parse(gex.ResponseContent);
+            var parsed = GraphApiErrorParser.Parse(gex.ResponseContent, gex.StatusCode);
             var code = parsed?.Error?.Code ?? string.Empty;
             foreach (var marker in ThrottleMarkers) {
                 if (code.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0)
@@ -59,7 +59,7 @@ internal static class GraphRetryHelper {
             if (code >= StatusServerErrorMin && code <= StatusServerErrorMax)
                 return true;
 
-            var parsed = GraphApiErrorParser.Parse(gex.ResponseContent);
+            var parsed = GraphApiErrorParser.Parse(gex.ResponseContent, gex.StatusCode);
             var message = parsed?.Error?.Message ?? parsed?.Raw ?? string.Empty;
             if (message.IndexOf("timeout", StringComparison.OrdinalIgnoreCase) >= 0) return true;
             if (message.IndexOf("temporarily", StringComparison.OrdinalIgnoreCase) >= 0) return true;

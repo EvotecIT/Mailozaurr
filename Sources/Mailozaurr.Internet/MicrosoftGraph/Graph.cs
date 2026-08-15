@@ -349,7 +349,10 @@ public partial class Graph : IDisposable {
 
     private async Task<GraphSmtpResult> TrySmtpFallbackAsync(GraphSendPolicy? policy, GraphSmtpResult current, Exception? lastException, CancellationToken cancellationToken) {
         if (current.GraphError == null && lastException != null) {
-            current.GraphError = GraphApiErrorParser.Parse(lastException.Message);
+            var graphException = lastException as GraphApiException;
+            current.GraphError = GraphApiErrorParser.Parse(
+                graphException?.ResponseContent ?? lastException.Message,
+                graphException?.StatusCode);
         }
         if (policy == null || !policy.EnableSmtpFallback) {
             return current;

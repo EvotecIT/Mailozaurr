@@ -6,7 +6,16 @@ namespace Mailozaurr;
 /// <summary>Searches Microsoft Graph mailboxes for structured mail reports.</summary>
 public static class GraphMailboxSearcher {
     /// <summary>Searches a Graph mailbox for DMARC aggregate reports.</summary>
+    /// <param name="credential">Credentials used to access Microsoft Graph.</param>
+    /// <param name="userPrincipalName">Mailbox user principal name.</param>
+    /// <param name="since">Optional inclusive received-time lower bound.</param>
+    /// <param name="before">Optional exclusive received-time upper bound.</param>
+    /// <param name="domain">Optional reporting domain filter.</param>
+    /// <param name="maxResults">Maximum number of messages to inspect, or zero for the provider default.</param>
+    /// <param name="parallelDownloadLimit">Maximum number of MIME messages downloaded concurrently.</param>
     /// <param name="maxUncompressedSize">Maximum uncompressed attachment size to inspect, in bytes.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    /// <returns>Parsed DMARC aggregate reports.</returns>
     public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
         GraphCredential credential, string userPrincipalName, DateTime? since = null,
         DateTime? before = null, string? domain = null, int maxResults = 0,

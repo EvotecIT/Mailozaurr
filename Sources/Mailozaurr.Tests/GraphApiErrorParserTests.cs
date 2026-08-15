@@ -32,4 +32,26 @@ public class GraphApiErrorParserTests {
         Assert.Equal(sample, parsed!.Raw);
         Assert.Null(parsed.Error);
     }
+
+    [Fact]
+    public void Parse_StandaloneJson_UsesSuppliedStatusCode() {
+        const string sample = "{\"error\":{\"code\":\"ErrorInvalidUser\",\"message\":\"Invalid mailbox\"}}";
+
+        var parsed = GraphApiErrorParser.Parse(sample, HttpStatusCode.BadRequest);
+
+        Assert.NotNull(parsed);
+        Assert.Equal(HttpStatusCode.BadRequest, parsed!.StatusCode);
+        Assert.Equal("ErrorInvalidUser", parsed.Error?.Code);
+        Assert.Equal("Invalid mailbox", parsed.Error?.Message);
+    }
+
+    [Fact]
+    public void Parse_MessageContainingJson_ExtractsStructuredError() {
+        const string sample = "Unknown error: {\"error\":{\"code\":\"ErrorAccessDenied\",\"message\":\"Denied\"}}";
+
+        var parsed = GraphApiErrorParser.Parse(sample);
+
+        Assert.NotNull(parsed);
+        Assert.Equal("ErrorAccessDenied", parsed!.Error?.Code);
+    }
 }

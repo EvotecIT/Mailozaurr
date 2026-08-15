@@ -228,6 +228,37 @@ namespace Mailozaurr.Tests {
         }
 
         [Fact]
+        public async Task SendEmail_Graph_HttpError_ReturnsStructuredGraphError() {
+            const string responseBody = "{\"error\":{\"code\":\"ErrorInvalidUser\",\"message\":\"Invalid mailbox\"}}";
+            var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.BadRequest) {
+                Content = new StringContent(responseBody)
+            });
+            using var graph = new Graph {
+                From = "sender@example.com",
+                To = new object[] { "recipient@example.com" },
+                Subject = "Test Email (Graph Failure)",
+                HTML = "<b>Hello from Mailozaurr Graph!</b>",
+                ContentType = "HTML",
+                AccessToken = "token",
+                TokenType = "Bearer"
+            };
+            graph.WithSendPolicy(new GraphSendPolicy { MaxRetries = 0 });
+            var field = typeof(Graph).GetField("_client", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+            field.SetValue(graph, new HttpClient(handler));
+
+            var result = await graph.SendMessageAsync();
+
+            Assert.False(result.Status);
+            Assert.Equal(EmailAction.Send, result.EmailAction);
+            Assert.NotNull(result.GraphError);
+            Assert.Equal(HttpStatusCode.BadRequest, result.GraphError!.StatusCode);
+            Assert.Equal("ErrorInvalidUser", result.GraphError.Error?.Code);
+            Assert.Equal("Invalid mailbox", result.GraphError.Error?.Message);
+            Assert.Equal(responseBody, result.GraphError.Raw);
+            Assert.Single(handler.Requests);
+        }
+
+        [Fact]
         public async Task ConnectO365GraphAsync_GraphCanceled_ThrowsOperationCanceledException() {
             using var graph = new Graph();
             using var cts = new CancellationTokenSource();
@@ -235,6 +266,28 @@ namespace Mailozaurr.Tests {
             graph.Authenticate(new NetworkCredential("client@tenant", "secret"));
 
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => graph.ConnectO365GraphAsync(cts.Token));
+        }
+
+        [Fact]
+        public async Task ConnectO365GraphAsync_HttpError_ReturnsStructuredGraphError() {
+            const string responseBody = "{\"error\":{\"code\":\"invalid_client\",\"message\":\"Bad credentials\"}}";
+            var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.Unauthorized) {
+                Content = new StringContent(responseBody)
+            });
+            using var graph = new Graph();
+            graph.Authenticate(new NetworkCredential("client@tenant", "secret"));
+            var field = typeof(Graph).GetField("_client", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+            field.SetValue(graph, new HttpClient(handler));
+
+            var result = await graph.ConnectO365GraphAsync();
+
+            Assert.False(result.Status);
+            Assert.Equal(EmailAction.Connect, result.EmailAction);
+            Assert.NotNull(result.GraphError);
+            Assert.Equal(HttpStatusCode.Unauthorized, result.GraphError!.StatusCode);
+            Assert.Equal("invalid_client", result.GraphError.Error?.Code);
+            Assert.Equal(responseBody, result.GraphError.Raw);
+            Assert.Single(handler.Requests);
         }
 
         [Fact]

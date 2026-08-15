@@ -183,7 +183,8 @@ public partial class Graph {
                     if (ErrorAction == ActionPreference.Stop) {
                         response.EnsureSuccessStatusCode();
                     }
-                    return CreateGraphFailureResult(operationStopwatch, content, content);
+                    return CreateGraphFailureResult(operationStopwatch, content, content,
+                        content, response.StatusCode, EmailAction.Connect);
                 }
 
                 var authorization = JsonSerializer.Deserialize(content, GraphJsonContext.Default.GraphAuthorization);
@@ -205,8 +206,11 @@ public partial class Graph {
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
+            var graphException = ex as GraphApiException;
             return new GraphSmtpResult(false, EmailAction.Connect, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed, string.Empty, ex.Message) {
-                GraphError = GraphApiErrorParser.Parse(ex.Message)
+                GraphError = GraphApiErrorParser.Parse(
+                    graphException?.ResponseContent ?? ex.Message,
+                    graphException?.StatusCode)
             };
         }
     }
