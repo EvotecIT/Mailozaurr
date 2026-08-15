@@ -9,7 +9,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\Mailozaurr.Meta\Mailozaurr.csproj" />
+		<ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
 	</ItemGroup>
 
 </Project>

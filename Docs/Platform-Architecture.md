@@ -11,15 +11,15 @@ The design serves two different installation experiences:
 
 ## Decisions
 
-- `Mailozaurr` becomes the all-library-features NuGet meta-package.
+- `Mailozaurr` becomes the all-features NuGet package and owns reusable cross-provider workflows.
 - The initial public implementation packages are limited to `Mailozaurr.Internet`, `Mailozaurr.MicrosoftGraph`, `Mailozaurr.Gmail`, and `Mailozaurr.Artifacts`.
-- `Mailozaurr.Application` is retired. CLI/MCP workflow composition is an internal, non-packable `Mailozaurr.Host` assembly; it is not another public C# package.
+- `Mailozaurr.Application` is retired. Its reusable profiles, drafts, queues, routing, message-action, and safety workflows move into the root `Mailozaurr` assembly; there is no separate Host or Workflows package.
 - There is no initial public `Mailozaurr.Core`, `Mailozaurr.Workflows`, `Mailozaurr.Mime`, `Mailozaurr.Protocols`, or `Mailozaurr.Transactional` package.
 - MimeKit and MailKit remain the Internet-message and standard-protocol engines. OfficeIMO.Email does not replace them.
 - OfficeIMO.Email remains the owner of persisted email and Outlook artifacts, including its native MIME/EML reader and writer.
 - `Mailozaurr.Artifacts`, rather than `Mailozaurr.OfficeIMO`, is the user-facing integration package.
 - OfficeIMO.Security remains an optional concrete security provider for artifact verification and decryption. It does not replace MimeKit security.
-- PowerShell and CLI compose the implementation packages explicitly. The `Mailozaurr` NuGet meta-package contains all Mailozaurr library features but does not pull CLI, MCP, PowerShell, or the optional concrete OfficeIMO.Security provider into C# applications.
+- PowerShell and CLI consume the root `Mailozaurr` package. It references every leaf but does not pull CLI, MCP, PowerShell, or the optional concrete OfficeIMO.Security provider into C# applications.
 - This is an intentional next-major-version change. Do not add type-forwarding assemblies, old/new API probes, or temporary compatibility packages unless a verified consumer requires them.
 
 ## Implementation checkpoint (2026-08-15)
@@ -27,7 +27,7 @@ The design serves two different installation experiences:
 - Baseline heads: Mailozaurr `9266346d35e8415c735953fa0eba780caaa1eb84` on `origin/v2-speedygonzales`; OfficeIMO `7d7a6c793bf294ee4354b24f63b9c9bfac351c01` on `origin/master`.
 - Public baseline: Mailozaurr NuGet 2.0.12, Mailozaurr PSGallery 2.1.6, and OfficeIMO.Email NuGet 3.2.2.
 - OfficeIMO bounded-save foundation is committed locally at `b1aa779cd64e328f8c366d7f5ec3c57bb3fe8c3d`; Mailozaurr's diagnostic-preserving bridge checkpoint is `73d0b39339e5af58cdf0adc18d770ff9297f3b5d`.
-- Final source suites: net8.0 1,316 passed and one skipped; net472 1,112 passed and one skipped.
+- Final source suites: net8.0 1,318 passed and one skipped; net472 1,114 passed and one skipped.
 - PowerForge produced six 3.0.0 NuGet packages plus the 3.0.0 PowerShell module. Selective local-feed consumers restored with the permitted dependency graphs.
 - Packed assembly inspection confirms that Internet exports no Graph- or Gmail-prefixed types; provider request, result, error, and mailbox DTOs live in their provider assemblies. Graph and Gmail report downloads are bounded and retain mailbox order.
 - Windows and Linux validation confirms that MIME staging files are owner-only, bounded, and deleted on close. Linux exercised the native cross-target path with mode `0600`; file-backed protected MIME payloads reopen through MimeKit without materialization.
@@ -51,7 +51,7 @@ The same assembly contains SMTP, IMAP, POP3, Microsoft Graph, Gmail, SendGrid, M
 
 `Mailozaurr.Application` contained valuable host workflows, but it also referenced the monolithic Mailozaurr project and constructed concrete IMAP, SMTP, Graph, and Gmail factories. It was therefore neither a dependency-free core nor an executable application.
 
-The implementation now has four public leaf projects, a dependency-only root meta-project in its own build directory, and a renamed internal `Mailozaurr.Host` composition layer. Source and packed tests prove the selective dependency boundaries; publication has not occurred.
+The implementation now has four public leaf projects plus a real root `Mailozaurr` assembly that owns reusable cross-provider workflows. Source and packed tests prove the selective dependency boundaries; publication has not occurred.
 
 OfficeIMO.Email already supports native MIME/EML reading and writing, MSG/OFT, TNEF, mbox, PST/OST, OLM, EMLX, Maildir, ICS, vCard, OAB, bounded streaming, structured diagnostics, semantic comparison, and explicit conversion-loss policy. It does not need MimeKit to produce or consume standards-level MIME streams.
 
@@ -63,15 +63,15 @@ Maturity here means more than feature count. A mature area needs a clear owner, 
 | --- | --- | --- |
 | SMTP, IMAP, POP3, and transport MIME | Mature engine foundation, now isolated in `Mailozaurr.Internet` | Installed-product and public-package proof is still pending |
 | Microsoft Graph and Gmail | Broad provider capability, now isolated into provider packages | Live provider validation and public-package proof remain |
-| Host workflows | Useful CLI/MCP composition, now internal and explicitly provider-wired | Keep it non-public until a real C# consumer proves a reusable workflows package is needed |
+| Reusable workflows | Profiles, routing, drafts, queues, plans, and safety policy now live in the root all-features assembly | Public-package and additional non-CLI consumer evidence remain |
 | PowerShell module | The established batteries-included product, explicitly referencing all leaves and OfficeIMO.Security | Public PSGallery installation and live-provider proof remain |
-| CLI and MCP | Internal Host composition, packed tool installation, MCP registration, and representative NativeAOT startup paths are working | Provider-deep NativeAOT and live workflows remain |
+| CLI and MCP | Thin composition over the root workflows, packed tool installation, MCP registration, and representative NativeAOT startup paths are working | Provider-deep NativeAOT and live workflows remain |
 | OfficeIMO MIME/EML | Broad native reader/writer foundation with bounded staged saves, preservation, and diagnostics | Independent and adversarial MIME evidence still needs expansion |
 | MSG, OFT, and TNEF | Broad and useful artifact support | Unknown-property, embedded-object, recurrence/time-zone, and independently generated Outlook fidelity need stronger proof |
 | PST/OST and other stores | Strong selective read/export/recovery breadth; Unicode PST writing and mutation exist | Large-store ceilings, resumability, real Outlook/libpff interoperability, and explicit operational safety need deeper evidence; several mutation modes remain intentional non-goals |
 | Artifact security | Correct optional-provider boundary already exists | Trust, chain, revocation, timestamp, offline-policy, and cross-engine protected-content diagnostics need a complete contract |
 | HTML body projection | Capabilities exist in specific OfficeIMO consumers | A shared API and second consumer have not yet proven that another package is justified |
-| C# package experience | Root meta-package and four selective packages restore and build from a local feed with the intended dependency graphs | Public-feed publication and downstream migration evidence remain |
+| C# package experience | Root all-features package and four selective packages restore and build from a local feed with the intended dependency graphs | Public-feed publication and downstream migration evidence remain |
 
 This assessment makes the package split necessary, but it does not make every OfficeIMO hardening item a blocker for the split. Mailozaurr package scaffolding and provider extraction can proceed in parallel. The public `Mailozaurr.Artifacts` release is gated only on the release-critical O0-O2 contract, direct-streaming, diagnostic, and round-trip items. Broader corpus growth continues after that gate; OfficeIMO O3-O5 remain product maturity work, while O6 remains evidence-gated.
 
@@ -102,7 +102,7 @@ OfficeIMO.Security owns reusable CMS, X.509, timestamp, and XML-signature implem
 
 It remains optional for `OfficeIMO.Email` and `Mailozaurr.Artifacts`. Artifact structure detection, protected-payload preservation, and ordinary artifact conversion must continue to work without the concrete provider. Verification and decryption require an explicitly supplied provider.
 
-The PowerShell module includes OfficeIMO.Security and supplies it explicitly so PowerShell users receive the complete artifact-verification experience. The C# meta-package and leaf packages keep it optional. A CLI command that requires concrete verification must add and supply it explicitly rather than making it transitive through the library packages.
+The PowerShell module includes OfficeIMO.Security and supplies it explicitly so PowerShell users receive the complete artifact-verification experience. The C# root and leaf packages keep it optional. A CLI command that requires concrete verification must add and supply it explicitly rather than making it transitive through the library packages.
 
 ### MimeKit and MailKit
 
@@ -124,7 +124,7 @@ Mailozaurr owns the higher-level send, receive, mailbox, retry, queue, profile, 
 
 ```mermaid
 flowchart TD
-    ALL["Mailozaurr<br/>all library features; dependency-only meta-package"]
+    ALL["Mailozaurr<br/>all features and reusable workflows"]
     INTERNET["Mailozaurr.Internet<br/>MimeKit, MailKit, SMTP, IMAP, POP3,<br/>MIME security and transactional senders"]
     GRAPH["Mailozaurr.MicrosoftGraph<br/>Graph APIs and Microsoft authentication"]
     GMAIL["Mailozaurr.Gmail<br/>Gmail APIs and Google authentication"]
@@ -137,17 +137,23 @@ flowchart TD
     ARTIFACTS -- "depends on" --> MIME["MimeKit"]
     ARTIFACTS -. "accepts provider from" .-> SECURITY
 
-    ALL -. "includes" .-> INTERNET
-    ALL -. "includes" .-> GRAPH
-    ALL -. "includes" .-> GMAIL
-    ALL -. "includes" .-> ARTIFACTS
+    ALL -- "depends on" --> INTERNET
+    ALL -- "depends on" --> GRAPH
+    ALL -- "depends on" --> GMAIL
+    ALL -- "depends on" --> ARTIFACTS
 ```
 
 ### Mailozaurr
 
-`Mailozaurr` is a dependency-only NuGet meta-package for C# users who want every library feature through one package reference.
+`Mailozaurr` is the all-features package for C# users who want every library feature and the high-level cross-provider workflow surface through one package reference.
 
-It includes:
+Its assembly owns:
+
+- profiles, validation, secrets, and provider capability descriptions
+- drafts, queues, routing, message-action plans, and safety rules
+- reusable IMAP/SMTP, Graph, Gmail, and transactional-provider workflow handlers
+
+It depends on:
 
 - `Mailozaurr.Internet`
 - `Mailozaurr.MicrosoftGraph`
@@ -162,7 +168,7 @@ It does not include:
 - System.CommandLine or Microsoft.Extensions.Hosting solely for the CLI
 - PowerShellStandard.Library or PowerShell hosting assemblies
 
-The meta-package contains the package README, icon, repository metadata, and aligned dependencies, but no implementation assembly.
+The package contains `Mailozaurr.dll`, the package README, icon, repository metadata, and aligned leaf dependencies.
 
 ### Mailozaurr.Internet
 
@@ -412,22 +418,20 @@ No provider package may be required merely to pass an already acquired OAuth tok
 
 ## Replacing Mailozaurr.Application
 
-There is no target `Mailozaurr.Application` or `Mailozaurr.Workflows` NuGet package.
-
-The package split does not need another public workflows/core package. The existing CLI and MCP workflows now live in the internal, non-packable `Mailozaurr.Host` assembly under the `Mailozaurr.Hosting` namespace:
+There is no target `Mailozaurr.Application`, `Mailozaurr.Host`, or `Mailozaurr.Workflows` NuGet package. The package split does not need another public workflows/core package because the root all-features package is the natural public owner:
 
 | Current responsibility | Target owner |
 | --- | --- |
-| Host workflow models, capabilities, routing, drafts, queues, plans, and safety rules | internal `Mailozaurr.Host` |
-| Host file/JSON profile, draft, queue, and plan stores | internal `Mailozaurr.Host` |
-| IMAP/SMTP host handlers and sessions | internal `Mailozaurr.Host`, over `Mailozaurr.Internet` |
-| Graph host handlers and sessions | internal `Mailozaurr.Host`, over `Mailozaurr.MicrosoftGraph` |
-| Gmail host handlers and sessions | internal `Mailozaurr.Host`, over `Mailozaurr.Gmail` |
+| Workflow models, capabilities, routing, drafts, queues, plans, and safety rules | root `Mailozaurr` |
+| File/JSON profile, draft, queue, and plan stores | root `Mailozaurr` |
+| IMAP/SMTP workflow handlers and sessions | root `Mailozaurr`, over `Mailozaurr.Internet` |
+| Graph workflow handlers and sessions | root `Mailozaurr`, over `Mailozaurr.MicrosoftGraph` |
+| Gmail workflow handlers and sessions | root `Mailozaurr`, over `Mailozaurr.Gmail` |
 | Artifact import/export and migration handlers | `Mailozaurr.Artifacts` |
 | Command parsing, output, exit codes, and MCP tools | `Mailozaurr.Cli` |
 | PowerShell binding, formatting, and `ShouldProcess` | `Mailozaurr.PowerShell` |
 
-The host composes explicitly selected handlers. It must not use reflection, package probing, or conditional type loading to discover optional providers.
+The root package composes explicitly selected handlers. It must not use reflection, package probing, or conditional type loading to discover providers.
 
 ## C# Installation Matrix
 
@@ -457,19 +461,19 @@ The PSGallery `Mailozaurr` module remains one product containing every supported
 
 Cmdlet names and user workflows remain stable unless an API is already misleading or unsafe. Package decomposition must not require PowerShell users to install or understand multiple NuGet packages.
 
-The binary module references all implementation projects explicitly and PowerForge assembles the complete module. Type accelerators remain a curated public PowerShell surface rather than exposing every type from every dependency.
+The binary module references the root all-features project and OfficeIMO.Security; PowerForge assembles the complete module. Type accelerators remain a curated public PowerShell surface rather than exposing every type from every dependency.
 
 ## CLI and MCP Distribution
 
-`Mailozaurr.Cli` remains the executable and MCP host. It references all four implementation packages plus the internal Host assembly and composes every provider explicitly. OfficeIMO.Security is added only when a CLI verification/decryption command actually consumes it.
+`Mailozaurr.Cli` remains the executable and MCP host. It references the root `Mailozaurr` package and keeps command parsing, terminal/JSON output, exit codes, and MCP hosting out of the library. OfficeIMO.Security is added only when a CLI verification/decryption command actually consumes it.
 
-The CLI package remains separate from the `Mailozaurr` library meta-package so C# users do not receive Microsoft.Extensions.Hosting, System.CommandLine, or ModelContextProtocol dependencies unless they install the tool.
+The CLI package remains separate from the `Mailozaurr` library package so C# users do not receive Microsoft.Extensions.Hosting, System.CommandLine, or ModelContextProtocol dependencies unless they install the tool.
 
-CLI and MCP code maps requests to the internal Host workflows. Provider APIs remain in their leaf packages; host-only profile, queue, plan, and safety policy stays in `Mailozaurr.Host` until a second public consumer proves another package is justified.
+CLI and MCP code maps requests to root-package workflows. Provider APIs remain in their leaf packages, while reusable profile, queue, plan, and safety policy is available to C# applications without CLI dependencies.
 
 ## Compatibility Policy
 
-This change targets the next Mailozaurr major version because the current `Mailozaurr` implementation assembly becomes a meta-package and public types move to new assemblies.
+This change targets the next Mailozaurr major version because transport and provider types move from the former monolith to leaf assemblies while the root `Mailozaurr` assembly changes responsibility to reusable high-level workflows.
 
 - Keep the public `Mailozaurr` namespace where it remains clear; package names do not require equivalent namespace fragmentation.
 - Document the assembly and package moves for C# users.
@@ -490,7 +494,7 @@ flowchart LR
     O2 --> MA["Mailozaurr.Artifacts<br/>typed MimeKit adapter"]
     MI --> MG["Mailozaurr.MicrosoftGraph"]
     MI --> MM["Mailozaurr.Gmail"]
-    MA --> ALL["Mailozaurr<br/>all-features meta-package"]
+    MA --> ALL["Mailozaurr<br/>all features and reusable workflows"]
     MG --> ALL
     MM --> ALL
     ALL --> HOSTS["PowerShell module and CLI"]
@@ -504,7 +508,7 @@ Delivery waves:
 3. **Build the joint package against local source.** Complete M2 and M4 using project references or a local feed. Expand the O1 interoperability corpus alongside the adapter instead of serializing unrelated work.
 4. **Prove the joint adapter and complete hosts.** Complete the Mailozaurr-owned parts of O2 plus M5-M7. Run end-to-end artifact/provider/PowerShell/CLI tests from packed artifacts.
 5. **Release OfficeIMO prerequisites.** Publish and publicly verify OfficeIMO.Email and, only if changed, OfficeIMO.Security. No Mailozaurr compatibility bridge should compensate for an unpublished OfficeIMO API.
-6. **Release Mailozaurr bottom-up.** Publish Internet first; publish Graph and Gmail after Internet and Artifacts after OfficeIMO.Email are public; publish the root meta-package after all leaves; then publish the PowerShell module and CLI.
+6. **Release Mailozaurr bottom-up.** Publish Internet first; publish Graph and Gmail after Internet and Artifacts after OfficeIMO.Email are public; publish the root all-features package after all leaves; then publish the PowerShell module and CLI.
 7. **Continue OfficeIMO product hardening.** Deliver O3-O5 independently according to verified risk and consumer needs. Apply O6 gates rather than promising both optional packages up front.
 
 Each wave requires source tests, locally packed consumer tests, dependency-graph inspection, and documentation updates before publication. A source merge is not treated as a consumable dependency until the required public package is available and restored successfully.
@@ -515,7 +519,7 @@ Each wave requires source tests, locally packed consumer tests, dependency-graph
 
 - [x] Record the current remote heads and public package versions used as the migration baseline.
 - [ ] Inventory public types, namespaces, cmdlet type accelerators, CLI contracts, examples, and direct consumers.
-- [x] Assign every production source folder and former `Mailozaurr.Application` type to a leaf or the internal Host assembly.
+- [x] Assign every production source folder and former `Mailozaurr.Application` type to a leaf or the root workflow assembly.
 - [x] Retain and adapt focused tests for current send, receive, provider, queue, artifact, and security contracts while moving assembly ownership.
 - [x] Capture packed-package dependency graphs and representative PowerShell 5.1/7 and CLI behaviour.
 - [x] Treat the assembly/package split as a major-version break and align the release family to 3.0.x.
@@ -525,10 +529,10 @@ Exit gate: every public type and current dependency has a target owner, and repr
 ### Mailozaurr phase M1: Prepare the multi-package build
 
 - [x] Add project definitions for `Mailozaurr.Internet`, `Mailozaurr.MicrosoftGraph`, `Mailozaurr.Gmail`, and `Mailozaurr.Artifacts`.
-- [x] Add a dependency-only project/package definition for the root `Mailozaurr` meta-package.
+- [x] Add the root `Mailozaurr` project/package for reusable workflows and all-feature composition.
 - [x] Align target frameworks, nullable settings, warnings-as-errors, package metadata, and version source.
 - [x] Extend `Build/project.build.json` to build all public packages from one version family.
-- [x] Prove that PowerForge can build the dependency-only meta-package and all five concrete artifacts without a Mailozaurr-local packaging engine.
+- [x] Prove that PowerForge can build the root package and all five additional artifacts without a Mailozaurr-local packaging engine.
 - [x] Add packed-package smoke validation that restores each selective scenario from a local feed rather than project references.
 
 Exit gate: empty or minimally populated package artifacts build with the intended IDs, versions, dependency direction, and publication order.
@@ -555,35 +559,35 @@ Exit gate: an Internet-only packed consumer restores without OfficeIMO packages,
 
 Exit gate: Internet, Graph, and Gmail packed smoke consumers restore only their permitted dependency sets and pass representative provider workflows.
 
-### Mailozaurr phase M4: Retire Mailozaurr.Application
+### Mailozaurr phase M4: Retire Mailozaurr.Application into the root owner
 
-- [x] Rename the internal workflow namespace and assembly to `Mailozaurr.Hosting` / `Mailozaurr.Host` without publishing another package.
-- [x] Reference Internet, Graph, and Gmail explicitly from the internal Host assembly.
-- [x] Change host composition so optional provider senders are registered explicitly.
+- [x] Move reusable workflow types into the root `Mailozaurr` assembly and namespace without adding another package.
+- [x] Reference Internet, Graph, Gmail, and Artifacts from the root assembly.
+- [x] Change root composition so provider senders are registered explicitly.
 - [x] Remove eager Graph and Gmail construction from the Internet leaf.
 - [x] Update CLI, MCP, PowerShell, tests, and examples to call the new owners.
 - [x] Remove the `Mailozaurr.Application` project, source path, namespace, and package entry.
 
-Exit gate: no source, project, namespace, or package references `Mailozaurr.Application`; the internal Host composes providers explicitly and is not packed.
+Exit gate: no source, project, namespace, or package references `Mailozaurr.Application` or `Mailozaurr.Host`; the public root assembly composes providers explicitly.
 
-### Mailozaurr phase M5: Convert Mailozaurr into the all-features meta-package
+### Mailozaurr phase M5: Make Mailozaurr the all-features workflow package
 
 - [x] Rename the current implementation assembly/project to `Mailozaurr.Internet`.
-- [x] Make the root `Mailozaurr` NuGet package dependency-only in an isolated project directory.
-- [x] Reference all four functional packages from the meta-package using the same release version family; keep OfficeIMO.Security optional.
+- [x] Keep a real root `Mailozaurr.dll` containing reusable cross-provider workflows.
+- [x] Reference all four functional packages from the root package using the same release version family; keep OfficeIMO.Security optional.
 - [x] Keep implementation namespaces stable where doing so remains clear.
-- [ ] Update the root README with all-package and selective-package installation examples.
-- [ ] Add migration documentation for existing C# package consumers.
+- [x] Update the root README with all-package and selective-package installation examples.
+- [x] Add migration documentation for existing C# package consumers.
 
 Exit gate: `dotnet add package Mailozaurr` provides all library features, while selective references produce the documented smaller graphs.
 
 ### Mailozaurr phase M6: Recompose PowerShell and CLI
 
-- [x] Reference all implementation packages explicitly from `Mailozaurr.PowerShell` and `Mailozaurr.Cli`.
+- [x] Reference the root all-features package from `Mailozaurr.PowerShell` and `Mailozaurr.Cli`.
 - [x] Register Graph and Gmail explicitly in the complete hosts and OfficeIMO.Security explicitly in PowerShell.
 - [x] Validate the curated PowerShell type-accelerator allow-list across the split assemblies (41 requested, 41 found).
 - [x] Confirm PowerShell 5.1 output uses the net472 lane and PowerShell 7+ uses the isolated modern lane.
-- [x] Confirm CLI and MCP use the same internal Host workflows and provider capability model through the existing source tests.
+- [x] Confirm CLI and MCP use the same root-package workflows and provider capability model through the existing source tests.
 - [x] Remove obsolete Application naming and default provider construction from shared code.
 
 Exit gate: existing representative PowerShell, CLI, and MCP workflows operate through the new packages without duplicate logic.
@@ -606,7 +610,7 @@ Exit gate: source, packed artifacts, installed PowerShell module, CLI tool, and 
 - [ ] Publish any required OfficeIMO package changes first and verify them on the public feed.
 - [ ] Publish `Mailozaurr.Internet`.
 - [ ] Publish `Mailozaurr.MicrosoftGraph` and `Mailozaurr.Gmail` after Internet is available; publish `Mailozaurr.Artifacts` after its OfficeIMO.Email prerequisite is available.
-- [ ] Publish the root `Mailozaurr` meta-package after all four leaf packages are available.
+- [ ] Publish the root `Mailozaurr` package after all four leaf packages are available.
 - [ ] Publish the Mailozaurr PowerShell module and CLI tool from the same coordinated version source.
 - [ ] Verify public-feed restore, PSGallery install, CLI tool install, package metadata, tags, and release artifacts.
 - [ ] Update downstream Evotec consumers only after the required public packages are available.

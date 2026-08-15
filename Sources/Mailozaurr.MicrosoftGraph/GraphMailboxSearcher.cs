@@ -6,10 +6,12 @@ namespace Mailozaurr;
 /// <summary>Searches Microsoft Graph mailboxes for structured mail reports.</summary>
 public static class GraphMailboxSearcher {
     /// <summary>Searches a Graph mailbox for DMARC aggregate reports.</summary>
+    /// <param name="maxUncompressedSize">Maximum uncompressed attachment size to inspect, in bytes.</param>
     public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
         GraphCredential credential, string userPrincipalName, DateTime? since = null,
         DateTime? before = null, string? domain = null, int maxResults = 0,
-        int parallelDownloadLimit = 4, CancellationToken cancellationToken = default) {
+        int parallelDownloadLimit = 4, long maxUncompressedSize = 10 * 1024 * 1024,
+        CancellationToken cancellationToken = default) {
         var filters = new List<string> { "hasAttachments eq true", "contains(subject,'report domain')" };
         DateTime? sinceUtc = NormalizeToUtc(since);
         DateTime? beforeUtc = NormalizeToUtc(before);
@@ -24,7 +26,7 @@ public static class GraphMailboxSearcher {
             messageIds, parallelDownloadLimit,
             (id, token) => MicrosoftGraphUtils.GetMailMessageMimeAsync(
                 credential, userPrincipalName, id, token), cancellationToken).ConfigureAwait(false);
-        return MailboxSearcher.FilterDmarcReports(mimeMessages, since, before, domain);
+        return MailboxSearcher.FilterDmarcReports(mimeMessages, since, before, domain, maxUncompressedSize);
     }
 
     /// <summary>Searches a Graph mailbox for non-delivery reports.</summary>

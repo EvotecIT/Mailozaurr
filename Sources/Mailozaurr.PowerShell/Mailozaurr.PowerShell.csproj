@@ -26,10 +26,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Mailozaurr\Mailozaurr.Internet.csproj" />
-        <ProjectReference Include="..\Mailozaurr.MicrosoftGraph\Mailozaurr.MicrosoftGraph.csproj" />
-        <ProjectReference Include="..\Mailozaurr.Gmail\Mailozaurr.Gmail.csproj" />
-        <ProjectReference Include="..\Mailozaurr.Artifacts\Mailozaurr.Artifacts.csproj" />
+        <ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
     </ItemGroup>
 
     <ItemGroup Condition=" '$(UseOfficeIMOProjectReferences)' == 'true' ">

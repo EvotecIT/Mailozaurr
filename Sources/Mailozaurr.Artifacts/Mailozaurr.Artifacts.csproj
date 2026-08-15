@@ -31,7 +31,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\Mailozaurr\MailFiles\**\*.cs" Link="MailFiles\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Mailozaurr.Internet\MailFiles\**\*.cs" Link="MailFiles\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

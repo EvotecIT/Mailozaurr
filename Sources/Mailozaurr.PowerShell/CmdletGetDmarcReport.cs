@@ -75,6 +75,13 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
     [ValidateRange(1, int.MaxValue)]
     public int ParallelDownloadLimit { get; set; } = 4;
 
+    /// <summary>
+    /// <para type="description">Maximum uncompressed attachment size to inspect, in bytes.</para>
+    /// </summary>
+    [Parameter]
+    [ValidateRange(1, long.MaxValue)]
+    public long MaxUncompressedSize { get; set; } = 10 * 1024 * 1024;
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         int max = Count > 0 ? Count : int.MaxValue;
@@ -90,6 +97,7 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
                             Domain,
                             max,
                             parallelDownloadLimit: ParallelDownloadLimit,
+                            maxUncompressedSize: MaxUncompressedSize,
                             cancellationToken: CancelToken);
                         foreach (var report in reports) WriteObject(report);
                     } else {
@@ -111,6 +119,7 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
                             Domain,
                             max,
                             parallelDownloadLimit: ParallelDownloadLimit,
+                            maxUncompressedSize: MaxUncompressedSize,
                             cancellationToken: CancelToken);
                         foreach (var report in reports) WriteObject(report);
                     } else {
@@ -133,6 +142,7 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
                             Domain,
                             max,
                             parallelDownloadLimit: ParallelDownloadLimit,
+                            maxUncompressedSize: MaxUncompressedSize,
                             cancellationToken: CancelToken);
                         foreach (var report in reports) WriteObject(report);
                     } else {
@@ -157,6 +167,7 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
                             Domain,
                             max,
                             parallelDownloadLimit: ParallelDownloadLimit,
+                            maxUncompressedSize: MaxUncompressedSize,
                             cancellationToken: CancelToken);
                         foreach (var report in reports) WriteObject(report);
                     } else {

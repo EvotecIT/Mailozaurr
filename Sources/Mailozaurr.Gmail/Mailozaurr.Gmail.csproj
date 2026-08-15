@@ -28,7 +28,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Mailozaurr\Mailozaurr.Internet.csproj" />
+    <ProjectReference Include="..\Mailozaurr.Internet\Mailozaurr.Internet.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -37,10 +37,10 @@
     <Compile Include="GmailNativeMailboxOperations.cs" />
     <Compile Include="GmailMailboxBrowserSession.cs" />
     <Compile Include="GmailMailboxSearcher.cs" />
-    <Compile Include="..\Mailozaurr\Gmail\**\*.cs" Link="Gmail\%(RecursiveDir)%(Filename)%(Extension)" />
-    <Compile Include="..\Mailozaurr\DmarcReports\GmailDmarcReportService.cs" Link="DmarcReports\GmailDmarcReportService.cs" />
-    <Compile Include="..\Mailozaurr\NonDeliveryReports\GmailNonDeliveryReportService.cs" Link="NonDeliveryReports\GmailNonDeliveryReportService.cs" />
-    <Compile Include="..\Mailozaurr\SentMessages\Senders\GmailPendingMessageSender.cs" Link="SentMessages\GmailPendingMessageSender.cs" />
+    <Compile Include="..\Mailozaurr.Internet\Gmail\**\*.cs" Link="Gmail\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Mailozaurr.Internet\DmarcReports\GmailDmarcReportService.cs" Link="DmarcReports\GmailDmarcReportService.cs" />
+    <Compile Include="..\Mailozaurr.Internet\NonDeliveryReports\GmailNonDeliveryReportService.cs" Link="NonDeliveryReports\GmailNonDeliveryReportService.cs" />
+    <Compile Include="..\Mailozaurr.Internet\SentMessages\Senders\GmailPendingMessageSender.cs" Link="SentMessages\GmailPendingMessageSender.cs" />
   </ItemGroup>
 
   <ItemGroup>

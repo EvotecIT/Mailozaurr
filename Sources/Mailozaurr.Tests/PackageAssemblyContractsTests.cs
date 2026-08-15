@@ -1,4 +1,4 @@
-using Mailozaurr.Hosting;
+using Mailozaurr;
 using System.Reflection;
 
 namespace Mailozaurr.Tests;
@@ -10,7 +10,7 @@ public sealed class PackageAssemblyContractsTests {
         Assert.Equal("Mailozaurr.MicrosoftGraph", typeof(GraphApiClient).Assembly.GetName().Name);
         Assert.Equal("Mailozaurr.Gmail", typeof(GmailApiClient).Assembly.GetName().Name);
         Assert.Equal("Mailozaurr.Artifacts", typeof(MailFileReader).Assembly.GetName().Name);
-        Assert.Equal("Mailozaurr.Host", typeof(MailApplication).Assembly.GetName().Name);
+        Assert.Equal("Mailozaurr", typeof(MailApplication).Assembly.GetName().Name);
         Assert.Equal("Mailozaurr.MicrosoftGraph", typeof(GraphApiErrorResponse).Assembly.GetName().Name);
         Assert.Equal("Mailozaurr.MicrosoftGraph", typeof(GraphBatchPayload).Assembly.GetName().Name);
         Assert.Equal("Mailozaurr.MicrosoftGraph", typeof(GraphSmtpResult).Assembly.GetName().Name);
@@ -18,6 +18,16 @@ public sealed class PackageAssemblyContractsTests {
         Assert.Equal("Mailozaurr.MicrosoftGraph", typeof(GraphImportance).Assembly.GetName().Name);
         Assert.Equal("Mailozaurr.MicrosoftGraph", typeof(GraphMailboxRole).Assembly.GetName().Name);
         Assert.Equal("Mailozaurr.Gmail", typeof(GmailRawRequest).Assembly.GetName().Name);
+    }
+
+    [Fact]
+    public void RootWorkflowAssemblyUsesProviderLeavesWithoutConcreteSecurity() {
+        string[] references = ReferencesOf(typeof(MailApplication).Assembly);
+
+        Assert.Contains("Mailozaurr.Internet", references);
+        Assert.Contains("Mailozaurr.MicrosoftGraph", references);
+        Assert.Contains("Mailozaurr.Gmail", references);
+        Assert.DoesNotContain("OfficeIMO.Security", references);
     }
 
     [Fact]
@@ -75,7 +85,6 @@ public sealed class PackageAssemblyContractsTests {
         Assert.Contains("Mailozaurr.Gmail", references);
         Assert.Contains("Mailozaurr.Artifacts", references);
         Assert.Contains("OfficeIMO.Security", references);
-        Assert.DoesNotContain("Mailozaurr", references);
     }
 
     private static string[] ReferencesOf(Assembly assembly) => assembly.GetReferencedAssemblies()

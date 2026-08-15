@@ -1,4 +1,3 @@
-﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.3.32804.467
@@ -13,19 +12,13 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mailozaurr.Examples", "Mail
 		{74FF5540-DB31-4031-BBE1-1A471A17CCFC} = {74FF5540-DB31-4031-BBE1-1A471A17CCFC}
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mailozaurr", "Mailozaurr.Meta\Mailozaurr.csproj", "{74FF5540-DB31-4031-BBE1-1A471A17CCFC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mailozaurr", "Mailozaurr\Mailozaurr.csproj", "{74FF5540-DB31-4031-BBE1-1A471A17CCFC}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mailozaurr.Tests", "Mailozaurr.Tests\Mailozaurr.Tests.csproj", "{707AD94F-2462-450D-92D0-6E239E141F68}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mailozaurr.Cli", "Mailozaurr.Cli\Mailozaurr.Cli.csproj", "{77665733-679C-492B-8AA4-9793DF741FA5}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Mailozaurr.Host", "Mailozaurr.Host", "{20674A5B-1F1A-A3BA-B4EA-3421BF2291F2}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mailozaurr.Host", "Mailozaurr.Host\Mailozaurr.Host.csproj", "{97224872-842E-4103-92CF-9D8B73C14891}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Mailozaurr", "Mailozaurr", "{0C60F903-6F09-1968-3149-A7074F9E1FC8}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mailozaurr.Internet", "Mailozaurr\Mailozaurr.Internet.csproj", "{9771CEC4-7313-4CD7-9B06-6372BBC3C832}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mailozaurr.Internet", "Mailozaurr.Internet\Mailozaurr.Internet.csproj", "{9771CEC4-7313-4CD7-9B06-6372BBC3C832}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mailozaurr.MicrosoftGraph", "Mailozaurr.MicrosoftGraph\Mailozaurr.MicrosoftGraph.csproj", "{3A4BB5AA-987E-4225-A777-058C7F96C36B}"
 EndProject
@@ -103,18 +96,6 @@ Global
 		{77665733-679C-492B-8AA4-9793DF741FA5}.Release|x64.Build.0 = Release|Any CPU
 		{77665733-679C-492B-8AA4-9793DF741FA5}.Release|x86.ActiveCfg = Release|Any CPU
 		{77665733-679C-492B-8AA4-9793DF741FA5}.Release|x86.Build.0 = Release|Any CPU
-		{97224872-842E-4103-92CF-9D8B73C14891}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{97224872-842E-4103-92CF-9D8B73C14891}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{97224872-842E-4103-92CF-9D8B73C14891}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{97224872-842E-4103-92CF-9D8B73C14891}.Debug|x64.Build.0 = Debug|Any CPU
-		{97224872-842E-4103-92CF-9D8B73C14891}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{97224872-842E-4103-92CF-9D8B73C14891}.Debug|x86.Build.0 = Debug|Any CPU
-		{97224872-842E-4103-92CF-9D8B73C14891}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{97224872-842E-4103-92CF-9D8B73C14891}.Release|Any CPU.Build.0 = Release|Any CPU
-		{97224872-842E-4103-92CF-9D8B73C14891}.Release|x64.ActiveCfg = Release|Any CPU
-		{97224872-842E-4103-92CF-9D8B73C14891}.Release|x64.Build.0 = Release|Any CPU
-		{97224872-842E-4103-92CF-9D8B73C14891}.Release|x86.ActiveCfg = Release|Any CPU
-		{97224872-842E-4103-92CF-9D8B73C14891}.Release|x86.Build.0 = Release|Any CPU
 		{9771CEC4-7313-4CD7-9B06-6372BBC3C832}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{9771CEC4-7313-4CD7-9B06-6372BBC3C832}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9771CEC4-7313-4CD7-9B06-6372BBC3C832}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -168,8 +149,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{97224872-842E-4103-92CF-9D8B73C14891} = {20674A5B-1F1A-A3BA-B4EA-3421BF2291F2}
-		{9771CEC4-7313-4CD7-9B06-6372BBC3C832} = {0C60F903-6F09-1968-3149-A7074F9E1FC8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F37BB785-3AB1-4498-8102-689C0E4C3924}

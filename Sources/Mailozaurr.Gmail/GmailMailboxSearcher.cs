@@ -6,10 +6,11 @@ namespace Mailozaurr;
 /// <summary>Searches Gmail mailboxes for structured mail reports.</summary>
 public static class GmailMailboxSearcher {
     /// <summary>Searches Gmail for DMARC aggregate reports.</summary>
+    /// <param name="maxUncompressedSize">Maximum uncompressed attachment size to inspect, in bytes.</param>
     public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
         GmailApiClient client, string userId, DateTime? since = null, DateTime? before = null,
         string? domain = null, int maxResults = 0, int parallelDownloadLimit = 4,
-        CancellationToken cancellationToken = default) {
+        long maxUncompressedSize = 10 * 1024 * 1024, CancellationToken cancellationToken = default) {
         if (client == null) throw new ArgumentNullException(nameof(client));
         string query = MailboxSearcher.BuildGmailDmarcReportQuery(since, before, domain);
         IList<GmailMessage> messages = await client.ListAsync(userId, query,
@@ -19,7 +20,7 @@ public static class GmailMailboxSearcher {
             messageIds, parallelDownloadLimit,
             (id, token) => client.GetMimeMessageAsync(userId, id, token), cancellationToken)
             .ConfigureAwait(false);
-        return MailboxSearcher.FilterDmarcReports(mimeMessages, since, before, domain);
+        return MailboxSearcher.FilterDmarcReports(mimeMessages, since, before, domain, maxUncompressedSize);
     }
 
     /// <summary>Searches Gmail for non-delivery reports.</summary>

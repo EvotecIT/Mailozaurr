@@ -500,31 +500,31 @@ public sealed class ProviderPendingMessageTests {
     [Fact]
     public async Task GraphApplicationHandlerQueuesAndProcessesPendingMessage() {
         var repository = new InMemoryPendingMessageRepository();
-        var handler = new Mailozaurr.Hosting.GraphMailSendHandler(
+        var handler = new Mailozaurr.GraphMailSendHandler(
             new FakeGraphSessionFactory(),
             pendingMessageRepository: repository,
             sendAsync: (session, profile, request, message, cancellationToken) =>
                 throw new HttpRequestException("temporary graph failure"));
 
         var queued = await handler.SendAsync(
-            new Mailozaurr.Hosting.MailProfile {
+            new Mailozaurr.MailProfile {
                 Id = "graph-profile",
                 DisplayName = "Graph Profile",
-                Kind = Mailozaurr.Hosting.MailProfileKind.Graph,
+                Kind = Mailozaurr.MailProfileKind.Graph,
                 DefaultMailbox = "shared@example.com",
                 DefaultSender = "sender@example.com",
                 Settings = new Dictionary<string, string> {
-                    [Mailozaurr.Hosting.MailProfileSettingsKeys.TenantId] = "tenant-id"
+                    [Mailozaurr.MailProfileSettingsKeys.TenantId] = "tenant-id"
                 }
             },
-            new Mailozaurr.Hosting.SendMessageRequest {
+            new Mailozaurr.SendMessageRequest {
                 ProfileId = "graph-profile",
                 QueueOnFailure = true,
-                Message = new Mailozaurr.Hosting.DraftMessage {
+                Message = new Mailozaurr.DraftMessage {
                     Subject = "graph-queued",
                     TextBody = "body",
                     To = {
-                        new Mailozaurr.Hosting.MessageRecipient { Address = "recipient@example.com" }
+                        new Mailozaurr.MessageRecipient { Address = "recipient@example.com" }
                     }
                 }
             },
@@ -674,9 +674,9 @@ public sealed class ProviderPendingMessageTests {
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await sendTask);
     }
 
-    private sealed class FakeGraphSessionFactory : Mailozaurr.Hosting.IGraphSessionFactory {
-        public Task<Mailozaurr.Hosting.GraphSession> ConnectAsync(Mailozaurr.Hosting.MailProfile profile, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new Mailozaurr.Hosting.GraphSession(
+    private sealed class FakeGraphSessionFactory : Mailozaurr.IGraphSessionFactory {
+        public Task<Mailozaurr.GraphSession> ConnectAsync(Mailozaurr.MailProfile profile, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new Mailozaurr.GraphSession(
                 new GraphApiClient(new OAuthCredential {
                     UserName = profile.DefaultMailbox ?? "me",
                     AccessToken = "graph-token",

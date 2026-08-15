@@ -28,7 +28,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Mailozaurr\Mailozaurr.Internet.csproj" />
+    <ProjectReference Include="..\Mailozaurr.Internet\Mailozaurr.Internet.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -36,17 +36,17 @@
     <Compile Include="GraphNativeMailboxOperations.cs" />
     <Compile Include="GraphEmailMessageContentExtensions.cs" />
     <Compile Include="GraphMailboxSearcher.cs" />
-    <Compile Include="..\Mailozaurr\Enums\GraphEndpoint.cs;..\Mailozaurr\Enums\GraphImportance.cs;..\Mailozaurr\Enums\GraphMailboxRole.cs" Link="Enums\%(Filename)%(Extension)" />
-    <Compile Include="..\Mailozaurr\Authentication\OAuthHelpers.cs;..\Mailozaurr\Authentication\TokenCacheHelper.cs" Link="Authentication\%(Filename)%(Extension)" />
-    <Compile Include="..\Mailozaurr\MicrosoftGraph\**\*.cs" Link="MicrosoftGraph\%(RecursiveDir)%(Filename)%(Extension)" />
-    <Compile Include="..\Mailozaurr\EmailGraphMessage.cs;..\Mailozaurr\GraphCredential.cs;..\Mailozaurr\GraphEmailMessage.cs" Link="%(Filename)%(Extension)" />
-    <Compile Include="..\Mailozaurr\MailozaurrOptions.cs" Link="MailozaurrOptions.cs" />
-    <Compile Include="..\Mailozaurr\NativeMailboxBrowserSessions.cs" Link="GraphMailboxBrowserSession.cs" />
-    <Compile Include="..\Mailozaurr\MicrosoftGraphUtils*.cs" Link="%(Filename)%(Extension)" />
-    <Compile Include="..\Mailozaurr\Receive\GraphMessageListener.cs" Link="Receive\GraphMessageListener.cs" />
-    <Compile Include="..\Mailozaurr\DmarcReports\GraphDmarcReportService.cs" Link="DmarcReports\GraphDmarcReportService.cs" />
-    <Compile Include="..\Mailozaurr\NonDeliveryReports\GraphNonDeliveryReportService.cs" Link="NonDeliveryReports\GraphNonDeliveryReportService.cs" />
-    <Compile Include="..\Mailozaurr\SentMessages\Senders\GraphPendingMessageSender.cs" Link="SentMessages\GraphPendingMessageSender.cs" />
+    <Compile Include="..\Mailozaurr.Internet\Enums\GraphEndpoint.cs;..\Mailozaurr.Internet\Enums\GraphImportance.cs;..\Mailozaurr.Internet\Enums\GraphMailboxRole.cs" Link="Enums\%(Filename)%(Extension)" />
+    <Compile Include="..\Mailozaurr.Internet\Authentication\OAuthHelpers.cs;..\Mailozaurr.Internet\Authentication\TokenCacheHelper.cs" Link="Authentication\%(Filename)%(Extension)" />
+    <Compile Include="..\Mailozaurr.Internet\MicrosoftGraph\**\*.cs" Link="MicrosoftGraph\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Mailozaurr.Internet\EmailGraphMessage.cs;..\Mailozaurr.Internet\GraphCredential.cs;..\Mailozaurr.Internet\GraphEmailMessage.cs" Link="%(Filename)%(Extension)" />
+    <Compile Include="..\Mailozaurr.Internet\MailozaurrOptions.cs" Link="MailozaurrOptions.cs" />
+    <Compile Include="..\Mailozaurr.Internet\NativeMailboxBrowserSessions.cs" Link="GraphMailboxBrowserSession.cs" />
+    <Compile Include="..\Mailozaurr.Internet\MicrosoftGraphUtils*.cs" Link="%(Filename)%(Extension)" />
+    <Compile Include="..\Mailozaurr.Internet\Receive\GraphMessageListener.cs" Link="Receive\GraphMessageListener.cs" />
+    <Compile Include="..\Mailozaurr.Internet\DmarcReports\GraphDmarcReportService.cs" Link="DmarcReports\GraphDmarcReportService.cs" />
+    <Compile Include="..\Mailozaurr.Internet\NonDeliveryReports\GraphNonDeliveryReportService.cs" Link="NonDeliveryReports\GraphNonDeliveryReportService.cs" />
+    <Compile Include="..\Mailozaurr.Internet\SentMessages\Senders\GraphPendingMessageSender.cs" Link="SentMessages\GraphPendingMessageSender.cs" />
   </ItemGroup>
 
   <ItemGroup>

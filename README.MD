@@ -56,7 +56,7 @@ For OAuth2 support, Mailozaurr also bundles:
 
 ## Choosing a .NET package (3.0 and later)
 
-Install `Mailozaurr` when the application needs the complete Mailozaurr library surface. It is a dependency-only meta-package that brings the four implementation packages together without adding CLI, MCP, PowerShell, or OfficeIMO.Security hosting dependencies:
+Install `Mailozaurr` when the application needs the complete Mailozaurr library surface. It contains the reusable profile, routing, draft, queue, and message-action workflows and brings the four implementation packages together without adding CLI, MCP, PowerShell, or OfficeIMO.Security hosting dependencies:
 
 ```shell
 dotnet add package Mailozaurr
@@ -74,7 +74,7 @@ Applications with a narrower job can avoid unrelated provider stacks:
 
 Graph and Gmail depend on `Mailozaurr.Internet`, so those packages also include the common MIME and protocol foundation. `Mailozaurr.Artifacts` is independent of Internet and depends only on MimeKit and OfficeIMO.Email. Add `OfficeIMO.Security` explicitly in C# when artifact verification or decryption needs its concrete provider.
 
-The PowerShell module remains one batteries-included installation. It composes all four Mailozaurr assemblies and OfficeIMO.Security internally; PowerShell users do not select NuGet leaves.
+The PowerShell module remains one batteries-included installation. It consumes the complete `Mailozaurr` package and includes OfficeIMO.Security; PowerShell users do not select NuGet leaves.
 
 ## EML, MSG, OFT, and TNEF files
 

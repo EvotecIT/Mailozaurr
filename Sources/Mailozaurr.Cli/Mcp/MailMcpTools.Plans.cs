@@ -1,4 +1,4 @@
-using Mailozaurr.Hosting;
+using Mailozaurr;
 using ModelContextProtocol.Server;
 using System.ComponentModel;
 

@@ -1,4 +1,4 @@
-using Mailozaurr.Hosting;
+using Mailozaurr;
 using System.Net.Http;
 
 namespace Mailozaurr.Tests;

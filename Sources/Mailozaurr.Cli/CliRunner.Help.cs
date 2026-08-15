@@ -1,4 +1,4 @@
-using Mailozaurr.Hosting;
+using Mailozaurr;
 
 namespace Mailozaurr.Cli;
 

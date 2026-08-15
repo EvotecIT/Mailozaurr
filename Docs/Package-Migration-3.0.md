@@ -1,6 +1,6 @@
 # Mailozaurr 3.0 package migration
 
-Mailozaurr 3.0 separates the former all-dependencies implementation assembly into four packages. The root `Mailozaurr` package remains the easiest installation path, but it is now a dependency-only meta-package and does not contain `Mailozaurr.dll`.
+Mailozaurr 3.0 separates provider and artifact dependency cliffs into four leaf packages. The root `Mailozaurr` package remains the easiest installation path and contains `Mailozaurr.dll` with reusable profiles, routing, drafts, queues, message actions, and provider composition workflows.
 
 ## Package selection
 
@@ -14,7 +14,7 @@ Mailozaurr 3.0 separates the former all-dependencies implementation assembly int
 
 Graph and Gmail reference Internet. Artifacts is independent of Internet and references only MimeKit and OfficeIMO.Email. OfficeIMO.Security is deliberately not transitive; add it explicitly and pass an `IOfficeSecurityProvider` when C# code needs artifact verification or decryption.
 
-Most reusable types keep the `Mailozaurr` namespace, so an application that references the root package normally needs no `using` changes. Assembly-qualified names, reflection, plugin allow-lists, linker descriptors, and code that assumed every type lived in `Mailozaurr.dll` must be updated to the new assembly owner.
+Most reusable types keep the `Mailozaurr` namespace, so an application that references the root package normally needs no `using` changes. Assembly-qualified names, reflection, plugin allow-lists, and linker descriptors must account for transport and provider types moving to their leaf assemblies while workflow types remain in `Mailozaurr.dll`.
 
 ## Intentional API moves
 
@@ -24,9 +24,7 @@ Most reusable types keep the `Mailozaurr` namespace, so an application that refe
 - Graph-specific `EmailMessageContent` projection is supplied by the Graph package.
 - Graph send methods now return `GraphSmtpResult`, which derives from `SmtpResult` and owns the `GraphError` property in `Mailozaurr.MicrosoftGraph`. Success, dry-run, retry, batch, draft, failure, and SMTP-fallback paths preserve that provider-specific result contract. Common SMTP results no longer expose Graph-specific DTOs.
 - Mail-file APIs, including `MailFileReader`, `MailFileMessage`, and `MailFileMimeAdapter`, are supplied by `Mailozaurr.Artifacts`.
-- The unpublished `Mailozaurr.Application` project and namespace were removed. CLI and MCP composition now uses the internal, non-packable `Mailozaurr.Host` assembly and `Mailozaurr.Hosting` namespace.
-
-Do not add a reference to `Mailozaurr.Host` from ordinary C# applications. Use the public leaf APIs, or propose a public workflow contract when a concrete non-CLI consumer needs one.
+- The unpublished `Mailozaurr.Application` project and namespace were removed. Its reusable profiles, drafts, queues, routing, and safety workflows now belong to the public root `Mailozaurr` assembly and namespace; CLI, MCP, and PowerShell consume that owner rather than a separate Host package.
 
 ## Artifact and MIME bridge
 

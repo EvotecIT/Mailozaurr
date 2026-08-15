@@ -1,6 +1,5 @@
 using MailKit.Security;
 using Mailozaurr;
-using Mailozaurr.Hosting;
 
 namespace Mailozaurr.Tests;
 

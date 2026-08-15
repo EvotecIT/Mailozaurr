@@ -1,4 +1,4 @@
-using Mailozaurr.Hosting;
+using Mailozaurr;
 using Xunit;
 
 namespace Mailozaurr.Tests;

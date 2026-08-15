@@ -1,5 +1,4 @@
 using Mailozaurr;
-using Mailozaurr.Hosting;
 
 namespace Mailozaurr.Tests;
 
