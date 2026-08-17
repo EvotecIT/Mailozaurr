@@ -115,15 +115,12 @@ public sealed class ApplicationJsonFileDocumentStoreTests {
             CreateNoWindow = true
         };
         startInfo.ArgumentList.Add(testAssemblyPath);
-        startInfo.ArgumentList.Add("-noLogo");
-        startInfo.ArgumentList.Add("-noColor");
-        startInfo.ArgumentList.Add("-reporter");
-        startInfo.ArgumentList.Add("silent");
-        startInfo.ArgumentList.Add("-parallel");
+        startInfo.ArgumentList.Add("--no-ansi");
+        startInfo.ArgumentList.Add("--parallel");
         startInfo.ArgumentList.Add("none");
-        startInfo.ArgumentList.Add("-explicit");
+        startInfo.ArgumentList.Add("--explicit");
         startInfo.ArgumentList.Add("only");
-        startInfo.ArgumentList.Add("-method");
+        startInfo.ArgumentList.Add("--filter-method");
         startInfo.ArgumentList.Add(
             "Mailozaurr.Tests.ApplicationJsonFileDocumentStoreTests.CrossProcessProfileWriteWorker");
         startInfo.Environment[WorkerFileVariable] = filePath;
