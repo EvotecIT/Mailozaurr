@@ -53,7 +53,7 @@
 
   <ItemGroup>
     <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />
-    <PackageReference Include="System.Text.Json" Version="10.0.10" Condition=" '$(TargetFramework)' != 'net8.0' " />
+    <PackageReference Include="System.Text.Json" Version="10.0.11" Condition=" '$(TargetFramework)' != 'net8.0' " />
     <None Include="..\..\Mailozaurr.png" Pack="true" PackagePath="\" />
     <None Include="..\..\README.MD" Pack="true" PackagePath="\" />
   </ItemGroup>
