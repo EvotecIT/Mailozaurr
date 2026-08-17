@@ -41,7 +41,7 @@ jobs:
         run: dotnet build Sources/Mailozaurr.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Run tests
-        run: dotnet test Sources/Mailozaurr.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
+        run: dotnet test Sources/Mailozaurr.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity ${{ env.TEST_VERBOSITY }} --results-directory TestResults -- --report-xunit-trx --coverage --coverage-output-format cobertura
 
       - name: Summarize failing tests
         if: failure() && env.SUMMARIZE_FAILURES == 'true'
@@ -116,7 +116,7 @@ jobs:
         run: dotnet build Sources/Mailozaurr.Tests/Mailozaurr.Tests.csproj --framework net8.0 --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Run tests
-        run: dotnet test Sources/Mailozaurr.Tests/Mailozaurr.Tests.csproj --framework net8.0 --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
+        run: dotnet test Sources/Mailozaurr.Tests/Mailozaurr.Tests.csproj --framework net8.0 --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity ${{ env.TEST_VERBOSITY }} --results-directory TestResults -- --report-xunit-trx --coverage --coverage-output-format cobertura
 
       - name: Summarize failing tests
         if: failure() && env.SUMMARIZE_FAILURES == 'true'
@@ -190,7 +190,7 @@ jobs:
         run: dotnet build Sources/Mailozaurr.Tests/Mailozaurr.Tests.csproj --framework net8.0 --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Run tests
-        run: dotnet test Sources/Mailozaurr.Tests/Mailozaurr.Tests.csproj --framework net8.0 --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity ${{ env.TEST_VERBOSITY }} --logger "console;verbosity=${{ env.TEST_VERBOSITY }}" --logger trx --collect:"XPlat Code Coverage"
+        run: dotnet test Sources/Mailozaurr.Tests/Mailozaurr.Tests.csproj --framework net8.0 --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity ${{ env.TEST_VERBOSITY }} --results-directory TestResults -- --report-xunit-trx --coverage --coverage-output-format cobertura
 
       - name: Summarize failing tests
         if: failure() && env.SUMMARIZE_FAILURES == 'true'
