@@ -26554,13 +26554,14 @@ StartTls to be used automatically.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>AuthenticationMechanism</maml:name>
           <maml:description>
-            <maml:para>Specifies the SASL mechanism for authentication. Defaults to Plain.</maml:para>
+            <maml:para>Specifies the SASL mechanism for authentication. Defaults to Auto, which negotiates a mechanism advertised by the server.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">AuthenticationMechanism</command:parameterValue>
           <command:parameterValueGroup>
             <command:parameterValue required="false" variableLength="false">Plain</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">Login</command:parameterValue>
             <command:parameterValue required="false" variableLength="false">CramMd5</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Auto</command:parameterValue>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>AuthenticationMechanism</maml:name>
@@ -29865,13 +29866,14 @@ type. Without this switch, only transient errors are retried.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>AuthenticationMechanism</maml:name>
         <maml:description>
-          <maml:para>Specifies the SASL mechanism for authentication. Defaults to Plain.</maml:para>
+          <maml:para>Specifies the SASL mechanism for authentication. Defaults to Auto, which negotiates a mechanism advertised by the server.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">AuthenticationMechanism</command:parameterValue>
         <command:parameterValueGroup>
           <command:parameterValue required="false" variableLength="false">Plain</command:parameterValue>
           <command:parameterValue required="false" variableLength="false">Login</command:parameterValue>
           <command:parameterValue required="false" variableLength="false">CramMd5</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Auto</command:parameterValue>
         </command:parameterValueGroup>
         <dev:type>
           <maml:name>AuthenticationMechanism</maml:name>

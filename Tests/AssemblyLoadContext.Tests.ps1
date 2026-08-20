@@ -1,5 +1,5 @@
 Describe 'Packaged AssemblyLoadContext isolation' {
-    It 'loads binary cmdlets and allowlisted public types from the module ALC' {
+    It 'loads binary cmdlets, package dependencies, and allowlisted public types from the module ALC' {
         if ($PSVersionTable.PSEdition -ne 'Core') {
             Set-ItResult -Skipped -Because 'module-scoped AssemblyLoadContext is PowerShell Core-only'
             return
@@ -11,6 +11,15 @@ Describe 'Packaged AssemblyLoadContext isolation' {
         $packagedModule = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $packagedLoader.FullName))
         $packagedModuleRoot = Split-Path -Parent $packagedModule
         $expectedCommandAssemblyPath = (Resolve-Path -LiteralPath (Join-Path $packagedModule 'Lib\Core\Mailozaurr.PowerShell.dll')).ProviderPath
+        $expectedIsolatedDependencyNames = @(
+            'System.Formats.Asn1'
+            'System.Security.Cryptography.Pkcs'
+            'System.Security.Cryptography.ProtectedData'
+        )
+        $expectedCorePath = (Resolve-Path -LiteralPath (Join-Path $packagedModule 'Lib\Core')).ProviderPath
+        foreach ($dependencyName in $expectedIsolatedDependencyNames) {
+            $null = Get-Item -LiteralPath (Join-Path $expectedCorePath "$dependencyName.dll") -ErrorAction Stop
+        }
 
         $moduleRootLiteral = $packagedModuleRoot.Replace("'", "''")
         $script = @"
@@ -32,6 +41,39 @@ Import-Module Mailozaurr -Force
 `$mimeAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$message.GetType().Assembly)
 `$mailKitAlc = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$query.GetType().Assembly)
 `$smtp = [Mailozaurr.Smtp]::new()
+`$securePassword = ConvertTo-SecureString 'mailozaurr-regression' -AsPlainText -Force
+`$protectedPassword = ConvertFrom-SecureString `$securePassword
+`$plainPassword = `$smtp.ConvertSecureStringToPlainString(`$protectedPassword, `$true)
+`$isolatedDependencyNames = @(
+    'System.Formats.Asn1'
+    'System.Security.Cryptography.Pkcs'
+    'System.Security.Cryptography.ProtectedData'
+)
+foreach (`$dependencyName in `$isolatedDependencyNames) {
+    `$dependencyAssemblyName = [System.Reflection.AssemblyName]::new(`$dependencyName)
+    `$null = `$commandAlc.LoadFromAssemblyName(`$dependencyAssemblyName)
+}
+`$isolatedDependencies = [ordered] @{}
+foreach (`$dependencyName in `$isolatedDependencyNames) {
+    `$dependencyAssembly = @(
+        [AppDomain]::CurrentDomain.GetAssemblies() | Where-Object {
+            `$_.GetName().Name -eq `$dependencyName -and
+            [object]::ReferenceEquals(
+                [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$_),
+                `$commandAlc
+            )
+        }
+    ) | Select-Object -First 1
+    `$isolatedDependencies[`$dependencyName] = [pscustomobject] @{
+        Path = `$dependencyAssembly.Location
+        Version = `$dependencyAssembly.GetName().Version.ToString()
+        ALC = [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$dependencyAssembly).Name
+        ALCIsDefault = [object]::ReferenceEquals(
+            [System.Runtime.Loader.AssemblyLoadContext]::GetLoadContext(`$dependencyAssembly),
+            [System.Runtime.Loader.AssemblyLoadContext]::Default
+        )
+    }
+}
 `$expectedAllowedTypes = @(
     'Mailozaurr.Definitions.EmailMessageContent'
     'Mailozaurr.EmailEncryption'
@@ -135,6 +177,8 @@ try {
     SearchQueryALC = `$mailKitAlc.Name
     SearchQueryALCIsDefault = [object]::ReferenceEquals(`$mailKitAlc, [System.Runtime.Loader.AssemblyLoadContext]::Default)
     SmtpCreated = `$null -ne `$smtp
+    SecurePasswordRoundTrip = `$plainPassword
+    IsolatedDependencies = `$isolatedDependencies
     AllowedTypeCount = `$expectedAllowedTypes.Count
     ActualAllowedTypeCount = `$actualAllowedTypes.Count
     MissingAllowedTypes = @(`$missingAllowedTypes)
@@ -175,6 +219,14 @@ try {
         $result.SearchQueryALC | Should -Be 'Mailozaurr'
         $result.SearchQueryALCIsDefault | Should -BeFalse
         $result.SmtpCreated | Should -BeTrue
+        $result.SecurePasswordRoundTrip | Should -Be 'mailozaurr-regression'
+        foreach ($dependencyName in $expectedIsolatedDependencyNames) {
+            $dependency = $result.IsolatedDependencies.$dependencyName
+            ($dependency.Path -replace '\\', '/') | Should -BeLike "$(($expectedCorePath -replace '\\', '/'))/*"
+            $dependency.Version | Should -Be '10.0.0.0'
+            $dependency.ALC | Should -Be 'Mailozaurr'
+            $dependency.ALCIsDefault | Should -BeFalse
+        }
         $result.AllowedTypeCount | Should -Be 41
         $result.ActualAllowedTypeCount | Should -Be 41
         @($result.MissingAllowedTypes).Count | Should -Be 0

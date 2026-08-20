@@ -171,10 +171,10 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
     public string? Password { get; set; }
     /// <summary>
-    /// <para>Specifies the SASL mechanism for authentication. Defaults to Plain.</para>
+    /// <para>Specifies the SASL mechanism for authentication. Defaults to Auto, which negotiates a mechanism advertised by the server.</para>
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
-    public AuthenticationMechanism AuthenticationMechanism { get; set; } = AuthenticationMechanism.Plain;
+    public AuthenticationMechanism AuthenticationMechanism { get; set; } = AuthenticationMechanism.Auto;
     /// <summary>
     /// <para>Specifies the secure socket options for SMTP connection. Options: None, Auto, StartTls, StartTlsWhenAvailable, SslOnConnect. Default is Auto.</para>
     /// </summary>

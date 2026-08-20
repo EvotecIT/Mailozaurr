@@ -11,15 +11,20 @@ public enum AuthenticationMechanism {
     /// <summary>
     /// Plain text authentication mechanism.
     /// </summary>
-    Plain,
+    Plain = 0,
 
     /// <summary>
     /// LOGIN authentication mechanism.
     /// </summary>
-    Login,
+    Login = 1,
 
     /// <summary>
     /// Challenge-response authentication using CRAM-MD5.
     /// </summary>
-    CramMd5
+    CramMd5 = 2,
+
+    /// <summary>
+    /// Automatically selects a mechanism advertised by the SMTP server.
+    /// </summary>
+    Auto = 3
 }

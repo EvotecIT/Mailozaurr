@@ -123,13 +123,13 @@ Accept wildcard characters: False
 ```
 
 ### -AuthenticationMechanism
-Specifies the SASL mechanism for authentication. Defaults to Plain.
+Specifies the SASL mechanism for authentication. Defaults to Auto, which negotiates a mechanism advertised by the server.
 
 ```yaml
 Type: AuthenticationMechanism
 Parameter Sets: SecureString
 Aliases: None
-Possible values: Plain, Login, CramMd5
+Possible values: Plain, Login, CramMd5, Auto
 
 Required: False
 Position: named

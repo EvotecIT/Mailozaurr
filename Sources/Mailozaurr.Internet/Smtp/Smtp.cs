@@ -912,7 +912,7 @@ public partial class Smtp {
     /// previously protected.</param>
     /// <param name="mechanism">Authentication mechanism to use.</param>
     /// <returns>An <see cref="SmtpResult"/> representing the outcome.</returns>
-    public SmtpResult Authenticate(string username, string password, bool isSecureString, AuthenticationMechanism mechanism = AuthenticationMechanism.Plain) {
+    public SmtpResult Authenticate(string username, string password, bool isSecureString, AuthenticationMechanism mechanism = AuthenticationMechanism.Auto) {
         if (DryRun) {
             LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "Authentication skipped (WhatIf)");
@@ -935,9 +935,14 @@ public partial class Smtp {
                 case AuthenticationMechanism.Login:
                     Client.Authenticate(new SaslMechanismLogin(username, password));
                     break;
-                default:
+                case AuthenticationMechanism.Plain:
                     Client.Authenticate(new SaslMechanismPlain(username, password));
                     break;
+                case AuthenticationMechanism.Auto:
+                    Client.Authenticate(username, password);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(mechanism), mechanism, "Unsupported SMTP authentication mechanism.");
             }
             LogVerbose($"Send-EmailMessage - Authenticated as {username}");
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
