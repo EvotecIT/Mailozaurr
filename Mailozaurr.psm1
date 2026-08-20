@@ -413,8 +413,7 @@ try {
         if ($InnerModule) {
             # Import-Module -Assembly loads the inner binary module into its own module object. PowerShell has no
             # public API to copy those exported cmdlets back to the script-module wrapper, so this uses the same
-            # private PSModuleInfo hook used by community ALC loaders. This runs on first load and reloads so the
-            # outer script module always re-exports cmdlets from the ALC-loaded binary module.
+            # private PSModuleInfo hook used by community ALC loaders.
             $AddExportedCmdlet = [System.Management.Automation.PSModuleInfo].GetMethod(
                 'AddExportedCmdlet',
                 [System.Reflection.BindingFlags]'Instance, NonPublic'
