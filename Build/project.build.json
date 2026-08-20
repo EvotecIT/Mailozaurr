@@ -39,6 +39,6 @@
   "GitHubGenerateReleaseNotes": true,
   "GitHubReleaseMode": "Single",
   "GitHubPrimaryProject": "Mailozaurr",
-  "GitHubTagTemplate": "{Repo}-v{UtcTimestamp}",
-  "GitHubReleaseName": "{Repo} {UtcDateTime}"
+  "GitHubTagTemplate": "{Repo}-v{PrimaryVersion}",
+  "GitHubReleaseName": "{Repo} {PrimaryVersion}"
 }
