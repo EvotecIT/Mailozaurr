@@ -52,14 +52,12 @@
         <Delete Files="$(OutDir)System.Management.dll" />
     </Target>
 
-    <!-- Do not ship framework assemblies for PowerShell 7+ (net8.0) to avoid version conflicts with
-    the host -->
+    <!-- Remove PowerShell host assemblies and adjacent framework facades from the publish root.
+    Package-owned runtime and crypto dependencies stay in the isolated module payload so older hosts
+    do not have to satisfy newer assembly references. -->
     <Target Name="RemoveFilesAfterPublish" AfterTargets="Publish"
         Condition=" '$(TargetFramework)' == 'net8.0' ">
         <ItemGroup>
-            <FilesToDelete Include="$(PublishDir)System.Formats.Asn1.dll" />
-            <FilesToDelete Include="$(PublishDir)System.Security.Cryptography.Pkcs.dll" />
-            <FilesToDelete Include="$(PublishDir)System.Security.Cryptography.ProtectedData.dll" />
             <FilesToDelete Include="$(PublishDir)System.Management.Automation.dll" />
             <FilesToDelete Include="$(PublishDir)System.Management.dll" />
         </ItemGroup>
