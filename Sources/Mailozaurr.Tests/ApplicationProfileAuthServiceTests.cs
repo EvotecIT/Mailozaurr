@@ -202,8 +202,51 @@ public sealed class ApplicationProfileAuthServiceTests {
         Assert.Equal(MailProfileAuthFlowNames.Interactive, profile.Settings[MailProfileSettingsKeys.AuthFlow]);
         Assert.Equal("user@example.com", profile.Settings[MailProfileSettingsKeys.LoginHint]);
         Assert.True(profile.Settings.ContainsKey(MailProfileSettingsKeys.TokenExpiresOn));
+        Assert.Contains("https://graph.microsoft.com/Mail.ReadWrite", profile.Settings[MailProfileSettingsKeys.OAuthScopes], StringComparison.Ordinal);
         Assert.Equal("https://login.microsoftonline.com/common/oauth2/nativeclient", profile.Settings[MailProfileSettingsKeys.RedirectUri]);
         Assert.Equal("graph-access-token", accessToken);
+    }
+
+    [Fact]
+    public async Task RefreshGraphAsyncReusesPersistedFeatureScopes() {
+        var profileStore = new InMemoryProfileStore(new[] {
+            new MailProfile {
+                Id = "graph-work",
+                DisplayName = "Work Graph",
+                Kind = MailProfileKind.Graph,
+                Settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+                    [MailProfileSettingsKeys.ClientId] = "client-id",
+                    [MailProfileSettingsKeys.TenantId] = "tenant-id"
+                }
+            }
+        });
+        var secretStore = new InMemorySecretStore();
+        var capturedScopes = new List<IReadOnlyList<string>>();
+        var service = new MailProfileAuthService(
+            new MailProfileService(profileStore, secretStore),
+            new MailProfileSecretService(profileStore, secretStore),
+            secretStore,
+            loginGraphAsync: (request, _) => {
+                capturedScopes.Add(request.Scopes!);
+                return Task.FromResult(new OAuthCredential {
+                    UserName = "user@example.test",
+                    AccessToken = "graph-access-token",
+                    ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
+                });
+            });
+
+        var first = await service.LoginGraphAsync(new GraphProfileLoginRequest {
+            ProfileId = "graph-work",
+            Login = "user@example.test",
+            Scopes = MailProfileAuthDefaults.GraphMailboxFeatureScopes
+        });
+        var refreshed = await service.RefreshAsync("graph-work");
+
+        Assert.True(first.Succeeded);
+        Assert.True(refreshed.Succeeded);
+        Assert.Equal(2, capturedScopes.Count);
+        Assert.Contains("https://graph.microsoft.com/MailboxSettings.ReadWrite", capturedScopes[1]);
+        Assert.Contains("https://graph.microsoft.com/Calendars.ReadWrite", capturedScopes[1]);
     }
 
     [Fact]

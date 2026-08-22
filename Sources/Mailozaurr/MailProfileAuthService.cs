@@ -141,7 +141,7 @@ public sealed class MailProfileAuthService : IMailProfileAuthService {
             ClientId = clientId,
             ClientSecret = clientSecret,
             ClientSecretReference = null,
-            Scopes = NormalizeScopes(request.Scopes, MailProfileAuthDefaults.GmailScopes)
+            Scopes = NormalizeScopes(request.Scopes, ResolveStoredScopes(profile, MailProfileAuthDefaults.GmailScopes))
         };
         var credential = await _loginGmailAsync(effectiveRequest, cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(credential.AccessToken)) {
@@ -152,6 +152,7 @@ public sealed class MailProfileAuthService : IMailProfileAuthService {
         profile.Settings[MailProfileSettingsKeys.ClientId] = clientId!;
         profile.Settings[MailProfileSettingsKeys.AuthFlow] = MailProfileAuthFlowNames.Interactive;
         profile.Settings[MailProfileSettingsKeys.LoginHint] = gmailAccount!;
+        profile.Settings[MailProfileSettingsKeys.OAuthScopes] = SerializeScopes(effectiveRequest.Scopes);
         UpsertTokenExpiration(profile, credential.ExpiresOn);
         profile.DefaultMailbox ??= gmailAccount;
         profile.DefaultSender ??= gmailAccount;
@@ -212,7 +213,7 @@ public sealed class MailProfileAuthService : IMailProfileAuthService {
             ClientId = clientId,
             TenantId = tenantId,
             RedirectUri = redirectUri,
-            Scopes = NormalizeScopes(request.Scopes, MailProfileAuthDefaults.GraphScopes)
+            Scopes = NormalizeScopes(request.Scopes, ResolveStoredScopes(profile, MailProfileAuthDefaults.GraphScopes))
         };
         var credential = await _loginGraphAsync(effectiveRequest, cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(credential.AccessToken)) {
@@ -223,6 +224,7 @@ public sealed class MailProfileAuthService : IMailProfileAuthService {
         profile.Settings[MailProfileSettingsKeys.TenantId] = tenantId!;
         profile.Settings[MailProfileSettingsKeys.RedirectUri] = redirectUri;
         profile.Settings[MailProfileSettingsKeys.AuthFlow] = MailProfileAuthFlowNames.Interactive;
+        profile.Settings[MailProfileSettingsKeys.OAuthScopes] = SerializeScopes(effectiveRequest.Scopes);
         UpsertSetting(profile.Settings, MailProfileSettingsKeys.LoginHint, login);
         UpsertTokenExpiration(profile, credential.ExpiresOn);
         if (!string.IsNullOrWhiteSpace(mailbox)) {
@@ -343,6 +345,23 @@ public sealed class MailProfileAuthService : IMailProfileAuthService {
         (scopes == null || scopes.Count == 0
             ? fallback
             : scopes.Where(scope => !string.IsNullOrWhiteSpace(scope)).Select(scope => scope.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray())!;
+
+    private static IReadOnlyList<string> ResolveStoredScopes(MailProfile profile, IReadOnlyList<string> fallback) {
+        if (!profile.Settings.TryGetValue(MailProfileSettingsKeys.OAuthScopes, out var serialized) ||
+            string.IsNullOrWhiteSpace(serialized)) {
+            return fallback;
+        }
+
+        var stored = serialized.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Where(scope => !string.IsNullOrWhiteSpace(scope))
+            .Select(scope => scope.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return stored.Length == 0 ? fallback : stored;
+    }
+
+    private static string SerializeScopes(IReadOnlyList<string>? scopes) =>
+        string.Join("\n", scopes ?? Array.Empty<string>());
 
     private static string? FirstNonEmpty(params string?[] values) {
         foreach (var value in values) {

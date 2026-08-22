@@ -19,7 +19,7 @@ public sealed partial class MailMcpTools {
         [Description("Configured Graph profile identifier.")] string profileId,
         [Description("Optional mailbox override.")] string? mailboxId = null,
         [Description("Optional OData filter.")] string? filter = null,
-        [Description("Provider page size from 1 to 999.")] int top = 100,
+        [Description("Maximum result count from 1 to 999.")] int top = 100,
         [Description("Maximum provider pages to read.")] int maxPages = 25,
         CancellationToken cancellationToken = default) =>
         _application.GraphMailbox.ListRulesAsync(profileId, mailboxId, filter, top, maxPages, cancellationToken);

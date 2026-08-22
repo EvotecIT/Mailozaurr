@@ -123,7 +123,7 @@ public sealed partial class GmailApiClient {
         bool refreshOnAuthenticationError,
         CancellationToken cancellationToken) {
         ThrowIfDisposed();
-        using var response = await _client.GetAsync($"users/{userId}/profile", cancellationToken).ConfigureAwait(false);
+        using var response = await _client.GetAsync(BuildGmailUserSegment(userId) + "/profile", cancellationToken).ConfigureAwait(false);
         if (refreshOnAuthenticationError) {
             await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
         } else if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden) {

@@ -285,8 +285,15 @@ public sealed partial class GraphApiClient {
         url.Append("&$filter=").Append(Uri.EscapeDataString(filter));
 
         string nextUrl = url.ToString();
+        var expectedPath = new Uri(
+            _client.BaseAddress ?? new Uri("https://graph.microsoft.com/v1.0/"),
+            userSegment + "/messages").AbsolutePath;
+        var seen = new HashSet<string>(StringComparer.Ordinal);
         while (pages++ < safeMaxPages) {
             cancellationToken.ThrowIfCancellationRequested();
+            if (!seen.Add(nextUrl)) {
+                throw new InvalidDataException("Graph conversation pagination returned a repeated continuation URL.");
+            }
             using var req = new HttpRequestMessage(HttpMethod.Get, nextUrl);
             ApplyAuthHeader(req);
             using var resp = await _client.SendAsync(req, cancellationToken).ConfigureAwait(false);
@@ -317,12 +324,17 @@ public sealed partial class GraphApiClient {
                 if (link != null) {
                     var trimmed = link.Trim();
                     if (trimmed.Length > 0) {
-                        nextUrl = trimmed;
+                        nextUrl = NormalizeContinuation(trimmed, expectedPath)
+                            ?? throw new InvalidDataException("Graph returned an empty conversation continuation URL.");
                         continue;
                     }
                 }
             }
             break;
+        }
+
+        if (pages > safeMaxPages) {
+            throw new InvalidDataException("Graph conversation identifier listing exceeded the configured page bound.");
         }
 
         return ids;
@@ -366,8 +378,15 @@ public sealed partial class GraphApiClient {
         }
 
         string nextUrl = url.ToString();
+        var expectedPath = new Uri(
+            _client.BaseAddress ?? new Uri("https://graph.microsoft.com/v1.0/"),
+            userSegment + "/messages").AbsolutePath;
+        var seen = new HashSet<string>(StringComparer.Ordinal);
         while (pages++ < safeMaxPages) {
             cancellationToken.ThrowIfCancellationRequested();
+            if (!seen.Add(nextUrl)) {
+                throw new InvalidDataException("Graph conversation pagination returned a repeated continuation URL.");
+            }
             using var req = new HttpRequestMessage(HttpMethod.Get, nextUrl);
             ApplyAuthHeader(req);
             using var resp = await _client.SendAsync(req, cancellationToken).ConfigureAwait(false);
@@ -387,6 +406,9 @@ public sealed partial class GraphApiClient {
                     var msg = TryParseMailMessage(it);
                     if (msg != null) {
                         messages.Add(msg);
+                        if (messages.Count >= safeTop) {
+                            return messages;
+                        }
                     }
                 }
             }
@@ -396,12 +418,17 @@ public sealed partial class GraphApiClient {
                 if (link != null) {
                     var trimmed = link.Trim();
                     if (trimmed.Length > 0) {
-                        nextUrl = trimmed;
+                        nextUrl = NormalizeContinuation(trimmed, expectedPath)
+                            ?? throw new InvalidDataException("Graph returned an empty conversation continuation URL.");
                         continue;
                     }
                 }
             }
             break;
+        }
+
+        if (pages > safeMaxPages) {
+            throw new InvalidDataException("Graph conversation listing exceeded the configured page bound.");
         }
 
         return messages;

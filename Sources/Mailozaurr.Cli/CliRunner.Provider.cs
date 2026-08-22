@@ -19,13 +19,15 @@ public static partial class CliRunner {
         var profile = RequireOption(parseResult, "profile");
         var mailbox = parseResult.GetOption("mailbox");
         var json = parseResult.HasFlag("json");
+        var resultLimit = Math.Max(1, Math.Min(parseResult.GetIntOption("limit") ?? 100, 999));
         switch (command) {
             case "permission-evidence":
                 var evidence = await application.PermissionEvidence.GetEvidenceAsync(profile, mailbox).ConfigureAwait(false);
                 await WriteItemAsync(output, evidence, json, value => value.Message ?? $"{value.Provider} permission evidence").ConfigureAwait(false);
                 return evidence.ProbeSucceeded ? 0 : 1;
             case "graph-rule-list":
-                var rules = await application.GraphMailbox.ListRulesAsync(profile, mailbox, parseResult.GetOption("filter"), parseResult.GetIntOption("limit") ?? 100, parseResult.GetIntOption("max-pages") ?? 25).ConfigureAwait(false);
+                var rules = (await application.GraphMailbox.ListRulesAsync(profile, mailbox, parseResult.GetOption("filter"), resultLimit, parseResult.GetIntOption("max-pages") ?? 25).ConfigureAwait(false))
+                    .Take(resultLimit).ToArray();
                 await WriteSequenceAsync(output, rules, json, value => value.DisplayName ?? value.Id ?? "(rule)").ConfigureAwait(false);
                 return 0;
             case "graph-rule-get":
@@ -47,7 +49,8 @@ public static partial class CliRunner {
                 await output.WriteLineAsync("Graph Inbox rule deleted.").ConfigureAwait(false);
                 return 0;
             case "graph-event-list":
-                var events = await application.GraphMailbox.ListEventsAsync(profile, mailbox, parseResult.GetOption("filter"), parseResult.GetOption("select") ?? GraphApiClient.DefaultEventSelect, parseResult.GetIntOption("limit") ?? 100, parseResult.GetIntOption("max-pages") ?? 25).ConfigureAwait(false);
+                var events = (await application.GraphMailbox.ListEventsAsync(profile, mailbox, parseResult.GetOption("filter"), parseResult.GetOption("select") ?? GraphApiClient.DefaultEventSelect, resultLimit, parseResult.GetIntOption("max-pages") ?? 25).ConfigureAwait(false))
+                    .Take(resultLimit).ToArray();
                 await WriteSequenceAsync(output, events, json, value => value.Subject ?? value.Id ?? "(event)").ConfigureAwait(false);
                 return 0;
             case "graph-event-get":
@@ -69,7 +72,8 @@ public static partial class CliRunner {
                 await output.WriteLineAsync("Graph event deleted.").ConfigureAwait(false);
                 return 0;
             case "graph-thread-get":
-                var conversation = await application.GraphMailbox.GetThreadAsync(profile, RequireOption(parseResult, "thread-id"), mailbox, parseResult.GetIntOption("limit") ?? 100, parseResult.GetIntOption("max-pages") ?? 25).ConfigureAwait(false);
+                var conversation = (await application.GraphMailbox.GetThreadAsync(profile, RequireOption(parseResult, "thread-id"), mailbox, resultLimit, parseResult.GetIntOption("max-pages") ?? 25).ConfigureAwait(false))
+                    .Take(resultLimit).ToArray();
                 await WriteSequenceAsync(output, conversation, json, value => value.Subject ?? value.Id).ConfigureAwait(false);
                 return 0;
             case "gmail-filter-list":
@@ -112,7 +116,7 @@ public static partial class CliRunner {
                 await output.WriteLineAsync("Gmail label deleted.").ConfigureAwait(false);
                 return 0;
             case "gmail-thread-list":
-                var threads = await application.GmailMailbox.ListThreadsAsync(profile, mailbox, parseResult.GetOption("query"), parseResult.GetIntOption("limit") ?? 100, parseResult.GetOption("cursor")).ConfigureAwait(false);
+                var threads = await application.GmailMailbox.ListThreadsAsync(profile, mailbox, parseResult.GetOption("query"), resultLimit, parseResult.GetOption("cursor")).ConfigureAwait(false);
                 await WriteItemAsync(output, threads, json, value => $"{value.Threads.Count} thread(s); cursor={value.NextPageToken ?? "(none)"}").ConfigureAwait(false);
                 return 0;
             case "gmail-thread-get":

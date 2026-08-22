@@ -31,6 +31,7 @@ public sealed partial class GraphApiClient {
         }
 
         var output = new List<GraphInboxRule>();
+        var resultLimit = ClampInt(top, 1, 999);
         var next = url.ToString();
         var expectedPath = new Uri(_client.BaseAddress ?? new Uri("https://graph.microsoft.com/v1.0/"), userSegment + "/mailFolders/inbox/messageRules").AbsolutePath;
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -44,6 +45,7 @@ public sealed partial class GraphApiClient {
                 throw new InvalidDataException("Graph returned an invalid inbox-rule list response.", ex);
             }
             if (envelope?.Value != null) output.AddRange(envelope.Value);
+            if (output.Count >= resultLimit) return output.Take(resultLimit).ToArray();
             next = NormalizeContinuation(envelope?.NextLink, expectedPath);
         }
         if (!string.IsNullOrWhiteSpace(next)) throw new InvalidDataException("Graph inbox-rule listing exceeded the configured page bound.");
@@ -101,6 +103,7 @@ public sealed partial class GraphApiClient {
         if (!string.IsNullOrWhiteSpace(select)) url.Append("&$select=").Append(Uri.EscapeDataString(select!.Trim()));
 
         var output = new List<GraphEvent>();
+        var resultLimit = ClampInt(top, 1, 999);
         var next = url.ToString();
         var expectedPath = new Uri(_client.BaseAddress ?? new Uri("https://graph.microsoft.com/v1.0/"), BuildUserSegment(userId) + "/events").AbsolutePath;
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -114,6 +117,7 @@ public sealed partial class GraphApiClient {
                 throw new InvalidDataException("Graph returned an invalid event list response.", ex);
             }
             if (envelope?.Value != null) output.AddRange(envelope.Value);
+            if (output.Count >= resultLimit) return output.Take(resultLimit).ToArray();
             next = NormalizeContinuation(envelope?.NextLink, expectedPath);
         }
         if (!string.IsNullOrWhiteSpace(next)) throw new InvalidDataException("Graph event listing exceeded the configured page bound.");

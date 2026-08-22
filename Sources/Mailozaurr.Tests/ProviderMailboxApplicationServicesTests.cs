@@ -68,17 +68,20 @@ public class ProviderMailboxApplicationServicesTests {
     }
 
     [Fact]
-    public async Task PermissionEvidence_ReturnsSafeProviderFailureWithoutResponseBody() {
+    public async Task PermissionEvidence_RetainsGraphClaimsWhenOptionalIdentityIsForbidden() {
         var store = await CreateStoreAsync(MailProfileKind.Graph);
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.Forbidden) {
             Content = new StringContent("secret-provider-payload")
         });
-        var service = new MailPermissionEvidenceService(store, new GraphFactory(handler), new GmailFactory(new RecordingHandler()));
+        var graphFactory = new GraphFactory(handler, CreateJwt("{\"scp\":\"Mail.ReadWrite Calendars.ReadWrite\",\"preferred_username\":\"user@example.test\"}"));
+        var service = new MailPermissionEvidenceService(store, graphFactory, new GmailFactory(new RecordingHandler()));
 
         var result = await service.GetEvidenceAsync("profile");
 
-        Assert.False(result.ProbeSucceeded);
-        Assert.Equal("graph_403", result.FailureCode);
+        Assert.True(result.ProbeSucceeded);
+        Assert.Null(result.Identity);
+        Assert.Contains("Mail.ReadWrite", result.Permissions!.DelegatedScopes);
+        Assert.Contains("403", result.Message ?? string.Empty, StringComparison.Ordinal);
         Assert.DoesNotContain("secret-provider-payload", result.Message, StringComparison.Ordinal);
     }
 

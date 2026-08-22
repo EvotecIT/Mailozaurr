@@ -30,9 +30,15 @@ public sealed class MailPermissionEvidenceService : IMailPermissionEvidenceServi
         try {
             if (profile.Kind == MailProfileKind.Graph) {
                 using var session = await _graphSessionFactory.ConnectAsync(effective, cancellationToken).ConfigureAwait(false);
-                var identity = await session.Client.GetMailboxIdentityAsync(session.UserId, cancellationToken).ConfigureAwait(false);
-                evidence = MailProfileDiagnosticEvidenceFactory.CreateGraphEvidence(session, identity);
-                MailProfileDiagnosticEvidenceFactory.ApplyVerifiedGraphDelegatedIdentity(evidence, identity);
+                evidence = MailProfileDiagnosticEvidenceFactory.CreateGraphEvidence(session);
+                try {
+                    var identity = await session.Client.GetMailboxIdentityWithoutRefreshAsync(session.UserId, cancellationToken).ConfigureAwait(false);
+                    evidence = MailProfileDiagnosticEvidenceFactory.CreateGraphEvidence(session, identity);
+                    MailProfileDiagnosticEvidenceFactory.ApplyVerifiedGraphDelegatedIdentity(evidence, identity);
+                } catch (GraphApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden) {
+                    evidence.IdentityUnavailableReason =
+                        $"Microsoft Graph users endpoint returned {(int)ex.StatusCode} ({ex.StatusCode}); token-claim permission evidence remains available.";
+                }
             } else {
                 using var session = await _gmailSessionFactory.ConnectAsync(effective, cancellationToken).ConfigureAwait(false);
                 var mailbox = await session.Browser.GetProfileAsync(cancellationToken).ConfigureAwait(false);
@@ -59,7 +65,7 @@ public sealed class MailPermissionEvidenceService : IMailPermissionEvidenceServi
             ProbeSucceeded = true,
             Identity = evidence.Identity,
             Permissions = evidence.Permissions,
-            Message = evidence.Permissions?.Detail
+            Message = evidence.IdentityUnavailableReason ?? evidence.Permissions?.Detail
         };
     }
 

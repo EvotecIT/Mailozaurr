@@ -58,6 +58,31 @@ public class ProviderFeatureApiClientTests {
     }
 
     [Fact]
+    public async Task GraphRules_ResultLimitStopsBeforeFollowingContinuation() {
+        var body = "{\"value\":[{\"id\":\"r1\"}],\"@odata.nextLink\":\"https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messageRules?$skiptoken=next\"}";
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) });
+        using var client = CreateGraphClient(handler);
+
+        var rules = await client.ListInboxRulesAsync(top: 1, maxPages: 25);
+
+        Assert.Equal("r1", Assert.Single(rules).Id);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task GraphConversation_RejectsCrossOriginContinuationBeforeSendingToken() {
+        var body = "{\"value\":[],\"@odata.nextLink\":\"https://attacker.example/steal\"}";
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) });
+        using var client = CreateGraphClient(handler);
+
+        var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            client.ListConversationMessagesAsync("conversation-1"));
+
+        Assert.Contains("outside", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
     public async Task GraphEvents_CreateEscapesMailboxAndUsesTypedPayload() {
         var body = "{\"id\":\"e1\",\"subject\":\"Review\"}";
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent(body) });
@@ -122,6 +147,19 @@ public class ProviderFeatureApiClientTests {
         Assert.Equal("next", page.NextPageToken);
         Assert.Single(handler.Requests);
         Assert.Contains("q=is%3Aunread", handler.Requests[0].RequestUri!.Query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GmailProfile_EscapesMailboxOverrideAsOnePathSegment() {
+        var body = "{\"emailAddress\":\"user@example.test\",\"messagesTotal\":1,\"threadsTotal\":1,\"historyId\":\"2\"}";
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) });
+        using var client = CreateGmailClient(handler);
+
+        _ = await client.GetProfileAsync("shared/mailbox?#fragment");
+
+        Assert.Equal(
+            "/gmail/v1/users/shared%2Fmailbox%3F%23fragment/profile",
+            Assert.Single(handler.Requests).RequestUri!.AbsolutePath);
     }
 
     private static GraphApiClient CreateGraphClient(HttpMessageHandler handler) =>
