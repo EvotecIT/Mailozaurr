@@ -505,6 +505,27 @@ public sealed class ApplicationProfileConnectionServiceTests {
     }
 
     [Fact]
+    public async Task DefaultGraphSendPreflightAcceptsSharedScopePairForSignedInMailbox() {
+        var handler = new RecordingHandler(
+            JsonResponse("{\"value\":[]}"),
+            JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
+        var service = new MailProfileConnectionService(
+            CreateGraphProfileStore(),
+            graphSessionFactory: new HttpGraphSessionFactory(handler, new OAuthCredential {
+                UserName = "ada@example.com",
+                AccessToken = CreateJwt("{\"scp\":\"Mail.ReadWrite.Shared Mail.Send.Shared\",\"preferred_username\":\"ada@example.com\"}"),
+                ExpiresOn = DateTimeOffset.MaxValue
+            }));
+
+        var result = await service.TestAsync("graph-work", MailProfileConnectionTestScope.Send);
+
+        Assert.True(result.Succeeded);
+        var evidence = result.Stages[result.Stages.Count - 1].Evidence;
+        Assert.True(evidence?.Preflight?.Ready);
+        Assert.Equal("ada@example.com", evidence?.Permissions?.DelegatedIdentity);
+    }
+
+    [Fact]
     public async Task DefaultGraphSendPreflightAcceptsApplicationRolePairForSelectedMailbox() {
         var handler = new RecordingHandler(
             JsonResponse("{\"value\":[]}"),

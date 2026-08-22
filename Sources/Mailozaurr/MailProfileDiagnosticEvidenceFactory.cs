@@ -131,8 +131,8 @@ internal static class MailProfileDiagnosticEvidenceFactory {
                 ready = false;
             } else if (applicationReady || (delegatedDirectPair && targetIsSignedInMailbox == true)) {
                 ready = true;
-            } else if (delegatedSharedPair && targetIsSignedInMailbox != true) {
-                ready = null;
+            } else if (delegatedSharedPair) {
+                ready = targetIsSignedInMailbox == true ? true : null;
             } else if (graphPermissionsKnown && (!delegatedDirectPair || targetIsSignedInMailbox.HasValue)) {
                 ready = false;
             }
