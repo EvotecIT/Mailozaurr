@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
+using System.Text.Json;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -20,6 +21,7 @@ public class GraphApiClientMailboxTests {
 
         Assert.Equal(expected, actual);
         Assert.Single(handler.Requests);
+        Assert.Contains("IdType=\"ImmutableId\"", handler.Requests[0].Headers.GetValues("Prefer"));
     }
 
     [Fact]
@@ -38,6 +40,7 @@ public class GraphApiClientMailboxTests {
         Assert.Single(handler.Requests);
         Assert.True(handler.Requests[0].Headers.Contains("ConsistencyLevel"));
         Assert.True(handler.Requests[0].Headers.Contains("Prefer"));
+        Assert.Contains("IdType=\"ImmutableId\"", handler.Requests[0].Headers.GetValues("Prefer"));
         Assert.Contains("/me/mailFolders/inbox/messages?", handler.Requests[0].RequestUri!.ToString());
     }
 
@@ -94,6 +97,25 @@ public class GraphApiClientMailboxTests {
         var body = await handler.Requests[0].Content!.ReadAsStringAsync();
         Assert.Contains("\"url\":\"me/messages/123\"", body);
         Assert.Contains("\"method\":\"DELETE\"", body);
+        using var document = JsonDocument.Parse(body);
+        Assert.Equal(
+            "IdType=\"ImmutableId\"",
+            document.RootElement.GetProperty("requests")[0].GetProperty("headers").GetProperty("Prefer").GetString());
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task MoveMessageAsync_RequestsImmutableResponseIdentity() {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.Created) {
+            Content = new StringContent("{\"id\":\"immutable-id\"}")
+        });
+        var api = new GraphApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = DateTimeOffset.MaxValue });
+        var field = typeof(GraphApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(api, new HttpClient(handler) { BaseAddress = new Uri("https://graph.microsoft.com/v1.0/") });
+
+        await api.MoveMessageAsync("m1", "archive");
+
+        Assert.Single(handler.Requests);
+        Assert.Contains("IdType=\"ImmutableId\"", handler.Requests[0].Headers.GetValues("Prefer"));
     }
 
     [Fact]

@@ -524,7 +524,7 @@ public sealed partial class GraphApiClient {
                 Id = id,
                 Method = r.Method.ToString(),
                 Url = url.TrimStart('/'),
-                Headers = r.Headers,
+                Headers = AddImmutableIdPreference(r.Headers),
                 Body = r.Body
             });
         }
@@ -573,6 +573,18 @@ public sealed partial class GraphApiClient {
         }
 
         return results;
+    }
+
+    private static IDictionary<string, string> AddImmutableIdPreference(IDictionary<string, string>? headers) {
+        var output = headers == null
+            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase);
+        if (!output.TryGetValue("Prefer", out var existing) || string.IsNullOrWhiteSpace(existing)) {
+            output["Prefer"] = ImmutableIdPreference;
+        } else if (existing.IndexOf(ImmutableIdPreference, StringComparison.OrdinalIgnoreCase) < 0) {
+            output["Prefer"] = existing.Trim() + ", " + ImmutableIdPreference;
+        }
+        return output;
     }
 
     private static List<string> NormalizeBulkIds(IEnumerable<string> ids) {

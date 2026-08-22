@@ -81,6 +81,29 @@ public sealed class MailEmlExportServiceTests {
     }
 
     [Fact]
+    public async Task Pop3HashResolutionScansMailboxOnlyOncePerBatchSession() {
+        var first = new MimeMessage { Subject = "First", Body = new TextPart("plain") { Text = "one" } };
+        var second = new MimeMessage { Subject = "Second", Body = new TextPart("plain") { Text = "two" } };
+        var client = new BoundedPop3Client(new[] { first, second }, oversizedIndex: -1);
+        var source = new Pop3RawMailMessageSource(new FixedPop3SessionFactory(client));
+        using var session = await source.OpenSessionAsync(
+            new MailProfile { Id = "pop", Kind = MailProfileKind.Pop3 });
+
+        var missingFirst = await session.GetRawMessageAsync(new RawMailMessageRequest {
+            MessageId = "hash:missing-first:0",
+            MaxBytes = 2048
+        });
+        var missingSecond = await session.GetRawMessageAsync(new RawMailMessageRequest {
+            MessageId = "hash:missing-second:0",
+            MaxBytes = 2048
+        });
+
+        Assert.Null(missingFirst);
+        Assert.Null(missingSecond);
+        Assert.Equal(new[] { 1, 0 }, client.Downloads);
+    }
+
+    [Fact]
     public async Task ProviderWriterClaimsOrReplacesDestinationAtomically() {
         var directory = CreateTemporaryDirectory();
         try {

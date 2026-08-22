@@ -21,6 +21,8 @@ public sealed class Pop3RawMailMessageSource : IRawMailMessageSource {
 
     private sealed class Session : IRawMailMessageSession {
         private readonly MailKit.Net.Pop3.Pop3Client _client;
+        private readonly Dictionary<long, Dictionary<string, List<int>>> _fingerprintIndexes = new();
+        private IList<string>? _uids;
 
         internal Session(MailKit.Net.Pop3.Pop3Client client) => _client = client;
 
@@ -30,7 +32,7 @@ public sealed class Pop3RawMailMessageSource : IRawMailMessageSource {
             _ = Pop3MailReadHandler.NormalizeFolderId(request.FolderId);
             var identifier = Pop3MailReadHandler.ParseMessageId(request.MessageId);
             if (!string.IsNullOrWhiteSpace(identifier.Uid)) {
-                var uids = await _client.GetMessageUidsAsync(cancellationToken).ConfigureAwait(false);
+                var uids = _uids ??= await _client.GetMessageUidsAsync(cancellationToken).ConfigureAwait(false);
                 var index = -1;
                 for (var candidate = 0; candidate < uids.Count; candidate++) {
                     if (string.Equals(uids[candidate], identifier.Uid, StringComparison.Ordinal)) {
@@ -43,29 +45,71 @@ public sealed class Pop3RawMailMessageSource : IRawMailMessageSource {
                     : await ReadAtIndexAsync(_client, request, index, cancellationToken).ConfigureAwait(false);
             }
 
-            var occurrence = 0;
-            for (var index = _client.Count - 1; index >= 0; index--) {
-                cancellationToken.ThrowIfCancellationRequested();
-                var announcedSize = _client.GetMessageSize(index, cancellationToken);
-                if (announcedSize > request.MaxBytes) {
-                    continue;
+            if (!_fingerprintIndexes.TryGetValue(request.MaxBytes, out var fingerprintIndex)) {
+                var indexedMatch = await BuildFingerprintIndexAsync(
+                        request.MaxBytes,
+                        identifier.Fingerprint!,
+                        identifier.Occurrence,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                if (indexedMatch != null) {
+                    indexedMatch.MessageId = request.MessageId;
+                    return indexedMatch;
                 }
-                var candidate = await ReadAtIndexAsync(_client, request, index, cancellationToken).ConfigureAwait(false);
-                using var stream = new MemoryStream(candidate.Content, writable: false);
-                var message = MimeKit.MimeMessage.Load(stream, cancellationToken);
-                if (!string.Equals(
-                        Pop3MailReadHandler.ComputeMessageFingerprint(message),
-                        identifier.Fingerprint,
-                        StringComparison.Ordinal)) {
-                    continue;
-                }
-                if (occurrence++ == identifier.Occurrence) return candidate;
+                fingerprintIndex = _fingerprintIndexes[request.MaxBytes];
+            }
+            if (!fingerprintIndex.TryGetValue(identifier.Fingerprint!, out var matchingIndexes) ||
+                identifier.Occurrence >= matchingIndexes.Count) {
+                return null;
             }
 
-            return null;
+            return await ReadAtIndexAsync(
+                    _client,
+                    request,
+                    matchingIndexes[identifier.Occurrence],
+                    cancellationToken)
+                .ConfigureAwait(false);
         }
 
         public void Dispose() => _client.Dispose();
+
+        private async Task<RawMailMessage?> BuildFingerprintIndexAsync(
+            long maxBytes,
+            string requestedFingerprint,
+            int requestedOccurrence,
+            CancellationToken cancellationToken) {
+            var indexByFingerprint = new Dictionary<string, List<int>>(StringComparer.Ordinal);
+            RawMailMessage? requestedMessage = null;
+            for (var index = _client.Count - 1; index >= 0; index--) {
+                cancellationToken.ThrowIfCancellationRequested();
+                var announcedSize = _client.GetMessageSize(index, cancellationToken);
+                if (announcedSize > maxBytes) {
+                    continue;
+                }
+                var candidate = await ReadAtIndexAsync(
+                        _client,
+                        new RawMailMessageRequest { MessageId = string.Empty, MaxBytes = maxBytes },
+                        index,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                using var stream = new MemoryStream(candidate.Content, writable: false);
+                var message = MimeKit.MimeMessage.Load(stream, cancellationToken);
+                var fingerprint = Pop3MailReadHandler.ComputeMessageFingerprint(message);
+                if (!indexByFingerprint.TryGetValue(fingerprint, out var indexes)) {
+                    indexes = new List<int>();
+                    indexByFingerprint.Add(fingerprint, indexes);
+                }
+                if (requestedMessage == null &&
+                    string.Equals(fingerprint, requestedFingerprint, StringComparison.Ordinal) &&
+                    indexes.Count == requestedOccurrence) {
+                    requestedMessage = candidate;
+                }
+                indexes.Add(index);
+            }
+
+            _fingerprintIndexes.Add(maxBytes, indexByFingerprint);
+            return requestedMessage;
+        }
 
         private static async Task<RawMailMessage> ReadAtIndexAsync(
             MailKit.Net.Pop3.Pop3Client client,
