@@ -17,10 +17,19 @@ internal static class MimeAttachmentStorage {
     public static string ResolveDestinationPath(string requestedPath, MimeEntity attachment) =>
         ResolveDestinationPath(requestedPath, GetAttachmentFileName(attachment));
 
-    public static string ResolveDestinationPath(string requestedPath, string remoteFileName) {
+    public static string ResolveDestinationPath(
+        string requestedPath,
+        MimeEntity attachment,
+        string storageIdentity) =>
+        ResolveDestinationPath(requestedPath, GetAttachmentFileName(attachment), storageIdentity);
+
+    public static string ResolveDestinationPath(
+        string requestedPath,
+        string remoteFileName,
+        string? attachmentIdentity = null) {
         var destinationPath = Path.GetFullPath(requestedPath);
         if (Directory.Exists(destinationPath)) {
-            var fileName = GetSafeAttachmentFileName(remoteFileName);
+            var fileName = GetSafeAttachmentFileName(remoteFileName, attachmentIdentity);
             var resolvedPath = Path.GetFullPath(Path.Combine(destinationPath, fileName));
             var directoryPrefix = destinationPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                 + Path.DirectorySeparatorChar;
@@ -41,13 +50,28 @@ internal static class MimeAttachmentStorage {
         return destinationPath;
     }
 
+    public static string CreateStorageIdentity(params string?[] components) {
+        if (components == null) {
+            throw new ArgumentNullException(nameof(components));
+        }
+
+        var builder = new StringBuilder();
+        foreach (var component in components) {
+            var value = component ?? string.Empty;
+            builder.Append(value.Length.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            builder.Append(':');
+            builder.Append(value);
+        }
+        return builder.ToString();
+    }
+
     public static string GetAttachmentFileName(MimeEntity attachment) => attachment switch {
         MimePart part => part.FileName ?? Path.GetRandomFileName(),
         MessagePart messagePart => messagePart.ContentDisposition?.FileName ?? messagePart.ContentType?.Name ?? Path.GetRandomFileName(),
         _ => Path.GetRandomFileName()
     };
 
-    private static string GetSafeAttachmentFileName(string remoteFileName) {
+    private static string GetSafeAttachmentFileName(string remoteFileName, string? attachmentIdentity) {
         var sourceFileName = remoteFileName ?? string.Empty;
         var raw = sourceFileName.Replace('\\', '/');
         var separatorIndex = raw.LastIndexOf('/');
@@ -75,7 +99,7 @@ internal static class MimeAttachmentStorage {
             sanitized = "_" + sanitized;
         }
 
-        return AppendSourceNameHash(sanitized, sourceFileName);
+        return AppendSourceNameHash(sanitized, sourceFileName, attachmentIdentity);
     }
 
     private static bool IsPortableInvalidFileNameCharacter(char character) => character switch {
@@ -104,9 +128,15 @@ internal static class MimeAttachmentStorage {
                 || prefix.Equals("LPT", StringComparison.OrdinalIgnoreCase));
     }
 
-    private static string AppendSourceNameHash(string sanitizedFileName, string sourceFileName) {
+    private static string AppendSourceNameHash(
+        string sanitizedFileName,
+        string sourceFileName,
+        string? attachmentIdentity) {
         using var sha256 = SHA256.Create();
-        var hash = sha256.ComputeHash(Encoding.Unicode.GetBytes(sourceFileName));
+        var identityInput = string.IsNullOrWhiteSpace(attachmentIdentity)
+            ? sourceFileName
+            : sourceFileName + "\0" + attachmentIdentity;
+        var hash = sha256.ComputeHash(Encoding.Unicode.GetBytes(identityInput));
         var hashText = BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
         var extension = TruncateUtf8(Path.GetExtension(sanitizedFileName), 32);
         var stem = TruncateUtf8(Path.GetFileNameWithoutExtension(sanitizedFileName), 96);

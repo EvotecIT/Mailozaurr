@@ -146,20 +146,48 @@ public static partial class MailboxSearcher {
         var results = new List<Pop3EmailMessage>();
         var sinceUtc = NormalizeToUtc(since);
         var beforeUtc = NormalizeToUtc(before);
+        var requiresFullMessageForFiltering =
+            !string.IsNullOrWhiteSpace(bodyContains) ||
+            priority.HasValue ||
+            hasAttachment ||
+            messageContainsTerms.Count > 0;
+        var useHeaderPrefilter = !requiresFullMessageForFiltering &&
+            (!string.IsNullOrWhiteSpace(subject) ||
+             !string.IsNullOrWhiteSpace(fromContains) ||
+             !string.IsNullOrWhiteSpace(toContains) ||
+             sinceUtc.HasValue ||
+             beforeUtc.HasValue);
         for (int i = 0; i < client.Count; i++) {
+            if (useHeaderPrefilter) {
+                var headers = await client.GetMessageHeadersAsync(i, cancellationToken).ConfigureAwait(false);
+                if (!Pop3HeadersMatch(
+                    headers,
+                    subject,
+                    fromContains,
+                    toContains,
+                    sinceUtc,
+                    beforeUtc)) {
+                    continue;
+                }
+            }
+
             var message = await client.GetMessageAsync(i, cancellationToken).ConfigureAwait(false);
-            if (!string.IsNullOrWhiteSpace(subject) && (message.Subject == null || message.Subject.IndexOf(subject, StringComparison.OrdinalIgnoreCase) < 0)) continue;
-            if (!string.IsNullOrWhiteSpace(fromContains) && !AddressMatches(message.From, fromContains!)) continue;
-            if (!string.IsNullOrWhiteSpace(toContains) && !AddressMatches(message.To, toContains!)) continue;
+            if (requiresFullMessageForFiltering) {
+                if (!string.IsNullOrWhiteSpace(subject) && (message.Subject == null || message.Subject.IndexOf(subject, StringComparison.OrdinalIgnoreCase) < 0)) continue;
+                if (!string.IsNullOrWhiteSpace(fromContains) && !AddressMatches(message.From, fromContains!)) continue;
+                if (!string.IsNullOrWhiteSpace(toContains) && !AddressMatches(message.To, toContains!)) continue;
+            }
             if (!string.IsNullOrWhiteSpace(bodyContains)) {
                 var textBody = message.TextBody ?? string.Empty;
                 var htmlBody = message.HtmlBody ?? string.Empty;
                 if (textBody.IndexOf(bodyContains, StringComparison.OrdinalIgnoreCase) < 0 &&
                     htmlBody.IndexOf(bodyContains, StringComparison.OrdinalIgnoreCase) < 0) continue;
             }
-            var msgDate = message.Date.UtcDateTime;
-            if (sinceUtc.HasValue && msgDate < sinceUtc.Value) continue;
-            if (beforeUtc.HasValue && msgDate > beforeUtc.Value) continue;
+            if (requiresFullMessageForFiltering) {
+                var msgDate = message.Date.UtcDateTime;
+                if (sinceUtc.HasValue && msgDate < sinceUtc.Value) continue;
+                if (beforeUtc.HasValue && msgDate > beforeUtc.Value) continue;
+            }
             if (priority.HasValue && message.Priority != ConvertPriority(priority.Value)) continue;
             if (hasAttachment && !message.Attachments.Any()) continue;
             if (messageContainsTerms.Any(term => !MessageContains(message, term))) continue;
@@ -167,6 +195,31 @@ public static partial class MailboxSearcher {
             if (maxResults > 0 && results.Count >= maxResults) break;
         }
         return results;
+    }
+
+    private static bool Pop3HeadersMatch(
+        HeaderList headers,
+        string? subject,
+        string? fromContains,
+        string? toContains,
+        DateTime? sinceUtc,
+        DateTime? beforeUtc) {
+        var message = new MimeMessage(headers);
+        if ((!string.IsNullOrWhiteSpace(subject) &&
+             (message.Subject == null || message.Subject.IndexOf(subject, StringComparison.OrdinalIgnoreCase) < 0)) ||
+            (!string.IsNullOrWhiteSpace(fromContains) && !AddressMatches(message.From, fromContains!)) ||
+            (!string.IsNullOrWhiteSpace(toContains) && !AddressMatches(message.To, toContains!))) {
+            return false;
+        }
+
+        var messageDate = message.Date.UtcDateTime;
+        if (sinceUtc.HasValue && messageDate < sinceUtc.Value) {
+            return false;
+        }
+        if (beforeUtc.HasValue && messageDate > beforeUtc.Value) {
+            return false;
+        }
+        return true;
     }
 
     private static bool MessageContains(MimeMessage message, string text) {

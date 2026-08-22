@@ -183,7 +183,16 @@ public sealed class GmailMailReadHandler : IMailReadHandler {
         }
 
         var fileName = string.IsNullOrWhiteSpace(resolved.FileName) ? resolved.Id!.Trim() : resolved.FileName!.Trim();
-        var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(request.DestinationPath, fileName);
+        var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(
+            request.DestinationPath,
+            fileName,
+            MimeAttachmentStorage.CreateStorageIdentity(
+                profile.Id,
+                profile.Kind.ToString(),
+                session.UserId,
+                request.FolderId,
+                request.MessageId,
+                request.AttachmentId));
         if (File.Exists(destinationPath) && !request.Overwrite) {
             return OperationResult.Failure("destination_exists", $"Destination '{destinationPath}' already exists.");
         }

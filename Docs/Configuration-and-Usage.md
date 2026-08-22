@@ -247,7 +247,7 @@ mailozaurr mail folders --profile archive-pop3 --json
 mailozaurr mail search --profile archive-pop3 --query Invoice --json
 ```
 
-Normalized POP3 operations expose one virtual `INBOX`. Message ids prefer the server UIDL as `uid:<value>` and fall back to a content-verified `hash:<value>` when UIDL is unavailable. The hash path safely re-identifies the message across sessions instead of reusing a session-local POP3 index. Use the returned id unchanged with `mail get` and attachment commands.
+Normalized POP3 operations expose one virtual `INBOX`. Message ids prefer the server UIDL as `uid:<value>` and fall back to `hash:<sha256>:<occurrence>` when UIDL is unavailable. The fallback verifies message content and disambiguates byte-identical entries by their oldest-first occurrence while those entries coexist; only UIDL provides a server-owned persistent identity across mailbox mutations. Use the returned id unchanged with `mail get` and attachment commands.
 
 ### Generic SMTP profile
 
@@ -314,7 +314,7 @@ mailozaurr mail attachments --profile work-imap --folder Inbox --message-id 123 
 mailozaurr mail save-attachments --profile work-imap --folder Inbox --message-id 123 --path C:\Temp\Attachments --json
 ```
 
-When `--path` names a directory, saved files keep a readable prefix and add a deterministic SHA-256 identity suffix from the exact provider filename. This prevents distinct remote names from overwriting one another after path removal, character replacement, or case folding. An explicit file path is used unchanged.
+When `--path` names a directory, saved files keep a readable prefix and add a deterministic SHA-256 identity suffix from the exact provider filename plus the profile, mailbox, folder, message, and provider/per-part identity. This prevents distinct remote names, repeated same-name parts, and cross-message batch saves from overwriting one another after path removal, character replacement, or case folding. An explicit file path is used unchanged.
 
 ### Save drafts and queue sends
 

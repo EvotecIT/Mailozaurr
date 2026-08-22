@@ -115,9 +115,16 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
             queryString: request.QueryText).ConfigureAwait(false);
 
         var results = new List<MessageSummary>(messages.Count);
+        var fingerprintOccurrences = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var message in messages) {
             var uid = await TryGetUidAsync(client, message.Index, cancellationToken).ConfigureAwait(false);
-            results.Add(MapSummary(profile.Id, uid, message.Message));
+            var occurrence = 0;
+            if (string.IsNullOrWhiteSpace(uid)) {
+                var fingerprint = ComputeMessageFingerprint(message.Message);
+                _ = fingerprintOccurrences.TryGetValue(fingerprint, out occurrence);
+                fingerprintOccurrences[fingerprint] = occurrence + 1;
+            }
+            results.Add(MapSummary(profile.Id, uid, message.Message, occurrence));
         }
         return results;
     }
@@ -137,7 +144,7 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
             throw new InvalidOperationException($"POP3 message '{request.MessageId}' could not be resolved ({resolved.Status}).");
         }
 
-        return MapDetail(profile.Id, resolved.Snapshot, request.IncludeRawContent);
+        return MapDetail(profile.Id, resolved.Snapshot, request.IncludeRawContent, identifier.Occurrence);
     }
 
     private static async Task<OperationResult> DefaultSaveAttachmentAsync(
@@ -158,7 +165,15 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
             return OperationResult.Failure("attachment_not_found", $"Attachment '{request.AttachmentId}' was not found.");
         }
 
-        var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(request.DestinationPath, attachment);
+        var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(
+            request.DestinationPath,
+            attachment,
+            MimeAttachmentStorage.CreateStorageIdentity(
+                profile.Id,
+                profile.Kind.ToString(),
+                request.FolderId,
+                request.MessageId,
+                request.AttachmentId));
         if (File.Exists(destinationPath) && !request.Overwrite) {
             return OperationResult.Failure("destination_exists", $"Destination '{destinationPath}' already exists.");
         }
@@ -167,12 +182,16 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
         return OperationResult.Success($"Attachment saved to '{destinationPath}'.");
     }
 
-    internal static string FormatMessageId(string? uid, MimeMessage message) =>
-        string.IsNullOrWhiteSpace(uid)
-            ? $"hash:{ComputeMessageFingerprint(message)}"
+    internal static string FormatMessageId(string? uid, MimeMessage message, int occurrence = 0) {
+        if (occurrence < 0) {
+            throw new ArgumentOutOfRangeException(nameof(occurrence));
+        }
+        return string.IsNullOrWhiteSpace(uid)
+            ? $"hash:{ComputeMessageFingerprint(message)}:{occurrence.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
             : $"uid:{uid}";
+    }
 
-    internal static (string? Uid, string? Fingerprint) ParseMessageId(string value) {
+    internal static (string? Uid, string? Fingerprint, int Occurrence) ParseMessageId(string value) {
         if (string.IsNullOrWhiteSpace(value)) {
             throw new InvalidOperationException("A POP3 message id is required.");
         }
@@ -183,14 +202,27 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
             if (string.IsNullOrWhiteSpace(uid)) {
                 throw new InvalidOperationException("A POP3 UID value is required after 'uid:'.");
             }
-            return (uid, null);
+            return (uid, null, 0);
         }
         if (normalized.StartsWith("hash:", StringComparison.OrdinalIgnoreCase)) {
-            var fingerprint = normalized.Substring(5);
+            var fingerprintWithOccurrence = normalized.Substring(5);
+            var separatorIndex = fingerprintWithOccurrence.LastIndexOf(':');
+            var fingerprint = separatorIndex < 0
+                ? fingerprintWithOccurrence
+                : fingerprintWithOccurrence.Substring(0, separatorIndex);
             if (string.IsNullOrWhiteSpace(fingerprint)) {
                 throw new InvalidOperationException("A POP3 content fingerprint is required after 'hash:'.");
             }
-            return (null, fingerprint);
+            var occurrence = 0;
+            if (separatorIndex >= 0 &&
+                (!int.TryParse(
+                    fingerprintWithOccurrence.Substring(separatorIndex + 1),
+                    System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out occurrence) || occurrence < 0)) {
+                throw new InvalidOperationException("A POP3 hash occurrence must be a non-negative integer.");
+            }
+            return (null, fingerprint, occurrence);
         }
         if (normalized.StartsWith("index:", StringComparison.OrdinalIgnoreCase) ||
             int.TryParse(normalized, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out _)) {
@@ -198,12 +230,16 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
                 "Session-local POP3 index ids are not reusable. Use the uid: or hash: id returned by search.");
         }
 
-        return (normalized, null);
+        return (normalized, null, 0);
     }
 
-    internal static MessageSummary MapSummary(string profileId, string? uid, MimeMessage message) => new() {
+    internal static MessageSummary MapSummary(
+        string profileId,
+        string? uid,
+        MimeMessage message,
+        int occurrence = 0) => new() {
         ProfileId = profileId,
-        Id = FormatMessageId(uid, message),
+        Id = FormatMessageId(uid, message, occurrence),
         FolderId = Inbox,
         Subject = message.Subject,
         Preview = CreatePreview(message.TextBody),
@@ -223,12 +259,13 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
     private static MessageDetail MapDetail(
         string profileId,
         Pop3MailboxBrowser.Pop3ResolvedMessageSnapshot snapshot,
-        bool includeRawContent) {
-        var id = FormatMessageId(snapshot.Uid, snapshot.Message);
+        bool includeRawContent,
+        int occurrence) {
+        var id = FormatMessageId(snapshot.Uid, snapshot.Message, occurrence);
         var detail = new MessageDetail {
             ProfileId = profileId,
             Id = id,
-            Summary = MapSummary(profileId, snapshot.Uid, snapshot.Message),
+            Summary = MapSummary(profileId, snapshot.Uid, snapshot.Message, occurrence),
             TextBody = snapshot.Message.TextBody,
             HtmlBody = snapshot.Message.HtmlBody,
             Attachments = snapshot.Message.Attachments.Select((attachment, index) => new AttachmentSummary {
@@ -266,7 +303,7 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
 
     private static async Task<Pop3MailboxBrowser.Pop3MessageResolveResult> ResolveMessageAsync(
         Pop3Client client,
-        (string? Uid, string? Fingerprint) identifier,
+        (string? Uid, string? Fingerprint, int Occurrence) identifier,
         CancellationToken cancellationToken) {
         if (string.IsNullOrWhiteSpace(identifier.Fingerprint)) {
             return await Pop3MailboxBrowser.ResolveMessageAsync(
@@ -276,7 +313,8 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
                 cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
-        for (var index = client.Count - 1; index >= 0; index--) {
+        var occurrence = 0;
+        for (var index = 0; index < client.Count; index++) {
             cancellationToken.ThrowIfCancellationRequested();
             var candidate = await Pop3MailboxBrowser.ResolveMessageAsync(
                 client,
@@ -285,11 +323,15 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
                 cancellationToken: cancellationToken).ConfigureAwait(false);
             if (candidate.Status == Pop3MailboxBrowser.Pop3MessageResolveStatus.Success &&
                 candidate.Snapshot != null &&
+                string.IsNullOrWhiteSpace(candidate.Snapshot.Uid) &&
                 string.Equals(
                     ComputeMessageFingerprint(candidate.Snapshot.Message),
                     identifier.Fingerprint,
                     StringComparison.Ordinal)) {
-                return candidate;
+                if (occurrence == identifier.Occurrence) {
+                    return candidate;
+                }
+                occurrence++;
             }
         }
 

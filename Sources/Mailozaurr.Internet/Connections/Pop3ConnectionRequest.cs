@@ -17,6 +17,24 @@ public sealed class Pop3ConnectionRequest {
         int retryCount = 3,
         int retryDelayMilliseconds = 500,
         double retryDelayBackoff = 2.0) {
+        if (string.IsNullOrWhiteSpace(server)) {
+            throw new ArgumentException("Server cannot be null or whitespace.", nameof(server));
+        }
+        if (port <= 0 || port > 65535) {
+            throw new ArgumentOutOfRangeException(nameof(port), "Port must be between 1 and 65535.");
+        }
+        if (timeout < 0) {
+            throw new ArgumentOutOfRangeException(nameof(timeout), "Timeout must be >= 0.");
+        }
+        if (retryCount < 0) {
+            throw new ArgumentOutOfRangeException(nameof(retryCount), "Retry count must be >= 0.");
+        }
+        if (retryDelayMilliseconds < 0) {
+            throw new ArgumentOutOfRangeException(nameof(retryDelayMilliseconds), "Retry delay must be >= 0.");
+        }
+        if (retryDelayBackoff <= 0 || double.IsNaN(retryDelayBackoff) || double.IsInfinity(retryDelayBackoff)) {
+            throw new ArgumentOutOfRangeException(nameof(retryDelayBackoff), "Retry backoff must be a finite value > 0.");
+        }
         Server = server;
         Port = port;
         Options = options;

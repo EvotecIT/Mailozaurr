@@ -202,7 +202,15 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
             return OperationResult.Failure("attachment_not_found", $"Attachment '{request.AttachmentId}' was not found.");
         }
 
-        var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(request.DestinationPath, attachment);
+        var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(
+            request.DestinationPath,
+            attachment,
+            MimeAttachmentStorage.CreateStorageIdentity(
+                profile.Id,
+                profile.Kind.ToString(),
+                folder,
+                request.MessageId,
+                request.AttachmentId));
         if (File.Exists(destinationPath) && !request.Overwrite) {
             return OperationResult.Failure("destination_exists", $"Destination '{destinationPath}' already exists.");
         }

@@ -1,4 +1,5 @@
 using MailKit.Net.Pop3;
+using MailKit;
 using Mailozaurr;
 using MimeKit;
 using System.Text;
@@ -39,13 +40,67 @@ public sealed class ApplicationPop3MailReadHandlerTests {
         Assert.Equal("uid:stable-id", Pop3MailReadHandler.FormatMessageId("stable-id", message));
         var fallback = Pop3MailReadHandler.FormatMessageId(null, message);
         Assert.StartsWith("hash:", fallback, StringComparison.Ordinal);
-        Assert.Equal(("stable-id", null), Pop3MailReadHandler.ParseMessageId("uid:stable-id"));
-        Assert.Equal((null, fallback.Substring(5)), Pop3MailReadHandler.ParseMessageId(fallback));
+        Assert.EndsWith(":0", fallback, StringComparison.Ordinal);
+        Assert.Equal(("stable-id", null, 0), Pop3MailReadHandler.ParseMessageId("uid:stable-id"));
+        var parsedFallback = Pop3MailReadHandler.ParseMessageId(fallback);
+        Assert.Null(parsedFallback.Uid);
+        Assert.Equal(0, parsedFallback.Occurrence);
+        Assert.Equal(fallback.Substring(5, fallback.Length - 7), parsedFallback.Fingerprint);
+        Assert.Equal(parsedFallback.Fingerprint, Pop3MailReadHandler.ParseMessageId("hash:" + parsedFallback.Fingerprint).Fingerprint);
         Assert.Throws<InvalidOperationException>(() => Pop3MailReadHandler.ParseMessageId("index:4"));
         Assert.Throws<InvalidOperationException>(() => Pop3MailReadHandler.ParseMessageId("4"));
+        Assert.Throws<InvalidOperationException>(() => Pop3MailReadHandler.ParseMessageId("hash:value:not-a-number"));
 
         message.Subject = "Changed content";
         Assert.NotEqual(fallback, Pop3MailReadHandler.FormatMessageId(null, message));
+    }
+
+    [Fact]
+    public void HashFallbackIdsDisambiguateByteIdenticalMailboxEntries() {
+        var message = new MimeMessage { Subject = "Duplicate" };
+        message.Body = new TextPart("plain") { Text = "Same bytes" };
+
+        var first = Pop3MailReadHandler.FormatMessageId(null, message, occurrence: 0);
+        var second = Pop3MailReadHandler.FormatMessageId(null, message, occurrence: 1);
+
+        Assert.NotEqual(first, second);
+        var firstId = Pop3MailReadHandler.ParseMessageId(first);
+        var secondId = Pop3MailReadHandler.ParseMessageId(second);
+        Assert.Equal(firstId.Fingerprint, secondId.Fingerprint);
+        Assert.Equal(0, firstId.Occurrence);
+        Assert.Equal(1, secondId.Occurrence);
+    }
+
+    [Fact]
+    public async Task HashFallbackIdsResolveTheIntendedDuplicateOccurrence() {
+        var duplicate = new MimeMessage { Subject = "Duplicate" };
+        duplicate.Body = new TextPart("plain") { Text = "Same bytes" };
+        var downloads = new List<int>();
+        var handler = new Pop3MailReadHandler(
+            new DuplicateMessagePop3SessionFactory(new[] { duplicate, duplicate }, downloads));
+
+        var results = await handler.SearchAsync(CreateProfile(), new MailSearchRequest {
+            ProfileId = "work-pop3"
+        });
+
+        Assert.Equal(2, results.Count);
+        Assert.NotEqual(results[0].Id, results[1].Id);
+
+        downloads.Clear();
+        var first = await handler.GetMessageAsync(CreateProfile(), new GetMessageRequest {
+            ProfileId = "work-pop3",
+            MessageId = results[0].Id
+        });
+        Assert.NotNull(first);
+        Assert.Equal(new[] { 0 }, downloads);
+
+        downloads.Clear();
+        var second = await handler.GetMessageAsync(CreateProfile(), new GetMessageRequest {
+            ProfileId = "work-pop3",
+            MessageId = results[1].Id
+        });
+        Assert.NotNull(second);
+        Assert.Equal(new[] { 0, 1 }, downloads);
     }
 
     [Fact]
@@ -99,6 +154,46 @@ public sealed class ApplicationPop3MailReadHandlerTests {
             Assert.StartsWith("report_a~", Path.GetFileName(question), StringComparison.Ordinal);
             Assert.EndsWith(".txt", colon, StringComparison.Ordinal);
             Assert.EndsWith(".txt", question, StringComparison.Ordinal);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void RepeatedAttachmentNamesUsePerPartIdentity() {
+        var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var first = MimeAttachmentStorage.ResolveDestinationPath(directory, "report.txt", "0");
+            var second = MimeAttachmentStorage.ResolveDestinationPath(directory, "report.txt", "1");
+
+            Assert.NotEqual(first, second);
+            Assert.Equal(first, MimeAttachmentStorage.ResolveDestinationPath(directory, "report.txt", "0"));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void BatchAttachmentNamesIncludeProfileFolderAndMessageIdentity() {
+        var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var firstIdentity = MimeAttachmentStorage.CreateStorageIdentity("profile-a", "Pop3", "INBOX", "message-a", "0");
+            var otherMessageIdentity = MimeAttachmentStorage.CreateStorageIdentity("profile-a", "Pop3", "INBOX", "message-b", "0");
+            var otherFolderIdentity = MimeAttachmentStorage.CreateStorageIdentity("profile-a", "Imap", "Archive", "message-a", "0");
+            var otherProfileIdentity = MimeAttachmentStorage.CreateStorageIdentity("profile-b", "Pop3", "INBOX", "message-a", "0");
+
+            var first = MimeAttachmentStorage.ResolveDestinationPath(directory, "report.txt", firstIdentity);
+            var paths = new[] {
+                first,
+                MimeAttachmentStorage.ResolveDestinationPath(directory, "report.txt", otherMessageIdentity),
+                MimeAttachmentStorage.ResolveDestinationPath(directory, "report.txt", otherFolderIdentity),
+                MimeAttachmentStorage.ResolveDestinationPath(directory, "report.txt", otherProfileIdentity)
+            };
+
+            Assert.Equal(4, paths.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.Equal(first, MimeAttachmentStorage.ResolveDestinationPath(directory, "report.txt", firstIdentity));
         } finally {
             Directory.Delete(directory, recursive: true);
         }
@@ -186,5 +281,43 @@ public sealed class ApplicationPop3MailReadHandlerTests {
     private sealed class FakePop3SessionFactory : IPop3SessionFactory {
         public Task<Pop3Client> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) =>
             Task.FromResult(new Pop3Client());
+    }
+
+    private sealed class DuplicateMessagePop3SessionFactory : IPop3SessionFactory {
+        private readonly IReadOnlyList<MimeMessage> _messages;
+        private readonly List<int> _downloads;
+
+        public DuplicateMessagePop3SessionFactory(IReadOnlyList<MimeMessage> messages, List<int> downloads) {
+            _messages = messages;
+            _downloads = downloads;
+        }
+
+        public Task<Pop3Client> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) =>
+            Task.FromResult<Pop3Client>(new DuplicateMessagePop3Client(_messages, _downloads));
+    }
+
+    private sealed class DuplicateMessagePop3Client : Pop3Client {
+        private readonly IReadOnlyList<MimeMessage> _messages;
+        private readonly List<int> _downloads;
+
+        public DuplicateMessagePop3Client(IReadOnlyList<MimeMessage> messages, List<int> downloads) {
+            _messages = messages;
+            _downloads = downloads;
+        }
+
+        public override bool IsConnected => true;
+        public override bool IsAuthenticated => true;
+        public override int Count => _messages.Count;
+
+        public override Task<MimeMessage> GetMessageAsync(
+            int index,
+            CancellationToken cancellationToken = default,
+            ITransferProgress? progress = null) {
+            _downloads.Add(index);
+            return Task.FromResult(_messages[index]);
+        }
+
+        public override Task<string> GetMessageUidAsync(int index, CancellationToken cancellationToken = default) =>
+            Task.FromException<string>(new NotSupportedException("UIDL is unavailable."));
     }
 }

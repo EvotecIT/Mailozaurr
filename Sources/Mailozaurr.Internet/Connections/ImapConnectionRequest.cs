@@ -46,8 +46,8 @@ public sealed class ImapConnectionRequest {
         if (retryDelayMilliseconds < 0) {
             throw new ArgumentOutOfRangeException(nameof(retryDelayMilliseconds), "Retry delay must be >= 0.");
         }
-        if (retryDelayBackoff <= 0) {
-            throw new ArgumentOutOfRangeException(nameof(retryDelayBackoff), "Retry backoff must be > 0.");
+        if (retryDelayBackoff <= 0 || double.IsNaN(retryDelayBackoff) || double.IsInfinity(retryDelayBackoff)) {
+            throw new ArgumentOutOfRangeException(nameof(retryDelayBackoff), "Retry backoff must be a finite value > 0.");
         }
 
         Server = server;
