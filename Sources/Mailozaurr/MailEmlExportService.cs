@@ -31,22 +31,11 @@ public sealed class MailEmlExportService : IMailEmlExportService {
             throw new ArgumentOutOfRangeException(nameof(request.MaxMessageBytes));
         }
 
-        if (request.MessageIds == null) throw new ArgumentException("At least one message id is required.", nameof(request));
-        var messageIds = request.MessageIds
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .Take(MaximumBatchMessageCount + 1)
-            .ToArray();
-        if (messageIds.Length == 0) throw new ArgumentException("At least one message id is required.", nameof(request));
-        if (messageIds.Length > MaximumBatchMessageCount) {
-            throw new ArgumentOutOfRangeException(
-                nameof(request.MessageIds),
-                $"A single EML export may contain at most {MaximumBatchMessageCount} distinct message ids.");
-        }
-
         var profile = await _profileStore.GetByIdAsync(request.ProfileId.Trim(), cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException($"Profile '{request.ProfileId}' was not found.");
+        if (request.MessageIds == null) throw new ArgumentException("At least one message id is required.", nameof(request));
+        var messageIds = CanonicalizeMessageIds(profile, request.MessageIds);
+        if (messageIds.Count == 0) throw new ArgumentException("At least one message id is required.", nameof(request));
         if (!_sources.TryGetValue(profile.Kind, out var source)) {
             throw new NotSupportedException($"Raw EML export is not configured for profile kind '{profile.Kind}'.");
         }
@@ -56,7 +45,7 @@ public sealed class MailEmlExportService : IMailEmlExportService {
         var result = new MailEmlExportResult {
             ProfileId = profile.Id,
             DestinationDirectory = destinationDirectory,
-            RequestedCount = messageIds.Length
+            RequestedCount = messageIds.Count
         };
 
         foreach (var messageId in messageIds) {
@@ -167,7 +156,28 @@ public sealed class MailEmlExportService : IMailEmlExportService {
     }
 
     private static string CanonicalizeMessageIdForStorage(MailProfile profile, string messageId) =>
-        profile.Kind == MailProfileKind.Imap
-            ? ImapMailReadHandler.CanonicalizeUidForStorage(messageId)
-            : messageId;
+        profile.Kind switch {
+            MailProfileKind.Imap => ImapMailReadHandler.CanonicalizeUidForStorage(messageId),
+            MailProfileKind.Pop3 => Pop3MailReadHandler.CanonicalizeMessageIdForStorage(messageId),
+            _ => messageId
+        };
+
+    private static IReadOnlyList<string> CanonicalizeMessageIds(
+        MailProfile profile,
+        IEnumerable<string> requestedMessageIds) {
+        var messageIds = new List<string>();
+        var identities = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var value in requestedMessageIds) {
+            if (string.IsNullOrWhiteSpace(value)) continue;
+            var messageId = CanonicalizeMessageIdForStorage(profile, value.Trim());
+            if (!identities.Add(messageId)) continue;
+            if (identities.Count > MaximumBatchMessageCount) {
+                throw new ArgumentOutOfRangeException(
+                    nameof(MailEmlExportRequest.MessageIds),
+                    $"A single EML export may contain at most {MaximumBatchMessageCount} distinct message ids.");
+            }
+            messageIds.Add(messageId);
+        }
+        return messageIds;
+    }
 }

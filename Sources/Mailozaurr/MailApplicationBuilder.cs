@@ -359,11 +359,12 @@ public sealed class MailApplicationBuilder {
         var draftExchangeService = _draftExchangeService ?? new JsonMailDraftExchangeService();
 
         var readService = _readService ?? new RoutedMailReadService(profileStore, readHandlers);
-        var rawMessageSources = new List<IRawMailMessageSource>();
-        if (_options.EnableImapReadHandler) rawMessageSources.Add(new ImapRawMailMessageSource(imapSessionFactory));
-        if (_options.EnablePop3ReadHandler) rawMessageSources.Add(new Pop3RawMailMessageSource(pop3SessionFactory));
-        if (_options.EnableGraphReadHandler) rawMessageSources.Add(new GraphRawMailMessageSource(graphSessionFactory));
-        if (_options.EnableGmailReadHandler) rawMessageSources.Add(new GmailRawMailMessageSource(gmailSessionFactory));
+        var rawMessageSources = new IRawMailMessageSource[] {
+            new ImapRawMailMessageSource(imapSessionFactory),
+            new Pop3RawMailMessageSource(pop3SessionFactory),
+            new GraphRawMailMessageSource(graphSessionFactory),
+            new GmailRawMailMessageSource(gmailSessionFactory)
+        };
         var emlExportService = _emlExportService ?? new MailEmlExportService(profileStore, rawMessageSources);
         var folderAliasService = _folderAliasService ?? new MailFolderAliasService(
             profileStore, readService, availableCapabilities);

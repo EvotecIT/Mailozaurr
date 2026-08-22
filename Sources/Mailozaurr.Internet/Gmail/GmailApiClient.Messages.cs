@@ -293,6 +293,12 @@ public sealed partial class GmailApiClient {
             HttpCompletionOption.ResponseHeadersRead,
             cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.NotFound) {
+            throw new GmailApiException(
+                response.StatusCode,
+                $"Gmail message '{id.Trim()}' was not found.",
+                string.Empty);
+        }
         response.EnsureSuccessStatusCode();
         if (response.Content.Headers.ContentLength is long contentLength && contentLength > maxResponseBytes) {
             throw new InvalidDataException($"Gmail raw response exceeds the bounded response size for {maxDecodedBytes} MIME bytes.");

@@ -57,12 +57,12 @@ public sealed class MailEmlExportServiceTests {
     }
 
     [Fact]
-    public async Task Pop3HashExportSkipsUnrelatedOversizedNewerMessage() {
+    public async Task Pop3HashExportSkipsOversizedNewerMessageWithMatchingHeaders() {
         var requested = new MimeMessage { Subject = "Requested" };
-        requested.Headers.Add("X-Identity", "requested");
+        requested.Headers.Add("X-Identity", "shared");
         requested.Body = new TextPart("plain") { Text = "small" };
-        var unrelated = new MimeMessage { Subject = "Unrelated" };
-        unrelated.Headers.Add("X-Identity", "unrelated");
+        var unrelated = new MimeMessage { Subject = "Requested" };
+        unrelated.Headers.Add("X-Identity", "shared");
         unrelated.Body = new TextPart("plain") { Text = new string('x', 4096) };
         var client = new BoundedPop3Client(new[] { requested, unrelated }, oversizedIndex: 1);
         var source = new Pop3RawMailMessageSource(new FixedPop3SessionFactory(client));
@@ -260,7 +260,7 @@ public sealed class MailEmlExportServiceTests {
             var first = await service.ExportAsync(new MailEmlExportRequest {
                 ProfileId = "imap-mailbox",
                 FolderId = " inbox ",
-                MessageIds = new List<string> { "042" },
+                MessageIds = new List<string> { "042", "42" },
                 DestinationDirectory = directory
             });
             var second = await service.ExportAsync(new MailEmlExportRequest {
@@ -273,12 +273,78 @@ public sealed class MailEmlExportServiceTests {
 
             Assert.True(first.Succeeded);
             Assert.True(second.Succeeded);
+            Assert.Equal(1, first.RequestedCount);
+            Assert.Equal(2, source.RequestCount);
             Assert.Equal(
                 Assert.Single(first.Results).DestinationPath,
                 Assert.Single(second.Results).DestinationPath);
         } finally {
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task Pop3UidAliasesAreCanonicalizedBeforeDeduplication() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profileStore = new InMemoryMailProfileStore();
+            await profileStore.SaveAsync(new MailProfile {
+                Id = "pop-mailbox",
+                DisplayName = "POP mailbox",
+                Kind = MailProfileKind.Pop3
+            });
+            var source = new FakeRawMailMessageSource(
+                new Dictionary<string, byte[]> {
+                    ["uid:abc"] = CreateMessage("message", "X-Test: value")
+                },
+                MailProfileKind.Pop3);
+            var service = new MailEmlExportService(profileStore, new[] { source });
+
+            var result = await service.ExportAsync(new MailEmlExportRequest {
+                ProfileId = "pop-mailbox",
+                MessageIds = new List<string> { "abc", "UID:abc" },
+                DestinationDirectory = directory
+            });
+
+            Assert.True(result.Succeeded);
+            Assert.Equal(1, result.RequestedCount);
+            Assert.Equal("uid:abc", Assert.Single(result.Results).MessageId);
+            Assert.Equal(1, source.RequestCount);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData("abc", "uid:abc")]
+    [InlineData("UID:abc", "uid:abc")]
+    [InlineData("hash:AbC", "hash:AbC:0")]
+    [InlineData("HASH:AbC:00", "hash:AbC:0")]
+    public void Pop3SupportedIdentifiersHaveOneCanonicalForm(string input, string expected) =>
+        Assert.Equal(expected, Pop3MailReadHandler.CanonicalizeMessageIdForStorage(input));
+
+    [Fact]
+    public async Task GraphRawSourceReturnsNullForProviderNotFound() {
+        var source = new GraphRawMailMessageSource(
+            new StatusGraphSessionFactory(System.Net.HttpStatusCode.NotFound));
+
+        var result = await source.GetRawMessageAsync(
+            new MailProfile { Id = "graph", Kind = MailProfileKind.Graph },
+            new RawMailMessageRequest { MessageId = "missing", MaxBytes = 1024 });
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GmailRawSourceReturnsNullForProviderNotFound() {
+        var source = new GmailRawMailMessageSource(
+            new StatusGmailSessionFactory(System.Net.HttpStatusCode.NotFound));
+
+        var result = await source.GetRawMessageAsync(
+            new MailProfile { Id = "gmail", Kind = MailProfileKind.Gmail },
+            new RawMailMessageRequest { MessageId = "missing", MaxBytes = 1024 });
+
+        Assert.Null(result);
     }
 
     [Fact]
@@ -395,7 +461,7 @@ public sealed class MailEmlExportServiceTests {
             });
             var source = new FakeRawMailMessageSource(
                 new Dictionary<string, byte[]> {
-                    ["message"] = CreateMessage("message", "X-Test: value")
+                    ["uid:message"] = CreateMessage("message", "X-Test: value")
                 },
                 MailProfileKind.Pop3);
             var service = new MailEmlExportService(profileStore, new[] { source });
@@ -486,6 +552,59 @@ public sealed class MailEmlExportServiceTests {
 
         public Task<Pop3Client> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) =>
             Task.FromResult(_client);
+    }
+
+    private sealed class StatusGraphSessionFactory : IGraphSessionFactory {
+        private readonly System.Net.HttpStatusCode _statusCode;
+
+        internal StatusGraphSessionFactory(System.Net.HttpStatusCode statusCode) => _statusCode = statusCode;
+
+        public Task<GraphSession> ConnectAsync(
+            MailProfile profile,
+            CancellationToken cancellationToken = default) {
+            var client = new GraphApiClient(new OAuthCredential {
+                UserName = "me",
+                AccessToken = "token",
+                ExpiresOn = DateTimeOffset.MaxValue
+            });
+            SetHttpClient(client, new StatusResponseHandler(_statusCode), "https://graph.microsoft.com/v1.0/");
+            return Task.FromResult(new GraphSession(client, "me"));
+        }
+    }
+
+    private sealed class StatusGmailSessionFactory : IGmailSessionFactory {
+        private readonly System.Net.HttpStatusCode _statusCode;
+
+        internal StatusGmailSessionFactory(System.Net.HttpStatusCode statusCode) => _statusCode = statusCode;
+
+        public Task<GmailSession> ConnectAsync(
+            MailProfile profile,
+            CancellationToken cancellationToken = default) {
+            var client = new GmailApiClient(new OAuthCredential {
+                UserName = "me",
+                AccessToken = "token",
+                ExpiresOn = DateTimeOffset.MaxValue
+            });
+            SetHttpClient(client, new StatusResponseHandler(_statusCode), "https://gmail.googleapis.com/gmail/v1/");
+            return Task.FromResult(new GmailSession(client, "me"));
+        }
+    }
+
+    private sealed class StatusResponseHandler : System.Net.Http.HttpMessageHandler {
+        private readonly System.Net.HttpStatusCode _statusCode;
+
+        internal StatusResponseHandler(System.Net.HttpStatusCode statusCode) => _statusCode = statusCode;
+
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(
+            System.Net.Http.HttpRequestMessage request,
+            CancellationToken cancellationToken) => Task.FromResult(new System.Net.Http.HttpResponseMessage(_statusCode) {
+                Content = new System.Net.Http.StringContent("{}")
+            });
+    }
+
+    private static void SetHttpClient(object client, System.Net.Http.HttpMessageHandler handler, string baseAddress) {
+        var field = client.GetType().GetField("_client", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        field.SetValue(client, new System.Net.Http.HttpClient(handler) { BaseAddress = new Uri(baseAddress) });
     }
 
     private sealed class BoundedPop3Client : Pop3Client {

@@ -18,11 +18,16 @@ public sealed class GraphRawMailMessageSource : IRawMailMessageSource {
         CancellationToken cancellationToken = default) {
         using var session = await _sessionFactory.ConnectAsync(profile, cancellationToken).ConfigureAwait(false);
         var userId = GraphMailReadHandler.ResolveUserId(profile, request.MailboxId);
-        var content = await session.Client.GetMessageMimeAsync(
-            request.MessageId,
-            userId: userId,
-            maxBytes: checked((int)request.MaxBytes),
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+        byte[] content;
+        try {
+            content = await session.Client.GetMessageMimeAsync(
+                request.MessageId,
+                userId: userId,
+                maxBytes: checked((int)request.MaxBytes),
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+        } catch (GraphApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound) {
+            return null;
+        }
         return new RawMailMessage { MessageId = request.MessageId, Content = content };
     }
 }
