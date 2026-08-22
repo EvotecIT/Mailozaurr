@@ -156,19 +156,16 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
             return OperationResult.Failure("message_not_found", $"POP3 message '{request.MessageId}' was not found.");
         }
 
+        var canonicalMessageId = CanonicalizeMessageIdForStorage(identifier, resolved.Snapshot);
         var attachments = resolved.Snapshot.Message.Attachments.ToList();
         var attachmentIndex = MimeAttachmentStorage.ResolveAttachmentIndex(
             attachments,
             request.AttachmentId,
-            index => MimeAttachmentStorage.CreateStorageIdentity(
-                profile.Id,
-                request.MessageId,
-                index.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            index => CreateAttachmentFallbackIdentity(profile.Id, canonicalMessageId, index));
         if (attachmentIndex < 0) {
             return OperationResult.Failure("attachment_not_found", $"Attachment '{request.AttachmentId}' was not found.");
         }
         var attachment = attachments[attachmentIndex];
-        var canonicalMessageId = CanonicalizeMessageIdForStorage(identifier, resolved.Snapshot);
 
         var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(
             request.DestinationPath,
@@ -186,6 +183,12 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
         MimeAttachmentStorage.SaveAttachment(attachment, destinationPath);
         return OperationResult.Success($"Attachment saved to '{destinationPath}'.");
     }
+
+    internal static string CreateAttachmentFallbackIdentity(string profileId, string canonicalMessageId, int attachmentIndex) =>
+        MimeAttachmentStorage.CreateStorageIdentity(
+            profileId,
+            canonicalMessageId,
+            attachmentIndex.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
     internal static string FormatMessageId(string? uid, MimeMessage message, int occurrence = 0) {
         if (occurrence < 0) {

@@ -19,6 +19,18 @@ public sealed class ApplicationImapMailReadHandlerTests {
         Assert.Equal(expected, ImapMailReadHandler.CanonicalizeUidForStorage(new MailKit.UniqueId(value)));
     }
 
+    [Theory]
+    [InlineData("1")]
+    [InlineData("001")]
+    public void UnnamedAttachmentFallbackUsesCanonicalImapUid(string requestedId) {
+        var canonical = ImapMailReadHandler.CanonicalizeUidForStorage(requestedId);
+        var identity = ImapMailReadHandler.CreateAttachmentFallbackIdentity("work-imap", canonical, 0);
+
+        Assert.Equal(
+            ImapMailReadHandler.CreateAttachmentFallbackIdentity("work-imap", "1", 0),
+            identity);
+    }
+
     [Fact]
     public async Task HandlerUsesInjectedSearchDelegate() {
         var handler = new ImapMailReadHandler(

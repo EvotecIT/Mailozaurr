@@ -86,6 +86,24 @@ public sealed class ApplicationPop3MailReadHandlerTests {
         Assert.Equal("uid:stable-id", canonical);
     }
 
+    [Theory]
+    [InlineData("uid:stable-id")]
+    [InlineData("stable-id")]
+    public void UnnamedAttachmentFallbackUsesCanonicalPop3MessageId(string requestedId) {
+        var message = new MimeMessage { Subject = "Stable content" };
+        message.Body = new TextPart("plain") { Text = "Body" };
+        var snapshot = new Pop3MailboxBrowser.Pop3ResolvedMessageSnapshot(0, "stable-id", 10, message);
+        var canonical = Pop3MailReadHandler.CanonicalizeMessageIdForStorage(
+            Pop3MailReadHandler.ParseMessageId(requestedId),
+            snapshot);
+
+        var identity = Pop3MailReadHandler.CreateAttachmentFallbackIdentity("work-pop3", canonical, 0);
+
+        Assert.Equal(
+            Pop3MailReadHandler.CreateAttachmentFallbackIdentity("work-pop3", "uid:stable-id", 0),
+            identity);
+    }
+
     [Fact]
     public async Task HashFallbackIdsResolveTheIntendedDuplicateOccurrence() {
         var duplicate = new MimeMessage { Subject = "Duplicate" };

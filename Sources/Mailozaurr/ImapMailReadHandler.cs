@@ -195,6 +195,7 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
         CancellationToken cancellationToken) {
         var folder = ResolveFolder(request.FolderId, profile);
         var uid = ParseUid(request.MessageId);
+        var canonicalUid = CanonicalizeUidForStorage(request.MessageId);
         var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadOnly);
         var message = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
         var attachments = message.Attachments.ToList();
@@ -205,10 +206,7 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
         var attachmentIndex = MimeAttachmentStorage.ResolveAttachmentIndex(
             attachments,
             request.AttachmentId,
-            index => MimeAttachmentStorage.CreateStorageIdentity(
-                profile.Id,
-                request.MessageId,
-                index.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            index => CreateAttachmentFallbackIdentity(profile.Id, canonicalUid, index));
         if (attachmentIndex < 0) {
             return OperationResult.Failure("attachment_not_found", $"Attachment '{request.AttachmentId}' was not found.");
         }
@@ -222,7 +220,7 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
                 profile.Id,
                 profile.Kind.ToString(),
                 canonicalFolder,
-                CanonicalizeUidForStorage(uid),
+                canonicalUid,
                 attachmentIndex.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         if (File.Exists(destinationPath) && !request.Overwrite) {
             return OperationResult.Failure("destination_exists", $"Destination '{destinationPath}' already exists.");
@@ -234,6 +232,15 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
 
     internal static string CanonicalizeUidForStorage(MailKit.UniqueId uid) =>
         uid.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    internal static string CanonicalizeUidForStorage(string messageId) =>
+        CanonicalizeUidForStorage(ParseUid(messageId));
+
+    internal static string CreateAttachmentFallbackIdentity(string profileId, string canonicalUid, int attachmentIndex) =>
+        MimeAttachmentStorage.CreateStorageIdentity(
+            profileId,
+            canonicalUid,
+            attachmentIndex.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
     private static MessageSummary MapSummary(string profileId, string folder, ImapEmailMessage message) => new() {
         ProfileId = profileId,
