@@ -165,7 +165,12 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
             Attachments = result.Attachments.Select((attachment, index) => new AttachmentSummary {
                 MessageId = summary.Id,
                 Id = index.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                FileName = attachment.FileName,
+                FileName = MimeAttachmentStorage.GetAttachmentFileName(
+                    attachment.FileName,
+                    MimeAttachmentStorage.CreateStorageIdentity(
+                        profile.Id,
+                        summary.Id,
+                        index.ToString(System.Globalization.CultureInfo.InvariantCulture))),
                 ContentType = attachment.ContentType
             }).ToList()
         };
@@ -190,6 +195,7 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
         CancellationToken cancellationToken) {
         var folder = ResolveFolder(request.FolderId, profile);
         var uid = ParseUid(request.MessageId);
+        var canonicalUid = CanonicalizeUidForStorage(request.MessageId);
         var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadOnly);
         var message = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
         var attachments = message.Attachments.ToList();
@@ -197,12 +203,25 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
             return OperationResult.Failure("attachment_not_found", "Message has no attachments.");
         }
 
-        var attachment = ResolveAttachment(attachments, request.AttachmentId);
-        if (attachment == null) {
+        var attachmentIndex = MimeAttachmentStorage.ResolveAttachmentIndex(
+            attachments,
+            request.AttachmentId,
+            index => CreateAttachmentFallbackIdentity(profile.Id, canonicalUid, index));
+        if (attachmentIndex < 0) {
             return OperationResult.Failure("attachment_not_found", $"Attachment '{request.AttachmentId}' was not found.");
         }
+        var attachment = attachments[attachmentIndex];
+        var canonicalFolder = CanonicalizeFolderForStorage(mailFolder.FullName);
 
-        var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(request.DestinationPath, attachment);
+        var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(
+            request.DestinationPath,
+            attachment,
+            MimeAttachmentStorage.CreateStorageIdentity(
+                profile.Id,
+                profile.Kind.ToString(),
+                canonicalFolder,
+                canonicalUid,
+                attachmentIndex.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         if (File.Exists(destinationPath) && !request.Overwrite) {
             return OperationResult.Failure("destination_exists", $"Destination '{destinationPath}' already exists.");
         }
@@ -210,6 +229,18 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
         MimeAttachmentStorage.SaveAttachment(attachment, destinationPath);
         return OperationResult.Success($"Attachment saved to '{destinationPath}'.");
     }
+
+    internal static string CanonicalizeUidForStorage(MailKit.UniqueId uid) =>
+        uid.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    internal static string CanonicalizeUidForStorage(string messageId) =>
+        CanonicalizeUidForStorage(ParseUid(messageId));
+
+    internal static string CreateAttachmentFallbackIdentity(string profileId, string canonicalUid, int attachmentIndex) =>
+        MimeAttachmentStorage.CreateStorageIdentity(
+            profileId,
+            canonicalUid,
+            attachmentIndex.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
     private static MessageSummary MapSummary(string profileId, string folder, ImapEmailMessage message) => new() {
         ProfileId = profileId,
@@ -235,7 +266,7 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
         }
     };
 
-    private static UniqueId ParseUid(string value) {
+    internal static UniqueId ParseUid(string value) {
         if (uint.TryParse(value, out var uid)) {
             return new UniqueId(uid);
         }
@@ -243,7 +274,12 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
         throw new InvalidOperationException($"Message id '{value}' is not a valid IMAP UID.");
     }
 
-    private static string ResolveFolder(string? folderId, MailProfile profile) {
+    internal static string CanonicalizeFolderForStorage(string fullName) =>
+        string.Equals(fullName, "INBOX", StringComparison.OrdinalIgnoreCase)
+            ? "INBOX"
+            : fullName;
+
+    internal static string ResolveFolder(string? folderId, MailProfile profile) {
         if (!string.IsNullOrWhiteSpace(folderId)) {
             return folderId!.Trim();
         }
@@ -275,6 +311,4 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
             .ToList();
     }
 
-    private static MimeEntity? ResolveAttachment(IReadOnlyList<MimeEntity> attachments, string attachmentId) =>
-        MimeAttachmentStorage.ResolveAttachment(attachments, attachmentId);
 }

@@ -55,7 +55,7 @@ In practice:
 | Kind | Read/Search | Folders | Move/Mark/Delete | Send | Notes |
 |---|---|---|---|---|---|
 | `imap` | Yes | Yes | Yes | No | strong mailbox model |
-| `pop3` | Yes | No real folder model | Delete only style workflows | No | limited mailbox model |
+| `pop3` | Yes | Virtual `INBOX` only | No normalized actions | No | UIDL-backed ids with content-hash fallback |
 | `graph` | Yes | Yes | Yes | Yes | also supports rules/events/permissions |
 | `gmail` | Yes | Yes | Yes | Yes | Gmail-specific threads/labels |
 | `smtp` | No | No | No | Yes | send only |
@@ -227,6 +227,28 @@ Remove-Item Env:MAILOZAURR_IMAP_PASSWORD
 mailozaurr profile test --profile work-imap --scope mailbox --json
 ```
 
+### Generic POP3 profile
+
+```powershell
+mailozaurr profile create --profile archive-pop3 --kind pop3 --name "Archive POP3" `
+  --default-mailbox user@example.com `
+  --setting server=pop.example.com `
+  --setting port=995 `
+  --setting userName=user@example.com `
+  --json
+
+$env:MAILOZAURR_POP3_PASSWORD = '<password>'
+mailozaurr profile set-secret --profile archive-pop3 --name password `
+  --value-env MAILOZAURR_POP3_PASSWORD --json
+Remove-Item Env:MAILOZAURR_POP3_PASSWORD
+
+mailozaurr profile test --profile archive-pop3 --scope mailbox --json
+mailozaurr mail folders --profile archive-pop3 --json
+mailozaurr mail search --profile archive-pop3 --query Invoice --json
+```
+
+Normalized POP3 operations expose one virtual `INBOX`. Message ids prefer the server UIDL as `uid:<value>` and fall back to `hash:<sha256>:<occurrence>` when UIDL is unavailable. The fallback verifies message content and disambiguates byte-identical entries by their newest-first occurrence while those entries coexist; only UIDL provides a server-owned persistent identity across mailbox mutations. Use the returned id unchanged with `mail get` and attachment commands.
+
 ### Generic SMTP profile
 
 ```powershell
@@ -245,6 +267,8 @@ Remove-Item Env:MAILOZAURR_SMTP_PASSWORD
 
 mailozaurr profile test --profile alerts-smtp --scope send --json
 ```
+
+`profile test --json` keeps the existing summary fields and also returns ordered `Stages`. Each stage identifies the observable profile, session, mailbox, provider-probe, or send-preflight phase, its duration, target, and failure code. Mailozaurr reports the combined session operation exposed by each provider factory; it does not invent separate DNS, TCP, TLS, or authentication timings when those boundaries are not observable.
 
 ### Microsoft Graph profile
 
@@ -287,7 +311,10 @@ mailozaurr mail folders --profile work-imap --compact --json
 mailozaurr mail search --profile work-imap --folder Inbox --query Invoice --compact --json
 mailozaurr mail get --profile work-imap --folder Inbox --message-id 123 --compact --json
 mailozaurr mail attachments --profile work-imap --folder Inbox --message-id 123 --json
+mailozaurr mail save-attachments --profile work-imap --folder Inbox --message-id 123 --path C:\Temp\Attachments --json
 ```
+
+When `--path` names a directory, saved files keep a readable prefix and add a deterministic SHA-256 identity suffix from the exact provider filename plus the profile, mailbox, folder, message, and provider/per-part identity. This prevents distinct remote names, repeated same-name parts, and cross-message batch saves from overwriting one another after path removal, character replacement, or case folding. An explicit file path is used unchanged.
 
 ### Save drafts and queue sends
 

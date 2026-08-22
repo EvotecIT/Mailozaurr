@@ -5,6 +5,7 @@ namespace Mailozaurr.Tests;
 public sealed class ApplicationCapabilitiesTests {
     [Theory]
     [InlineData(MailProfileKind.Imap, MailCapability.ListFolders | MailCapability.SearchMessages | MailCapability.ReadMessages | MailCapability.MoveMessages)]
+    [InlineData(MailProfileKind.Pop3, MailCapability.ListFolders | MailCapability.SearchMessages | MailCapability.ReadMessages | MailCapability.SaveAttachments)]
     [InlineData(MailProfileKind.Graph, MailCapability.ListFolders | MailCapability.SendMessages | MailCapability.MarkMessages)]
     [InlineData(MailProfileKind.Gmail, MailCapability.SearchMessages | MailCapability.MarkMessages | MailCapability.MoveMessages | MailCapability.SendMessages)]
     [InlineData(MailProfileKind.Smtp, MailCapability.SendMessages)]
@@ -31,12 +32,6 @@ public sealed class ApplicationCapabilitiesTests {
         Assert.True(capabilities.Supports(MailCapability.SearchMessages));
         Assert.False(capabilities.Supports(MailCapability.WaitForMessages));
         Assert.False(capabilities.Supports(MailCapability.SendMessages));
-    }
-
-    [Theory]
-    [InlineData(MailProfileKind.Pop3)]
-    public void CatalogDoesNotAdvertiseProvidersWithoutNormalizedHandlers(MailProfileKind kind) {
-        Assert.Equal(MailCapability.None, MailCapabilityCatalog.For(kind).Capabilities);
     }
 
     [Fact]

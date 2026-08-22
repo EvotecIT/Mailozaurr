@@ -245,6 +245,8 @@ mailozaurr profile summary --profile work-imap --json
 mailozaurr profile test --profile work-imap --scope mailbox --json
 ```
 
+Connection-test JSON includes ordered, timed stages for profile resolution, session acquisition, and the requested provider probe. POP3 profiles participate in the same application surface with a virtual `INBOX` and normalized `uid:` message identifiers (falling back to a content-verified `hash:<sha256>:<occurrence>` identity when UIDL is unavailable).
+
 Search and inspect mail:
 
 ```powershell
@@ -254,6 +256,8 @@ mailozaurr mail get --profile work-imap --folder Inbox --message-id 123 --compac
 mailozaurr mail attachments --profile work-imap --folder Inbox --message-id 123 --json
 mailozaurr mail save-attachments --profile work-imap --folder Inbox --message-id 123 --path C:\Temp\Attachments --json
 ```
+
+When `--path` names a directory, saved files keep a readable prefix and add a deterministic SHA-256 identity suffix from the exact provider filename plus the profile, mailbox, folder, message, and provider/per-part identity. This prevents distinct remote names, repeated same-name parts, and cross-message batch saves from overwriting one another after path removal, character replacement, or case folding. An explicit file path is used unchanged.
 
 Draft, send, and queue mail:
 

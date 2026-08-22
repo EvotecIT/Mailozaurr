@@ -1,9 +1,28 @@
 using MailKit.Net.Imap;
+using MailKit.Net.Pop3;
 using Mailozaurr;
 
 namespace Mailozaurr.Tests;
 
 public sealed class ApplicationProfileConnectionServiceTests {
+    [Fact]
+    public void OriginalConstructorRemainsUnambiguousForPositionalNullArguments() {
+        var profileStore = new InMemoryProfileStore(Array.Empty<MailProfile>());
+
+        var service = new MailProfileConnectionService(profileStore, null, null, null, null, null);
+
+        Assert.NotNull(service);
+    }
+
+    [Fact]
+    public void Pop3FactoryIsPublicForDirectLibraryComposition() {
+        var method = typeof(MailProfileConnectionService).GetMethod(
+            nameof(MailProfileConnectionService.CreateWithPop3));
+
+        Assert.NotNull(method);
+        Assert.True(method!.IsPublic);
+    }
+
     [Fact]
     public async Task TestAsyncUsesMailboxScopeByDefaultForGmail() {
         var profileStore = new InMemoryProfileStore(new[] {
@@ -37,6 +56,21 @@ public sealed class ApplicationProfileConnectionServiceTests {
         Assert.Equal("listFolders", result.Probe);
         Assert.Equal(0, authProbeCalls);
         Assert.Equal(1, mailboxProbeCalls);
+        Assert.Collection(
+            result.Stages,
+            stage => {
+                Assert.Equal(MailProfileConnectionTestPhase.Profile, stage.Phase);
+                Assert.True(stage.Succeeded);
+            },
+            stage => {
+                Assert.Equal(MailProfileConnectionTestPhase.Session, stage.Phase);
+                Assert.True(stage.Succeeded);
+            },
+            stage => {
+                Assert.Equal(MailProfileConnectionTestPhase.Mailbox, stage.Phase);
+                Assert.True(stage.Succeeded);
+                Assert.Equal("listFolders", stage.Probe);
+            });
     }
 
     [Fact]
@@ -97,6 +131,95 @@ public sealed class ApplicationProfileConnectionServiceTests {
         Assert.Equal("connect", result.Probe);
     }
 
+    [Fact]
+    public async Task TestAsyncUsesMailboxScopeByDefaultForPop3() {
+        var profileStore = new InMemoryProfileStore(new[] {
+            new MailProfile {
+                Id = "pop3-work",
+                DisplayName = "Work POP3",
+                Kind = MailProfileKind.Pop3,
+                DefaultMailbox = "user@example.com"
+            }
+        });
+        var mailboxProbeCalls = 0;
+        var service = MailProfileConnectionService.CreateWithPop3(
+            profileStore,
+            new FakePop3SessionFactory(),
+            imapSessionFactory: null,
+            graphSessionFactory: null,
+            gmailSessionFactory: null,
+            smtpSessionFactory: null,
+            probePop3Async: (_, _) => Task.CompletedTask,
+            probePop3MailboxAsync: (_, _) => {
+                mailboxProbeCalls++;
+                return Task.CompletedTask;
+            });
+
+        var result = await service.TestAsync("pop3-work");
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(MailProfileKind.Pop3, result.ProfileKind);
+        Assert.Equal(MailProfileConnectionTestScope.Mailbox, result.ExecutedScope);
+        Assert.Equal("inspectMailbox", result.Probe);
+        Assert.Equal(1, mailboxProbeCalls);
+        Assert.Equal(MailProfileConnectionTestPhase.Mailbox, result.Stages[result.Stages.Count - 1].Phase);
+    }
+
+    [Fact]
+    public async Task TestAsyncRecordsFailedProbeWithoutLosingCompletedStages() {
+        var profileStore = new InMemoryProfileStore(new[] {
+            new MailProfile {
+                Id = "imap-work",
+                DisplayName = "Work IMAP",
+                Kind = MailProfileKind.Imap,
+                DefaultMailbox = "user@example.com"
+            }
+        });
+        var service = new MailProfileConnectionService(
+            profileStore,
+            imapSessionFactory: new FakeImapSessionFactory(),
+            probeImapAsync: (_, _) => throw new InvalidOperationException("Authentication probe failed."));
+
+        var result = await service.TestAsync("imap-work", MailProfileConnectionTestScope.Auth);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("connection_test_failed", result.Code);
+        Assert.Collection(
+            result.Stages,
+            stage => Assert.Equal(MailProfileConnectionTestPhase.Profile, stage.Phase),
+            stage => Assert.Equal(MailProfileConnectionTestPhase.Session, stage.Phase),
+            stage => {
+                Assert.Equal(MailProfileConnectionTestPhase.Probe, stage.Phase);
+                Assert.False(stage.Succeeded);
+                Assert.Equal("connection_test_failed", stage.Code);
+            });
+    }
+
+    [Fact]
+    public async Task TestAsyncConvertsSessionDisposalFailureIntoStructuredResult() {
+        var profileStore = new InMemoryProfileStore(new[] {
+            new MailProfile {
+                Id = "imap-work",
+                DisplayName = "Work IMAP",
+                Kind = MailProfileKind.Imap,
+                DefaultMailbox = "user@example.com"
+            }
+        });
+        var service = new MailProfileConnectionService(
+            profileStore,
+            imapSessionFactory: new ThrowingDisposeImapSessionFactory(),
+            probeImapAsync: (_, _) => Task.CompletedTask);
+
+        var result = await service.TestAsync("imap-work", MailProfileConnectionTestScope.Auth);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("connection_test_failed", result.Code);
+        var cleanup = result.Stages[result.Stages.Count - 1];
+        Assert.Equal(MailProfileConnectionTestPhase.Cleanup, cleanup.Phase);
+        Assert.Equal("dispose", cleanup.Probe);
+        Assert.Contains("dispose failed", cleanup.Message);
+    }
+
     private sealed class InMemoryProfileStore : IMailProfileStore {
         private readonly Dictionary<string, MailProfile> _profiles;
 
@@ -138,6 +261,25 @@ public sealed class ApplicationProfileConnectionServiceTests {
     private sealed class FakeImapSessionFactory : IImapSessionFactory {
         public Task<ImapClient> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) =>
             Task.FromResult(new ImapClient());
+    }
+
+    private sealed class ThrowingDisposeImapSessionFactory : IImapSessionFactory {
+        public Task<ImapClient> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) =>
+            Task.FromResult<ImapClient>(new ThrowingDisposeImapClient());
+    }
+
+    private sealed class ThrowingDisposeImapClient : ImapClient {
+        protected override void Dispose(bool disposing) {
+            base.Dispose(disposing);
+            if (disposing) {
+                throw new InvalidOperationException("dispose failed");
+            }
+        }
+    }
+
+    private sealed class FakePop3SessionFactory : IPop3SessionFactory {
+        public Task<Pop3Client> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new Pop3Client());
     }
 
     private sealed class FakeGraphSessionFactory : IGraphSessionFactory {

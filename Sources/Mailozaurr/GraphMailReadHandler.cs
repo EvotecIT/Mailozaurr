@@ -219,7 +219,9 @@ public sealed class GraphMailReadHandler : IMailReadHandler {
             Attachments = message.Attachments.Select((attachment, index) => new AttachmentSummary {
                 MessageId = summary.Id,
                 Id = index.ToString(CultureInfo.InvariantCulture),
-                FileName = MimeAttachmentStorage.GetAttachmentFileName(attachment),
+                FileName = MimeAttachmentStorage.GetAttachmentFileName(
+                    attachment,
+                    MimeAttachmentStorage.CreateStorageIdentity(profile.Id, summary.Id, index.ToString(CultureInfo.InvariantCulture))),
                 ContentType = attachment.ContentType?.MimeType
             }).ToList()
         };
@@ -258,12 +260,27 @@ public sealed class GraphMailReadHandler : IMailReadHandler {
             return OperationResult.Failure("attachment_not_found", "Message has no attachments.");
         }
 
-        var attachment = MimeAttachmentStorage.ResolveAttachment(attachments, request.AttachmentId);
-        if (attachment == null) {
+        var attachmentIndex = MimeAttachmentStorage.ResolveAttachmentIndex(
+            attachments,
+            request.AttachmentId,
+            index => MimeAttachmentStorage.CreateStorageIdentity(
+                profile.Id,
+                request.MessageId,
+                index.ToString(CultureInfo.InvariantCulture)));
+        if (attachmentIndex < 0) {
             return OperationResult.Failure("attachment_not_found", $"Attachment '{request.AttachmentId}' was not found.");
         }
+        var attachment = attachments[attachmentIndex];
 
-        var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(request.DestinationPath, attachment);
+        var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(
+            request.DestinationPath,
+            attachment,
+            MimeAttachmentStorage.CreateStorageIdentity(
+                profile.Id,
+                profile.Kind.ToString(),
+                CanonicalizeUserIdForStorage(userId),
+                request.MessageId,
+                attachmentIndex.ToString(CultureInfo.InvariantCulture)));
         if (File.Exists(destinationPath) && !request.Overwrite) {
             return OperationResult.Failure("destination_exists", $"Destination '{destinationPath}' already exists.");
         }
@@ -352,6 +369,11 @@ public sealed class GraphMailReadHandler : IMailReadHandler {
         }
 
         return "me";
+    }
+
+    internal static string CanonicalizeUserIdForStorage(string? userId) {
+        var normalized = string.IsNullOrWhiteSpace(userId) ? "me" : userId!.Trim();
+        return string.Equals(normalized, "me", StringComparison.OrdinalIgnoreCase) ? "me" : normalized;
     }
 
     private static int GetMaxMimeBytes(MailProfile profile) {

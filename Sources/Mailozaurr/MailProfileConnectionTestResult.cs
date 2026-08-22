@@ -21,4 +21,7 @@ public sealed class MailProfileConnectionTestResult : OperationResult {
 
     /// <summary>The scope that was actually executed.</summary>
     public MailProfileConnectionTestScope ExecutedScope { get; set; }
+
+    /// <summary>Ordered evidence for the observable phases executed by the test.</summary>
+    public List<MailProfileConnectionTestStage> Stages { get; set; } = new();
 }

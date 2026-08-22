@@ -24,7 +24,7 @@
         <PackageProjectUrl>https://github.com/EvotecIT/Mailozaurr</PackageProjectUrl>
         <PackageReadmeFile>README.MD</PackageReadmeFile>
         <RepositoryUrl>https://github.com/EvotecIT/Mailozaurr</RepositoryUrl>
-        <PackageTags>Windows;MacOS;Linux;Mail;Email;Graph;Gmail;IMAP;SMTP;CLI;MCP</PackageTags>
+        <PackageTags>Windows;MacOS;Linux;Mail;Email;Graph;Gmail;IMAP;POP3;SMTP;CLI;MCP</PackageTags>
     </PropertyGroup>
 
     <ItemGroup>

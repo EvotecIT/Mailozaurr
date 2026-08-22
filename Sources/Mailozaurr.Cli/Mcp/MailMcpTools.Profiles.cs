@@ -270,7 +270,7 @@ public sealed partial class MailMcpTools {
     }
 
     [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
-    [Description("Runs a live provider connection test for a saved Mailozaurr profile.")]
+    [Description("Runs a provider connection test for a saved Mailozaurr profile and returns timed phase evidence.")]
     public Task<MailProfileConnectionTestResult> mail_profile_test(
         [Description("The saved profile identifier to test.")] string profileId,
         [Description("Optional test scope: auto, auth, mailbox, or send.")] string? scope = null,

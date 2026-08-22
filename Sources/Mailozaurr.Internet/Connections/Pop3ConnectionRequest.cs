@@ -1,29 +1,15 @@
 using MailKit.Security;
-using System;
 
 namespace Mailozaurr;
 
 /// <summary>
-/// Represents connection settings used by <see cref="ImapConnector"/>.
+/// Describes the transport settings used to establish a POP3 connection.
 /// </summary>
-public sealed class ImapConnectionRequest {
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ImapConnectionRequest"/> class.
-    /// </summary>
-    /// <param name="server">IMAP server hostname.</param>
-    /// <param name="port">IMAP server port.</param>
-    /// <param name="options">Secure socket options.</param>
-    /// <param name="timeout">Connection timeout in milliseconds.</param>
-    /// <param name="skipCertificateRevocation">Whether to skip certificate revocation checks.</param>
-    /// <param name="skipCertificateValidation">Whether to skip certificate validation checks.</param>
-    /// <param name="retryCount">Retry count for transient failures.</param>
-    /// <param name="retryDelayMilliseconds">Initial retry delay in milliseconds.</param>
-    /// <param name="retryDelayBackoff">Retry delay backoff multiplier.</param>
-    /// <exception cref="ArgumentException">Thrown when <paramref name="server"/> is empty.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when a numeric argument is outside supported range.</exception>
-    public ImapConnectionRequest(
+public sealed class Pop3ConnectionRequest {
+    /// <summary>Creates a POP3 connection request.</summary>
+    public Pop3ConnectionRequest(
         string server,
-        int port,
+        int port = 995,
         SecureSocketOptions options = SecureSocketOptions.Auto,
         int timeout = 30000,
         bool skipCertificateRevocation = false,
@@ -49,7 +35,6 @@ public sealed class ImapConnectionRequest {
         if (retryDelayBackoff <= 0 || double.IsNaN(retryDelayBackoff) || double.IsInfinity(retryDelayBackoff)) {
             throw new ArgumentOutOfRangeException(nameof(retryDelayBackoff), "Retry backoff must be a finite value > 0.");
         }
-
         Server = server;
         Port = port;
         Options = options;
@@ -61,48 +46,30 @@ public sealed class ImapConnectionRequest {
         RetryDelayBackoff = retryDelayBackoff;
     }
 
-    /// <summary>
-    /// Gets the IMAP server hostname.
-    /// </summary>
+    /// <summary>POP3 server hostname.</summary>
     public string Server { get; }
 
-    /// <summary>
-    /// Gets the IMAP server port.
-    /// </summary>
+    /// <summary>POP3 server port.</summary>
     public int Port { get; }
 
-    /// <summary>
-    /// Gets secure socket options.
-    /// </summary>
+    /// <summary>TLS mode used for the connection.</summary>
     public SecureSocketOptions Options { get; }
 
-    /// <summary>
-    /// Gets connection timeout in milliseconds.
-    /// </summary>
+    /// <summary>Connection timeout in milliseconds.</summary>
     public int Timeout { get; }
 
-    /// <summary>
-    /// Gets a value indicating whether certificate revocation checks are skipped.
-    /// </summary>
+    /// <summary>Whether certificate revocation checks are skipped.</summary>
     public bool SkipCertificateRevocation { get; }
 
-    /// <summary>
-    /// Gets a value indicating whether certificate validation checks are skipped.
-    /// </summary>
+    /// <summary>Whether certificate validation is skipped.</summary>
     public bool SkipCertificateValidation { get; }
 
-    /// <summary>
-    /// Gets retry count for transient failures.
-    /// </summary>
+    /// <summary>Number of connection attempts.</summary>
     public int RetryCount { get; }
 
-    /// <summary>
-    /// Gets initial retry delay in milliseconds.
-    /// </summary>
+    /// <summary>Initial retry delay in milliseconds.</summary>
     public int RetryDelayMilliseconds { get; }
 
-    /// <summary>
-    /// Gets retry delay backoff multiplier.
-    /// </summary>
+    /// <summary>Retry-delay backoff multiplier.</summary>
     public double RetryDelayBackoff { get; }
 }

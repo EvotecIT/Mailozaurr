@@ -37,5 +37,7 @@ public class ImapConnectionRequestTests {
         Assert.Throws<ArgumentOutOfRangeException>(() => new ImapConnectionRequest("imap.example.test", 993, retryCount: -1));
         Assert.Throws<ArgumentOutOfRangeException>(() => new ImapConnectionRequest("imap.example.test", 993, retryDelayMilliseconds: -1));
         Assert.Throws<ArgumentOutOfRangeException>(() => new ImapConnectionRequest("imap.example.test", 993, retryDelayBackoff: 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ImapConnectionRequest("imap.example.test", 993, retryDelayBackoff: double.NaN));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ImapConnectionRequest("imap.example.test", 993, retryDelayBackoff: double.PositiveInfinity));
     }
 }

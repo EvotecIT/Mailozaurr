@@ -39,7 +39,7 @@ internal static partial class CliCommandModel {
             ]),
         Leaf("refresh-auth", "Refresh saved authentication for a profile.", required: ["profile"]),
         Leaf("auth-status", "Show persisted authentication status.", required: ["profile"]),
-        Leaf("test", "Test profile authentication, mailbox, or send readiness.",
+        Leaf("test", "Test profile authentication, mailbox, or send readiness with timed phase evidence.",
             required: ["profile"], optional: ["scope"]),
         Leaf("summary", "Show the normalized profile summary.",
             required: ["profile"], optional: ["compact"]),

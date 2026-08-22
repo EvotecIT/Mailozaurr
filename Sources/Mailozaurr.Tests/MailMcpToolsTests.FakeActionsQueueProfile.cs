@@ -288,7 +288,17 @@ public sealed partial class MailMcpToolsTests {
                 Probe = "getProfile",
                 Target = "gmail-work",
                 RequestedScope = scope,
-                ExecutedScope = scope == MailProfileConnectionTestScope.Auto ? MailProfileConnectionTestScope.Mailbox : scope
+                ExecutedScope = scope == MailProfileConnectionTestScope.Auto ? MailProfileConnectionTestScope.Mailbox : scope,
+                Stages = new List<MailProfileConnectionTestStage> {
+                    new() {
+                        Phase = MailProfileConnectionTestPhase.Profile,
+                        Succeeded = true,
+                        Probe = "resolveProfile",
+                        Target = profileId,
+                        DurationMilliseconds = 2,
+                        Message = "Profile resolved."
+                    }
+                }
             });
         }
     }

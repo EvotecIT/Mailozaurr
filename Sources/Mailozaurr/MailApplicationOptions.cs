@@ -22,6 +22,9 @@ public sealed class MailApplicationOptions {
     /// <summary>Whether the built-in IMAP read handler should be registered.</summary>
     public bool EnableImapReadHandler { get; set; } = true;
 
+    /// <summary>Whether the built-in POP3 read handler should be registered.</summary>
+    public bool EnablePop3ReadHandler { get; set; } = true;
+
     /// <summary>Whether the built-in Graph read handler should be registered.</summary>
     public bool EnableGraphReadHandler { get; set; } = true;
 

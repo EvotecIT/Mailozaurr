@@ -3,6 +3,15 @@ using Mailozaurr;
 namespace Mailozaurr.Tests;
 
 public sealed class ApplicationGraphMailReadHandlerTests {
+    [Theory]
+    [InlineData(null, "me")]
+    [InlineData("", "me")]
+    [InlineData(" ME ", "me")]
+    [InlineData("User@Example.test", "User@Example.test")]
+    public void GraphStorageIdentityCanonicalizesMeLikeTheRequestRoute(string? userId, string expected) {
+        Assert.Equal(expected, GraphMailReadHandler.CanonicalizeUserIdForStorage(userId));
+    }
+
     [Fact]
     public async Task HandlerUsesInjectedFolderDelegate() {
         var handler = new GraphMailReadHandler(

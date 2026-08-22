@@ -4,6 +4,33 @@ using Mailozaurr;
 namespace Mailozaurr.Tests;
 
 public sealed class ApplicationImapMailReadHandlerTests {
+    [Theory]
+    [InlineData("INBOX")]
+    [InlineData("inbox")]
+    [InlineData("Inbox")]
+    public void ImapInboxAliasesUseOneCanonicalStorageIdentity(string fullName) {
+        Assert.Equal("INBOX", ImapMailReadHandler.CanonicalizeFolderForStorage(fullName));
+    }
+
+    [Theory]
+    [InlineData(1u, "1")]
+    [InlineData(42u, "42")]
+    public void ImapUidStorageIdentityUsesCanonicalNumericValue(uint value, string expected) {
+        Assert.Equal(expected, ImapMailReadHandler.CanonicalizeUidForStorage(new MailKit.UniqueId(value)));
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("001")]
+    public void UnnamedAttachmentFallbackUsesCanonicalImapUid(string requestedId) {
+        var canonical = ImapMailReadHandler.CanonicalizeUidForStorage(requestedId);
+        var identity = ImapMailReadHandler.CreateAttachmentFallbackIdentity("work-imap", canonical, 0);
+
+        Assert.Equal(
+            ImapMailReadHandler.CreateAttachmentFallbackIdentity("work-imap", "1", 0),
+            identity);
+    }
+
     [Fact]
     public async Task HandlerUsesInjectedSearchDelegate() {
         var handler = new ImapMailReadHandler(
