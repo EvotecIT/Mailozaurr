@@ -24,6 +24,13 @@ public sealed class ImapMessageReaderTests {
         };
         builder.Attachments.Add("report.txt", new byte[] { 1, 2, 3 });
         message.Body = builder.ToMessageBody();
+        var forwarded = new MessagePart {
+            Message = new MimeMessage(),
+            ContentDisposition = new ContentDisposition(ContentDisposition.Attachment) {
+                FileName = "forwarded.eml"
+            }
+        };
+        Assert.IsAssignableFrom<Multipart>(message.Body).Add(forwarded);
 
         var folder = new Mock<IMailFolder>();
         folder.SetupGet(f => f.FullName).Returns("Inbox/Sub");
@@ -61,8 +68,10 @@ public sealed class ImapMessageReaderTests {
         Assert.True(result.TextTruncated);
         Assert.True(result.HtmlTruncated);
         Assert.True(result.HasAttachments);
-        var attachment = Assert.Single(result.Attachments);
-        Assert.Equal("report.txt", attachment.FileName);
+        Assert.Collection(
+            result.Attachments,
+            attachment => Assert.Equal("report.txt", attachment.FileName),
+            attachment => Assert.Equal("forwarded.eml", attachment.FileName));
     }
 
     [Fact]

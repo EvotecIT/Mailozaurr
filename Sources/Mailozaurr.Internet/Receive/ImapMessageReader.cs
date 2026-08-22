@@ -63,13 +63,15 @@ public static class ImapMessageReader {
         var mailFolder = client.GetCachedFolder(request.Folder, FolderAccess.ReadOnly);
         var message = await mailFolder.GetMessageAsync(request.Uid, cancellationToken).ConfigureAwait(false);
 
-        var attachments = message.Attachments.Select(static attachment => attachment is MimePart part
-            ? new ImapMessageAttachmentInfo(
-                FileName: part.FileName ?? string.Empty,
-                ContentType: part.ContentType?.MimeType ?? string.Empty)
-            : new ImapMessageAttachmentInfo(
-                FileName: string.Empty,
-                ContentType: attachment.ContentType?.MimeType ?? string.Empty)).ToArray();
+        var attachments = message.Attachments.Select(static attachment => new ImapMessageAttachmentInfo(
+            FileName: attachment switch {
+                MimePart part => part.FileName ?? string.Empty,
+                MessagePart messagePart => messagePart.ContentDisposition?.FileName
+                    ?? messagePart.ContentType?.Name
+                    ?? string.Empty,
+                _ => string.Empty
+            },
+            ContentType: attachment.ContentType?.MimeType ?? string.Empty)).ToArray();
 
         var text = TruncateUtf8(message.TextBody, request.MaxBodyBytes, out var textTruncated);
         var html = TruncateUtf8(message.HtmlBody, request.MaxBodyBytes, out var htmlTruncated);
