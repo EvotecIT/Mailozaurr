@@ -183,7 +183,44 @@ public sealed class MailEmlExportServiceTests {
             Assert.False(second.Succeeded);
             Assert.Equal("destination_exists", Assert.Single(second.Results).Code);
             Assert.Equal(original, File.ReadAllBytes(path));
-            Assert.Equal(1, source.RequestCount);
+            Assert.Equal(2, source.RequestCount);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ImapUidValidityCreatesDistinctStorageEpochs() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profileStore = new InMemoryMailProfileStore();
+            await profileStore.SaveAsync(new MailProfile {
+                Id = "imap-mailbox",
+                DisplayName = "IMAP mailbox",
+                Kind = MailProfileKind.Imap
+            });
+            var source = new FakeRawMailMessageSource(new Dictionary<string, byte[]> {
+                ["42"] = CreateMessage("message", "X-Test: value")
+            }) {
+                StorageIdentityComponent = "uidvalidity:100"
+            };
+            var service = new MailEmlExportService(profileStore, new[] { source });
+            var request = new MailEmlExportRequest {
+                ProfileId = "imap-mailbox",
+                FolderId = "INBOX",
+                MessageIds = new List<string> { "42" },
+                DestinationDirectory = directory
+            };
+
+            var first = await service.ExportAsync(request);
+            source.StorageIdentityComponent = "uidvalidity:200";
+            var second = await service.ExportAsync(request);
+
+            Assert.True(first.Succeeded);
+            Assert.True(second.Succeeded);
+            Assert.NotEqual(
+                Assert.Single(first.Results).DestinationPath,
+                Assert.Single(second.Results).DestinationPath);
         } finally {
             Directory.Delete(directory, recursive: true);
         }
@@ -260,13 +297,19 @@ public sealed class MailEmlExportServiceTests {
 
         public int RequestCount { get; private set; }
 
+        public string? StorageIdentityComponent { get; set; }
+
         public Task<RawMailMessage?> GetRawMessageAsync(
             MailProfile profile,
             RawMailMessageRequest request,
             CancellationToken cancellationToken = default) {
             RequestCount++;
             return Task.FromResult(_messages.TryGetValue(request.MessageId, out var content)
-                ? new RawMailMessage { MessageId = request.MessageId, Content = content }
+                ? new RawMailMessage {
+                    MessageId = request.MessageId,
+                    Content = content,
+                    StorageIdentityComponent = StorageIdentityComponent
+                }
                 : null);
         }
     }

@@ -7,6 +7,22 @@ namespace Mailozaurr.Tests;
 
 public class GraphApiClientMailboxTests {
     [Fact]
+    public async System.Threading.Tasks.Task GetMessageMimeAsync_AllowsCallerLimitAbove256MiB() {
+        var expected = new byte[] { 1, 2, 3, 4 };
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new ByteArrayContent(expected)
+        });
+        var api = new GraphApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = DateTimeOffset.MaxValue });
+        var field = typeof(GraphApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(api, new HttpClient(handler) { BaseAddress = new Uri("https://graph.microsoft.com/v1.0/") });
+
+        var actual = await api.GetMessageMimeAsync("m1", maxBytes: 300 * 1024 * 1024);
+
+        Assert.Equal(expected, actual);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task ListMessagesAsync_AddsConsistencyHeaders_WhenSearchIsUsed() {
         var json = "{\"value\":[{\"id\":\"m1\",\"subject\":\"s\",\"receivedDateTime\":\"2026-02-15T00:00:00Z\",\"internetMessageId\":\"<x>\",\"hasAttachments\":false,\"isRead\":true,\"conversationId\":\"c1\",\"from\":{\"emailAddress\":{\"address\":\"a@b.com\"}},\"toRecipients\":[{\"emailAddress\":{\"address\":\"c@d.com\"}}],\"flag\":{\"flagStatus\":\"flagged\"}}]}";
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });

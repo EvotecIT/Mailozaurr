@@ -7,6 +7,15 @@ public sealed class RawMailMessage {
 
     /// <summary>Unmodified RFC 822 bytes returned by the provider.</summary>
     public byte[] Content { get; set; } = Array.Empty<byte>();
+
+    /// <summary>
+    /// Optional provider epoch or namespace component required to keep persisted identities stable.
+    /// </summary>
+    /// <remarks>
+    /// IMAP sources use this for UIDVALIDITY because a numeric UID is reusable after the mailbox
+    /// epoch changes. Other providers normally leave it unset.
+    /// </remarks>
+    public string? StorageIdentityComponent { get; set; }
 }
 
 /// <summary>Request for provider-native RFC 822 message content.</summary>

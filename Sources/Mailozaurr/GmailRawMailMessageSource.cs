@@ -19,9 +19,10 @@ public sealed class GmailRawMailMessageSource : IRawMailMessageSource {
         CancellationToken cancellationToken = default) {
         using var session = await _sessionFactory.ConnectAsync(profile, cancellationToken).ConfigureAwait(false);
         var userId = GmailMailReadHandler.ResolveUserId(profile, request.MailboxId);
-        var message = await session.Client.GetRawAsync(
+        var message = await session.Client.GetRawBoundedAsync(
             userId,
             request.MessageId,
+            request.MaxBytes,
             fields: RawFields,
             cancellationToken: cancellationToken).ConfigureAwait(false);
         return new RawMailMessage {

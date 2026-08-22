@@ -22,9 +22,26 @@ public sealed class ImapRawMailMessageSource : IRawMailMessageSource {
         var folder = ImapMailReadHandler.ResolveFolder(request.FolderId, profile);
         var uid = ImapMailReadHandler.ParseUid(request.MessageId);
         var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadOnly);
-        using var stream = await mailFolder.GetStreamAsync(uid, cancellationToken).ConfigureAwait(false);
+        var summaries = await mailFolder.FetchAsync(
+            new[] { uid },
+            MessageSummaryItems.UniqueId | MessageSummaryItems.Size,
+            cancellationToken).ConfigureAwait(false);
+        var summary = summaries.FirstOrDefault(value => value.UniqueId == uid);
+        if (summary == null) return null;
+        if (summary.Size.HasValue && summary.Size.Value > request.MaxBytes) {
+            throw new InvalidDataException($"IMAP MIME content exceeds {request.MaxBytes} bytes.");
+        }
+        var requestedBytes = request.MaxBytes < int.MaxValue
+            ? checked((int)request.MaxBytes + 1)
+            : int.MaxValue;
+        using var stream = await mailFolder.GetStreamAsync(
+            uid,
+            offset: 0,
+            count: requestedBytes,
+            cancellationToken).ConfigureAwait(false);
         return new RawMailMessage {
             MessageId = request.MessageId,
+            StorageIdentityComponent = "uidvalidity:" + mailFolder.UidValidity.ToString(System.Globalization.CultureInfo.InvariantCulture),
             Content = await RawMailMessageSourceUtilities.ReadBoundedAsync(stream, request.MaxBytes, cancellationToken)
                 .ConfigureAwait(false)
         };

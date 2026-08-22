@@ -465,11 +465,6 @@ public sealed partial class GraphApiClient {
         if (maxBytes <= 0) {
             throw new ArgumentOutOfRangeException(nameof(maxBytes), "maxBytes must be > 0.");
         }
-        const int hardLimitBytes = 256 * 1024 * 1024;
-        if (maxBytes > hardLimitBytes) {
-            throw new ArgumentOutOfRangeException(nameof(maxBytes), $"maxBytes must be <= {hardLimitBytes}.");
-        }
-
         var userSegment = BuildUserSegment(userId);
         var selector = Uri.EscapeDataString(messageId.Trim());
         var url = userSegment + "/messages/" + selector + "/$value";

@@ -52,24 +52,12 @@ public sealed class MailEmlExportService : IMailEmlExportService {
 
         foreach (var messageId in messageIds) {
             cancellationToken.ThrowIfCancellationRequested();
-            var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(
-                destinationDirectory,
-                messageId + ".eml",
-                CreateStorageIdentity(profile, request, messageId));
             var item = new MailEmlExportItemResult {
-                MessageId = messageId,
-                DestinationPath = destinationPath
+                MessageId = messageId
             };
             result.Results.Add(item);
 
             try {
-                if (File.Exists(destinationPath) && !request.Overwrite) {
-                    item.Code = "destination_exists";
-                    item.Message = $"Destination '{destinationPath}' already exists.";
-                    result.FailedCount++;
-                    continue;
-                }
-
                 var raw = await source.GetRawMessageAsync(profile, new RawMailMessageRequest {
                     MailboxId = request.MailboxId,
                     FolderId = request.FolderId,
@@ -79,6 +67,18 @@ public sealed class MailEmlExportService : IMailEmlExportService {
                 if (raw == null) {
                     item.Code = "message_not_found";
                     item.Message = $"Message '{messageId}' was not found.";
+                    result.FailedCount++;
+                    continue;
+                }
+
+                var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(
+                    destinationDirectory,
+                    messageId + ".eml",
+                    CreateStorageIdentity(profile, request, messageId, raw.StorageIdentityComponent));
+                item.DestinationPath = destinationPath;
+                if (File.Exists(destinationPath) && !request.Overwrite) {
+                    item.Code = "destination_exists";
+                    item.Message = $"Destination '{destinationPath}' already exists.";
                     result.FailedCount++;
                     continue;
                 }
@@ -124,7 +124,8 @@ public sealed class MailEmlExportService : IMailEmlExportService {
     private static string CreateStorageIdentity(
         MailProfile profile,
         MailEmlExportRequest request,
-        string messageId) {
+        string messageId,
+        string? providerIdentityComponent) {
         string? mailbox = null;
         string? folder = null;
         switch (profile.Kind) {
@@ -150,6 +151,7 @@ public sealed class MailEmlExportService : IMailEmlExportService {
             profile.Kind.ToString(),
             mailbox,
             folder,
-            messageId);
+            messageId,
+            providerIdentityComponent);
     }
 }
