@@ -332,6 +332,22 @@ public sealed class GmailMailboxBrowserTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task GetHistoryAsync_StopsAtFullProviderPageAndReturnsContinuation() {
+        const string first = "{\"historyId\":\"200\",\"nextPageToken\":\"next\",\"history\":[{\"id\":\"10\",\"messagesAdded\":[{\"message\":{\"id\":\"m1\"}},{\"message\":{\"id\":\"m2\"}}]}]}";
+        const string undisclosedSecond = "{\"historyId\":\"201\",\"history\":[{\"id\":\"11\",\"messagesAdded\":[{\"message\":{\"id\":\"m3\"}}]}]}";
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(first) },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(undisclosedSecond) });
+        var browser = CreateBrowser(handler);
+
+        var result = await browser.GetHistoryAsync("INBOX", "5", maxChanges: 1);
+
+        Assert.Equal(new[] { "m1", "m2" }, result.UpsertNativeIds);
+        Assert.Equal("next", result.NextPageToken);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
     public void BuildSearchQuery_ComposesExpectedTokens() {
         var query = GmailMailboxBrowser.BuildSearchQuery(new GmailMailboxBrowser.GmailMailboxSearchRequest {
             Query = "urgent",

@@ -123,6 +123,8 @@ public sealed partial class GmailMailboxBrowser {
         string? newHistoryId = null;
         string? resolvedLabelId = null;
         var seenPageTokens = new HashSet<string>(StringComparer.Ordinal);
+        const int maxProviderPages = 25;
+        var pagesRead = 0;
 
         do {
             var page = await GetHistoryPageAsync(
@@ -140,6 +142,16 @@ public sealed partial class GmailMailboxBrowser {
             if (pageToken != null && !seenPageTokens.Add(pageToken)) {
                 throw new InvalidDataException("Gmail history pagination returned a repeated page token.");
             }
+            pagesRead++;
+
+            // A Gmail page is the smallest safe continuation boundary: never
+            // discard events from the page that crossed the requested limit.
+            // Empty pages may be followed by changes, but the legacy helper is
+            // still bounded so a hostile or enormous backlog cannot drain
+            // indefinitely. Callers can resume from NextPageToken.
+            if (finalStates.Count >= ClampInt(maxChanges, 1, 500) || pagesRead >= maxProviderPages) {
+                break;
+            }
         } while (pageToken != null);
 
         var upsertIds = finalStates.Where(pair => !pair.Value).Select(pair => pair.Key).ToList();
@@ -150,6 +162,7 @@ public sealed partial class GmailMailboxBrowser {
         return new GmailMailboxHistoryResult {
             ResolvedLabelId = resolvedLabelId ?? string.Empty,
             NewHistoryId = newHistoryId,
+            NextPageToken = pageToken,
             UpsertNativeIds = upsertIds,
             DeletedNativeIds = deleteIds
         };

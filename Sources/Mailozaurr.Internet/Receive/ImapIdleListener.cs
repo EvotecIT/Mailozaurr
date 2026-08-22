@@ -87,15 +87,21 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
             _folder = _client.GetCachedFolder(_folderName, FolderAccess.ReadOnly);
             await _folder.OpenAsync(FolderAccess.ReadOnly, _cancel.Token).ConfigureAwait(false);
 
-            _folder.CountChanged += OnCountChanged;
-            _folder.MessageExpunged += OnMessageExpunged;
-
             var search = _searchQuery ?? SearchQuery.All;
             var initialUids = await _folder.SearchAsync(search, _cancel.Token).ConfigureAwait(false);
             foreach (var uid in initialUids) {
                 _summaries.Add(uid);
                 _known.Add(uid);
             }
+
+            // Fix the baseline before subscribing, then reconcile once after the
+            // handlers are attached. This closes both setup windows: an arrival
+            // between the baseline search and subscription is found by the
+            // reconciliation search, while an arrival during reconciliation sets
+            // _messagesArrived and is checked again by the idle loop.
+            _folder.CountChanged += OnCountChanged;
+            _folder.MessageExpunged += OnMessageExpunged;
+            await FetchNewMessagesAsync().ConfigureAwait(false);
 
             _idleTask = IdleLoopAsync();
         } catch {
