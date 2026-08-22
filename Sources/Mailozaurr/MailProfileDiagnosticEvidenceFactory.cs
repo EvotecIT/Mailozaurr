@@ -119,7 +119,7 @@ internal static class MailProfileDiagnosticEvidenceFactory {
         var graphPermissionsKnown = kind == MailProfileKind.Graph &&
             (delegatedScopes.Count > 0 || applicationRoles.Count > 0);
         var applicationReady = HasPermissionPair(applicationRoles, "Mail.ReadWrite", "Mail.Send");
-        var delegatedSharedReady = HasPermissionPair(
+        var delegatedSharedPair = HasPermissionPair(
             delegatedScopes,
             "Mail.ReadWrite.Shared",
             "Mail.Send.Shared");
@@ -129,8 +129,10 @@ internal static class MailProfileDiagnosticEvidenceFactory {
         if (kind == MailProfileKind.Graph) {
             if (!graphMailEndpointSucceeded) {
                 ready = false;
-            } else if (applicationReady || delegatedSharedReady || (delegatedDirectPair && targetIsSignedInMailbox == true)) {
+            } else if (applicationReady || (delegatedDirectPair && targetIsSignedInMailbox == true)) {
                 ready = true;
+            } else if (delegatedSharedPair && targetIsSignedInMailbox != true) {
+                ready = null;
             } else if (graphPermissionsKnown && (!delegatedDirectPair || targetIsSignedInMailbox.HasValue)) {
                 ready = false;
             }
@@ -172,7 +174,7 @@ internal static class MailProfileDiagnosticEvidenceFactory {
             false => "The selected mailbox differs from the delegated sign-in identity, so delegated direct-mail scopes do not prove shared-mailbox send readiness.",
             null => "The token did not declare enough identity evidence to prove that the selected mailbox is the delegated sign-in mailbox."
         };
-        return $"{endpoint} {target} Sending uses draft creation followed by draft send. Application tokens require Mail.ReadWrite plus Mail.Send; delegated access requires that pair for the signed-in mailbox or Mail.ReadWrite.Shared plus Mail.Send.Shared for another mailbox. No draft or message was created.";
+        return $"{endpoint} {target} Sending uses draft creation followed by draft send. Application tokens require Mail.ReadWrite plus Mail.Send, and delegated direct-mail scopes can establish readiness only for the signed-in mailbox. For another mailbox, Mail.ReadWrite.Shared plus Mail.Send.Shared still does not prove Exchange Send As or Send on Behalf authority, so readiness remains unknown unless that mailbox-level delegation is verified separately. No draft or message was created.";
     }
 
     private static MailProfileSessionEvidence CreateSessionEvidence(

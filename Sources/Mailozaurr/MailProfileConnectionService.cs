@@ -534,14 +534,18 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
         GraphSession session,
         MailProfileDiagnosticEvidence evidence,
         CancellationToken cancellationToken) {
+        var authenticationMode = ResolveGraphAuthenticationMode(session, evidence);
         if (string.Equals(session.UserId, "me", StringComparison.OrdinalIgnoreCase) &&
-            ((evidence.Permissions?.ApplicationRoles.Count ?? 0) > 0 || session.GraphCredential != null)) {
+            authenticationMode != GraphSessionAuthenticationMode.Delegated) {
             var organizationReadable = await session.Client
                 .ProbeApplicationCredentialWithoutRefreshAsync(cancellationToken)
                 .ConfigureAwait(false);
+            var credentialDescription = authenticationMode == GraphSessionAuthenticationMode.Application
+                ? "application credential"
+                : "credential while its delegated/application mode remained unknown";
             evidence.IdentityUnavailableReason = organizationReadable
-                ? "Microsoft Graph verified the application credential through the organization endpoint. No mailbox was configured, so no mailbox identity was inferred."
-                : "Microsoft Graph authenticated the application credential but denied the organization endpoint permission. No mailbox was configured, so no mailbox identity was inferred.";
+                ? $"Microsoft Graph verified the {credentialDescription} through the organization endpoint. No mailbox was configured, so no mailbox identity was inferred."
+                : $"Microsoft Graph authenticated the {credentialDescription} but denied the organization endpoint permission. No mailbox was configured, so no mailbox identity was inferred.";
             return;
         }
 
@@ -554,6 +558,21 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
         } catch (GraphApiException ex) when (ex.StatusCode == HttpStatusCode.Forbidden) {
             evidence.IdentityUnavailableReason = $"Microsoft Graph users endpoint returned {(int)ex.StatusCode} ({ex.StatusCode}); mail capability evidence remains valid.";
         }
+    }
+
+    private static GraphSessionAuthenticationMode ResolveGraphAuthenticationMode(
+        GraphSession session,
+        MailProfileDiagnosticEvidence evidence) {
+        if (session.AuthenticationMode != GraphSessionAuthenticationMode.Unknown) {
+            return session.AuthenticationMode;
+        }
+        if ((evidence.Permissions?.ApplicationRoles.Count ?? 0) > 0) {
+            return GraphSessionAuthenticationMode.Application;
+        }
+        if ((evidence.Permissions?.DelegatedScopes.Count ?? 0) > 0) {
+            return GraphSessionAuthenticationMode.Delegated;
+        }
+        return GraphSessionAuthenticationMode.Unknown;
     }
 
     private static bool IsGmailInsufficientScope(GmailAuthenticationException exception) {

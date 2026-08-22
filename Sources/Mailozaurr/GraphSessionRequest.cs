@@ -12,4 +12,7 @@ public sealed class GraphSessionRequest {
 
     /// <summary>Optional Graph credential metadata used to mint new access tokens.</summary>
     public GraphCredential? GraphCredential { get; set; }
+
+    /// <summary>Known authentication mode established independently of access-token claims.</summary>
+    public GraphSessionAuthenticationMode AuthenticationMode { get; set; }
 }

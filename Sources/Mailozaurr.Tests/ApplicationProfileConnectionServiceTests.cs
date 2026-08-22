@@ -288,6 +288,35 @@ public sealed class ApplicationProfileConnectionServiceTests {
     }
 
     [Fact]
+    public async Task DefaultGraphAuthProbeDoesNotCallMeForOpaqueAccessTokenOnlySessionWithoutMailbox() {
+        var profileStore = new InMemoryProfileStore(new[] {
+            new MailProfile {
+                Id = "graph-token",
+                DisplayName = "Graph token",
+                Kind = MailProfileKind.Graph
+            }
+        });
+        var handler = new RecordingHandler(
+            JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
+        var service = new MailProfileConnectionService(
+            profileStore,
+            graphSessionFactory: new HttpGraphSessionFactory(handler, new OAuthCredential {
+                UserName = "opaque",
+                AccessToken = "opaque-access-token",
+                ExpiresOn = DateTimeOffset.MaxValue
+            }));
+
+        var result = await service.TestAsync("graph-token", MailProfileConnectionTestScope.Auth);
+
+        Assert.True(result.Succeeded);
+        var evidence = result.Stages[result.Stages.Count - 1].Evidence;
+        Assert.Null(evidence?.Identity);
+        Assert.Contains("mode remained unknown", evidence?.IdentityUnavailableReason);
+        Assert.Single(handler.Requests);
+        Assert.Contains("/organization?", handler.Requests[0].RequestUri?.AbsoluteUri);
+    }
+
+    [Fact]
     public async Task DefaultGraphAuthProbeRejectsInvalidOpaqueApplicationTokenWithoutMailbox() {
         var profileStore = new InMemoryProfileStore(new[] {
             new MailProfile {
@@ -455,7 +484,7 @@ public sealed class ApplicationProfileConnectionServiceTests {
     }
 
     [Fact]
-    public async Task DefaultGraphSendPreflightAcceptsCompleteSharedMailboxPermissionPair() {
+    public async Task DefaultGraphSendPreflightKeepsSharedMailboxReadinessUnknownWithoutExchangeDelegationEvidence() {
         var handler = new RecordingHandler(
             JsonResponse("{\"value\":[]}"),
             JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
@@ -470,7 +499,9 @@ public sealed class ApplicationProfileConnectionServiceTests {
         var result = await service.TestAsync("graph-work", MailProfileConnectionTestScope.Send);
 
         Assert.True(result.Succeeded);
-        Assert.True(result.Stages[result.Stages.Count - 1].Evidence?.Preflight?.Ready);
+        var preflight = result.Stages[result.Stages.Count - 1].Evidence?.Preflight;
+        Assert.Null(preflight?.Ready);
+        Assert.Contains("Send As or Send on Behalf", preflight?.Detail);
     }
 
     [Fact]
