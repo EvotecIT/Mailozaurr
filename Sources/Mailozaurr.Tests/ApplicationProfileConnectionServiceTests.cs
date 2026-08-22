@@ -229,7 +229,8 @@ public sealed class ApplicationProfileConnectionServiceTests {
                 Kind = MailProfileKind.Graph
             }
         });
-        var handler = new RecordingHandler();
+        var handler = new RecordingHandler(
+            JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
         var service = new MailProfileConnectionService(
             profileStore,
             graphSessionFactory: new HttpGraphSessionFactory(handler, new OAuthCredential {
@@ -244,8 +245,9 @@ public sealed class ApplicationProfileConnectionServiceTests {
         var evidence = result.Stages[result.Stages.Count - 1].Evidence;
         Assert.Equal(new[] { "Mail.Read" }, evidence?.Permissions?.ApplicationRoles);
         Assert.Null(evidence?.Identity);
-        Assert.Contains("/me", evidence?.IdentityUnavailableReason);
-        Assert.Empty(handler.Requests);
+        Assert.Contains("authenticated", evidence?.IdentityUnavailableReason);
+        Assert.Single(handler.Requests);
+        Assert.Contains("/organization?", handler.Requests[0].RequestUri?.AbsoluteUri);
     }
 
     [Fact]
@@ -257,7 +259,8 @@ public sealed class ApplicationProfileConnectionServiceTests {
                 Kind = MailProfileKind.Graph
             }
         });
-        var handler = new RecordingHandler();
+        var handler = new RecordingHandler(
+            JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
         var service = new MailProfileConnectionService(
             profileStore,
             graphSessionFactory: new HttpGraphSessionFactory(
@@ -279,8 +282,43 @@ public sealed class ApplicationProfileConnectionServiceTests {
         var evidence = result.Stages[result.Stages.Count - 1].Evidence;
         Assert.Empty(evidence?.Permissions?.ApplicationRoles ?? new List<string>());
         Assert.Null(evidence?.Identity);
-        Assert.Contains("/me", evidence?.IdentityUnavailableReason);
-        Assert.Empty(handler.Requests);
+        Assert.Contains("authenticated", evidence?.IdentityUnavailableReason);
+        Assert.Single(handler.Requests);
+        Assert.Contains("/organization?", handler.Requests[0].RequestUri?.AbsoluteUri);
+    }
+
+    [Fact]
+    public async Task DefaultGraphAuthProbeRejectsInvalidOpaqueApplicationTokenWithoutMailbox() {
+        var profileStore = new InMemoryProfileStore(new[] {
+            new MailProfile {
+                Id = "graph-app",
+                DisplayName = "Graph application",
+                Kind = MailProfileKind.Graph
+            }
+        });
+        var handler = new RecordingHandler(
+            JsonResponse("{\"error\":{\"code\":\"InvalidAuthenticationToken\"}}", HttpStatusCode.Unauthorized));
+        var service = new MailProfileConnectionService(
+            profileStore,
+            graphSessionFactory: new HttpGraphSessionFactory(
+                handler,
+                new OAuthCredential {
+                    UserName = "app",
+                    AccessToken = "invalid-opaque-application-token",
+                    ExpiresOn = DateTimeOffset.MaxValue
+                },
+                graphCredential: new GraphCredential {
+                    ClientId = "client-id",
+                    DirectoryId = "tenant-id",
+                    ClientSecret = "client-secret"
+                }));
+
+        var result = await service.TestAsync("graph-app", MailProfileConnectionTestScope.Auth);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("connection_test_failed", result.Code);
+        Assert.Single(handler.Requests);
+        Assert.Contains("/organization?", handler.Requests[0].RequestUri?.AbsoluteUri);
     }
 
     [Fact]

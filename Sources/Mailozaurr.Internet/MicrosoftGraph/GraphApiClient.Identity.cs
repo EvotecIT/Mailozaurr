@@ -9,6 +9,39 @@ namespace Mailozaurr;
 
 public sealed partial class GraphApiClient {
     /// <summary>
+    /// Verifies an application credential against an application-compatible Graph endpoint without refreshing it.
+    /// </summary>
+    /// <returns>
+    /// <c>true</c> when the organization endpoint was readable; <c>false</c> when Graph authenticated the token but
+    /// denied the organization permission.
+    /// </returns>
+    public async Task<bool> ProbeApplicationCredentialWithoutRefreshAsync(
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "organization?$select=id&$top=1");
+        ApplyAuthHeader(request);
+        using var response = await _client.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode == System.Net.HttpStatusCode.Forbidden) {
+            return false;
+        }
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) {
+            throw new GraphApiException(response.StatusCode, "Graph application authentication failed.", string.Empty);
+        }
+        if (!response.IsSuccessStatusCode) {
+            throw new GraphApiException(
+                response.StatusCode,
+                $"Graph application credential probe failed ({(int)response.StatusCode}).",
+                string.Empty,
+                TryGetRetryAfter(response));
+        }
+        return true;
+    }
+
+    /// <summary>
     /// Gets the provider-verified identity for the selected Graph user.
     /// </summary>
     public async Task<GraphMailboxIdentity> GetMailboxIdentityAsync(

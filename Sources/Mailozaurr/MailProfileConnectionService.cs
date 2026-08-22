@@ -536,8 +536,12 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
         CancellationToken cancellationToken) {
         if (string.Equals(session.UserId, "me", StringComparison.OrdinalIgnoreCase) &&
             ((evidence.Permissions?.ApplicationRoles.Count ?? 0) > 0 || session.GraphCredential != null)) {
-            evidence.IdentityUnavailableReason =
-                "Microsoft Graph /me is unavailable to application tokens. Configure a mailbox to verify an application identity without using a delegated-only endpoint.";
+            var organizationReadable = await session.Client
+                .ProbeApplicationCredentialWithoutRefreshAsync(cancellationToken)
+                .ConfigureAwait(false);
+            evidence.IdentityUnavailableReason = organizationReadable
+                ? "Microsoft Graph verified the application credential through the organization endpoint. No mailbox was configured, so no mailbox identity was inferred."
+                : "Microsoft Graph authenticated the application credential but denied the organization endpoint permission. No mailbox was configured, so no mailbox identity was inferred.";
             return;
         }
 
