@@ -115,7 +115,19 @@ public sealed class MailMcpToolsMetadataTests {
             nameof(MailMcpTools.mail_action_plan),
             nameof(MailMcpTools.mail_actions_bundle_preview),
             nameof(MailMcpTools.mail_actions_preview),
-            nameof(MailMcpTools.mail_move_preview));
+            nameof(MailMcpTools.mail_move_preview),
+            nameof(MailMcpTools.mail_provider_permission_evidence),
+            nameof(MailMcpTools.mail_graph_rule_list),
+            nameof(MailMcpTools.mail_graph_rule_get),
+            nameof(MailMcpTools.mail_graph_event_list),
+            nameof(MailMcpTools.mail_graph_event_get),
+            nameof(MailMcpTools.mail_graph_thread_get),
+            nameof(MailMcpTools.mail_gmail_filter_list),
+            nameof(MailMcpTools.mail_gmail_filter_get),
+            nameof(MailMcpTools.mail_gmail_label_list),
+            nameof(MailMcpTools.mail_gmail_label_get),
+            nameof(MailMcpTools.mail_gmail_thread_list),
+            nameof(MailMcpTools.mail_gmail_thread_get));
 
         Add(expected, readOnly: true, destructive: false, idempotent: false, openWorld: true,
             nameof(MailMcpTools.mail_changes_wait));
@@ -167,7 +179,12 @@ public sealed class MailMcpToolsMetadataTests {
             nameof(MailMcpTools.mail_action_batch_store_execute),
             nameof(MailMcpTools.mail_action_plan_export),
             nameof(MailMcpTools.mail_action_execute),
-            nameof(MailMcpTools.mail_action_batch_execute));
+            nameof(MailMcpTools.mail_action_batch_execute),
+            nameof(MailMcpTools.mail_graph_rule_update),
+            nameof(MailMcpTools.mail_graph_event_update),
+            nameof(MailMcpTools.mail_gmail_label_update),
+            nameof(MailMcpTools.mail_gmail_thread_labels),
+            nameof(MailMcpTools.mail_gmail_thread_trash));
 
         Add(expected, readOnly: false, destructive: true, idempotent: false, openWorld: true,
             nameof(MailMcpTools.mail_draft_send),
@@ -176,7 +193,16 @@ public sealed class MailMcpToolsMetadataTests {
             nameof(MailMcpTools.mail_profile_gmail_login),
             nameof(MailMcpTools.mail_profile_refresh_auth),
             nameof(MailMcpTools.mail_send),
-            nameof(MailMcpTools.mail_action_batch_store_append_plan));
+            nameof(MailMcpTools.mail_action_batch_store_append_plan),
+            nameof(MailMcpTools.mail_graph_rule_create),
+            nameof(MailMcpTools.mail_graph_rule_delete),
+            nameof(MailMcpTools.mail_graph_event_create),
+            nameof(MailMcpTools.mail_graph_event_delete),
+            nameof(MailMcpTools.mail_gmail_filter_create),
+            nameof(MailMcpTools.mail_gmail_filter_delete),
+            nameof(MailMcpTools.mail_gmail_label_create),
+            nameof(MailMcpTools.mail_gmail_label_delete),
+            nameof(MailMcpTools.mail_gmail_thread_delete));
 
         return expected;
     }

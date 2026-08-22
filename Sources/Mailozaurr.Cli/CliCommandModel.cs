@@ -42,6 +42,7 @@ internal static partial class CliCommandModel {
         root.Add(CreateProfileCommand());
         root.Add(CreateDraftCommand());
         root.Add(CreateMailCommand());
+        root.Add(CreateProviderCommand());
         root.Add(CreateMcpCommand());
         root.Add(CreateSendCommand());
         root.Add(CreateQueueCommand());
@@ -144,6 +145,7 @@ internal static partial class CliCommandModel {
         "attachment" => "Attachment file path; repeat for multiple files.",
         "attachment-id" => "Attachment identifier; repeat when supported.",
         "batch" => "Stored action-plan batch identifier.",
+        "add-label" => "Gmail label identifier to add; repeat for multiple labels.",
         "bcc" => "BCC recipient address; repeat for multiple recipients.",
         "can-read" => "Return only profiles that support read operations.",
         "can-send" => "Return only profiles that support send operations.",
@@ -169,7 +171,10 @@ internal static partial class CliCommandModel {
         "drafts-dir" => "Override the draft-store directory.",
         "cursor" => "Graph delta URL or opaque Gmail history cursor.",
         "expiration" => "ISO 8601 Graph subscription expiration timestamp.",
+        "event-id" => "Microsoft Graph event identifier.",
         "file" => "Input file path.",
+        "filter" => "Microsoft Graph OData filter expression.",
+        "filter-id" => "Gmail filter identifier.",
         "folder" => "Mailbox folder identifier or name.",
         "from" => "Sender address.",
         "has-attachments" => "Return only messages with attachments.",
@@ -180,9 +185,11 @@ internal static partial class CliCommandModel {
         "is-default" => "Make the profile the default.",
         "kind" => "Mail provider kind.",
         "limit" => "Maximum result count.",
+        "label-id" => "Gmail label identifier.",
         "login" => "Interactive login user name.",
         "mailbox" => "Mailbox identifier or address.",
         "max-bytes" => "Maximum provider bytes accepted for one message.",
+        "max-pages" => "Maximum provider pages to read.",
         "message-id" => "Message identifier; repeat when supported.",
         "name" => "Display name or stable secret name.",
         "name-contains" => "Attachment filename substring filter.",
@@ -195,6 +202,7 @@ internal static partial class CliCommandModel {
         "profile" => "Mail profile identifier; repeat when supported.",
         "profiles-dir" => "Override the profile-store directory.",
         "query" => "Provider search query.",
+        "remove-label" => "Gmail label identifier to remove; repeat for multiple labels.",
         "queue-on-failure" => "Queue the message only when immediate delivery fails.",
         "ready-only" => "Return only profiles ready for use.",
         "redirect-uri" => "OAuth redirect URI.",
@@ -204,6 +212,7 @@ internal static partial class CliCommandModel {
         "reply-to" => "Reply-To address; repeat for multiple addresses.",
         "root-only" => "Return only top-level folders.",
         "scope" => "Connection-test or OAuth scope; repeat when supported.",
+        "select" => "Provider field selection expression.",
         "secrets-dir" => "Override the protected secret-store directory.",
         "setting" => "Non-secret profile setting in key=value form; repeat when needed.",
         "sort" => "Sort key.",
@@ -212,6 +221,7 @@ internal static partial class CliCommandModel {
         "strict" => "Fail when a remote subscription is already absent.",
         "subject" => "Message subject or subject search filter.",
         "subscription-id" => "Graph subscription identifier.",
+        "rule-id" => "Microsoft Graph Inbox rule identifier.",
         "summary" => "Return the summary response projection.",
         "target-batch" => "Target action-plan batch identifier.",
         "target-folder" => "Destination folder identifier or alias.",
@@ -219,6 +229,7 @@ internal static partial class CliCommandModel {
         "tenant-id" => "OAuth tenant or directory identifier.",
         "text" => "Plain-text message body.",
         "timeout-seconds" => "Maximum live wait duration in seconds.",
+        "thread-id" => "Provider conversation or thread identifier.",
         "topic" => "Gmail Pub/Sub topic name.",
         "to" => "Recipient address; repeat for multiple recipients.",
         "unflag" => "Clear the flagged state.",

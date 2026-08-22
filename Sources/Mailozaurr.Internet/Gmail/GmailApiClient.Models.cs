@@ -150,6 +150,12 @@ public sealed partial class GmailApiClient {
         public List<GmailLabel>? Labels { get; set; }
     }
 
+    /// <summary>Response envelope for Gmail filter listing.</summary>
+    public sealed class GmailFilterListResponse {
+        /// <summary>Filters returned by the API.</summary>
+        public List<GmailFilter>? Filter { get; set; }
+    }
+
     /// <summary>Request payload for Gmail modify label endpoints.</summary>
     public sealed class GmailModifyLabelsRequest {
         /// <summary>Label ids to add.</summary>

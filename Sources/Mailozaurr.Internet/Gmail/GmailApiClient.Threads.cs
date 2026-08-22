@@ -34,7 +34,10 @@ public sealed partial class GmailApiClient {
         };
         var jsonRequest = JsonSerializer.Serialize(request, GmailJsonContext.Default.GmailModifyLabelsRequest);
         using var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
-        using var response = await _client.PostAsync($"users/{userId}/threads/{id}/modify", content, cancellationToken).ConfigureAwait(false);
+        using var response = await _client.PostAsync(
+            BuildGmailUserSegment(userId) + "/threads/" + EscapeGmailRequired(id, nameof(id)) + "/modify",
+            content,
+            cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 #if NET5_0_OR_GREATER
@@ -62,7 +65,10 @@ public sealed partial class GmailApiClient {
         if (DryRun) {
             return new GmailThread { Id = id, Messages = new List<GmailMessage>() };
         }
-        using var response = await _client.PostAsync($"users/{userId}/threads/{id}/trash", content: null, cancellationToken).ConfigureAwait(false);
+        using var response = await _client.PostAsync(
+            BuildGmailUserSegment(userId) + "/threads/" + EscapeGmailRequired(id, nameof(id)) + "/trash",
+            content: null,
+            cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 #if NET5_0_OR_GREATER
@@ -90,7 +96,9 @@ public sealed partial class GmailApiClient {
         if (DryRun) {
             return;
         }
-        using var response = await _client.DeleteAsync($"users/{userId}/threads/{id}", cancellationToken).ConfigureAwait(false);
+        using var response = await _client.DeleteAsync(
+            BuildGmailUserSegment(userId) + "/threads/" + EscapeGmailRequired(id, nameof(id)),
+            cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
     }
@@ -285,7 +293,7 @@ public sealed partial class GmailApiClient {
         var threads = new List<GmailThreadInfo>();
         string? pageToken = null;
         do {
-            var url = new StringBuilder($"users/{userId}/threads");
+            var url = new StringBuilder(BuildGmailUserSegment(userId) + "/threads");
             var qs = new List<string>();
             if (!string.IsNullOrWhiteSpace(query)) qs.Add($"q={Uri.EscapeDataString(query)}");
             if (maxResults.HasValue) qs.Add($"maxResults={maxResults.Value}");
@@ -321,7 +329,9 @@ public sealed partial class GmailApiClient {
     /// </summary>
     public async Task<GmailThread> GetThreadAsync(string userId, string id, CancellationToken cancellationToken = default) {
         ThrowIfDisposed();
-        using var response = await _client.GetAsync($"users/{userId}/threads/{id}", cancellationToken).ConfigureAwait(false);
+        using var response = await _client.GetAsync(
+            BuildGmailUserSegment(userId) + "/threads/" + EscapeGmailRequired(id, nameof(id)),
+            cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 #if NET5_0_OR_GREATER
@@ -356,7 +366,7 @@ public sealed partial class GmailApiClient {
         }
 
         var safeId = Uri.EscapeDataString(id.Trim());
-        var url = new StringBuilder($"users/{userId}/threads/{safeId}");
+        var url = new StringBuilder(BuildGmailUserSegment(userId) + "/threads/" + safeId);
         var qs = new List<string>();
         if (!string.IsNullOrWhiteSpace(format)) qs.Add($"format={Uri.EscapeDataString(format!.Trim())}");
         if (!string.IsNullOrWhiteSpace(fields)) qs.Add($"fields={Uri.EscapeDataString(fields!.Trim())}");

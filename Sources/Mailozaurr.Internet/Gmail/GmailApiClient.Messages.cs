@@ -537,7 +537,9 @@ public sealed partial class GmailApiClient {
     /// </summary>
     public async Task<IList<GmailLabel>> ListLabelsAsync(string userId, CancellationToken cancellationToken = default) {
         ThrowIfDisposed();
-        using var response = await _client.GetAsync($"users/{userId}/labels?fields=labels(id,name,type)", cancellationToken).ConfigureAwait(false);
+        using var response = await _client.GetAsync(
+            BuildGmailUserSegment(userId) + "/labels?fields=labels(id,name,type,messageListVisibility,labelListVisibility,messagesTotal,messagesUnread,threadsTotal,threadsUnread,color)",
+            cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 #if NET5_0_OR_GREATER

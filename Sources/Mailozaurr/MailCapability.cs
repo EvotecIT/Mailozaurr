@@ -49,4 +49,7 @@ public enum MailCapability {
 
     /// <summary>Work with labels or label-like grouping.</summary>
     UseLabels = 1 << 13,
+
+    /// <summary>Inspect bounded OAuth permission evidence without claiming delegation management.</summary>
+    InspectPermissions = 1 << 14,
 }
