@@ -165,7 +165,12 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
             Attachments = result.Attachments.Select((attachment, index) => new AttachmentSummary {
                 MessageId = summary.Id,
                 Id = index.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                FileName = attachment.FileName,
+                FileName = MimeAttachmentStorage.GetAttachmentFileName(
+                    attachment.FileName,
+                    MimeAttachmentStorage.CreateStorageIdentity(
+                        profile.Id,
+                        summary.Id,
+                        index.ToString(System.Globalization.CultureInfo.InvariantCulture))),
                 ContentType = attachment.ContentType
             }).ToList()
         };
@@ -197,7 +202,13 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
             return OperationResult.Failure("attachment_not_found", "Message has no attachments.");
         }
 
-        var attachmentIndex = MimeAttachmentStorage.ResolveAttachmentIndex(attachments, request.AttachmentId);
+        var attachmentIndex = MimeAttachmentStorage.ResolveAttachmentIndex(
+            attachments,
+            request.AttachmentId,
+            index => MimeAttachmentStorage.CreateStorageIdentity(
+                profile.Id,
+                request.MessageId,
+                index.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         if (attachmentIndex < 0) {
             return OperationResult.Failure("attachment_not_found", $"Attachment '{request.AttachmentId}' was not found.");
         }

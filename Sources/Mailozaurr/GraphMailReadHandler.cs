@@ -260,7 +260,13 @@ public sealed class GraphMailReadHandler : IMailReadHandler {
             return OperationResult.Failure("attachment_not_found", "Message has no attachments.");
         }
 
-        var attachmentIndex = MimeAttachmentStorage.ResolveAttachmentIndex(attachments, request.AttachmentId);
+        var attachmentIndex = MimeAttachmentStorage.ResolveAttachmentIndex(
+            attachments,
+            request.AttachmentId,
+            index => MimeAttachmentStorage.CreateStorageIdentity(
+                profile.Id,
+                request.MessageId,
+                index.ToString(CultureInfo.InvariantCulture)));
         if (attachmentIndex < 0) {
             return OperationResult.Failure("attachment_not_found", $"Attachment '{request.AttachmentId}' was not found.");
         }
@@ -272,7 +278,7 @@ public sealed class GraphMailReadHandler : IMailReadHandler {
             MimeAttachmentStorage.CreateStorageIdentity(
                 profile.Id,
                 profile.Kind.ToString(),
-                userId,
+                CanonicalizeUserIdForStorage(userId),
                 request.MessageId,
                 attachmentIndex.ToString(CultureInfo.InvariantCulture)));
         if (File.Exists(destinationPath) && !request.Overwrite) {
@@ -363,6 +369,11 @@ public sealed class GraphMailReadHandler : IMailReadHandler {
         }
 
         return "me";
+    }
+
+    internal static string CanonicalizeUserIdForStorage(string? userId) {
+        var normalized = string.IsNullOrWhiteSpace(userId) ? "me" : userId!.Trim();
+        return string.Equals(normalized, "me", StringComparison.OrdinalIgnoreCase) ? "me" : normalized;
     }
 
     private static int GetMaxMimeBytes(MailProfile profile) {

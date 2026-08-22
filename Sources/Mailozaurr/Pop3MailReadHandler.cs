@@ -157,7 +157,13 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
         }
 
         var attachments = resolved.Snapshot.Message.Attachments.ToList();
-        var attachmentIndex = MimeAttachmentStorage.ResolveAttachmentIndex(attachments, request.AttachmentId);
+        var attachmentIndex = MimeAttachmentStorage.ResolveAttachmentIndex(
+            attachments,
+            request.AttachmentId,
+            index => MimeAttachmentStorage.CreateStorageIdentity(
+                profile.Id,
+                request.MessageId,
+                index.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         if (attachmentIndex < 0) {
             return OperationResult.Failure("attachment_not_found", $"Attachment '{request.AttachmentId}' was not found.");
         }

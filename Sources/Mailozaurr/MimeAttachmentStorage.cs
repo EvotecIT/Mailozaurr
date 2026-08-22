@@ -11,12 +11,20 @@ internal static class MimeAttachmentStorage {
     }
 
     public static int ResolveAttachmentIndex(IReadOnlyList<MimeEntity> attachments, string attachmentId) {
+        return ResolveAttachmentIndex(attachments, attachmentId, fallbackIdentityFactory: null);
+    }
+
+    public static int ResolveAttachmentIndex(
+        IReadOnlyList<MimeEntity> attachments,
+        string attachmentId,
+        Func<int, string?>? fallbackIdentityFactory) {
         if (int.TryParse(attachmentId, out var index) && index >= 0 && index < attachments.Count) {
             return index;
         }
 
         for (var attachmentIndex = 0; attachmentIndex < attachments.Count; attachmentIndex++) {
-            if (string.Equals(GetAttachmentFileName(attachments[attachmentIndex]), attachmentId,
+            var fallbackIdentity = fallbackIdentityFactory?.Invoke(attachmentIndex);
+            if (string.Equals(GetAttachmentFileName(attachments[attachmentIndex], fallbackIdentity), attachmentId,
                 StringComparison.OrdinalIgnoreCase)) {
                 return attachmentIndex;
             }
@@ -86,6 +94,9 @@ internal static class MimeAttachmentStorage {
             ? CreateFallbackFileName(fallbackIdentity)
             : fileName!;
     }
+
+    public static string GetAttachmentFileName(string? fileName, string? fallbackIdentity = null) =>
+        string.IsNullOrWhiteSpace(fileName) ? CreateFallbackFileName(fallbackIdentity) : fileName!;
 
     private static string GetSafeAttachmentFileName(string remoteFileName, string? attachmentIdentity) {
         var sourceFileName = remoteFileName ?? string.Empty;

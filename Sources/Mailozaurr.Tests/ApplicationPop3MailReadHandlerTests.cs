@@ -292,6 +292,23 @@ public sealed class ApplicationPop3MailReadHandlerTests {
     }
 
     [Fact]
+    public void UnnamedAttachmentFallbackAliasResolvesToTheListedPart() {
+        IReadOnlyList<MimeEntity> attachments = new MimeEntity[] {
+            new MimePart("application", "octet-stream"),
+            new MimePart("application", "octet-stream")
+        };
+        string Identity(int index) => MimeAttachmentStorage.CreateStorageIdentity(
+            "profile-a",
+            "message-a",
+            index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        var listedName = MimeAttachmentStorage.GetAttachmentFileName(attachments[1], Identity(1));
+
+        var resolved = MimeAttachmentStorage.ResolveAttachmentIndex(attachments, listedName, Identity);
+
+        Assert.Equal(1, resolved);
+    }
+
+    [Fact]
     public void BatchAttachmentNamesIncludeProfileFolderAndMessageIdentity() {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
