@@ -296,7 +296,14 @@ public sealed partial class MailMcpToolsTests {
                         Probe = "resolveProfile",
                         Target = profileId,
                         DurationMilliseconds = 2,
-                        Message = "Profile resolved."
+                        Message = "Profile resolved.",
+                        Evidence = new MailProfileDiagnosticEvidence {
+                            Protocol = "Gmail",
+                            Identity = new MailProfileIdentityEvidence {
+                                EmailAddress = "user@example.com",
+                                Source = "Gmail users.getProfile endpoint"
+                            }
+                        }
                     }
                 }
             });

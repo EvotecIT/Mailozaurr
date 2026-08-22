@@ -268,7 +268,16 @@ Remove-Item Env:MAILOZAURR_SMTP_PASSWORD
 mailozaurr profile test --profile alerts-smtp --scope send --json
 ```
 
-`profile test --json` keeps the existing summary fields and also returns ordered `Stages`. Each stage identifies the observable profile, session, mailbox, provider-probe, or send-preflight phase, its duration, target, and failure code. Mailozaurr reports the combined session operation exposed by each provider factory; it does not invent separate DNS, TCP, TLS, or authentication timings when those boundaries are not observable.
+`profile test --json` keeps the existing summary fields and also returns ordered `Stages`. Each stage identifies the observable profile, session, mailbox, provider-probe, or send-preflight phase, its duration, target, failure code, and typed `Evidence` when the provider exposes it.
+
+The evidence is deliberately provider-neutral and non-secret:
+
+- IMAP, POP3, and SMTP report observed connection, authentication, TLS, advertised capability, and authentication-mechanism facts. Mailbox probes add bounded count/cursor evidence where available.
+- Graph calls the users endpoint to verify the selected identity. It never treats a configured mailbox string as authentication proof. JWT `scp` and `roles` values are shown only as non-authoritative, token-declared evidence after that live request succeeds; opaque tokens are reported as unavailable rather than guessed.
+- Gmail calls `users.getProfile` and reports the verified email address, message/thread totals, and history cursor. OAuth permissions remain unavailable unless the provider supplies authoritative scope metadata.
+- Send preflight is non-destructive. It reports the validation depth and whether readiness is known; it does not claim that a message, envelope, or recipient was accepted.
+
+Mailozaurr reports the combined session operation exposed by each provider factory; it does not invent separate DNS, TCP, TLS, or authentication timings when those boundaries are not observable.
 
 ### Microsoft Graph profile
 

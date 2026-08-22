@@ -245,7 +245,7 @@ mailozaurr profile summary --profile work-imap --json
 mailozaurr profile test --profile work-imap --scope mailbox --json
 ```
 
-Connection-test JSON includes ordered, timed stages for profile resolution, session acquisition, and the requested provider probe. POP3 profiles participate in the same application surface with a virtual `INBOX` and normalized `uid:` message identifiers (falling back to a content-verified `hash:<sha256>:<occurrence>` identity when UIDL is unavailable).
+Connection-test JSON includes ordered, timed stages for profile resolution, session acquisition, and the requested provider probe. Typed `Evidence` reports non-secret protocol capabilities, authenticated identity, permission provenance, mailbox counts/cursors, and non-destructive send readiness when those facts are actually observable. Graph identity is verified with a live users-endpoint request; Gmail identity and mailbox totals come from `users.getProfile`; opaque permissions remain explicitly unavailable instead of being guessed. POP3 profiles participate in the same application surface with a virtual `INBOX` and normalized `uid:` message identifiers (falling back to a content-verified `hash:<sha256>:<occurrence>` identity when UIDL is unavailable).
 
 Search and inspect mail:
 

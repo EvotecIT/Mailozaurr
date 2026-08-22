@@ -1,6 +1,9 @@
 using MailKit.Net.Imap;
 using MailKit.Net.Pop3;
 using Mailozaurr;
+using System.Net;
+using System.Net.Http;
+using System.Text;
 
 namespace Mailozaurr.Tests;
 
@@ -74,6 +77,38 @@ public sealed class ApplicationProfileConnectionServiceTests {
     }
 
     [Fact]
+    public async Task DefaultGmailAuthProbeReportsVerifiedIdentityCountsAndHistoryCursor() {
+        var profileStore = new InMemoryProfileStore(new[] {
+            new MailProfile {
+                Id = "gmail-work",
+                DisplayName = "Work Gmail",
+                Kind = MailProfileKind.Gmail,
+                DefaultMailbox = "user@gmail.com"
+            }
+        });
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new StringContent("{\"emailAddress\":\"user@gmail.com\",\"messagesTotal\":42,\"threadsTotal\":21,\"historyId\":\"9001\"}")
+        });
+        var service = new MailProfileConnectionService(
+            profileStore,
+            gmailSessionFactory: new HttpGmailSessionFactory(handler));
+
+        var result = await service.TestAsync("gmail-work", MailProfileConnectionTestScope.Auth);
+
+        Assert.True(result.Succeeded);
+        var evidence = result.Stages[result.Stages.Count - 1].Evidence;
+        Assert.Equal("Gmail", evidence?.Protocol);
+        Assert.Equal("user@gmail.com", evidence?.Identity?.EmailAddress);
+        Assert.Equal("Gmail users.getProfile endpoint", evidence?.Identity?.Source);
+        Assert.Equal(42, evidence?.Mailbox?.MessageCount);
+        Assert.Equal(21, evidence?.Mailbox?.ThreadCount);
+        Assert.Equal("9001", evidence?.Mailbox?.ChangeCursor);
+        Assert.Equal("unavailable", evidence?.Permissions?.Source);
+        Assert.Empty(evidence?.Permissions?.Names ?? new List<string>());
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
     public async Task TestAsyncUsesAuthScopeWhenRequestedForGraph() {
         var profileStore = new InMemoryProfileStore(new[] {
             new MailProfile {
@@ -102,9 +137,63 @@ public sealed class ApplicationProfileConnectionServiceTests {
         Assert.True(result.Succeeded);
         Assert.Equal(MailProfileConnectionTestScope.Auth, result.RequestedScope);
         Assert.Equal(MailProfileConnectionTestScope.Auth, result.ExecutedScope);
-        Assert.Equal("connect", result.Probe);
+        Assert.Equal("getIdentity", result.Probe);
         Assert.Equal(1, authProbeCalls);
         Assert.Equal(0, mailboxProbeCalls);
+    }
+
+    [Fact]
+    public async Task DefaultGraphAuthProbeVerifiesIdentityAndReportsTokenDeclaredPermissions() {
+        var profileStore = CreateGraphProfileStore();
+        var response = new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new StringContent("{\"id\":\"user-id\",\"displayName\":\"Ada Lovelace\",\"mail\":\"ada@example.com\",\"userPrincipalName\":\"ada@example.com\"}")
+        };
+        var handler = new RecordingHandler(response);
+        var credential = new OAuthCredential {
+            UserName = "ada@example.com",
+            AccessToken = CreateJwt("{\"scp\":\"Mail.Read Mail.Send\",\"roles\":[\"MailboxSettings.Read\"]}"),
+            ExpiresOn = DateTimeOffset.MaxValue
+        };
+        var service = new MailProfileConnectionService(
+            profileStore,
+            graphSessionFactory: new HttpGraphSessionFactory(handler, credential));
+
+        var result = await service.TestAsync("graph-work", MailProfileConnectionTestScope.Auth);
+
+        Assert.True(result.Succeeded);
+        var probe = result.Stages[result.Stages.Count - 1];
+        Assert.Equal("user-id", probe.Evidence?.Identity?.Id);
+        Assert.Equal("ada@example.com", probe.Evidence?.Identity?.EmailAddress);
+        Assert.Equal("Microsoft Graph users endpoint", probe.Evidence?.Identity?.Source);
+        Assert.False(probe.Evidence?.Permissions?.Authoritative);
+        Assert.Equal(
+            new[] { "Mail.Read", "Mail.Send", "MailboxSettings.Read" },
+            probe.Evidence?.Permissions?.Names);
+        Assert.Single(handler.Requests);
+        Assert.Equal(
+            "https://graph.microsoft.com/v1.0/users/ada%40example.com?$select=id,displayName,mail,userPrincipalName",
+            handler.Requests[0].RequestUri?.AbsoluteUri);
+    }
+
+    [Fact]
+    public async Task DefaultGraphAuthProbeDoesNotTreatConfiguredUserIdAsAuthenticationProof() {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.Unauthorized) {
+            Content = new StringContent("{\"error\":{\"code\":\"InvalidAuthenticationToken\"}}")
+        });
+        var service = new MailProfileConnectionService(
+            CreateGraphProfileStore(),
+            graphSessionFactory: new HttpGraphSessionFactory(handler, new OAuthCredential {
+                UserName = "ada@example.com",
+                AccessToken = "opaque-token",
+                ExpiresOn = DateTimeOffset.MaxValue
+            }));
+
+        var result = await service.TestAsync("graph-work", MailProfileConnectionTestScope.Auth);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("connection_test_failed", result.Code);
+        Assert.Equal(MailProfileConnectionTestPhase.Probe, result.Stages[result.Stages.Count - 1].Phase);
+        Assert.Single(handler.Requests);
     }
 
     [Fact]
@@ -258,6 +347,23 @@ public sealed class ApplicationProfileConnectionServiceTests {
         };
     }
 
+    private static InMemoryProfileStore CreateGraphProfileStore() => new(new[] {
+        new MailProfile {
+            Id = "graph-work",
+            DisplayName = "Work Graph",
+            Kind = MailProfileKind.Graph,
+            DefaultMailbox = "ada@example.com"
+        }
+    });
+
+    private static string CreateJwt(string payload) {
+        static string Encode(string value) => Convert.ToBase64String(Encoding.UTF8.GetBytes(value))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+        return Encode("{\"alg\":\"none\"}") + "." + Encode(payload) + ".signature";
+    }
+
     private sealed class FakeImapSessionFactory : IImapSessionFactory {
         public Task<ImapClient> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) =>
             Task.FromResult(new ImapClient());
@@ -291,6 +397,24 @@ public sealed class ApplicationProfileConnectionServiceTests {
             }), profile.DefaultMailbox ?? "me"));
     }
 
+    private sealed class HttpGraphSessionFactory : IGraphSessionFactory {
+        private readonly HttpMessageHandler _handler;
+        private readonly OAuthCredential _credential;
+
+        public HttpGraphSessionFactory(HttpMessageHandler handler, OAuthCredential credential) {
+            _handler = handler;
+            _credential = credential;
+        }
+
+        public Task<GraphSession> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) {
+            var httpClient = new HttpClient(_handler) {
+                BaseAddress = new Uri("https://graph.microsoft.com/v1.0/")
+            };
+            var client = new GraphApiClient(httpClient, credential: _credential);
+            return Task.FromResult(new GraphSession(client, profile.DefaultMailbox ?? "me", _credential));
+        }
+    }
+
     private sealed class FakeGmailSessionFactory : IGmailSessionFactory {
         public Task<GmailSession> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) =>
             Task.FromResult(new GmailSession(new GmailApiClient(new OAuthCredential {
@@ -298,5 +422,21 @@ public sealed class ApplicationProfileConnectionServiceTests {
                 AccessToken = "token",
                 ExpiresOn = DateTimeOffset.MaxValue
             }), profile.DefaultMailbox ?? "me"));
+    }
+
+    private sealed class HttpGmailSessionFactory : IGmailSessionFactory {
+        private readonly HttpMessageHandler _handler;
+
+        public HttpGmailSessionFactory(HttpMessageHandler handler) {
+            _handler = handler;
+        }
+
+        public Task<GmailSession> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) {
+            var httpClient = new HttpClient(_handler) {
+                BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/")
+            };
+            var client = new GmailApiClient(httpClient);
+            return Task.FromResult(new GmailSession(client, profile.DefaultMailbox ?? "me"));
+        }
     }
 }
