@@ -138,6 +138,7 @@ public sealed class MailEmlExportService : IMailEmlExportService {
                 break;
             case MailProfileKind.Graph:
                 mailbox = GraphMailReadHandler.CanonicalizeUserIdForStorage(
+                    profile,
                     GraphMailReadHandler.ResolveUserId(profile, request.MailboxId));
                 break;
             case MailProfileKind.Gmail:

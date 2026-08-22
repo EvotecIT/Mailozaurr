@@ -278,7 +278,7 @@ public sealed class GraphMailReadHandler : IMailReadHandler {
             MimeAttachmentStorage.CreateStorageIdentity(
                 profile.Id,
                 profile.Kind.ToString(),
-                CanonicalizeUserIdForStorage(userId),
+                CanonicalizeUserIdForStorage(profile, userId),
                 request.MessageId,
                 attachmentIndex.ToString(CultureInfo.InvariantCulture)));
         if (File.Exists(destinationPath) && !request.Overwrite) {
@@ -373,7 +373,31 @@ public sealed class GraphMailReadHandler : IMailReadHandler {
 
     internal static string CanonicalizeUserIdForStorage(string? userId) {
         var normalized = string.IsNullOrWhiteSpace(userId) ? "me" : userId!.Trim();
-        return string.Equals(normalized, "me", StringComparison.OrdinalIgnoreCase) ? "me" : normalized;
+        return string.Equals(normalized, "me", StringComparison.OrdinalIgnoreCase)
+            ? "me"
+            : normalized.ToLowerInvariant();
+    }
+
+    internal static string CanonicalizeUserIdForStorage(MailProfile profile, string? userId) {
+        if (profile == null) throw new ArgumentNullException(nameof(profile));
+
+        var normalized = CanonicalizeUserIdForStorage(userId);
+        if (normalized == "me" || IsConfiguredMailbox(profile, normalized)) {
+            return "me";
+        }
+
+        return normalized;
+    }
+
+    private static bool IsConfiguredMailbox(MailProfile profile, string userId) {
+        if (!string.IsNullOrWhiteSpace(profile.DefaultMailbox) &&
+            string.Equals(profile.DefaultMailbox!.Trim(), userId, StringComparison.OrdinalIgnoreCase)) {
+            return true;
+        }
+
+        return profile.Settings.TryGetValue(MailProfileSettingsKeys.Mailbox, out var mailbox) &&
+               !string.IsNullOrWhiteSpace(mailbox) &&
+               string.Equals(mailbox!.Trim(), userId, StringComparison.OrdinalIgnoreCase);
     }
 
     private static int GetMaxMimeBytes(MailProfile profile) {

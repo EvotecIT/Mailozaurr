@@ -81,6 +81,25 @@ public sealed class MailEmlExportServiceTests {
     }
 
     [Fact]
+    public async Task Pop3HashExportReportsInconclusiveOversizedCandidate() {
+        var oversized = new MimeMessage { Subject = "Oversized" };
+        oversized.Body = new TextPart("plain") { Text = new string('x', 4096) };
+        var client = new BoundedPop3Client(new[] { oversized }, oversizedIndex: 0);
+        var source = new Pop3RawMailMessageSource(new FixedPop3SessionFactory(client));
+        using var session = await source.OpenSessionAsync(
+            new MailProfile { Id = "pop", Kind = MailProfileKind.Pop3 });
+
+        var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            session.GetRawMessageAsync(new RawMailMessageRequest {
+                MessageId = Pop3MailReadHandler.FormatMessageId(null, oversized),
+                MaxBytes = 2048
+            }));
+
+        Assert.Contains("cannot be resolved", exception.Message, StringComparison.Ordinal);
+        Assert.Empty(client.Downloads);
+    }
+
+    [Fact]
     public async Task Pop3HashResolutionScansMailboxOnlyOncePerBatchSession() {
         var first = new MimeMessage { Subject = "First", Body = new TextPart("plain") { Text = "one" } };
         var second = new MimeMessage { Subject = "Second", Body = new TextPart("plain") { Text = "two" } };
@@ -400,6 +419,48 @@ public sealed class MailEmlExportServiceTests {
             var second = await service.ExportAsync(new MailEmlExportRequest {
                 ProfileId = "graph-mailbox",
                 MailboxId = "me",
+                MessageIds = { "message" },
+                DestinationDirectory = directory,
+                Overwrite = true
+            });
+
+            Assert.True(first.Succeeded);
+            Assert.True(second.Succeeded);
+            Assert.Equal(
+                Assert.Single(first.Results).DestinationPath,
+                Assert.Single(second.Results).DestinationPath);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task GraphConfiguredMailboxAliasesUseOneDeterministicDestination() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profileStore = new InMemoryMailProfileStore();
+            await profileStore.SaveAsync(new MailProfile {
+                Id = "graph-mailbox",
+                DisplayName = "Graph mailbox",
+                Kind = MailProfileKind.Graph,
+                DefaultMailbox = "owner@example.com"
+            });
+            var source = new FakeRawMailMessageSource(
+                new Dictionary<string, byte[]> {
+                    ["message"] = CreateMessage("message", "X-Test: value")
+                },
+                MailProfileKind.Graph);
+            var service = new MailEmlExportService(profileStore, new[] { source });
+
+            var first = await service.ExportAsync(new MailEmlExportRequest {
+                ProfileId = "graph-mailbox",
+                MailboxId = "me",
+                MessageIds = { "message" },
+                DestinationDirectory = directory
+            });
+            var second = await service.ExportAsync(new MailEmlExportRequest {
+                ProfileId = "graph-mailbox",
+                MailboxId = "OWNER@example.com",
                 MessageIds = { "message" },
                 DestinationDirectory = directory,
                 Overwrite = true

@@ -7,9 +7,25 @@ public sealed class ApplicationGraphMailReadHandlerTests {
     [InlineData(null, "me")]
     [InlineData("", "me")]
     [InlineData(" ME ", "me")]
-    [InlineData("User@Example.test", "User@Example.test")]
+    [InlineData("User@Example.test", "user@example.test")]
     public void GraphStorageIdentityCanonicalizesMeLikeTheRequestRoute(string? userId, string expected) {
         Assert.Equal(expected, GraphMailReadHandler.CanonicalizeUserIdForStorage(userId));
+    }
+
+    [Theory]
+    [InlineData("me", "me")]
+    [InlineData("OWNER@Example.com", "me")]
+    [InlineData("00000000-0000-0000-0000-000000000001", "me")]
+    [InlineData("other@Example.com", "other@example.com")]
+    public void GraphStorageIdentityCanonicalizesConfiguredMailboxAliases(string userId, string expected) {
+        var profile = new MailProfile {
+            Id = "work-graph",
+            Kind = MailProfileKind.Graph,
+            DefaultMailbox = "owner@example.com"
+        };
+        profile.Settings[MailProfileSettingsKeys.Mailbox] = "00000000-0000-0000-0000-000000000001";
+
+        Assert.Equal(expected, GraphMailReadHandler.CanonicalizeUserIdForStorage(profile, userId));
     }
 
     [Fact]

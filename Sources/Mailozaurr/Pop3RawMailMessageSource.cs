@@ -22,6 +22,7 @@ public sealed class Pop3RawMailMessageSource : IRawMailMessageSource {
     private sealed class Session : IRawMailMessageSession {
         private readonly MailKit.Net.Pop3.Pop3Client _client;
         private readonly Dictionary<long, Dictionary<string, List<int>>> _fingerprintIndexes = new();
+        private readonly Dictionary<long, bool> _fingerprintIndexesSkippedOversized = new();
         private IList<string>? _uids;
 
         internal Session(MailKit.Net.Pop3.Pop3Client client) => _client = client;
@@ -60,6 +61,10 @@ public sealed class Pop3RawMailMessageSource : IRawMailMessageSource {
             }
             if (!fingerprintIndex.TryGetValue(identifier.Fingerprint!, out var matchingIndexes) ||
                 identifier.Occurrence >= matchingIndexes.Count) {
+                if (_fingerprintIndexesSkippedOversized[request.MaxBytes]) {
+                    throw new InvalidDataException(
+                        $"POP3 hash identity cannot be resolved without reading messages larger than {request.MaxBytes} bytes.");
+                }
                 return null;
             }
 
@@ -80,10 +85,12 @@ public sealed class Pop3RawMailMessageSource : IRawMailMessageSource {
             CancellationToken cancellationToken) {
             var indexByFingerprint = new Dictionary<string, List<int>>(StringComparer.Ordinal);
             RawMailMessage? requestedMessage = null;
+            var skippedOversized = false;
             for (var index = _client.Count - 1; index >= 0; index--) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var announcedSize = _client.GetMessageSize(index, cancellationToken);
                 if (announcedSize > maxBytes) {
+                    skippedOversized = true;
                     continue;
                 }
                 var candidate = await ReadAtIndexAsync(
@@ -108,6 +115,7 @@ public sealed class Pop3RawMailMessageSource : IRawMailMessageSource {
             }
 
             _fingerprintIndexes.Add(maxBytes, indexByFingerprint);
+            _fingerprintIndexesSkippedOversized.Add(maxBytes, skippedOversized);
             return requestedMessage;
         }
 
