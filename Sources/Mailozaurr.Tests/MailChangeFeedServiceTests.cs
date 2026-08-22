@@ -55,7 +55,7 @@ public sealed class MailChangeFeedServiceTests {
 
     [Fact]
     public async Task GraphCursorUsesConfiguredSovereignEndpointBoundary() {
-        const string cursor = "https://graph.microsoft.us/v1.0/me/mailFolders/inbox/messages/delta?$deltatoken=next";
+        const string cursor = "https://graph.microsoft.us/v1.0/me/mailFolders/inbox/messages/delta?$skiptoken=next";
         var handler = new RecordingHandler(Response(
             HttpStatusCode.OK,
             "{\"@odata.deltaLink\":\"" + cursor + "\",\"value\":[]}"));
@@ -81,12 +81,14 @@ public sealed class MailChangeFeedServiceTests {
 
         var result = await service.GetChangesAsync(new MailChangeFeedRequest {
             ProfileId = "profile",
-            Cursor = "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages/delta?$deltatoken=expired"
+            FolderId = "Sent Items",
+            Cursor = "https://graph.microsoft.com/v1.0/me/mailFolders/sentitems/messages/delta?$deltatoken=expired"
         });
 
         Assert.True(result.ResetRequired);
         Assert.Empty(result.Changes);
         Assert.Equal("durable-delta", result.CursorKind);
+        Assert.Equal("sentitems", result.FolderId);
     }
 
     [Theory]
@@ -95,6 +97,10 @@ public sealed class MailChangeFeedServiceTests {
     [InlineData("https://graph.microsoft.com.evil.test/v1.0/delta")]
     [InlineData("https://graph.microsoft.com:8443/v1.0/delta")]
     [InlineData("https://graph.microsoft.com/v1.0/me/messages")]
+    [InlineData("https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages/delta")]
+    [InlineData("https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages/delta?$filter=isRead%20eq%20false")]
+    [InlineData("https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages/delta?$deltatoken=")]
+    [InlineData("https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages/delta?$deltatoken=x&$skiptoken=y")]
     [InlineData("https://graph.microsoft.com/v1.0/users/other/mailFolders/inbox/messages/delta?$deltatoken=x")]
     [InlineData("https://graph.microsoft.com/v1.0/me/mailFolders/archive/messages/delta?$deltatoken=x")]
     public async Task GraphCursorRejectsNonGraphDestinations(string cursor) {

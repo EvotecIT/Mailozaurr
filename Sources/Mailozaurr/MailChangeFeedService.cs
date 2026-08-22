@@ -193,7 +193,7 @@ public sealed class MailChangeFeedService : IMailChangeFeedService {
                 Changes = changes
             };
         } catch (GraphApiException ex) when (ex.StatusCode == HttpStatusCode.Gone) {
-            return ResetRequired(profile, folder, "durable-delta");
+            return ResetRequired(profile, folderSelector, "durable-delta");
         }
     }
 
@@ -338,19 +338,47 @@ public sealed class MailChangeFeedService : IMailChangeFeedService {
         string folderSelector,
         string parameterName) {
         if (string.IsNullOrWhiteSpace(cursor)) return null;
-        if (!Uri.TryCreate(cursor!.Trim(), UriKind.Absolute, out var uri) ||
+        var normalized = cursor!.Trim();
+        if (normalized.Length > 8192 ||
+            !Uri.TryCreate(normalized, UriKind.Absolute, out var uri) ||
             !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(uri.Scheme, baseAddress.Scheme, StringComparison.OrdinalIgnoreCase) ||
             !string.Equals(uri.IdnHost, baseAddress.IdnHost, StringComparison.OrdinalIgnoreCase) ||
             uri.Port != baseAddress.Port ||
             !string.IsNullOrEmpty(uri.UserInfo) ||
             !string.IsNullOrEmpty(uri.Fragment) ||
-            !IsExpectedGraphDeltaPath(uri, baseAddress, userId, folderSelector)) {
+            !IsExpectedGraphDeltaPath(uri, baseAddress, userId, folderSelector) ||
+            !HasGraphContinuationState(uri)) {
             throw new ArgumentException(
-                "A Graph cursor must be an HTTPS delta URL on the configured Graph endpoint for the requested mailbox and folder.",
+                "A Graph cursor must be an HTTPS continuation URL on the configured Graph endpoint for the requested mailbox and folder.",
                 parameterName);
         }
         return uri.AbsoluteUri;
+    }
+
+    private static bool HasGraphContinuationState(Uri uri) {
+        var query = uri.Query;
+        if (string.IsNullOrWhiteSpace(query)) return false;
+
+        var found = false;
+        try {
+            foreach (var component in query.TrimStart('?').Split('&')) {
+                var separator = component.IndexOf('=');
+                if (separator <= 0) continue;
+                var name = Uri.UnescapeDataString(component.Substring(0, separator));
+                if (!string.Equals(name, "$deltatoken", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(name, "$skiptoken", StringComparison.OrdinalIgnoreCase)) {
+                    continue;
+                }
+                if (found) return false;
+                var value = Uri.UnescapeDataString(component.Substring(separator + 1));
+                if (string.IsNullOrWhiteSpace(value)) return false;
+                found = true;
+            }
+        } catch (UriFormatException) {
+            return false;
+        }
+        return found;
     }
 
     private static bool IsExpectedGraphDeltaPath(Uri uri, Uri baseAddress, string userId, string folderSelector) {
