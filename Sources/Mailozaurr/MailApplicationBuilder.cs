@@ -396,14 +396,14 @@ public sealed class MailApplicationBuilder {
         var profileBootstrapService = _profileBootstrapService ?? new MailProfileBootstrapService(profileService, profileSecretService, secretStore);
         var profileAuthService = _profileAuthService ?? new MailProfileAuthService(profileService, profileSecretService, secretStore);
         var profileOverviewService = _profileOverviewService ?? new MailProfileOverviewService(profileService, profileAuthService);
-        var profileConnectionService = _profileConnectionService ?? MailProfileConnectionService.CreateWithPop3(
+        var profileConnectionService = _profileConnectionService ?? MailProfileConnectionService.CreateWithJmap(
             profileStore,
+            jmapSessionFactory,
             pop3SessionFactory,
             imapSessionFactory,
             graphSessionFactory,
             gmailSessionFactory,
-            smtpSessionFactory,
-            jmapSessionFactory: jmapSessionFactory);
+            smtpSessionFactory);
         var draftService = _draftService ?? new MailDraftService(draftStore, profileStore);
         var draftExchangeService = _draftExchangeService ?? new JsonMailDraftExchangeService();
 

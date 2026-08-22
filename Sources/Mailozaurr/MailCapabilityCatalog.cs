@@ -82,7 +82,6 @@ public static class MailCapabilityCatalog {
             MailProfileKind.Jmap => MailCapability.ListFolders
                 | MailCapability.SearchMessages
                 | MailCapability.ReadMessages
-                | MailCapability.WaitForMessages
                 | MailCapability.UseThreads,
             MailProfileKind.Smtp => MailCapability.SendMessages,
             MailProfileKind.SendGrid => MailCapability.SendMessages,
@@ -145,7 +144,7 @@ public static class MailCapabilityCatalog {
             hasJmapMailboxService,
             new[] { MailProfileKind.Jmap },
             MailCapability.ListFolders | MailCapability.SearchMessages | MailCapability.ReadMessages |
-            MailCapability.WaitForMessages | MailCapability.UseThreads);
+            MailCapability.UseThreads);
         AddServiceOverrideCapabilities(
             result,
             hasPermissionEvidenceService,

@@ -27,6 +27,45 @@ public sealed class JmapApiClientTests {
     }
 
     [Fact]
+    public async Task QueryEmails_PreservesNegativePositionFromEnd() {
+        var handler = new RecordingHandler(
+            JsonResponse(SessionJson("https://mail.example.test/jmap/api")),
+            JsonResponse("{\"methodResponses\":[[\"Email/query\",{\"accountId\":\"a1\",\"queryState\":\"q1\",\"position\":1,\"ids\":[\"e2\"],\"total\":2},\"c1\"]]}"));
+        using var httpClient = new HttpClient(handler);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient);
+
+        await client.QueryEmailsAsync(position: -1, limit: 1);
+
+        var body = await handler.Requests[1].Content!.ReadAsStringAsync();
+        Assert.Contains("\"position\":-1", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetEmails_EnforcesDiscoveredServerObjectLimit() {
+        var handler = new RecordingHandler(JsonResponse(SessionJson("https://mail.example.test/jmap/api")));
+        using var httpClient = new HttpClient(handler);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient);
+
+        var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            client.GetEmailsAsync(new[] { "e1", "e2", "e3" }));
+
+        Assert.Contains("2", exception.Message, StringComparison.Ordinal);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task GetThreads_EnforcesDiscoveredServerObjectLimit() {
+        var handler = new RecordingHandler(JsonResponse(SessionJson("https://mail.example.test/jmap/api")));
+        using var httpClient = new HttpClient(handler);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient);
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            client.GetThreadsAsync(new[] { "t1", "t2", "t3" }));
+
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
     public async Task Session_RejectsCrossOriginApiUrlBeforeSendingBearerTokenThere() {
         var handler = new RecordingHandler(JsonResponse(SessionJson("https://attacker.example/jmap/api")));
         using var httpClient = new HttpClient(handler);
@@ -58,7 +97,7 @@ public sealed class JmapApiClientTests {
     };
 
     private static string SessionJson(string apiUrl) =>
-        "{\"capabilities\":{\"urn:ietf:params:jmap:core\":{},\"urn:ietf:params:jmap:mail\":{}}," +
+        "{\"capabilities\":{\"urn:ietf:params:jmap:core\":{\"maxObjectsInGet\":2},\"urn:ietf:params:jmap:mail\":{}}," +
         "\"accounts\":{\"a1\":{\"name\":\"Primary\",\"isPersonal\":true,\"isReadOnly\":false," +
         "\"accountCapabilities\":{\"urn:ietf:params:jmap:mail\":{}}}}," +
         "\"primaryAccounts\":{\"urn:ietf:params:jmap:mail\":\"a1\"}," +

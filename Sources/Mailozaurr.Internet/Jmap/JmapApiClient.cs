@@ -94,7 +94,7 @@ public sealed partial class JmapApiClient : IDisposable {
                 AccountId = context.AccountId,
                 Filter = filter,
                 Sort = sort?.ToList(),
-                Position = Clamp(position, 0, int.MaxValue),
+                Position = position,
                 Limit = Clamp(limit, 1, 5000),
                 CollapseThreads = collapseThreads
             },
@@ -117,7 +117,7 @@ public sealed partial class JmapApiClient : IDisposable {
             "Email/get",
             new JmapEmailGetArguments {
                 AccountId = context.AccountId,
-                Ids = NormalizeIds(ids, nameof(ids)),
+                Ids = NormalizeIds(ids, nameof(ids), ResolveMaxObjectsInGet(context.Session)),
                 Properties = NormalizeProperties(properties)
             },
             JmapJsonContext.Default.JmapEmailGetArguments,
@@ -155,7 +155,10 @@ public sealed partial class JmapApiClient : IDisposable {
         var response = await CallAsync(
             context.Session,
             "Thread/get",
-            new JmapThreadGetArguments { AccountId = context.AccountId, Ids = NormalizeIds(ids, nameof(ids)) },
+            new JmapThreadGetArguments {
+                AccountId = context.AccountId,
+                Ids = NormalizeIds(ids, nameof(ids), ResolveMaxObjectsInGet(context.Session))
+            },
             JmapJsonContext.Default.JmapThreadGetArguments,
             JmapJsonContext.Default.JmapThreadGetResponse,
             cancellationToken).ConfigureAwait(false);

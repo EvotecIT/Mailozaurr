@@ -8,6 +8,7 @@ public sealed class ApplicationCapabilitiesTests {
     [InlineData(MailProfileKind.Pop3, MailCapability.ListFolders | MailCapability.SearchMessages | MailCapability.ReadMessages | MailCapability.SaveAttachments)]
     [InlineData(MailProfileKind.Graph, MailCapability.ListFolders | MailCapability.SendMessages | MailCapability.MarkMessages | MailCapability.WaitForMessages)]
     [InlineData(MailProfileKind.Gmail, MailCapability.SearchMessages | MailCapability.MarkMessages | MailCapability.MoveMessages | MailCapability.SendMessages | MailCapability.WaitForMessages)]
+    [InlineData(MailProfileKind.Jmap, MailCapability.ListFolders | MailCapability.SearchMessages | MailCapability.ReadMessages | MailCapability.UseThreads)]
     [InlineData(MailProfileKind.Smtp, MailCapability.SendMessages)]
     [InlineData(MailProfileKind.SendGrid, MailCapability.SendMessages)]
     [InlineData(MailProfileKind.Mailgun, MailCapability.SendMessages)]
@@ -32,6 +33,34 @@ public sealed class ApplicationCapabilitiesTests {
         Assert.True(capabilities.Supports(MailCapability.SearchMessages));
         Assert.True(capabilities.Supports(MailCapability.WaitForMessages));
         Assert.False(capabilities.Supports(MailCapability.SendMessages));
+    }
+
+    [Fact]
+    public void JmapDoesNotAdvertiseLiveWaitBeforeAChangeFeedAdapterExists() {
+        Assert.False(MailCapabilityCatalog.For(MailProfileKind.Jmap).Supports(MailCapability.WaitForMessages));
+    }
+
+    [Fact]
+    public async Task BuiltApplicationDoesNotAdvertiseJmapLiveWaitBeforeAChangeFeedAdapterExists() {
+        string directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var store = new FileMailProfileStore(Path.Combine(directory, "profiles.json"));
+            await store.SaveAsync(new MailProfile {
+                Id = "jmap-work",
+                DisplayName = "Work JMAP",
+                Kind = MailProfileKind.Jmap
+            });
+            var application = new MailApplicationBuilder().UseProfileStore(store).Build();
+
+            var capabilities = await application.Profiles.GetCapabilitiesAsync("jmap-work");
+
+            Assert.NotNull(capabilities);
+            Assert.True(capabilities!.Supports(MailCapability.UseThreads));
+            Assert.False(capabilities.Supports(MailCapability.WaitForMessages));
+        } finally {
+            Directory.Delete(directory, true);
+        }
     }
 
     [Fact]

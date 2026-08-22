@@ -161,15 +161,33 @@ public sealed partial class JmapApiClient {
         string.Equals(left.Host, right.Host, StringComparison.OrdinalIgnoreCase) &&
         left.Port == right.Port;
 
-    private static string[] NormalizeIds(IReadOnlyCollection<string> ids, string parameterName) {
+    private static int ResolveMaxObjectsInGet(JmapSessionResource session) {
+        if (!session.Capabilities.TryGetValue(JmapCapabilities.Core, out var core) ||
+            core.ValueKind != JsonValueKind.Object ||
+            !core.TryGetProperty("maxObjectsInGet", out var value) ||
+            value.ValueKind != JsonValueKind.Number ||
+            !value.TryGetInt64(out var advertisedMaximum) ||
+            advertisedMaximum <= 0) {
+            throw new JmapApiException(
+                "invalidSession",
+                "The JMAP core capability did not report a valid maxObjectsInGet limit.");
+        }
+        return (int)Math.Min(advertisedMaximum, 5000L);
+    }
+
+    private static string[] NormalizeIds(IReadOnlyCollection<string> ids, string parameterName, int maximum) {
         if (ids == null) throw new ArgumentNullException(parameterName);
         var normalized = ids.Where(id => !string.IsNullOrWhiteSpace(id))
             .Select(id => id.Trim())
             .Distinct(StringComparer.Ordinal)
-            .Take(5001)
+            .Take(maximum + 1)
             .ToArray();
         if (normalized.Length == 0) throw new ArgumentException("At least one identifier is required.", parameterName);
-        if (normalized.Length > 5000) throw new ArgumentOutOfRangeException(parameterName, "No more than 5000 identifiers may be requested.");
+        if (normalized.Length > maximum) {
+            throw new ArgumentOutOfRangeException(
+                parameterName,
+                $"The discovered JMAP server permits no more than {maximum} objects in one get request.");
+        }
         return normalized;
     }
 

@@ -84,8 +84,7 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
         Func<GraphSession, CancellationToken, Task>? probeGraphMailboxAsync = null,
         Func<GmailSession, CancellationToken, Task>? probeGmailAsync = null,
         Func<GmailSession, CancellationToken, Task>? probeGmailMailboxAsync = null,
-        Func<Smtp, CancellationToken, Task>? probeSmtpAsync = null,
-        IJmapSessionFactory? jmapSessionFactory = null) =>
+        Func<Smtp, CancellationToken, Task>? probeSmtpAsync = null) =>
         new MailProfileConnectionService(
             profileStore,
             pop3SessionFactory ?? throw new ArgumentNullException(nameof(pop3SessionFactory)),
@@ -102,7 +101,46 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
             probeGmailAsync,
             probeGmailMailboxAsync,
             probeSmtpAsync,
-            jmapSessionFactory,
+            jmapSessionFactory: null,
+            initialize: true);
+
+    /// <summary>
+    /// Creates a connection-test service with explicit JMAP support and optional protocol factories.
+    /// </summary>
+    public static MailProfileConnectionService CreateWithJmap(
+        IMailProfileStore profileStore,
+        IJmapSessionFactory jmapSessionFactory,
+        IPop3SessionFactory? pop3SessionFactory = null,
+        IImapSessionFactory? imapSessionFactory = null,
+        IGraphSessionFactory? graphSessionFactory = null,
+        IGmailSessionFactory? gmailSessionFactory = null,
+        ISmtpSessionFactory? smtpSessionFactory = null,
+        Func<ImapClient, CancellationToken, Task>? probeImapAsync = null,
+        Func<ImapClient, CancellationToken, Task>? probeImapMailboxAsync = null,
+        Func<Pop3Client, CancellationToken, Task>? probePop3Async = null,
+        Func<Pop3Client, CancellationToken, Task>? probePop3MailboxAsync = null,
+        Func<GraphSession, CancellationToken, Task>? probeGraphAsync = null,
+        Func<GraphSession, CancellationToken, Task>? probeGraphMailboxAsync = null,
+        Func<GmailSession, CancellationToken, Task>? probeGmailAsync = null,
+        Func<GmailSession, CancellationToken, Task>? probeGmailMailboxAsync = null,
+        Func<Smtp, CancellationToken, Task>? probeSmtpAsync = null) =>
+        new MailProfileConnectionService(
+            profileStore,
+            pop3SessionFactory,
+            imapSessionFactory,
+            graphSessionFactory,
+            gmailSessionFactory,
+            smtpSessionFactory,
+            probeImapAsync,
+            probeImapMailboxAsync,
+            probePop3Async,
+            probePop3MailboxAsync,
+            probeGraphAsync,
+            probeGraphMailboxAsync,
+            probeGmailAsync,
+            probeGmailMailboxAsync,
+            probeSmtpAsync,
+            jmapSessionFactory ?? throw new ArgumentNullException(nameof(jmapSessionFactory)),
             initialize: true);
 
     private MailProfileConnectionService(
@@ -363,31 +401,72 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
         var accountId = clientSession.AccountId;
         if (string.IsNullOrWhiteSpace(accountId)) session.PrimaryAccounts.TryGetValue(JmapCapabilities.Mail, out accountId);
         session.Accounts.TryGetValue(accountId ?? string.Empty, out var account);
-        var permissionNames = account?.AccountCapabilities.Keys.OrderBy(value => value, StringComparer.Ordinal).ToList()
-            ?? new List<string>();
+        IReadOnlyList<JmapMailbox> mailboxes = Array.Empty<JmapMailbox>();
+        if (includeMailboxes) {
+            mailboxes = await clientSession.Client.ListMailboxesAsync(accountId, cancellationToken).ConfigureAwait(false);
+        }
+        var permissions = CreateJmapPermissionEvidence(account, mailboxes, includeMailboxes);
         var evidence = new MailProfileDiagnosticEvidence {
             Protocol = "JMAP",
             Identity = new MailProfileIdentityEvidence {
                 Id = accountId,
-                EmailAddress = session.UserName,
                 DisplayName = account?.Name,
-                Source = "JMAP Session resource"
+                Source = "JMAP Session account"
             },
-            Permissions = new MailProfilePermissionEvidence {
-                Names = permissionNames,
-                Source = "JMAP accountCapabilities",
-                Authoritative = true,
-                Detail = "The JMAP Session resource authoritatively reported capabilities for the selected account; per-mailbox rights are reported separately."
-            }
+            IdentityUnavailableReason = string.IsNullOrWhiteSpace(session.UserName)
+                ? "The JMAP Session resource did not report an authentication username or a verified email address."
+                : "The JMAP Session username is an authentication identifier and was not treated as a verified email address.",
+            Permissions = permissions
         };
         if (includeMailboxes) {
-            var mailboxes = await clientSession.Client.ListMailboxesAsync(accountId, cancellationToken).ConfigureAwait(false);
             evidence.Mailbox = new MailProfileMailboxEvidence {
                 FolderCount = mailboxes.Count,
                 MessageCount = mailboxes.Where(item => string.Equals(item.Role, "inbox", StringComparison.OrdinalIgnoreCase)).Select(item => (long?)item.TotalEmails).FirstOrDefault()
             };
         }
         return evidence;
+    }
+
+    private static MailProfilePermissionEvidence CreateJmapPermissionEvidence(
+        JmapAccount? account,
+        IReadOnlyList<JmapMailbox> mailboxes,
+        bool includeMailboxes) {
+        var capabilities = account?.AccountCapabilities.Keys.OrderBy(value => value, StringComparer.Ordinal).ToArray()
+            ?? Array.Empty<string>();
+        if (!includeMailboxes) {
+            return new MailProfilePermissionEvidence {
+                Source = "JMAP Session accountCapabilities",
+                Authoritative = false,
+                Detail = capabilities.Length == 0
+                    ? "The selected JMAP account reported no account capabilities. Effective mailbox permissions were not inspected."
+                    : $"The selected JMAP account advertises protocol capabilities ({string.Join(", ", capabilities)}), not effective permissions. Inspect Mailbox/get myRights for effective mailbox access."
+            };
+        }
+
+        var names = new List<string>();
+        if (account != null) names.Add(account.IsReadOnly ? "account:isReadOnly" : "account:isReadWrite");
+        foreach (var mailbox in mailboxes) {
+            if (mailbox.MyRights == null) continue;
+            var prefix = $"mailbox:{mailbox.Id ?? "unknown"}:";
+            if (mailbox.MyRights.MayReadItems) names.Add(prefix + "mayReadItems");
+            if (mailbox.MyRights.MayAddItems) names.Add(prefix + "mayAddItems");
+            if (mailbox.MyRights.MayRemoveItems) names.Add(prefix + "mayRemoveItems");
+            if (mailbox.MyRights.MaySetSeen) names.Add(prefix + "maySetSeen");
+            if (mailbox.MyRights.MaySetKeywords) names.Add(prefix + "maySetKeywords");
+            if (mailbox.MyRights.MayCreateChild) names.Add(prefix + "mayCreateChild");
+            if (mailbox.MyRights.MayRename) names.Add(prefix + "mayRename");
+            if (mailbox.MyRights.MayDelete) names.Add(prefix + "mayDelete");
+            if (mailbox.MyRights.MaySubmit) names.Add(prefix + "maySubmit");
+        }
+        var authoritative = account != null && mailboxes.All(mailbox => mailbox.MyRights != null);
+        return new MailProfilePermissionEvidence {
+            Names = names,
+            Source = "JMAP Session account isReadOnly and Mailbox/get myRights",
+            Authoritative = authoritative,
+            Detail = authoritative
+                ? "The selected account read-only state and per-mailbox effective rights were reported by JMAP. Granted rights are qualified by mailbox id."
+                : "JMAP did not return effective rights for every mailbox; reported rights are incomplete and must not be treated as complete permission evidence."
+        };
     }
 
     private static async Task<MailProfileConnectionTestResult> ExecuteSessionAsync<TSession>(
@@ -654,7 +733,7 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
                 _ => MailProfileConnectionTestScope.Auth
             },
             MailProfileConnectionTestScope.Mailbox when profile.Kind == MailProfileKind.Smtp => MailProfileConnectionTestScope.Send,
-            MailProfileConnectionTestScope.Send when profile.Kind is MailProfileKind.Imap or MailProfileKind.Pop3 => MailProfileConnectionTestScope.Auth,
+            MailProfileConnectionTestScope.Send when profile.Kind is MailProfileKind.Imap or MailProfileKind.Pop3 or MailProfileKind.Jmap => MailProfileConnectionTestScope.Auth,
             _ => scope
         };
 
