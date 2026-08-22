@@ -118,67 +118,93 @@ public sealed partial class GmailMailboxBrowser {
             throw new ArgumentException("startHistoryId is required.", nameof(startHistoryId));
         }
 
+        var finalStates = new Dictionary<string, bool>(StringComparer.Ordinal);
+        string? pageToken = null;
+        string? newHistoryId = null;
+        string? resolvedLabelId = null;
+        var seenPageTokens = new HashSet<string>(StringComparer.Ordinal);
+
+        do {
+            var page = await GetHistoryPageAsync(
+                folder,
+                startHistoryId,
+                maxChanges,
+                pageToken,
+                cancellationToken).ConfigureAwait(false);
+            resolvedLabelId = page.ResolvedLabelId;
+            newHistoryId = page.NewHistoryId ?? newHistoryId;
+            foreach (var id in page.DeletedNativeIds) finalStates[id] = true;
+            foreach (var id in page.UpsertNativeIds) finalStates[id] = false;
+
+            pageToken = NormalizeOptional(page.NextPageToken);
+            if (pageToken != null && !seenPageTokens.Add(pageToken)) {
+                throw new InvalidDataException("Gmail history pagination returned a repeated page token.");
+            }
+        } while (pageToken != null);
+
+        var upsertIds = finalStates.Where(pair => !pair.Value).Select(pair => pair.Key).ToList();
+        upsertIds.Sort(StringComparer.Ordinal);
+        var deleteIds = finalStates.Where(pair => pair.Value).Select(pair => pair.Key).ToList();
+        deleteIds.Sort(StringComparer.Ordinal);
+
+        return new GmailMailboxHistoryResult {
+            ResolvedLabelId = resolvedLabelId ?? string.Empty,
+            NewHistoryId = newHistoryId,
+            UpsertNativeIds = upsertIds,
+            DeletedNativeIds = deleteIds
+        };
+    }
+
+    /// <summary>
+    /// Gets exactly one Gmail history provider page without discarding events from that page.
+    /// </summary>
+    public async Task<GmailMailboxHistoryResult> GetHistoryPageAsync(
+        string folder,
+        string startHistoryId,
+        int pageSize,
+        string? pageToken = null,
+        CancellationToken cancellationToken = default) {
+        if (string.IsNullOrWhiteSpace(startHistoryId)) {
+            throw new ArgumentException("startHistoryId is required.", nameof(startHistoryId));
+        }
+
         var resolvedLabelId = NormalizeOptional(await ResolveLabelIdAsync(folder, cancellationToken).ConfigureAwait(false));
         if (resolvedLabelId == null) {
             throw new InvalidOperationException("Unable to resolve Gmail folder/label.");
         }
 
-        var max = ClampInt(maxChanges, 1, 2000);
-        var upserts = new HashSet<string>(StringComparer.Ordinal);
-        var deletes = new HashSet<string>(StringComparer.Ordinal);
-        var historyTypes = new[] { "messageAdded", "messageDeleted", "labelAdded", "labelRemoved" };
-        string? pageToken = null;
-        string? newHistoryId = null;
-        var pageCount = 0;
-
-        while (pageCount++ < 25 && (upserts.Count + deletes.Count) < max) {
-            var history = await _gmail.ListHistoryAsync(
-                _userId,
-                startHistoryId.Trim(),
-                labelId: resolvedLabelId,
-                historyTypes: historyTypes,
-                maxResults: 500,
-                pageToken: pageToken,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
-
-            var historyId = NormalizeOptional(history.HistoryId);
-            if (historyId != null) {
-                newHistoryId = historyId;
-            }
-
-            pageToken = NormalizeOptional(history.NextPageToken);
-            if (history.History == null || history.History.Count == 0) {
-                break;
-            }
-
+        var history = await _gmail.ListHistoryAsync(
+            _userId,
+            startHistoryId.Trim(),
+            labelId: resolvedLabelId,
+            historyTypes: new[] { "messageAdded", "messageDeleted", "labelAdded", "labelRemoved" },
+            maxResults: ClampInt(pageSize, 1, 500),
+            pageToken: NormalizeOptional(pageToken),
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        var finalStates = new Dictionary<string, bool>(StringComparer.Ordinal);
+        if (history.History != null) {
             foreach (var entry in history.History) {
-                if (entry == null) {
-                    continue;
-                }
+                if (entry == null) continue;
+                var entryUpserts = new HashSet<string>(StringComparer.Ordinal);
+                AddHistoryRefs(entry.MessagesAdded, entryUpserts);
+                AddHistoryRefs(entry.LabelsAdded, entryUpserts);
+                foreach (var id in entryUpserts) finalStates[id] = false;
 
-                AddHistoryRefs(entry.MessagesAdded, upserts);
-                AddHistoryRefs(entry.LabelsAdded, upserts);
-                AddHistoryRefs(entry.MessagesDeleted, deletes);
-                AddHistoryRefs(entry.LabelsRemoved, deletes);
-            }
-
-            if (string.IsNullOrWhiteSpace(pageToken)) {
-                break;
+                var entryDeletes = new HashSet<string>(StringComparer.Ordinal);
+                AddHistoryRefs(entry.MessagesDeleted, entryDeletes);
+                AddHistoryRefs(entry.LabelsRemoved, entryDeletes);
+                foreach (var id in entryDeletes) finalStates[id] = true;
             }
         }
 
-        foreach (var deletedId in deletes) {
-            _ = upserts.Remove(deletedId);
-        }
-
-        var upsertIds = upserts.ToList();
+        var upsertIds = finalStates.Where(pair => !pair.Value).Select(pair => pair.Key).ToList();
         upsertIds.Sort(StringComparer.Ordinal);
-        var deleteIds = deletes.ToList();
+        var deleteIds = finalStates.Where(pair => pair.Value).Select(pair => pair.Key).ToList();
         deleteIds.Sort(StringComparer.Ordinal);
-
         return new GmailMailboxHistoryResult {
             ResolvedLabelId = resolvedLabelId,
-            NewHistoryId = newHistoryId,
+            NewHistoryId = NormalizeOptional(history.HistoryId),
+            NextPageToken = NormalizeOptional(history.NextPageToken),
             UpsertNativeIds = upsertIds,
             DeletedNativeIds = deleteIds
         };

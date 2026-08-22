@@ -97,7 +97,7 @@ internal static partial class CliCommandModel {
             required: ["profile"],
             optional: ["mailbox", "folder", "notification-url", "client-state", "expiration", "subscription-id", "topic"]),
         Leaf("unsubscribe-changes", "Remove Graph/Gmail change notifications.",
-            required: ["profile"], optional: ["subscription-id", "strict"]),
+            required: ["profile"], optional: ["mailbox", "subscription-id", "strict"]),
         Leaf("mark-read", "Execute a confirmed read-state change.",
             required: ["profile", "message-id"],
             optional: ["mailbox", "folder", "unread", "confirm-token"]),

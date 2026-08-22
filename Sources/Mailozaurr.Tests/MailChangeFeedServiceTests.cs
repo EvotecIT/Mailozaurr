@@ -8,7 +8,7 @@ namespace Mailozaurr.Tests;
 public sealed class MailChangeFeedServiceTests {
     [Fact]
     public async Task GraphDeltaMapsUpsertsDeletesAndDurableCursor() {
-        const string body = "{\"@odata.deltaLink\":\"https://graph.microsoft.com/v1.0/delta-token\",\"value\":[{\"id\":\"up-1\",\"subject\":\"hello\",\"conversationId\":\"thread-1\"},{\"id\":\"gone-1\",\"@removed\":{}}]}";
+        const string body = "{\"@odata.deltaLink\":\"https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages/delta?$deltatoken=next\",\"value\":[{\"id\":\"up-1\",\"subject\":\"hello\",\"conversationId\":\"thread-1\"},{\"id\":\"gone-1\",\"@removed\":{}}]}";
         var handler = new RecordingHandler(Response(HttpStatusCode.OK, body));
         var service = await CreateAsync(MailProfileKind.Graph, new HttpGraphSessionFactory(handler));
 
@@ -19,7 +19,7 @@ public sealed class MailChangeFeedServiceTests {
         });
 
         Assert.Equal("durable-delta", result.CursorKind);
-        Assert.Equal("https://graph.microsoft.com/v1.0/delta-token", result.NextCursor);
+        Assert.Equal("https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages/delta?$deltatoken=next", result.NextCursor);
         Assert.True(result.SupportsDeletes);
         Assert.False(result.ResetRequired);
         Assert.Collection(result.Changes,
@@ -43,7 +43,7 @@ public sealed class MailChangeFeedServiceTests {
 
         var result = await service.GetChangesAsync(new MailChangeFeedRequest {
             ProfileId = "profile",
-            Cursor = "https://graph.microsoft.com/v1.0/expired"
+            Cursor = "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages/delta?$deltatoken=expired"
         });
 
         Assert.True(result.ResetRequired);
@@ -56,6 +56,9 @@ public sealed class MailChangeFeedServiceTests {
     [InlineData("https://example.test/v1.0/delta")]
     [InlineData("https://graph.microsoft.com.evil.test/v1.0/delta")]
     [InlineData("https://graph.microsoft.com:8443/v1.0/delta")]
+    [InlineData("https://graph.microsoft.com/v1.0/me/messages")]
+    [InlineData("https://graph.microsoft.com/v1.0/users/other/mailFolders/inbox/messages/delta?$deltatoken=x")]
+    [InlineData("https://graph.microsoft.com/v1.0/me/mailFolders/archive/messages/delta?$deltatoken=x")]
     public async Task GraphCursorRejectsNonGraphDestinations(string cursor) {
         var service = await CreateAsync(MailProfileKind.Graph);
 
@@ -83,6 +86,70 @@ public sealed class MailChangeFeedServiceTests {
         Assert.True(result.SupportsDeletes);
         Assert.Contains(result.Changes, item => item.Kind == MailChangeKind.Upsert && item.MessageId == "up-1");
         Assert.Contains(result.Changes, item => item.Kind == MailChangeKind.Delete && item.MessageId == "gone-1");
+    }
+
+    [Fact]
+    public async Task GmailHistoryCarriesProviderPageTokenWithoutSkippingEvents() {
+        const string first = "{\"historyId\":\"200\",\"nextPageToken\":\"page-2\",\"history\":[{\"messagesAdded\":[{\"message\":{\"id\":\"up-1\"}}]}]}";
+        const string second = "{\"historyId\":\"200\",\"history\":[{\"messagesAdded\":[{\"message\":{\"id\":\"up-2\"}}]}]}";
+        var handler = new RecordingHandler(
+            Response(HttpStatusCode.OK, first),
+            Response(HttpStatusCode.OK, second));
+        var service = await CreateAsync(
+            MailProfileKind.Gmail,
+            gmailFactory: new HttpGmailSessionFactory(handler));
+
+        var firstResult = await service.GetChangesAsync(new MailChangeFeedRequest {
+            ProfileId = "profile",
+            FolderId = "INBOX",
+            Cursor = "100",
+            MaxChanges = 1
+        });
+        var secondResult = await service.GetChangesAsync(new MailChangeFeedRequest {
+            ProfileId = "profile",
+            FolderId = "INBOX",
+            Cursor = firstResult.NextCursor,
+            MaxChanges = 1
+        });
+
+        Assert.StartsWith("gmail-v1.100.", firstResult.NextCursor);
+        Assert.Equal("up-1", Assert.Single(firstResult.Changes).MessageId);
+        Assert.Equal("200", secondResult.NextCursor);
+        Assert.Equal("up-2", Assert.Single(secondResult.Changes).MessageId);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Contains("startHistoryId=100", handler.Requests[1].RequestUri!.Query);
+        Assert.Contains("pageToken=page-2", handler.Requests[1].RequestUri!.Query);
+    }
+
+    [Fact]
+    public async Task GmailExpiredHistoryReturnsResetEvidence() {
+        var service = await CreateAsync(
+            MailProfileKind.Gmail,
+            gmailFactory: new HttpGmailSessionFactory(
+                new RecordingHandler(Response(HttpStatusCode.NotFound, "{\"error\":\"stale\"}"))));
+
+        var result = await service.GetChangesAsync(new MailChangeFeedRequest {
+            ProfileId = "profile",
+            Cursor = "100"
+        });
+
+        Assert.True(result.ResetRequired);
+        Assert.Empty(result.Changes);
+    }
+
+    [Fact]
+    public async Task ProviderPageIsNeverTruncatedAfterCursorAdvances() {
+        const string body = "{\"@odata.deltaLink\":\"https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages/delta?$deltatoken=next\",\"value\":[{\"id\":\"one\"},{\"id\":\"two\"}]}";
+        var service = await CreateAsync(
+            MailProfileKind.Graph,
+            new HttpGraphSessionFactory(new RecordingHandler(Response(HttpStatusCode.OK, body))));
+
+        var result = await service.GetChangesAsync(new MailChangeFeedRequest {
+            ProfileId = "profile",
+            MaxChanges = 1
+        });
+
+        Assert.Equal(2, result.Changes.Count);
     }
 
     [Fact]
@@ -130,6 +197,46 @@ public sealed class MailChangeFeedServiceTests {
     }
 
     [Fact]
+    public async Task GraphSubscribeRejectsMultipleFolderResources() {
+        var handler = new RecordingHandler();
+        var service = await CreateAsync(MailProfileKind.Graph, new HttpGraphSessionFactory(handler));
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.SubscribeAsync(new MailChangeSubscriptionRequest {
+            ProfileId = "profile",
+            FolderIds = new List<string> { "INBOX", "Archive" },
+            NotificationUrl = "https://example.test/mail-hook",
+            Expiration = DateTimeOffset.UtcNow.AddHours(1)
+        }));
+
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
+    public async Task GmailUnsubscribeRoutesToExplicitMailbox() {
+        var handler = new RecordingHandler(Response(HttpStatusCode.NoContent, string.Empty));
+        var service = await CreateAsync(
+            MailProfileKind.Gmail,
+            gmailFactory: new HttpGmailSessionFactory(handler),
+            profile: new MailProfile {
+                Id = "profile",
+                DisplayName = "Profile",
+                Kind = MailProfileKind.Gmail,
+                DefaultMailbox = "default@example.test",
+                Settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+                    [MailProfileSettingsKeys.Mailbox] = "configured@example.test"
+                }
+            });
+
+        var result = await service.UnsubscribeAsync(new MailChangeUnsubscribeRequest {
+            ProfileId = "profile",
+            MailboxId = "override@example.test"
+        });
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("/gmail/v1/users/override@example.test/stop", handler.Requests[0].RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
     public async Task GmailWatchMapsLabelsCursorAndExpiration() {
         const string watch = "{\"historyId\":\"77\",\"expiration\":\"1787479200000\"}";
         var handler = new RecordingHandler(Response(HttpStatusCode.OK, watch));
@@ -161,9 +268,10 @@ public sealed class MailChangeFeedServiceTests {
     private static async Task<MailChangeFeedService> CreateAsync(
         MailProfileKind kind,
         IGraphSessionFactory? graphFactory = null,
-        IGmailSessionFactory? gmailFactory = null) {
+        IGmailSessionFactory? gmailFactory = null,
+        MailProfile? profile = null) {
         var store = new InMemoryMailProfileStore();
-        await store.SaveAsync(new MailProfile {
+        await store.SaveAsync(profile ?? new MailProfile {
             Id = "profile",
             DisplayName = "Profile",
             Kind = kind,
@@ -185,13 +293,14 @@ public sealed class MailChangeFeedServiceTests {
         public HttpGraphSessionFactory(HttpMessageHandler handler) => _handler = handler;
 
         public Task<GraphSession> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) {
+            var userId = ResolveUserId(profile);
             var client = new HttpClient(_handler) { BaseAddress = new Uri("https://graph.microsoft.com/v1.0/") };
             var api = new GraphApiClient(client, credential: new OAuthCredential {
-                UserName = "me",
+                UserName = userId,
                 AccessToken = "token",
                 ExpiresOn = DateTimeOffset.MaxValue
             });
-            return Task.FromResult(new GraphSession(api, "me"));
+            return Task.FromResult(new GraphSession(api, userId));
         }
     }
 
@@ -201,10 +310,16 @@ public sealed class MailChangeFeedServiceTests {
         public HttpGmailSessionFactory(HttpMessageHandler handler) => _handler = handler;
 
         public Task<GmailSession> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) {
+            var userId = ResolveUserId(profile);
             var client = new HttpClient(_handler) { BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/") };
-            return Task.FromResult(new GmailSession(new GmailApiClient(client), "me"));
+            return Task.FromResult(new GmailSession(new GmailApiClient(client), userId));
         }
     }
+
+    private static string ResolveUserId(MailProfile profile) =>
+        profile.Settings.TryGetValue(MailProfileSettingsKeys.Mailbox, out var mailbox) && !string.IsNullOrWhiteSpace(mailbox)
+            ? mailbox.Trim()
+            : profile.DefaultMailbox ?? "me";
 
     private sealed class ThrowingImapSessionFactory : IImapSessionFactory {
         public Task<ImapClient> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) =>

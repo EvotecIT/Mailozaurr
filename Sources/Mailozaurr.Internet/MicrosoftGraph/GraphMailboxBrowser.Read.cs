@@ -258,12 +258,22 @@ public sealed partial class GraphMailboxBrowser {
     /// <summary>
     /// Performs Graph mailbox delta query for a folder.
     /// </summary>
-    public async Task<GraphMailboxDeltaResult> DeltaMessagesAsync(
+    public Task<GraphMailboxDeltaResult> DeltaMessagesAsync(
         string folder,
         string? cursor,
         int max,
-        CancellationToken cancellationToken = default,
-        string userId = "me") {
+        CancellationToken cancellationToken = default) =>
+        DeltaMessagesForUserAsync(folder, cursor, max, "me", cancellationToken);
+
+    /// <summary>
+    /// Performs a Graph mailbox delta query for a selected user mailbox.
+    /// </summary>
+    public async Task<GraphMailboxDeltaResult> DeltaMessagesForUserAsync(
+        string folder,
+        string? cursor,
+        int max,
+        string userId,
+        CancellationToken cancellationToken = default) {
         var folderSelector = ResolveFolderSelector(folder);
         var delta = await _graph.DeltaMessagesAsync(
             folderSelector,

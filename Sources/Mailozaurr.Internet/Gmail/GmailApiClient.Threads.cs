@@ -254,12 +254,17 @@ public sealed partial class GmailApiClient {
 
         using var response = await _client.GetAsync(url.ToString(), cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
 #if NET5_0_OR_GREATER
         var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 #else
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
+        if (!response.IsSuccessStatusCode) {
+            throw new GmailApiException(
+                response.StatusCode,
+                $"Gmail users.history.list failed ({(int)response.StatusCode}).",
+                json);
+        }
         GmailHistoryListResponse? history;
         try {
             history = JsonSerializer.Deserialize(json, GmailJsonContext.Default.GmailHistoryListResponse);

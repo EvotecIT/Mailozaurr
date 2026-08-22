@@ -9,10 +9,10 @@ public sealed partial class MailMcpTools {
     [Description("Reads one provider-neutral Graph delta or Gmail history batch from a durable cursor.")]
     public Task<MailChangeFeedResult> mail_changes_get(
         [Description("The profile identifier to query.")] string profileId,
-        [Description("The Graph delta URL or Gmail history id. Gmail requires a cursor.")] string? cursor = null,
+        [Description("The Graph delta URL or opaque Gmail history cursor. Gmail requires a cursor.")] string? cursor = null,
         [Description("Optional mailbox identifier.")] string? mailboxId = null,
         [Description("Optional folder or label identifier.")] string? folderId = null,
-        [Description("Maximum number of normalized changes.")] int maxChanges = 100,
+        [Description("Requested provider page size. Provider pages are never truncated.")] int maxChanges = 100,
         CancellationToken cancellationToken = default) =>
         _application.ChangeFeeds.GetChangesAsync(new MailChangeFeedRequest {
             ProfileId = profileId,
@@ -64,11 +64,13 @@ public sealed partial class MailMcpTools {
     [Description("Removes Graph webhook or Gmail Pub/Sub change notifications.")]
     public Task<MailChangeSubscriptionResult> mail_changes_unsubscribe(
         [Description("The Graph or Gmail profile identifier.")] string profileId,
+        [Description("Optional mailbox identifier, primarily for Gmail watch removal.")] string? mailboxId = null,
         [Description("Graph subscription id. Gmail does not require one.")] string? subscriptionId = null,
         [Description("When true, treats an already absent subscription as success.")] bool treatMissingAsSuccess = true,
         CancellationToken cancellationToken = default) =>
         _application.ChangeFeeds.UnsubscribeAsync(new MailChangeUnsubscribeRequest {
             ProfileId = profileId,
+            MailboxId = mailboxId,
             SubscriptionId = subscriptionId,
             TreatMissingAsSuccess = treatMissingAsSuccess
         }, cancellationToken);

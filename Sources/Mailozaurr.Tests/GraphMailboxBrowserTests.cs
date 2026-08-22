@@ -9,6 +9,22 @@ using Xunit;
 namespace Mailozaurr.Tests;
 
 public class GraphMailboxBrowserTests {
+    [Fact]
+    public void ExistingDeltaAndSubscriptionMethodSignaturesRemainAvailable() {
+        Assert.NotNull(typeof(GraphMailboxBrowser).GetMethod(
+            nameof(GraphMailboxBrowser.DeltaMessagesAsync),
+            new[] { typeof(string), typeof(string), typeof(int), typeof(CancellationToken) }));
+        Assert.NotNull(typeof(GraphMailboxBrowser).GetMethod(
+            nameof(GraphMailboxBrowser.CreateMessageSubscriptionAsync),
+            new[] {
+                typeof(string), typeof(string), typeof(DateTimeOffset?), typeof(string), typeof(string),
+                typeof(CancellationToken)
+            }));
+        Assert.NotNull(typeof(GraphMailboxBrowser).GetMethod(
+            nameof(GraphMailboxBrowser.BuildMessageSubscriptionResource),
+            new[] { typeof(string) }));
+    }
+
     [Theory]
     [InlineData(null, "inbox")]
     [InlineData("", "inbox")]

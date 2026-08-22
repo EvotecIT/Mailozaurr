@@ -95,14 +95,33 @@ public sealed partial class GraphMailboxBrowser {
     /// <summary>
     /// Creates a Graph webhook subscription for message changes in a selected folder.
     /// </summary>
-    public async Task<GraphMailboxSubscriptionResult> CreateMessageSubscriptionAsync(
+    public Task<GraphMailboxSubscriptionResult> CreateMessageSubscriptionAsync(
         string notificationUrl,
         string folder = "INBOX",
         DateTimeOffset? expirationDateTime = null,
         string changeType = "created,updated,deleted",
         string? clientState = null,
-        CancellationToken cancellationToken = default,
-        string userId = "me") {
+        CancellationToken cancellationToken = default) =>
+        CreateMessageSubscriptionForUserAsync(
+            notificationUrl,
+            folder,
+            expirationDateTime,
+            changeType,
+            clientState,
+            "me",
+            cancellationToken);
+
+    /// <summary>
+    /// Creates a Graph webhook subscription for message changes in a selected user mailbox.
+    /// </summary>
+    public async Task<GraphMailboxSubscriptionResult> CreateMessageSubscriptionForUserAsync(
+        string notificationUrl,
+        string folder,
+        DateTimeOffset? expirationDateTime,
+        string changeType,
+        string? clientState,
+        string userId,
+        CancellationToken cancellationToken = default) {
         if (string.IsNullOrWhiteSpace(notificationUrl)) {
             throw new ArgumentException("notificationUrl is required.", nameof(notificationUrl));
         }
@@ -110,7 +129,7 @@ public sealed partial class GraphMailboxBrowser {
             throw new ArgumentException("changeType is required.", nameof(changeType));
         }
 
-        var resource = BuildMessageSubscriptionResource(folder, userId);
+        var resource = BuildMessageSubscriptionResourceForUser(folder, userId);
         var request = new GraphApiClient.GraphCreateSubscriptionRequest {
             ChangeType = changeType.Trim(),
             NotificationUrl = notificationUrl.Trim(),
@@ -192,7 +211,13 @@ public sealed partial class GraphMailboxBrowser {
     /// <summary>
     /// Builds Graph subscription resource for folder message notifications.
     /// </summary>
-    public static string BuildMessageSubscriptionResource(string folder, string userId = "me") {
+    public static string BuildMessageSubscriptionResource(string folder) =>
+        BuildMessageSubscriptionResourceForUser(folder, "me");
+
+    /// <summary>
+    /// Builds a Graph subscription resource for a selected user mailbox.
+    /// </summary>
+    public static string BuildMessageSubscriptionResourceForUser(string folder, string userId) {
         var selector = ResolveFolderSelector(folder);
         var normalizedUserId = NormalizeOptional(userId) ?? "me";
         var userSegment = string.Equals(normalizedUserId, "me", StringComparison.OrdinalIgnoreCase)

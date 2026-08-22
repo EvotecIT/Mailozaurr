@@ -24,6 +24,17 @@ public class ImapIdleListenerTests {
     }
 
     [Fact]
+    public void LightweightConstructor_DisablesMimeBodyDownloads() {
+        var listener = new ImapIdleListener(
+            new ImapClient(),
+            folder: "INBOX",
+            searchQuery: null,
+            downloadMessageContent: false);
+
+        Assert.False(GetPrivateField<bool>(listener, "_downloadMessageContent"));
+    }
+
+    [Fact]
     public async Task StopAsync_CancelsIdleLoopGracefully() {
         var listener = new ImapIdleListener(new ImapClient());
         var cancellation = new CancellationTokenSource();

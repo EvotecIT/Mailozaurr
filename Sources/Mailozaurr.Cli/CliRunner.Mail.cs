@@ -444,6 +444,7 @@ public static partial class CliRunner {
             case "unsubscribe-changes":
                 var unsubscribeResult = await application.ChangeFeeds.UnsubscribeAsync(new MailChangeUnsubscribeRequest {
                     ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
                     SubscriptionId = parseResult.GetOption("subscription-id"),
                     TreatMissingAsSuccess = !parseResult.HasFlag("strict")
                 }).ConfigureAwait(false);

@@ -167,7 +167,7 @@ internal static partial class CliCommandModel {
         "description" => "Human-readable description.",
         "draft" => "Draft identifier.",
         "drafts-dir" => "Override the draft-store directory.",
-        "cursor" => "Graph delta URL or Gmail history identifier.",
+        "cursor" => "Graph delta URL or opaque Gmail history cursor.",
         "expiration" => "ISO 8601 Graph subscription expiration timestamp.",
         "file" => "Input file path.",
         "folder" => "Mailbox folder identifier or name.",

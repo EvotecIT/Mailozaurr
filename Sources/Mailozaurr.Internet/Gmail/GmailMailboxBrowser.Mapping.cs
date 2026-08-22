@@ -405,6 +405,9 @@ public sealed partial class GmailMailboxBrowser {
         /// <summary>Newest history id seen while reading history pages.</summary>
         public string? NewHistoryId { get; set; }
 
+        /// <summary>Provider token for the next history page, when more pages remain.</summary>
+        public string? NextPageToken { get; set; }
+
         /// <summary>Message ids that should be upserted.</summary>
         public List<string> UpsertNativeIds { get; set; } = new();
 

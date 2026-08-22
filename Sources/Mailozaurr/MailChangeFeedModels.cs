@@ -28,9 +28,9 @@ public sealed class MailChangeFeedRequest {
     public string? MailboxId { get; set; }
     /// <summary>Optional folder or label selector.</summary>
     public string? FolderId { get; set; }
-    /// <summary>Graph delta URL or Gmail history id. Gmail requires it.</summary>
+    /// <summary>Graph delta URL or opaque Gmail history cursor. Gmail requires it.</summary>
     public string? Cursor { get; set; }
-    /// <summary>Maximum number of normalized changes.</summary>
+    /// <summary>Requested provider page size. A provider page may contain more events, which are never discarded.</summary>
     public int MaxChanges { get; set; } = 100;
 }
 
@@ -40,7 +40,7 @@ public sealed class MailChangeWaitRequest {
     public string ProfileId { get; set; } = string.Empty;
     /// <summary>Optional folder selector. Defaults to INBOX.</summary>
     public string? FolderId { get; set; }
-    /// <summary>Maximum arrivals returned before ending the observation.</summary>
+    /// <summary>Target arrivals before ending the observation. A simultaneous server burst is never truncated.</summary>
     public int MaxChanges { get; set; } = 1;
     /// <summary>Maximum observation duration.</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
@@ -90,6 +90,8 @@ public sealed class MailChangeSubscriptionRequest {
 public sealed class MailChangeUnsubscribeRequest {
     /// <summary>Profile identifier.</summary>
     public string ProfileId { get; set; } = string.Empty;
+    /// <summary>Optional mailbox selector, primarily for Gmail watch removal.</summary>
+    public string? MailboxId { get; set; }
     /// <summary>Graph subscription id. Gmail does not require one.</summary>
     public string? SubscriptionId { get; set; }
     /// <summary>Whether a missing remote subscription counts as success.</summary>
