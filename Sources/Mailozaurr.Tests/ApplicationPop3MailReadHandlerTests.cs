@@ -175,6 +175,28 @@ public sealed class ApplicationPop3MailReadHandlerTests {
     }
 
     [Fact]
+    public void UnnamedAttachmentUsesDeterministicPerPartFallback() {
+        var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var attachment = new MimePart("application", "octet-stream");
+            var firstIdentity = MimeAttachmentStorage.CreateStorageIdentity("profile-a", "message-a", "0");
+            var secondIdentity = MimeAttachmentStorage.CreateStorageIdentity("profile-a", "message-a", "1");
+
+            var first = MimeAttachmentStorage.ResolveDestinationPath(directory, attachment, firstIdentity);
+            var repeated = MimeAttachmentStorage.ResolveDestinationPath(directory, attachment, firstIdentity);
+            var second = MimeAttachmentStorage.ResolveDestinationPath(directory, attachment, secondIdentity);
+
+            Assert.Equal(first, repeated);
+            Assert.NotEqual(first, second);
+            Assert.StartsWith("attachment-", Path.GetFileName(first), StringComparison.Ordinal);
+            Assert.EndsWith(".bin", first, StringComparison.Ordinal);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void BatchAttachmentNamesIncludeProfileFolderAndMessageIdentity() {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

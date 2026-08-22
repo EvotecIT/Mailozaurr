@@ -17,5 +17,8 @@ public enum MailProfileConnectionTestPhase {
     Mailbox,
 
     /// <summary>Running a non-destructive send-path preflight.</summary>
-    SendPreflight
+    SendPreflight,
+
+    /// <summary>Tearing down the provider session and releasing its resources.</summary>
+    Cleanup
 }

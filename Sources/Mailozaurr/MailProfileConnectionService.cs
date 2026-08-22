@@ -319,6 +319,7 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
             return Failure("connection_test_failed", ex.Message, profile.Id, profile.Kind, requestedScope, effectiveScope, stages);
         }
 
+        MailProfileConnectionTestResult result;
         try {
             timer.Stop();
             target = targetResolver?.Invoke(session) ?? target;
@@ -326,23 +327,38 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
                 null, sessionMessage);
 
             timer.Restart();
-            try {
-                await probeAsync(session, cancellationToken).ConfigureAwait(false);
-            } catch (OperationCanceledException) {
-                throw;
-            } catch (Exception ex) {
-                timer.Stop();
-                AddStage(stages, probePhase, false, probe, target, timer.ElapsedMilliseconds,
-                    "connection_test_failed", ex.Message);
-                return Failure("connection_test_failed", ex.Message, profile.Id, profile.Kind, requestedScope, effectiveScope, stages);
-            }
-
+            await probeAsync(session, cancellationToken).ConfigureAwait(false);
             timer.Stop();
             AddStage(stages, probePhase, true, probe, target, timer.ElapsedMilliseconds, null, successMessage);
-            return Success(profile, probe, target, successMessage, requestedScope, effectiveScope, stages);
-        } finally {
-            dispose(session);
+            result = Success(profile, probe, target, successMessage, requestedScope, effectiveScope, stages);
+        } catch (OperationCanceledException) {
+            try {
+                dispose(session);
+            } catch (Exception) {
+                // Preserve cancellation as the controlling outcome.
+            }
+            throw;
+        } catch (Exception ex) {
+            timer.Stop();
+            AddStage(stages, probePhase, false, probe, target, timer.ElapsedMilliseconds,
+                "connection_test_failed", ex.Message);
+            result = Failure("connection_test_failed", ex.Message, profile.Id, profile.Kind, requestedScope, effectiveScope, stages);
         }
+
+        timer.Restart();
+        try {
+            dispose(session);
+        } catch (OperationCanceledException) {
+            throw;
+        } catch (Exception ex) {
+            timer.Stop();
+            AddStage(stages, MailProfileConnectionTestPhase.Cleanup, false, "dispose", target, timer.ElapsedMilliseconds,
+                "connection_test_failed", ex.Message);
+            if (result.Succeeded) {
+                return Failure("connection_test_failed", ex.Message, profile.Id, profile.Kind, requestedScope, effectiveScope, stages);
+            }
+        }
+        return result;
     }
 
     private static Task DefaultProbeImapAsync(ImapClient client, CancellationToken cancellationToken) {

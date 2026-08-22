@@ -271,7 +271,9 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
             Attachments = snapshot.Message.Attachments.Select((attachment, index) => new AttachmentSummary {
                 MessageId = id,
                 Id = index.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                FileName = MimeAttachmentStorage.GetAttachmentFileName(attachment),
+                FileName = MimeAttachmentStorage.GetAttachmentFileName(
+                    attachment,
+                    MimeAttachmentStorage.CreateStorageIdentity(profileId, id, index.ToString(System.Globalization.CultureInfo.InvariantCulture))),
                 ContentType = attachment.ContentType.MimeType
             }).ToList()
         };

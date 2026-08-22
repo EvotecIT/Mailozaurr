@@ -127,16 +127,23 @@ public static partial class MailboxSearcher {
         CancellationToken cancellationToken = default,
         string? queryString = null) {
         IReadOnlyList<string> messageContainsTerms = Array.Empty<string>();
+        string? querySubject = null;
+        string? queryFromContains = null;
+        string? queryToContains = null;
+        string? queryBodyContains = null;
+        MessagePriority? queryPriority = null;
+        DateTime? querySince = null;
+        DateTime? queryBefore = null;
         if (!string.IsNullOrWhiteSpace(queryString)) {
             try {
                 var parsed = ParseQuery(queryString);
-                if (string.IsNullOrWhiteSpace(subject)) subject = parsed.Subject;
-                if (string.IsNullOrWhiteSpace(fromContains)) fromContains = parsed.FromContains;
-                if (string.IsNullOrWhiteSpace(toContains)) toContains = parsed.ToContains;
-                if (string.IsNullOrWhiteSpace(bodyContains)) bodyContains = parsed.BodyContains;
-                if (!since.HasValue) since = parsed.Since;
-                if (!before.HasValue) before = parsed.Before;
-                if (!priority.HasValue) priority = parsed.Priority;
+                querySubject = parsed.Subject;
+                queryFromContains = parsed.FromContains;
+                queryToContains = parsed.ToContains;
+                queryBodyContains = parsed.BodyContains;
+                querySince = parsed.Since;
+                queryBefore = parsed.Before;
+                queryPriority = parsed.Priority;
                 hasAttachment |= parsed.HasAttachment;
                 messageContainsTerms = parsed.MessageContainsTerms;
             } catch (Exception ex) {
@@ -146,27 +153,41 @@ public static partial class MailboxSearcher {
         var results = new List<Pop3EmailMessage>();
         var sinceUtc = NormalizeToUtc(since);
         var beforeUtc = NormalizeToUtc(before);
+        var querySinceUtc = NormalizeToUtc(querySince);
+        var queryBeforeUtc = NormalizeToUtc(queryBefore);
         var requiresFullMessageForFiltering =
             !string.IsNullOrWhiteSpace(bodyContains) ||
+            !string.IsNullOrWhiteSpace(queryBodyContains) ||
             priority.HasValue ||
+            queryPriority.HasValue ||
             hasAttachment ||
             messageContainsTerms.Count > 0;
         var useHeaderPrefilter = !requiresFullMessageForFiltering &&
             (!string.IsNullOrWhiteSpace(subject) ||
+             !string.IsNullOrWhiteSpace(querySubject) ||
              !string.IsNullOrWhiteSpace(fromContains) ||
+             !string.IsNullOrWhiteSpace(queryFromContains) ||
              !string.IsNullOrWhiteSpace(toContains) ||
+             !string.IsNullOrWhiteSpace(queryToContains) ||
              sinceUtc.HasValue ||
-             beforeUtc.HasValue);
+             beforeUtc.HasValue ||
+             querySinceUtc.HasValue ||
+             queryBeforeUtc.HasValue);
         for (int i = 0; i < client.Count; i++) {
             if (useHeaderPrefilter) {
                 var headers = await client.GetMessageHeadersAsync(i, cancellationToken).ConfigureAwait(false);
                 if (!Pop3HeadersMatch(
                     headers,
                     subject,
+                    querySubject,
                     fromContains,
+                    queryFromContains,
                     toContains,
+                    queryToContains,
                     sinceUtc,
-                    beforeUtc)) {
+                    querySinceUtc,
+                    beforeUtc,
+                    queryBeforeUtc)) {
                     continue;
                 }
             }
@@ -174,8 +195,11 @@ public static partial class MailboxSearcher {
             var message = await client.GetMessageAsync(i, cancellationToken).ConfigureAwait(false);
             if (requiresFullMessageForFiltering) {
                 if (!string.IsNullOrWhiteSpace(subject) && (message.Subject == null || message.Subject.IndexOf(subject, StringComparison.OrdinalIgnoreCase) < 0)) continue;
+                if (!string.IsNullOrWhiteSpace(querySubject) && (message.Subject == null || message.Subject.IndexOf(querySubject, StringComparison.OrdinalIgnoreCase) < 0)) continue;
                 if (!string.IsNullOrWhiteSpace(fromContains) && !AddressMatches(message.From, fromContains!)) continue;
+                if (!string.IsNullOrWhiteSpace(queryFromContains) && !AddressMatches(message.From, queryFromContains!)) continue;
                 if (!string.IsNullOrWhiteSpace(toContains) && !AddressMatches(message.To, toContains!)) continue;
+                if (!string.IsNullOrWhiteSpace(queryToContains) && !AddressMatches(message.To, queryToContains!)) continue;
             }
             if (!string.IsNullOrWhiteSpace(bodyContains)) {
                 var textBody = message.TextBody ?? string.Empty;
@@ -183,12 +207,21 @@ public static partial class MailboxSearcher {
                 if (textBody.IndexOf(bodyContains, StringComparison.OrdinalIgnoreCase) < 0 &&
                     htmlBody.IndexOf(bodyContains, StringComparison.OrdinalIgnoreCase) < 0) continue;
             }
+            if (!string.IsNullOrWhiteSpace(queryBodyContains)) {
+                var textBody = message.TextBody ?? string.Empty;
+                var htmlBody = message.HtmlBody ?? string.Empty;
+                if (textBody.IndexOf(queryBodyContains, StringComparison.OrdinalIgnoreCase) < 0 &&
+                    htmlBody.IndexOf(queryBodyContains, StringComparison.OrdinalIgnoreCase) < 0) continue;
+            }
             if (requiresFullMessageForFiltering) {
                 var msgDate = message.Date.UtcDateTime;
                 if (sinceUtc.HasValue && msgDate < sinceUtc.Value) continue;
+                if (querySinceUtc.HasValue && msgDate < querySinceUtc.Value) continue;
                 if (beforeUtc.HasValue && msgDate > beforeUtc.Value) continue;
+                if (queryBeforeUtc.HasValue && msgDate > queryBeforeUtc.Value) continue;
             }
             if (priority.HasValue && message.Priority != ConvertPriority(priority.Value)) continue;
+            if (queryPriority.HasValue && message.Priority != ConvertPriority(queryPriority.Value)) continue;
             if (hasAttachment && !message.Attachments.Any()) continue;
             if (messageContainsTerms.Any(term => !MessageContains(message, term))) continue;
             results.Add(new Pop3EmailMessage(i, message));
@@ -200,15 +233,24 @@ public static partial class MailboxSearcher {
     private static bool Pop3HeadersMatch(
         HeaderList headers,
         string? subject,
+        string? querySubject,
         string? fromContains,
+        string? queryFromContains,
         string? toContains,
+        string? queryToContains,
         DateTime? sinceUtc,
-        DateTime? beforeUtc) {
+        DateTime? querySinceUtc,
+        DateTime? beforeUtc,
+        DateTime? queryBeforeUtc) {
         var message = new MimeMessage(headers);
         if ((!string.IsNullOrWhiteSpace(subject) &&
              (message.Subject == null || message.Subject.IndexOf(subject, StringComparison.OrdinalIgnoreCase) < 0)) ||
+            (!string.IsNullOrWhiteSpace(querySubject) &&
+             (message.Subject == null || message.Subject.IndexOf(querySubject, StringComparison.OrdinalIgnoreCase) < 0)) ||
             (!string.IsNullOrWhiteSpace(fromContains) && !AddressMatches(message.From, fromContains!)) ||
-            (!string.IsNullOrWhiteSpace(toContains) && !AddressMatches(message.To, toContains!))) {
+            (!string.IsNullOrWhiteSpace(queryFromContains) && !AddressMatches(message.From, queryFromContains!)) ||
+            (!string.IsNullOrWhiteSpace(toContains) && !AddressMatches(message.To, toContains!)) ||
+            (!string.IsNullOrWhiteSpace(queryToContains) && !AddressMatches(message.To, queryToContains!))) {
             return false;
         }
 
@@ -216,7 +258,13 @@ public static partial class MailboxSearcher {
         if (sinceUtc.HasValue && messageDate < sinceUtc.Value) {
             return false;
         }
+        if (querySinceUtc.HasValue && messageDate < querySinceUtc.Value) {
+            return false;
+        }
         if (beforeUtc.HasValue && messageDate > beforeUtc.Value) {
+            return false;
+        }
+        if (queryBeforeUtc.HasValue && messageDate > queryBeforeUtc.Value) {
             return false;
         }
         return true;

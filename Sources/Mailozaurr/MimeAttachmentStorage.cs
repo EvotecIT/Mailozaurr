@@ -21,7 +21,7 @@ internal static class MimeAttachmentStorage {
         string requestedPath,
         MimeEntity attachment,
         string storageIdentity) =>
-        ResolveDestinationPath(requestedPath, GetAttachmentFileName(attachment), storageIdentity);
+        ResolveDestinationPath(requestedPath, GetAttachmentFileName(attachment, storageIdentity), storageIdentity);
 
     public static string ResolveDestinationPath(
         string requestedPath,
@@ -65,11 +65,16 @@ internal static class MimeAttachmentStorage {
         return builder.ToString();
     }
 
-    public static string GetAttachmentFileName(MimeEntity attachment) => attachment switch {
-        MimePart part => part.FileName ?? Path.GetRandomFileName(),
-        MessagePart messagePart => messagePart.ContentDisposition?.FileName ?? messagePart.ContentType?.Name ?? Path.GetRandomFileName(),
-        _ => Path.GetRandomFileName()
-    };
+    public static string GetAttachmentFileName(MimeEntity attachment, string? fallbackIdentity = null) {
+        var fileName = attachment switch {
+            MimePart part => part.FileName,
+            MessagePart messagePart => messagePart.ContentDisposition?.FileName ?? messagePart.ContentType?.Name,
+            _ => null
+        };
+        return string.IsNullOrWhiteSpace(fileName)
+            ? CreateFallbackFileName(fallbackIdentity)
+            : fileName!;
+    }
 
     private static string GetSafeAttachmentFileName(string remoteFileName, string? attachmentIdentity) {
         var sourceFileName = remoteFileName ?? string.Empty;
@@ -77,7 +82,8 @@ internal static class MimeAttachmentStorage {
         var separatorIndex = raw.LastIndexOf('/');
         var fileName = separatorIndex >= 0 ? raw.Substring(separatorIndex + 1) : raw;
         if (string.IsNullOrWhiteSpace(fileName) || fileName == "." || fileName == "..") {
-            return Path.GetRandomFileName();
+            fileName = CreateFallbackFileName(attachmentIdentity);
+            sourceFileName = fileName;
         }
 
         var invalid = Path.GetInvalidFileNameChars();
@@ -92,7 +98,7 @@ internal static class MimeAttachmentStorage {
 
         var sanitized = builder.ToString().TrimEnd(' ', '.');
         if (string.IsNullOrWhiteSpace(sanitized)) {
-            return Path.GetRandomFileName();
+            sanitized = CreateFallbackFileName(attachmentIdentity);
         }
 
         if (IsReservedWindowsFileName(sanitized)) {
@@ -100,6 +106,17 @@ internal static class MimeAttachmentStorage {
         }
 
         return AppendSourceNameHash(sanitized, sourceFileName, attachmentIdentity);
+    }
+
+    private static string CreateFallbackFileName(string? attachmentIdentity) {
+        if (string.IsNullOrWhiteSpace(attachmentIdentity)) {
+            return "attachment.bin";
+        }
+
+        using var sha256 = SHA256.Create();
+        var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(attachmentIdentity));
+        var hashText = BitConverter.ToString(hash, 0, 8).Replace("-", string.Empty).ToLowerInvariant();
+        return "attachment-" + hashText + ".bin";
     }
 
     private static bool IsPortableInvalidFileNameCharacter(char character) => character switch {

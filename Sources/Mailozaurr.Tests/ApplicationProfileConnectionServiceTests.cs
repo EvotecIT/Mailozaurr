@@ -195,6 +195,31 @@ public sealed class ApplicationProfileConnectionServiceTests {
             });
     }
 
+    [Fact]
+    public async Task TestAsyncConvertsSessionDisposalFailureIntoStructuredResult() {
+        var profileStore = new InMemoryProfileStore(new[] {
+            new MailProfile {
+                Id = "imap-work",
+                DisplayName = "Work IMAP",
+                Kind = MailProfileKind.Imap,
+                DefaultMailbox = "user@example.com"
+            }
+        });
+        var service = new MailProfileConnectionService(
+            profileStore,
+            imapSessionFactory: new ThrowingDisposeImapSessionFactory(),
+            probeImapAsync: (_, _) => Task.CompletedTask);
+
+        var result = await service.TestAsync("imap-work", MailProfileConnectionTestScope.Auth);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("connection_test_failed", result.Code);
+        var cleanup = result.Stages[result.Stages.Count - 1];
+        Assert.Equal(MailProfileConnectionTestPhase.Cleanup, cleanup.Phase);
+        Assert.Equal("dispose", cleanup.Probe);
+        Assert.Contains("dispose failed", cleanup.Message);
+    }
+
     private sealed class InMemoryProfileStore : IMailProfileStore {
         private readonly Dictionary<string, MailProfile> _profiles;
 
@@ -236,6 +261,20 @@ public sealed class ApplicationProfileConnectionServiceTests {
     private sealed class FakeImapSessionFactory : IImapSessionFactory {
         public Task<ImapClient> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) =>
             Task.FromResult(new ImapClient());
+    }
+
+    private sealed class ThrowingDisposeImapSessionFactory : IImapSessionFactory {
+        public Task<ImapClient> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) =>
+            Task.FromResult<ImapClient>(new ThrowingDisposeImapClient());
+    }
+
+    private sealed class ThrowingDisposeImapClient : ImapClient {
+        protected override void Dispose(bool disposing) {
+            base.Dispose(disposing);
+            if (disposing) {
+                throw new InvalidOperationException("dispose failed");
+            }
+        }
     }
 
     private sealed class FakePop3SessionFactory : IPop3SessionFactory {

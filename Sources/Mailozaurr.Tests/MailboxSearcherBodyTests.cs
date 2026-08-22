@@ -41,6 +41,25 @@ public class MailboxSearcherBodyTests {
     }
 
     [Fact]
+    public async Task SearchPop3Async_CombinesStructuredAndQualifiedQueryFilters() {
+        var structuredOnly = new MimeMessage { Subject = "Invoice ready" };
+        var queryOnly = new MimeMessage { Subject = "Overdue notice" };
+        var matching = new MimeMessage { Subject = "Overdue invoice" };
+        var client = new FakePop3Client(new[] { structuredOnly, queryOnly, matching });
+
+        var result = await MailboxSearcher.SearchPop3Async(
+            client,
+            subject: "Invoice",
+            queryString: "subject:Overdue");
+
+        var message = Assert.Single(result);
+        Assert.Equal(2, message.Index);
+        Assert.Equal("Overdue invoice", message.Message.Subject);
+        Assert.Equal(3, client.HeaderDownloads);
+        Assert.Equal(1, client.FullMessageDownloads);
+    }
+
+    [Fact]
     public async Task SearchPop3Async_HeaderOnlyFilterDownloadsBodiesOnlyForMatches() {
         var unrelated = new MimeMessage { Subject = "Unrelated" };
         unrelated.Body = new TextPart("plain") { Text = new string('x', 100_000) };

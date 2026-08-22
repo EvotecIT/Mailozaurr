@@ -219,7 +219,9 @@ public sealed class GraphMailReadHandler : IMailReadHandler {
             Attachments = message.Attachments.Select((attachment, index) => new AttachmentSummary {
                 MessageId = summary.Id,
                 Id = index.ToString(CultureInfo.InvariantCulture),
-                FileName = MimeAttachmentStorage.GetAttachmentFileName(attachment),
+                FileName = MimeAttachmentStorage.GetAttachmentFileName(
+                    attachment,
+                    MimeAttachmentStorage.CreateStorageIdentity(profile.Id, summary.Id, index.ToString(CultureInfo.InvariantCulture))),
                 ContentType = attachment.ContentType?.MimeType
             }).ToList()
         };
