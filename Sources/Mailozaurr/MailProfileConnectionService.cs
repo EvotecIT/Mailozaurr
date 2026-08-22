@@ -2,6 +2,7 @@ using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Net.Pop3;
 using System.Diagnostics;
+using System.Net;
 using static Mailozaurr.MailProfileDiagnosticEvidenceFactory;
 
 namespace Mailozaurr;
@@ -254,10 +255,10 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
             session => session.Dispose(),
             mailbox ? _probeGraphMailboxAsync : _probeGraphAsync,
             mailbox ? MailProfileConnectionTestPhase.Mailbox : send ? MailProfileConnectionTestPhase.SendPreflight : MailProfileConnectionTestPhase.Probe,
-            mailbox ? "listFolders" : "getIdentity",
+            mailbox ? "listFolders" : "inspectMailAccess",
             ResolveTarget(profile),
             "Graph credential session created.",
-            mailbox ? "Graph mailbox probe succeeded." : send ? "Graph send preflight completed." : "Graph identity probe succeeded.",
+            mailbox ? "Graph mailbox probe succeeded." : send ? "Graph send preflight completed." : "Graph mail-access probe succeeded.",
             cancellationToken,
             session => session.UserId,
             CreateGraphSessionEvidence);
@@ -357,9 +358,17 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
                 evidence ??= new MailProfileDiagnosticEvidence();
                 evidence.Preflight ??= CreateSendPreflightEvidence(profile.Kind, evidence);
             }
-            timer.Stop();
-            AddStage(stages, probePhase, true, probe, target, timer.ElapsedMilliseconds, null, successMessage, evidence);
-            result = Success(profile, probe, target, successMessage, requestedScope, effectiveScope, stages);
+            if (evidence?.Preflight?.Ready == false) {
+                timer.Stop();
+                const string code = "send_preflight_not_ready";
+                var message = evidence.Preflight.Detail ?? "The available evidence does not support attempting the send operation.";
+                AddStage(stages, probePhase, false, probe, target, timer.ElapsedMilliseconds, code, message, evidence);
+                result = Failure(code, message, profile.Id, profile.Kind, requestedScope, effectiveScope, stages);
+            } else {
+                timer.Stop();
+                AddStage(stages, probePhase, true, probe, target, timer.ElapsedMilliseconds, null, successMessage, evidence);
+                result = Success(profile, probe, target, successMessage, requestedScope, effectiveScope, stages);
+            }
         } catch (OperationCanceledException) {
             try {
                 dispose(session);
@@ -436,41 +445,74 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
     }
 
     private static async Task<MailProfileDiagnosticEvidence?> DefaultProbeGraphAsync(GraphSession session, CancellationToken cancellationToken) {
-        var identity = await session.Client.GetMailboxIdentityAsync(session.UserId, cancellationToken).ConfigureAwait(false);
-        return CreateGraphEvidence(session, identity);
+        await session.Client.ListMailFoldersRecursiveAsync(
+            session.UserId,
+            top: 1,
+            maxRequests: 1,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        var evidence = CreateGraphEvidence(session);
+        await TryAttachGraphIdentityAsync(session, evidence, cancellationToken).ConfigureAwait(false);
+        return evidence;
     }
 
     private static async Task<MailProfileDiagnosticEvidence?> DefaultProbeGraphMailboxAsync(GraphSession session, CancellationToken cancellationToken) {
-        var identity = await session.Client.GetMailboxIdentityAsync(session.UserId, cancellationToken).ConfigureAwait(false);
         var folders = await session.Client.ListMailFoldersRecursiveAsync(
             session.UserId,
             top: 1,
             maxRequests: 1,
             cancellationToken: cancellationToken).ConfigureAwait(false);
-        var evidence = CreateGraphEvidence(session, identity);
+        var evidence = CreateGraphEvidence(session);
         evidence.Mailbox = new MailProfileMailboxEvidence {
             FolderCount = folders.Count
         };
+        await TryAttachGraphIdentityAsync(session, evidence, cancellationToken).ConfigureAwait(false);
         return evidence;
     }
 
     private static async Task<MailProfileDiagnosticEvidence?> DefaultProbeGmailAsync(GmailSession session, CancellationToken cancellationToken) {
-        var profile = await session.Browser.GetProfileAsync(cancellationToken).ConfigureAwait(false);
-        if (string.IsNullOrWhiteSpace(profile.EmailAddress)) {
-            throw new InvalidOperationException("Gmail profile probe did not return an email address.");
+        try {
+            var profile = await session.Browser.GetProfileAsync(cancellationToken).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(profile.EmailAddress)) {
+                throw new InvalidOperationException("Gmail profile probe did not return an email address.");
+            }
+            return CreateGmailEvidence(profile);
+        } catch (GmailAuthenticationException ex) when (ex.StatusCode == HttpStatusCode.Forbidden) {
+            var evidence = CreateGmailCapabilityEvidence(
+                "Gmail recognized the credential but the users.getProfile endpoint was outside its granted scope. OAuth scope metadata was not available and send readiness was not inferred.");
+            evidence.IdentityUnavailableReason = "Gmail users.getProfile returned 403 Forbidden for this credential scope.";
+            return evidence;
         }
-        return CreateGmailEvidence(profile);
     }
 
     private static async Task<MailProfileDiagnosticEvidence?> DefaultProbeGmailMailboxAsync(GmailSession session, CancellationToken cancellationToken) {
-        var profile = await session.Browser.GetProfileAsync(cancellationToken).ConfigureAwait(false);
-        if (string.IsNullOrWhiteSpace(profile.EmailAddress)) {
-            throw new InvalidOperationException("Gmail profile probe did not return an email address.");
-        }
         var folders = await session.Browser.ListFoldersAsync(cancellationToken).ConfigureAwait(false);
-        var evidence = CreateGmailEvidence(profile);
-        evidence.Mailbox!.FolderCount = folders.Count;
+        var evidence = CreateGmailCapabilityEvidence(
+            "The Gmail labels endpoint verified mailbox access, but OAuth scope metadata was not available and was not inferred.");
+        evidence.Mailbox = new MailProfileMailboxEvidence { FolderCount = folders.Count };
+        try {
+            var profile = await session.Browser.GetProfileAsync(cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(profile.EmailAddress)) {
+                ApplyGmailProfile(evidence, profile);
+            } else {
+                evidence.IdentityUnavailableReason = "Gmail users.getProfile returned no email address.";
+            }
+        } catch (GmailAuthenticationException ex) when (ex.StatusCode == HttpStatusCode.Forbidden) {
+            evidence.IdentityUnavailableReason = "Gmail users.getProfile returned 403 Forbidden for this credential scope.";
+        }
         return evidence;
+    }
+
+    private static async Task TryAttachGraphIdentityAsync(
+        GraphSession session,
+        MailProfileDiagnosticEvidence evidence,
+        CancellationToken cancellationToken) {
+        try {
+            var identity = await session.Client.GetMailboxIdentityAsync(session.UserId, cancellationToken).ConfigureAwait(false);
+            var identityEvidence = CreateGraphEvidence(session, identity);
+            evidence.Identity = identityEvidence.Identity;
+        } catch (GraphApiException ex) {
+            evidence.IdentityUnavailableReason = $"Microsoft Graph users endpoint returned {(int)ex.StatusCode} ({ex.StatusCode}); mail capability evidence remains valid.";
+        }
     }
 
     private static Task<MailProfileDiagnosticEvidence?> DefaultProbeSmtpAsync(Smtp smtp, CancellationToken cancellationToken) {

@@ -137,7 +137,7 @@ public sealed class ApplicationProfileConnectionServiceTests {
         Assert.True(result.Succeeded);
         Assert.Equal(MailProfileConnectionTestScope.Auth, result.RequestedScope);
         Assert.Equal(MailProfileConnectionTestScope.Auth, result.ExecutedScope);
-        Assert.Equal("getIdentity", result.Probe);
+        Assert.Equal("inspectMailAccess", result.Probe);
         Assert.Equal(1, authProbeCalls);
         Assert.Equal(0, mailboxProbeCalls);
     }
@@ -145,10 +145,9 @@ public sealed class ApplicationProfileConnectionServiceTests {
     [Fact]
     public async Task DefaultGraphAuthProbeVerifiesIdentityAndReportsTokenDeclaredPermissions() {
         var profileStore = CreateGraphProfileStore();
-        var response = new HttpResponseMessage(HttpStatusCode.OK) {
-            Content = new StringContent("{\"id\":\"user-id\",\"displayName\":\"Ada Lovelace\",\"mail\":\"ada@example.com\",\"userPrincipalName\":\"ada@example.com\"}")
-        };
-        var handler = new RecordingHandler(response);
+        var handler = new RecordingHandler(
+            JsonResponse("{\"value\":[{\"id\":\"inbox\",\"displayName\":\"Inbox\",\"childFolderCount\":0}]}"),
+            JsonResponse("{\"id\":\"user-id\",\"displayName\":\"Ada Lovelace\",\"mail\":\"ada@example.com\",\"userPrincipalName\":\"ada@example.com\"}"));
         var credential = new OAuthCredential {
             UserName = "ada@example.com",
             AccessToken = CreateJwt("{\"scp\":\"Mail.Read Mail.Send\",\"roles\":[\"MailboxSettings.Read\"]}"),
@@ -169,10 +168,130 @@ public sealed class ApplicationProfileConnectionServiceTests {
         Assert.Equal(
             new[] { "Mail.Read", "Mail.Send", "MailboxSettings.Read" },
             probe.Evidence?.Permissions?.Names);
-        Assert.Single(handler.Requests);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Contains("/users/ada%40example.com/mailFolders?", handler.Requests[0].RequestUri?.AbsoluteUri);
         Assert.Equal(
             "https://graph.microsoft.com/v1.0/users/ada%40example.com?$select=id,displayName,mail,userPrincipalName",
-            handler.Requests[0].RequestUri?.AbsoluteUri);
+            handler.Requests[1].RequestUri?.AbsoluteUri);
+    }
+
+    [Fact]
+    public async Task DefaultGraphAuthProbeKeepsMailEvidenceWhenIdentityPermissionIsUnavailable() {
+        var handler = new RecordingHandler(
+            JsonResponse("{\"value\":[{\"id\":\"inbox\",\"displayName\":\"Inbox\",\"childFolderCount\":0}]}"),
+            JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
+        var service = new MailProfileConnectionService(
+            CreateGraphProfileStore(),
+            graphSessionFactory: new HttpGraphSessionFactory(handler, new OAuthCredential {
+                UserName = "ada@example.com",
+                AccessToken = CreateJwt("{\"scp\":\"Mail.ReadWrite Mail.Send\"}"),
+                ExpiresOn = DateTimeOffset.MaxValue
+            }));
+
+        var result = await service.TestAsync("graph-work", MailProfileConnectionTestScope.Auth);
+
+        Assert.True(result.Succeeded);
+        var evidence = result.Stages[result.Stages.Count - 1].Evidence;
+        Assert.Null(evidence?.Identity);
+        Assert.Contains("403", evidence?.IdentityUnavailableReason);
+        Assert.Equal(new[] { "Mail.ReadWrite", "Mail.Send" }, evidence?.Permissions?.Names);
+        Assert.Equal(2, handler.Requests.Count);
+    }
+
+    [Fact]
+    public async Task DefaultGraphSendPreflightFailsWhenDraftCreationPermissionIsMissing() {
+        var handler = new RecordingHandler(
+            JsonResponse("{\"value\":[]}"),
+            JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
+        var service = new MailProfileConnectionService(
+            CreateGraphProfileStore(),
+            graphSessionFactory: new HttpGraphSessionFactory(handler, new OAuthCredential {
+                UserName = "ada@example.com",
+                AccessToken = CreateJwt("{\"scp\":\"Mail.Send\"}"),
+                ExpiresOn = DateTimeOffset.MaxValue
+            }));
+
+        var result = await service.TestAsync("graph-work", MailProfileConnectionTestScope.Send);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("send_preflight_not_ready", result.Code);
+        var stage = result.Stages[result.Stages.Count - 1];
+        Assert.False(stage.Succeeded);
+        Assert.False(stage.Evidence?.Preflight?.Ready);
+        Assert.Contains("Mail.ReadWrite", stage.Evidence?.Preflight?.Detail);
+    }
+
+    [Fact]
+    public async Task DefaultGraphSendPreflightAcceptsCompleteSharedMailboxPermissionPair() {
+        var handler = new RecordingHandler(
+            JsonResponse("{\"value\":[]}"),
+            JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
+        var service = new MailProfileConnectionService(
+            CreateGraphProfileStore(),
+            graphSessionFactory: new HttpGraphSessionFactory(handler, new OAuthCredential {
+                UserName = "ada@example.com",
+                AccessToken = CreateJwt("{\"scp\":\"Mail.ReadWrite.Shared Mail.Send.Shared\"}"),
+                ExpiresOn = DateTimeOffset.MaxValue
+            }));
+
+        var result = await service.TestAsync("graph-work", MailProfileConnectionTestScope.Send);
+
+        Assert.True(result.Succeeded);
+        Assert.True(result.Stages[result.Stages.Count - 1].Evidence?.Preflight?.Ready);
+    }
+
+    [Fact]
+    public async Task DefaultGmailMailboxProbeDoesNotRequireProfilePermission() {
+        var profileStore = new InMemoryProfileStore(new[] {
+            new MailProfile {
+                Id = "gmail-work",
+                DisplayName = "Work Gmail",
+                Kind = MailProfileKind.Gmail,
+                DefaultMailbox = "user@gmail.com"
+            }
+        });
+        var handler = new RecordingHandler(
+            JsonResponse("{\"labels\":[{\"id\":\"INBOX\",\"name\":\"INBOX\",\"type\":\"system\"}]}"),
+            JsonResponse("{\"error\":{\"code\":403}}", HttpStatusCode.Forbidden));
+        var service = new MailProfileConnectionService(
+            profileStore,
+            gmailSessionFactory: new HttpGmailSessionFactory(handler));
+
+        var result = await service.TestAsync("gmail-work", MailProfileConnectionTestScope.Mailbox);
+
+        Assert.True(result.Succeeded);
+        var evidence = result.Stages[result.Stages.Count - 1].Evidence;
+        Assert.Equal(1, evidence?.Mailbox?.FolderCount);
+        Assert.Null(evidence?.Identity);
+        Assert.Contains("403", evidence?.IdentityUnavailableReason);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Contains("/labels?", handler.Requests[0].RequestUri?.AbsoluteUri);
+        Assert.EndsWith("/profile", handler.Requests[1].RequestUri?.AbsoluteUri);
+    }
+
+    [Fact]
+    public async Task DefaultGmailSendPreflightKeepsReadinessUnknownForSendOnlyCredential() {
+        var profileStore = new InMemoryProfileStore(new[] {
+            new MailProfile {
+                Id = "gmail-work",
+                DisplayName = "Work Gmail",
+                Kind = MailProfileKind.Gmail,
+                DefaultMailbox = "user@gmail.com"
+            }
+        });
+        var handler = new RecordingHandler(
+            JsonResponse("{\"error\":{\"code\":403}}", HttpStatusCode.Forbidden));
+        var service = new MailProfileConnectionService(
+            profileStore,
+            gmailSessionFactory: new HttpGmailSessionFactory(handler));
+
+        var result = await service.TestAsync("gmail-work", MailProfileConnectionTestScope.Send);
+
+        Assert.True(result.Succeeded);
+        var evidence = result.Stages[result.Stages.Count - 1].Evidence;
+        Assert.Null(evidence?.Preflight?.Ready);
+        Assert.Contains("outside its granted scope", evidence?.Permissions?.Detail);
+        Assert.Contains("403", evidence?.IdentityUnavailableReason);
     }
 
     [Fact]
@@ -363,6 +482,10 @@ public sealed class ApplicationProfileConnectionServiceTests {
             .Replace('/', '_');
         return Encode("{\"alg\":\"none\"}") + "." + Encode(payload) + ".signature";
     }
+
+    private static HttpResponseMessage JsonResponse(string content, HttpStatusCode statusCode = HttpStatusCode.OK) => new(statusCode) {
+        Content = new StringContent(content, Encoding.UTF8, "application/json")
+    };
 
     private sealed class FakeImapSessionFactory : IImapSessionFactory {
         public Task<ImapClient> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) =>

@@ -46,15 +46,21 @@ internal static class MailProfileDiagnosticEvidenceFactory {
         return new MailProfileDiagnosticEvidence { Protocol = "Graph" };
     }
 
-    internal static MailProfileDiagnosticEvidence CreateGraphEvidence(GraphSession session, GraphMailboxIdentity identity) {
+    internal static MailProfileDiagnosticEvidence CreateGraphEvidence(
+        GraphSession session,
+        GraphMailboxIdentity? identity = null,
+        string? identityUnavailableReason = null) {
         var evidence = CreateGraphSessionEvidence(session);
         evidence.Permissions = CreateGraphPermissionEvidence(session.Credential?.AccessToken);
-        evidence.Identity = new MailProfileIdentityEvidence {
-            Id = identity.Id,
-            EmailAddress = string.IsNullOrWhiteSpace(identity.Mail) ? identity.UserPrincipalName : identity.Mail,
-            DisplayName = identity.DisplayName,
-            Source = "Microsoft Graph users endpoint"
-        };
+        evidence.IdentityUnavailableReason = identityUnavailableReason;
+        if (identity != null) {
+            evidence.Identity = new MailProfileIdentityEvidence {
+                Id = identity.Id,
+                EmailAddress = string.IsNullOrWhiteSpace(identity.Mail) ? identity.UserPrincipalName : identity.Mail,
+                DisplayName = identity.DisplayName,
+                Source = "Microsoft Graph users endpoint"
+            };
+        }
         return evidence;
     }
 
@@ -63,23 +69,35 @@ internal static class MailProfileDiagnosticEvidenceFactory {
         return new MailProfileDiagnosticEvidence { Protocol = "Gmail" };
     }
 
-    internal static MailProfileDiagnosticEvidence CreateGmailEvidence(GmailMailboxBrowser.GmailMailboxProfileResult profile) => new() {
+    internal static MailProfileDiagnosticEvidence CreateGmailCapabilityEvidence(string detail) => new() {
         Protocol = "Gmail",
-        Identity = new MailProfileIdentityEvidence {
-            EmailAddress = profile.EmailAddress,
-            Source = "Gmail users.getProfile endpoint"
-        },
         Permissions = new MailProfilePermissionEvidence {
             Source = "unavailable",
             Authoritative = false,
-            Detail = "The Gmail profile endpoint verified the credential and identity, but OAuth scope metadata was not available and was not inferred."
-        },
-        Mailbox = new MailProfileMailboxEvidence {
-            MessageCount = profile.MessagesTotal,
-            ThreadCount = profile.ThreadsTotal,
-            ChangeCursor = profile.HistoryId
+            Detail = detail
         }
     };
+
+    internal static MailProfileDiagnosticEvidence CreateGmailEvidence(GmailMailboxBrowser.GmailMailboxProfileResult profile) {
+        var evidence = CreateGmailCapabilityEvidence(
+            "The Gmail profile endpoint verified the credential and identity, but OAuth scope metadata was not available and was not inferred.");
+        ApplyGmailProfile(evidence, profile);
+        return evidence;
+    }
+
+    internal static void ApplyGmailProfile(
+        MailProfileDiagnosticEvidence evidence,
+        GmailMailboxBrowser.GmailMailboxProfileResult profile) {
+        evidence.Identity = new MailProfileIdentityEvidence {
+            EmailAddress = profile.EmailAddress,
+            Source = "Gmail users.getProfile endpoint"
+        };
+        evidence.IdentityUnavailableReason = null;
+        evidence.Mailbox ??= new MailProfileMailboxEvidence();
+        evidence.Mailbox.MessageCount = profile.MessagesTotal;
+        evidence.Mailbox.ThreadCount = profile.ThreadsTotal;
+        evidence.Mailbox.ChangeCursor = profile.HistoryId;
+    }
 
     internal static MailProfilePreflightEvidence CreateSendPreflightEvidence(
         MailProfileKind kind,
@@ -94,18 +112,23 @@ internal static class MailProfileDiagnosticEvidenceFactory {
         }
 
         var permissionNames = evidence.Permissions?.Names ?? new List<string>();
-        var requiredPermission = kind == MailProfileKind.Graph ? "Mail.Send" : null;
-        bool? ready = null;
-        if (requiredPermission != null && permissionNames.Count > 0) {
-            ready = permissionNames.Contains(requiredPermission, StringComparer.OrdinalIgnoreCase);
-        }
+        var graphPermissionsKnown = kind == MailProfileKind.Graph && permissionNames.Count > 0;
+        var graphDirectReady = graphPermissionsKnown &&
+            permissionNames.Contains("Mail.ReadWrite", StringComparer.OrdinalIgnoreCase) &&
+            permissionNames.Contains("Mail.Send", StringComparer.OrdinalIgnoreCase);
+        var graphSharedReady = graphPermissionsKnown &&
+            permissionNames.Contains("Mail.ReadWrite.Shared", StringComparer.OrdinalIgnoreCase) &&
+            permissionNames.Contains("Mail.Send.Shared", StringComparer.OrdinalIgnoreCase);
+        bool? ready = kind == MailProfileKind.Graph
+            ? graphPermissionsKnown ? graphDirectReady || graphSharedReady : null
+            : null;
         return new MailProfilePreflightEvidence {
             Operation = "send",
-            ValidationLevel = "provider-identity",
+            ValidationLevel = kind == MailProfileKind.Graph ? "mail-endpoint-and-token-claims" : "provider-response",
             Ready = ready,
-            Detail = requiredPermission == null
-                ? "The provider identity endpoint succeeded. Effective send permission was not available, and no message was submitted."
-                : "The provider identity endpoint succeeded. Readiness reflects token-declared Mail.Send when claims were available; no message was submitted."
+            Detail = kind == MailProfileKind.Graph
+                ? "A Graph mail endpoint succeeded. Sending uses draft creation followed by draft send, so readiness requires token-declared Mail.ReadWrite plus Mail.Send, or Mail.ReadWrite.Shared plus Mail.Send.Shared. No draft or message was created."
+                : "The provider response was inspected. Effective send permission was not available, and no message was submitted."
         };
     }
 

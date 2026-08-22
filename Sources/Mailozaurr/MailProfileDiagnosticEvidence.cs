@@ -13,6 +13,9 @@ public sealed class MailProfileDiagnosticEvidence {
     /// <summary>Provider-verified account identity, when queried successfully.</summary>
     public MailProfileIdentityEvidence? Identity { get; set; }
 
+    /// <summary>Why identity evidence is unavailable even though another provider capability was verified.</summary>
+    public string? IdentityUnavailableReason { get; set; }
+
     /// <summary>Permission claims visible to the client and their authority boundary.</summary>
     public MailProfilePermissionEvidence? Permissions { get; set; }
 
