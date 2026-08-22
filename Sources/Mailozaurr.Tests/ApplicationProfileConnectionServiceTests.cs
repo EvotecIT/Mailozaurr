@@ -249,6 +249,41 @@ public sealed class ApplicationProfileConnectionServiceTests {
     }
 
     [Fact]
+    public async Task DefaultGraphAuthProbeDoesNotCallMeForOpaqueApplicationTokenWithoutMailbox() {
+        var profileStore = new InMemoryProfileStore(new[] {
+            new MailProfile {
+                Id = "graph-app",
+                DisplayName = "Graph application",
+                Kind = MailProfileKind.Graph
+            }
+        });
+        var handler = new RecordingHandler();
+        var service = new MailProfileConnectionService(
+            profileStore,
+            graphSessionFactory: new HttpGraphSessionFactory(
+                handler,
+                new OAuthCredential {
+                    UserName = "app",
+                    AccessToken = "opaque-application-token",
+                    ExpiresOn = DateTimeOffset.MaxValue
+                },
+                graphCredential: new GraphCredential {
+                    ClientId = "client-id",
+                    DirectoryId = "tenant-id",
+                    ClientSecret = "client-secret"
+                }));
+
+        var result = await service.TestAsync("graph-app", MailProfileConnectionTestScope.Auth);
+
+        Assert.True(result.Succeeded);
+        var evidence = result.Stages[result.Stages.Count - 1].Evidence;
+        Assert.Empty(evidence?.Permissions?.ApplicationRoles ?? new List<string>());
+        Assert.Null(evidence?.Identity);
+        Assert.Contains("/me", evidence?.IdentityUnavailableReason);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
     public async Task DefaultGraphSendPreflightFailsWhenDraftCreationPermissionIsMissing() {
         var handler = new RecordingHandler(
             JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
@@ -795,14 +830,17 @@ public sealed class ApplicationProfileConnectionServiceTests {
         private readonly HttpMessageHandler _handler;
         private readonly OAuthCredential _credential;
         private readonly Func<CancellationToken, Task<string>>? _refreshToken;
+        private readonly GraphCredential? _graphCredential;
 
         public HttpGraphSessionFactory(
             HttpMessageHandler handler,
             OAuthCredential credential,
-            Func<CancellationToken, Task<string>>? refreshToken = null) {
+            Func<CancellationToken, Task<string>>? refreshToken = null,
+            GraphCredential? graphCredential = null) {
             _handler = handler;
             _credential = credential;
             _refreshToken = refreshToken;
+            _graphCredential = graphCredential;
         }
 
         public Task<GraphSession> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) {
@@ -810,7 +848,7 @@ public sealed class ApplicationProfileConnectionServiceTests {
                 BaseAddress = new Uri("https://graph.microsoft.com/v1.0/")
             };
             var client = new GraphApiClient(httpClient, _refreshToken, credential: _credential);
-            return Task.FromResult(new GraphSession(client, profile.DefaultMailbox ?? "me", _credential));
+            return Task.FromResult(new GraphSession(client, profile.DefaultMailbox ?? "me", _credential, _graphCredential));
         }
     }
 
