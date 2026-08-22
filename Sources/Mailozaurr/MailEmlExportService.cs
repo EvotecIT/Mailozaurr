@@ -2,6 +2,9 @@ namespace Mailozaurr;
 
 /// <summary>Default provider-neutral EML export orchestration.</summary>
 public sealed class MailEmlExportService : IMailEmlExportService {
+    /// <summary>Maximum number of distinct messages accepted by one export request.</summary>
+    public const int MaximumBatchMessageCount = 1000;
+
     private readonly IMailProfileStore _profileStore;
     private readonly IReadOnlyDictionary<MailProfileKind, IRawMailMessageSource> _sources;
     private readonly ProviderEmlArtifactWriter _writer;
@@ -33,8 +36,14 @@ public sealed class MailEmlExportService : IMailEmlExportService {
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => value.Trim())
             .Distinct(StringComparer.Ordinal)
+            .Take(MaximumBatchMessageCount + 1)
             .ToArray();
         if (messageIds.Length == 0) throw new ArgumentException("At least one message id is required.", nameof(request));
+        if (messageIds.Length > MaximumBatchMessageCount) {
+            throw new ArgumentOutOfRangeException(
+                nameof(request.MessageIds),
+                $"A single EML export may contain at most {MaximumBatchMessageCount} distinct message ids.");
+        }
 
         var profile = await _profileStore.GetByIdAsync(request.ProfileId.Trim(), cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException($"Profile '{request.ProfileId}' was not found.");
@@ -71,10 +80,11 @@ public sealed class MailEmlExportService : IMailEmlExportService {
                     continue;
                 }
 
+                var storageMessageId = CanonicalizeMessageIdForStorage(profile, messageId);
                 var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(
                     destinationDirectory,
-                    messageId + ".eml",
-                    CreateStorageIdentity(profile, request, messageId, raw.StorageIdentityComponent));
+                    storageMessageId + ".eml",
+                    CreateStorageIdentity(profile, request, storageMessageId, raw.StorageIdentityComponent));
                 item.DestinationPath = destinationPath;
                 if (File.Exists(destinationPath) && !request.Overwrite) {
                     item.Code = "destination_exists";
@@ -104,7 +114,7 @@ public sealed class MailEmlExportService : IMailEmlExportService {
                 item.UsedPreservedSource = write.UsedPreservedSource;
                 item.DiagnosticCodes = write.DiagnosticCodes;
                 result.ExportedCount++;
-            } catch (OperationCanceledException) {
+            } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 throw;
             } catch (Exception ex) {
                 item.Code = "eml_export_failed";
@@ -133,7 +143,8 @@ public sealed class MailEmlExportService : IMailEmlExportService {
                 folder = Pop3MailReadHandler.NormalizeFolderId(request.FolderId);
                 break;
             case MailProfileKind.Imap:
-                folder = ImapMailReadHandler.ResolveFolder(request.FolderId, profile);
+                folder = ImapMailReadHandler.CanonicalizeFolderForStorage(
+                    ImapMailReadHandler.ResolveFolder(request.FolderId, profile));
                 break;
             case MailProfileKind.Graph:
                 mailbox = GraphMailReadHandler.ResolveUserId(profile, request.MailboxId);
@@ -154,4 +165,9 @@ public sealed class MailEmlExportService : IMailEmlExportService {
             messageId,
             providerIdentityComponent);
     }
+
+    private static string CanonicalizeMessageIdForStorage(MailProfile profile, string messageId) =>
+        profile.Kind == MailProfileKind.Imap
+            ? ImapMailReadHandler.CanonicalizeUidForStorage(messageId)
+            : messageId;
 }

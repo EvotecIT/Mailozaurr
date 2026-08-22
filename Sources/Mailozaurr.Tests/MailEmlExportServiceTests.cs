@@ -151,15 +151,15 @@ public sealed class MailEmlExportServiceTests {
             var first = CreateMessage("first", "X-Test: one");
             var second = CreateMessage("second", "X-Test: two");
             var source = new FakeRawMailMessageSource(new Dictionary<string, byte[]> {
-                ["same:a"] = first,
-                ["same?a"] = second
+                ["41"] = first,
+                ["42"] = second
             });
             var service = new MailEmlExportService(profileStore, new[] { source });
 
             var result = await service.ExportAsync(new MailEmlExportRequest {
                 ProfileId = "mailbox",
                 FolderId = "INBOX",
-                MessageIds = new List<string> { "same:a", "same?a", "same:a" },
+                MessageIds = new List<string> { "41", "42", "41" },
                 DestinationDirectory = directory
             });
 
@@ -192,13 +192,13 @@ public sealed class MailEmlExportServiceTests {
                 Kind = MailProfileKind.Imap
             });
             var source = new FakeRawMailMessageSource(new Dictionary<string, byte[]> {
-                ["message"] = CreateMessage("message", "X-Test: value")
+                ["42"] = CreateMessage("message", "X-Test: value")
             });
             var service = new MailEmlExportService(profileStore, new[] { source });
             var request = new MailEmlExportRequest {
                 ProfileId = "mailbox",
                 FolderId = "INBOX",
-                MessageIds = new List<string> { "message" },
+                MessageIds = new List<string> { "42" },
                 DestinationDirectory = directory
             };
             var first = await service.ExportAsync(request);
@@ -211,6 +211,136 @@ public sealed class MailEmlExportServiceTests {
             Assert.Equal("destination_exists", Assert.Single(second.Results).Code);
             Assert.Equal(original, File.ReadAllBytes(path));
             Assert.Equal(2, source.RequestCount);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task BatchExportRejectsOversizedBatchBeforeProviderWork() {
+        var profileStore = new InMemoryMailProfileStore();
+        await profileStore.SaveAsync(new MailProfile {
+            Id = "mailbox",
+            DisplayName = "Mailbox",
+            Kind = MailProfileKind.Imap
+        });
+        var source = new FakeRawMailMessageSource(new Dictionary<string, byte[]>());
+        var service = new MailEmlExportService(profileStore, new[] { source });
+
+        var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.ExportAsync(
+            new MailEmlExportRequest {
+                ProfileId = "mailbox",
+                MessageIds = Enumerable.Range(1, MailEmlExportService.MaximumBatchMessageCount + 1)
+                    .Select(value => value.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                    .ToList(),
+                DestinationDirectory = Path.GetTempPath()
+            }));
+
+        Assert.Equal("MessageIds", exception.ParamName);
+        Assert.Equal(0, source.RequestCount);
+    }
+
+    [Fact]
+    public async Task ImapFolderAndUidAliasesUseOneDeterministicDestination() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profileStore = new InMemoryMailProfileStore();
+            await profileStore.SaveAsync(new MailProfile {
+                Id = "imap-mailbox",
+                DisplayName = "IMAP mailbox",
+                Kind = MailProfileKind.Imap
+            });
+            var content = CreateMessage("message", "X-Test: value");
+            var source = new FakeRawMailMessageSource(new Dictionary<string, byte[]> {
+                ["042"] = content,
+                ["42"] = content
+            });
+            var service = new MailEmlExportService(profileStore, new[] { source });
+
+            var first = await service.ExportAsync(new MailEmlExportRequest {
+                ProfileId = "imap-mailbox",
+                FolderId = " inbox ",
+                MessageIds = new List<string> { "042" },
+                DestinationDirectory = directory
+            });
+            var second = await service.ExportAsync(new MailEmlExportRequest {
+                ProfileId = "imap-mailbox",
+                FolderId = "INBOX",
+                MessageIds = new List<string> { "42" },
+                DestinationDirectory = directory,
+                Overwrite = true
+            });
+
+            Assert.True(first.Succeeded);
+            Assert.True(second.Succeeded);
+            Assert.Equal(
+                Assert.Single(first.Results).DestinationPath,
+                Assert.Single(second.Results).DestinationPath);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ProviderTimeoutIsReportedPerItemAndBatchContinues() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profileStore = new InMemoryMailProfileStore();
+            await profileStore.SaveAsync(new MailProfile {
+                Id = "mailbox",
+                DisplayName = "Mailbox",
+                Kind = MailProfileKind.Imap
+            });
+            var source = new FakeRawMailMessageSource(new Dictionary<string, byte[]> {
+                ["42"] = CreateMessage("message", "X-Test: value")
+            }) {
+                ThrowOperationCanceledForMessageId = "41"
+            };
+            var service = new MailEmlExportService(profileStore, new[] { source });
+
+            var result = await service.ExportAsync(new MailEmlExportRequest {
+                ProfileId = "mailbox",
+                MessageIds = new List<string> { "41", "42" },
+                DestinationDirectory = directory
+            });
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(1, result.ExportedCount);
+            Assert.Equal(1, result.FailedCount);
+            Assert.Equal("eml_export_failed", result.Results[0].Code);
+            Assert.True(result.Results[1].Succeeded);
+            Assert.Equal(2, source.RequestCount);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task CallerCancellationStillAbortsBatch() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profileStore = new InMemoryMailProfileStore();
+            await profileStore.SaveAsync(new MailProfile {
+                Id = "mailbox",
+                DisplayName = "Mailbox",
+                Kind = MailProfileKind.Imap
+            });
+            using var cancellation = new CancellationTokenSource();
+            var source = new FakeRawMailMessageSource(new Dictionary<string, byte[]>()) {
+                ThrowOperationCanceledForMessageId = "41",
+                CancelOnOperationCanceled = cancellation
+            };
+            var service = new MailEmlExportService(profileStore, new[] { source });
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.ExportAsync(
+                new MailEmlExportRequest {
+                    ProfileId = "mailbox",
+                    MessageIds = new List<string> { "41", "42" },
+                    DestinationDirectory = directory
+                },
+                cancellation.Token));
+
+            Assert.Equal(1, source.RequestCount);
         } finally {
             Directory.Delete(directory, recursive: true);
         }
@@ -326,11 +456,19 @@ public sealed class MailEmlExportServiceTests {
 
         public string? StorageIdentityComponent { get; set; }
 
+        public string? ThrowOperationCanceledForMessageId { get; set; }
+
+        public CancellationTokenSource? CancelOnOperationCanceled { get; set; }
+
         public Task<RawMailMessage?> GetRawMessageAsync(
             MailProfile profile,
             RawMailMessageRequest request,
             CancellationToken cancellationToken = default) {
             RequestCount++;
+            if (string.Equals(request.MessageId, ThrowOperationCanceledForMessageId, StringComparison.Ordinal)) {
+                CancelOnOperationCanceled?.Cancel();
+                throw new OperationCanceledException("Provider operation timed out.", cancellationToken);
+            }
             return Task.FromResult(_messages.TryGetValue(request.MessageId, out var content)
                 ? new RawMailMessage {
                     MessageId = request.MessageId,
