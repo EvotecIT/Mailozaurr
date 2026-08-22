@@ -13,7 +13,27 @@ public sealed partial class GraphApiClient {
     /// </summary>
     public async Task<GraphMailboxIdentity> GetMailboxIdentityAsync(
         string userId = "me",
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default) =>
+        await GetMailboxIdentityCoreAsync(userId, refreshOnAuthenticationError: true, cancellationToken)
+            .ConfigureAwait(false);
+
+    /// <summary>
+    /// Gets the provider-verified identity without refreshing authentication after a 401/403 response.
+    /// </summary>
+    /// <remarks>
+    /// This is intended for optional capability probes where an authorization denial is evidence and must not mutate
+    /// authentication state.
+    /// </remarks>
+    public async Task<GraphMailboxIdentity> GetMailboxIdentityWithoutRefreshAsync(
+        string userId = "me",
+        CancellationToken cancellationToken = default) =>
+        await GetMailboxIdentityCoreAsync(userId, refreshOnAuthenticationError: false, cancellationToken)
+            .ConfigureAwait(false);
+
+    private async Task<GraphMailboxIdentity> GetMailboxIdentityCoreAsync(
+        string userId,
+        bool refreshOnAuthenticationError,
+        CancellationToken cancellationToken) {
         ThrowIfDisposed();
 
         var userSegment = BuildUserSegment(userId);
@@ -22,12 +42,19 @@ public sealed partial class GraphApiClient {
             userSegment + "?$select=id,displayName,mail,userPrincipalName");
         ApplyAuthHeader(request);
         using var response = await _client.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        if (refreshOnAuthenticationError) {
+            await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        }
 #if NET5_0_OR_GREATER
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 #else
         var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
+        if (!refreshOnAuthenticationError &&
+            (response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+             response.StatusCode == System.Net.HttpStatusCode.Forbidden)) {
+            throw new GraphApiException(response.StatusCode, "Graph authentication failed.", body);
+        }
         if (!response.IsSuccessStatusCode) {
             throw new GraphApiException(
                 response.StatusCode,

@@ -124,7 +124,7 @@ internal static class MailProfileDiagnosticEvidenceFactory {
             "Mail.ReadWrite.Shared",
             "Mail.Send.Shared");
         var delegatedDirectPair = HasPermissionPair(delegatedScopes, "Mail.ReadWrite", "Mail.Send");
-        var targetIsSignedInMailbox = IsSignedInMailbox(target, permissions?.DelegatedIdentity);
+        var targetIsSignedInMailbox = IsSignedInMailbox(target, permissions?.DelegatedMailboxIdentifiers);
         bool? ready = null;
         if (kind == MailProfileKind.Graph) {
             if (!graphMailEndpointSucceeded) {
@@ -151,14 +151,16 @@ internal static class MailProfileDiagnosticEvidenceFactory {
         permissions.Contains(first, StringComparer.OrdinalIgnoreCase) &&
         permissions.Contains(second, StringComparer.OrdinalIgnoreCase);
 
-    private static bool? IsSignedInMailbox(string? target, string? delegatedIdentity) {
+    private static bool? IsSignedInMailbox(string? target, IReadOnlyCollection<string>? delegatedIdentifiers) {
         if (string.IsNullOrWhiteSpace(target) || target!.Equals("me", StringComparison.OrdinalIgnoreCase)) {
             return true;
         }
-        if (string.IsNullOrWhiteSpace(delegatedIdentity)) {
+        if (delegatedIdentifiers == null || delegatedIdentifiers.Count == 0) {
             return null;
         }
-        return target.Trim().Equals(delegatedIdentity!.Trim(), StringComparison.OrdinalIgnoreCase);
+        var normalizedTarget = target.Trim();
+        return delegatedIdentifiers.Any(identifier =>
+            normalizedTarget.Equals(identifier, StringComparison.OrdinalIgnoreCase));
     }
 
     private static string CreateGraphPreflightDetail(bool mailEndpointSucceeded, bool? targetIsSignedInMailbox) {
@@ -213,6 +215,12 @@ internal static class MailProfileDiagnosticEvidenceFactory {
             DelegatedScopes = claims.DelegatedScopes,
             ApplicationRoles = claims.ApplicationRoles,
             DelegatedIdentity = claims.DelegatedIdentity,
+            DelegatedObjectId = claims.DelegatedObjectId,
+            DelegatedMailboxIdentifiers = new[] { claims.DelegatedIdentity, claims.DelegatedObjectId }
+                .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .Select(static value => value!.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
             Source = names.Count == 0 ? "unavailable" : "access-token claims",
             Authoritative = false,
             Detail = names.Count == 0
@@ -250,10 +258,14 @@ internal static class MailProfileDiagnosticEvidenceFactory {
                 }
             }
             var delegatedIdentity = ReadFirstStringClaim(document.RootElement, "preferred_username", "upn", "email");
+            var delegatedObjectId = delegatedScopes.Count > 0
+                ? ReadFirstStringClaim(document.RootElement, "oid")
+                : null;
             return new GraphPermissionClaims {
                 DelegatedScopes = delegatedScopes.OrderBy(static value => value, StringComparer.OrdinalIgnoreCase).ToList(),
                 ApplicationRoles = applicationRoles.OrderBy(static value => value, StringComparer.OrdinalIgnoreCase).ToList(),
-                DelegatedIdentity = delegatedIdentity
+                DelegatedIdentity = delegatedIdentity,
+                DelegatedObjectId = delegatedObjectId
             };
         } catch (FormatException) {
             return new GraphPermissionClaims();
@@ -276,5 +288,23 @@ internal static class MailProfileDiagnosticEvidenceFactory {
         internal List<string> DelegatedScopes { get; set; } = new();
         internal List<string> ApplicationRoles { get; set; } = new();
         internal string? DelegatedIdentity { get; set; }
+        internal string? DelegatedObjectId { get; set; }
+    }
+
+    internal static void ApplyVerifiedGraphDelegatedIdentity(
+        MailProfileDiagnosticEvidence evidence,
+        GraphMailboxIdentity identity) {
+        var permissions = evidence.Permissions;
+        if (permissions == null || string.IsNullOrWhiteSpace(permissions.DelegatedObjectId) ||
+            !string.Equals(permissions.DelegatedObjectId, identity.Id, StringComparison.OrdinalIgnoreCase)) {
+            return;
+        }
+
+        foreach (var identifier in new[] { identity.Id, identity.Mail, identity.UserPrincipalName }) {
+            if (!string.IsNullOrWhiteSpace(identifier) &&
+                !permissions.DelegatedMailboxIdentifiers.Contains(identifier!, StringComparer.OrdinalIgnoreCase)) {
+                permissions.DelegatedMailboxIdentifiers.Add(identifier!.Trim());
+            }
+        }
     }
 }

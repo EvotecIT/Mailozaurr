@@ -246,6 +246,58 @@ public sealed class ApplicationProfileConnectionServiceTests {
     }
 
     [Fact]
+    public async Task DefaultGraphSendPreflightRecognizesDelegatedObjectIdMailbox() {
+        const string objectId = "11111111-2222-3333-4444-555555555555";
+        var profileStore = new InMemoryProfileStore(new[] {
+            new MailProfile {
+                Id = "graph-work",
+                DisplayName = "Work Graph",
+                Kind = MailProfileKind.Graph,
+                DefaultMailbox = objectId
+            }
+        });
+        var handler = new RecordingHandler(
+            JsonResponse("{\"value\":[]}"),
+            JsonResponse($"{{\"id\":\"{objectId}\",\"mail\":\"ada@example.com\",\"userPrincipalName\":\"ada@example.com\"}}"));
+        var service = new MailProfileConnectionService(
+            profileStore,
+            graphSessionFactory: new HttpGraphSessionFactory(handler, new OAuthCredential {
+                UserName = "ada@example.com",
+                AccessToken = CreateJwt($"{{\"scp\":\"Mail.ReadWrite Mail.Send\",\"oid\":\"{objectId}\"}}"),
+                ExpiresOn = DateTimeOffset.MaxValue
+            }));
+
+        var result = await service.TestAsync("graph-work", MailProfileConnectionTestScope.Send);
+
+        Assert.True(result.Succeeded);
+        var permissions = result.Stages[result.Stages.Count - 1].Evidence?.Permissions;
+        Assert.True(result.Stages[result.Stages.Count - 1].Evidence?.Preflight?.Ready);
+        Assert.Equal(objectId, permissions?.DelegatedObjectId);
+        Assert.Contains(objectId, permissions?.DelegatedMailboxIdentifiers ?? new List<string>());
+        Assert.Contains("ada@example.com", permissions?.DelegatedMailboxIdentifiers ?? new List<string>());
+    }
+
+    [Fact]
+    public async Task DefaultGraphSendPreflightUsesVerifiedIdentityAliasForDelegatedObjectId() {
+        const string objectId = "11111111-2222-3333-4444-555555555555";
+        var handler = new RecordingHandler(
+            JsonResponse("{\"value\":[]}"),
+            JsonResponse($"{{\"id\":\"{objectId}\",\"mail\":\"ada@example.com\",\"userPrincipalName\":\"ada@example.com\"}}"));
+        var service = new MailProfileConnectionService(
+            CreateGraphProfileStore(),
+            graphSessionFactory: new HttpGraphSessionFactory(handler, new OAuthCredential {
+                UserName = "ada@example.com",
+                AccessToken = CreateJwt($"{{\"scp\":\"Mail.ReadWrite Mail.Send\",\"oid\":\"{objectId}\"}}"),
+                ExpiresOn = DateTimeOffset.MaxValue
+            }));
+
+        var result = await service.TestAsync("graph-work", MailProfileConnectionTestScope.Send);
+
+        Assert.True(result.Succeeded);
+        Assert.True(result.Stages[result.Stages.Count - 1].Evidence?.Preflight?.Ready);
+    }
+
+    [Fact]
     public async Task DefaultGraphSendPreflightRejectsDirectPairForSelectedSharedMailbox() {
         var profileStore = new InMemoryProfileStore(new[] {
             new MailProfile {
@@ -420,6 +472,33 @@ public sealed class ApplicationProfileConnectionServiceTests {
         Assert.False(result.Succeeded);
         Assert.Equal("connection_test_failed", result.Code);
         Assert.Equal(2, handler.Requests.Count);
+    }
+
+    [Fact]
+    public async Task DefaultGraphOptionalIdentityDenialDoesNotRefreshCredential() {
+        var handler = new RecordingHandler(
+            JsonResponse("{\"value\":[]}"),
+            JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
+        var refreshCalls = 0;
+        var service = new MailProfileConnectionService(
+            CreateGraphProfileStore(),
+            graphSessionFactory: new HttpGraphSessionFactory(
+                handler,
+                new OAuthCredential {
+                    UserName = "ada@example.com",
+                    AccessToken = CreateJwt("{\"scp\":\"Mail.Read\",\"preferred_username\":\"ada@example.com\"}"),
+                    ExpiresOn = DateTimeOffset.MaxValue
+                },
+                _ => {
+                    refreshCalls++;
+                    return Task.FromResult("refreshed-token");
+                }));
+
+        var result = await service.TestAsync("graph-work", MailProfileConnectionTestScope.Auth);
+
+        Assert.True(result.Succeeded);
+        Assert.Contains("403", result.Stages[result.Stages.Count - 1].Evidence?.IdentityUnavailableReason);
+        Assert.Equal(0, refreshCalls);
     }
 
     [Fact]
@@ -654,17 +733,22 @@ public sealed class ApplicationProfileConnectionServiceTests {
     private sealed class HttpGraphSessionFactory : IGraphSessionFactory {
         private readonly HttpMessageHandler _handler;
         private readonly OAuthCredential _credential;
+        private readonly Func<CancellationToken, Task<string>>? _refreshToken;
 
-        public HttpGraphSessionFactory(HttpMessageHandler handler, OAuthCredential credential) {
+        public HttpGraphSessionFactory(
+            HttpMessageHandler handler,
+            OAuthCredential credential,
+            Func<CancellationToken, Task<string>>? refreshToken = null) {
             _handler = handler;
             _credential = credential;
+            _refreshToken = refreshToken;
         }
 
         public Task<GraphSession> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) {
             var httpClient = new HttpClient(_handler) {
                 BaseAddress = new Uri("https://graph.microsoft.com/v1.0/")
             };
-            var client = new GraphApiClient(httpClient, credential: _credential);
+            var client = new GraphApiClient(httpClient, _refreshToken, credential: _credential);
             return Task.FromResult(new GraphSession(client, profile.DefaultMailbox ?? "me", _credential));
         }
     }

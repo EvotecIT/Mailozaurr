@@ -76,6 +76,12 @@ public sealed class MailProfilePermissionEvidence {
     /// <summary>Delegated sign-in identity declared by the token, when available.</summary>
     public string? DelegatedIdentity { get; set; }
 
+    /// <summary>Delegated sign-in object identifier declared by the token's <c>oid</c> claim, when available.</summary>
+    public string? DelegatedObjectId { get; set; }
+
+    /// <summary>Token-declared and provider-verified identifiers for the delegated sign-in mailbox.</summary>
+    public List<string> DelegatedMailboxIdentifiers { get; set; } = new();
+
     /// <summary>Where the permission names came from.</summary>
     public string? Source { get; set; }
 

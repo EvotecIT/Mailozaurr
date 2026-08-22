@@ -538,7 +538,9 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
         MailProfileDiagnosticEvidence evidence,
         CancellationToken cancellationToken) {
         try {
-            var identity = await session.Client.GetMailboxIdentityAsync(session.UserId, cancellationToken).ConfigureAwait(false);
+            var identity = await session.Client.GetMailboxIdentityWithoutRefreshAsync(session.UserId, cancellationToken)
+                .ConfigureAwait(false);
+            ApplyVerifiedGraphDelegatedIdentity(evidence, identity);
             var identityEvidence = CreateGraphEvidence(session, identity);
             evidence.Identity = identityEvidence.Identity;
         } catch (GraphApiException ex) when (ex.StatusCode == HttpStatusCode.Forbidden) {
