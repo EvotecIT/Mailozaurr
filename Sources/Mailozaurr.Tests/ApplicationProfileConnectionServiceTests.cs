@@ -146,7 +146,6 @@ public sealed class ApplicationProfileConnectionServiceTests {
     public async Task DefaultGraphAuthProbeVerifiesIdentityAndReportsTokenDeclaredPermissions() {
         var profileStore = CreateGraphProfileStore();
         var handler = new RecordingHandler(
-            JsonResponse("{\"value\":[{\"id\":\"inbox\",\"displayName\":\"Inbox\",\"childFolderCount\":0}]}"),
             JsonResponse("{\"id\":\"user-id\",\"displayName\":\"Ada Lovelace\",\"mail\":\"ada@example.com\",\"userPrincipalName\":\"ada@example.com\"}"));
         var credential = new OAuthCredential {
             UserName = "ada@example.com",
@@ -170,17 +169,15 @@ public sealed class ApplicationProfileConnectionServiceTests {
             probe.Evidence?.Permissions?.Names);
         Assert.Equal(new[] { "Mail.Read", "Mail.Send" }, probe.Evidence?.Permissions?.DelegatedScopes);
         Assert.Equal(new[] { "MailboxSettings.Read" }, probe.Evidence?.Permissions?.ApplicationRoles);
-        Assert.Equal(2, handler.Requests.Count);
-        Assert.Contains("/users/ada%40example.com/mailFolders?", handler.Requests[0].RequestUri?.AbsoluteUri);
+        Assert.Single(handler.Requests);
         Assert.Equal(
             "https://graph.microsoft.com/v1.0/users/ada%40example.com?$select=id,displayName,mail,userPrincipalName",
-            handler.Requests[1].RequestUri?.AbsoluteUri);
+            handler.Requests[0].RequestUri?.AbsoluteUri);
     }
 
     [Fact]
     public async Task DefaultGraphAuthProbeKeepsMailEvidenceWhenIdentityPermissionIsUnavailable() {
         var handler = new RecordingHandler(
-            JsonResponse("{\"value\":[{\"id\":\"inbox\",\"displayName\":\"Inbox\",\"childFolderCount\":0}]}"),
             JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
         var service = new MailProfileConnectionService(
             CreateGraphProfileStore(),
@@ -197,7 +194,30 @@ public sealed class ApplicationProfileConnectionServiceTests {
         Assert.Null(evidence?.Identity);
         Assert.Contains("403", evidence?.IdentityUnavailableReason);
         Assert.Equal(new[] { "Mail.ReadWrite", "Mail.Send" }, evidence?.Permissions?.Names);
-        Assert.Equal(2, handler.Requests.Count);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task DefaultGraphAuthProbeAcceptsRecognizedMailSendCredentialWithoutMailboxRead() {
+        var handler = new RecordingHandler(
+            JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
+        var service = new MailProfileConnectionService(
+            CreateGraphProfileStore(),
+            graphSessionFactory: new HttpGraphSessionFactory(handler, new OAuthCredential {
+                UserName = "ada@example.com",
+                AccessToken = CreateJwt("{\"scp\":\"Mail.Send\"}"),
+                ExpiresOn = DateTimeOffset.MaxValue
+            }));
+
+        var result = await service.TestAsync("graph-work", MailProfileConnectionTestScope.Auth);
+
+        Assert.True(result.Succeeded);
+        var evidence = result.Stages[result.Stages.Count - 1].Evidence;
+        Assert.Equal(new[] { "Mail.Send" }, evidence?.Permissions?.DelegatedScopes);
+        Assert.Contains("403", evidence?.IdentityUnavailableReason);
+        Assert.Single(handler.Requests);
+        Assert.DoesNotContain(handler.Requests, request =>
+            request.RequestUri?.AbsoluteUri.Contains("/mailFolders", StringComparison.OrdinalIgnoreCase) == true);
     }
 
     [Fact]
@@ -457,7 +477,6 @@ public sealed class ApplicationProfileConnectionServiceTests {
     [Fact]
     public async Task DefaultGraphIdentityProbePropagatesUnauthorizedResponse() {
         var handler = new RecordingHandler(
-            JsonResponse("{\"value\":[]}"),
             JsonResponse("{\"error\":{\"code\":\"InvalidAuthenticationToken\"}}", HttpStatusCode.Unauthorized));
         var service = new MailProfileConnectionService(
             CreateGraphProfileStore(),
@@ -471,13 +490,12 @@ public sealed class ApplicationProfileConnectionServiceTests {
 
         Assert.False(result.Succeeded);
         Assert.Equal("connection_test_failed", result.Code);
-        Assert.Equal(2, handler.Requests.Count);
+        Assert.Single(handler.Requests);
     }
 
     [Fact]
     public async Task DefaultGraphOptionalIdentityDenialDoesNotRefreshCredential() {
         var handler = new RecordingHandler(
-            JsonResponse("{\"value\":[]}"),
             JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
         var refreshCalls = 0;
         var service = new MailProfileConnectionService(
@@ -499,6 +517,15 @@ public sealed class ApplicationProfileConnectionServiceTests {
         Assert.True(result.Succeeded);
         Assert.Contains("403", result.Stages[result.Stages.Count - 1].Evidence?.IdentityUnavailableReason);
         Assert.Equal(0, refreshCalls);
+        Assert.Single(handler.Requests);
+    }
+
+    [Theory]
+    [InlineData(-1, null)]
+    [InlineData(0, 0L)]
+    [InlineData(7, 7L)]
+    public void ImapUnreadEvidencePreservesUnknownAsNull(int unread, long? expected) {
+        Assert.Equal(expected, MailProfileConnectionService.NormalizeImapUnreadCount(unread));
     }
 
     [Fact]

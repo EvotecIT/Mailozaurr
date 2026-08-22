@@ -419,11 +419,13 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
         var evidence = CreateImapEvidence(client);
         evidence.Mailbox = new MailProfileMailboxEvidence {
             MessageCount = inbox.Count,
-            UnreadCount = inbox.Unread,
+            UnreadCount = NormalizeImapUnreadCount(inbox.Unread),
             ChangeCursor = "uidValidity:" + inbox.UidValidity.ToString(System.Globalization.CultureInfo.InvariantCulture)
         };
         return evidence;
     }
+
+    internal static long? NormalizeImapUnreadCount(int unread) => unread < 0 ? null : unread;
 
     private static Task<MailProfileDiagnosticEvidence?> DefaultProbePop3Async(Pop3Client client, CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
@@ -450,11 +452,6 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
     }
 
     private static async Task<MailProfileDiagnosticEvidence?> DefaultProbeGraphAsync(GraphSession session, CancellationToken cancellationToken) {
-        await session.Client.ListMailFoldersRecursiveAsync(
-            session.UserId,
-            top: 1,
-            maxRequests: 1,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
         var evidence = CreateGraphEvidence(session);
         await TryAttachGraphIdentityAsync(session, evidence, cancellationToken).ConfigureAwait(false);
         return evidence;
