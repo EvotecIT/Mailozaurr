@@ -16,13 +16,24 @@ public sealed partial class GmailMailboxBrowser {
     /// </summary>
     public async Task<GmailMailboxProfileResult> GetProfileAsync(CancellationToken cancellationToken = default) {
         var profile = await _gmail.GetProfileAsync(_userId, cancellationToken).ConfigureAwait(false);
-        return new GmailMailboxProfileResult {
+        return MapProfile(profile);
+    }
+
+    /// <summary>
+    /// Gets mailbox profile without refreshing authentication after a 401/403 response.
+    /// </summary>
+    public async Task<GmailMailboxProfileResult> GetProfileWithoutRefreshAsync(CancellationToken cancellationToken = default) {
+        var profile = await _gmail.GetProfileWithoutRefreshAsync(_userId, cancellationToken).ConfigureAwait(false);
+        return MapProfile(profile);
+    }
+
+    private static GmailMailboxProfileResult MapProfile(GmailApiClient.GmailProfile profile) =>
+        new() {
             EmailAddress = NormalizeOptional(profile.EmailAddress),
             MessagesTotal = profile.MessagesTotal,
             ThreadsTotal = profile.ThreadsTotal,
             HistoryId = NormalizeOptional(profile.HistoryId)
         };
-    }
 
     /// <summary>
     /// Starts Gmail watch subscription for selected folders.

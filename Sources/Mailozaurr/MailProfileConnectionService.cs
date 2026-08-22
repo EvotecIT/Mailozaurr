@@ -471,7 +471,7 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
 
     private static async Task<MailProfileDiagnosticEvidence?> DefaultProbeGmailAsync(GmailSession session, CancellationToken cancellationToken) {
         try {
-            var profile = await session.Browser.GetProfileAsync(cancellationToken).ConfigureAwait(false);
+            var profile = await session.Browser.GetProfileWithoutRefreshAsync(cancellationToken).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(profile.EmailAddress)) {
                 throw new InvalidOperationException("Gmail profile probe did not return an email address.");
             }
@@ -490,7 +490,7 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
             "The Gmail labels endpoint verified mailbox access, but OAuth scope metadata was not available and was not inferred.");
         evidence.Mailbox = new MailProfileMailboxEvidence { FolderCount = folders.Count };
         try {
-            var profile = await session.Browser.GetProfileAsync(cancellationToken).ConfigureAwait(false);
+            var profile = await session.Browser.GetProfileWithoutRefreshAsync(cancellationToken).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(profile.EmailAddress)) {
                 ApplyGmailProfile(evidence, profile);
             } else {

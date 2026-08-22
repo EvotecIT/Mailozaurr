@@ -253,9 +253,13 @@ public sealed class ApplicationProfileConnectionServiceTests {
         var handler = new RecordingHandler(
             JsonResponse("{\"labels\":[{\"id\":\"INBOX\",\"name\":\"INBOX\",\"type\":\"system\"}]}"),
             JsonResponse("{\"error\":{\"code\":403}}", HttpStatusCode.Forbidden));
+        var refreshCalls = 0;
         var service = new MailProfileConnectionService(
             profileStore,
-            gmailSessionFactory: new HttpGmailSessionFactory(handler));
+            gmailSessionFactory: new HttpGmailSessionFactory(handler, _ => {
+                refreshCalls++;
+                return Task.FromResult("refreshed-token");
+            }));
 
         var result = await service.TestAsync("gmail-work", MailProfileConnectionTestScope.Mailbox);
 
@@ -267,6 +271,7 @@ public sealed class ApplicationProfileConnectionServiceTests {
         Assert.Equal(2, handler.Requests.Count);
         Assert.Contains("/labels?", handler.Requests[0].RequestUri?.AbsoluteUri);
         Assert.EndsWith("/profile", handler.Requests[1].RequestUri?.AbsoluteUri);
+        Assert.Equal(0, refreshCalls);
     }
 
     [Fact]
@@ -281,9 +286,13 @@ public sealed class ApplicationProfileConnectionServiceTests {
         });
         var handler = new RecordingHandler(
             JsonResponse("{\"error\":{\"code\":403}}", HttpStatusCode.Forbidden));
+        var refreshCalls = 0;
         var service = new MailProfileConnectionService(
             profileStore,
-            gmailSessionFactory: new HttpGmailSessionFactory(handler));
+            gmailSessionFactory: new HttpGmailSessionFactory(handler, _ => {
+                refreshCalls++;
+                return Task.FromResult("refreshed-token");
+            }));
 
         var result = await service.TestAsync("gmail-work", MailProfileConnectionTestScope.Send);
 
@@ -292,6 +301,7 @@ public sealed class ApplicationProfileConnectionServiceTests {
         Assert.Null(evidence?.Preflight?.Ready);
         Assert.Contains("outside its granted scope", evidence?.Permissions?.Detail);
         Assert.Contains("403", evidence?.IdentityUnavailableReason);
+        Assert.Equal(0, refreshCalls);
     }
 
     [Fact]
@@ -549,16 +559,20 @@ public sealed class ApplicationProfileConnectionServiceTests {
 
     private sealed class HttpGmailSessionFactory : IGmailSessionFactory {
         private readonly HttpMessageHandler _handler;
+        private readonly Func<CancellationToken, Task<string>>? _refreshToken;
 
-        public HttpGmailSessionFactory(HttpMessageHandler handler) {
+        public HttpGmailSessionFactory(
+            HttpMessageHandler handler,
+            Func<CancellationToken, Task<string>>? refreshToken = null) {
             _handler = handler;
+            _refreshToken = refreshToken;
         }
 
         public Task<GmailSession> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) {
             var httpClient = new HttpClient(_handler) {
                 BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/")
             };
-            var client = new GmailApiClient(httpClient);
+            var client = new GmailApiClient(httpClient, _refreshToken);
             return Task.FromResult(new GmailSession(client, profile.DefaultMailbox ?? "me"));
         }
     }

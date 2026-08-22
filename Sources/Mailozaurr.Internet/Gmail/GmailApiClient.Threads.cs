@@ -98,10 +98,34 @@ public sealed partial class GmailApiClient {
     /// <summary>
     /// Gets the Gmail profile for the specified user.
     /// </summary>
-    public async Task<GmailProfile> GetProfileAsync(string userId, CancellationToken cancellationToken = default) {
+    public Task<GmailProfile> GetProfileAsync(string userId, CancellationToken cancellationToken = default) =>
+        GetProfileCoreAsync(userId, refreshOnAuthenticationError: true, cancellationToken);
+
+    /// <summary>
+    /// Gets the Gmail profile without invoking the token-refresh delegate when the endpoint returns 401/403.
+    /// </summary>
+    /// <remarks>
+    /// This is intended for optional capability probes where an insufficient-scope response is evidence and must not mutate authentication state.
+    /// </remarks>
+    public Task<GmailProfile> GetProfileWithoutRefreshAsync(string userId, CancellationToken cancellationToken = default) =>
+        GetProfileCoreAsync(userId, refreshOnAuthenticationError: false, cancellationToken);
+
+    private async Task<GmailProfile> GetProfileCoreAsync(
+        string userId,
+        bool refreshOnAuthenticationError,
+        CancellationToken cancellationToken) {
         ThrowIfDisposed();
         using var response = await _client.GetAsync($"users/{userId}/profile", cancellationToken).ConfigureAwait(false);
-        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        if (refreshOnAuthenticationError) {
+            await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        } else if (response.StatusCode == HttpStatusCode.Unauthorized || response.StatusCode == HttpStatusCode.Forbidden) {
+#if NET5_0_OR_GREATER
+            var errorContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+            var errorContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+            throw new GmailAuthenticationException(response.StatusCode, errorContent);
+        }
         response.EnsureSuccessStatusCode();
 #if NET5_0_OR_GREATER
         var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
