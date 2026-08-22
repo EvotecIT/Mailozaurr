@@ -168,6 +168,8 @@ public sealed class ApplicationProfileConnectionServiceTests {
         Assert.Equal(
             new[] { "Mail.Read", "Mail.Send", "MailboxSettings.Read" },
             probe.Evidence?.Permissions?.Names);
+        Assert.Equal(new[] { "Mail.Read", "Mail.Send" }, probe.Evidence?.Permissions?.DelegatedScopes);
+        Assert.Equal(new[] { "MailboxSettings.Read" }, probe.Evidence?.Permissions?.ApplicationRoles);
         Assert.Equal(2, handler.Requests.Count);
         Assert.Contains("/users/ada%40example.com/mailFolders?", handler.Requests[0].RequestUri?.AbsoluteUri);
         Assert.Equal(
@@ -201,7 +203,6 @@ public sealed class ApplicationProfileConnectionServiceTests {
     [Fact]
     public async Task DefaultGraphSendPreflightFailsWhenDraftCreationPermissionIsMissing() {
         var handler = new RecordingHandler(
-            JsonResponse("{\"value\":[]}"),
             JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
         var service = new MailProfileConnectionService(
             CreateGraphProfileStore(),
@@ -219,6 +220,59 @@ public sealed class ApplicationProfileConnectionServiceTests {
         Assert.False(stage.Succeeded);
         Assert.False(stage.Evidence?.Preflight?.Ready);
         Assert.Contains("Mail.ReadWrite", stage.Evidence?.Preflight?.Detail);
+        Assert.Equal("denied-mail-endpoint-and-token-claims", stage.Evidence?.Preflight?.ValidationLevel);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task DefaultGraphSendPreflightAcceptsDelegatedDirectPairOnlyForSignedInMailbox() {
+        var handler = new RecordingHandler(
+            JsonResponse("{\"value\":[]}"),
+            JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
+        var service = new MailProfileConnectionService(
+            CreateGraphProfileStore(),
+            graphSessionFactory: new HttpGraphSessionFactory(handler, new OAuthCredential {
+                UserName = "ada@example.com",
+                AccessToken = CreateJwt("{\"scp\":\"Mail.ReadWrite Mail.Send\",\"preferred_username\":\"ada@example.com\"}"),
+                ExpiresOn = DateTimeOffset.MaxValue
+            }));
+
+        var result = await service.TestAsync("graph-work", MailProfileConnectionTestScope.Send);
+
+        Assert.True(result.Succeeded);
+        var evidence = result.Stages[result.Stages.Count - 1].Evidence;
+        Assert.True(evidence?.Preflight?.Ready);
+        Assert.Equal("ada@example.com", evidence?.Permissions?.DelegatedIdentity);
+    }
+
+    [Fact]
+    public async Task DefaultGraphSendPreflightRejectsDirectPairForSelectedSharedMailbox() {
+        var profileStore = new InMemoryProfileStore(new[] {
+            new MailProfile {
+                Id = "graph-work",
+                DisplayName = "Work Graph",
+                Kind = MailProfileKind.Graph,
+                DefaultMailbox = "shared@example.com"
+            }
+        });
+        var handler = new RecordingHandler(
+            JsonResponse("{\"value\":[]}"),
+            JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
+        var service = new MailProfileConnectionService(
+            profileStore,
+            graphSessionFactory: new HttpGraphSessionFactory(handler, new OAuthCredential {
+                UserName = "owner@example.com",
+                AccessToken = CreateJwt("{\"scp\":\"Mail.ReadWrite Mail.Send Mail.ReadWrite.Shared\",\"preferred_username\":\"owner@example.com\"}"),
+                ExpiresOn = DateTimeOffset.MaxValue
+            }));
+
+        var result = await service.TestAsync("graph-work", MailProfileConnectionTestScope.Send);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("send_preflight_not_ready", result.Code);
+        var evidence = result.Stages[result.Stages.Count - 1].Evidence;
+        Assert.False(evidence?.Preflight?.Ready);
+        Assert.Contains("differs", evidence?.Preflight?.Detail);
     }
 
     [Fact]
@@ -241,6 +295,28 @@ public sealed class ApplicationProfileConnectionServiceTests {
     }
 
     [Fact]
+    public async Task DefaultGraphSendPreflightAcceptsApplicationRolePairForSelectedMailbox() {
+        var handler = new RecordingHandler(
+            JsonResponse("{\"value\":[]}"),
+            JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
+        var service = new MailProfileConnectionService(
+            CreateGraphProfileStore(),
+            graphSessionFactory: new HttpGraphSessionFactory(handler, new OAuthCredential {
+                UserName = "app",
+                AccessToken = CreateJwt("{\"roles\":[\"Mail.ReadWrite\",\"Mail.Send\"]}"),
+                ExpiresOn = DateTimeOffset.MaxValue
+            }));
+
+        var result = await service.TestAsync("graph-work", MailProfileConnectionTestScope.Send);
+
+        Assert.True(result.Succeeded);
+        var evidence = result.Stages[result.Stages.Count - 1].Evidence;
+        Assert.True(evidence?.Preflight?.Ready);
+        Assert.Empty(evidence?.Permissions?.DelegatedScopes ?? new List<string>());
+        Assert.Equal(new[] { "Mail.ReadWrite", "Mail.Send" }, evidence?.Permissions?.ApplicationRoles);
+    }
+
+    [Fact]
     public async Task DefaultGmailMailboxProbeDoesNotRequireProfilePermission() {
         var profileStore = new InMemoryProfileStore(new[] {
             new MailProfile {
@@ -252,7 +328,7 @@ public sealed class ApplicationProfileConnectionServiceTests {
         });
         var handler = new RecordingHandler(
             JsonResponse("{\"labels\":[{\"id\":\"INBOX\",\"name\":\"INBOX\",\"type\":\"system\"}]}"),
-            JsonResponse("{\"error\":{\"code\":403}}", HttpStatusCode.Forbidden));
+            JsonResponse(GmailInsufficientPermissionsResponse, HttpStatusCode.Forbidden));
         var refreshCalls = 0;
         var service = new MailProfileConnectionService(
             profileStore,
@@ -285,7 +361,7 @@ public sealed class ApplicationProfileConnectionServiceTests {
             }
         });
         var handler = new RecordingHandler(
-            JsonResponse("{\"error\":{\"code\":403}}", HttpStatusCode.Forbidden));
+            JsonResponse(GmailInsufficientPermissionsResponse, HttpStatusCode.Forbidden));
         var refreshCalls = 0;
         var service = new MailProfileConnectionService(
             profileStore,
@@ -302,6 +378,48 @@ public sealed class ApplicationProfileConnectionServiceTests {
         Assert.Contains("outside its granted scope", evidence?.Permissions?.Detail);
         Assert.Contains("403", evidence?.IdentityUnavailableReason);
         Assert.Equal(0, refreshCalls);
+    }
+
+    [Fact]
+    public async Task DefaultGmailProbeDoesNotSuppressNonScopeForbiddenResponses() {
+        var profileStore = new InMemoryProfileStore(new[] {
+            new MailProfile {
+                Id = "gmail-work",
+                DisplayName = "Work Gmail",
+                Kind = MailProfileKind.Gmail,
+                DefaultMailbox = "user@gmail.com"
+            }
+        });
+        var handler = new RecordingHandler(
+            JsonResponse("{\"error\":{\"errors\":[{\"reason\":\"accessNotConfigured\"}],\"code\":403}}", HttpStatusCode.Forbidden));
+        var service = new MailProfileConnectionService(
+            profileStore,
+            gmailSessionFactory: new HttpGmailSessionFactory(handler));
+
+        var result = await service.TestAsync("gmail-work", MailProfileConnectionTestScope.Send);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("connection_test_failed", result.Code);
+    }
+
+    [Fact]
+    public async Task DefaultGraphIdentityProbePropagatesUnauthorizedResponse() {
+        var handler = new RecordingHandler(
+            JsonResponse("{\"value\":[]}"),
+            JsonResponse("{\"error\":{\"code\":\"InvalidAuthenticationToken\"}}", HttpStatusCode.Unauthorized));
+        var service = new MailProfileConnectionService(
+            CreateGraphProfileStore(),
+            graphSessionFactory: new HttpGraphSessionFactory(handler, new OAuthCredential {
+                UserName = "ada@example.com",
+                AccessToken = CreateJwt("{\"scp\":\"Mail.Read\",\"preferred_username\":\"ada@example.com\"}"),
+                ExpiresOn = DateTimeOffset.MaxValue
+            }));
+
+        var result = await service.TestAsync("graph-work", MailProfileConnectionTestScope.Auth);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("connection_test_failed", result.Code);
+        Assert.Equal(2, handler.Requests.Count);
     }
 
     [Fact]
@@ -484,6 +602,9 @@ public sealed class ApplicationProfileConnectionServiceTests {
             DefaultMailbox = "ada@example.com"
         }
     });
+
+    private const string GmailInsufficientPermissionsResponse =
+        "{\"error\":{\"errors\":[{\"reason\":\"insufficientPermissions\"}],\"code\":403,\"status\":\"PERMISSION_DENIED\"}}";
 
     private static string CreateJwt(string payload) {
         static string Encode(string value) => Convert.ToBase64String(Encoding.UTF8.GetBytes(value))

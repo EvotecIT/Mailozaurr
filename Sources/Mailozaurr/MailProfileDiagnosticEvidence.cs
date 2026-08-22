@@ -67,6 +67,15 @@ public sealed class MailProfilePermissionEvidence {
     /// <summary>Permission or role names visible to the client.</summary>
     public List<string> Names { get; set; } = new();
 
+    /// <summary>Delegated OAuth scopes declared by the token's <c>scp</c> claim.</summary>
+    public List<string> DelegatedScopes { get; set; } = new();
+
+    /// <summary>Application permissions declared by the token's <c>roles</c> claim.</summary>
+    public List<string> ApplicationRoles { get; set; } = new();
+
+    /// <summary>Delegated sign-in identity declared by the token, when available.</summary>
+    public string? DelegatedIdentity { get; set; }
+
     /// <summary>Where the permission names came from.</summary>
     public string? Source { get; set; }
 
