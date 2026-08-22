@@ -167,7 +167,12 @@ public static class Pop3MailboxBrowser {
         var messages = new List<Pop3MessageHeaderSnapshot>();
         var start = totalCount - 1 - offset;
         for (var index = start; index >= 0 && messages.Count < limit; index--) {
-            var headers = await client.GetMessageHeadersAsync(index, cancellationToken).ConfigureAwait(false);
+            HeaderList headers;
+            try {
+                headers = await client.GetMessageHeadersAsync(index, cancellationToken).ConfigureAwait(false);
+            } catch (NotSupportedException) {
+                headers = (await client.GetMessageAsync(index, cancellationToken).ConfigureAwait(false)).Headers;
+            }
             var uid = await TryGetMessageUidAsync(client, index, cancellationToken).ConfigureAwait(false);
             var messageSize = TryGetMessageSize(client, index, cancellationToken);
 

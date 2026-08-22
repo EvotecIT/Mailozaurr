@@ -119,6 +119,17 @@ public sealed class Pop3MailboxBrowserTests {
     }
 
     [Fact]
+    public async Task ListMessageHeadersCoreAsync_FallsBackWhenTopIsUnsupported() {
+        var fake = new FakePop3Client(count: 1) { ThrowHeadersNotSupported = true };
+        fake.SetMessage(0, new MimeMessage { Subject = "Fallback" });
+
+        var result = await Pop3MailboxBrowser.ListMessageHeadersCoreAsync(fake, 1, 0, CancellationToken.None);
+
+        Assert.Single(result.Messages);
+        Assert.Equal("Fallback", result.Messages[0].Subject);
+    }
+
+    [Fact]
     public void NormalizeMessageIdValue_StripsAngleBrackets() {
         Assert.Equal("x@y", Pop3MailboxBrowser.NormalizeMessageIdValue("<x@y>"));
         Assert.Equal("x@y", Pop3MailboxBrowser.NormalizeMessageIdValue("x@y"));
@@ -147,6 +158,7 @@ public sealed class Pop3MailboxBrowserTests {
 
         public int Count { get; }
         public bool ThrowUidListNotSupported { get; set; }
+        public bool ThrowHeadersNotSupported { get; set; }
         public IList<string> Uids { get; set; } = new List<string>();
         public List<int> DeletedIndices { get; } = new();
 
@@ -155,8 +167,10 @@ public sealed class Pop3MailboxBrowserTests {
         internal void SetSize(int index, long size) => _sizes[index] = size;
         internal void SetMessage(int index, MimeMessage msg) => _messages[index] = msg;
 
-        public Task<HeaderList> GetMessageHeadersAsync(int index, CancellationToken cancellationToken) =>
-            Task.FromResult(_headers.TryGetValue(index, out var h) ? h : new HeaderList());
+        public Task<HeaderList> GetMessageHeadersAsync(int index, CancellationToken cancellationToken) {
+            if (ThrowHeadersNotSupported) throw new NotSupportedException("TOP is unavailable.");
+            return Task.FromResult(_headers.TryGetValue(index, out var h) ? h : new HeaderList());
+        }
 
         public Task<MimeMessage> GetMessageAsync(int index, CancellationToken cancellationToken) =>
             Task.FromResult(_messages.TryGetValue(index, out var m) ? m : new MimeMessage());

@@ -386,7 +386,11 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
     private static async Task DefaultProbePop3MailboxAsync(Pop3Client client, CancellationToken cancellationToken) {
         await DefaultProbePop3Async(client, cancellationToken).ConfigureAwait(false);
         if (client.Count > 0) {
-            await client.GetMessageHeadersAsync(client.Count - 1, cancellationToken).ConfigureAwait(false);
+            try {
+                await client.GetMessageHeadersAsync(client.Count - 1, cancellationToken).ConfigureAwait(false);
+            } catch (NotSupportedException) {
+                await client.GetMessageAsync(client.Count - 1, cancellationToken).ConfigureAwait(false);
+            }
         }
     }
 

@@ -111,16 +111,30 @@ public class MailboxSearcherBodyTests {
         Assert.Equal(1, client.FullMessageDownloads);
     }
 
+    [Fact]
+    public async Task SearchPop3Async_HeaderOnlyFilterFallsBackWhenTopIsUnsupported() {
+        var matching = new MimeMessage { Subject = "Quarterly report" };
+        var client = new FakePop3Client(new[] { matching }) { ThrowHeadersNotSupported = true };
+
+        var result = await MailboxSearcher.SearchPop3Async(client, subject: "report");
+
+        Assert.Single(result);
+        Assert.Equal(1, client.HeaderDownloads);
+        Assert.Equal(1, client.FullMessageDownloads);
+    }
+
     private sealed class FakePop3Client : Pop3Client {
         private readonly List<MimeMessage> _messages;
         public FakePop3Client(IEnumerable<MimeMessage> messages) => _messages = new List<MimeMessage>(messages);
         public int HeaderDownloads { get; private set; }
         public int FullMessageDownloads { get; private set; }
+        public bool ThrowHeadersNotSupported { get; set; }
         public override bool IsConnected => true;
         public override bool IsAuthenticated => true;
         public override int Count => _messages.Count;
         public override Task<HeaderList> GetMessageHeadersAsync(int index, CancellationToken cancellationToken = default) {
             HeaderDownloads++;
+            if (ThrowHeadersNotSupported) throw new NotSupportedException("TOP is unavailable.");
             return Task.FromResult(_messages[index].Headers);
         }
         public override Task<MimeMessage> GetMessageAsync(int index, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {

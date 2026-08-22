@@ -211,7 +211,7 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
                 profile.Id,
                 profile.Kind.ToString(),
                 canonicalFolder,
-                request.MessageId,
+                CanonicalizeUidForStorage(uid),
                 attachmentIndex.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         if (File.Exists(destinationPath) && !request.Overwrite) {
             return OperationResult.Failure("destination_exists", $"Destination '{destinationPath}' already exists.");
@@ -220,6 +220,9 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
         MimeAttachmentStorage.SaveAttachment(attachment, destinationPath);
         return OperationResult.Success($"Attachment saved to '{destinationPath}'.");
     }
+
+    internal static string CanonicalizeUidForStorage(MailKit.UniqueId uid) =>
+        uid.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private static MessageSummary MapSummary(string profileId, string folder, ImapEmailMessage message) => new() {
         ProfileId = profileId,

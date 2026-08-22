@@ -247,7 +247,7 @@ mailozaurr mail folders --profile archive-pop3 --json
 mailozaurr mail search --profile archive-pop3 --query Invoice --json
 ```
 
-Normalized POP3 operations expose one virtual `INBOX`. Message ids prefer the server UIDL as `uid:<value>` and fall back to `hash:<sha256>:<occurrence>` when UIDL is unavailable. The fallback verifies message content and disambiguates byte-identical entries by their oldest-first occurrence while those entries coexist; only UIDL provides a server-owned persistent identity across mailbox mutations. Use the returned id unchanged with `mail get` and attachment commands.
+Normalized POP3 operations expose one virtual `INBOX`. Message ids prefer the server UIDL as `uid:<value>` and fall back to `hash:<sha256>:<occurrence>` when UIDL is unavailable. The fallback verifies message content and disambiguates byte-identical entries by their newest-first occurrence while those entries coexist; only UIDL provides a server-owned persistent identity across mailbox mutations. Use the returned id unchanged with `mail get` and attachment commands.
 
 ### Generic SMTP profile
 

@@ -12,6 +12,13 @@ public sealed class ApplicationImapMailReadHandlerTests {
         Assert.Equal("INBOX", ImapMailReadHandler.CanonicalizeFolderForStorage(fullName));
     }
 
+    [Theory]
+    [InlineData(1u, "1")]
+    [InlineData(42u, "42")]
+    public void ImapUidStorageIdentityUsesCanonicalNumericValue(uint value, string expected) {
+        Assert.Equal(expected, ImapMailReadHandler.CanonicalizeUidForStorage(new MailKit.UniqueId(value)));
+    }
+
     [Fact]
     public async Task HandlerUsesInjectedSearchDelegate() {
         var handler = new ImapMailReadHandler(

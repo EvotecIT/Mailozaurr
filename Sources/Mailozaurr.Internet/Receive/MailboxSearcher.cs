@@ -174,8 +174,15 @@ public static partial class MailboxSearcher {
              querySinceUtc.HasValue ||
              queryBeforeUtc.HasValue);
         for (int i = client.Count - 1; i >= 0; i--) {
+            MimeMessage? message = null;
             if (useHeaderPrefilter) {
-                var headers = await client.GetMessageHeadersAsync(i, cancellationToken).ConfigureAwait(false);
+                HeaderList headers;
+                try {
+                    headers = await client.GetMessageHeadersAsync(i, cancellationToken).ConfigureAwait(false);
+                } catch (NotSupportedException) {
+                    message = await client.GetMessageAsync(i, cancellationToken).ConfigureAwait(false);
+                    headers = message.Headers;
+                }
                 if (!Pop3HeadersMatch(
                     headers,
                     subject,
@@ -192,7 +199,7 @@ public static partial class MailboxSearcher {
                 }
             }
 
-            var message = await client.GetMessageAsync(i, cancellationToken).ConfigureAwait(false);
+            message ??= await client.GetMessageAsync(i, cancellationToken).ConfigureAwait(false);
             if (requiresFullMessageForFiltering) {
                 if (!string.IsNullOrWhiteSpace(subject) && (message.Subject == null || message.Subject.IndexOf(subject, StringComparison.OrdinalIgnoreCase) < 0)) continue;
                 if (!string.IsNullOrWhiteSpace(querySubject) && (message.Subject == null || message.Subject.IndexOf(querySubject, StringComparison.OrdinalIgnoreCase) < 0)) continue;
