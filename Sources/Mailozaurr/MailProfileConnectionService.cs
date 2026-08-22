@@ -462,7 +462,7 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
         CancellationToken cancellationToken) {
         var mailEndpointSucceeded = true;
         try {
-            await session.Client.ListMailFoldersRecursiveAsync(
+            await session.Client.ListMailFoldersRecursiveWithoutRefreshAsync(
                 session.UserId,
                 top: 1,
                 maxRequests: 1,

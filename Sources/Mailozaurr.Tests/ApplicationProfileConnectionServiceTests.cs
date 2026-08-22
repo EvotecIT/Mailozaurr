@@ -224,12 +224,16 @@ public sealed class ApplicationProfileConnectionServiceTests {
     public async Task DefaultGraphSendPreflightFailsWhenDraftCreationPermissionIsMissing() {
         var handler = new RecordingHandler(
             JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));
+        var refreshCalls = 0;
         var service = new MailProfileConnectionService(
             CreateGraphProfileStore(),
             graphSessionFactory: new HttpGraphSessionFactory(handler, new OAuthCredential {
                 UserName = "ada@example.com",
                 AccessToken = CreateJwt("{\"scp\":\"Mail.Send\"}"),
                 ExpiresOn = DateTimeOffset.MaxValue
+            }, _ => {
+                refreshCalls++;
+                return Task.FromResult("refreshed-token");
             }));
 
         var result = await service.TestAsync("graph-work", MailProfileConnectionTestScope.Send);
@@ -241,6 +245,8 @@ public sealed class ApplicationProfileConnectionServiceTests {
         Assert.False(stage.Evidence?.Preflight?.Ready);
         Assert.Contains("Mail.ReadWrite", stage.Evidence?.Preflight?.Detail);
         Assert.Equal("denied-mail-endpoint-and-token-claims", stage.Evidence?.Preflight?.ValidationLevel);
+        Assert.Equal(new[] { "Mail.Send" }, stage.Evidence?.Permissions?.DelegatedScopes);
+        Assert.Equal(0, refreshCalls);
         Assert.Single(handler.Requests);
     }
 

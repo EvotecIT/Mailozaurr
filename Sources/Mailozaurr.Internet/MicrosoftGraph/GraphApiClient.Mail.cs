@@ -20,12 +20,33 @@ public sealed partial class GraphApiClient {
     /// <remarks>
     /// This performs best-effort traversal with safeguards to prevent infinite loops in pathological cases.
     /// </remarks>
-    public async Task<IReadOnlyList<GraphMailFolder>> ListMailFoldersRecursiveAsync(
+    public Task<IReadOnlyList<GraphMailFolder>> ListMailFoldersRecursiveAsync(
         string userId = "me",
         int top = 200,
         string? select = "id,displayName,parentFolderId,childFolderCount,wellKnownName,totalItemCount,unreadItemCount",
         int maxRequests = 250,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default) =>
+        ListMailFoldersRecursiveCoreAsync(userId, top, select, maxRequests, refreshOnAuthenticationError: true, cancellationToken);
+
+    /// <summary>
+    /// Lists mail folders without refreshing authentication after a 401/403 response.
+    /// </summary>
+    /// <remarks>This is intended for observational permission probes that must not mutate authentication state.</remarks>
+    public Task<IReadOnlyList<GraphMailFolder>> ListMailFoldersRecursiveWithoutRefreshAsync(
+        string userId = "me",
+        int top = 200,
+        string? select = "id,displayName,parentFolderId,childFolderCount,wellKnownName,totalItemCount,unreadItemCount",
+        int maxRequests = 250,
+        CancellationToken cancellationToken = default) =>
+        ListMailFoldersRecursiveCoreAsync(userId, top, select, maxRequests, refreshOnAuthenticationError: false, cancellationToken);
+
+    private async Task<IReadOnlyList<GraphMailFolder>> ListMailFoldersRecursiveCoreAsync(
+        string userId,
+        int top,
+        string? select,
+        int maxRequests,
+        bool refreshOnAuthenticationError,
+        CancellationToken cancellationToken) {
         ThrowIfDisposed();
 
         var safeTop = ClampInt(top, 1, 999);
@@ -53,12 +74,18 @@ public sealed partial class GraphApiClient {
             using var req = new HttpRequestMessage(HttpMethod.Get, url);
             ApplyAuthHeader(req);
             using var resp = await _client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-            await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
+            if (refreshOnAuthenticationError) {
+                await ThrowIfAuthErrorAsync(resp, cancellationToken).ConfigureAwait(false);
+            }
 #if NET5_0_OR_GREATER
             var body = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 #else
             var body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
+            if (!refreshOnAuthenticationError &&
+                (resp.StatusCode == HttpStatusCode.Unauthorized || resp.StatusCode == HttpStatusCode.Forbidden)) {
+                throw new GraphApiException(resp.StatusCode, "Graph authentication failed.", body);
+            }
             if (!resp.IsSuccessStatusCode) {
                 throw new GraphApiException(resp.StatusCode, $"Graph mailFolders list failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
             }
