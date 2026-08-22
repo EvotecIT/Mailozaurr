@@ -12,10 +12,23 @@ internal static class MimeAttachmentStorage {
             string.Equals(GetAttachmentFileName(attachment), attachmentId, StringComparison.OrdinalIgnoreCase));
     }
 
-    public static string ResolveDestinationPath(string requestedPath, MimeEntity attachment) {
+    public static string ResolveDestinationPath(string requestedPath, MimeEntity attachment) =>
+        ResolveDestinationPath(requestedPath, GetAttachmentFileName(attachment));
+
+    public static string ResolveDestinationPath(string requestedPath, string remoteFileName) {
         var destinationPath = Path.GetFullPath(requestedPath);
         if (Directory.Exists(destinationPath)) {
-            return Path.Combine(destinationPath, GetAttachmentFileName(attachment));
+            var fileName = GetSafeAttachmentFileName(remoteFileName);
+            var resolvedPath = Path.GetFullPath(Path.Combine(destinationPath, fileName));
+            var directoryPrefix = destinationPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            var comparison = Path.DirectorySeparatorChar == '\\'
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal;
+            if (!resolvedPath.StartsWith(directoryPrefix, comparison)) {
+                throw new InvalidOperationException("Attachment destination escaped the requested directory.");
+            }
+            return resolvedPath;
         }
 
         var directory = Path.GetDirectoryName(destinationPath);
@@ -31,6 +44,19 @@ internal static class MimeAttachmentStorage {
         MessagePart messagePart => messagePart.ContentDisposition?.FileName ?? messagePart.ContentType?.Name ?? Path.GetRandomFileName(),
         _ => Path.GetRandomFileName()
     };
+
+    private static string GetSafeAttachmentFileName(string remoteFileName) {
+        var raw = (remoteFileName ?? string.Empty).Replace('\\', '/');
+        var fileName = Path.GetFileName(raw);
+        if (string.IsNullOrWhiteSpace(fileName) || fileName == "." || fileName == "..") {
+            return Path.GetRandomFileName();
+        }
+
+        var invalid = Path.GetInvalidFileNameChars();
+        var sanitized = new string(fileName.Select(character => invalid.Contains(character) ? '_' : character).ToArray())
+            .TrimEnd(' ', '.');
+        return string.IsNullOrWhiteSpace(sanitized) ? Path.GetRandomFileName() : sanitized;
+    }
 
     public static void SaveAttachment(MimeEntity attachment, string destinationPath) {
         switch (attachment) {

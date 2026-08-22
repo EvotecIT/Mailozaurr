@@ -435,6 +435,7 @@ public sealed partial class MailMcpToolsTests {
         Assert.True(result.Succeeded);
         Assert.Equal("gmail-work", fixture.ProfileConnectionService.LastProfileId);
         Assert.Equal("getProfile", result.Probe);
+        Assert.Equal(MailProfileConnectionTestPhase.Profile, Assert.Single(result.Stages).Phase);
     }
 
     [Fact]

@@ -35,6 +35,7 @@ public sealed class MailApplicationBuilder {
     private IPendingMessageRepository? _pendingMessageRepository;
     private IPendingMessageDeadLetterRepository? _pendingMessageDeadLetterRepository;
     private IImapSessionFactory? _imapSessionFactory;
+    private IPop3SessionFactory? _pop3SessionFactory;
     private IGraphSessionFactory? _graphSessionFactory;
     private IGmailSessionFactory? _gmailSessionFactory;
     private ISmtpSessionFactory? _smtpSessionFactory;
@@ -222,6 +223,12 @@ public sealed class MailApplicationBuilder {
         return this;
     }
 
+    /// <summary>Uses an explicit POP3 session factory.</summary>
+    public MailApplicationBuilder UsePop3SessionFactory(IPop3SessionFactory pop3SessionFactory) {
+        _pop3SessionFactory = pop3SessionFactory ?? throw new ArgumentNullException(nameof(pop3SessionFactory));
+        return this;
+    }
+
     /// <summary>Uses an explicit Graph session factory.</summary>
     public MailApplicationBuilder UseGraphSessionFactory(IGraphSessionFactory graphSessionFactory) {
         _graphSessionFactory = graphSessionFactory ?? throw new ArgumentNullException(nameof(graphSessionFactory));
@@ -267,6 +274,7 @@ public sealed class MailApplicationBuilder {
         var draftStore = _draftStore ?? new FileMailDraftStore(_options.DraftStore);
         var messageActionPlanBatchStore = _messageActionPlanBatchStore ?? new FileMailMessageActionPlanBatchStore(_options.ActionPlanBatchStore);
         var imapSessionFactory = _imapSessionFactory ?? new ImapSessionFactory(secretStore);
+        var pop3SessionFactory = _pop3SessionFactory ?? new Pop3SessionFactory(secretStore);
         var graphSessionFactory = _graphSessionFactory ?? new GraphSessionFactory(secretStore);
         var gmailSessionFactory = _gmailSessionFactory ?? new GmailSessionFactory(secretStore);
         var smtpSessionFactory = _smtpSessionFactory ?? new SmtpSessionFactory(secretStore);
@@ -279,6 +287,9 @@ public sealed class MailApplicationBuilder {
         var readHandlers = new List<IMailReadHandler>(_readHandlers);
         if (_options.EnableImapReadHandler && !readHandlers.Any(handler => handler.Kind == MailProfileKind.Imap)) {
             readHandlers.Add(new ImapMailReadHandler(imapSessionFactory));
+        }
+        if (_options.EnablePop3ReadHandler && !readHandlers.Any(handler => handler.Kind == MailProfileKind.Pop3)) {
+            readHandlers.Add(new Pop3MailReadHandler(pop3SessionFactory));
         }
         if (_options.EnableGraphReadHandler && !readHandlers.Any(handler => handler.Kind == MailProfileKind.Graph)) {
             readHandlers.Add(new GraphMailReadHandler(graphSessionFactory));
@@ -330,7 +341,13 @@ public sealed class MailApplicationBuilder {
         var profileBootstrapService = _profileBootstrapService ?? new MailProfileBootstrapService(profileService, profileSecretService, secretStore);
         var profileAuthService = _profileAuthService ?? new MailProfileAuthService(profileService, profileSecretService, secretStore);
         var profileOverviewService = _profileOverviewService ?? new MailProfileOverviewService(profileService, profileAuthService);
-        var profileConnectionService = _profileConnectionService ?? new MailProfileConnectionService(profileStore, imapSessionFactory, graphSessionFactory, gmailSessionFactory, smtpSessionFactory);
+        var profileConnectionService = _profileConnectionService ?? MailProfileConnectionService.CreateWithPop3(
+            profileStore,
+            pop3SessionFactory,
+            imapSessionFactory,
+            graphSessionFactory,
+            gmailSessionFactory,
+            smtpSessionFactory);
         var draftService = _draftService ?? new MailDraftService(draftStore, profileStore);
         var draftExchangeService = _draftExchangeService ?? new JsonMailDraftExchangeService();
 

@@ -603,6 +603,8 @@ public sealed partial class CliRunnerTests {
         Assert.Equal(0, exitCode);
         Assert.Equal("work-imap", fixture.ProfileConnectionService.LastProfileId);
         Assert.Contains("\"Probe\": \"connect\"", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"Stages\"", stdout.ToString(), StringComparison.Ordinal);
+        Assert.Contains("\"DurationMilliseconds\": 3", stdout.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

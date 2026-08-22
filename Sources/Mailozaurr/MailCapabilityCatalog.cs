@@ -43,6 +43,10 @@ public static class MailCapabilityCatalog {
                 | MailCapability.MarkMessages
                 | MailCapability.MoveMessages
                 | MailCapability.DeleteMessages,
+            MailProfileKind.Pop3 => MailCapability.ListFolders
+                | MailCapability.SearchMessages
+                | MailCapability.ReadMessages
+                | MailCapability.SaveAttachments,
             MailProfileKind.Graph => MailCapability.ListFolders
                 | MailCapability.SearchMessages
                 | MailCapability.ReadMessages

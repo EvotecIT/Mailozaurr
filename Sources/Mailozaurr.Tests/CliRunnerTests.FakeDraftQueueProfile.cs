@@ -357,7 +357,17 @@ public sealed partial class CliRunnerTests {
                 Probe = "connect",
                 Target = "work@example.com",
                 RequestedScope = scope,
-                ExecutedScope = scope == MailProfileConnectionTestScope.Auto ? MailProfileConnectionTestScope.Auth : scope
+                ExecutedScope = scope == MailProfileConnectionTestScope.Auto ? MailProfileConnectionTestScope.Auth : scope,
+                Stages = new List<MailProfileConnectionTestStage> {
+                    new() {
+                        Phase = MailProfileConnectionTestPhase.Profile,
+                        Succeeded = true,
+                        Probe = "resolveProfile",
+                        Target = profileId,
+                        DurationMilliseconds = 3,
+                        Message = "Profile resolved."
+                    }
+                }
             });
         }
     }

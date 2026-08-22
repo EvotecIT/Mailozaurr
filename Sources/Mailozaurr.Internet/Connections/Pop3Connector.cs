@@ -26,6 +26,34 @@ public static class Pop3Connector {
     /// Delegate used to delay between connection retries.
     /// </summary>
     public static Func<int, CancellationToken, Task>? DelayAsync { get; set; }
+
+    /// <summary>
+    /// Connects and authenticates to a POP3 server using a reusable connection request.
+    /// </summary>
+    public static Task<Pop3Client> ConnectAsync(
+        Pop3ConnectionRequest request,
+        Func<Pop3Client, CancellationToken, Task> authenticateAsync,
+        CancellationToken cancellationToken = default) {
+        if (request == null) {
+            throw new ArgumentNullException(nameof(request));
+        }
+        if (authenticateAsync == null) {
+            throw new ArgumentNullException(nameof(authenticateAsync));
+        }
+
+        return ConnectAsync(
+            request.Server,
+            request.Port,
+            request.Options,
+            request.Timeout,
+            request.SkipCertificateRevocation,
+            request.SkipCertificateValidation,
+            authenticateAsync,
+            request.RetryCount,
+            request.RetryDelayMilliseconds,
+            request.RetryDelayBackoff,
+            cancellationToken);
+    }
     /// <summary>
     /// Connects and authenticates to a POP3 server with retry support.
     /// </summary>

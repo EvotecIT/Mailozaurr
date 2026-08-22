@@ -10,6 +10,8 @@ namespace Mailozaurr.Cli;
 [JsonSerializable(typeof(MailProfileAuthenticationResult))]
 [JsonSerializable(typeof(MailProfileAuthStatus))]
 [JsonSerializable(typeof(MailProfileConnectionTestResult))]
+[JsonSerializable(typeof(MailProfileConnectionTestStage))]
+[JsonSerializable(typeof(IReadOnlyList<MailProfileConnectionTestStage>), TypeInfoPropertyName = "MailProfileConnectionTestStageList")]
 [JsonSerializable(typeof(MailProfileOverviewCompact))]
 [JsonSerializable(typeof(MailProfileOverview))]
 [JsonSerializable(typeof(MailProfile))]

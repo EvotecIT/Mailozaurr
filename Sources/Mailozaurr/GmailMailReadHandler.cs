@@ -183,7 +183,7 @@ public sealed class GmailMailReadHandler : IMailReadHandler {
         }
 
         var fileName = string.IsNullOrWhiteSpace(resolved.FileName) ? resolved.Id!.Trim() : resolved.FileName!.Trim();
-        var destinationPath = ResolveDestinationPath(request.DestinationPath, fileName);
+        var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(request.DestinationPath, fileName);
         if (File.Exists(destinationPath) && !request.Overwrite) {
             return OperationResult.Failure("destination_exists", $"Destination '{destinationPath}' already exists.");
         }
@@ -296,20 +296,6 @@ public sealed class GmailMailReadHandler : IMailReadHandler {
         return attachments.FirstOrDefault(attachment =>
             string.Equals(attachment.Id, attachmentId, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(attachment.FileName, attachmentId, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static string ResolveDestinationPath(string requestedPath, string fileName) {
-        var destinationPath = Path.GetFullPath(requestedPath);
-        if (Directory.Exists(destinationPath)) {
-            return Path.Combine(destinationPath, fileName);
-        }
-
-        var directory = Path.GetDirectoryName(destinationPath);
-        if (!string.IsNullOrWhiteSpace(directory)) {
-            Directory.CreateDirectory(directory);
-        }
-
-        return destinationPath;
     }
 
     private static string? GetParentPath(string path) {

@@ -38,6 +38,7 @@ public sealed class ApplicationBuilderTests {
         Assert.NotNull(app.Send);
         Assert.NotNull(app.Queue);
         Assert.Contains(app.ReadHandlers, handler => handler.Kind == MailProfileKind.Imap);
+        Assert.Contains(app.ReadHandlers, handler => handler.Kind == MailProfileKind.Pop3);
         Assert.Contains(app.ReadHandlers, handler => handler.Kind == MailProfileKind.Graph);
         Assert.Contains(app.ReadHandlers, handler => handler.Kind == MailProfileKind.Gmail);
         Assert.Contains(app.MessageActionHandlers, handler => handler.Kind == MailProfileKind.Imap);
@@ -55,6 +56,7 @@ public sealed class ApplicationBuilderTests {
     public void BuildHonorsDisabledImapHandlerOption() {
         var builder = new MailApplicationBuilder(new MailApplicationOptions {
             EnableImapReadHandler = false,
+            EnablePop3ReadHandler = false,
             EnableGraphReadHandler = false,
             EnableGraphSendHandler = false,
             EnableGmailReadHandler = false,
@@ -70,6 +72,7 @@ public sealed class ApplicationBuilderTests {
         var app = builder.Build();
 
         Assert.DoesNotContain(app.ReadHandlers, handler => handler.Kind == MailProfileKind.Imap);
+        Assert.DoesNotContain(app.ReadHandlers, handler => handler.Kind == MailProfileKind.Pop3);
         Assert.DoesNotContain(app.ReadHandlers, handler => handler.Kind == MailProfileKind.Graph);
         Assert.DoesNotContain(app.ReadHandlers, handler => handler.Kind == MailProfileKind.Gmail);
         Assert.DoesNotContain(app.SendHandlers, handler => handler.Kind == MailProfileKind.Graph);

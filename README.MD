@@ -245,6 +245,8 @@ mailozaurr profile summary --profile work-imap --json
 mailozaurr profile test --profile work-imap --scope mailbox --json
 ```
 
+Connection-test JSON includes ordered, timed stages for profile resolution, session acquisition, and the requested provider probe. POP3 profiles participate in the same application surface with a virtual `INBOX` and normalized `uid:` message identifiers (falling back to a content-verified `hash:` identity when UIDL is unavailable).
+
 Search and inspect mail:
 
 ```powershell
