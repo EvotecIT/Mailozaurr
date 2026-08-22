@@ -97,7 +97,7 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
         MailProfile profile,
         MailSearchRequest request,
         CancellationToken cancellationToken) {
-        ValidateFolder(request.FolderId);
+        _ = NormalizeFolderId(request.FolderId);
         if (request.IsRead.HasValue) {
             throw new InvalidOperationException("POP3 does not expose persistent read state.");
         }
@@ -134,7 +134,7 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
         MailProfile profile,
         GetMessageRequest request,
         CancellationToken cancellationToken) {
-        ValidateFolder(request.FolderId);
+        _ = NormalizeFolderId(request.FolderId);
         var identifier = ParseMessageId(request.MessageId);
         var resolved = await ResolveMessageAsync(client, identifier, cancellationToken).ConfigureAwait(false);
         if (resolved.Status == Pop3MailboxBrowser.Pop3MessageResolveStatus.NotFound) {
@@ -144,7 +144,7 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
             throw new InvalidOperationException($"POP3 message '{request.MessageId}' could not be resolved ({resolved.Status}).");
         }
 
-        return MapDetail(profile.Id, resolved.Snapshot, request.IncludeRawContent, identifier.Occurrence);
+        return MapDetail(profile.Id, resolved.Snapshot, request.IncludeRawContent, identifier);
     }
 
     private static async Task<OperationResult> DefaultSaveAttachmentAsync(
@@ -152,7 +152,7 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
         MailProfile profile,
         SaveAttachmentRequest request,
         CancellationToken cancellationToken) {
-        ValidateFolder(request.FolderId);
+        var folderId = NormalizeFolderId(request.FolderId);
         var identifier = ParseMessageId(request.MessageId);
         var resolved = await ResolveMessageAsync(client, identifier, cancellationToken).ConfigureAwait(false);
         if (resolved.Status != Pop3MailboxBrowser.Pop3MessageResolveStatus.Success || resolved.Snapshot == null) {
@@ -171,7 +171,7 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
             MimeAttachmentStorage.CreateStorageIdentity(
                 profile.Id,
                 profile.Kind.ToString(),
-                request.FolderId,
+                folderId,
                 request.MessageId,
                 request.AttachmentId));
         if (File.Exists(destinationPath) && !request.Overwrite) {
@@ -260,12 +260,18 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
         string profileId,
         Pop3MailboxBrowser.Pop3ResolvedMessageSnapshot snapshot,
         bool includeRawContent,
-        int occurrence) {
-        var id = FormatMessageId(snapshot.Uid, snapshot.Message, occurrence);
+        (string? Uid, string? Fingerprint, int Occurrence) identifier) {
+        var id = string.IsNullOrWhiteSpace(identifier.Fingerprint)
+            ? FormatMessageId(snapshot.Uid, snapshot.Message)
+            : FormatMessageId(null, snapshot.Message, identifier.Occurrence);
         var detail = new MessageDetail {
             ProfileId = profileId,
             Id = id,
-            Summary = MapSummary(profileId, snapshot.Uid, snapshot.Message, occurrence),
+            Summary = MapSummary(
+                profileId,
+                string.IsNullOrWhiteSpace(identifier.Fingerprint) ? snapshot.Uid : null,
+                snapshot.Message,
+                identifier.Occurrence),
             TextBody = snapshot.Message.TextBody,
             HtmlBody = snapshot.Message.HtmlBody,
             Attachments = snapshot.Message.Attachments.Select((attachment, index) => new AttachmentSummary {
@@ -325,7 +331,6 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
                 cancellationToken: cancellationToken).ConfigureAwait(false);
             if (candidate.Status == Pop3MailboxBrowser.Pop3MessageResolveStatus.Success &&
                 candidate.Snapshot != null &&
-                string.IsNullOrWhiteSpace(candidate.Snapshot.Uid) &&
                 string.Equals(
                     ComputeMessageFingerprint(candidate.Snapshot.Message),
                     identifier.Fingerprint,
@@ -358,11 +363,12 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
             .Replace('/', '_');
     }
 
-    private static void ValidateFolder(string? folderId) {
+    internal static string NormalizeFolderId(string? folderId) {
         if (!string.IsNullOrWhiteSpace(folderId) &&
             !string.Equals(folderId!.Trim(), Inbox, StringComparison.OrdinalIgnoreCase)) {
             throw new InvalidOperationException($"POP3 exposes only the '{Inbox}' folder.");
         }
+        return Inbox;
     }
 
     private static List<MessageRecipient> MapRecipients(InternetAddressList addresses) =>

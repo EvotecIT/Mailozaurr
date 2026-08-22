@@ -104,6 +104,45 @@ public sealed class ApplicationPop3MailReadHandlerTests {
     }
 
     [Fact]
+    public async Task HashFallbackIdRemainsResolvableWhenUidlRecovers() {
+        var message = new MimeMessage { Subject = "Transient UIDL" };
+        message.Body = new TextPart("plain") { Text = "Same message" };
+        var handler = new Pop3MailReadHandler(new RecoveringUidlPop3SessionFactory(message));
+
+        var result = Assert.Single(await handler.SearchAsync(CreateProfile(), new MailSearchRequest {
+            ProfileId = "work-pop3"
+        }));
+        Assert.StartsWith("hash:", result.Id, StringComparison.Ordinal);
+
+        var detail = await handler.GetMessageAsync(CreateProfile(), new GetMessageRequest {
+            ProfileId = "work-pop3",
+            MessageId = result.Id
+        });
+
+        Assert.NotNull(detail);
+        Assert.Equal(result.Id, detail!.Id);
+        Assert.Equal(result.Id, detail.Summary!.Id);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("INBOX")]
+    [InlineData(" inbox ")]
+    public void Pop3FolderAliasesNormalizeToOneStorageIdentity(string? folderId) {
+        var normalized = Pop3MailReadHandler.NormalizeFolderId(folderId);
+        var identity = MimeAttachmentStorage.CreateStorageIdentity(
+            "work-pop3", "Pop3", normalized, "message", "attachment");
+
+        Assert.Equal("INBOX", normalized);
+        Assert.Equal(
+            MimeAttachmentStorage.CreateStorageIdentity(
+                "work-pop3", "Pop3", "INBOX", "message", "attachment"),
+            identity);
+    }
+
+    [Fact]
     public void SummaryMappingUsesNormalizedPop3IdentityAndInbox() {
         var message = new MimeMessage {
             Subject = "Quarterly report",
@@ -316,6 +355,46 @@ public sealed class ApplicationPop3MailReadHandlerTests {
 
         public Task<Pop3Client> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) =>
             Task.FromResult<Pop3Client>(new DuplicateMessagePop3Client(_messages, _downloads));
+    }
+
+    private sealed class RecoveringUidlPop3SessionFactory : IPop3SessionFactory {
+        private readonly MimeMessage _message;
+        private int _connectionCount;
+
+        public RecoveringUidlPop3SessionFactory(MimeMessage message) {
+            _message = message;
+        }
+
+        public Task<Pop3Client> ConnectAsync(
+            MailProfile profile,
+            CancellationToken cancellationToken = default) {
+            var uidlAvailable = Interlocked.Increment(ref _connectionCount) > 1;
+            return Task.FromResult<Pop3Client>(new RecoveringUidlPop3Client(_message, uidlAvailable));
+        }
+    }
+
+    private sealed class RecoveringUidlPop3Client : Pop3Client {
+        private readonly MimeMessage _message;
+        private readonly bool _uidlAvailable;
+
+        public RecoveringUidlPop3Client(MimeMessage message, bool uidlAvailable) {
+            _message = message;
+            _uidlAvailable = uidlAvailable;
+        }
+
+        public override bool IsConnected => true;
+        public override bool IsAuthenticated => true;
+        public override int Count => 1;
+
+        public override Task<MimeMessage> GetMessageAsync(
+            int index,
+            CancellationToken cancellationToken = default,
+            ITransferProgress? progress = null) => Task.FromResult(_message);
+
+        public override Task<string> GetMessageUidAsync(int index, CancellationToken cancellationToken = default) =>
+            _uidlAvailable
+                ? Task.FromResult("recovered-uid")
+                : Task.FromException<string>(new Pop3CommandException("UIDL failed transiently."));
     }
 
     private sealed class DuplicateMessagePop3Client : Pop3Client {
