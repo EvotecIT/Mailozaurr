@@ -111,10 +111,17 @@ public sealed class MailMcpToolsMetadataTests {
             nameof(MailMcpTools.mail_folders_compact_list),
             nameof(MailMcpTools.mail_folder_aliases_list),
             nameof(MailMcpTools.mail_folder_resolve),
+            nameof(MailMcpTools.mail_changes_get),
             nameof(MailMcpTools.mail_action_plan),
             nameof(MailMcpTools.mail_actions_bundle_preview),
             nameof(MailMcpTools.mail_actions_preview),
             nameof(MailMcpTools.mail_move_preview));
+
+        Add(expected, readOnly: true, destructive: false, idempotent: false, openWorld: true,
+            nameof(MailMcpTools.mail_changes_wait));
+
+        Add(expected, readOnly: false, destructive: false, idempotent: false, openWorld: true,
+            nameof(MailMcpTools.mail_changes_subscribe));
 
         Add(expected, readOnly: false, destructive: true, idempotent: true, openWorld: false,
             nameof(MailMcpTools.mail_draft_save),
@@ -154,6 +161,7 @@ public sealed class MailMcpToolsMetadataTests {
             nameof(MailMcpTools.mail_attachments_save),
             nameof(MailMcpTools.mail_attachments_save_many),
             nameof(MailMcpTools.mail_export_eml),
+            nameof(MailMcpTools.mail_changes_unsubscribe),
             nameof(MailMcpTools.mail_action_batch_store_create_common),
             nameof(MailMcpTools.mail_action_batch_store_replace_plan),
             nameof(MailMcpTools.mail_action_batch_store_execute),

@@ -101,7 +101,8 @@ public sealed partial class GraphMailboxBrowser {
         DateTimeOffset? expirationDateTime = null,
         string changeType = "created,updated,deleted",
         string? clientState = null,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default,
+        string userId = "me") {
         if (string.IsNullOrWhiteSpace(notificationUrl)) {
             throw new ArgumentException("notificationUrl is required.", nameof(notificationUrl));
         }
@@ -109,7 +110,7 @@ public sealed partial class GraphMailboxBrowser {
             throw new ArgumentException("changeType is required.", nameof(changeType));
         }
 
-        var resource = BuildMessageSubscriptionResource(folder);
+        var resource = BuildMessageSubscriptionResource(folder, userId);
         var request = new GraphApiClient.GraphCreateSubscriptionRequest {
             ChangeType = changeType.Trim(),
             NotificationUrl = notificationUrl.Trim(),
@@ -191,8 +192,12 @@ public sealed partial class GraphMailboxBrowser {
     /// <summary>
     /// Builds Graph subscription resource for folder message notifications.
     /// </summary>
-    public static string BuildMessageSubscriptionResource(string folder) {
+    public static string BuildMessageSubscriptionResource(string folder, string userId = "me") {
         var selector = ResolveFolderSelector(folder);
-        return "me/mailFolders('" + EscapeGraphLiteral(selector) + "')/messages";
+        var normalizedUserId = NormalizeOptional(userId) ?? "me";
+        var userSegment = string.Equals(normalizedUserId, "me", StringComparison.OrdinalIgnoreCase)
+            ? "me"
+            : "users/" + Uri.EscapeDataString(normalizedUserId);
+        return userSegment + "/mailFolders('" + EscapeGraphLiteral(selector) + "')/messages";
     }
 }

@@ -23,6 +23,11 @@ public static class MailCapabilityCatalog {
         MailProfileKind.Mailgun,
         MailProfileKind.Ses
     };
+    private static readonly MailProfileKind[] ChangeFeedServiceProfileKinds = {
+        MailProfileKind.Imap,
+        MailProfileKind.Graph,
+        MailProfileKind.Gmail
+    };
     private const MailCapability ReadServiceCapabilities = MailCapability.ListFolders
         | MailCapability.SearchMessages
         | MailCapability.ReadMessages
@@ -79,7 +84,8 @@ public static class MailCapabilityCatalog {
         IEnumerable<IMailSendHandler> sendHandlers,
         bool hasReadServiceOverride = false,
         bool hasMessageActionServiceOverride = false,
-        bool hasSendServiceOverride = false) {
+        bool hasSendServiceOverride = false,
+        bool hasChangeFeedService = false) {
         var result = new Dictionary<MailProfileKind, MailCapability>();
         Add(result, readHandlers.Select(handler => handler.Kind), ReadServiceCapabilities);
         Add(result, messageActionHandlers.Select(handler => handler.Kind), MessageActionServiceCapabilities);
@@ -99,6 +105,11 @@ public static class MailCapabilityCatalog {
             hasSendServiceOverride,
             SendServiceProfileKinds,
             MailCapability.SendMessages);
+        AddServiceOverrideCapabilities(
+            result,
+            hasChangeFeedService,
+            ChangeFeedServiceProfileKinds,
+            MailCapability.WaitForMessages);
         return result;
     }
 

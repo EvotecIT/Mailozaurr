@@ -56,6 +56,7 @@ public sealed class ApplicationCapabilitiesTests {
 
             Assert.True(capabilities!.Supports(MailCapability.MarkMessages));
             Assert.True(capabilities.Supports(MailCapability.MoveMessages));
+            Assert.True(capabilities.Supports(MailCapability.WaitForMessages));
             Assert.False(capabilities.Supports(MailCapability.SearchMessages));
             Assert.False(capabilities.Supports(MailCapability.SendMessages));
         } finally {

@@ -20,6 +20,7 @@ public sealed class MailApplication {
         IMailDraftExchangeService draftExchange,
         IMailReadService read,
         IMailEmlExportService emlExport,
+        IMailChangeFeedService changeFeeds,
         IMailMessageActionPreviewService messageActionPreview,
         IMailMessageActionPlanService messageActionPlans,
         IMailMessageActionPlanExchangeService messageActionPlanExchange,
@@ -46,6 +47,7 @@ public sealed class MailApplication {
         DraftExchange = draftExchange;
         Read = read;
         EmlExport = emlExport;
+        ChangeFeeds = changeFeeds;
         MessageActionPreview = messageActionPreview;
         MessageActionPlans = messageActionPlans;
         MessageActionPlanExchange = messageActionPlanExchange;
@@ -103,6 +105,9 @@ public sealed class MailApplication {
 
     /// <summary>Provider-neutral, lossless EML export service.</summary>
     public IMailEmlExportService EmlExport { get; }
+
+    /// <summary>Normalized durable and live mailbox change-feed service.</summary>
+    public IMailChangeFeedService ChangeFeeds { get; }
 
     /// <summary>Normalized dry-run mailbox action preview service.</summary>
     public IMailMessageActionPreviewService MessageActionPreview { get; }

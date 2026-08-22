@@ -13,7 +13,7 @@ public static partial class CliRunner {
         TextWriter output,
         TextWriter error) {
         if (parseResult.Positionals.Count < 2) {
-            await error.WriteLineAsync("Missing mail command. Use 'mail folders', 'mail folder-aliases', 'mail resolve-folder', 'mail list-plan-batches', 'mail show-plan-batch', 'mail import-plan-batch', 'mail export-plan-batch', 'mail create-common-plan-batch', 'mail clone-plan-batch', 'mail preview-transform-plan-batch', 'mail transform-plan-batch', 'mail add-plan-to-batch', 'mail add-plan-file-to-batch', 'mail replace-plan-in-batch', 'mail replace-plan-file-in-batch', 'mail remove-plan-from-batch', 'mail delete-plan-batch', 'mail execute-plan-batch-stored', 'mail plan-action', 'mail export-plan', 'mail show-plan', 'mail execute-plan', 'mail execute-plan-file', 'mail execute-plan-batch', 'mail preview-all', 'mail preview-mark-read', 'mail preview-flag', 'mail preview-actions', 'mail preview-move', 'mail preview-delete', 'mail search', 'mail attachments', 'mail get', 'mail get-many', 'mail export-eml', 'mail mark-read', 'mail flag', 'mail archive', 'mail trash', 'mail move', 'mail delete', 'mail save-attachment', 'mail save-attachments', or 'mail save-attachments-many'.").ConfigureAwait(false);
+            await error.WriteLineAsync("Missing mail command. Use 'mail --help' to list mailbox operations.").ConfigureAwait(false);
             return 1;
         }
 
@@ -394,6 +394,62 @@ public static partial class CliRunner {
                 await WriteItemAsync(output, emlResult, json, value =>
                     value.Message ?? $"Exported {value.ExportedCount} EML message(s).").ConfigureAwait(false);
                 return emlResult.Succeeded ? 0 : 1;
+            case "changes":
+                var changeResult = await application.ChangeFeeds.GetChangesAsync(new MailChangeFeedRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
+                    FolderId = parseResult.GetOption("folder"),
+                    Cursor = parseResult.GetOption("cursor"),
+                    MaxChanges = parseResult.GetIntOption("limit") ?? 100
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, changeResult, json, value =>
+                    $"{value.Provider} {value.Changes.Count} change(s); cursor={value.NextCursor ?? "(none)"}; reset={value.ResetRequired}").ConfigureAwait(false);
+                return changeResult.ResetRequired ? 2 : 0;
+            case "wait-changes":
+                var waitResult = await application.ChangeFeeds.WaitForChangesAsync(new MailChangeWaitRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    FolderId = parseResult.GetOption("folder"),
+                    MaxChanges = parseResult.GetIntOption("limit") ?? 1,
+                    Timeout = TimeSpan.FromSeconds(parseResult.GetIntOption("timeout-seconds") ?? 30)
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, waitResult, json, value =>
+                    $"{value.Provider} {value.Changes.Count} live change(s)").ConfigureAwait(false);
+                return 0;
+            case "subscribe-changes":
+                var expirationRaw = parseResult.GetOption("expiration");
+                DateTimeOffset? expiration = null;
+                if (!string.IsNullOrWhiteSpace(expirationRaw)) {
+                    if (!DateTimeOffset.TryParse(expirationRaw, System.Globalization.CultureInfo.InvariantCulture,
+                            System.Globalization.DateTimeStyles.RoundtripKind, out var parsedExpiration)) {
+                        throw new InvalidOperationException("Option '--expiration' must be an ISO 8601 timestamp.");
+                    }
+                    expiration = parsedExpiration;
+                }
+                var subscriptionResult = await application.ChangeFeeds.SubscribeAsync(new MailChangeSubscriptionRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
+                    FolderIds = parseResult.GetOptionValues("folder")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToList(),
+                    NotificationUrl = parseResult.GetOption("notification-url"),
+                    ClientState = parseResult.GetOption("client-state"),
+                    Expiration = expiration,
+                    SubscriptionId = parseResult.GetOption("subscription-id"),
+                    TopicName = parseResult.GetOption("topic")
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, subscriptionResult, json, value =>
+                    $"{value.Provider} subscription {value.SubscriptionId ?? value.Cursor ?? "active"}").ConfigureAwait(false);
+                return subscriptionResult.Succeeded ? 0 : 1;
+            case "unsubscribe-changes":
+                var unsubscribeResult = await application.ChangeFeeds.UnsubscribeAsync(new MailChangeUnsubscribeRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    SubscriptionId = parseResult.GetOption("subscription-id"),
+                    TreatMissingAsSuccess = !parseResult.HasFlag("strict")
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, unsubscribeResult, json, value =>
+                    $"{value.Provider} subscription removed; already-missing={value.AlreadyMissing}").ConfigureAwait(false);
+                return unsubscribeResult.Succeeded ? 0 : 1;
             case "mark-read":
                 var markReadResult = await application.MessageActions.SetReadStateAsync(new SetReadStateRequest {
                     ProfileId = RequireOption(parseResult, "profile"),

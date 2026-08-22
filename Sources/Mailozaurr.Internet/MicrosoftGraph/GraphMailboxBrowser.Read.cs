@@ -262,11 +262,13 @@ public sealed partial class GraphMailboxBrowser {
         string folder,
         string? cursor,
         int max,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default,
+        string userId = "me") {
         var folderSelector = ResolveFolderSelector(folder);
         var delta = await _graph.DeltaMessagesAsync(
             folderSelector,
             cursor: cursor,
+            userId: userId,
             top: ClampInt(max, 1, 1000),
             select: SummarySelect,
             cancellationToken: cancellationToken).ConfigureAwait(false);

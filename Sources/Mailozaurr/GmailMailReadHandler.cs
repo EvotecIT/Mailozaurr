@@ -261,7 +261,7 @@ public sealed class GmailMailReadHandler : IMailReadHandler {
             .ToList() ?? new List<MessageRecipient>();
     }
 
-    private static string ResolveFolder(string? folderId, MailProfile profile) {
+    internal static string ResolveFolder(string? folderId, MailProfile profile) {
         if (!string.IsNullOrWhiteSpace(folderId)) {
             return folderId!.Trim();
         }

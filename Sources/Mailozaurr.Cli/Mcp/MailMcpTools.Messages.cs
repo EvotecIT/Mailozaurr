@@ -5,6 +5,74 @@ using System.ComponentModel;
 namespace Mailozaurr.Cli.Mcp;
 
 public sealed partial class MailMcpTools {
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
+    [Description("Reads one provider-neutral Graph delta or Gmail history batch from a durable cursor.")]
+    public Task<MailChangeFeedResult> mail_changes_get(
+        [Description("The profile identifier to query.")] string profileId,
+        [Description("The Graph delta URL or Gmail history id. Gmail requires a cursor.")] string? cursor = null,
+        [Description("Optional mailbox identifier.")] string? mailboxId = null,
+        [Description("Optional folder or label identifier.")] string? folderId = null,
+        [Description("Maximum number of normalized changes.")] int maxChanges = 100,
+        CancellationToken cancellationToken = default) =>
+        _application.ChangeFeeds.GetChangesAsync(new MailChangeFeedRequest {
+            ProfileId = profileId,
+            Cursor = cursor,
+            MailboxId = mailboxId,
+            FolderId = folderId,
+            MaxChanges = maxChanges
+        }, cancellationToken);
+
+    [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = false, OpenWorld = true)]
+    [Description("Waits for a bounded provider-neutral IMAP IDLE change batch.")]
+    public Task<MailChangeFeedResult> mail_changes_wait(
+        [Description("The IMAP profile identifier to query.")] string profileId,
+        [Description("Optional folder identifier. Defaults to INBOX.")] string? folderId = null,
+        [Description("Maximum number of arrivals.")] int maxChanges = 1,
+        [Description("Maximum wait in seconds.")] int timeoutSeconds = 30,
+        CancellationToken cancellationToken = default) =>
+        _application.ChangeFeeds.WaitForChangesAsync(new MailChangeWaitRequest {
+            ProfileId = profileId,
+            FolderId = folderId,
+            MaxChanges = maxChanges,
+            Timeout = TimeSpan.FromSeconds(timeoutSeconds)
+        }, cancellationToken);
+
+    [McpServerTool(ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = true)]
+    [Description("Creates or renews Graph webhook or Gmail Pub/Sub change notifications.")]
+    public Task<MailChangeSubscriptionResult> mail_changes_subscribe(
+        [Description("The Graph or Gmail profile identifier.")] string profileId,
+        [Description("Optional folder or label identifiers. Defaults to INBOX.")] string[]? folderIds = null,
+        [Description("Optional mailbox identifier.")] string? mailboxId = null,
+        [Description("Graph HTTPS notification URL.")] string? notificationUrl = null,
+        [Description("Graph opaque client state.")] string? clientState = null,
+        [Description("Graph expiration timestamp.")] DateTimeOffset? expiration = null,
+        [Description("Existing Graph subscription id to renew.")] string? subscriptionId = null,
+        [Description("Gmail Pub/Sub topic name.")] string? topicName = null,
+        CancellationToken cancellationToken = default) =>
+        _application.ChangeFeeds.SubscribeAsync(new MailChangeSubscriptionRequest {
+            ProfileId = profileId,
+            MailboxId = mailboxId,
+            FolderIds = folderIds?.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()).ToList() ?? new List<string>(),
+            NotificationUrl = notificationUrl,
+            ClientState = clientState,
+            Expiration = expiration,
+            SubscriptionId = subscriptionId,
+            TopicName = topicName
+        }, cancellationToken);
+
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
+    [Description("Removes Graph webhook or Gmail Pub/Sub change notifications.")]
+    public Task<MailChangeSubscriptionResult> mail_changes_unsubscribe(
+        [Description("The Graph or Gmail profile identifier.")] string profileId,
+        [Description("Graph subscription id. Gmail does not require one.")] string? subscriptionId = null,
+        [Description("When true, treats an already absent subscription as success.")] bool treatMissingAsSuccess = true,
+        CancellationToken cancellationToken = default) =>
+        _application.ChangeFeeds.UnsubscribeAsync(new MailChangeUnsubscribeRequest {
+            ProfileId = profileId,
+            SubscriptionId = subscriptionId,
+            TreatMissingAsSuccess = treatMissingAsSuccess
+        }, cancellationToken);
+
     [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
     [Description("Exports provider messages to validated, byte-preserved EML files on the Mailozaurr server filesystem.")]
     public Task<MailEmlExportResult> mail_export_eml(

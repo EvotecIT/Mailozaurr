@@ -134,7 +134,7 @@ internal static partial class CliCommandModel {
         "client-secret-stdin" or "compact" or "default-only" or "desc" or "has-attachments" or
         "include-raw" or "is-default" or "json" or "overwrite" or "queue-on-failure" or
         "ready-only" or "refresh-token-stdin" or "root-only" or "stop-on-error" or "summary" or
-        "unflag" or "unread" or "value-stdin";
+        "strict" or "unflag" or "unread" or "value-stdin";
 
     private static string GetOptionDescription(string name) => name switch {
         "access-token-env" => "Environment variable containing an access token.",
@@ -158,6 +158,7 @@ internal static partial class CliCommandModel {
         "client-secret-stdin" => "Read the client secret from standard input.",
         "compact" => "Return the compact response projection.",
         "confirm-token" => "Confirmation token from the matching preview.",
+        "client-state" => "Opaque Graph notification client state.",
         "content-type" => "Attachment content-type filter.",
         "default-mailbox" => "Default mailbox identifier or address.",
         "default-only" => "Return only the default profile.",
@@ -166,6 +167,8 @@ internal static partial class CliCommandModel {
         "description" => "Human-readable description.",
         "draft" => "Draft identifier.",
         "drafts-dir" => "Override the draft-store directory.",
+        "cursor" => "Graph delta URL or Gmail history identifier.",
+        "expiration" => "ISO 8601 Graph subscription expiration timestamp.",
         "file" => "Input file path.",
         "folder" => "Mailbox folder identifier or name.",
         "from" => "Sender address.",
@@ -183,6 +186,7 @@ internal static partial class CliCommandModel {
         "message-id" => "Message identifier; repeat when supported.",
         "name" => "Display name or stable secret name.",
         "name-contains" => "Attachment filename substring filter.",
+        "notification-url" => "Graph HTTPS notification endpoint.",
         "overwrite" => "Allow replacement of an existing destination file.",
         "parent-folder" => "Parent folder identifier.",
         "path" => "Input or destination path.",
@@ -205,13 +209,17 @@ internal static partial class CliCommandModel {
         "sort" => "Sort key.",
         "source-batch" => "Source action-plan batch identifier.",
         "stop-on-error" => "Stop batch execution after the first failure.",
+        "strict" => "Fail when a remote subscription is already absent.",
         "subject" => "Message subject or subject search filter.",
+        "subscription-id" => "Graph subscription identifier.",
         "summary" => "Return the summary response projection.",
         "target-batch" => "Target action-plan batch identifier.",
         "target-folder" => "Destination folder identifier or alias.",
         "target-profile" => "Replacement profile identifier.",
         "tenant-id" => "OAuth tenant or directory identifier.",
         "text" => "Plain-text message body.",
+        "timeout-seconds" => "Maximum live wait duration in seconds.",
+        "topic" => "Gmail Pub/Sub topic name.",
         "to" => "Recipient address; repeat for multiple recipients.",
         "unflag" => "Clear the flagged state.",
         "unread" => "Set the unread state.",
