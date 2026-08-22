@@ -155,6 +155,26 @@ public class GmailApiClientTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task GetProfileWithoutRefreshAsync_PreservesForbiddenEvidenceWithoutRefreshing() {
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.Forbidden) {
+            Content = new System.Net.Http.StringContent("{\"error\":{\"code\":403}}")
+        });
+        var refreshes = 0;
+        var httpClient = new System.Net.Http.HttpClient(handler) { BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/") };
+        var client = new GmailApiClient(httpClient, _ => {
+            refreshes++;
+            return System.Threading.Tasks.Task.FromResult("new-token");
+        });
+
+        var exception = await Assert.ThrowsAsync<GmailAuthenticationException>(() =>
+            client.GetProfileWithoutRefreshAsync("me"));
+
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, exception.StatusCode);
+        Assert.Equal(0, refreshes);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task WatchAsync_SendsRequestAndParsesResponse() {
         var json = "{\"historyId\":\"1\",\"expiration\":\"12345\"}";
         var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });
@@ -810,6 +830,7 @@ public class GmailApiClientTests {
         yield return new object[] { (Func<GmailApiClient, Task>)(c => c.TrashThreadAsync("u", "id")) };
         yield return new object[] { (Func<GmailApiClient, Task>)(c => c.DeleteThreadAsync("u", "id")) };
         yield return new object[] { (Func<GmailApiClient, Task>)(c => c.GetProfileAsync("u")) };
+        yield return new object[] { (Func<GmailApiClient, Task>)(c => c.GetProfileWithoutRefreshAsync("u")) };
         yield return new object[] { (Func<GmailApiClient, Task>)(c => c.WatchAsync("u", "topic")) };
         yield return new object[] { (Func<GmailApiClient, Task>)(c => c.StopWatchAsync("u")) };
         yield return new object[] { (Func<GmailApiClient, Task>)(c => c.ListHistoryAsync("u", "1")) };

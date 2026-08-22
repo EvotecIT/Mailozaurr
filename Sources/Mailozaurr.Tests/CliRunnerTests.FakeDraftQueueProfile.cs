@@ -365,7 +365,18 @@ public sealed partial class CliRunnerTests {
                         Probe = "resolveProfile",
                         Target = profileId,
                         DurationMilliseconds = 3,
-                        Message = "Profile resolved."
+                        Message = "Profile resolved.",
+                        Evidence = new MailProfileDiagnosticEvidence {
+                            Protocol = "IMAP",
+                            Session = new MailProfileSessionEvidence {
+                                Connected = true,
+                                Authenticated = true,
+                                Secure = true,
+                                TlsProtocol = "Tls13",
+                                Capabilities = new List<string> { "Idle" },
+                                AuthenticationMechanisms = new List<string> { "XOAUTH2" }
+                            }
+                        }
                     }
                 }
             });

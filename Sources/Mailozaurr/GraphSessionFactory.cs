@@ -30,7 +30,8 @@ public sealed class GraphSessionFactory : IGraphSessionFactory {
         }
 
         var userId = ResolveUserId(profile);
-        var credential = await ResolveCredentialAsync(profile, userId, cancellationToken).ConfigureAwait(false);
+        var resolvedCredential = await ResolveCredentialAsync(profile, userId, cancellationToken).ConfigureAwait(false);
+        var credential = resolvedCredential.Credential;
         var graphCredential = await TryBuildGraphCredentialAsync(profile, cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(credential.UserName)) {
             credential.UserName = userId;
@@ -42,23 +43,19 @@ public sealed class GraphSessionFactory : IGraphSessionFactory {
         return await _connectAsync(new GraphSessionRequest {
             UserId = userId,
             Credential = credential,
-            GraphCredential = graphCredential
+            GraphCredential = graphCredential,
+            AuthenticationMode = resolvedCredential.AuthenticationMode
         }, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<OAuthCredential> ResolveCredentialAsync(MailProfile profile, string userId, CancellationToken cancellationToken) {
+    private async Task<ResolvedGraphCredential> ResolveCredentialAsync(MailProfile profile, string userId, CancellationToken cancellationToken) {
         var accessToken = await _secretStore.GetSecretAsync(profile.Id, MailSecretNames.AccessToken, cancellationToken).ConfigureAwait(false);
         var tokenExpiresOn = TryResolveTokenExpiration(profile);
         if (!string.IsNullOrWhiteSpace(accessToken)) {
             if (!ShouldRefreshToken(tokenExpiresOn)) {
-                return new OAuthCredential {
-                    UserName = userId,
-                    AccessToken = accessToken!.Trim(),
-                    RefreshToken = await _secretStore.GetSecretAsync(profile.Id, MailSecretNames.RefreshToken, cancellationToken).ConfigureAwait(false),
-                    ClientId = profile.Settings.TryGetValue(MailProfileSettingsKeys.ClientId, out var clientId) ? clientId : null,
-                    ClientSecret = await _secretStore.GetSecretAsync(profile.Id, MailSecretNames.ClientSecret, cancellationToken).ConfigureAwait(false),
-                    ExpiresOn = tokenExpiresOn ?? DateTimeOffset.MaxValue
-                };
+                return new ResolvedGraphCredential(
+                    await CreateStoredTokenCredentialAsync(profile, userId, accessToken!, tokenExpiresOn, cancellationToken).ConfigureAwait(false),
+                    ResolveStoredTokenMode(profile));
             }
         }
 
@@ -69,19 +66,14 @@ public sealed class GraphSessionFactory : IGraphSessionFactory {
                 if (refreshedCredential.ExpiresOn == default) {
                     refreshedCredential.ExpiresOn = DateTimeOffset.MaxValue;
                 }
-                return refreshedCredential;
+                return new ResolvedGraphCredential(refreshedCredential, GraphSessionAuthenticationMode.Delegated);
             }
         }
 
         if (!string.IsNullOrWhiteSpace(accessToken)) {
-            return new OAuthCredential {
-                UserName = userId,
-                AccessToken = accessToken!.Trim(),
-                RefreshToken = await _secretStore.GetSecretAsync(profile.Id, MailSecretNames.RefreshToken, cancellationToken).ConfigureAwait(false),
-                ClientId = profile.Settings.TryGetValue(MailProfileSettingsKeys.ClientId, out var clientId) ? clientId : null,
-                ClientSecret = await _secretStore.GetSecretAsync(profile.Id, MailSecretNames.ClientSecret, cancellationToken).ConfigureAwait(false),
-                ExpiresOn = tokenExpiresOn ?? DateTimeOffset.MaxValue
-            };
+            return new ResolvedGraphCredential(
+                await CreateStoredTokenCredentialAsync(profile, userId, accessToken!, tokenExpiresOn, cancellationToken).ConfigureAwait(false),
+                ResolveStoredTokenMode(profile));
         }
 
         var graphCredential = await BuildGraphCredentialAsync(profile, cancellationToken).ConfigureAwait(false);
@@ -90,8 +82,28 @@ public sealed class GraphSessionFactory : IGraphSessionFactory {
             throw new InvalidOperationException($"Graph profile '{profile.Id}' did not produce an access token.");
         }
 
-        return credential;
+        return new ResolvedGraphCredential(credential, GraphSessionAuthenticationMode.Application);
     }
+
+    private async Task<OAuthCredential> CreateStoredTokenCredentialAsync(
+        MailProfile profile,
+        string userId,
+        string accessToken,
+        DateTimeOffset? tokenExpiresOn,
+        CancellationToken cancellationToken) => new() {
+        UserName = userId,
+        AccessToken = accessToken.Trim(),
+        RefreshToken = await _secretStore.GetSecretAsync(profile.Id, MailSecretNames.RefreshToken, cancellationToken).ConfigureAwait(false),
+        ClientId = profile.Settings.TryGetValue(MailProfileSettingsKeys.ClientId, out var clientId) ? clientId : null,
+        ClientSecret = await _secretStore.GetSecretAsync(profile.Id, MailSecretNames.ClientSecret, cancellationToken).ConfigureAwait(false),
+        ExpiresOn = tokenExpiresOn ?? DateTimeOffset.MaxValue
+    };
+
+    private static GraphSessionAuthenticationMode ResolveStoredTokenMode(MailProfile profile) =>
+        profile.Settings.TryGetValue(MailProfileSettingsKeys.AuthFlow, out var authFlow) &&
+        string.Equals(authFlow, MailProfileAuthFlowNames.Interactive, StringComparison.OrdinalIgnoreCase)
+            ? GraphSessionAuthenticationMode.Delegated
+            : GraphSessionAuthenticationMode.Unknown;
 
     private async Task<GraphCredential> BuildGraphCredentialAsync(MailProfile profile, CancellationToken cancellationToken) {
         var clientId = GetRequiredSetting(profile, MailProfileSettingsKeys.ClientId);
@@ -186,7 +198,8 @@ public sealed class GraphSessionFactory : IGraphSessionFactory {
             new GraphApiClient(request.Credential),
             request.UserId,
             request.Credential,
-            request.GraphCredential));
+            request.GraphCredential,
+            request.AuthenticationMode));
     }
 
     private static string ResolveUserId(MailProfile profile) {
@@ -262,5 +275,17 @@ public sealed class GraphSessionFactory : IGraphSessionFactory {
         return trimmed.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase)
             ? trimmed.Substring(bearerPrefix.Length).Trim()
             : trimmed;
+    }
+
+    private sealed class ResolvedGraphCredential {
+        internal ResolvedGraphCredential(
+            OAuthCredential credential,
+            GraphSessionAuthenticationMode authenticationMode) {
+            Credential = credential;
+            AuthenticationMode = authenticationMode;
+        }
+
+        internal OAuthCredential Credential { get; }
+        internal GraphSessionAuthenticationMode AuthenticationMode { get; }
     }
 }

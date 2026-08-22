@@ -4,6 +4,18 @@ namespace Mailozaurr.Tests;
 
 public sealed class ApplicationGraphSessionFactoryTests {
     [Fact]
+    public void GraphSessionPreservesOriginalConstructorSignature() {
+        var constructor = typeof(GraphSession).GetConstructor(new[] {
+            typeof(GraphApiClient),
+            typeof(string),
+            typeof(OAuthCredential),
+            typeof(GraphCredential)
+        });
+
+        Assert.NotNull(constructor);
+    }
+
+    [Fact]
     public async Task FactoryUsesAccessTokenSecretWhenAvailable() {
         var secretStore = new InMemorySecretStore();
         await secretStore.SetSecretAsync("work-graph", MailSecretNames.AccessToken, "graph-token");
@@ -27,6 +39,7 @@ public sealed class ApplicationGraphSessionFactoryTests {
         Assert.Equal("user@example.com", captured!.UserId);
         Assert.Equal("graph-token", captured.Credential.AccessToken);
         Assert.Equal("user@example.com", captured.Credential.UserName);
+        Assert.Equal(GraphSessionAuthenticationMode.Unknown, captured.AuthenticationMode);
     }
 
     [Fact]
@@ -35,6 +48,7 @@ public sealed class ApplicationGraphSessionFactoryTests {
         await secretStore.SetSecretAsync("tenant-graph", MailSecretNames.ClientSecret, "top-secret");
 
         GraphCredential? captured = null;
+        GraphSessionRequest? capturedRequest = null;
         var factory = new GraphSessionFactory(
             secretStore,
             acquireCredentialAsync: (profile, credential, cancellationToken) => {
@@ -44,8 +58,10 @@ public sealed class ApplicationGraphSessionFactoryTests {
                     ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
                 });
             },
-            connectAsync: (request, cancellationToken) =>
-                Task.FromResult(new GraphSession(new GraphApiClient(request.Credential), request.UserId)));
+            connectAsync: (request, cancellationToken) => {
+                capturedRequest = request;
+                return Task.FromResult(new GraphSession(new GraphApiClient(request.Credential), request.UserId));
+            });
 
         using var session = await factory.ConnectAsync(new MailProfile {
             Id = "tenant-graph",
@@ -63,6 +79,36 @@ public sealed class ApplicationGraphSessionFactoryTests {
         Assert.Equal("tenant-id", captured.DirectoryId);
         Assert.Equal("top-secret", captured.ClientSecret);
         Assert.Equal("shared@example.com", session.UserId);
+        Assert.Equal(GraphSessionAuthenticationMode.Application, capturedRequest?.AuthenticationMode);
+    }
+
+    [Fact]
+    public async Task FactoryDoesNotClassifyStoredTokenFromAvailableClientCredentialMetadata() {
+        var secretStore = new InMemorySecretStore();
+        await secretStore.SetSecretAsync("hybrid-graph", MailSecretNames.AccessToken, "opaque-token");
+        await secretStore.SetSecretAsync("hybrid-graph", MailSecretNames.ClientSecret, "top-secret");
+        GraphSessionRequest? captured = null;
+        var factory = new GraphSessionFactory(
+            secretStore,
+            connectAsync: (request, cancellationToken) => {
+                captured = request;
+                return Task.FromResult(new GraphSession(new GraphApiClient(request.Credential), request.UserId));
+            });
+
+        using var session = await factory.ConnectAsync(new MailProfile {
+            Id = "hybrid-graph",
+            DisplayName = "Hybrid Graph",
+            Kind = MailProfileKind.Graph,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.ClientId] = "client-id",
+                [MailProfileSettingsKeys.TenantId] = "tenant-id"
+            }
+        });
+
+        Assert.NotNull(captured);
+        Assert.Equal("opaque-token", captured!.Credential.AccessToken);
+        Assert.NotNull(captured.GraphCredential);
+        Assert.Equal(GraphSessionAuthenticationMode.Unknown, captured.AuthenticationMode);
     }
 
     [Fact]
@@ -101,6 +147,7 @@ public sealed class ApplicationGraphSessionFactoryTests {
         Assert.NotNull(captured);
         Assert.Equal("silent-token", captured!.Credential.AccessToken);
         Assert.Equal("user@example.com", session.UserId);
+        Assert.Equal(GraphSessionAuthenticationMode.Delegated, captured.AuthenticationMode);
     }
 
     private sealed class InMemorySecretStore : IMailSecretStore {

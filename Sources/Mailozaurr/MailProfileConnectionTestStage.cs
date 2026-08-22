@@ -15,4 +15,7 @@ public sealed class MailProfileConnectionTestStage : OperationResult {
 
     /// <summary>Elapsed phase duration in milliseconds.</summary>
     public long DurationMilliseconds { get; set; }
+
+    /// <summary>Typed, non-secret evidence observed during this phase.</summary>
+    public MailProfileDiagnosticEvidence? Evidence { get; set; }
 }
