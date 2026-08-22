@@ -406,6 +406,8 @@ public sealed partial class CliRunnerTests {
 
         public FakeReadService ReadService { get; } = new();
 
+        public FakeEmlExportService EmlExportService { get; } = new();
+
         public FakeQueueService QueueService { get; } = new();
 
         public FakeSendService SendService { get; } = new();
@@ -436,6 +438,7 @@ public sealed partial class CliRunnerTests {
                 .UseDraftService(DraftService)
                 .UseDraftExchangeService(DraftExchangeService)
                 .UseReadService(ReadService)
+                .UseEmlExportService(EmlExportService)
                 .UseMessageActionService(MessageActionService)
                 .UseMessageActionPlanExchangeService(MessageActionPlanExchangeService)
                 .UseMessageActionPlanRegistryService(MessageActionPlanRegistryService)
@@ -446,6 +449,24 @@ public sealed partial class CliRunnerTests {
             var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(directory);
             return Path.Combine(directory, fileName);
+        }
+    }
+
+    private sealed class FakeEmlExportService : IMailEmlExportService {
+        public MailEmlExportRequest? LastRequest { get; private set; }
+
+        public Task<MailEmlExportResult> ExportAsync(
+            MailEmlExportRequest request,
+            CancellationToken cancellationToken = default) {
+            LastRequest = request;
+            return Task.FromResult(new MailEmlExportResult {
+                Succeeded = true,
+                ProfileId = request.ProfileId,
+                DestinationDirectory = request.DestinationDirectory,
+                RequestedCount = request.MessageIds.Count,
+                ExportedCount = request.MessageIds.Count,
+                Message = $"Exported {request.MessageIds.Count} EML message(s)."
+            });
         }
     }
 

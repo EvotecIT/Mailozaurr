@@ -20,6 +20,7 @@ namespace Mailozaurr;
 /// This is a minimal helper focused on reusable primitives needed by apps (for example, managing webhook subscriptions).
 /// </remarks>
 public sealed partial class GraphApiClient : IDisposable {
+    private const string ImmutableIdPreference = "IdType=\"ImmutableId\"";
     private readonly HttpClient _client;
     private readonly Func<CancellationToken, Task<string>>? _refreshToken;
     private readonly OAuthCredential? _credential;
@@ -33,6 +34,8 @@ public sealed partial class GraphApiClient : IDisposable {
     }
 
     private void ApplyAuthHeader(HttpRequestMessage request) {
+        request.Headers.TryAddWithoutValidation("Prefer", ImmutableIdPreference);
+
         // Avoid mutating HttpClient.DefaultRequestHeaders.Authorization (thread-safety + token refresh semantics).
         // If no credential was provided, we assume the caller configured auth on the HttpClient itself.
         if (_credential != null && !string.IsNullOrWhiteSpace(_credential.AccessToken) && request.Headers.Authorization == null) {

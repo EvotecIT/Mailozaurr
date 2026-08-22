@@ -114,6 +114,41 @@ public sealed class ApplicationBuilderTests {
     }
 
     [Fact]
+    public async Task DisabledBuiltInReadHandlerDoesNotDisableEmlSource() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profileStore = new InMemoryMailProfileStore();
+            await profileStore.SaveAsync(new MailProfile {
+                Id = "pop-mailbox",
+                DisplayName = "POP mailbox",
+                Kind = MailProfileKind.Pop3
+            });
+            var message = new MimeKit.MimeMessage { Subject = "Export" };
+            message.Body = new MimeKit.TextPart("plain") { Text = "Body" };
+            var builder = new MailApplicationBuilder(new MailApplicationOptions {
+                EnablePop3ReadHandler = false,
+                ProfileStore = new MailProfileStoreOptions { DirectoryPath = Path.Combine(directory, "profiles") },
+                SecretStore = new MailSecretStoreOptions { DirectoryPath = Path.Combine(directory, "secrets") }
+            })
+                .UseProfileStore(profileStore)
+                .UsePop3SessionFactory(new ExportPop3SessionFactory(message))
+                .AddReadHandler(new FakeReadHandler(MailProfileKind.Pop3));
+            var app = builder.Build();
+
+            var result = await app.EmlExport.ExportAsync(new MailEmlExportRequest {
+                ProfileId = "pop-mailbox",
+                MessageIds = { Pop3MailReadHandler.FormatMessageId(null, message) },
+                DestinationDirectory = Path.Combine(directory, "export")
+            });
+
+            Assert.True(result.Succeeded);
+            Assert.Contains(app.ReadHandlers, handler => handler.Kind == MailProfileKind.Pop3);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task BuildUsesRegisteredCustomHandlerCapabilitiesWithoutStaticDefaults() {
         var directory = CreateTemporaryDirectory();
         try {
@@ -343,6 +378,42 @@ public sealed class ApplicationBuilderTests {
     private sealed class FakeImapSessionFactory : IImapSessionFactory {
         public Task<ImapClient> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) =>
             Task.FromResult(new ImapClient());
+    }
+
+    private sealed class ExportPop3SessionFactory : IPop3SessionFactory {
+        private readonly byte[] _content;
+
+        internal ExportPop3SessionFactory(MimeKit.MimeMessage message) {
+            using var stream = new MemoryStream();
+            message.WriteTo(stream);
+            _content = stream.ToArray();
+        }
+
+        public Task<MailKit.Net.Pop3.Pop3Client> ConnectAsync(
+            MailProfile profile,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<MailKit.Net.Pop3.Pop3Client>(new ExportPop3Client(_content));
+    }
+
+    private sealed class ExportPop3Client : MailKit.Net.Pop3.Pop3Client {
+        private readonly byte[] _content;
+
+        internal ExportPop3Client(byte[] content) => _content = content;
+
+        public override bool IsConnected => true;
+
+        public override bool IsAuthenticated => true;
+
+        public override int Count => 1;
+
+        public override int GetMessageSize(int index, CancellationToken cancellationToken = default) => _content.Length;
+
+        public override Task<Stream> GetStreamAsync(
+            int index,
+            bool headersOnly = false,
+            CancellationToken cancellationToken = default,
+            MailKit.ITransferProgress? progress = null) =>
+            Task.FromResult<Stream>(new MemoryStream(_content, writable: false));
     }
 
     private sealed class FakeGraphSessionFactory : IGraphSessionFactory {

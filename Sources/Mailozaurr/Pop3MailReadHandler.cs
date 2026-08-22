@@ -206,6 +206,13 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
             ? FormatMessageId(snapshot.Uid, snapshot.Message)
             : FormatMessageId(null, snapshot.Message, identifier.Occurrence);
 
+    internal static string CanonicalizeMessageIdForStorage(string messageId) {
+        var identifier = ParseMessageId(messageId);
+        return string.IsNullOrWhiteSpace(identifier.Fingerprint)
+            ? $"uid:{identifier.Uid}"
+            : $"hash:{identifier.Fingerprint}:{identifier.Occurrence.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+    }
+
     internal static (string? Uid, string? Fingerprint, int Occurrence) ParseMessageId(string value) {
         if (string.IsNullOrWhiteSpace(value)) {
             throw new InvalidOperationException("A POP3 message id is required.");
@@ -324,7 +331,7 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
         }
     }
 
-    private static async Task<Pop3MailboxBrowser.Pop3MessageResolveResult> ResolveMessageAsync(
+    internal static async Task<Pop3MailboxBrowser.Pop3MessageResolveResult> ResolveMessageAsync(
         Pop3Client client,
         (string? Uid, string? Fingerprint, int Occurrence) identifier,
         CancellationToken cancellationToken) {

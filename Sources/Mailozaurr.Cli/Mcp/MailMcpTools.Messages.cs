@@ -5,6 +5,27 @@ using System.ComponentModel;
 namespace Mailozaurr.Cli.Mcp;
 
 public sealed partial class MailMcpTools {
+    [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
+    [Description("Exports provider messages to validated, byte-preserved EML files on the Mailozaurr server filesystem.")]
+    public Task<MailEmlExportResult> mail_export_eml(
+        [Description("The profile identifier to query.")] string profileId,
+        [Description("The provider-specific message identifiers to export.")] string[] messageIds,
+        [Description("The destination directory on the server filesystem.")] string destinationDirectory,
+        [Description("Optional mailbox identifier for providers that support multiple mailboxes.")] string? mailboxId = null,
+        [Description("Optional folder identifier when the provider requires folder scoping.")] string? folderId = null,
+        [Description("Maximum accepted provider bytes per message.")] int maxMessageBytes = 64 * 1024 * 1024,
+        [Description("When true, replaces an existing deterministic destination file.")] bool overwrite = false,
+        CancellationToken cancellationToken = default) =>
+        _application.EmlExport.ExportAsync(new MailEmlExportRequest {
+            ProfileId = profileId,
+            MailboxId = mailboxId,
+            FolderId = folderId,
+            MessageIds = messageIds?.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()).ToList() ?? new List<string>(),
+            DestinationDirectory = destinationDirectory,
+            MaxMessageBytes = maxMessageBytes,
+            Overwrite = overwrite
+        }, cancellationToken);
+
     [McpServerTool(ReadOnly = true, Destructive = false, Idempotent = true, OpenWorld = true)]
     [Description("Searches messages in a mailbox using normalized Mailozaurr filters.")]
     public Task<IReadOnlyList<MessageSummary>> mail_search(

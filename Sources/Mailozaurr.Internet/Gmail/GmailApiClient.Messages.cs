@@ -257,6 +257,88 @@ public sealed partial class GmailApiClient {
         GetMessageWithFormatAsync(userId, id, format: "raw", fields: fields, cancellationToken: cancellationToken);
 
     /// <summary>
+    /// Retrieves a raw message while bounding the encoded HTTP response before it is materialized.
+    /// </summary>
+    public async Task<GmailMessage> GetRawBoundedAsync(
+        string userId,
+        string id,
+        long maxDecodedBytes,
+        string? fields = null,
+        CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (string.IsNullOrWhiteSpace(id)) {
+            throw new ArgumentException("id is required.", nameof(id));
+        }
+        if (maxDecodedBytes <= 0 || maxDecodedBytes > int.MaxValue) {
+            throw new ArgumentOutOfRangeException(nameof(maxDecodedBytes));
+        }
+
+        var safeId = Uri.EscapeDataString(id.Trim());
+        var url = new StringBuilder($"users/{userId}/messages/{safeId}?format=raw");
+        if (!string.IsNullOrWhiteSpace(fields)) {
+            url.Append("&fields=").Append(Uri.EscapeDataString(fields!.Trim()));
+        }
+
+        // Base64 uses at most four encoded bytes for every three decoded bytes.
+        // The fixed allowance covers the small JSON envelope and message id.
+        var maxEncodedBytes = checked(((maxDecodedBytes + 2L) / 3L) * 4L);
+        var maxResponseBytes = checked(maxEncodedBytes + 64L * 1024L);
+        if (maxResponseBytes > int.MaxValue) {
+            maxResponseBytes = int.MaxValue;
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, url.ToString());
+        using var response = await _client.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken).ConfigureAwait(false);
+        await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.NotFound) {
+            throw new GmailApiException(
+                response.StatusCode,
+                $"Gmail message '{id.Trim()}' was not found.",
+                string.Empty);
+        }
+        response.EnsureSuccessStatusCode();
+        if (response.Content.Headers.ContentLength is long contentLength && contentLength > maxResponseBytes) {
+            throw new InvalidDataException($"Gmail raw response exceeds the bounded response size for {maxDecodedBytes} MIME bytes.");
+        }
+
+#if NET5_0_OR_GREATER
+        await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+#else
+        using var responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+#endif
+        using var buffer = new MemoryStream();
+        var chunk = new byte[81920];
+        while (true) {
+            cancellationToken.ThrowIfCancellationRequested();
+#if NET5_0_OR_GREATER
+            var read = await responseStream.ReadAsync(chunk, cancellationToken).ConfigureAwait(false);
+#else
+            var read = await responseStream.ReadAsync(chunk, 0, chunk.Length, cancellationToken).ConfigureAwait(false);
+#endif
+            if (read <= 0) break;
+            if (buffer.Length + read > maxResponseBytes) {
+                throw new InvalidDataException($"Gmail raw response exceeds the bounded response size for {maxDecodedBytes} MIME bytes.");
+            }
+            buffer.Write(chunk, 0, read);
+        }
+
+        buffer.Position = 0;
+        GmailMessage? message;
+        try {
+            message = await JsonSerializer.DeserializeAsync(
+                buffer,
+                GmailJsonContext.Default.GmailMessage,
+                cancellationToken).ConfigureAwait(false);
+        } catch (JsonException ex) {
+            throw new GmailApiException("Failed to parse Gmail API raw-message response.", string.Empty, ex);
+        }
+        return message ?? throw new InvalidDataException("Gmail API returned an invalid raw-message response.");
+    }
+
+    /// <summary>
     /// Retrieves a full message by id.
     /// </summary>
     public Task<GmailMessage> GetFullAsync(string userId, string id, string? fields = null, CancellationToken cancellationToken = default) =>

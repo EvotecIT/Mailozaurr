@@ -155,6 +155,42 @@ public class GmailApiClientTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task GetRawBoundedAsync_RejectsOversizedResponseBeforeDeserialization() {
+        var content = new System.Net.Http.ByteArrayContent(new byte[70 * 1024]);
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) {
+            Content = content
+        });
+        var httpClient = new System.Net.Http.HttpClient(handler) {
+            BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/")
+        };
+        var client = new GmailApiClient(httpClient);
+
+        var exception = await Assert.ThrowsAsync<System.IO.InvalidDataException>(() =>
+            client.GetRawBoundedAsync("me", "123", maxDecodedBytes: 3));
+
+        Assert.Contains("bounded response size", exception.Message, StringComparison.Ordinal);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetRawBoundedAsync_ReturnsRawPayloadWithinLimit() {
+        var json = "{\"id\":\"123\",\"raw\":\"dGVzdA\"}";
+        var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) {
+            Content = new System.Net.Http.StringContent(json)
+        });
+        var httpClient = new System.Net.Http.HttpClient(handler) {
+            BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/")
+        };
+        var client = new GmailApiClient(httpClient);
+
+        var message = await client.GetRawBoundedAsync("me", "123", maxDecodedBytes: 4, fields: "id,raw");
+
+        Assert.Equal("123", message.Id);
+        Assert.Equal("dGVzdA", message.Raw);
+        Assert.Contains("format=raw", handler.Requests[0].RequestUri!.Query);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task GetProfileWithoutRefreshAsync_PreservesForbiddenEvidenceWithoutRefreshing() {
         var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.Forbidden) {
             Content = new System.Net.Http.StringContent("{\"error\":{\"code\":403}}")

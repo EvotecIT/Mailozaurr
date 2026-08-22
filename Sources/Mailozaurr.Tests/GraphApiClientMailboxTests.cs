@@ -1,11 +1,29 @@
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
+using System.Text.Json;
 using Xunit;
 
 namespace Mailozaurr.Tests;
 
 public class GraphApiClientMailboxTests {
+    [Fact]
+    public async System.Threading.Tasks.Task GetMessageMimeAsync_AllowsCallerLimitAbove256MiB() {
+        var expected = new byte[] { 1, 2, 3, 4 };
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new ByteArrayContent(expected)
+        });
+        var api = new GraphApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = DateTimeOffset.MaxValue });
+        var field = typeof(GraphApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(api, new HttpClient(handler) { BaseAddress = new Uri("https://graph.microsoft.com/v1.0/") });
+
+        var actual = await api.GetMessageMimeAsync("m1", maxBytes: 300 * 1024 * 1024);
+
+        Assert.Equal(expected, actual);
+        Assert.Single(handler.Requests);
+        Assert.Contains("IdType=\"ImmutableId\"", handler.Requests[0].Headers.GetValues("Prefer"));
+    }
+
     [Fact]
     public async System.Threading.Tasks.Task ListMessagesAsync_AddsConsistencyHeaders_WhenSearchIsUsed() {
         var json = "{\"value\":[{\"id\":\"m1\",\"subject\":\"s\",\"receivedDateTime\":\"2026-02-15T00:00:00Z\",\"internetMessageId\":\"<x>\",\"hasAttachments\":false,\"isRead\":true,\"conversationId\":\"c1\",\"from\":{\"emailAddress\":{\"address\":\"a@b.com\"}},\"toRecipients\":[{\"emailAddress\":{\"address\":\"c@d.com\"}}],\"flag\":{\"flagStatus\":\"flagged\"}}]}";
@@ -22,6 +40,7 @@ public class GraphApiClientMailboxTests {
         Assert.Single(handler.Requests);
         Assert.True(handler.Requests[0].Headers.Contains("ConsistencyLevel"));
         Assert.True(handler.Requests[0].Headers.Contains("Prefer"));
+        Assert.Contains("IdType=\"ImmutableId\"", handler.Requests[0].Headers.GetValues("Prefer"));
         Assert.Contains("/me/mailFolders/inbox/messages?", handler.Requests[0].RequestUri!.ToString());
     }
 
@@ -78,6 +97,25 @@ public class GraphApiClientMailboxTests {
         var body = await handler.Requests[0].Content!.ReadAsStringAsync();
         Assert.Contains("\"url\":\"me/messages/123\"", body);
         Assert.Contains("\"method\":\"DELETE\"", body);
+        using var document = JsonDocument.Parse(body);
+        Assert.Equal(
+            "IdType=\"ImmutableId\"",
+            document.RootElement.GetProperty("requests")[0].GetProperty("headers").GetProperty("Prefer").GetString());
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task MoveMessageAsync_RequestsImmutableResponseIdentity() {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.Created) {
+            Content = new StringContent("{\"id\":\"immutable-id\"}")
+        });
+        var api = new GraphApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = DateTimeOffset.MaxValue });
+        var field = typeof(GraphApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(api, new HttpClient(handler) { BaseAddress = new Uri("https://graph.microsoft.com/v1.0/") });
+
+        await api.MoveMessageAsync("m1", "archive");
+
+        Assert.Single(handler.Requests);
+        Assert.Contains("IdType=\"ImmutableId\"", handler.Requests[0].Headers.GetValues("Prefer"));
     }
 
     [Fact]

@@ -277,6 +277,41 @@ public sealed partial class CliRunnerTests {
     }
 
     [Fact]
+    public async Task MailExportEmlUsesApplicationExportService() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "export-eml",
+                "--profile", "work-imap",
+                "--mailbox", "shared@example.com",
+                "--folder", "Inbox",
+                "--message-id", "msg-42",
+                "--message-id", "msg-84",
+                "--path", @"C:\Temp\mail-export",
+                "--max-bytes", "1048576",
+                "--overwrite",
+                "--json"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(fixture.EmlExportService.LastRequest);
+        Assert.Equal("work-imap", fixture.EmlExportService.LastRequest!.ProfileId);
+        Assert.Equal("shared@example.com", fixture.EmlExportService.LastRequest.MailboxId);
+        Assert.Equal("Inbox", fixture.EmlExportService.LastRequest.FolderId);
+        Assert.Equal(new[] { "msg-42", "msg-84" }, fixture.EmlExportService.LastRequest.MessageIds);
+        Assert.Equal(@"C:\Temp\mail-export", fixture.EmlExportService.LastRequest.DestinationDirectory);
+        Assert.Equal(1048576, fixture.EmlExportService.LastRequest.MaxMessageBytes);
+        Assert.True(fixture.EmlExportService.LastRequest.Overwrite);
+        Assert.Contains("\"ExportedCount\": 2", stdout.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task MailMarkReadUsesApplicationMessageActionService() {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();

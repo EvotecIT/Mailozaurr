@@ -3,6 +3,21 @@ using Mailozaurr;
 namespace Mailozaurr.Tests;
 
 public sealed class ApplicationGmailMailReadHandlerTests {
+    [Theory]
+    [InlineData("me", "me")]
+    [InlineData("ME", "me")]
+    [InlineData("Owner@Example.com", "me")]
+    [InlineData("other@Example.com", "other@example.com")]
+    public void StorageUserIdCanonicalizesAuthenticatedMailboxAliases(string userId, string expected) {
+        var profile = new MailProfile {
+            Id = "personal-gmail",
+            Kind = MailProfileKind.Gmail,
+            DefaultMailbox = "owner@example.com"
+        };
+
+        Assert.Equal(expected, GmailMailReadHandler.CanonicalizeUserIdForStorage(profile, userId));
+    }
+
     [Fact]
     public async Task HandlerUsesInjectedFolderDelegate() {
         var handler = new GmailMailReadHandler(

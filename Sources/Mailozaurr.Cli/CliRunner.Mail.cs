@@ -13,7 +13,7 @@ public static partial class CliRunner {
         TextWriter output,
         TextWriter error) {
         if (parseResult.Positionals.Count < 2) {
-            await error.WriteLineAsync("Missing mail command. Use 'mail folders', 'mail folder-aliases', 'mail resolve-folder', 'mail list-plan-batches', 'mail show-plan-batch', 'mail import-plan-batch', 'mail export-plan-batch', 'mail create-common-plan-batch', 'mail clone-plan-batch', 'mail preview-transform-plan-batch', 'mail transform-plan-batch', 'mail add-plan-to-batch', 'mail add-plan-file-to-batch', 'mail replace-plan-in-batch', 'mail replace-plan-file-in-batch', 'mail remove-plan-from-batch', 'mail delete-plan-batch', 'mail execute-plan-batch-stored', 'mail plan-action', 'mail export-plan', 'mail show-plan', 'mail execute-plan', 'mail execute-plan-file', 'mail execute-plan-batch', 'mail preview-all', 'mail preview-mark-read', 'mail preview-flag', 'mail preview-actions', 'mail preview-move', 'mail preview-delete', 'mail search', 'mail attachments', 'mail get', 'mail get-many', 'mail mark-read', 'mail flag', 'mail archive', 'mail trash', 'mail move', 'mail delete', 'mail save-attachment', 'mail save-attachments', or 'mail save-attachments-many'.").ConfigureAwait(false);
+            await error.WriteLineAsync("Missing mail command. Use 'mail folders', 'mail folder-aliases', 'mail resolve-folder', 'mail list-plan-batches', 'mail show-plan-batch', 'mail import-plan-batch', 'mail export-plan-batch', 'mail create-common-plan-batch', 'mail clone-plan-batch', 'mail preview-transform-plan-batch', 'mail transform-plan-batch', 'mail add-plan-to-batch', 'mail add-plan-file-to-batch', 'mail replace-plan-in-batch', 'mail replace-plan-file-in-batch', 'mail remove-plan-from-batch', 'mail delete-plan-batch', 'mail execute-plan-batch-stored', 'mail plan-action', 'mail export-plan', 'mail show-plan', 'mail execute-plan', 'mail execute-plan-file', 'mail execute-plan-batch', 'mail preview-all', 'mail preview-mark-read', 'mail preview-flag', 'mail preview-actions', 'mail preview-move', 'mail preview-delete', 'mail search', 'mail attachments', 'mail get', 'mail get-many', 'mail export-eml', 'mail mark-read', 'mail flag', 'mail archive', 'mail trash', 'mail move', 'mail delete', 'mail save-attachment', 'mail save-attachments', or 'mail save-attachments-many'.").ConfigureAwait(false);
             return 1;
         }
 
@@ -377,6 +377,23 @@ public static partial class CliRunner {
                 var details = await application.Read.GetMessagesAsync(getMessagesRequest).ConfigureAwait(false);
                 await WriteSequenceAsync(output, details, json, value => value.Summary?.Subject ?? value.Id).ConfigureAwait(false);
                 return 0;
+            case "export-eml":
+                var maxBytes = parseResult.GetIntOption("max-bytes");
+                var emlResult = await application.EmlExport.ExportAsync(new MailEmlExportRequest {
+                    ProfileId = RequireOption(parseResult, "profile"),
+                    MailboxId = parseResult.GetOption("mailbox"),
+                    FolderId = parseResult.GetOption("folder"),
+                    MessageIds = parseResult.GetOptionValues("message-id")
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value!.Trim())
+                        .ToList(),
+                    DestinationDirectory = RequireOption(parseResult, "path"),
+                    MaxMessageBytes = maxBytes ?? 64 * 1024 * 1024,
+                    Overwrite = parseResult.HasFlag("overwrite")
+                }).ConfigureAwait(false);
+                await WriteItemAsync(output, emlResult, json, value =>
+                    value.Message ?? $"Exported {value.ExportedCount} EML message(s).").ConfigureAwait(false);
+                return emlResult.Succeeded ? 0 : 1;
             case "mark-read":
                 var markReadResult = await application.MessageActions.SetReadStateAsync(new SetReadStateRequest {
                     ProfileId = RequireOption(parseResult, "profile"),
