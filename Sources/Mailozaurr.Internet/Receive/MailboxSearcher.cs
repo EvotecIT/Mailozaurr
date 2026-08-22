@@ -173,7 +173,7 @@ public static partial class MailboxSearcher {
              beforeUtc.HasValue ||
              querySinceUtc.HasValue ||
              queryBeforeUtc.HasValue);
-        for (int i = 0; i < client.Count; i++) {
+        for (int i = client.Count - 1; i >= 0; i--) {
             if (useHeaderPrefilter) {
                 var headers = await client.GetMessageHeadersAsync(i, cancellationToken).ConfigureAwait(false);
                 if (!Pop3HeadersMatch(

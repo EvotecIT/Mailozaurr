@@ -92,7 +92,7 @@ public sealed class ApplicationPop3MailReadHandlerTests {
             MessageId = results[0].Id
         });
         Assert.NotNull(first);
-        Assert.Equal(new[] { 0 }, downloads);
+        Assert.Equal(new[] { 1 }, downloads);
 
         downloads.Clear();
         var second = await handler.GetMessageAsync(CreateProfile(), new GetMessageRequest {
@@ -100,7 +100,33 @@ public sealed class ApplicationPop3MailReadHandlerTests {
             MessageId = results[1].Id
         });
         Assert.NotNull(second);
-        Assert.Equal(new[] { 0, 1 }, downloads);
+        Assert.Equal(new[] { 1, 0 }, downloads);
+    }
+
+    [Fact]
+    public async Task HashOccurrencesCountMatchingMessagesThatHaveUids() {
+        var duplicate = new MimeMessage { Subject = "Mixed UIDL" };
+        duplicate.Body = new TextPart("plain") { Text = "Same bytes" };
+        var downloads = new List<int>();
+        var handler = new Pop3MailReadHandler(
+            new MixedUidlPop3SessionFactory(new[] { duplicate, duplicate }, downloads));
+
+        var results = await handler.SearchAsync(CreateProfile(), new MailSearchRequest {
+            ProfileId = "work-pop3"
+        });
+
+        Assert.Equal(2, results.Count);
+        Assert.StartsWith("hash:", results[0].Id, StringComparison.Ordinal);
+        Assert.Equal("uid:older-uid", results[1].Id);
+
+        downloads.Clear();
+        var detail = await handler.GetMessageAsync(CreateProfile(), new GetMessageRequest {
+            ProfileId = "work-pop3",
+            MessageId = results[0].Id
+        });
+
+        Assert.NotNull(detail);
+        Assert.Equal(new[] { 1 }, downloads);
     }
 
     [Fact]
@@ -211,6 +237,21 @@ public sealed class ApplicationPop3MailReadHandlerTests {
         } finally {
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [Fact]
+    public void NumericAndFileNameAttachmentAliasesResolveToOneCanonicalIdentity() {
+        var attachment = new MimePart("application", "octet-stream") { FileName = "report.txt" };
+        IReadOnlyList<MimeEntity> attachments = new[] { attachment };
+
+        var numericIndex = MimeAttachmentStorage.ResolveAttachmentIndex(attachments, "0");
+        var fileNameIndex = MimeAttachmentStorage.ResolveAttachmentIndex(attachments, "report.txt");
+
+        Assert.Equal(0, numericIndex);
+        Assert.Equal(numericIndex, fileNameIndex);
+        Assert.Equal(
+            MimeAttachmentStorage.CreateStorageIdentity("profile", "message", numericIndex.ToString()),
+            MimeAttachmentStorage.CreateStorageIdentity("profile", "message", fileNameIndex.ToString()));
     }
 
     [Fact]
@@ -373,6 +414,29 @@ public sealed class ApplicationPop3MailReadHandlerTests {
         }
     }
 
+    private sealed class MixedUidlPop3SessionFactory : IPop3SessionFactory {
+        private readonly IReadOnlyList<MimeMessage> _messages;
+        private readonly List<int> _downloads;
+
+        public MixedUidlPop3SessionFactory(IReadOnlyList<MimeMessage> messages, List<int> downloads) {
+            _messages = messages;
+            _downloads = downloads;
+        }
+
+        public Task<Pop3Client> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) =>
+            Task.FromResult<Pop3Client>(new MixedUidlPop3Client(_messages, _downloads));
+    }
+
+    private sealed class MixedUidlPop3Client : DuplicateMessagePop3Client {
+        public MixedUidlPop3Client(IReadOnlyList<MimeMessage> messages, List<int> downloads)
+            : base(messages, downloads) { }
+
+        public override Task<string> GetMessageUidAsync(int index, CancellationToken cancellationToken = default) =>
+            index == 0
+                ? Task.FromResult("older-uid")
+                : Task.FromException<string>(new Pop3CommandException("UIDL failed transiently."));
+    }
+
     private sealed class RecoveringUidlPop3Client : Pop3Client {
         private readonly MimeMessage _message;
         private readonly bool _uidlAvailable;
@@ -397,7 +461,7 @@ public sealed class ApplicationPop3MailReadHandlerTests {
                 : Task.FromException<string>(new Pop3CommandException("UIDL failed transiently."));
     }
 
-    private sealed class DuplicateMessagePop3Client : Pop3Client {
+    private class DuplicateMessagePop3Client : Pop3Client {
         private readonly IReadOnlyList<MimeMessage> _messages;
         private readonly List<int> _downloads;
 

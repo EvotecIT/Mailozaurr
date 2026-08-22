@@ -190,9 +190,8 @@ public sealed class GmailMailReadHandler : IMailReadHandler {
                 profile.Id,
                 profile.Kind.ToString(),
                 session.UserId,
-                request.FolderId,
                 request.MessageId,
-                request.AttachmentId));
+                resolved.Id!.Trim()));
         if (File.Exists(destinationPath) && !request.Overwrite) {
             return OperationResult.Failure("destination_exists", $"Destination '{destinationPath}' already exists.");
         }

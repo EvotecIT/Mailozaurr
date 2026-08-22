@@ -21,6 +21,20 @@ public class MailboxSearcherBodyTests {
     }
 
     [Fact]
+    public async Task SearchPop3Async_AppliesLimitToNewestMatches() {
+        var oldest = new MimeMessage { Subject = "Oldest" };
+        var middle = new MimeMessage { Subject = "Middle" };
+        var newest = new MimeMessage { Subject = "Newest" };
+        var client = new FakePop3Client(new[] { oldest, middle, newest });
+
+        var result = await MailboxSearcher.SearchPop3Async(client, maxResults: 1);
+
+        var message = Assert.Single(result);
+        Assert.Equal(2, message.Index);
+        Assert.Equal("Newest", message.Message.Subject);
+    }
+
+    [Fact]
     public async Task SearchPop3Async_UnqualifiedQueryFiltersHeaderAndBodyBeforeLimit() {
         var unrelated = new MimeMessage { Subject = "Unrelated" };
         unrelated.Body = new TextPart("plain") { Text = "Other content" };
@@ -36,8 +50,8 @@ public class MailboxSearcherBodyTests {
             queryString: "Invoice approved");
 
         var message = Assert.Single(result);
-        Assert.Equal(1, message.Index);
-        Assert.Equal("Invoice 42", message.Message.Subject);
+        Assert.Equal(2, message.Index);
+        Assert.Equal("Invoice 43", message.Message.Subject);
     }
 
     [Fact]

@@ -260,10 +260,11 @@ public sealed class GraphMailReadHandler : IMailReadHandler {
             return OperationResult.Failure("attachment_not_found", "Message has no attachments.");
         }
 
-        var attachment = MimeAttachmentStorage.ResolveAttachment(attachments, request.AttachmentId);
-        if (attachment == null) {
+        var attachmentIndex = MimeAttachmentStorage.ResolveAttachmentIndex(attachments, request.AttachmentId);
+        if (attachmentIndex < 0) {
             return OperationResult.Failure("attachment_not_found", $"Attachment '{request.AttachmentId}' was not found.");
         }
+        var attachment = attachments[attachmentIndex];
 
         var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(
             request.DestinationPath,
@@ -272,9 +273,8 @@ public sealed class GraphMailReadHandler : IMailReadHandler {
                 profile.Id,
                 profile.Kind.ToString(),
                 userId,
-                request.FolderId,
                 request.MessageId,
-                request.AttachmentId));
+                attachmentIndex.ToString(CultureInfo.InvariantCulture)));
         if (File.Exists(destinationPath) && !request.Overwrite) {
             return OperationResult.Failure("destination_exists", $"Destination '{destinationPath}' already exists.");
         }

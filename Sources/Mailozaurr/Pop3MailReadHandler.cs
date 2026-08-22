@@ -117,13 +117,10 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
         var results = new List<MessageSummary>(messages.Count);
         var fingerprintOccurrences = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var message in messages) {
+            var fingerprint = ComputeMessageFingerprint(message.Message);
+            _ = fingerprintOccurrences.TryGetValue(fingerprint, out var occurrence);
+            fingerprintOccurrences[fingerprint] = occurrence + 1;
             var uid = await TryGetUidAsync(client, message.Index, cancellationToken).ConfigureAwait(false);
-            var occurrence = 0;
-            if (string.IsNullOrWhiteSpace(uid)) {
-                var fingerprint = ComputeMessageFingerprint(message.Message);
-                _ = fingerprintOccurrences.TryGetValue(fingerprint, out occurrence);
-                fingerprintOccurrences[fingerprint] = occurrence + 1;
-            }
             results.Add(MapSummary(profile.Id, uid, message.Message, occurrence));
         }
         return results;
@@ -160,10 +157,11 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
         }
 
         var attachments = resolved.Snapshot.Message.Attachments.ToList();
-        var attachment = MimeAttachmentStorage.ResolveAttachment(attachments, request.AttachmentId);
-        if (attachment == null) {
+        var attachmentIndex = MimeAttachmentStorage.ResolveAttachmentIndex(attachments, request.AttachmentId);
+        if (attachmentIndex < 0) {
             return OperationResult.Failure("attachment_not_found", $"Attachment '{request.AttachmentId}' was not found.");
         }
+        var attachment = attachments[attachmentIndex];
 
         var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(
             request.DestinationPath,
@@ -173,7 +171,7 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
                 profile.Kind.ToString(),
                 folderId,
                 request.MessageId,
-                request.AttachmentId));
+                attachmentIndex.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         if (File.Exists(destinationPath) && !request.Overwrite) {
             return OperationResult.Failure("destination_exists", $"Destination '{destinationPath}' already exists.");
         }
@@ -322,7 +320,7 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
         }
 
         var occurrence = 0;
-        for (var index = 0; index < client.Count; index++) {
+        for (var index = client.Count - 1; index >= 0; index--) {
             cancellationToken.ThrowIfCancellationRequested();
             var candidate = await Pop3MailboxBrowser.ResolveMessageAsync(
                 client,

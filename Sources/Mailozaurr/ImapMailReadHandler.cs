@@ -197,10 +197,11 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
             return OperationResult.Failure("attachment_not_found", "Message has no attachments.");
         }
 
-        var attachment = ResolveAttachment(attachments, request.AttachmentId);
-        if (attachment == null) {
+        var attachmentIndex = MimeAttachmentStorage.ResolveAttachmentIndex(attachments, request.AttachmentId);
+        if (attachmentIndex < 0) {
             return OperationResult.Failure("attachment_not_found", $"Attachment '{request.AttachmentId}' was not found.");
         }
+        var attachment = attachments[attachmentIndex];
 
         var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(
             request.DestinationPath,
@@ -210,7 +211,7 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
                 profile.Kind.ToString(),
                 folder,
                 request.MessageId,
-                request.AttachmentId));
+                attachmentIndex.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         if (File.Exists(destinationPath) && !request.Overwrite) {
             return OperationResult.Failure("destination_exists", $"Destination '{destinationPath}' already exists.");
         }
@@ -283,6 +284,4 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
             .ToList();
     }
 
-    private static MimeEntity? ResolveAttachment(IReadOnlyList<MimeEntity> attachments, string attachmentId) =>
-        MimeAttachmentStorage.ResolveAttachment(attachments, attachmentId);
 }

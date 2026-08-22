@@ -6,12 +6,23 @@ namespace Mailozaurr;
 
 internal static class MimeAttachmentStorage {
     public static MimeEntity? ResolveAttachment(IReadOnlyList<MimeEntity> attachments, string attachmentId) {
+        var index = ResolveAttachmentIndex(attachments, attachmentId);
+        return index >= 0 ? attachments[index] : null;
+    }
+
+    public static int ResolveAttachmentIndex(IReadOnlyList<MimeEntity> attachments, string attachmentId) {
         if (int.TryParse(attachmentId, out var index) && index >= 0 && index < attachments.Count) {
-            return attachments[index];
+            return index;
         }
 
-        return attachments.FirstOrDefault(attachment =>
-            string.Equals(GetAttachmentFileName(attachment), attachmentId, StringComparison.OrdinalIgnoreCase));
+        for (var attachmentIndex = 0; attachmentIndex < attachments.Count; attachmentIndex++) {
+            if (string.Equals(GetAttachmentFileName(attachments[attachmentIndex]), attachmentId,
+                StringComparison.OrdinalIgnoreCase)) {
+                return attachmentIndex;
+            }
+        }
+
+        return -1;
     }
 
     public static string ResolveDestinationPath(string requestedPath, MimeEntity attachment) =>
