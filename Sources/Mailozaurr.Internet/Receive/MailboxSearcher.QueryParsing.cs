@@ -120,6 +120,7 @@ public static partial class MailboxSearcher {
         public DateTime? Before { get; set; }
         public bool HasAttachment { get; set; }
         public List<SearchQuery> AdditionalQueries { get; } = new();
+        public List<string> MessageContainsTerms { get; } = new();
     }
 
     internal static ParsedQuery ParseQuery(string? query) {
@@ -147,14 +148,19 @@ public static partial class MailboxSearcher {
                 } else if (string.Equals(key, "body", StringComparison.OrdinalIgnoreCase)) {
                     result.BodyContains = value;
                 } else {
-                    result.AdditionalQueries.Add(SearchQuery.MessageContains(token));
+                    AddMessageContains(result, token);
                 }
             } else {
                 var text = Unquote(token);
-                result.AdditionalQueries.Add(SearchQuery.MessageContains(text));
+                AddMessageContains(result, text);
             }
         }
         return result;
+    }
+
+    private static void AddMessageContains(ParsedQuery result, string text) {
+        result.AdditionalQueries.Add(SearchQuery.MessageContains(text));
+        result.MessageContainsTerms.Add(text);
     }
 
     private static DateTime? NormalizeToUtc(DateTime? value) {

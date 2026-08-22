@@ -126,6 +126,7 @@ public static partial class MailboxSearcher {
         int maxResults = 0,
         CancellationToken cancellationToken = default,
         string? queryString = null) {
+        IReadOnlyList<string> messageContainsTerms = Array.Empty<string>();
         if (!string.IsNullOrWhiteSpace(queryString)) {
             try {
                 var parsed = ParseQuery(queryString);
@@ -137,6 +138,7 @@ public static partial class MailboxSearcher {
                 if (!before.HasValue) before = parsed.Before;
                 if (!priority.HasValue) priority = parsed.Priority;
                 hasAttachment |= parsed.HasAttachment;
+                messageContainsTerms = parsed.MessageContainsTerms;
             } catch (Exception ex) {
                 LoggingMessages.Logger.WriteWarning("Failed to parse POP3 query string: {0}", ex.Message);
             }
@@ -160,10 +162,31 @@ public static partial class MailboxSearcher {
             if (beforeUtc.HasValue && msgDate > beforeUtc.Value) continue;
             if (priority.HasValue && message.Priority != ConvertPriority(priority.Value)) continue;
             if (hasAttachment && !message.Attachments.Any()) continue;
+            if (messageContainsTerms.Any(term => !MessageContains(message, term))) continue;
             results.Add(new Pop3EmailMessage(i, message));
             if (maxResults > 0 && results.Count >= maxResults) break;
         }
         return results;
+    }
+
+    private static bool MessageContains(MimeMessage message, string text) {
+        if (message.Headers.Any(header =>
+                header.Value?.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)) {
+            return true;
+        }
+
+        foreach (var part in message.BodyParts) {
+            if (part.Headers.Any(header =>
+                    header.Value?.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0)) {
+                return true;
+            }
+            if (part is TextPart textPart &&
+                textPart.Text?.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
 

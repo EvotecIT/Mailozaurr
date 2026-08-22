@@ -20,6 +20,26 @@ public class MailboxSearcherBodyTests {
         Assert.Single(result);
     }
 
+    [Fact]
+    public async Task SearchPop3Async_UnqualifiedQueryFiltersHeaderAndBodyBeforeLimit() {
+        var unrelated = new MimeMessage { Subject = "Unrelated" };
+        unrelated.Body = new TextPart("plain") { Text = "Other content" };
+        var matching = new MimeMessage { Subject = "Invoice 42" };
+        matching.Body = new TextPart("plain") { Text = "Approved for payment" };
+        var alsoMatching = new MimeMessage { Subject = "Invoice 43" };
+        alsoMatching.Body = new TextPart("plain") { Text = "Approved for payment" };
+        var client = new FakePop3Client(new[] { unrelated, matching, alsoMatching });
+
+        var result = await MailboxSearcher.SearchPop3Async(
+            client,
+            maxResults: 1,
+            queryString: "Invoice approved");
+
+        var message = Assert.Single(result);
+        Assert.Equal(1, message.Index);
+        Assert.Equal("Invoice 42", message.Message.Subject);
+    }
+
     private sealed class FakePop3Client : Pop3Client {
         private readonly List<MimeMessage> _messages;
         public FakePop3Client(IEnumerable<MimeMessage> messages) => _messages = new List<MimeMessage>(messages);
