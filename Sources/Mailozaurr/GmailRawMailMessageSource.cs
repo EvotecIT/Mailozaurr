@@ -13,26 +13,43 @@ public sealed class GmailRawMailMessageSource : IRawMailMessageSource {
     public MailProfileKind Kind => MailProfileKind.Gmail;
 
     /// <inheritdoc />
-    public async Task<RawMailMessage?> GetRawMessageAsync(
+    public async Task<IRawMailMessageSession> OpenSessionAsync(
         MailProfile profile,
-        RawMailMessageRequest request,
         CancellationToken cancellationToken = default) {
-        using var session = await _sessionFactory.ConnectAsync(profile, cancellationToken).ConfigureAwait(false);
-        var userId = GmailMailReadHandler.ResolveUserId(profile, request.MailboxId);
-        GmailMessage message;
-        try {
-            message = await session.Client.GetRawBoundedAsync(
-                userId,
-                request.MessageId,
-                request.MaxBytes,
-                fields: RawFields,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
-        } catch (GmailApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound) {
-            return null;
+        var session = await _sessionFactory.ConnectAsync(profile, cancellationToken).ConfigureAwait(false);
+        return new Session(profile, session);
+    }
+
+    private sealed class Session : IRawMailMessageSession {
+        private readonly MailProfile _profile;
+        private readonly GmailSession _session;
+
+        internal Session(MailProfile profile, GmailSession session) {
+            _profile = profile;
+            _session = session;
         }
-        return new RawMailMessage {
-            MessageId = request.MessageId,
-            Content = RawMailMessageSourceUtilities.DecodeBase64Url(message.Raw ?? string.Empty, request.MaxBytes)
-        };
+
+        public async Task<RawMailMessage?> GetRawMessageAsync(
+            RawMailMessageRequest request,
+            CancellationToken cancellationToken = default) {
+            var userId = GmailMailReadHandler.ResolveUserId(_profile, request.MailboxId);
+            GmailMessage message;
+            try {
+                message = await _session.Client.GetRawBoundedAsync(
+                    userId,
+                    request.MessageId,
+                    request.MaxBytes,
+                    fields: RawFields,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+            } catch (GmailApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound) {
+                return null;
+            }
+            return new RawMailMessage {
+                MessageId = request.MessageId,
+                Content = RawMailMessageSourceUtilities.DecodeBase64Url(message.Raw ?? string.Empty, request.MaxBytes)
+            };
+        }
+
+        public void Dispose() => _session.Dispose();
     }
 }

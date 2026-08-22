@@ -42,6 +42,7 @@ public sealed class MailEmlExportService : IMailEmlExportService {
 
         var destinationDirectory = Path.GetFullPath(request.DestinationDirectory);
         Directory.CreateDirectory(destinationDirectory);
+        using var sourceSession = await source.OpenSessionAsync(profile, cancellationToken).ConfigureAwait(false);
         var result = new MailEmlExportResult {
             ProfileId = profile.Id,
             DestinationDirectory = destinationDirectory,
@@ -56,7 +57,7 @@ public sealed class MailEmlExportService : IMailEmlExportService {
             result.Results.Add(item);
 
             try {
-                var raw = await source.GetRawMessageAsync(profile, new RawMailMessageRequest {
+                var raw = await sourceSession.GetRawMessageAsync(new RawMailMessageRequest {
                     MailboxId = request.MailboxId,
                     FolderId = request.FolderId,
                     MessageId = messageId,
@@ -136,7 +137,8 @@ public sealed class MailEmlExportService : IMailEmlExportService {
                     ImapMailReadHandler.ResolveFolder(request.FolderId, profile));
                 break;
             case MailProfileKind.Graph:
-                mailbox = GraphMailReadHandler.ResolveUserId(profile, request.MailboxId);
+                mailbox = GraphMailReadHandler.CanonicalizeUserIdForStorage(
+                    GraphMailReadHandler.ResolveUserId(profile, request.MailboxId));
                 break;
             case MailProfileKind.Gmail:
                 mailbox = GmailMailReadHandler.ResolveUserId(profile, request.MailboxId);

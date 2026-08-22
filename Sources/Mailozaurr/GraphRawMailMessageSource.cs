@@ -12,22 +12,39 @@ public sealed class GraphRawMailMessageSource : IRawMailMessageSource {
     public MailProfileKind Kind => MailProfileKind.Graph;
 
     /// <inheritdoc />
-    public async Task<RawMailMessage?> GetRawMessageAsync(
+    public async Task<IRawMailMessageSession> OpenSessionAsync(
         MailProfile profile,
-        RawMailMessageRequest request,
         CancellationToken cancellationToken = default) {
-        using var session = await _sessionFactory.ConnectAsync(profile, cancellationToken).ConfigureAwait(false);
-        var userId = GraphMailReadHandler.ResolveUserId(profile, request.MailboxId);
-        byte[] content;
-        try {
-            content = await session.Client.GetMessageMimeAsync(
-                request.MessageId,
-                userId: userId,
-                maxBytes: checked((int)request.MaxBytes),
-                cancellationToken: cancellationToken).ConfigureAwait(false);
-        } catch (GraphApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound) {
-            return null;
+        var session = await _sessionFactory.ConnectAsync(profile, cancellationToken).ConfigureAwait(false);
+        return new Session(profile, session);
+    }
+
+    private sealed class Session : IRawMailMessageSession {
+        private readonly MailProfile _profile;
+        private readonly GraphSession _session;
+
+        internal Session(MailProfile profile, GraphSession session) {
+            _profile = profile;
+            _session = session;
         }
-        return new RawMailMessage { MessageId = request.MessageId, Content = content };
+
+        public async Task<RawMailMessage?> GetRawMessageAsync(
+            RawMailMessageRequest request,
+            CancellationToken cancellationToken = default) {
+            var userId = GraphMailReadHandler.ResolveUserId(_profile, request.MailboxId);
+            byte[] content;
+            try {
+                content = await _session.Client.GetMessageMimeAsync(
+                    request.MessageId,
+                    userId: userId,
+                    maxBytes: checked((int)request.MaxBytes),
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+            } catch (GraphApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound) {
+                return null;
+            }
+            return new RawMailMessage { MessageId = request.MessageId, Content = content };
+        }
+
+        public void Dispose() => _session.Dispose();
     }
 }

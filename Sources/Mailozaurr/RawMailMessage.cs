@@ -33,14 +33,21 @@ public sealed class RawMailMessageRequest {
     public long MaxBytes { get; set; }
 }
 
-/// <summary>Provider-specific source of raw RFC 822 message content.</summary>
+/// <summary>Reusable provider session for bounded RFC 822 message retrieval.</summary>
+public interface IRawMailMessageSession : IDisposable {
+    /// <summary>Gets one bounded provider message through the open session.</summary>
+    Task<RawMailMessage?> GetRawMessageAsync(
+        RawMailMessageRequest request,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>Provider-specific source of batch-scoped raw RFC 822 sessions.</summary>
 public interface IRawMailMessageSource {
     /// <summary>Profile kind handled by this source.</summary>
     MailProfileKind Kind { get; }
 
-    /// <summary>Gets one bounded provider message.</summary>
-    Task<RawMailMessage?> GetRawMessageAsync(
+    /// <summary>Opens one reusable provider session for a bounded export batch.</summary>
+    Task<IRawMailMessageSession> OpenSessionAsync(
         MailProfile profile,
-        RawMailMessageRequest request,
         CancellationToken cancellationToken = default);
 }

@@ -66,13 +66,13 @@ public sealed class MailEmlExportServiceTests {
         unrelated.Body = new TextPart("plain") { Text = new string('x', 4096) };
         var client = new BoundedPop3Client(new[] { requested, unrelated }, oversizedIndex: 1);
         var source = new Pop3RawMailMessageSource(new FixedPop3SessionFactory(client));
+        using var session = await source.OpenSessionAsync(
+            new MailProfile { Id = "pop", Kind = MailProfileKind.Pop3 });
 
-        var result = await source.GetRawMessageAsync(
-            new MailProfile { Id = "pop", Kind = MailProfileKind.Pop3 },
-            new RawMailMessageRequest {
-                MessageId = Pop3MailReadHandler.FormatMessageId(null, requested),
-                MaxBytes = 2048
-            });
+        var result = await session.GetRawMessageAsync(new RawMailMessageRequest {
+            MessageId = Pop3MailReadHandler.FormatMessageId(null, requested),
+            MaxBytes = 2048
+        });
 
         Assert.NotNull(result);
         Assert.Equal(new[] { 0 }, client.Downloads);
@@ -139,7 +139,7 @@ public sealed class MailEmlExportServiceTests {
     }
 
     [Fact]
-    public async Task BatchExportUsesDistinctDeterministicPathsAndOfficeImoEvidence() {
+    public async Task BatchExportUsesOneSessionWithDistinctDeterministicPathsAndOfficeImoEvidence() {
         var directory = CreateTemporaryDirectory();
         try {
             var profileStore = new InMemoryMailProfileStore();
@@ -167,6 +167,8 @@ public sealed class MailEmlExportServiceTests {
             Assert.Equal(2, result.RequestedCount);
             Assert.Equal(2, result.ExportedCount);
             Assert.Equal(0, result.FailedCount);
+            Assert.Equal(1, source.SessionCount);
+            Assert.Equal(1, source.DisposeCount);
             Assert.Equal(2, result.Results.Select(item => item.DestinationPath).Distinct(StringComparer.OrdinalIgnoreCase).Count());
             Assert.All(result.Results, item => {
                 Assert.True(item.Succeeded);
@@ -327,9 +329,10 @@ public sealed class MailEmlExportServiceTests {
     public async Task GraphRawSourceReturnsNullForProviderNotFound() {
         var source = new GraphRawMailMessageSource(
             new StatusGraphSessionFactory(System.Net.HttpStatusCode.NotFound));
+        using var session = await source.OpenSessionAsync(
+            new MailProfile { Id = "graph", Kind = MailProfileKind.Graph });
 
-        var result = await source.GetRawMessageAsync(
-            new MailProfile { Id = "graph", Kind = MailProfileKind.Graph },
+        var result = await session.GetRawMessageAsync(
             new RawMailMessageRequest { MessageId = "missing", MaxBytes = 1024 });
 
         Assert.Null(result);
@@ -339,12 +342,54 @@ public sealed class MailEmlExportServiceTests {
     public async Task GmailRawSourceReturnsNullForProviderNotFound() {
         var source = new GmailRawMailMessageSource(
             new StatusGmailSessionFactory(System.Net.HttpStatusCode.NotFound));
+        using var session = await source.OpenSessionAsync(
+            new MailProfile { Id = "gmail", Kind = MailProfileKind.Gmail });
 
-        var result = await source.GetRawMessageAsync(
-            new MailProfile { Id = "gmail", Kind = MailProfileKind.Gmail },
+        var result = await session.GetRawMessageAsync(
             new RawMailMessageRequest { MessageId = "missing", MaxBytes = 1024 });
 
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GraphMeAliasesUseOneDeterministicDestination() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profileStore = new InMemoryMailProfileStore();
+            await profileStore.SaveAsync(new MailProfile {
+                Id = "graph-mailbox",
+                DisplayName = "Graph mailbox",
+                Kind = MailProfileKind.Graph
+            });
+            var source = new FakeRawMailMessageSource(
+                new Dictionary<string, byte[]> {
+                    ["message"] = CreateMessage("message", "X-Test: value")
+                },
+                MailProfileKind.Graph);
+            var service = new MailEmlExportService(profileStore, new[] { source });
+
+            var first = await service.ExportAsync(new MailEmlExportRequest {
+                ProfileId = "graph-mailbox",
+                MailboxId = "ME",
+                MessageIds = { "message" },
+                DestinationDirectory = directory
+            });
+            var second = await service.ExportAsync(new MailEmlExportRequest {
+                ProfileId = "graph-mailbox",
+                MailboxId = "me",
+                MessageIds = { "message" },
+                DestinationDirectory = directory,
+                Overwrite = true
+            });
+
+            Assert.True(first.Succeeded);
+            Assert.True(second.Succeeded);
+            Assert.Equal(
+                Assert.Single(first.Results).DestinationPath,
+                Assert.Single(second.Results).DestinationPath);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     [Fact]
@@ -506,7 +551,7 @@ public sealed class MailEmlExportServiceTests {
         return directory;
     }
 
-    private sealed class FakeRawMailMessageSource : IRawMailMessageSource {
+    private sealed class FakeRawMailMessageSource : IRawMailMessageSource, IRawMailMessageSession {
         private readonly IReadOnlyDictionary<string, byte[]> _messages;
 
         internal FakeRawMailMessageSource(
@@ -520,14 +565,24 @@ public sealed class MailEmlExportServiceTests {
 
         public int RequestCount { get; private set; }
 
+        public int SessionCount { get; private set; }
+
+        public int DisposeCount { get; private set; }
+
         public string? StorageIdentityComponent { get; set; }
 
         public string? ThrowOperationCanceledForMessageId { get; set; }
 
         public CancellationTokenSource? CancelOnOperationCanceled { get; set; }
 
-        public Task<RawMailMessage?> GetRawMessageAsync(
+        public Task<IRawMailMessageSession> OpenSessionAsync(
             MailProfile profile,
+            CancellationToken cancellationToken = default) {
+            SessionCount++;
+            return Task.FromResult<IRawMailMessageSession>(this);
+        }
+
+        public Task<RawMailMessage?> GetRawMessageAsync(
             RawMailMessageRequest request,
             CancellationToken cancellationToken = default) {
             RequestCount++;
@@ -543,6 +598,8 @@ public sealed class MailEmlExportServiceTests {
                 }
                 : null);
         }
+
+        public void Dispose() => DisposeCount++;
     }
 
     private sealed class FixedPop3SessionFactory : IPop3SessionFactory {
