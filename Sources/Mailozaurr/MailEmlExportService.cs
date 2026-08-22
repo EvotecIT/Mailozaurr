@@ -141,7 +141,9 @@ public sealed class MailEmlExportService : IMailEmlExportService {
                     GraphMailReadHandler.ResolveUserId(profile, request.MailboxId));
                 break;
             case MailProfileKind.Gmail:
-                mailbox = GmailMailReadHandler.ResolveUserId(profile, request.MailboxId);
+                mailbox = GmailMailReadHandler.CanonicalizeUserIdForStorage(
+                    profile,
+                    GmailMailReadHandler.ResolveUserId(profile, request.MailboxId));
                 break;
             default:
                 mailbox = request.MailboxId?.Trim();

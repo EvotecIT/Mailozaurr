@@ -416,6 +416,48 @@ public sealed class MailEmlExportServiceTests {
     }
 
     [Fact]
+    public async Task GmailAuthenticatedMailboxAliasesUseOneDeterministicDestination() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profileStore = new InMemoryMailProfileStore();
+            await profileStore.SaveAsync(new MailProfile {
+                Id = "gmail-mailbox",
+                DisplayName = "Gmail mailbox",
+                Kind = MailProfileKind.Gmail,
+                DefaultMailbox = "owner@example.com"
+            });
+            var source = new FakeRawMailMessageSource(
+                new Dictionary<string, byte[]> {
+                    ["message"] = CreateMessage("message", "X-Test: value")
+                },
+                MailProfileKind.Gmail);
+            var service = new MailEmlExportService(profileStore, new[] { source });
+
+            var first = await service.ExportAsync(new MailEmlExportRequest {
+                ProfileId = "gmail-mailbox",
+                MailboxId = "me",
+                MessageIds = { "message" },
+                DestinationDirectory = directory
+            });
+            var second = await service.ExportAsync(new MailEmlExportRequest {
+                ProfileId = "gmail-mailbox",
+                MailboxId = "OWNER@example.com",
+                MessageIds = { "message" },
+                DestinationDirectory = directory,
+                Overwrite = true
+            });
+
+            Assert.True(first.Succeeded);
+            Assert.True(second.Succeeded);
+            Assert.Equal(
+                Assert.Single(first.Results).DestinationPath,
+                Assert.Single(second.Results).DestinationPath);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ProviderTimeoutIsReportedPerItemAndBatchContinues() {
         var directory = CreateTemporaryDirectory();
         try {

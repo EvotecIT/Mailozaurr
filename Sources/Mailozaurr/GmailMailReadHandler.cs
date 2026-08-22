@@ -286,6 +286,30 @@ public sealed class GmailMailReadHandler : IMailReadHandler {
         return "me";
     }
 
+    internal static string CanonicalizeUserIdForStorage(MailProfile profile, string userId) {
+        if (profile == null) throw new ArgumentNullException(nameof(profile));
+        if (string.IsNullOrWhiteSpace(userId)) throw new ArgumentException("Gmail user id is required.", nameof(userId));
+
+        var normalized = userId.Trim();
+        if (string.Equals(normalized, "me", StringComparison.OrdinalIgnoreCase) ||
+            IsConfiguredMailbox(profile, normalized)) {
+            return "me";
+        }
+
+        return normalized.ToLowerInvariant();
+    }
+
+    private static bool IsConfiguredMailbox(MailProfile profile, string userId) {
+        if (!string.IsNullOrWhiteSpace(profile.DefaultMailbox) &&
+            string.Equals(profile.DefaultMailbox!.Trim(), userId, StringComparison.OrdinalIgnoreCase)) {
+            return true;
+        }
+
+        return profile.Settings.TryGetValue(MailProfileSettingsKeys.Mailbox, out var mailbox) &&
+               !string.IsNullOrWhiteSpace(mailbox) &&
+               string.Equals(mailbox!.Trim(), userId, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static int GetMaxMimeBytes(MailProfile profile) {
         if (profile.Settings.TryGetValue(MailProfileSettingsKeys.MaxBodyBytes, out var raw) &&
             int.TryParse(raw, out var value) &&
