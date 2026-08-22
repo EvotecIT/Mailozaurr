@@ -118,23 +118,25 @@ public sealed partial class GmailMailboxBrowser {
         if (string.IsNullOrWhiteSpace(startHistoryId)) {
             throw new ArgumentException("startHistoryId is required.", nameof(startHistoryId));
         }
+        var resolvedLabelId = NormalizeOptional(await ResolveLabelIdAsync(folder, cancellationToken).ConfigureAwait(false));
+        if (resolvedLabelId == null) {
+            throw new InvalidOperationException("Unable to resolve Gmail folder/label.");
+        }
 
         var finalStates = new Dictionary<string, bool>(StringComparer.Ordinal);
         string? pageToken = null;
         string? newHistoryId = null;
-        string? resolvedLabelId = null;
         var seenPageTokens = new HashSet<string>(StringComparer.Ordinal);
         const int maxProviderPages = 25;
         var pagesRead = 0;
 
         do {
-            var page = await GetHistoryPageAsync(
-                folder,
+            var page = await GetHistoryPageForLabelIdAsync(
+                resolvedLabelId,
                 startHistoryId,
                 maxChanges,
                 pageToken,
                 cancellationToken).ConfigureAwait(false);
-            resolvedLabelId = page.ResolvedLabelId;
             newHistoryId = page.NewHistoryId ?? newHistoryId;
             foreach (var id in page.DeletedNativeIds) finalStates[id] = true;
             foreach (var id in page.UpsertNativeIds) finalStates[id] = false;
@@ -161,7 +163,7 @@ public sealed partial class GmailMailboxBrowser {
         deleteIds.Sort(StringComparer.Ordinal);
 
         return new GmailMailboxHistoryResult {
-            ResolvedLabelId = resolvedLabelId ?? string.Empty,
+            ResolvedLabelId = resolvedLabelId,
             NewHistoryId = newHistoryId,
             NextPageToken = pageToken,
             UpsertNativeIds = upsertIds,
@@ -185,6 +187,31 @@ public sealed partial class GmailMailboxBrowser {
         var resolvedLabelId = NormalizeOptional(await ResolveLabelIdAsync(folder, cancellationToken).ConfigureAwait(false));
         if (resolvedLabelId == null) {
             throw new InvalidOperationException("Unable to resolve Gmail folder/label.");
+        }
+
+        return await GetHistoryPageForLabelIdAsync(
+            resolvedLabelId,
+            startHistoryId,
+            pageSize,
+            pageToken,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gets exactly one Gmail history provider page for an already-resolved label id.
+    /// </summary>
+    public async Task<GmailMailboxHistoryResult> GetHistoryPageForLabelIdAsync(
+        string labelId,
+        string startHistoryId,
+        int pageSize,
+        string? pageToken = null,
+        CancellationToken cancellationToken = default) {
+        var resolvedLabelId = NormalizeOptional(labelId);
+        if (resolvedLabelId == null) {
+            throw new ArgumentException("labelId is required.", nameof(labelId));
+        }
+        if (string.IsNullOrWhiteSpace(startHistoryId)) {
+            throw new ArgumentException("startHistoryId is required.", nameof(startHistoryId));
         }
 
         var history = await _gmail.ListHistoryAsync(

@@ -206,6 +206,28 @@ public sealed class MailChangeFeedServiceTests {
     }
 
     [Fact]
+    public async Task GmailExpiredHistoryReturnsResolvedCustomLabelEvidence() {
+        var handler = new RecordingHandler(
+            Response(HttpStatusCode.OK, "{\"labels\":[{\"id\":\"Label_1\",\"name\":\"Project\"}]}"),
+            Response(HttpStatusCode.NotFound, "{\"error\":\"stale\"}"));
+        var service = await CreateAsync(
+            MailProfileKind.Gmail,
+            gmailFactory: new HttpGmailSessionFactory(handler));
+
+        var result = await service.GetChangesAsync(new MailChangeFeedRequest {
+            ProfileId = "profile",
+            FolderId = "Project",
+            Cursor = "100"
+        });
+
+        Assert.True(result.ResetRequired);
+        Assert.Equal("Label_1", result.FolderId);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Contains("/labels", handler.Requests[0].RequestUri!.AbsolutePath);
+        Assert.Contains("labelId=Label_1", handler.Requests[1].RequestUri!.Query);
+    }
+
+    [Fact]
     public async Task ProviderPageIsNeverTruncatedAfterCursorAdvances() {
         const string body = "{\"@odata.deltaLink\":\"https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages/delta?$deltatoken=next\",\"value\":[{\"id\":\"one\"},{\"id\":\"two\"}]}";
         var service = await CreateAsync(

@@ -209,9 +209,13 @@ public sealed class MailChangeFeedService : IMailChangeFeedService {
         using var session = await _gmailSessionFactory.ConnectAsync(
             WithMailbox(profile, request.MailboxId), cancellationToken).ConfigureAwait(false);
         var folder = GmailMailReadHandler.ResolveFolder(request.FolderId, profile);
+        var resolvedLabelId = await session.Browser.ResolveLabelIdAsync(folder, cancellationToken).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(resolvedLabelId)) {
+            throw new InvalidOperationException("Unable to resolve Gmail folder/label.");
+        }
         try {
-            var history = await session.Browser.GetHistoryPageAsync(
-                folder, cursor.StartHistoryId, max, cursor.PageToken, cancellationToken).ConfigureAwait(false);
+            var history = await session.Browser.GetHistoryPageForLabelIdAsync(
+                resolvedLabelId!, cursor.StartHistoryId, max, cursor.PageToken, cancellationToken).ConfigureAwait(false);
             var changes = history.UpsertNativeIds.Select(id => new MailChangeItem {
                 MessageId = id,
                 Kind = MailChangeKind.Upsert
@@ -241,7 +245,7 @@ public sealed class MailChangeFeedService : IMailChangeFeedService {
                 Changes = changes
             };
         } catch (GmailApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound) {
-            return ResetRequired(profile, folder, "durable-history");
+            return ResetRequired(profile, resolvedLabelId!, "durable-history");
         }
     }
 
