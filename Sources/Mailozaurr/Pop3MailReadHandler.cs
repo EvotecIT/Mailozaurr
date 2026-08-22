@@ -162,6 +162,7 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
             return OperationResult.Failure("attachment_not_found", $"Attachment '{request.AttachmentId}' was not found.");
         }
         var attachment = attachments[attachmentIndex];
+        var canonicalMessageId = CanonicalizeMessageIdForStorage(identifier, resolved.Snapshot);
 
         var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(
             request.DestinationPath,
@@ -170,7 +171,7 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
                 profile.Id,
                 profile.Kind.ToString(),
                 folderId,
-                request.MessageId,
+                canonicalMessageId,
                 attachmentIndex.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         if (File.Exists(destinationPath) && !request.Overwrite) {
             return OperationResult.Failure("destination_exists", $"Destination '{destinationPath}' already exists.");
@@ -188,6 +189,13 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
             ? $"hash:{ComputeMessageFingerprint(message)}:{occurrence.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
             : $"uid:{uid}";
     }
+
+    internal static string CanonicalizeMessageIdForStorage(
+        (string? Uid, string? Fingerprint, int Occurrence) identifier,
+        Pop3MailboxBrowser.Pop3ResolvedMessageSnapshot snapshot) =>
+        string.IsNullOrWhiteSpace(identifier.Fingerprint)
+            ? FormatMessageId(snapshot.Uid, snapshot.Message)
+            : FormatMessageId(null, snapshot.Message, identifier.Occurrence);
 
     internal static (string? Uid, string? Fingerprint, int Occurrence) ParseMessageId(string value) {
         if (string.IsNullOrWhiteSpace(value)) {

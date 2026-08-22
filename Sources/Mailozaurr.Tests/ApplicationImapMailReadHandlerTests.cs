@@ -4,6 +4,14 @@ using Mailozaurr;
 namespace Mailozaurr.Tests;
 
 public sealed class ApplicationImapMailReadHandlerTests {
+    [Theory]
+    [InlineData("INBOX")]
+    [InlineData("inbox")]
+    [InlineData("Inbox")]
+    public void ImapInboxAliasesUseOneCanonicalStorageIdentity(string fullName) {
+        Assert.Equal("INBOX", ImapMailReadHandler.CanonicalizeFolderForStorage(fullName));
+    }
+
     [Fact]
     public async Task HandlerUsesInjectedSearchDelegate() {
         var handler = new ImapMailReadHandler(

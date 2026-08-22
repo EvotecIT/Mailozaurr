@@ -202,6 +202,7 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
             return OperationResult.Failure("attachment_not_found", $"Attachment '{request.AttachmentId}' was not found.");
         }
         var attachment = attachments[attachmentIndex];
+        var canonicalFolder = CanonicalizeFolderForStorage(mailFolder.FullName);
 
         var destinationPath = MimeAttachmentStorage.ResolveDestinationPath(
             request.DestinationPath,
@@ -209,7 +210,7 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
             MimeAttachmentStorage.CreateStorageIdentity(
                 profile.Id,
                 profile.Kind.ToString(),
-                folder,
+                canonicalFolder,
                 request.MessageId,
                 attachmentIndex.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         if (File.Exists(destinationPath) && !request.Overwrite) {
@@ -244,7 +245,7 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
         }
     };
 
-    private static UniqueId ParseUid(string value) {
+    internal static UniqueId ParseUid(string value) {
         if (uint.TryParse(value, out var uid)) {
             return new UniqueId(uid);
         }
@@ -252,7 +253,12 @@ public sealed class ImapMailReadHandler : IMailReadHandler {
         throw new InvalidOperationException($"Message id '{value}' is not a valid IMAP UID.");
     }
 
-    private static string ResolveFolder(string? folderId, MailProfile profile) {
+    internal static string CanonicalizeFolderForStorage(string fullName) =>
+        string.Equals(fullName, "INBOX", StringComparison.OrdinalIgnoreCase)
+            ? "INBOX"
+            : fullName;
+
+    internal static string ResolveFolder(string? folderId, MailProfile profile) {
         if (!string.IsNullOrWhiteSpace(folderId)) {
             return folderId!.Trim();
         }
