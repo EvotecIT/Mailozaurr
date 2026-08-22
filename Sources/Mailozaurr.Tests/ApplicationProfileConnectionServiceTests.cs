@@ -221,6 +221,34 @@ public sealed class ApplicationProfileConnectionServiceTests {
     }
 
     [Fact]
+    public async Task DefaultGraphAuthProbeDoesNotCallMeForApplicationTokenWithoutMailbox() {
+        var profileStore = new InMemoryProfileStore(new[] {
+            new MailProfile {
+                Id = "graph-app",
+                DisplayName = "Graph application",
+                Kind = MailProfileKind.Graph
+            }
+        });
+        var handler = new RecordingHandler();
+        var service = new MailProfileConnectionService(
+            profileStore,
+            graphSessionFactory: new HttpGraphSessionFactory(handler, new OAuthCredential {
+                UserName = "app",
+                AccessToken = CreateJwt("{\"roles\":[\"Mail.Read\"]}"),
+                ExpiresOn = DateTimeOffset.MaxValue
+            }));
+
+        var result = await service.TestAsync("graph-app", MailProfileConnectionTestScope.Auth);
+
+        Assert.True(result.Succeeded);
+        var evidence = result.Stages[result.Stages.Count - 1].Evidence;
+        Assert.Equal(new[] { "Mail.Read" }, evidence?.Permissions?.ApplicationRoles);
+        Assert.Null(evidence?.Identity);
+        Assert.Contains("/me", evidence?.IdentityUnavailableReason);
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
     public async Task DefaultGraphSendPreflightFailsWhenDraftCreationPermissionIsMissing() {
         var handler = new RecordingHandler(
             JsonResponse("{\"error\":{\"code\":\"Authorization_RequestDenied\"}}", HttpStatusCode.Forbidden));

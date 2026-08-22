@@ -534,6 +534,13 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
         GraphSession session,
         MailProfileDiagnosticEvidence evidence,
         CancellationToken cancellationToken) {
+        if (string.Equals(session.UserId, "me", StringComparison.OrdinalIgnoreCase) &&
+            (evidence.Permissions?.ApplicationRoles.Count ?? 0) > 0) {
+            evidence.IdentityUnavailableReason =
+                "Microsoft Graph /me is unavailable to application tokens. Configure a mailbox to verify an application identity without using a delegated-only endpoint.";
+            return;
+        }
+
         try {
             var identity = await session.Client.GetMailboxIdentityWithoutRefreshAsync(session.UserId, cancellationToken)
                 .ConfigureAwait(false);
