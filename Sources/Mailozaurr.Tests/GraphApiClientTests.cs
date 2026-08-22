@@ -55,6 +55,25 @@ public class GraphApiClientTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task CreateSubscriptionAsync_RejectsMissingRemoteId() {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new System.Net.Http.StringContent("{\"resource\":\"me/messages\"}")
+        });
+        var client = new GraphApiClient(
+            new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GraphApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new HttpClient(handler) { BaseAddress = new System.Uri("https://graph.microsoft.com/v1.0/") });
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => client.CreateSubscriptionAsync(
+            new GraphApiClient.GraphCreateSubscriptionRequest {
+                Resource = "me/messages",
+                ChangeType = "created",
+                NotificationUrl = "https://example.com",
+                ExpirationDateTime = System.DateTimeOffset.UtcNow.AddHours(1)
+            }));
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task RenewSubscriptionAsync_EncodesSubscriptionId_UsesPatch() {
         var json = "{\"id\":\"a b\",\"resource\":\"me/messages\",\"changeType\":\"created\",\"notificationUrl\":\"https://example.com\",\"expirationDateTime\":\"2026-02-15T00:00:00Z\"}";
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new System.Net.Http.StringContent(json) });
@@ -66,6 +85,21 @@ public class GraphApiClientTests {
         Assert.Single(handler.Requests);
         Assert.Equal("PATCH", handler.Requests[0].Method.Method);
         Assert.Equal("https://graph.microsoft.com/v1.0/subscriptions/a%20b", handler.Requests[0].RequestUri!.AbsoluteUri);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task RenewSubscriptionAsync_RejectsMissingRemoteId() {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new System.Net.Http.StringContent("{\"resource\":\"me/messages\"}")
+        });
+        var client = new GraphApiClient(
+            new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });
+        var field = typeof(GraphApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        field.SetValue(client, new HttpClient(handler) { BaseAddress = new System.Uri("https://graph.microsoft.com/v1.0/") });
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => client.RenewSubscriptionAsync(
+            "sub-1",
+            System.DateTimeOffset.UtcNow.AddHours(1)));
     }
 
     [Fact]

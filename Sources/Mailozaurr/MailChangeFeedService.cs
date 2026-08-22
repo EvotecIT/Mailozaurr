@@ -302,11 +302,12 @@ public sealed class MailChangeFeedService : IMailChangeFeedService {
             WithMailbox(profile, request.MailboxId), cancellationToken).ConfigureAwait(false);
         var watch = await session.Browser.WatchAsync(
             request.TopicName!, request.FolderIds, cancellationToken).ConfigureAwait(false);
+        var cursor = NormalizeGmailResponseHistoryId(watch.HistoryId);
         return new MailChangeSubscriptionResult {
             ProfileId = profile.Id,
             Provider = profile.Kind,
             Succeeded = true,
-            Cursor = watch.HistoryId,
+            Cursor = cursor,
             Expiration = watch.ExpirationUtc.HasValue
                 ? new DateTimeOffset(DateTime.SpecifyKind(watch.ExpirationUtc.Value, DateTimeKind.Utc))
                 : null,

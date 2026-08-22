@@ -47,7 +47,8 @@ public static class MailCapabilityCatalog {
                 | MailCapability.SaveAttachments
                 | MailCapability.MarkMessages
                 | MailCapability.MoveMessages
-                | MailCapability.DeleteMessages,
+                | MailCapability.DeleteMessages
+                | MailCapability.WaitForMessages,
             MailProfileKind.Pop3 => MailCapability.ListFolders
                 | MailCapability.SearchMessages
                 | MailCapability.ReadMessages
@@ -59,7 +60,8 @@ public static class MailCapabilityCatalog {
                 | MailCapability.MarkMessages
                 | MailCapability.MoveMessages
                 | MailCapability.DeleteMessages
-                | MailCapability.SendMessages,
+                | MailCapability.SendMessages
+                | MailCapability.WaitForMessages,
             MailProfileKind.Gmail => MailCapability.ListFolders
                 | MailCapability.SearchMessages
                 | MailCapability.ReadMessages
@@ -67,7 +69,8 @@ public static class MailCapabilityCatalog {
                 | MailCapability.MarkMessages
                 | MailCapability.MoveMessages
                 | MailCapability.DeleteMessages
-                | MailCapability.SendMessages,
+                | MailCapability.SendMessages
+                | MailCapability.WaitForMessages,
             MailProfileKind.Smtp => MailCapability.SendMessages,
             MailProfileKind.SendGrid => MailCapability.SendMessages,
             MailProfileKind.Mailgun => MailCapability.SendMessages,

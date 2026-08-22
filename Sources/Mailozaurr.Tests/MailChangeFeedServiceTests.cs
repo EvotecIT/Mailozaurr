@@ -318,6 +318,22 @@ public sealed class MailChangeFeedServiceTests {
         Assert.Equal(new[] { "INBOX" }, result.FolderIds);
     }
 
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"historyId\":\" \"}")]
+    [InlineData("{\"historyId\":\"not-a-history-id\"}")]
+    public async Task GmailWatchRejectsMissingOrInvalidHistoryCursor(string watch) {
+        var handler = new RecordingHandler(Response(HttpStatusCode.OK, watch));
+        var service = await CreateAsync(
+            MailProfileKind.Gmail,
+            gmailFactory: new HttpGmailSessionFactory(handler));
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => service.SubscribeAsync(new MailChangeSubscriptionRequest {
+            ProfileId = "profile",
+            TopicName = "projects/test/topics/mail"
+        }));
+    }
+
     [Fact]
     public async Task ExplicitCapabilityOverrideCanDisableChangeFeeds() {
         var profile = new MailProfile {

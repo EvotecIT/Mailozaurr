@@ -59,6 +59,9 @@ public sealed partial class GraphApiClient {
         if (result is null) {
             throw new InvalidDataException("Graph returned an invalid subscription response.");
         }
+        if (string.IsNullOrWhiteSpace(result.Id)) {
+            throw new InvalidDataException("Graph subscription create response did not contain a subscription id.");
+        }
         return result;
     }
 
@@ -100,6 +103,9 @@ public sealed partial class GraphApiClient {
         }
         if (result is null) {
             throw new InvalidDataException("Graph returned an invalid subscription response.");
+        }
+        if (string.IsNullOrWhiteSpace(result.Id)) {
+            throw new InvalidDataException("Graph subscription renew response did not contain a subscription id.");
         }
         return result;
     }
