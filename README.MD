@@ -257,6 +257,8 @@ mailozaurr mail attachments --profile work-imap --folder Inbox --message-id 123 
 mailozaurr mail save-attachments --profile work-imap --folder Inbox --message-id 123 --path C:\Temp\Attachments --json
 ```
 
+When `--path` names a directory, saved files keep a readable prefix and add a deterministic SHA-256 identity suffix from the exact provider filename. This prevents distinct remote names from overwriting one another after path removal, character replacement, or case folding. An explicit file path is used unchanged.
+
 Draft, send, and queue mail:
 
 ```powershell

@@ -61,9 +61,9 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
     }
 
     /// <summary>
-    /// Creates the builder-owned connection-test service with POP3 support.
+    /// Creates a connection-test service with explicit POP3 support for direct library composition.
     /// </summary>
-    internal static MailProfileConnectionService CreateWithPop3(
+    public static MailProfileConnectionService CreateWithPop3(
         IMailProfileStore profileStore,
         IPop3SessionFactory pop3SessionFactory,
         IImapSessionFactory? imapSessionFactory,

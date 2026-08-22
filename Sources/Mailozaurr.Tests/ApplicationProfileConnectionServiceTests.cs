@@ -15,6 +15,15 @@ public sealed class ApplicationProfileConnectionServiceTests {
     }
 
     [Fact]
+    public void Pop3FactoryIsPublicForDirectLibraryComposition() {
+        var method = typeof(MailProfileConnectionService).GetMethod(
+            nameof(MailProfileConnectionService.CreateWithPop3));
+
+        Assert.NotNull(method);
+        Assert.True(method!.IsPublic);
+    }
+
+    [Fact]
     public async Task TestAsyncUsesMailboxScopeByDefaultForGmail() {
         var profileStore = new InMemoryProfileStore(new[] {
             new MailProfile {

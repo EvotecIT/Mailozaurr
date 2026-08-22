@@ -311,7 +311,10 @@ mailozaurr mail folders --profile work-imap --compact --json
 mailozaurr mail search --profile work-imap --folder Inbox --query Invoice --compact --json
 mailozaurr mail get --profile work-imap --folder Inbox --message-id 123 --compact --json
 mailozaurr mail attachments --profile work-imap --folder Inbox --message-id 123 --json
+mailozaurr mail save-attachments --profile work-imap --folder Inbox --message-id 123 --path C:\Temp\Attachments --json
 ```
+
+When `--path` names a directory, saved files keep a readable prefix and add a deterministic SHA-256 identity suffix from the exact provider filename. This prevents distinct remote names from overwriting one another after path removal, character replacement, or case folding. An explicit file path is used unchanged.
 
 ### Save drafts and queue sends
 
