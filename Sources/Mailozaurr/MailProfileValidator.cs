@@ -44,6 +44,14 @@ public static class MailProfileValidator {
             case MailProfileKind.Gmail:
                 RequireOneOf(profile, result, MailProfileSettingsKeys.Mailbox, "defaultMailbox");
                 break;
+            case MailProfileKind.Jmap:
+                RequireSetting(profile, MailProfileSettingsKeys.JmapSessionUrl, result);
+                if (profile.Settings.TryGetValue(MailProfileSettingsKeys.JmapSessionUrl, out var jmapSessionUrl) &&
+                    (!Uri.TryCreate(jmapSessionUrl, UriKind.Absolute, out var parsedJmapSessionUrl) ||
+                     !string.Equals(parsedJmapSessionUrl.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))) {
+                    result.Errors.Add($"Profile setting '{MailProfileSettingsKeys.JmapSessionUrl}' must be an absolute HTTPS URL.");
+                }
+                break;
         }
 
         if (profile.GetCapabilities().Supports(MailCapability.SendMessages) &&

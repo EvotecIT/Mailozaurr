@@ -127,7 +127,14 @@ public sealed class MailMcpToolsMetadataTests {
             nameof(MailMcpTools.mail_gmail_label_list),
             nameof(MailMcpTools.mail_gmail_label_get),
             nameof(MailMcpTools.mail_gmail_thread_list),
-            nameof(MailMcpTools.mail_gmail_thread_get));
+            nameof(MailMcpTools.mail_gmail_thread_get),
+            nameof(MailMcpTools.mail_jmap_session_get),
+            nameof(MailMcpTools.mail_jmap_mailbox_list),
+            nameof(MailMcpTools.mail_jmap_email_query),
+            nameof(MailMcpTools.mail_jmap_email_get),
+            nameof(MailMcpTools.mail_jmap_email_changes),
+            nameof(MailMcpTools.mail_jmap_thread_get),
+            nameof(MailMcpTools.mail_jmap_identity_list));
 
         Add(expected, readOnly: true, destructive: false, idempotent: false, openWorld: true,
             nameof(MailMcpTools.mail_changes_wait));

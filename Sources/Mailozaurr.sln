@@ -1,3 +1,4 @@
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.3.32804.467
@@ -25,6 +26,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mailozaurr.Gmail", "Mailozaurr.Gmail\Mailozaurr.Gmail.csproj", "{9F00E3ED-6869-48E2-9EF5-1C827380B6F9}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mailozaurr.Artifacts", "Mailozaurr.Artifacts\Mailozaurr.Artifacts.csproj", "{90799E07-B3DF-4564-944E-B0CC82685160}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mailozaurr.Jmap", "Mailozaurr.Jmap\Mailozaurr.Jmap.csproj", "{EA57234D-E099-4BD8-B27D-F2B001A16E52}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -144,11 +147,21 @@ Global
 		{90799E07-B3DF-4564-944E-B0CC82685160}.Release|x64.Build.0 = Release|Any CPU
 		{90799E07-B3DF-4564-944E-B0CC82685160}.Release|x86.ActiveCfg = Release|Any CPU
 		{90799E07-B3DF-4564-944E-B0CC82685160}.Release|x86.Build.0 = Release|Any CPU
+		{EA57234D-E099-4BD8-B27D-F2B001A16E52}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EA57234D-E099-4BD8-B27D-F2B001A16E52}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EA57234D-E099-4BD8-B27D-F2B001A16E52}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{EA57234D-E099-4BD8-B27D-F2B001A16E52}.Debug|x64.Build.0 = Debug|Any CPU
+		{EA57234D-E099-4BD8-B27D-F2B001A16E52}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{EA57234D-E099-4BD8-B27D-F2B001A16E52}.Debug|x86.Build.0 = Debug|Any CPU
+		{EA57234D-E099-4BD8-B27D-F2B001A16E52}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EA57234D-E099-4BD8-B27D-F2B001A16E52}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EA57234D-E099-4BD8-B27D-F2B001A16E52}.Release|x64.ActiveCfg = Release|Any CPU
+		{EA57234D-E099-4BD8-B27D-F2B001A16E52}.Release|x64.Build.0 = Release|Any CPU
+		{EA57234D-E099-4BD8-B27D-F2B001A16E52}.Release|x86.ActiveCfg = Release|Any CPU
+		{EA57234D-E099-4BD8-B27D-F2B001A16E52}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(NestedProjects) = preSolution
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F37BB785-3AB1-4498-8102-689C0E4C3924}

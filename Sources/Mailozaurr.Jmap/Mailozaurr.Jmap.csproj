@@ -3,23 +3,24 @@
     <Company>Evotec</Company>
     <Authors>Przemyslaw Klys</Authors>
     <VersionPrefix>3.0.0</VersionPrefix>
-    <AssemblyName>Mailozaurr</AssemblyName>
-    <PackageId>Mailozaurr</PackageId>
-    <Description>All Mailozaurr email transports, provider integrations, artifact interoperability, and reusable mail workflows for .NET.</Description>
-    <Copyright>(c) 2011 - 2026 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
     <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
+    <AssemblyName>Mailozaurr.Jmap</AssemblyName>
+    <PackageId>Mailozaurr.Jmap</PackageId>
+    <Description>RFC 8620 and RFC 8621 JMAP mail discovery, synchronization, and mailbox operations for .NET.</Description>
+    <Copyright>(c) 2011 - 2026 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
+    <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <IsPackable>true</IsPackable>
     <PackageIcon>Mailozaurr.png</PackageIcon>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/EvotecIT/Mailozaurr</PackageProjectUrl>
     <PackageReadmeFile>README.MD</PackageReadmeFile>
     <RepositoryUrl>https://github.com/EvotecIT/Mailozaurr</RepositoryUrl>
-    <PackageTags>Windows;MacOS;Linux;Mail;Email;SMTP;IMAP;POP3;Graph;Gmail;PST;OST;OLM;Mbox;EMLX;Maildir</PackageTags>
+    <PackageTags>Mail;Email;JMAP;RFC8620;RFC8621</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(TargetFramework)' == 'net8.0' ">
@@ -27,25 +28,26 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Mailozaurr.Internet\Mailozaurr.Internet.csproj" />
-    <ProjectReference Include="..\Mailozaurr.MicrosoftGraph\Mailozaurr.MicrosoftGraph.csproj" />
-    <ProjectReference Include="..\Mailozaurr.Gmail\Mailozaurr.Gmail.csproj" />
-    <ProjectReference Include="..\Mailozaurr.Jmap\Mailozaurr.Jmap.csproj" />
-    <ProjectReference Include="..\Mailozaurr.Artifacts\Mailozaurr.Artifacts.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-      <_Parameter1>Mailozaurr.Tests</_Parameter1>
-    </AssemblyAttribute>
+    <Compile Include="JmapJsonContext.cs" />
+    <Compile Include="..\Mailozaurr.Internet\Jmap\**\*.cs" Link="Jmap\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'netstandard2.0' ">
     <PackageReference Include="System.Text.Json" Version="10.0.11" />
   </ItemGroup>
 
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Include="..\..\Mailozaurr.png" Pack="true" PackagePath="\" />
     <None Include="..\..\README.MD" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Mailozaurr.Tests</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 </Project>

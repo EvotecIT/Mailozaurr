@@ -23,6 +23,7 @@ public sealed class MailApplication {
         IMailChangeFeedService changeFeeds,
         IGraphMailboxService graphMailbox,
         IGmailMailboxService gmailMailbox,
+        IJmapMailboxService jmapMailbox,
         IMailPermissionEvidenceService permissionEvidence,
         IMailMessageActionPreviewService messageActionPreview,
         IMailMessageActionPlanService messageActionPlans,
@@ -53,6 +54,7 @@ public sealed class MailApplication {
         ChangeFeeds = changeFeeds;
         GraphMailbox = graphMailbox;
         GmailMailbox = gmailMailbox;
+        JmapMailbox = jmapMailbox;
         PermissionEvidence = permissionEvidence;
         MessageActionPreview = messageActionPreview;
         MessageActionPlans = messageActionPlans;
@@ -120,6 +122,9 @@ public sealed class MailApplication {
 
     /// <summary>Gmail filters, labels, and threads service.</summary>
     public IGmailMailboxService GmailMailbox { get; }
+
+    /// <summary>JMAP session, mailbox, email, change, thread, and identity service.</summary>
+    public IJmapMailboxService JmapMailbox { get; }
 
     /// <summary>Truthful Graph/Gmail permission-evidence service.</summary>
     public IMailPermissionEvidenceService PermissionEvidence { get; }

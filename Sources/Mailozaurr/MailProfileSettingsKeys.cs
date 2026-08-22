@@ -90,4 +90,10 @@ public static class MailProfileSettingsKeys {
 
     /// <summary>Maximum message body size used when reading messages.</summary>
     public const string MaxBodyBytes = "maxBodyBytes";
+
+    /// <summary>Absolute HTTPS URL of the JMAP Session resource.</summary>
+    public const string JmapSessionUrl = "jmapSessionUrl";
+
+    /// <summary>Optional JMAP account identifier override.</summary>
+    public const string JmapAccountId = "jmapAccountId";
 }

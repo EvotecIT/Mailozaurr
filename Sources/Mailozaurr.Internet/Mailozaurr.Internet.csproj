@@ -31,7 +31,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Gmail\**\*.cs;MicrosoftGraph\**\*.cs;MailFiles\**\*.cs" />
+    <Compile Remove="Gmail\**\*.cs;Jmap\**\*.cs;MicrosoftGraph\**\*.cs;MailFiles\**\*.cs" />
     <Compile Remove="Enums\GraphEndpoint.cs;Enums\GraphImportance.cs;Enums\GraphMailboxRole.cs" />
     <Compile Remove="EmailGraphMessage.cs;GraphCredential.cs;GraphEmailMessage.cs;MicrosoftGraphUtils*.cs;NativeMailboxBrowserSessions.cs;MailozaurrOptions.cs" />
     <Compile Remove="Authentication\OAuthHelpers.cs;Authentication\TokenCacheHelper.cs" />

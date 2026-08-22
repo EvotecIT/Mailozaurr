@@ -30,4 +30,7 @@ public enum MailProfileKind {
 
     /// <summary>Amazon SES transport.</summary>
     Ses,
+
+    /// <summary>RFC 8620 and RFC 8621 JMAP mailbox access.</summary>
+    Jmap,
 }

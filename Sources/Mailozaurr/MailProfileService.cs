@@ -184,6 +184,11 @@ public sealed class MailProfileService : IMailProfileService {
                     result.Errors.Add("Gmail profiles need an access token or a refresh token with a client id and client secret.");
                 }
                 break;
+            case MailProfileKind.Jmap:
+                if (!await HasSecretAsync(profile.Id, MailSecretNames.AccessToken, cancellationToken).ConfigureAwait(false)) {
+                    result.Errors.Add("JMAP profiles need a bearer access token.");
+                }
+                break;
             case MailProfileKind.SendGrid:
             case MailProfileKind.Mailgun:
                 if (!await HasSecretAsync(profile.Id, MailSecretNames.ApiKey, cancellationToken).ConfigureAwait(false)) {

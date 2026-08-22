@@ -17,6 +17,7 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
     private readonly IPop3SessionFactory? _pop3SessionFactory;
     private readonly IGraphSessionFactory? _graphSessionFactory;
     private readonly IGmailSessionFactory? _gmailSessionFactory;
+    private readonly IJmapSessionFactory? _jmapSessionFactory;
     private readonly ISmtpSessionFactory? _smtpSessionFactory;
     private readonly Func<ImapClient, CancellationToken, Task<MailProfileDiagnosticEvidence?>> _probeImapAsync;
     private readonly Func<ImapClient, CancellationToken, Task<MailProfileDiagnosticEvidence?>> _probeImapMailboxAsync;
@@ -61,6 +62,7 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
             probeGmailAsync,
             probeGmailMailboxAsync,
             probeSmtpAsync,
+            jmapSessionFactory: null,
             initialize: true) {
     }
 
@@ -82,7 +84,8 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
         Func<GraphSession, CancellationToken, Task>? probeGraphMailboxAsync = null,
         Func<GmailSession, CancellationToken, Task>? probeGmailAsync = null,
         Func<GmailSession, CancellationToken, Task>? probeGmailMailboxAsync = null,
-        Func<Smtp, CancellationToken, Task>? probeSmtpAsync = null) =>
+        Func<Smtp, CancellationToken, Task>? probeSmtpAsync = null,
+        IJmapSessionFactory? jmapSessionFactory = null) =>
         new MailProfileConnectionService(
             profileStore,
             pop3SessionFactory ?? throw new ArgumentNullException(nameof(pop3SessionFactory)),
@@ -99,6 +102,7 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
             probeGmailAsync,
             probeGmailMailboxAsync,
             probeSmtpAsync,
+            jmapSessionFactory,
             initialize: true);
 
     private MailProfileConnectionService(
@@ -117,6 +121,7 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
         Func<GmailSession, CancellationToken, Task>? probeGmailAsync,
         Func<GmailSession, CancellationToken, Task>? probeGmailMailboxAsync,
         Func<Smtp, CancellationToken, Task>? probeSmtpAsync,
+        IJmapSessionFactory? jmapSessionFactory,
         bool initialize) {
         _ = initialize;
         _profileStore = profileStore ?? throw new ArgumentNullException(nameof(profileStore));
@@ -124,6 +129,7 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
         _imapSessionFactory = imapSessionFactory;
         _graphSessionFactory = graphSessionFactory;
         _gmailSessionFactory = gmailSessionFactory;
+        _jmapSessionFactory = jmapSessionFactory;
         _smtpSessionFactory = smtpSessionFactory;
         _probeImapAsync = probeImapAsync == null
             ? DefaultProbeImapAsync
@@ -187,6 +193,7 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
             MailProfileKind.Pop3 => await TestPop3Async(profile, scope, effectiveScope, stages, cancellationToken).ConfigureAwait(false),
             MailProfileKind.Graph => await TestGraphAsync(profile, scope, effectiveScope, stages, cancellationToken).ConfigureAwait(false),
             MailProfileKind.Gmail => await TestGmailAsync(profile, scope, effectiveScope, stages, cancellationToken).ConfigureAwait(false),
+            MailProfileKind.Jmap => await TestJmapAsync(profile, scope, effectiveScope, stages, cancellationToken).ConfigureAwait(false),
             MailProfileKind.Smtp => await TestSmtpAsync(profile, scope, effectiveScope, stages, cancellationToken).ConfigureAwait(false),
             _ => Unsupported(profile, scope, effectiveScope, stages)
         };
@@ -319,6 +326,68 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
             send ? "SMTP send preflight completed." : "SMTP session probe succeeded.",
             cancellationToken,
             sessionEvidenceResolver: CreateSmtpEvidence);
+    }
+
+    private Task<MailProfileConnectionTestResult> TestJmapAsync(
+        MailProfile profile,
+        MailProfileConnectionTestScope requestedScope,
+        MailProfileConnectionTestScope effectiveScope,
+        List<MailProfileConnectionTestStage> stages,
+        CancellationToken cancellationToken) {
+        if (_jmapSessionFactory == null) {
+            return Task.FromResult(Unsupported(profile, requestedScope, effectiveScope, stages, "JMAP connection testing is not configured."));
+        }
+
+        var mailbox = effectiveScope == MailProfileConnectionTestScope.Mailbox;
+        return ExecuteSessionAsync(
+            profile,
+            requestedScope,
+            effectiveScope,
+            stages,
+            token => _jmapSessionFactory.ConnectAsync(profile, token),
+            session => session.Dispose(),
+            (session, token) => ProbeJmapAsync(session, mailbox, token),
+            mailbox ? MailProfileConnectionTestPhase.Mailbox : MailProfileConnectionTestPhase.Probe,
+            mailbox ? "listMailboxes" : "discoverSession",
+            profile.Settings.TryGetValue(MailProfileSettingsKeys.JmapSessionUrl, out var url) ? url : null,
+            "JMAP client created.",
+            mailbox ? "JMAP mailbox and rights probe succeeded." : "JMAP Session resource probe succeeded.",
+            cancellationToken);
+    }
+
+    private static async Task<MailProfileDiagnosticEvidence?> ProbeJmapAsync(
+        JmapSession clientSession,
+        bool includeMailboxes,
+        CancellationToken cancellationToken) {
+        var session = await clientSession.Client.GetSessionAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        var accountId = clientSession.AccountId;
+        if (string.IsNullOrWhiteSpace(accountId)) session.PrimaryAccounts.TryGetValue(JmapCapabilities.Mail, out accountId);
+        session.Accounts.TryGetValue(accountId ?? string.Empty, out var account);
+        var permissionNames = account?.AccountCapabilities.Keys.OrderBy(value => value, StringComparer.Ordinal).ToList()
+            ?? new List<string>();
+        var evidence = new MailProfileDiagnosticEvidence {
+            Protocol = "JMAP",
+            Identity = new MailProfileIdentityEvidence {
+                Id = accountId,
+                EmailAddress = session.UserName,
+                DisplayName = account?.Name,
+                Source = "JMAP Session resource"
+            },
+            Permissions = new MailProfilePermissionEvidence {
+                Names = permissionNames,
+                Source = "JMAP accountCapabilities",
+                Authoritative = true,
+                Detail = "The JMAP Session resource authoritatively reported capabilities for the selected account; per-mailbox rights are reported separately."
+            }
+        };
+        if (includeMailboxes) {
+            var mailboxes = await clientSession.Client.ListMailboxesAsync(accountId, cancellationToken).ConfigureAwait(false);
+            evidence.Mailbox = new MailProfileMailboxEvidence {
+                FolderCount = mailboxes.Count,
+                MessageCount = mailboxes.Where(item => string.Equals(item.Role, "inbox", StringComparison.OrdinalIgnoreCase)).Select(item => (long?)item.TotalEmails).FirstOrDefault()
+            };
+        }
+        return evidence;
     }
 
     private static async Task<MailProfileConnectionTestResult> ExecuteSessionAsync<TSession>(
@@ -580,6 +649,7 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
                 MailProfileKind.Pop3 => MailProfileConnectionTestScope.Mailbox,
                 MailProfileKind.Graph => MailProfileConnectionTestScope.Mailbox,
                 MailProfileKind.Gmail => MailProfileConnectionTestScope.Mailbox,
+                MailProfileKind.Jmap => MailProfileConnectionTestScope.Mailbox,
                 MailProfileKind.Smtp => MailProfileConnectionTestScope.Send,
                 _ => MailProfileConnectionTestScope.Auth
             },
