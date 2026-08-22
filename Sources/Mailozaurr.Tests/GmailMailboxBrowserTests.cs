@@ -259,6 +259,20 @@ public sealed class GmailMailboxBrowserTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task WatchAsync_RejectsEveryUnresolvedFolderBeforeCreatingWatch() {
+        var labelsJson = "{\"labels\":[{\"id\":\"Label_1\",\"name\":\"Project\"}]}";
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(labelsJson) });
+        var browser = CreateBrowser(handler);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            browser.WatchAsync("projects/p/topics/t", new[] { "Missing" }));
+
+        Assert.Single(handler.Requests);
+        Assert.Contains("/labels", handler.Requests[0].RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task StopWatchAsync_ReturnsAlreadyStopped_WhenMissingAndConfigured() {
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.NotFound) { Content = new StringContent("{\"error\":\"missing\"}") });
         var browser = CreateBrowser(handler);
@@ -289,7 +303,7 @@ public sealed class GmailMailboxBrowserTests {
                           "\"messagesAdded\":[{\"message\":{\"id\":\"m1\"}},{\"message\":{\"id\":\"m2\"}}]," +
                           "\"messagesDeleted\":[{\"message\":{\"id\":\"m2\"}}]," +
                           "\"labelsAdded\":[{\"message\":{\"id\":\"m3\"}}]," +
-                          "\"labelsRemoved\":[{\"message\":{\"id\":\"m3\"}}]" +
+                          "\"labelsRemoved\":[{\"message\":{\"id\":\"m3\"},\"labelIds\":[\"INBOX\"]}]" +
                           "}" +
                           "]" +
                           "}";
@@ -312,6 +326,19 @@ public sealed class GmailMailboxBrowserTests {
         Assert.Contains("messageDeleted", query["historyTypes"]);
         Assert.Contains("labelAdded", query["historyTypes"]);
         Assert.Contains("labelRemoved", query["historyTypes"]);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetHistoryAsync_TreatsUnrelatedLabelRemovalAsUpsert() {
+        const string historyJson = "{\"historyId\":\"200\",\"history\":[{\"id\":\"10\",\"labelsRemoved\":[{\"message\":{\"id\":\"m1\"},\"labelIds\":[\"UNREAD\"]},{\"message\":{\"id\":\"m2\"},\"labelIds\":[\"INBOX\"]}]}]}";
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(historyJson) });
+        var browser = CreateBrowser(handler);
+
+        var result = await browser.GetHistoryAsync("INBOX", "5", maxChanges: 100);
+
+        Assert.Equal(new[] { "m1" }, result.UpsertNativeIds);
+        Assert.Equal(new[] { "m2" }, result.DeletedNativeIds);
     }
 
     [Fact]
@@ -345,6 +372,24 @@ public sealed class GmailMailboxBrowserTests {
         Assert.Equal(new[] { "m1", "m2" }, result.UpsertNativeIds);
         Assert.Equal("next", result.NextPageToken);
         Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task GetHistoryAsync_HonorsAggregateLimitAboveProviderPageSize() {
+        static string AddedMessages(int start, int count) => string.Join(",", Enumerable.Range(start, count)
+            .Select(index => "{\"message\":{\"id\":\"m" + index + "\"}}"));
+        var first = "{\"historyId\":\"200\",\"nextPageToken\":\"next\",\"history\":[{\"messagesAdded\":[" + AddedMessages(0, 500) + "]}]}";
+        var second = "{\"historyId\":\"201\",\"history\":[{\"messagesAdded\":[" + AddedMessages(500, 1) + "]}]}";
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(first) },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(second) });
+        var browser = CreateBrowser(handler);
+
+        var result = await browser.GetHistoryAsync("INBOX", "5", maxChanges: 1000);
+
+        Assert.Equal(501, result.UpsertNativeIds.Count);
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Null(result.NextPageToken);
     }
 
     [Fact]

@@ -158,13 +158,14 @@ public sealed class MailChangeFeedService : IMailChangeFeedService {
         var effectiveProfile = WithMailbox(profile, request.MailboxId);
         var folder = GraphMailReadHandler.ResolveFolder(request.FolderId, profile);
         var folderSelector = GraphMailboxBrowser.ResolveFolderSelector(folder);
-        var expectedUserId = GraphMailReadHandler.ResolveUserId(effectiveProfile);
-        var cursor = NormalizeGraphCursor(request.Cursor, expectedUserId, folderSelector, nameof(request));
         using var session = await _graphSessionFactory.ConnectAsync(
             effectiveProfile, cancellationToken).ConfigureAwait(false);
-        if (cursor != null) {
-            cursor = NormalizeGraphCursor(cursor, session.UserId, folderSelector, nameof(request));
-        }
+        var cursor = NormalizeGraphCursor(
+            request.Cursor,
+            session.Client.BaseAddress,
+            session.UserId,
+            folderSelector,
+            nameof(request));
         try {
             var delta = await new GraphMailboxBrowser(session.Client).DeltaMessagesForUserAsync(
                 folder, cursor, max, session.UserId, cancellationToken).ConfigureAwait(false);
@@ -177,7 +178,11 @@ public sealed class MailChangeFeedService : IMailChangeFeedService {
                 MessageId = id,
                 Kind = MailChangeKind.Delete
             })).ToList();
-            var nextCursor = NormalizeGraphResponseCursor(delta.Cursor, session.UserId, folderSelector);
+            var nextCursor = NormalizeGraphResponseCursor(
+                delta.Cursor,
+                session.Client.BaseAddress,
+                session.UserId,
+                folderSelector);
             return new MailChangeFeedResult {
                 ProfileId = profile.Id,
                 Provider = profile.Kind,
@@ -215,9 +220,17 @@ public sealed class MailChangeFeedService : IMailChangeFeedService {
                 Kind = MailChangeKind.Delete
             })).ToList();
             var responseHistoryId = NormalizeGmailResponseHistoryId(history.NewHistoryId);
+            var responsePageToken = string.IsNullOrWhiteSpace(history.NextPageToken)
+                ? null
+                : history.NextPageToken!.Trim();
+            if (cursor.PageToken != null &&
+                responsePageToken != null &&
+                string.Equals(cursor.PageToken, responsePageToken, StringComparison.Ordinal)) {
+                throw new InvalidDataException("Gmail history pagination returned the current page token again.");
+            }
             var nextCursor = string.IsNullOrWhiteSpace(history.NextPageToken)
                 ? responseHistoryId
-                : EncodeGmailCursor(cursor.StartHistoryId, history.NextPageToken!);
+                : EncodeGmailCursor(cursor.StartHistoryId, responsePageToken!);
             return new MailChangeFeedResult {
                 ProfileId = profile.Id,
                 Provider = profile.Kind,
@@ -303,8 +316,13 @@ public sealed class MailChangeFeedService : IMailChangeFeedService {
 
     private async Task<MailProfile> GetProfileAsync(string profileId, CancellationToken cancellationToken) {
         if (string.IsNullOrWhiteSpace(profileId)) throw new ArgumentException("Profile id is required.", nameof(profileId));
-        return await _profileStore.GetByIdAsync(profileId.Trim(), cancellationToken).ConfigureAwait(false)
+        var profile = await _profileStore.GetByIdAsync(profileId.Trim(), cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException($"Profile '{profileId}' was not found.");
+        if (profile.Capabilities != null &&
+            !profile.Capabilities.Supports(MailCapability.WaitForMessages)) {
+            throw new NotSupportedException($"Profile '{profile.Id}' does not allow mailbox change feeds.");
+        }
+        return profile;
     }
 
     private static int ClampMax(int max) {
@@ -314,28 +332,35 @@ public sealed class MailChangeFeedService : IMailChangeFeedService {
 
     private static string? NormalizeGraphCursor(
         string? cursor,
+        Uri baseAddress,
         string userId,
         string folderSelector,
         string parameterName) {
         if (string.IsNullOrWhiteSpace(cursor)) return null;
         if (!Uri.TryCreate(cursor!.Trim(), UriKind.Absolute, out var uri) ||
             !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(uri.Host, "graph.microsoft.com", StringComparison.OrdinalIgnoreCase) ||
-            !uri.IsDefaultPort ||
+            !string.Equals(uri.Scheme, baseAddress.Scheme, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(uri.IdnHost, baseAddress.IdnHost, StringComparison.OrdinalIgnoreCase) ||
+            uri.Port != baseAddress.Port ||
             !string.IsNullOrEmpty(uri.UserInfo) ||
             !string.IsNullOrEmpty(uri.Fragment) ||
-            !IsExpectedGraphDeltaPath(uri, userId, folderSelector)) {
+            !IsExpectedGraphDeltaPath(uri, baseAddress, userId, folderSelector)) {
             throw new ArgumentException(
-                "A Graph cursor must be an HTTPS Microsoft Graph v1.0 delta URL for the requested mailbox and folder.",
+                "A Graph cursor must be an HTTPS delta URL on the configured Graph endpoint for the requested mailbox and folder.",
                 parameterName);
         }
         return uri.AbsoluteUri;
     }
 
-    private static bool IsExpectedGraphDeltaPath(Uri uri, string userId, string folderSelector) {
+    private static bool IsExpectedGraphDeltaPath(Uri uri, Uri baseAddress, string userId, string folderSelector) {
         string[] segments;
+        string[] baseSegments;
         try {
             segments = uri.AbsolutePath
+                .Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(Uri.UnescapeDataString)
+                .ToArray();
+            baseSegments = baseAddress.AbsolutePath
                 .Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(Uri.UnescapeDataString)
                 .ToArray();
@@ -343,25 +368,30 @@ public sealed class MailChangeFeedService : IMailChangeFeedService {
             return false;
         }
 
+        if (segments.Length < baseSegments.Length ||
+            !baseSegments.Select((segment, index) =>
+                string.Equals(segment, segments[index], StringComparison.OrdinalIgnoreCase)).All(matches => matches)) {
+            return false;
+        }
+        segments = segments.Skip(baseSegments.Length).ToArray();
+
         var normalizedUser = string.IsNullOrWhiteSpace(userId) ? "me" : userId.Trim();
         if (string.Equals(normalizedUser, "me", StringComparison.OrdinalIgnoreCase)) {
-            return segments.Length == 6 &&
-                   string.Equals(segments[0], "v1.0", StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(segments[1], "me", StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(segments[2], "mailFolders", StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(segments[3], folderSelector, StringComparison.Ordinal) &&
-                   string.Equals(segments[4], "messages", StringComparison.OrdinalIgnoreCase) &&
-                   string.Equals(segments[5], "delta", StringComparison.OrdinalIgnoreCase);
+            return segments.Length == 5 &&
+                   string.Equals(segments[0], "me", StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(segments[1], "mailFolders", StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(segments[2], folderSelector, StringComparison.Ordinal) &&
+                   string.Equals(segments[3], "messages", StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(segments[4], "delta", StringComparison.OrdinalIgnoreCase);
         }
 
-        return segments.Length == 7 &&
-               string.Equals(segments[0], "v1.0", StringComparison.OrdinalIgnoreCase) &&
-               string.Equals(segments[1], "users", StringComparison.OrdinalIgnoreCase) &&
-               string.Equals(segments[2], normalizedUser, StringComparison.Ordinal) &&
-               string.Equals(segments[3], "mailFolders", StringComparison.OrdinalIgnoreCase) &&
-               string.Equals(segments[4], folderSelector, StringComparison.Ordinal) &&
-               string.Equals(segments[5], "messages", StringComparison.OrdinalIgnoreCase) &&
-               string.Equals(segments[6], "delta", StringComparison.OrdinalIgnoreCase);
+        return segments.Length == 6 &&
+               string.Equals(segments[0], "users", StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(segments[1], normalizedUser, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(segments[2], "mailFolders", StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(segments[3], folderSelector, StringComparison.Ordinal) &&
+               string.Equals(segments[4], "messages", StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(segments[5], "delta", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string NormalizeGmailCursor(string cursor, string parameterName) {
@@ -420,9 +450,13 @@ public sealed class MailChangeFeedService : IMailChangeFeedService {
         return Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
     }
 
-    private static string NormalizeGraphResponseCursor(string? cursor, string userId, string folderSelector) {
+    private static string NormalizeGraphResponseCursor(
+        string? cursor,
+        Uri baseAddress,
+        string userId,
+        string folderSelector) {
         try {
-            return NormalizeGraphCursor(cursor, userId, folderSelector, "Graph response")
+            return NormalizeGraphCursor(cursor, baseAddress, userId, folderSelector, "Graph response")
                    ?? throw new InvalidDataException("Graph delta response did not contain a continuation cursor.");
         } catch (ArgumentException ex) {
             throw new InvalidDataException("Graph delta response contained an invalid continuation cursor.", ex);

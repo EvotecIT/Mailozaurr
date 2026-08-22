@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -62,8 +63,10 @@ public sealed partial class GraphApiClient {
             throw new GraphApiException(resp.StatusCode, $"Graph delta failed ({(int)resp.StatusCode}).", body, TryGetRetryAfter(resp));
         }
 
-        var upserts = new List<GraphMailMessage>();
-        var deletedIds = new List<string>();
+        var orderedIds = new List<string>();
+        var seenIds = new HashSet<string>(StringComparer.Ordinal);
+        var upsertsById = new Dictionary<string, GraphMailMessage>(StringComparer.Ordinal);
+        var deletedIds = new HashSet<string>(StringComparer.Ordinal);
         string? nextLink = null;
         string? deltaLink = null;
 
@@ -84,19 +87,29 @@ public sealed partial class GraphApiClient {
                     if (trimmedId.Length == 0) {
                         continue;
                     }
+                    if (seenIds.Add(trimmedId)) {
+                        orderedIds.Add(trimmedId);
+                    }
                     if (item.TryGetProperty("@removed", out _)) {
+                        upsertsById.Remove(trimmedId);
                         deletedIds.Add(trimmedId);
                         continue;
                     }
                     var msg = TryParseMailMessage(item);
                     if (msg != null) {
-                        upserts.Add(msg);
+                        deletedIds.Remove(trimmedId);
+                        upsertsById[trimmedId] = msg;
                     }
                 }
             }
         }
 
-        return new GraphDeltaPage<GraphMailMessage>(upserts, nextLink, deltaLink, deletedIds);
+        var upserts = orderedIds
+            .Where(id => upsertsById.ContainsKey(id))
+            .Select(id => upsertsById[id])
+            .ToList();
+        var finalDeletedIds = orderedIds.Where(deletedIds.Contains).ToList();
+        return new GraphDeltaPage<GraphMailMessage>(upserts, nextLink, deltaLink, finalDeletedIds);
     }
 
     /// <summary>

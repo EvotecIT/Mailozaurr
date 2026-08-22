@@ -53,13 +53,14 @@ public sealed partial class GmailMailboxBrowser {
         var labelIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var raw in folderInput) {
             if (string.IsNullOrWhiteSpace(raw)) {
-                continue;
+                throw new ArgumentException("Gmail watch folder selectors must not be empty.", nameof(folders));
             }
             var labelId = await ResolveWatchLabelIdAsync(raw, cancellationToken).ConfigureAwait(false);
             var normalizedLabelId = NormalizeOptional(labelId);
-            if (normalizedLabelId != null) {
-                labelIds.Add(normalizedLabelId);
+            if (normalizedLabelId == null) {
+                throw new ArgumentException($"Gmail watch folder '{raw.Trim()}' could not be resolved.", nameof(folders));
             }
+            labelIds.Add(normalizedLabelId);
         }
 
         var watch = await _gmail.WatchAsync(
@@ -149,7 +150,7 @@ public sealed partial class GmailMailboxBrowser {
             // Empty pages may be followed by changes, but the legacy helper is
             // still bounded so a hostile or enormous backlog cannot drain
             // indefinitely. Callers can resume from NextPageToken.
-            if (finalStates.Count >= ClampInt(maxChanges, 1, 500) || pagesRead >= maxProviderPages) {
+            if (finalStates.Count >= ClampInt(maxChanges, 1, 2000) || pagesRead >= maxProviderPages) {
                 break;
             }
         } while (pageToken != null);
@@ -203,9 +204,10 @@ public sealed partial class GmailMailboxBrowser {
                 AddHistoryRefs(entry.LabelsAdded, entryUpserts);
                 foreach (var id in entryUpserts) finalStates[id] = false;
 
+                ApplyLabelRemovedHistoryRefs(entry.LabelsRemoved, resolvedLabelId, finalStates);
+
                 var entryDeletes = new HashSet<string>(StringComparer.Ordinal);
                 AddHistoryRefs(entry.MessagesDeleted, entryDeletes);
-                AddHistoryRefs(entry.LabelsRemoved, entryDeletes);
                 foreach (var id in entryDeletes) finalStates[id] = true;
             }
         }

@@ -177,6 +177,25 @@ public sealed partial class GmailMailboxBrowser {
         }
     }
 
+    private static void ApplyLabelRemovedHistoryRefs(
+        IReadOnlyCollection<GmailApiClient.GmailHistoryLabelRemoved>? refs,
+        string resolvedLabelId,
+        Dictionary<string, bool> finalStates) {
+        if (refs == null || refs.Count == 0) {
+            return;
+        }
+
+        foreach (var entry in refs) {
+            var id = NormalizeOptional(entry?.Message?.Id);
+            if (id == null) {
+                continue;
+            }
+            var selectedFolderWasRemoved = entry!.LabelIds?.Any(labelId =>
+                string.Equals(NormalizeOptional(labelId), resolvedLabelId, StringComparison.OrdinalIgnoreCase)) == true;
+            finalStates[id] = selectedFolderWasRemoved;
+        }
+    }
+
     private async Task<GmailMailboxMessageSummary?> TryGetMessageSummaryAsync(string messageId, CancellationToken cancellationToken) {
         try {
             return await GetMessageSummaryAsync(messageId, cancellationToken).ConfigureAwait(false);

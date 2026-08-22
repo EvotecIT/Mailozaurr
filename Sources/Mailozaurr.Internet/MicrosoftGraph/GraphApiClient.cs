@@ -27,6 +27,9 @@ public sealed partial class GraphApiClient : IDisposable {
     private readonly bool _disposeClient;
     private bool _disposed;
 
+    /// <summary>Configured Microsoft Graph API base address.</summary>
+    public Uri BaseAddress => _client.BaseAddress ?? new Uri("https://graph.microsoft.com/v1.0/");
+
     private void ThrowIfDisposed() {
         if (_disposed) {
             throw new ObjectDisposedException(nameof(GraphApiClient));

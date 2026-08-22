@@ -36,6 +36,44 @@ public sealed class MailChangeFeedServiceTests {
     }
 
     [Fact]
+    public async Task GraphDeltaKeepsOnlyEachMessagesFinalProviderState() {
+        const string body = "{\"@odata.deltaLink\":\"https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages/delta?$deltatoken=next\",\"value\":[{\"id\":\"restored\",\"@removed\":{}},{\"id\":\"restored\",\"subject\":\"latest\"},{\"id\":\"deleted\",\"subject\":\"old\"},{\"id\":\"deleted\",\"@removed\":{}}]}";
+        var service = await CreateAsync(
+            MailProfileKind.Graph,
+            new HttpGraphSessionFactory(new RecordingHandler(Response(HttpStatusCode.OK, body))));
+
+        var result = await service.GetChangesAsync(new MailChangeFeedRequest {
+            ProfileId = "profile",
+            FolderId = "INBOX"
+        });
+
+        Assert.Contains(result.Changes, item => item.MessageId == "restored" && item.Kind == MailChangeKind.Upsert);
+        Assert.Contains(result.Changes, item => item.MessageId == "deleted" && item.Kind == MailChangeKind.Delete);
+        Assert.Equal(1, result.Changes.Count(item => item.MessageId == "restored"));
+        Assert.Equal(1, result.Changes.Count(item => item.MessageId == "deleted"));
+    }
+
+    [Fact]
+    public async Task GraphCursorUsesConfiguredSovereignEndpointBoundary() {
+        const string cursor = "https://graph.microsoft.us/v1.0/me/mailFolders/inbox/messages/delta?$deltatoken=next";
+        var handler = new RecordingHandler(Response(
+            HttpStatusCode.OK,
+            "{\"@odata.deltaLink\":\"" + cursor + "\",\"value\":[]}"));
+        var service = await CreateAsync(
+            MailProfileKind.Graph,
+            new HttpGraphSessionFactory(handler, new Uri("https://graph.microsoft.us/v1.0/")));
+
+        var result = await service.GetChangesAsync(new MailChangeFeedRequest {
+            ProfileId = "profile",
+            FolderId = "INBOX",
+            Cursor = cursor
+        });
+
+        Assert.Equal(cursor, result.NextCursor);
+        Assert.Equal(cursor, handler.Requests[0].RequestUri!.AbsoluteUri);
+    }
+
+    [Fact]
     public async Task GraphGoneReturnsResetEvidence() {
         var service = await CreateAsync(
             MailProfileKind.Graph,
@@ -60,12 +98,14 @@ public sealed class MailChangeFeedServiceTests {
     [InlineData("https://graph.microsoft.com/v1.0/users/other/mailFolders/inbox/messages/delta?$deltatoken=x")]
     [InlineData("https://graph.microsoft.com/v1.0/me/mailFolders/archive/messages/delta?$deltatoken=x")]
     public async Task GraphCursorRejectsNonGraphDestinations(string cursor) {
-        var service = await CreateAsync(MailProfileKind.Graph);
+        var handler = new RecordingHandler();
+        var service = await CreateAsync(MailProfileKind.Graph, new HttpGraphSessionFactory(handler));
 
         await Assert.ThrowsAsync<ArgumentException>(() => service.GetChangesAsync(new MailChangeFeedRequest {
             ProfileId = "profile",
             Cursor = cursor
         }));
+        Assert.Empty(handler.Requests);
     }
 
     [Fact]
@@ -119,6 +159,28 @@ public sealed class MailChangeFeedServiceTests {
         Assert.Equal(2, handler.Requests.Count);
         Assert.Contains("startHistoryId=100", handler.Requests[1].RequestUri!.Query);
         Assert.Contains("pageToken=page-2", handler.Requests[1].RequestUri!.Query);
+    }
+
+    [Fact]
+    public async Task GmailHistoryRejectsRepeatedContinuationToken() {
+        const string first = "{\"historyId\":\"200\",\"nextPageToken\":\"page-2\",\"history\":[]}";
+        const string replayed = "{\"historyId\":\"200\",\"nextPageToken\":\"page-2\",\"history\":[{\"messagesAdded\":[{\"message\":{\"id\":\"up-1\"}}]}]}";
+        var handler = new RecordingHandler(
+            Response(HttpStatusCode.OK, first),
+            Response(HttpStatusCode.OK, replayed));
+        var service = await CreateAsync(
+            MailProfileKind.Gmail,
+            gmailFactory: new HttpGmailSessionFactory(handler));
+
+        var firstResult = await service.GetChangesAsync(new MailChangeFeedRequest {
+            ProfileId = "profile",
+            Cursor = "100"
+        });
+
+        await Assert.ThrowsAsync<InvalidDataException>(() => service.GetChangesAsync(new MailChangeFeedRequest {
+            ProfileId = "profile",
+            Cursor = firstResult.NextCursor
+        }));
     }
 
     [Fact]
@@ -257,6 +319,23 @@ public sealed class MailChangeFeedServiceTests {
     }
 
     [Fact]
+    public async Task ExplicitCapabilityOverrideCanDisableChangeFeeds() {
+        var profile = new MailProfile {
+            Id = "profile",
+            DisplayName = "Profile",
+            Kind = MailProfileKind.Gmail,
+            DefaultMailbox = "me",
+            Capabilities = new ProfileCapabilities(MailProfileKind.Gmail, MailCapability.ReadMessages)
+        };
+        var service = await CreateAsync(MailProfileKind.Gmail, profile: profile);
+
+        await Assert.ThrowsAsync<NotSupportedException>(() => service.GetChangesAsync(new MailChangeFeedRequest {
+            ProfileId = "profile",
+            Cursor = "100"
+        }));
+    }
+
+    [Fact]
     public async Task Pop3ChangeFeedsAreReportedAsUnsupported() {
         var service = await CreateAsync(MailProfileKind.Pop3);
 
@@ -289,12 +368,16 @@ public sealed class MailChangeFeedServiceTests {
 
     private sealed class HttpGraphSessionFactory : IGraphSessionFactory {
         private readonly HttpMessageHandler _handler;
+        private readonly Uri _baseAddress;
 
-        public HttpGraphSessionFactory(HttpMessageHandler handler) => _handler = handler;
+        public HttpGraphSessionFactory(HttpMessageHandler handler, Uri? baseAddress = null) {
+            _handler = handler;
+            _baseAddress = baseAddress ?? new Uri("https://graph.microsoft.com/v1.0/");
+        }
 
         public Task<GraphSession> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) {
             var userId = ResolveUserId(profile);
-            var client = new HttpClient(_handler) { BaseAddress = new Uri("https://graph.microsoft.com/v1.0/") };
+            var client = new HttpClient(_handler) { BaseAddress = _baseAddress };
             var api = new GraphApiClient(client, credential: new OAuthCredential {
                 UserName = userId,
                 AccessToken = "token",
