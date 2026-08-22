@@ -324,7 +324,7 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
         }
     }
 
-    private static async Task<Pop3MailboxBrowser.Pop3MessageResolveResult> ResolveMessageAsync(
+    internal static async Task<Pop3MailboxBrowser.Pop3MessageResolveResult> ResolveMessageAsync(
         Pop3Client client,
         (string? Uid, string? Fingerprint, int Occurrence) identifier,
         CancellationToken cancellationToken) {

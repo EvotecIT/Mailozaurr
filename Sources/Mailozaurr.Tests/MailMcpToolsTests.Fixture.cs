@@ -20,6 +20,7 @@ public sealed partial class MailMcpToolsTests {
             });
             SecretStore = new InMemorySecretStore();
             ReadService = new FakeReadService();
+            EmlExportService = new FakeEmlExportService();
             SendService = new FakeSendService();
             MessageActionService = new FakeMessageActionService();
             PlanExchangeService = new FakeMessageActionPlanExchangeService();
@@ -35,6 +36,7 @@ public sealed partial class MailMcpToolsTests {
                 .UseProfileAuthService(ProfileAuthService)
                 .UseProfileConnectionService(ProfileConnectionService)
                 .UseReadService(ReadService)
+                .UseEmlExportService(EmlExportService)
                 .UseMessageActionService(MessageActionService)
                 .UseMessageActionPlanExchangeService(PlanExchangeService)
                 .UseMessageActionPlanRegistryService(PlanRegistryService)
@@ -54,6 +56,8 @@ public sealed partial class MailMcpToolsTests {
         public InMemorySecretStore SecretStore { get; }
 
         public FakeReadService ReadService { get; }
+
+        public FakeEmlExportService EmlExportService { get; }
 
         public FakeSendService SendService { get; }
 
@@ -75,6 +79,24 @@ public sealed partial class MailMcpToolsTests {
             if (Directory.Exists(_tempDirectory)) {
                 Directory.Delete(_tempDirectory, recursive: true);
             }
+        }
+    }
+
+    private sealed class FakeEmlExportService : IMailEmlExportService {
+        public MailEmlExportRequest? LastRequest { get; private set; }
+
+        public Task<MailEmlExportResult> ExportAsync(
+            MailEmlExportRequest request,
+            CancellationToken cancellationToken = default) {
+            LastRequest = request;
+            return Task.FromResult(new MailEmlExportResult {
+                Succeeded = true,
+                ProfileId = request.ProfileId,
+                DestinationDirectory = request.DestinationDirectory,
+                RequestedCount = request.MessageIds.Count,
+                ExportedCount = request.MessageIds.Count,
+                Message = $"Exported {request.MessageIds.Count} EML message(s)."
+            });
         }
     }
 }

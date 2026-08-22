@@ -153,6 +153,7 @@ public sealed class MailMcpToolsMetadataTests {
             nameof(MailMcpTools.mail_attachment_save),
             nameof(MailMcpTools.mail_attachments_save),
             nameof(MailMcpTools.mail_attachments_save_many),
+            nameof(MailMcpTools.mail_export_eml),
             nameof(MailMcpTools.mail_action_batch_store_create_common),
             nameof(MailMcpTools.mail_action_batch_store_replace_plan),
             nameof(MailMcpTools.mail_action_batch_store_execute),

@@ -272,7 +272,7 @@ public sealed class GmailMailReadHandler : IMailReadHandler {
         return "INBOX";
     }
 
-    private static string ResolveUserId(MailProfile profile, string? mailboxOverride = null) {
+    internal static string ResolveUserId(MailProfile profile, string? mailboxOverride = null) {
         if (!string.IsNullOrWhiteSpace(mailboxOverride)) {
             return mailboxOverride!.Trim();
         }

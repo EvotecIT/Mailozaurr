@@ -357,7 +357,7 @@ public sealed class GraphMailReadHandler : IMailReadHandler {
         return "inbox";
     }
 
-    private static string ResolveUserId(MailProfile profile, string? mailboxOverride = null) {
+    internal static string ResolveUserId(MailProfile profile, string? mailboxOverride = null) {
         if (!string.IsNullOrWhiteSpace(mailboxOverride)) {
             return mailboxOverride!.Trim();
         }

@@ -179,6 +179,7 @@ internal static partial class CliCommandModel {
         "limit" => "Maximum result count.",
         "login" => "Interactive login user name.",
         "mailbox" => "Mailbox identifier or address.",
+        "max-bytes" => "Maximum provider bytes accepted for one message.",
         "message-id" => "Message identifier; repeat when supported.",
         "name" => "Display name or stable secret name.",
         "name-contains" => "Attachment filename substring filter.",

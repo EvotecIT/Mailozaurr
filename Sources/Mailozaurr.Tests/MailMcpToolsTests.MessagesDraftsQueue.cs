@@ -6,6 +6,30 @@ namespace Mailozaurr.Tests;
 
 public sealed partial class MailMcpToolsTests {
     [Fact]
+    public async Task MailExportEmlDelegatesToApplicationExportService() {
+        using var fixture = new TestFixture();
+
+        var result = await fixture.Tools.mail_export_eml(
+            "gmail-work",
+            new[] { "message-1", "message-2" },
+            @"C:\Temp\mail-export",
+            mailboxId: "primary",
+            folderId: "Inbox",
+            maxMessageBytes: 1048576,
+            overwrite: true);
+
+        Assert.True(result.Succeeded);
+        Assert.NotNull(fixture.EmlExportService.LastRequest);
+        Assert.Equal("gmail-work", fixture.EmlExportService.LastRequest!.ProfileId);
+        Assert.Equal("primary", fixture.EmlExportService.LastRequest.MailboxId);
+        Assert.Equal("Inbox", fixture.EmlExportService.LastRequest.FolderId);
+        Assert.Equal(new[] { "message-1", "message-2" }, fixture.EmlExportService.LastRequest.MessageIds);
+        Assert.Equal(@"C:\Temp\mail-export", fixture.EmlExportService.LastRequest.DestinationDirectory);
+        Assert.Equal(1048576, fixture.EmlExportService.LastRequest.MaxMessageBytes);
+        Assert.True(fixture.EmlExportService.LastRequest.Overwrite);
+    }
+
+    [Fact]
     public async Task MailSearchCompactDelegatesToApplicationReadService() {
         using var fixture = new TestFixture();
 

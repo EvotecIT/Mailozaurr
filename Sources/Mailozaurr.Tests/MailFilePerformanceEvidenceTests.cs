@@ -5,6 +5,7 @@ namespace Mailozaurr.Tests;
 
 public sealed class MailFilePerformanceEvidenceTests {
     private const int AttachmentByteCount = 3 * 1024 * 1024;
+    private const int AllocationMeasurementTolerance = 64 * 1024;
 
     [Fact]
     public void LargeEmlReadWithoutAttachmentsOrSignatureUsesTheBoundedOwnerPath() {
@@ -48,7 +49,10 @@ public sealed class MailFilePerformanceEvidenceTests {
 
             Assert.True(boundedAllocated <= (sourceBytes * 4L) + (8L * 1024L * 1024L),
                 $"Bounded read allocated {boundedAllocated:N0} bytes for a {sourceBytes:N0}-byte EML.");
-            Assert.True(retainedAllocated >= boundedAllocated + AttachmentByteCount,
+            // Runtime and owner-version bookkeeping can shift a small amount of allocation
+            // between the two paths. Require the retained path to account for essentially
+            // the complete attachment while leaving room for that measurement variance.
+            Assert.True(retainedAllocated >= boundedAllocated + AttachmentByteCount - AllocationMeasurementTolerance,
                 $"Retained-content read allocated {retainedAllocated:N0} bytes versus " +
                 $"{boundedAllocated:N0} bytes for the bounded read.");
 

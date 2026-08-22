@@ -23,6 +23,7 @@ public sealed class MailApplicationBuilder {
     private IMailDraftService? _draftService;
     private IMailDraftExchangeService? _draftExchangeService;
     private IMailReadService? _readService;
+    private IMailEmlExportService? _emlExportService;
     private IMailMessageActionPreviewService? _messageActionPreviewService;
     private IMailMessageActionPlanService? _messageActionPlanService;
     private IMailMessageActionPlanExchangeService? _messageActionPlanExchangeService;
@@ -148,6 +149,12 @@ public sealed class MailApplicationBuilder {
     /// <summary>Uses an explicit read service.</summary>
     public MailApplicationBuilder UseReadService(IMailReadService readService) {
         _readService = readService ?? throw new ArgumentNullException(nameof(readService));
+        return this;
+    }
+
+    /// <summary>Uses an explicit provider-neutral EML export service.</summary>
+    public MailApplicationBuilder UseEmlExportService(IMailEmlExportService emlExportService) {
+        _emlExportService = emlExportService ?? throw new ArgumentNullException(nameof(emlExportService));
         return this;
     }
 
@@ -352,6 +359,12 @@ public sealed class MailApplicationBuilder {
         var draftExchangeService = _draftExchangeService ?? new JsonMailDraftExchangeService();
 
         var readService = _readService ?? new RoutedMailReadService(profileStore, readHandlers);
+        var rawMessageSources = new List<IRawMailMessageSource>();
+        if (_options.EnableImapReadHandler) rawMessageSources.Add(new ImapRawMailMessageSource(imapSessionFactory));
+        if (_options.EnablePop3ReadHandler) rawMessageSources.Add(new Pop3RawMailMessageSource(pop3SessionFactory));
+        if (_options.EnableGraphReadHandler) rawMessageSources.Add(new GraphRawMailMessageSource(graphSessionFactory));
+        if (_options.EnableGmailReadHandler) rawMessageSources.Add(new GmailRawMailMessageSource(gmailSessionFactory));
+        var emlExportService = _emlExportService ?? new MailEmlExportService(profileStore, rawMessageSources);
         var folderAliasService = _folderAliasService ?? new MailFolderAliasService(
             profileStore, readService, availableCapabilities);
         var messageActionPreviewService = _messageActionPreviewService ?? new MailMessageActionPreviewService(
@@ -379,6 +392,7 @@ public sealed class MailApplicationBuilder {
             draftService,
             draftExchangeService,
             readService,
+            emlExportService,
             messageActionPreviewService,
             messageActionPlanService,
             messageActionPlanExchangeService,

@@ -19,6 +19,7 @@ public sealed class MailApplication {
         IMailDraftService drafts,
         IMailDraftExchangeService draftExchange,
         IMailReadService read,
+        IMailEmlExportService emlExport,
         IMailMessageActionPreviewService messageActionPreview,
         IMailMessageActionPlanService messageActionPlans,
         IMailMessageActionPlanExchangeService messageActionPlanExchange,
@@ -44,6 +45,7 @@ public sealed class MailApplication {
         Drafts = drafts;
         DraftExchange = draftExchange;
         Read = read;
+        EmlExport = emlExport;
         MessageActionPreview = messageActionPreview;
         MessageActionPlans = messageActionPlans;
         MessageActionPlanExchange = messageActionPlanExchange;
@@ -98,6 +100,9 @@ public sealed class MailApplication {
 
     /// <summary>Normalized read service.</summary>
     public IMailReadService Read { get; }
+
+    /// <summary>Provider-neutral, lossless EML export service.</summary>
+    public IMailEmlExportService EmlExport { get; }
 
     /// <summary>Normalized dry-run mailbox action preview service.</summary>
     public IMailMessageActionPreviewService MessageActionPreview { get; }
