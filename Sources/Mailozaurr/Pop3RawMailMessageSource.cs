@@ -34,8 +34,15 @@ public sealed class Pop3RawMailMessageSource : IRawMailMessageSource {
         }
 
         var occurrence = 0;
+        var oversizedHeaderFingerprints = new HashSet<string>(StringComparer.Ordinal);
         for (var index = client.Count - 1; index >= 0; index--) {
             cancellationToken.ThrowIfCancellationRequested();
+            var announcedSize = client.GetMessageSize(index, cancellationToken);
+            if (announcedSize > request.MaxBytes) {
+                var headers = await client.GetMessageHeadersAsync(index, cancellationToken).ConfigureAwait(false);
+                oversizedHeaderFingerprints.Add(ComputeHeaderFingerprint(headers));
+                continue;
+            }
             var candidate = await ReadAtIndexAsync(client, request, index, cancellationToken).ConfigureAwait(false);
             using var stream = new MemoryStream(candidate.Content, writable: false);
             var message = MimeKit.MimeMessage.Load(stream, cancellationToken);
@@ -44,6 +51,10 @@ public sealed class Pop3RawMailMessageSource : IRawMailMessageSource {
                     identifier.Fingerprint,
                     StringComparison.Ordinal)) {
                 continue;
+            }
+            if (oversizedHeaderFingerprints.Contains(ComputeHeaderFingerprint(message.Headers))) {
+                throw new InvalidDataException(
+                    "POP3 hash identity is ambiguous because an oversized earlier message has the same headers.");
             }
             if (occurrence++ == identifier.Occurrence) return candidate;
         }
@@ -70,5 +81,30 @@ public sealed class Pop3RawMailMessageSource : IRawMailMessageSource {
             Content = await RawMailMessageSourceUtilities.ReadBoundedAsync(stream, request.MaxBytes, cancellationToken)
                 .ConfigureAwait(false)
         };
+    }
+
+    internal static string ComputeHeaderFingerprint(IEnumerable<MimeKit.Header> headers) {
+        using var algorithm = System.Security.Cryptography.SHA256.Create();
+        using var sink = new System.Security.Cryptography.CryptoStream(
+            Stream.Null,
+            algorithm,
+            System.Security.Cryptography.CryptoStreamMode.Write);
+        foreach (var header in headers) {
+            var field = System.Text.Encoding.UTF8.GetBytes(header.Field ?? string.Empty);
+            var value = System.Text.Encoding.UTF8.GetBytes(header.Value ?? string.Empty);
+            WriteLengthPrefixed(sink, field);
+            WriteLengthPrefixed(sink, value);
+        }
+        sink.FlushFinalBlock();
+        return Convert.ToBase64String(algorithm.Hash!)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+    }
+
+    private static void WriteLengthPrefixed(Stream destination, byte[] value) {
+        var length = BitConverter.GetBytes(value.Length);
+        destination.Write(length, 0, length.Length);
+        destination.Write(value, 0, value.Length);
     }
 }

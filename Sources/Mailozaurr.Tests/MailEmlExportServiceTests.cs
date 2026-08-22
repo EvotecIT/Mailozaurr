@@ -1,4 +1,7 @@
 using System.Text;
+using MailKit;
+using MailKit.Net.Pop3;
+using MimeKit;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -51,6 +54,30 @@ public sealed class MailEmlExportServiceTests {
             RawMailMessageSourceUtilities.DecodeBase64Url("QUJDREVGRw", maxBytes: 3));
 
         Assert.Contains("3 byte export limit", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Pop3HashExportSkipsUnrelatedOversizedNewerMessage() {
+        var requested = new MimeMessage { Subject = "Requested" };
+        requested.Headers.Add("X-Identity", "requested");
+        requested.Body = new TextPart("plain") { Text = "small" };
+        var unrelated = new MimeMessage { Subject = "Unrelated" };
+        unrelated.Headers.Add("X-Identity", "unrelated");
+        unrelated.Body = new TextPart("plain") { Text = new string('x', 4096) };
+        var client = new BoundedPop3Client(new[] { requested, unrelated }, oversizedIndex: 1);
+        var source = new Pop3RawMailMessageSource(new FixedPop3SessionFactory(client));
+
+        var result = await source.GetRawMessageAsync(
+            new MailProfile { Id = "pop", Kind = MailProfileKind.Pop3 },
+            new RawMailMessageRequest {
+                MessageId = Pop3MailReadHandler.FormatMessageId(null, requested),
+                MaxBytes = 2048
+            });
+
+        Assert.NotNull(result);
+        Assert.Equal(new[] { 0 }, client.Downloads);
+        using var stream = new MemoryStream(result!.Content, writable: false);
+        Assert.Equal("Requested", MimeMessage.Load(stream).Subject);
     }
 
     [Fact]
@@ -311,6 +338,55 @@ public sealed class MailEmlExportServiceTests {
                     StorageIdentityComponent = StorageIdentityComponent
                 }
                 : null);
+        }
+    }
+
+    private sealed class FixedPop3SessionFactory : IPop3SessionFactory {
+        private readonly Pop3Client _client;
+
+        internal FixedPop3SessionFactory(Pop3Client client) => _client = client;
+
+        public Task<Pop3Client> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_client);
+    }
+
+    private sealed class BoundedPop3Client : Pop3Client {
+        private readonly IReadOnlyList<MimeMessage> _messages;
+        private readonly int _oversizedIndex;
+
+        internal BoundedPop3Client(IReadOnlyList<MimeMessage> messages, int oversizedIndex) {
+            _messages = messages;
+            _oversizedIndex = oversizedIndex;
+        }
+
+        public List<int> Downloads { get; } = new();
+
+        public override bool IsConnected => true;
+
+        public override bool IsAuthenticated => true;
+
+        public override int Count => _messages.Count;
+
+        public override int GetMessageSize(int index, CancellationToken cancellationToken = default) =>
+            index == _oversizedIndex ? 4096 : GetBytes(_messages[index]).Length;
+
+        public override Task<HeaderList> GetMessageHeadersAsync(
+            int index,
+            CancellationToken cancellationToken = default) => Task.FromResult(_messages[index].Headers);
+
+        public override Task<Stream> GetStreamAsync(
+            int index,
+            bool headersOnly = false,
+            CancellationToken cancellationToken = default,
+            ITransferProgress? progress = null) {
+            Downloads.Add(index);
+            return Task.FromResult<Stream>(new MemoryStream(GetBytes(_messages[index]), writable: false));
+        }
+
+        private static byte[] GetBytes(MimeMessage message) {
+            using var stream = new MemoryStream();
+            message.WriteTo(stream);
+            return stream.ToArray();
         }
     }
 }
