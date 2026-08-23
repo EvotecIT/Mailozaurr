@@ -44,7 +44,7 @@ public sealed class NativeMailboxBrowserSessionsTests {
 
         Assert.Empty(labels);
         Assert.Single(handler.Requests);
-        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/custom-user/labels?fields=labels(id,name,type)", handler.Requests[0].RequestUri!.ToString());
+        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/custom-user/labels?fields=labels(id,name,type,messageListVisibility,labelListVisibility,messagesTotal,messagesUnread,threadsTotal,threadsUnread,color)", handler.Requests[0].RequestUri!.ToString());
         Assert.Equal("Bearer", handler.Requests[0].Headers.Authorization?.Scheme);
         Assert.Equal("gmail-token", handler.Requests[0].Headers.Authorization?.Parameter);
     }
@@ -60,7 +60,7 @@ public sealed class NativeMailboxBrowserSessionsTests {
 
         Assert.Empty(labels);
         Assert.Single(handler.Requests);
-        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/labels?fields=labels(id,name,type)", handler.Requests[0].RequestUri!.ToString());
+        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/labels?fields=labels(id,name,type,messageListVisibility,labelListVisibility,messagesTotal,messagesUnread,threadsTotal,threadsUnread,color)", handler.Requests[0].RequestUri!.ToString());
     }
 
     [Fact]

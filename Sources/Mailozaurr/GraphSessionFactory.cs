@@ -183,13 +183,20 @@ public sealed class GraphSessionFactory : IGraphSessionFactory {
                           !string.IsNullOrWhiteSpace(storedRedirectUri)
             ? storedRedirectUri.Trim()
             : MailProfileAuthDefaults.GraphRedirectUri;
+        var scopes = profile.Settings.TryGetValue(MailProfileSettingsKeys.OAuthScopes, out var storedScopes)
+            ? storedScopes.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(scope => !string.IsNullOrWhiteSpace(scope))
+                .Select(scope => scope.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray()
+            : Array.Empty<string>();
         var login = ResolveLoginHint(profile);
         return OAuthHelpers.TryAcquireO365TokenSilentAsync(
             login,
             clientId.Trim(),
             tenantId.Trim(),
             redirectUri,
-            MailProfileAuthDefaults.GraphScopes);
+            scopes.Length == 0 ? MailProfileAuthDefaults.GraphScopes : scopes);
     }
 
     private static Task<GraphSession> DefaultConnectAsync(GraphSessionRequest request, CancellationToken cancellationToken) {
@@ -276,7 +283,6 @@ public sealed class GraphSessionFactory : IGraphSessionFactory {
             ? trimmed.Substring(bearerPrefix.Length).Trim()
             : trimmed;
     }
-
     private sealed class ResolvedGraphCredential {
         internal ResolvedGraphCredential(
             OAuthCredential credential,

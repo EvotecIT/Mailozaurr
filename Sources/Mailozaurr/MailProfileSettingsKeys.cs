@@ -37,6 +37,9 @@ public static class MailProfileSettingsKeys {
     /// <summary>Access-token expiration timestamp in round-trip format.</summary>
     public const string TokenExpiresOn = "tokenExpiresOn";
 
+    /// <summary>OAuth scopes selected for repeat authentication and silent token renewal.</summary>
+    public const string OAuthScopes = "oauthScopes";
+
     /// <summary>Mailbox address or user principal name.</summary>
     public const string Mailbox = "mailbox";
 

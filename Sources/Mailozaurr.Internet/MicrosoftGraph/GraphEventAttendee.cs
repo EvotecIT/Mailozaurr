@@ -12,7 +12,7 @@ namespace Mailozaurr;
 public class GraphEventAttendee {
     /// <summary>Email address of the attendee.</summary>
     [JsonPropertyName("emailAddress")]
-    public GraphEmailAddress EmailAddress { get; set; } = new();
+    public GraphEmail EmailAddress { get; set; } = new();
 
     /// <summary>Attendee type such as required or optional.</summary>
     [JsonPropertyName("type")]

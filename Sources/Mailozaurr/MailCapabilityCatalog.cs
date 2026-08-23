@@ -61,7 +61,11 @@ public static class MailCapabilityCatalog {
                 | MailCapability.MoveMessages
                 | MailCapability.DeleteMessages
                 | MailCapability.SendMessages
-                | MailCapability.WaitForMessages,
+                | MailCapability.WaitForMessages
+                | MailCapability.ManageRules
+                | MailCapability.ManageEvents
+                | MailCapability.UseThreads
+                | MailCapability.InspectPermissions,
             MailProfileKind.Gmail => MailCapability.ListFolders
                 | MailCapability.SearchMessages
                 | MailCapability.ReadMessages
@@ -70,7 +74,11 @@ public static class MailCapabilityCatalog {
                 | MailCapability.MoveMessages
                 | MailCapability.DeleteMessages
                 | MailCapability.SendMessages
-                | MailCapability.WaitForMessages,
+                | MailCapability.WaitForMessages
+                | MailCapability.ManageRules
+                | MailCapability.UseThreads
+                | MailCapability.UseLabels
+                | MailCapability.InspectPermissions,
             MailProfileKind.Smtp => MailCapability.SendMessages,
             MailProfileKind.SendGrid => MailCapability.SendMessages,
             MailProfileKind.Mailgun => MailCapability.SendMessages,
@@ -88,7 +96,10 @@ public static class MailCapabilityCatalog {
         bool hasReadServiceOverride = false,
         bool hasMessageActionServiceOverride = false,
         bool hasSendServiceOverride = false,
-        bool hasChangeFeedService = false) {
+        bool hasChangeFeedService = false,
+        bool hasGraphMailboxService = false,
+        bool hasGmailMailboxService = false,
+        bool hasPermissionEvidenceService = false) {
         var result = new Dictionary<MailProfileKind, MailCapability>();
         Add(result, readHandlers.Select(handler => handler.Kind), ReadServiceCapabilities);
         Add(result, messageActionHandlers.Select(handler => handler.Kind), MessageActionServiceCapabilities);
@@ -113,6 +124,21 @@ public static class MailCapabilityCatalog {
             hasChangeFeedService,
             ChangeFeedServiceProfileKinds,
             MailCapability.WaitForMessages);
+        AddServiceOverrideCapabilities(
+            result,
+            hasGraphMailboxService,
+            new[] { MailProfileKind.Graph },
+            MailCapability.ManageRules | MailCapability.ManageEvents | MailCapability.UseThreads);
+        AddServiceOverrideCapabilities(
+            result,
+            hasGmailMailboxService,
+            new[] { MailProfileKind.Gmail },
+            MailCapability.ManageRules | MailCapability.UseThreads | MailCapability.UseLabels);
+        AddServiceOverrideCapabilities(
+            result,
+            hasPermissionEvidenceService,
+            new[] { MailProfileKind.Graph, MailProfileKind.Gmail },
+            MailCapability.InspectPermissions);
         return result;
     }
 

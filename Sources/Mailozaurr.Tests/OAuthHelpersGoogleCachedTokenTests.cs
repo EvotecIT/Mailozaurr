@@ -91,14 +91,61 @@ public class OAuthHelpersGoogleCachedTokenTests {
         Assert.Equal(clientId, legacy.ClientId);
     }
 
+    [Fact]
+    public async Task AcquireGoogleTokenCachedAsync_PartitionsCredentialsByRequestedScopes() {
+        var account = "scoped@example.com";
+        var clientId = "client-scoped";
+        var defaultScopes = new[] { "https://www.googleapis.com/auth/gmail.modify" };
+        var featureScopes = new[] {
+            "https://www.googleapis.com/auth/gmail.modify",
+            "https://www.googleapis.com/auth/gmail.settings.basic"
+        };
+        var defaultKey = BuildScopedCacheKey(account, clientId, defaultScopes);
+        var featureKey = BuildScopedCacheKey(account, clientId, featureScopes);
+        Assert.NotEqual(defaultKey, featureKey);
+
+        await OAuthTokenCache.SetAsync(defaultKey, new OAuthCredential {
+            UserName = account,
+            AccessToken = "default-token",
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
+            ClientId = clientId
+        });
+        await OAuthTokenCache.SetAsync(featureKey, new OAuthCredential {
+            UserName = account,
+            AccessToken = "feature-token",
+            ExpiresOn = DateTimeOffset.UtcNow.AddHours(1),
+            ClientId = clientId
+        });
+
+        var defaultResult = await GmailOAuthHelpers.AcquireTokenCachedAsync(account, clientId, "secret", defaultScopes);
+        var featureResult = await GmailOAuthHelpers.AcquireTokenCachedAsync(account, clientId, "secret", featureScopes);
+
+        Assert.Equal("default-token", defaultResult.AccessToken);
+        Assert.Equal("feature-token", featureResult.AccessToken);
+    }
+
     private static async Task PersistGoogleCredentialAsync(
         OAuthCredential credential,
         string gmailAccount,
         string clientId) {
-        var method = typeof(GmailOAuthHelpers).GetMethod("PersistCredentialAsync",
-            BindingFlags.Static | BindingFlags.NonPublic);
+        var method = typeof(GmailOAuthHelpers).GetMethod(
+            "PersistCredentialAsync",
+            BindingFlags.Static | BindingFlags.NonPublic,
+            binder: null,
+            types: new[] { typeof(OAuthCredential), typeof(string), typeof(string) },
+            modifiers: null);
         var task = (Task)method!.Invoke(null, new object[] { credential, gmailAccount, clientId })!;
         await task.ConfigureAwait(false);
+    }
+
+    private static string BuildScopedCacheKey(string gmailAccount, string clientId, IEnumerable<string> scopes) {
+        var method = typeof(GmailOAuthHelpers).GetMethod(
+            "BuildCacheKey",
+            BindingFlags.Static | BindingFlags.NonPublic,
+            binder: null,
+            types: new[] { typeof(string), typeof(string), typeof(IEnumerable<string>) },
+            modifiers: null);
+        return (string)method!.Invoke(null, new object[] { gmailAccount, clientId, scopes })!;
     }
 
 }

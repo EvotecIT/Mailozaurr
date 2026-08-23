@@ -25,6 +25,9 @@ public sealed class MailApplicationBuilder {
     private IMailReadService? _readService;
     private IMailEmlExportService? _emlExportService;
     private IMailChangeFeedService? _changeFeedService;
+    private IGraphMailboxService? _graphMailboxService;
+    private IGmailMailboxService? _gmailMailboxService;
+    private IMailPermissionEvidenceService? _permissionEvidenceService;
     private IMailMessageActionPreviewService? _messageActionPreviewService;
     private IMailMessageActionPlanService? _messageActionPlanService;
     private IMailMessageActionPlanExchangeService? _messageActionPlanExchangeService;
@@ -162,6 +165,24 @@ public sealed class MailApplicationBuilder {
     /// <summary>Uses an explicit normalized mailbox change-feed service.</summary>
     public MailApplicationBuilder UseChangeFeedService(IMailChangeFeedService changeFeedService) {
         _changeFeedService = changeFeedService ?? throw new ArgumentNullException(nameof(changeFeedService));
+        return this;
+    }
+
+    /// <summary>Uses an explicit Microsoft Graph mailbox feature service.</summary>
+    public MailApplicationBuilder UseGraphMailboxService(IGraphMailboxService graphMailboxService) {
+        _graphMailboxService = graphMailboxService ?? throw new ArgumentNullException(nameof(graphMailboxService));
+        return this;
+    }
+
+    /// <summary>Uses an explicit Gmail mailbox feature service.</summary>
+    public MailApplicationBuilder UseGmailMailboxService(IGmailMailboxService gmailMailboxService) {
+        _gmailMailboxService = gmailMailboxService ?? throw new ArgumentNullException(nameof(gmailMailboxService));
+        return this;
+    }
+
+    /// <summary>Uses an explicit provider permission-evidence service.</summary>
+    public MailApplicationBuilder UsePermissionEvidenceService(IMailPermissionEvidenceService permissionEvidenceService) {
+        _permissionEvidenceService = permissionEvidenceService ?? throw new ArgumentNullException(nameof(permissionEvidenceService));
         return this;
     }
 
@@ -350,7 +371,10 @@ public sealed class MailApplicationBuilder {
             hasReadServiceOverride: _readService != null,
             hasMessageActionServiceOverride: _messageActionService != null,
             hasSendServiceOverride: _sendService != null,
-            hasChangeFeedService: true);
+            hasChangeFeedService: true,
+            hasGraphMailboxService: true,
+            hasGmailMailboxService: true,
+            hasPermissionEvidenceService: true);
         var profileService = _profileService ?? new MailProfileService(
             profileStore, secretStore, availableCapabilities);
         var profileBootstrapService = _profileBootstrapService ?? new MailProfileBootstrapService(profileService, profileSecretService, secretStore);
@@ -377,6 +401,12 @@ public sealed class MailApplicationBuilder {
         var changeFeedService = _changeFeedService ?? new MailChangeFeedService(
             profileStore,
             imapSessionFactory,
+            graphSessionFactory,
+            gmailSessionFactory);
+        var graphMailboxService = _graphMailboxService ?? new GraphMailboxService(profileStore, graphSessionFactory);
+        var gmailMailboxService = _gmailMailboxService ?? new GmailMailboxService(profileStore, gmailSessionFactory);
+        var permissionEvidenceService = _permissionEvidenceService ?? new MailPermissionEvidenceService(
+            profileStore,
             graphSessionFactory,
             gmailSessionFactory);
         var folderAliasService = _folderAliasService ?? new MailFolderAliasService(
@@ -408,6 +438,9 @@ public sealed class MailApplicationBuilder {
             readService,
             emlExportService,
             changeFeedService,
+            graphMailboxService,
+            gmailMailboxService,
+            permissionEvidenceService,
             messageActionPreviewService,
             messageActionPlanService,
             messageActionPlanExchangeService,

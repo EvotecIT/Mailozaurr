@@ -37,7 +37,7 @@ public sealed class GraphEventBuilder {
     public GraphEventBuilder Attendee(string address, string name, string type = "required") {
         _event.Attendees ??= new List<GraphEventAttendee>();
         _event.Attendees.Add(new GraphEventAttendee {
-            EmailAddress = new GraphEmailAddress { Email = new GraphEmail { Address = address } },
+            EmailAddress = new GraphEmail { Address = address, Name = name },
             Type = type
         });
         return this;

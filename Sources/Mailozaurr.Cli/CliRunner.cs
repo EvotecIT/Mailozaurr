@@ -81,6 +81,7 @@ public static partial class CliRunner {
             "profile" => await ExecuteProfileAsync(application, parseResult, output, error, input).ConfigureAwait(false),
             "draft" => await ExecuteDraftAsync(application, parseResult, output, error).ConfigureAwait(false),
             "mail" => await ExecuteMailAsync(application, parseResult, output, error).ConfigureAwait(false),
+            "provider" => await ExecuteProviderAsync(application, parseResult, output, error).ConfigureAwait(false),
             "mcp" => await ExecuteMcpAsync(application, parseResult, error).ConfigureAwait(false),
             "send" => await ExecuteSendAsync(application, parseResult, output, error).ConfigureAwait(false),
             "queue" => await ExecuteQueueAsync(application, parseResult, output, error).ConfigureAwait(false),

@@ -323,7 +323,7 @@ public class GmailApiClientTests {
 
         Assert.Single(handler.Requests);
         Assert.Equal(System.Net.Http.HttpMethod.Get, handler.Requests[0].Method);
-        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/labels?fields=labels(id,name,type)", handler.Requests[0].RequestUri!.ToString());
+        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/labels?fields=labels(id,name,type,messageListVisibility,labelListVisibility,messagesTotal,messagesUnread,threadsTotal,threadsUnread,color)", handler.Requests[0].RequestUri!.ToString());
     }
 
     [Fact]

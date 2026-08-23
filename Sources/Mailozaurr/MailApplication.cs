@@ -21,6 +21,9 @@ public sealed class MailApplication {
         IMailReadService read,
         IMailEmlExportService emlExport,
         IMailChangeFeedService changeFeeds,
+        IGraphMailboxService graphMailbox,
+        IGmailMailboxService gmailMailbox,
+        IMailPermissionEvidenceService permissionEvidence,
         IMailMessageActionPreviewService messageActionPreview,
         IMailMessageActionPlanService messageActionPlans,
         IMailMessageActionPlanExchangeService messageActionPlanExchange,
@@ -48,6 +51,9 @@ public sealed class MailApplication {
         Read = read;
         EmlExport = emlExport;
         ChangeFeeds = changeFeeds;
+        GraphMailbox = graphMailbox;
+        GmailMailbox = gmailMailbox;
+        PermissionEvidence = permissionEvidence;
         MessageActionPreview = messageActionPreview;
         MessageActionPlans = messageActionPlans;
         MessageActionPlanExchange = messageActionPlanExchange;
@@ -108,6 +114,15 @@ public sealed class MailApplication {
 
     /// <summary>Normalized durable and live mailbox change-feed service.</summary>
     public IMailChangeFeedService ChangeFeeds { get; }
+
+    /// <summary>Microsoft Graph rules, events, and conversation-thread service.</summary>
+    public IGraphMailboxService GraphMailbox { get; }
+
+    /// <summary>Gmail filters, labels, and threads service.</summary>
+    public IGmailMailboxService GmailMailbox { get; }
+
+    /// <summary>Truthful Graph/Gmail permission-evidence service.</summary>
+    public IMailPermissionEvidenceService PermissionEvidence { get; }
 
     /// <summary>Normalized dry-run mailbox action preview service.</summary>
     public IMailMessageActionPreviewService MessageActionPreview { get; }

@@ -21,7 +21,7 @@ public sealed class GmailMailboxBrowserTests {
         Assert.Equal("Label_1", await browser.ResolveLabelIdAsync("Project"));
 
         Assert.Single(handler.Requests);
-        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/labels?fields=labels(id,name,type)", handler.Requests[0].RequestUri!.ToString());
+        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/labels?fields=labels(id,name,type,messageListVisibility,labelListVisibility,messagesTotal,messagesUnread,threadsTotal,threadsUnread,color)", handler.Requests[0].RequestUri!.ToString());
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class GmailMailboxBrowserTests {
         Assert.Equal("INBOX", folders[1].Id);
         Assert.Equal("system", folders[1].Type);
         Assert.Single(handler.Requests);
-        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/labels?fields=labels(id,name,type)", handler.Requests[0].RequestUri!.ToString());
+        Assert.Equal("https://gmail.googleapis.com/gmail/v1/users/me/labels?fields=labels(id,name,type,messageListVisibility,labelListVisibility,messagesTotal,messagesUnread,threadsTotal,threadsUnread,color)", handler.Requests[0].RequestUri!.ToString());
     }
 
     [Fact]
