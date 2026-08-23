@@ -453,7 +453,7 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
 
     private static async Task<MailProfileDiagnosticEvidence?> DefaultProbeGraphAsync(GraphSession session, CancellationToken cancellationToken) {
         var evidence = CreateGraphEvidence(session);
-        await TryAttachGraphIdentityAsync(session, evidence, cancellationToken).ConfigureAwait(false);
+        await MailProfileDiagnosticEvidenceFactory.AttachGraphIdentityAsync(session, evidence, cancellationToken).ConfigureAwait(false);
         return evidence;
     }
 
@@ -473,7 +473,7 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
 
         var evidence = CreateGraphEvidence(session);
         if (mailEndpointSucceeded) {
-            await TryAttachGraphIdentityAsync(session, evidence, cancellationToken).ConfigureAwait(false);
+            await MailProfileDiagnosticEvidenceFactory.AttachGraphIdentityAsync(session, evidence, cancellationToken).ConfigureAwait(false);
         }
         evidence.Preflight = CreateSendPreflightEvidence(
             MailProfileKind.Graph,
@@ -493,7 +493,7 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
         evidence.Mailbox = new MailProfileMailboxEvidence {
             FolderCount = folders.Count
         };
-        await TryAttachGraphIdentityAsync(session, evidence, cancellationToken).ConfigureAwait(false);
+        await MailProfileDiagnosticEvidenceFactory.AttachGraphIdentityAsync(session, evidence, cancellationToken).ConfigureAwait(false);
         return evidence;
     }
 
@@ -504,7 +504,7 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
                 throw new InvalidOperationException("Gmail profile probe did not return an email address.");
             }
             return CreateGmailEvidence(profile);
-        } catch (GmailAuthenticationException ex) when (IsGmailInsufficientScope(ex)) {
+        } catch (GmailAuthenticationException ex) when (MailProfileDiagnosticEvidenceFactory.IsGmailInsufficientScope(ex)) {
             var evidence = CreateGmailCapabilityEvidence(
                 "Gmail recognized the credential but the users.getProfile endpoint was outside its granted scope. OAuth scope metadata was not available and send readiness was not inferred.");
             evidence.IdentityUnavailableReason = "Gmail users.getProfile returned 403 Forbidden for this credential scope.";
@@ -524,81 +524,10 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
             } else {
                 evidence.IdentityUnavailableReason = "Gmail users.getProfile returned no email address.";
             }
-        } catch (GmailAuthenticationException ex) when (IsGmailInsufficientScope(ex)) {
+        } catch (GmailAuthenticationException ex) when (MailProfileDiagnosticEvidenceFactory.IsGmailInsufficientScope(ex)) {
             evidence.IdentityUnavailableReason = "Gmail users.getProfile returned 403 Forbidden for this credential scope.";
         }
         return evidence;
-    }
-
-    private static async Task TryAttachGraphIdentityAsync(
-        GraphSession session,
-        MailProfileDiagnosticEvidence evidence,
-        CancellationToken cancellationToken) {
-        var authenticationMode = ResolveGraphAuthenticationMode(session, evidence);
-        if (string.Equals(session.UserId, "me", StringComparison.OrdinalIgnoreCase) &&
-            authenticationMode != GraphSessionAuthenticationMode.Delegated) {
-            var organizationReadable = await session.Client
-                .ProbeApplicationCredentialWithoutRefreshAsync(cancellationToken)
-                .ConfigureAwait(false);
-            var credentialDescription = authenticationMode == GraphSessionAuthenticationMode.Application
-                ? "application credential"
-                : "credential while its delegated/application mode remained unknown";
-            evidence.IdentityUnavailableReason = organizationReadable
-                ? $"Microsoft Graph verified the {credentialDescription} through the organization endpoint. No mailbox was configured, so no mailbox identity was inferred."
-                : $"Microsoft Graph authenticated the {credentialDescription} but denied the organization endpoint permission. No mailbox was configured, so no mailbox identity was inferred.";
-            return;
-        }
-
-        try {
-            var identity = await session.Client.GetMailboxIdentityWithoutRefreshAsync(session.UserId, cancellationToken)
-                .ConfigureAwait(false);
-            ApplyVerifiedGraphDelegatedIdentity(evidence, identity);
-            var identityEvidence = CreateGraphEvidence(session, identity);
-            evidence.Identity = identityEvidence.Identity;
-        } catch (GraphApiException ex) when (ex.StatusCode == HttpStatusCode.Forbidden) {
-            evidence.IdentityUnavailableReason = $"Microsoft Graph users endpoint returned {(int)ex.StatusCode} ({ex.StatusCode}); mail capability evidence remains valid.";
-        }
-    }
-
-    private static GraphSessionAuthenticationMode ResolveGraphAuthenticationMode(
-        GraphSession session,
-        MailProfileDiagnosticEvidence evidence) {
-        if (session.AuthenticationMode != GraphSessionAuthenticationMode.Unknown) {
-            return session.AuthenticationMode;
-        }
-        if ((evidence.Permissions?.ApplicationRoles.Count ?? 0) > 0) {
-            return GraphSessionAuthenticationMode.Application;
-        }
-        if ((evidence.Permissions?.DelegatedScopes.Count ?? 0) > 0) {
-            return GraphSessionAuthenticationMode.Delegated;
-        }
-        return GraphSessionAuthenticationMode.Unknown;
-    }
-
-    private static bool IsGmailInsufficientScope(GmailAuthenticationException exception) {
-        if (exception.StatusCode != HttpStatusCode.Forbidden ||
-            string.IsNullOrWhiteSpace(exception.ResponseContent)) {
-            return false;
-        }
-
-        try {
-            using var document = JsonDocument.Parse(exception.ResponseContent);
-            if (!document.RootElement.TryGetProperty("error", out var error) ||
-                !error.TryGetProperty("errors", out var errors) ||
-                errors.ValueKind != JsonValueKind.Array) {
-                return false;
-            }
-            foreach (var item in errors.EnumerateArray()) {
-                if (item.TryGetProperty("reason", out var reason) &&
-                    reason.ValueKind == JsonValueKind.String &&
-                    string.Equals(reason.GetString(), "insufficientPermissions", StringComparison.OrdinalIgnoreCase)) {
-                    return true;
-                }
-            }
-        } catch (JsonException) {
-            return false;
-        }
-        return false;
     }
 
     private static Task<MailProfileDiagnosticEvidence?> DefaultProbeSmtpAsync(Smtp smtp, CancellationToken cancellationToken) {

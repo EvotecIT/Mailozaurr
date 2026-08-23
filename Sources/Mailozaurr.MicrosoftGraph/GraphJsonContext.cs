@@ -46,4 +46,6 @@ namespace Mailozaurr;
 [JsonSerializable(typeof(GraphApiClient.GraphSubscriptionListResponse))]
 [JsonSerializable(typeof(GraphApiClient.GraphInboxRuleListResponse))]
 [JsonSerializable(typeof(GraphApiClient.GraphEventListResponse))]
+[JsonSerializable(typeof(GraphApiClient.GraphInboxRuleWriteRequest))]
+[JsonSerializable(typeof(GraphApiClient.GraphEventWriteRequest))]
 internal partial class GraphJsonContext : JsonSerializerContext;

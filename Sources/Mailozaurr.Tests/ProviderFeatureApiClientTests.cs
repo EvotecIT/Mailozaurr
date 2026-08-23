@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http;
+using System.Text.Json;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -83,6 +84,21 @@ public class ProviderFeatureApiClientTests {
     }
 
     [Fact]
+    public async Task GraphConversation_TopRemainsProviderPageSizeAcrossContinuation() {
+        var first = "{\"value\":[{\"id\":\"m1\"}],\"@odata.nextLink\":\"https://graph.microsoft.com/v1.0/me/messages?$skiptoken=next\"}";
+        var second = "{\"value\":[{\"id\":\"m2\"}]}";
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(first) },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(second) });
+        using var client = CreateGraphClient(handler);
+
+        var messages = await client.ListConversationMessagesAsync("conversation-1", top: 1);
+
+        Assert.Equal(new[] { "m1", "m2" }, messages.Select(message => message.Id));
+        Assert.Equal(2, handler.Requests.Count);
+    }
+
+    [Fact]
     public async Task GraphEvents_CreateEscapesMailboxAndUsesTypedPayload() {
         var body = "{\"id\":\"e1\",\"subject\":\"Review\"}";
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent(body) });
@@ -94,6 +110,40 @@ public class ProviderFeatureApiClientTests {
         var request = Assert.Single(handler.Requests);
         Assert.Equal(HttpMethod.Post, request.Method);
         Assert.Contains("users/user%2Btag%40example.test/events", request.RequestUri!.AbsoluteUri, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GraphWrites_OmitReadOnlyFieldsAndUseGraphAttendeeShape() {
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("{\"id\":\"r2\"}") },
+            new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("{\"id\":\"e2\"}") });
+        using var client = CreateGraphClient(handler);
+
+        await client.CreateInboxRuleAsync(new GraphInboxRule {
+            Id = "server-rule",
+            DisplayName = "Rule",
+            IsReadOnly = true,
+            HasError = true
+        });
+        await client.CreateEventAsync(new GraphEvent {
+            Id = "server-event",
+            Subject = "Review",
+            Attendees = new List<GraphEventAttendee> {
+                new() { EmailAddress = new GraphEmail { Address = "user@example.test", Name = "User" }, Type = "required" }
+            }
+        });
+
+        using var rulePayload = JsonDocument.Parse(await handler.Requests[0].Content!.ReadAsStringAsync());
+        Assert.Equal("Rule", rulePayload.RootElement.GetProperty("displayName").GetString());
+        Assert.False(rulePayload.RootElement.TryGetProperty("id", out _));
+        Assert.False(rulePayload.RootElement.TryGetProperty("isReadOnly", out _));
+        Assert.False(rulePayload.RootElement.TryGetProperty("hasError", out _));
+
+        using var eventPayload = JsonDocument.Parse(await handler.Requests[1].Content!.ReadAsStringAsync());
+        Assert.False(eventPayload.RootElement.TryGetProperty("id", out _));
+        var emailAddress = eventPayload.RootElement.GetProperty("attendees")[0].GetProperty("emailAddress");
+        Assert.Equal("user@example.test", emailAddress.GetProperty("address").GetString());
+        Assert.False(emailAddress.TryGetProperty("emailAddress", out _));
     }
 
     [Fact]
@@ -133,6 +183,61 @@ public class ProviderFeatureApiClientTests {
         var request = Assert.Single(handler.Requests);
         Assert.Equal("PATCH", request.Method.Method);
         Assert.EndsWith("/users/me/labels/Label%201", request.RequestUri!.AbsoluteUri, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GmailWrites_UseApiNamesAndOmitServerManagedFields() {
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"id\":\"f2\"}") },
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"id\":\"Label_2\",\"name\":\"Archive\"}") });
+        using var client = CreateGmailClient(handler);
+
+        await client.CreateFilterAsync("me", new GmailFilter {
+            Id = "server-filter",
+            Criteria = new GmailFilterCriteria { From = "sender@example.test" },
+            Action = new GmailFilterAction { AddLabelIds = new List<string> { "STARRED" } }
+        });
+        await client.UpdateLabelAsync("me", "Label_2", new GmailLabel {
+            Id = "server-label",
+            Name = "Archive",
+            Type = "user",
+            MessageListVisibility = "show",
+            LabelListVisibility = "labelShow",
+            MessagesTotal = 10,
+            MessagesUnread = 2,
+            ThreadsTotal = 5,
+            ThreadsUnread = 1,
+            Color = new GmailLabelColor { TextColor = "#ffffff", BackgroundColor = "#000000" }
+        });
+
+        using var filterPayload = JsonDocument.Parse(await handler.Requests[0].Content!.ReadAsStringAsync());
+        Assert.False(filterPayload.RootElement.TryGetProperty("id", out _));
+        Assert.Equal("sender@example.test", filterPayload.RootElement.GetProperty("criteria").GetProperty("from").GetString());
+
+        using var labelPayload = JsonDocument.Parse(await handler.Requests[1].Content!.ReadAsStringAsync());
+        Assert.Equal("Archive", labelPayload.RootElement.GetProperty("name").GetString());
+        Assert.Equal("show", labelPayload.RootElement.GetProperty("messageListVisibility").GetString());
+        Assert.Equal("#ffffff", labelPayload.RootElement.GetProperty("color").GetProperty("textColor").GetString());
+        foreach (var readOnlyName in new[] { "id", "type", "messagesTotal", "messagesUnread", "threadsTotal", "threadsUnread" }) {
+            Assert.False(labelPayload.RootElement.TryGetProperty(readOnlyName, out _));
+        }
+    }
+
+    [Fact]
+    public async Task GmailSettingsMutations_HonorDryRunWithoutSendingRequests() {
+        var handler = new RecordingHandler();
+        using var client = CreateGmailClient(handler);
+        client.DryRun = true;
+
+        var filter = new GmailFilter { Criteria = new GmailFilterCriteria { From = "sender@example.test" } };
+        var label = new GmailLabel { Name = "Archive" };
+        Assert.Same(filter, await client.CreateFilterAsync("me", filter));
+        await client.DeleteFilterAsync("me", "filter-1");
+        Assert.Same(label, await client.CreateLabelAsync("me", label));
+        Assert.Same(label, await client.UpdateLabelAsync("me", "Label_1", label));
+        await client.DeleteLabelAsync("me", "Label_1");
+
+        Assert.Empty(handler.Requests);
     }
 
     [Fact]

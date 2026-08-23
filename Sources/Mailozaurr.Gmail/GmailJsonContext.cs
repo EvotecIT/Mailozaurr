@@ -22,6 +22,8 @@ namespace Mailozaurr;
 [JsonSerializable(typeof(GmailApiClient.GmailThreadListResponse))]
 [JsonSerializable(typeof(GmailApiClient.GmailLabelListResponse))]
 [JsonSerializable(typeof(GmailApiClient.GmailFilterListResponse))]
+[JsonSerializable(typeof(GmailApiClient.GmailFilterWriteRequest))]
+[JsonSerializable(typeof(GmailApiClient.GmailLabelWriteRequest))]
 [JsonSerializable(typeof(GmailApiClient.GmailModifyLabelsRequest))]
 [JsonSerializable(typeof(GmailApiClient.GmailBatchModifyRequest))]
 [JsonSerializable(typeof(GmailApiClient.GmailBatchDeleteRequest))]

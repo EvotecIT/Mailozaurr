@@ -65,7 +65,8 @@ public sealed partial class GraphApiClient {
         WriteResourceAsync(
             HttpMethod.Post,
             BuildUserSegment(userId) + "/mailFolders/inbox/messageRules",
-            rule ?? throw new ArgumentNullException(nameof(rule)),
+            GraphInboxRuleWriteRequest.From(rule ?? throw new ArgumentNullException(nameof(rule))),
+            GraphJsonContext.Default.GraphInboxRuleWriteRequest,
             GraphJsonContext.Default.GraphInboxRule,
             "inbox-rule create",
             cancellationToken);
@@ -75,7 +76,8 @@ public sealed partial class GraphApiClient {
         WriteResourceAsync(
             new HttpMethod("PATCH"),
             BuildUserSegment(userId) + "/mailFolders/inbox/messageRules/" + EscapeRequired(ruleId, nameof(ruleId)),
-            rule ?? throw new ArgumentNullException(nameof(rule)),
+            GraphInboxRuleWriteRequest.From(rule ?? throw new ArgumentNullException(nameof(rule))),
+            GraphJsonContext.Default.GraphInboxRuleWriteRequest,
             GraphJsonContext.Default.GraphInboxRule,
             "inbox-rule update",
             cancellationToken);
@@ -137,7 +139,8 @@ public sealed partial class GraphApiClient {
         WriteResourceAsync(
             HttpMethod.Post,
             BuildUserSegment(userId) + "/events",
-            graphEvent ?? throw new ArgumentNullException(nameof(graphEvent)),
+            GraphEventWriteRequest.From(graphEvent ?? throw new ArgumentNullException(nameof(graphEvent))),
+            GraphJsonContext.Default.GraphEventWriteRequest,
             GraphJsonContext.Default.GraphEvent,
             "event create",
             cancellationToken);
@@ -147,7 +150,8 @@ public sealed partial class GraphApiClient {
         WriteResourceAsync(
             new HttpMethod("PATCH"),
             BuildUserSegment(userId) + "/events/" + EscapeRequired(eventId, nameof(eventId)),
-            graphEvent ?? throw new ArgumentNullException(nameof(graphEvent)),
+            GraphEventWriteRequest.From(graphEvent ?? throw new ArgumentNullException(nameof(graphEvent))),
+            GraphJsonContext.Default.GraphEventWriteRequest,
             GraphJsonContext.Default.GraphEvent,
             "event update",
             cancellationToken);
@@ -173,18 +177,19 @@ public sealed partial class GraphApiClient {
         }
     }
 
-    private async Task<T> WriteResourceAsync<T>(
+    private async Task<TResponse> WriteResourceAsync<TRequest, TResponse>(
         HttpMethod method,
         string url,
-        T value,
-        System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo,
+        TRequest value,
+        System.Text.Json.Serialization.Metadata.JsonTypeInfo<TRequest> requestTypeInfo,
+        System.Text.Json.Serialization.Metadata.JsonTypeInfo<TResponse> responseTypeInfo,
         string operation,
         CancellationToken cancellationToken) {
-        var requestBody = JsonSerializer.Serialize(value, typeInfo);
+        var requestBody = JsonSerializer.Serialize(value, requestTypeInfo);
         using var content = new StringContent(requestBody, Encoding.UTF8, "application/json");
         var response = await SendJsonAsync(method, url, content, operation, cancellationToken).ConfigureAwait(false);
         try {
-            return JsonSerializer.Deserialize(response, typeInfo)
+            return JsonSerializer.Deserialize(response, responseTypeInfo)
                 ?? throw new InvalidDataException($"Graph returned an empty {operation} response.");
         } catch (JsonException ex) {
             throw new InvalidDataException($"Graph returned an invalid {operation} response.", ex);

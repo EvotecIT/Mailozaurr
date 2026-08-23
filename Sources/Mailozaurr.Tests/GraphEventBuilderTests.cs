@@ -16,6 +16,6 @@ public class GraphEventBuilderTests {
         Assert.NotNull(ev.Start);
         Assert.NotNull(ev.End);
         Assert.NotNull(ev.Attendees);
-        Assert.Contains(ev.Attendees!, a => a.EmailAddress.Email.Address == "user@example.com");
+        Assert.Contains(ev.Attendees!, a => a.EmailAddress.Address == "user@example.com");
     }
 }

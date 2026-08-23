@@ -1,6 +1,7 @@
 using MailKit.Net.Imap;
 using MailKit.Net.Pop3;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 
@@ -64,6 +65,35 @@ internal static class MailProfileDiagnosticEvidenceFactory {
         return evidence;
     }
 
+    internal static async Task AttachGraphIdentityAsync(
+        GraphSession session,
+        MailProfileDiagnosticEvidence evidence,
+        CancellationToken cancellationToken) {
+        var authenticationMode = ResolveGraphAuthenticationMode(session, evidence);
+        if (string.Equals(session.UserId, "me", StringComparison.OrdinalIgnoreCase) &&
+            authenticationMode != GraphSessionAuthenticationMode.Delegated) {
+            var organizationReadable = await session.Client
+                .ProbeApplicationCredentialWithoutRefreshAsync(cancellationToken)
+                .ConfigureAwait(false);
+            var credentialDescription = authenticationMode == GraphSessionAuthenticationMode.Application
+                ? "application credential"
+                : "credential while its delegated/application mode remained unknown";
+            evidence.IdentityUnavailableReason = organizationReadable
+                ? $"Microsoft Graph verified the {credentialDescription} through the organization endpoint. No mailbox was configured, so no mailbox identity was inferred."
+                : $"Microsoft Graph authenticated the {credentialDescription} but denied the organization endpoint permission. No mailbox was configured, so no mailbox identity was inferred.";
+            return;
+        }
+
+        try {
+            var identity = await session.Client.GetMailboxIdentityWithoutRefreshAsync(session.UserId, cancellationToken)
+                .ConfigureAwait(false);
+            ApplyVerifiedGraphDelegatedIdentity(evidence, identity);
+            evidence.Identity = CreateGraphEvidence(session, identity).Identity;
+        } catch (GraphApiException ex) when (ex.StatusCode == HttpStatusCode.Forbidden) {
+            evidence.IdentityUnavailableReason = $"Microsoft Graph users endpoint returned {(int)ex.StatusCode} ({ex.StatusCode}); mail capability evidence remains valid.";
+        }
+    }
+
     internal static MailProfileDiagnosticEvidence CreateGmailSessionEvidence(GmailSession session) {
         _ = session;
         return new MailProfileDiagnosticEvidence { Protocol = "Gmail" };
@@ -83,6 +113,32 @@ internal static class MailProfileDiagnosticEvidenceFactory {
             "The Gmail profile endpoint verified the credential and identity, but OAuth scope metadata was not available and was not inferred.");
         ApplyGmailProfile(evidence, profile);
         return evidence;
+    }
+
+    internal static bool IsGmailInsufficientScope(GmailAuthenticationException exception) {
+        if (exception.StatusCode != HttpStatusCode.Forbidden ||
+            string.IsNullOrWhiteSpace(exception.ResponseContent)) {
+            return false;
+        }
+
+        try {
+            using var document = JsonDocument.Parse(exception.ResponseContent);
+            if (!document.RootElement.TryGetProperty("error", out var error) ||
+                !error.TryGetProperty("errors", out var errors) ||
+                errors.ValueKind != JsonValueKind.Array) {
+                return false;
+            }
+            foreach (var item in errors.EnumerateArray()) {
+                if (item.TryGetProperty("reason", out var reason) &&
+                    reason.ValueKind == JsonValueKind.String &&
+                    string.Equals(reason.GetString(), "insufficientPermissions", StringComparison.OrdinalIgnoreCase)) {
+                    return true;
+                }
+            }
+        } catch (JsonException) {
+            return false;
+        }
+        return false;
     }
 
     internal static void ApplyGmailProfile(
@@ -229,6 +285,21 @@ internal static class MailProfileDiagnosticEvidenceFactory {
                 ? "The access token was opaque or did not expose scp/roles claims; no permissions were inferred."
                 : "These are token-declared scp/roles values. The successful Graph endpoint probe verifies the token, but does not authoritatively enumerate every effective permission."
         };
+    }
+
+    private static GraphSessionAuthenticationMode ResolveGraphAuthenticationMode(
+        GraphSession session,
+        MailProfileDiagnosticEvidence evidence) {
+        if (session.AuthenticationMode != GraphSessionAuthenticationMode.Unknown) {
+            return session.AuthenticationMode;
+        }
+        if ((evidence.Permissions?.ApplicationRoles.Count ?? 0) > 0) {
+            return GraphSessionAuthenticationMode.Application;
+        }
+        if ((evidence.Permissions?.DelegatedScopes.Count ?? 0) > 0) {
+            return GraphSessionAuthenticationMode.Delegated;
+        }
+        return GraphSessionAuthenticationMode.Unknown;
     }
 
     private static GraphPermissionClaims TryReadJwtPermissionClaims(string? accessToken) {

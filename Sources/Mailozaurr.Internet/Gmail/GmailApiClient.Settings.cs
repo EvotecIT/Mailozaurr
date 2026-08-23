@@ -36,17 +36,25 @@ public sealed partial class GmailApiClient {
             cancellationToken);
 
     /// <summary>Creates a server-side Gmail filter.</summary>
-    public Task<GmailFilter> CreateFilterAsync(string userId, GmailFilter filter, CancellationToken cancellationToken = default) =>
-        WriteSettingsResourceAsync(
+    public Task<GmailFilter> CreateFilterAsync(string userId, GmailFilter filter, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (filter == null) throw new ArgumentNullException(nameof(filter));
+        if (DryRun) return Task.FromResult(filter);
+        return WriteSettingsResourceAsync(
             HttpMethod.Post,
             BuildGmailUserSegment(userId) + "/settings/filters",
-            filter ?? throw new ArgumentNullException(nameof(filter)),
+            new GmailFilterWriteRequest { Criteria = filter.Criteria, Action = filter.Action },
+            GmailJsonContext.Default.GmailFilterWriteRequest,
             GmailJsonContext.Default.GmailFilter,
             "filter create",
             cancellationToken);
+    }
 
     /// <summary>Deletes a server-side Gmail filter.</summary>
     public async Task DeleteFilterAsync(string userId, string filterId, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        _ = EscapeGmailRequired(filterId, nameof(filterId));
+        if (DryRun) return;
         _ = await SendSettingsJsonAsync(
             HttpMethod.Delete,
             BuildGmailUserSegment(userId) + "/settings/filters/" + EscapeGmailRequired(filterId, nameof(filterId)),
@@ -64,27 +72,41 @@ public sealed partial class GmailApiClient {
             cancellationToken);
 
     /// <summary>Creates a Gmail user label.</summary>
-    public Task<GmailLabel> CreateLabelAsync(string userId, GmailLabel label, CancellationToken cancellationToken = default) =>
-        WriteSettingsResourceAsync(
+    public Task<GmailLabel> CreateLabelAsync(string userId, GmailLabel label, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        if (label == null) throw new ArgumentNullException(nameof(label));
+        if (DryRun) return Task.FromResult(label);
+        return WriteSettingsResourceAsync(
             HttpMethod.Post,
             BuildGmailUserSegment(userId) + "/labels",
-            label ?? throw new ArgumentNullException(nameof(label)),
+            GmailLabelWriteRequest.From(label),
+            GmailJsonContext.Default.GmailLabelWriteRequest,
             GmailJsonContext.Default.GmailLabel,
             "label create",
             cancellationToken);
+    }
 
     /// <summary>Patches a Gmail user label.</summary>
-    public Task<GmailLabel> UpdateLabelAsync(string userId, string labelId, GmailLabel label, CancellationToken cancellationToken = default) =>
-        WriteSettingsResourceAsync(
+    public Task<GmailLabel> UpdateLabelAsync(string userId, string labelId, GmailLabel label, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        var escapedLabelId = EscapeGmailRequired(labelId, nameof(labelId));
+        if (label == null) throw new ArgumentNullException(nameof(label));
+        if (DryRun) return Task.FromResult(label);
+        return WriteSettingsResourceAsync(
             new HttpMethod("PATCH"),
-            BuildGmailUserSegment(userId) + "/labels/" + EscapeGmailRequired(labelId, nameof(labelId)),
-            label ?? throw new ArgumentNullException(nameof(label)),
+            BuildGmailUserSegment(userId) + "/labels/" + escapedLabelId,
+            GmailLabelWriteRequest.From(label),
+            GmailJsonContext.Default.GmailLabelWriteRequest,
             GmailJsonContext.Default.GmailLabel,
             "label update",
             cancellationToken);
+    }
 
     /// <summary>Deletes a Gmail user label.</summary>
     public async Task DeleteLabelAsync(string userId, string labelId, CancellationToken cancellationToken = default) {
+        ThrowIfDisposed();
+        _ = EscapeGmailRequired(labelId, nameof(labelId));
+        if (DryRun) return;
         _ = await SendSettingsJsonAsync(
             HttpMethod.Delete,
             BuildGmailUserSegment(userId) + "/labels/" + EscapeGmailRequired(labelId, nameof(labelId)),
@@ -132,18 +154,19 @@ public sealed partial class GmailApiClient {
         }
     }
 
-    private async Task<T> WriteSettingsResourceAsync<T>(
+    private async Task<TResponse> WriteSettingsResourceAsync<TRequest, TResponse>(
         HttpMethod method,
         string url,
-        T value,
-        System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo,
+        TRequest value,
+        System.Text.Json.Serialization.Metadata.JsonTypeInfo<TRequest> requestTypeInfo,
+        System.Text.Json.Serialization.Metadata.JsonTypeInfo<TResponse> responseTypeInfo,
         string operation,
         CancellationToken cancellationToken) {
-        var payload = JsonSerializer.Serialize(value, typeInfo);
+        var payload = JsonSerializer.Serialize(value, requestTypeInfo);
         using var content = new StringContent(payload, Encoding.UTF8, "application/json");
         var json = await SendSettingsJsonAsync(method, url, content, operation, cancellationToken).ConfigureAwait(false);
         try {
-            return JsonSerializer.Deserialize(json, typeInfo)
+            return JsonSerializer.Deserialize(json, responseTypeInfo)
                 ?? throw new InvalidDataException($"Gmail returned an empty {operation} response.");
         } catch (JsonException ex) {
             throw new InvalidDataException($"Gmail returned an invalid {operation} response.", ex);
@@ -180,6 +203,35 @@ public sealed partial class GmailApiClient {
     private static string EscapeGmailRequired(string value, string parameterName) {
         if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException($"{parameterName} is required.", parameterName);
         return Uri.EscapeDataString(value.Trim());
+    }
+
+    internal sealed class GmailFilterWriteRequest {
+        [System.Text.Json.Serialization.JsonPropertyName("criteria")]
+        public GmailFilterCriteria? Criteria { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("action")]
+        public GmailFilterAction? Action { get; set; }
+    }
+
+    internal sealed class GmailLabelWriteRequest {
+        [System.Text.Json.Serialization.JsonPropertyName("name")]
+        public string? Name { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("messageListVisibility")]
+        public string? MessageListVisibility { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("labelListVisibility")]
+        public string? LabelListVisibility { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("color")]
+        public GmailLabelColor? Color { get; set; }
+
+        internal static GmailLabelWriteRequest From(GmailLabel label) => new() {
+            Name = label.Name,
+            MessageListVisibility = label.MessageListVisibility,
+            LabelListVisibility = label.LabelListVisibility,
+            Color = label.Color
+        };
     }
 
     /// <summary>One Gmail thread provider page.</summary>

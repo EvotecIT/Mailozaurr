@@ -406,9 +406,6 @@ public sealed partial class GraphApiClient {
                     var msg = TryParseMailMessage(it);
                     if (msg != null) {
                         messages.Add(msg);
-                        if (messages.Count >= safeTop) {
-                            return messages;
-                        }
                     }
                 }
             }

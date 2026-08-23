@@ -24,6 +24,9 @@ public sealed class MailPermissionEvidenceService : IMailPermissionEvidenceServi
         if (profile.Kind != MailProfileKind.Graph && profile.Kind != MailProfileKind.Gmail) {
             throw new NotSupportedException("OAuth permission evidence is currently available for Graph and Gmail profiles.");
         }
+        if (!profile.GetCapabilities().Supports(MailCapability.InspectPermissions)) {
+            throw new NotSupportedException($"Profile '{profile.Id}' does not allow '{MailCapability.InspectPermissions}'.");
+        }
 
         var effective = ProviderMailboxProfileResolver.WithMailbox(profile, mailboxId);
         MailProfileDiagnosticEvidence evidence;
@@ -31,18 +34,20 @@ public sealed class MailPermissionEvidenceService : IMailPermissionEvidenceServi
             if (profile.Kind == MailProfileKind.Graph) {
                 using var session = await _graphSessionFactory.ConnectAsync(effective, cancellationToken).ConfigureAwait(false);
                 evidence = MailProfileDiagnosticEvidenceFactory.CreateGraphEvidence(session);
-                try {
-                    var identity = await session.Client.GetMailboxIdentityWithoutRefreshAsync(session.UserId, cancellationToken).ConfigureAwait(false);
-                    evidence = MailProfileDiagnosticEvidenceFactory.CreateGraphEvidence(session, identity);
-                    MailProfileDiagnosticEvidenceFactory.ApplyVerifiedGraphDelegatedIdentity(evidence, identity);
-                } catch (GraphApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Forbidden) {
-                    evidence.IdentityUnavailableReason =
-                        $"Microsoft Graph users endpoint returned {(int)ex.StatusCode} ({ex.StatusCode}); token-claim permission evidence remains available.";
-                }
+                await MailProfileDiagnosticEvidenceFactory.AttachGraphIdentityAsync(session, evidence, cancellationToken).ConfigureAwait(false);
             } else {
                 using var session = await _gmailSessionFactory.ConnectAsync(effective, cancellationToken).ConfigureAwait(false);
-                var mailbox = await session.Browser.GetProfileAsync(cancellationToken).ConfigureAwait(false);
-                evidence = MailProfileDiagnosticEvidenceFactory.CreateGmailEvidence(mailbox);
+                try {
+                    var mailbox = await session.Browser.GetProfileWithoutRefreshAsync(cancellationToken).ConfigureAwait(false);
+                    if (string.IsNullOrWhiteSpace(mailbox.EmailAddress)) {
+                        return Failure(profile, "gmail_identity_missing", "Gmail users.getProfile returned no email address.");
+                    }
+                    evidence = MailProfileDiagnosticEvidenceFactory.CreateGmailEvidence(mailbox);
+                } catch (GmailAuthenticationException ex) when (MailProfileDiagnosticEvidenceFactory.IsGmailInsufficientScope(ex)) {
+                    evidence = MailProfileDiagnosticEvidenceFactory.CreateGmailCapabilityEvidence(
+                        "Gmail recognized the credential but users.getProfile was outside its granted scope. OAuth scope metadata was not available and was not inferred.");
+                    evidence.IdentityUnavailableReason = "Gmail users.getProfile returned 403 Forbidden for this credential scope.";
+                }
             }
         } catch (GraphApiException ex) {
             return Failure(profile, "graph_" + ((int)ex.StatusCode).ToString(System.Globalization.CultureInfo.InvariantCulture), ex.Message);

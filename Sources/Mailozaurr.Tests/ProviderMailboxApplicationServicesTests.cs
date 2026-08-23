@@ -50,6 +50,32 @@ public class ProviderMailboxApplicationServicesTests {
     }
 
     [Fact]
+    public async Task GraphService_EnforcesProfileCapabilitiesBeforeConnecting() {
+        var store = await CreateStoreAsync(MailProfileKind.Graph, MailCapability.None);
+        var factory = new GraphFactory(new RecordingHandler());
+        var service = new GraphMailboxService(store, factory);
+
+        await Assert.ThrowsAsync<NotSupportedException>(() => service.ListRulesAsync("profile"));
+        await Assert.ThrowsAsync<NotSupportedException>(() => service.ListEventsAsync("profile"));
+        await Assert.ThrowsAsync<NotSupportedException>(() => service.GetThreadAsync("profile", "conversation-1"));
+
+        Assert.Null(factory.LastProfile);
+    }
+
+    [Fact]
+    public async Task GmailService_EnforcesProfileCapabilitiesBeforeConnecting() {
+        var store = await CreateStoreAsync(MailProfileKind.Gmail, MailCapability.None);
+        var factory = new GmailFactory(new RecordingHandler());
+        var service = new GmailMailboxService(store, factory);
+
+        await Assert.ThrowsAsync<NotSupportedException>(() => service.ListFiltersAsync("profile"));
+        await Assert.ThrowsAsync<NotSupportedException>(() => service.ListLabelsAsync("profile"));
+        await Assert.ThrowsAsync<NotSupportedException>(() => service.ListThreadsAsync("profile"));
+
+        Assert.Null(factory.LastProfile);
+    }
+
+    [Fact]
     public async Task PermissionEvidence_ReportsGraphTokenClaimsAsNonAuthoritative() {
         var store = await CreateStoreAsync(MailProfileKind.Graph);
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) {
@@ -86,6 +112,71 @@ public class ProviderMailboxApplicationServicesTests {
     }
 
     [Fact]
+    public async Task PermissionEvidence_UsesApplicationCompatibleProbeWithoutMailbox() {
+        var store = await CreateStoreAsync(MailProfileKind.Graph, defaultMailbox: null);
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK));
+        var graphFactory = new GraphFactory(handler, CreateJwt("{\"roles\":[\"Mail.ReadWrite\",\"Mail.Send\"]}"));
+        var service = new MailPermissionEvidenceService(store, graphFactory, new GmailFactory(new RecordingHandler()));
+
+        var result = await service.GetEvidenceAsync("profile");
+
+        Assert.True(result.ProbeSucceeded);
+        Assert.Null(result.Identity);
+        Assert.Contains("Mail.ReadWrite", result.Permissions!.ApplicationRoles);
+        Assert.Contains("organization endpoint", result.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.EndsWith("/organization?$select=id&$top=1", Assert.Single(handler.Requests).RequestUri!.PathAndQuery, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PermissionEvidence_GmailScopeDenialDoesNotRefreshCredential() {
+        var store = await CreateStoreAsync(MailProfileKind.Gmail);
+        var refreshCount = 0;
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.Forbidden) {
+            Content = new StringContent("{\"error\":{\"errors\":[{\"reason\":\"insufficientPermissions\"}]}}")
+        });
+        var gmailFactory = new GmailFactory(handler, _ => {
+            refreshCount++;
+            return Task.FromResult("refreshed-token");
+        });
+        var service = new MailPermissionEvidenceService(store, new GraphFactory(new RecordingHandler()), gmailFactory);
+
+        var result = await service.GetEvidenceAsync("profile");
+
+        Assert.True(result.ProbeSucceeded);
+        Assert.Null(result.Identity);
+        Assert.Equal(0, refreshCount);
+        Assert.Contains("403", result.Message ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PermissionEvidence_GmailRequiresVerifiedIdentityOnSuccess() {
+        var store = await CreateStoreAsync(MailProfileKind.Gmail);
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new StringContent("{\"messagesTotal\":1,\"threadsTotal\":1}")
+        });
+        var service = new MailPermissionEvidenceService(store, new GraphFactory(new RecordingHandler()), new GmailFactory(handler));
+
+        var result = await service.GetEvidenceAsync("profile");
+
+        Assert.False(result.ProbeSucceeded);
+        Assert.Equal("gmail_identity_missing", result.FailureCode);
+        Assert.Null(result.Identity);
+    }
+
+    [Fact]
+    public async Task PermissionEvidence_EnforcesCapabilityBeforeConnecting() {
+        var store = await CreateStoreAsync(MailProfileKind.Graph, MailCapability.None);
+        var graphFactory = new GraphFactory(new RecordingHandler());
+        var gmailFactory = new GmailFactory(new RecordingHandler());
+        var service = new MailPermissionEvidenceService(store, graphFactory, gmailFactory);
+
+        await Assert.ThrowsAsync<NotSupportedException>(() => service.GetEvidenceAsync("profile"));
+
+        Assert.Null(graphFactory.LastProfile);
+        Assert.Null(gmailFactory.LastProfile);
+    }
+
+    [Fact]
     public void FeatureScopeBundlesAreExplicitAndDefaultsRemainNarrower() {
         Assert.DoesNotContain("https://graph.microsoft.com/MailboxSettings.ReadWrite", MailProfileAuthDefaults.GraphScopes);
         Assert.DoesNotContain("https://graph.microsoft.com/Calendars.ReadWrite", MailProfileAuthDefaults.GraphScopes);
@@ -108,13 +199,17 @@ public class ProviderMailboxApplicationServicesTests {
         Assert.False(gmail.Supports(MailCapability.ManageEvents | MailCapability.ManagePermissions));
     }
 
-    private static async Task<InMemoryMailProfileStore> CreateStoreAsync(MailProfileKind kind) {
+    private static async Task<InMemoryMailProfileStore> CreateStoreAsync(
+        MailProfileKind kind,
+        MailCapability? capabilities = null,
+        string? defaultMailbox = "me") {
         var store = new InMemoryMailProfileStore();
         await store.SaveAsync(new MailProfile {
             Id = "profile",
             DisplayName = "Profile",
             Kind = kind,
-            DefaultMailbox = "me"
+            DefaultMailbox = defaultMailbox,
+            Capabilities = capabilities.HasValue ? new ProfileCapabilities(kind, capabilities.Value) : null
         });
         return store;
     }
@@ -150,8 +245,12 @@ public class ProviderMailboxApplicationServicesTests {
 
     private sealed class GmailFactory : IGmailSessionFactory {
         private readonly HttpMessageHandler _handler;
+        private readonly Func<CancellationToken, Task<string>>? _refreshToken;
 
-        internal GmailFactory(HttpMessageHandler handler) => _handler = handler;
+        internal GmailFactory(HttpMessageHandler handler, Func<CancellationToken, Task<string>>? refreshToken = null) {
+            _handler = handler;
+            _refreshToken = refreshToken;
+        }
 
         internal MailProfile? LastProfile { get; private set; }
 
@@ -159,6 +258,7 @@ public class ProviderMailboxApplicationServicesTests {
             LastProfile = profile;
             var client = new GmailApiClient(
                 new HttpClient(_handler) { BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/") },
+                refreshToken: _refreshToken,
                 credential: new OAuthCredential { AccessToken = "token", ExpiresOn = DateTimeOffset.MaxValue });
             return Task.FromResult(new GmailSession(client, profile.DefaultMailbox ?? "me"));
         }
