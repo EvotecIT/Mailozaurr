@@ -253,33 +253,45 @@ public sealed class MailChangeFeedService : IMailChangeFeedService {
         MailProfile profile,
         MailChangeSubscriptionRequest request,
         CancellationToken cancellationToken) {
-        using var session = await _graphSessionFactory.ConnectAsync(
-            WithMailbox(profile, request.MailboxId), cancellationToken).ConfigureAwait(false);
-        var browser = new GraphMailboxBrowser(session.Client);
-        GraphMailboxBrowser.GraphMailboxSubscriptionResult subscription;
-        if (!string.IsNullOrWhiteSpace(request.SubscriptionId)) {
+        var renew = request.SubscriptionId != null;
+        string? folder = null;
+        if (renew) {
+            if (string.IsNullOrWhiteSpace(request.SubscriptionId)) {
+                throw new ArgumentException("Graph renewal requires a subscription id.", nameof(request));
+            }
             if (!request.Expiration.HasValue) {
                 throw new ArgumentException("Graph renewal requires an expiration value.", nameof(request));
             }
-            subscription = await browser.RenewSubscriptionAsync(
-                request.SubscriptionId!, request.Expiration.Value, cancellationToken).ConfigureAwait(false);
         } else {
             if (string.IsNullOrWhiteSpace(request.NotificationUrl) || !request.Expiration.HasValue) {
                 throw new ArgumentException("Graph subscription creation requires notification URL and expiration.", nameof(request));
             }
-            var folders = request.FolderIds
-                .Where(value => !string.IsNullOrWhiteSpace(value))
+            var folderInputs = request.FolderIds ?? new List<string>();
+            if (folderInputs.Any(string.IsNullOrWhiteSpace)) {
+                throw new ArgumentException("Graph subscription folder selectors must not be blank.", nameof(request));
+            }
+            var folders = folderInputs
                 .Select(value => value.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             if (folders.Count > 1) {
                 throw new ArgumentException("A Graph subscription supports exactly one folder resource.", nameof(request));
             }
-            var folder = folders.FirstOrDefault() ?? "INBOX";
+            folder = folders.FirstOrDefault() ?? "INBOX";
+        }
+
+        using var session = await _graphSessionFactory.ConnectAsync(
+            WithMailbox(profile, request.MailboxId), cancellationToken).ConfigureAwait(false);
+        var browser = new GraphMailboxBrowser(session.Client);
+        GraphMailboxBrowser.GraphMailboxSubscriptionResult subscription;
+        if (renew) {
+            subscription = await browser.RenewSubscriptionAsync(
+                request.SubscriptionId!, request.Expiration!.Value, cancellationToken).ConfigureAwait(false);
+        } else {
             subscription = await browser.CreateMessageSubscriptionForUserAsync(
                 request.NotificationUrl!,
-                folder,
-                request.Expiration.Value,
+                folder!,
+                request.Expiration!.Value,
                 "created,updated,deleted",
                 request.ClientState,
                 session.UserId,

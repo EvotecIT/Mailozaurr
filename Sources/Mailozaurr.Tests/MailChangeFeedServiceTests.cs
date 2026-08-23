@@ -301,6 +301,31 @@ public sealed class MailChangeFeedServiceTests {
         Assert.Empty(handler.Requests);
     }
 
+    [Theory]
+    [InlineData(" ")]
+    [InlineData("\t")]
+    public async Task GraphSubscribeRejectsBlankFolderResourcesBeforeConnecting(string blankFolder) {
+        var service = await CreateAsync(MailProfileKind.Graph);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.SubscribeAsync(new MailChangeSubscriptionRequest {
+            ProfileId = "profile",
+            FolderIds = new List<string> { blankFolder },
+            NotificationUrl = "https://example.test/mail-hook",
+            Expiration = DateTimeOffset.UtcNow.AddHours(1)
+        }));
+    }
+
+    [Fact]
+    public async Task GraphRenewRejectsExplicitBlankSubscriptionIdBeforeConnecting() {
+        var service = await CreateAsync(MailProfileKind.Graph);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.SubscribeAsync(new MailChangeSubscriptionRequest {
+            ProfileId = "profile",
+            SubscriptionId = " ",
+            Expiration = DateTimeOffset.UtcNow.AddHours(1)
+        }));
+    }
+
     [Fact]
     public async Task GmailUnsubscribeRoutesToExplicitMailbox() {
         var handler = new RecordingHandler(Response(HttpStatusCode.NoContent, string.Empty));
