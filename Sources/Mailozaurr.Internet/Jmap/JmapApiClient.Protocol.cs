@@ -156,7 +156,7 @@ public sealed partial class JmapApiClient {
     }
 
     private async Task<byte[]> ReadBoundedAsync(HttpContent content, CancellationToken cancellationToken) {
-        var maximum = Clamp(MaximumResponseBytes, 1024, 128 * 1024 * 1024);
+        var maximum = MaximumResponseBytes;
 #if NET5_0_OR_GREATER
         using var stream = await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
 #else

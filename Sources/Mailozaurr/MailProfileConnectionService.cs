@@ -400,10 +400,19 @@ public sealed class MailProfileConnectionService : IMailProfileConnectionService
         var session = await clientSession.Client.GetSessionAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         var accountId = clientSession.AccountId;
         if (string.IsNullOrWhiteSpace(accountId)) session.PrimaryAccounts.TryGetValue(JmapCapabilities.Mail, out accountId);
-        session.Accounts.TryGetValue(accountId ?? string.Empty, out var account);
+        if (string.IsNullOrWhiteSpace(accountId)) {
+            throw new JmapApiException("accountNotFound", "The JMAP Session resource did not identify a primary mail account.");
+        }
+        var selectedAccountId = accountId!;
+        if (!session.Accounts.TryGetValue(selectedAccountId, out var account) || account == null) {
+            throw new JmapApiException("accountNotFound", "The selected JMAP account was not present in the Session resource.");
+        }
+        if (!account.AccountCapabilities.ContainsKey(JmapCapabilities.Mail)) {
+            throw new JmapApiException("accountCapabilityMissing", "The selected JMAP account does not advertise mail capability.");
+        }
         IReadOnlyList<JmapMailbox> mailboxes = Array.Empty<JmapMailbox>();
         if (includeMailboxes) {
-            mailboxes = await clientSession.Client.ListMailboxesAsync(accountId, cancellationToken).ConfigureAwait(false);
+            mailboxes = await clientSession.Client.ListMailboxesAsync(selectedAccountId, cancellationToken).ConfigureAwait(false);
         }
         var permissions = CreateJmapPermissionEvidence(account, mailboxes, includeMailboxes);
         var evidence = new MailProfileDiagnosticEvidence {

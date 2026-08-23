@@ -15,6 +15,7 @@ public sealed partial class JmapApiClient : IDisposable {
     private readonly SemaphoreSlim _sessionLock = new(1, 1);
     private readonly SemaphoreSlim _methodRequestGate = new(1, 1);
     private JmapSessionResource? _session;
+    private int _maximumResponseBytes = DefaultMaximumResponseBytes;
     private int _callSequence;
     private bool _disposed;
 
@@ -47,7 +48,13 @@ public sealed partial class JmapApiClient : IDisposable {
     public Uri SessionUrl { get; }
 
     /// <summary>Maximum accepted bytes for one JMAP response.</summary>
-    public int MaximumResponseBytes { get; set; } = DefaultMaximumResponseBytes;
+    public int MaximumResponseBytes {
+        get => _maximumResponseBytes;
+        set {
+            if (value <= 0) throw new ArgumentOutOfRangeException(nameof(value), "The JMAP response byte limit must be positive.");
+            _maximumResponseBytes = value;
+        }
+    }
 
     /// <summary>Discovers and validates the JMAP Session resource.</summary>
     public async Task<JmapSessionResource> GetSessionAsync(bool forceRefresh = false, CancellationToken cancellationToken = default) {

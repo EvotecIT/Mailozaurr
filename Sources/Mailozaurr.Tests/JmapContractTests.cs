@@ -8,6 +8,21 @@ namespace Mailozaurr.Tests;
 /// <summary>Regression coverage for the public JMAP protocol, profile, and evidence contracts.</summary>
 public sealed class JmapContractTests {
     [Fact]
+    public async Task MaximumResponseBytes_PreservesStrictPositiveCallerLimit() {
+        var handler = new RecordingHandler(JsonResponse(SessionJson("https://mail.example.test/jmap/api")));
+        using var httpClient = new HttpClient(handler);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient, callerOwnedClientDisablesRedirects: true) {
+            MaximumResponseBytes = 32
+        };
+
+        var exception = await Assert.ThrowsAsync<JmapApiException>(() => client.GetSessionAsync());
+
+        Assert.Equal("responseTooLarge", exception.ErrorType);
+        Assert.Single(handler.Requests);
+        Assert.Throws<ArgumentOutOfRangeException>(() => client.MaximumResponseBytes = 0);
+    }
+
+    [Fact]
     public void CallerOwnedHttpClient_RequiresRedirectDisabledAcknowledgement() {
         using var httpClient = new HttpClient(new RecordingHandler());
 

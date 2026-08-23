@@ -738,6 +738,36 @@ public sealed class ApplicationProfileConnectionServiceTests {
         Assert.Equal(1, evidence?.Mailbox?.FolderCount);
     }
 
+    [Fact]
+    public async Task JmapAuthProbeRejectsConfiguredAccountMissingFromSession() {
+        var profile = CreateJmapProfile();
+        profile.Settings[MailProfileSettingsKeys.JmapAccountId] = "missing";
+        var handler = new RecordingHandler(JsonResponse(
+            "{\"capabilities\":{\"urn:ietf:params:jmap:core\":{\"maxObjectsInGet\":100,\"maxSizeRequest\":1000000},\"urn:ietf:params:jmap:mail\":{}}," +
+            "\"accounts\":{\"a1\":{\"name\":\"Primary\",\"isPersonal\":true,\"isReadOnly\":false," +
+            "\"accountCapabilities\":{\"urn:ietf:params:jmap:mail\":{}}}}," +
+            "\"primaryAccounts\":{\"urn:ietf:params:jmap:mail\":\"a1\"}," +
+            "\"username\":\"login-name\",\"apiUrl\":\"https://mail.example.test/jmap/api\",\"state\":\"s1\"}"));
+        using var httpClient = new HttpClient(handler);
+        var factory = new DelegateJmapSessionFactory(current => new JmapSession(
+            new JmapApiClient(
+                new Uri(current.Settings[MailProfileSettingsKeys.JmapSessionUrl]),
+                "token",
+                httpClient,
+                callerOwnedClientDisablesRedirects: true),
+            current.Settings[MailProfileSettingsKeys.JmapAccountId]));
+        var service = MailProfileConnectionService.CreateWithJmap(
+            new InMemoryProfileStore(new[] { profile }),
+            factory);
+
+        var result = await service.TestAsync("jmap-work", MailProfileConnectionTestScope.Auth);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("connection_test_failed", result.Code);
+        Assert.Single(handler.Requests);
+        Assert.Null(result.Stages[result.Stages.Count - 1].Evidence);
+    }
+
     [Theory]
     [InlineData(-1, null)]
     [InlineData(0, 0L)]
