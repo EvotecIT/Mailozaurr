@@ -95,7 +95,7 @@ public sealed partial class JmapApiClient {
         string? accountId,
         string capability,
         CancellationToken cancellationToken) {
-        var session = await GetSessionAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        var session = await GetTrustedSessionAsync(forceRefresh: false, cancellationToken: cancellationToken).ConfigureAwait(false);
         string resolved;
         if (!string.IsNullOrWhiteSpace(accountId)) {
             resolved = accountId!;
@@ -189,13 +189,19 @@ public sealed partial class JmapApiClient {
         return (int)Math.Min(advertisedMaximum, 5000L);
     }
 
-    private static string[] NormalizeIds(IReadOnlyCollection<string> ids, string parameterName, int maximum) {
+    private static string[] NormalizeIds(IReadOnlyCollection<string> ids, string parameterName, int maximum, bool allowEmpty = false) {
         if (ids == null) throw new ArgumentNullException(parameterName);
-        var normalized = ids.Where(id => !string.IsNullOrWhiteSpace(id))
+        if (ids.Count == 0) {
+            if (allowEmpty) return Array.Empty<string>();
+            throw new ArgumentException("At least one identifier is required.", parameterName);
+        }
+        if (ids.Any(string.IsNullOrWhiteSpace)) {
+            throw new ArgumentException("Identifiers must be non-empty opaque strings.", parameterName);
+        }
+        var normalized = ids
             .Distinct(StringComparer.Ordinal)
             .Take(maximum + 1)
             .ToArray();
-        if (normalized.Length == 0) throw new ArgumentException("At least one identifier is required.", parameterName);
         if (normalized.Length > maximum) {
             throw new ArgumentOutOfRangeException(
                 parameterName,

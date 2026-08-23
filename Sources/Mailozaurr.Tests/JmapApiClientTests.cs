@@ -11,7 +11,7 @@ public sealed class JmapApiClientTests {
             JsonResponse(SessionJson("https://mail.example.test/jmap/api")),
             JsonResponse("{\"methodResponses\":[[\"Email/query\",{\"accountId\":\"a1\",\"queryState\":\"q1\",\"position\":0,\"ids\":[\"e1\"],\"total\":2},\"c1\"]]}"));
         using var httpClient = new HttpClient(handler);
-        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient, callerOwnedClientDisablesRedirects: true);
 
         var result = await client.QueryEmailsAsync(new JmapEmailFilter { Text = "invoice" }, limit: 1);
 
@@ -32,7 +32,7 @@ public sealed class JmapApiClientTests {
             JsonResponse(SessionJson("https://mail.example.test/jmap/api")),
             JsonResponse("{\"methodResponses\":[[\"Email/query\",{\"accountId\":\"a1\",\"queryState\":\"q1\",\"position\":1,\"ids\":[\"e2\"],\"total\":2},\"c1\"]]}"));
         using var httpClient = new HttpClient(handler);
-        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient, callerOwnedClientDisablesRedirects: true);
 
         await client.QueryEmailsAsync(position: -1, limit: 1);
 
@@ -44,7 +44,7 @@ public sealed class JmapApiClientTests {
     public async Task GetEmails_EnforcesDiscoveredServerObjectLimit() {
         var handler = new RecordingHandler(JsonResponse(SessionJson("https://mail.example.test/jmap/api")));
         using var httpClient = new HttpClient(handler);
-        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient, callerOwnedClientDisablesRedirects: true);
 
         var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
             client.GetEmailsAsync(new[] { "e1", "e2", "e3" }));
@@ -57,7 +57,7 @@ public sealed class JmapApiClientTests {
     public async Task GetThreads_EnforcesDiscoveredServerObjectLimit() {
         var handler = new RecordingHandler(JsonResponse(SessionJson("https://mail.example.test/jmap/api")));
         using var httpClient = new HttpClient(handler);
-        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient, callerOwnedClientDisablesRedirects: true);
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
             client.GetThreadsAsync(new[] { "t1", "t2", "t3" }));
@@ -69,7 +69,7 @@ public sealed class JmapApiClientTests {
     public async Task Session_RejectsCrossOriginApiUrlBeforeSendingBearerTokenThere() {
         var handler = new RecordingHandler(JsonResponse(SessionJson("https://attacker.example/jmap/api")));
         using var httpClient = new HttpClient(handler);
-        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient, callerOwnedClientDisablesRedirects: true);
 
         var exception = await Assert.ThrowsAsync<JmapApiException>(() => client.GetSessionAsync());
 
@@ -84,7 +84,7 @@ public sealed class JmapApiClientTests {
             JsonResponse(SessionJson("https://mail.example.test/jmap/api")),
             JsonResponse("{\"methodResponses\":[[\"error\",{\"type\":\"forbidden\",\"description\":\"secret provider text\"},\"c1\"]]}"));
         using var httpClient = new HttpClient(handler);
-        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient, callerOwnedClientDisablesRedirects: true);
 
         var exception = await Assert.ThrowsAsync<JmapApiException>(() => client.ListMailboxesAsync());
 

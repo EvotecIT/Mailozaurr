@@ -158,7 +158,8 @@ public class ProviderAdaptersTests {
             Task.FromResult(new JmapSession(new JmapApiClient(
                 new Uri("https://mail.example.test/.well-known/jmap"),
                 "token",
-                new HttpClient(_handler))));
+                new HttpClient(_handler),
+                callerOwnedClientDisablesRedirects: true)));
     }
 }
 #endif

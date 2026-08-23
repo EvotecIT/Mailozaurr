@@ -19,13 +19,24 @@ public sealed partial class JmapApiClient : IDisposable {
     private bool _disposed;
 
     /// <summary>Creates a JMAP client using an optional caller-owned HTTP client.</summary>
+    /// <param name="sessionUrl">HTTPS JMAP Session resource URL.</param>
+    /// <param name="accessToken">Bearer access token.</param>
+    /// <param name="httpClient">Optional caller-owned client. Its transport must have automatic redirects disabled.</param>
+    /// <param name="allowCrossOriginApiUrl">Whether explicitly discovered cross-origin JMAP endpoints may receive authorization.</param>
+    /// <param name="callerOwnedClientDisablesRedirects">Acknowledges that <paramref name="httpClient"/> cannot follow redirects automatically.</param>
     public JmapApiClient(
         Uri sessionUrl,
         string accessToken,
         HttpClient? httpClient = null,
-        bool allowCrossOriginApiUrl = false) {
+        bool allowCrossOriginApiUrl = false,
+        bool callerOwnedClientDisablesRedirects = false) {
         SessionUrl = ValidateSessionUrl(sessionUrl ?? throw new ArgumentNullException(nameof(sessionUrl)));
         if (string.IsNullOrWhiteSpace(accessToken)) throw new ArgumentException("Access token is required.", nameof(accessToken));
+        if (httpClient != null && !callerOwnedClientDisablesRedirects) {
+            throw new ArgumentException(
+                "A caller-owned JMAP HTTP client must disable automatic redirects so discovery can validate every redirect before reapplying bearer authorization.",
+                nameof(httpClient));
+        }
         _accessToken = accessToken.Trim();
         _client = httpClient ?? new HttpClient(new HttpClientHandler { AllowAutoRedirect = false });
         _ownsClient = httpClient == null;
@@ -40,6 +51,11 @@ public sealed partial class JmapApiClient : IDisposable {
 
     /// <summary>Discovers and validates the JMAP Session resource.</summary>
     public async Task<JmapSessionResource> GetSessionAsync(bool forceRefresh = false, CancellationToken cancellationToken = default) {
+        var session = await GetTrustedSessionAsync(forceRefresh, cancellationToken).ConfigureAwait(false);
+        return CloneSession(session);
+    }
+
+    private async Task<JmapSessionResource> GetTrustedSessionAsync(bool forceRefresh, CancellationToken cancellationToken) {
         ThrowIfDisposed();
         if (!forceRefresh && _session != null) return _session;
         await _sessionLock.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -70,6 +86,7 @@ public sealed partial class JmapApiClient : IDisposable {
         var maximum = ResolveMaxObjectsInGet(context.Session);
         var mailboxes = new List<JmapMailbox>();
         var seenIds = new HashSet<string>(StringComparer.Ordinal);
+        string? queryState = null;
         var position = 0;
         while (true) {
             var query = await CallAsync(
@@ -83,6 +100,14 @@ public sealed partial class JmapApiClient : IDisposable {
                 JmapJsonContext.Default.JmapMailboxQueryArguments,
                 JmapJsonContext.Default.JmapMailboxQueryResult,
                 cancellationToken).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(query.QueryState)) {
+                throw new JmapApiException("invalidResponse", "JMAP Mailbox/query did not return a query state.");
+            }
+            if (queryState == null) {
+                queryState = query.QueryState;
+            } else if (!string.Equals(queryState, query.QueryState, StringComparison.Ordinal)) {
+                throw new JmapApiException("stateChanged", "JMAP mailbox state changed while the bounded listing was in progress; restart the listing.");
+            }
             if (query.Ids.Count == 0) {
                 if (query.Total.HasValue && position < query.Total.Value) {
                     throw new JmapApiException("invalidResponse", "JMAP Mailbox/query ended before its reported total was reached.");
@@ -158,7 +183,7 @@ public sealed partial class JmapApiClient : IDisposable {
             "Email/get",
             new JmapEmailGetArguments {
                 AccountId = context.AccountId,
-                Ids = NormalizeIds(ids, nameof(ids), ResolveMaxObjectsInGet(context.Session)),
+                Ids = NormalizeIds(ids, nameof(ids), ResolveMaxObjectsInGet(context.Session), allowEmpty: true),
                 Properties = NormalizeProperties(properties)
             },
             JmapJsonContext.Default.JmapEmailGetArguments,
@@ -212,6 +237,7 @@ public sealed partial class JmapApiClient : IDisposable {
     /// <summary>Lists identities when the account advertises JMAP submission.</summary>
     public async Task<IReadOnlyList<JmapIdentity>> ListIdentitiesAsync(string? accountId = null, CancellationToken cancellationToken = default) {
         var context = await ResolveAccountAsync(accountId, JmapCapabilities.Submission, cancellationToken).ConfigureAwait(false);
+        var maximum = ResolveMaxObjectsInGet(context.Session);
         var response = await CallAsync(
             context.Session,
             "Identity/get",
@@ -219,6 +245,14 @@ public sealed partial class JmapApiClient : IDisposable {
             JmapJsonContext.Default.JmapIdentityGetArguments,
             JmapJsonContext.Default.JmapIdentityGetResponse,
             cancellationToken).ConfigureAwait(false);
+        if (response.List.Count > maximum) {
+            throw new JmapApiException("invalidResponse", "JMAP Identity/get exceeded the server's advertised maxObjectsInGet limit.");
+        }
+        if (response.NotFound.Count > 0 ||
+            response.List.Any(identity => string.IsNullOrWhiteSpace(identity.Id)) ||
+            response.List.Select(identity => identity.Id!).Distinct(StringComparer.Ordinal).Count() != response.List.Count) {
+            throw new JmapApiException("invalidResponse", "JMAP Identity/get returned invalid identity evidence.");
+        }
         return response.List;
     }
 
@@ -258,4 +292,30 @@ public sealed partial class JmapApiClient : IDisposable {
         statusCode == System.Net.HttpStatusCode.RedirectMethod ||
         statusCode == System.Net.HttpStatusCode.TemporaryRedirect ||
         (int)statusCode == 308;
+
+    private static JmapSessionResource CloneSession(JmapSessionResource session) => new() {
+        Capabilities = session.Capabilities.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value.Clone(),
+            StringComparer.Ordinal),
+        Accounts = session.Accounts.ToDictionary(
+            pair => pair.Key,
+            pair => new JmapAccount {
+                Name = pair.Value.Name,
+                IsPersonal = pair.Value.IsPersonal,
+                IsReadOnly = pair.Value.IsReadOnly,
+                AccountCapabilities = pair.Value.AccountCapabilities.ToDictionary(
+                    capability => capability.Key,
+                    capability => capability.Value.Clone(),
+                    StringComparer.Ordinal)
+            },
+            StringComparer.Ordinal),
+        PrimaryAccounts = new Dictionary<string, string>(session.PrimaryAccounts, StringComparer.Ordinal),
+        UserName = session.UserName,
+        ApiUrl = session.ApiUrl,
+        DownloadUrl = session.DownloadUrl,
+        UploadUrl = session.UploadUrl,
+        EventSourceUrl = session.EventSourceUrl,
+        State = session.State
+    };
 }

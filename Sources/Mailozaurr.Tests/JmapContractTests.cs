@@ -8,6 +8,19 @@ namespace Mailozaurr.Tests;
 /// <summary>Regression coverage for the public JMAP protocol, profile, and evidence contracts.</summary>
 public sealed class JmapContractTests {
     [Fact]
+    public void CallerOwnedHttpClient_RequiresRedirectDisabledAcknowledgement() {
+        using var httpClient = new HttpClient(new RecordingHandler());
+
+        var exception = Assert.Throws<ArgumentException>(() => new JmapApiClient(
+            new Uri("https://mail.example.test/.well-known/jmap"),
+            "secret-token",
+            httpClient));
+
+        Assert.Equal("httpClient", exception.ParamName);
+        Assert.Contains("disable automatic redirects", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task SessionDiscovery_FollowsSameOriginRedirectAndPreservesUploadUrl() {
         var redirect = new HttpResponseMessage(HttpStatusCode.Redirect) {
             Headers = { Location = new Uri("/jmap/session", UriKind.Relative) }
@@ -16,7 +29,7 @@ public sealed class JmapContractTests {
             redirect,
             JsonResponse(SessionJson("https://mail.example.test/jmap/api", uploadUrl: "https://mail.example.test/upload/{accountId}")));
         using var httpClient = new HttpClient(handler);
-        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient, callerOwnedClientDisablesRedirects: true);
 
         var session = await client.GetSessionAsync();
 
@@ -36,7 +49,7 @@ public sealed class JmapContractTests {
         };
         var handler = new RecordingHandler(redirect);
         using var httpClient = new HttpClient(handler);
-        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "secret-token", httpClient, callerOwnedClientDisablesRedirects: true);
 
         var exception = await Assert.ThrowsAsync<JmapApiException>(() => client.GetSessionAsync());
 
@@ -57,7 +70,8 @@ public sealed class JmapContractTests {
             new Uri("https://mail.example.test/.well-known/jmap"),
             "secret-token",
             httpClient,
-            allowCrossOriginApiUrl: true);
+            allowCrossOriginApiUrl: true,
+            callerOwnedClientDisablesRedirects: true);
 
         var session = await client.GetSessionAsync();
 
@@ -122,7 +136,7 @@ public sealed class JmapContractTests {
             JsonResponse(SessionJson("https://mail.example.test/jmap/api")),
             MethodResponse("Email/query", "{\"accountId\":\"a1\",\"queryState\":\"q1\",\"position\":0,\"ids\":[],\"total\":0}", "c1"));
         using var httpClient = new HttpClient(handler);
-        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient, callerOwnedClientDisablesRedirects: true);
 
         await client.QueryEmailsAsync(
             new JmapEmailFilter {
@@ -148,7 +162,7 @@ public sealed class JmapContractTests {
                 "{\"accountId\":\"a1\",\"state\":\"e1\",\"list\":[{\"id\":\" id \",\"to\":null,\"bodyStructure\":{\"type\":\"text/plain\"}}],\"notFound\":null}",
                 "c1"));
         using var httpClient = new HttpClient(handler);
-        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient, callerOwnedClientDisablesRedirects: true);
 
         var result = await client.GetEmailsAsync(new[] { " id ", "id" }, Array.Empty<string>());
 
@@ -163,12 +177,28 @@ public sealed class JmapContractTests {
     }
 
     [Fact]
+    public async Task GetEmails_ExplicitEmptyIdsReturnsCollectionStateWithoutObjects() {
+        var handler = new RecordingHandler(
+            JsonResponse(SessionJson("https://mail.example.test/jmap/api")),
+            MethodResponse("Email/get", "{\"accountId\":\"a1\",\"state\":\"e1\",\"list\":[],\"notFound\":[]}", "c1"));
+        using var httpClient = new HttpClient(handler);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient, callerOwnedClientDisablesRedirects: true);
+
+        var result = await client.GetEmailsAsync(Array.Empty<string>());
+
+        Assert.Equal("e1", result.State);
+        Assert.Empty(result.List);
+        var body = await handler.Requests[1].Content!.ReadAsStringAsync();
+        Assert.Contains("\"ids\":[]", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task EmailChanges_PreservesOpaqueStateTokenVerbatim() {
         var handler = new RecordingHandler(
             JsonResponse(SessionJson("https://mail.example.test/jmap/api")),
             MethodResponse("Email/changes", "{\"accountId\":\"a1\",\"oldState\":\" state \",\"newState\":\"next\",\"hasMoreChanges\":false,\"created\":[],\"updated\":[],\"destroyed\":[]}", "c1"));
         using var httpClient = new HttpClient(handler);
-        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient, callerOwnedClientDisablesRedirects: true);
 
         await client.GetEmailChangesAsync(" state ");
 
@@ -185,7 +215,7 @@ public sealed class JmapContractTests {
             MethodResponse("Mailbox/query", "{\"accountId\":\"a1\",\"queryState\":\"q1\",\"position\":2,\"ids\":[\"m3\"],\"total\":3}", "c3"),
             MethodResponse("Mailbox/get", "{\"accountId\":\"a1\",\"state\":\"m1\",\"list\":[{\"id\":\"m3\",\"name\":\"Shared\"}]}", "c4"));
         using var httpClient = new HttpClient(handler);
-        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient, callerOwnedClientDisablesRedirects: true);
 
         var mailboxes = await client.ListMailboxesAsync();
 
@@ -198,12 +228,28 @@ public sealed class JmapContractTests {
     }
 
     [Fact]
+    public async Task ListMailboxes_FailsWhenQueryStateChangesBetweenPages() {
+        var handler = new RecordingHandler(
+            JsonResponse(SessionJson("https://mail.example.test/jmap/api")),
+            MethodResponse("Mailbox/query", "{\"accountId\":\"a1\",\"queryState\":\"q1\",\"position\":0,\"ids\":[\"m1\",\"m2\"],\"total\":3}", "c1"),
+            MethodResponse("Mailbox/get", "{\"accountId\":\"a1\",\"state\":\"m1\",\"list\":[{\"id\":\"m1\"},{\"id\":\"m2\"}],\"notFound\":[]}", "c2"),
+            MethodResponse("Mailbox/query", "{\"accountId\":\"a1\",\"queryState\":\"q2\",\"position\":2,\"ids\":[\"m3\"],\"total\":3}", "c3"));
+        using var httpClient = new HttpClient(handler);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient, callerOwnedClientDisablesRedirects: true);
+
+        var exception = await Assert.ThrowsAsync<JmapApiException>(() => client.ListMailboxesAsync());
+
+        Assert.Equal("stateChanged", exception.ErrorType);
+        Assert.Equal(4, handler.Requests.Count);
+    }
+
+    [Fact]
     public async Task GetThreads_FailsWhenAnyRequestedIdentifierIsMissing() {
         var handler = new RecordingHandler(
             JsonResponse(SessionJson("https://mail.example.test/jmap/api")),
             MethodResponse("Thread/get", "{\"accountId\":\"a1\",\"state\":\"t1\",\"list\":[{\"id\":\"t1\",\"emailIds\":null}],\"notFound\":[\"missing\"]}", "c1"));
         using var httpClient = new HttpClient(handler);
-        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient, callerOwnedClientDisablesRedirects: true);
 
         var exception = await Assert.ThrowsAsync<JmapApiException>(() => client.GetThreadsAsync(new[] { "t1", "missing" }));
 
@@ -216,7 +262,7 @@ public sealed class JmapContractTests {
             JsonResponse(SessionJson("https://mail.example.test/jmap/api", includeSubmission: true)),
             MethodResponse("Identity/get", "{\"accountId\":\"a1\",\"state\":\"i1\",\"list\":[{\"id\":\"i1\",\"name\":\"User\",\"email\":\"user@example.test\",\"replyTo\":[{\"email\":\"reply@example.test\"}],\"bcc\":null,\"textSignature\":\"Thanks\",\"htmlSignature\":\"<b>Thanks</b>\"}]}", "c1"));
         using var httpClient = new HttpClient(handler);
-        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient, callerOwnedClientDisablesRedirects: true);
 
         var identity = Assert.Single(await client.ListIdentitiesAsync());
 
@@ -224,6 +270,46 @@ public sealed class JmapContractTests {
         Assert.Empty(identity.Bcc);
         Assert.Equal("Thanks", identity.TextSignature);
         Assert.Equal("<b>Thanks</b>", identity.HtmlSignature);
+    }
+
+    [Fact]
+    public async Task ListIdentities_RejectsReplyBeyondAdvertisedGetBound() {
+        var handler = new RecordingHandler(
+            JsonResponse(SessionJson("https://mail.example.test/jmap/api", includeSubmission: true)),
+            MethodResponse(
+                "Identity/get",
+                "{\"accountId\":\"a1\",\"state\":\"i1\",\"list\":[{\"id\":\"i1\"},{\"id\":\"i2\"},{\"id\":\"i3\"}],\"notFound\":[]}",
+                "c1"));
+        using var httpClient = new HttpClient(handler);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient, callerOwnedClientDisablesRedirects: true);
+
+        var exception = await Assert.ThrowsAsync<JmapApiException>(() => client.ListIdentitiesAsync());
+
+        Assert.Equal("invalidResponse", exception.ErrorType);
+        Assert.Contains("maxObjectsInGet", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SessionCache_IsNotMutableThroughReturnedResource() {
+        var handler = new RecordingHandler(
+            JsonResponse(SessionJson("https://mail.example.test/jmap/api")),
+            MethodResponse("Email/query", "{\"accountId\":\"a1\",\"queryState\":\"q1\",\"position\":0,\"ids\":[],\"total\":0}", "c1"));
+        using var httpClient = new HttpClient(handler);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient, callerOwnedClientDisablesRedirects: true);
+
+        var returned = await client.GetSessionAsync();
+        returned.ApiUrl = "https://attacker.example/jmap/api";
+        returned.Accounts.Clear();
+        returned.Capabilities.Clear();
+
+        await client.QueryEmailsAsync(limit: 0);
+        var second = await client.GetSessionAsync();
+
+        Assert.Equal("https://mail.example.test/jmap/api", second.ApiUrl);
+        Assert.True(second.Accounts.ContainsKey("a1"));
+        Assert.True(second.Capabilities.ContainsKey(JmapCapabilities.Core));
+        Assert.Equal(2, handler.Requests.Count);
+        Assert.Equal("mail.example.test", handler.Requests[1].RequestUri?.Host);
     }
 
     [Fact]
@@ -235,7 +321,7 @@ public sealed class JmapContractTests {
             },
             JsonResponse(SessionJson("https://mail.example.test/jmap/api", state: "s2")));
         using var httpClient = new HttpClient(handler);
-        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient, callerOwnedClientDisablesRedirects: true);
 
         await client.QueryEmailsAsync(limit: 0);
         var refreshed = await client.GetSessionAsync();
@@ -248,7 +334,7 @@ public sealed class JmapContractTests {
     public async Task ConcurrentMethodCalls_AreSerializedBelowEveryAdvertisedPositiveLimit() {
         var handler = new ConcurrentJmapHandler();
         using var httpClient = new HttpClient(handler);
-        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient, callerOwnedClientDisablesRedirects: true);
 
         await Task.WhenAll(
             client.QueryEmailsAsync(limit: 0),

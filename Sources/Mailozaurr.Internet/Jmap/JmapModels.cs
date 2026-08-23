@@ -632,6 +632,7 @@ internal sealed class JmapIdentityGetArguments {
 
 internal sealed class JmapIdentityGetResponse {
     private List<JmapIdentity> _list = new();
+    private List<string> _notFound = new();
 
     [JsonPropertyName("accountId")]
     public string? AccountId { get; set; }
@@ -643,6 +644,12 @@ internal sealed class JmapIdentityGetResponse {
     public List<JmapIdentity> List {
         get => _list;
         set => _list = value ?? new List<JmapIdentity>();
+    }
+
+    [JsonPropertyName("notFound")]
+    public List<string> NotFound {
+        get => _notFound;
+        set => _notFound = value ?? new List<string>();
     }
 }
 

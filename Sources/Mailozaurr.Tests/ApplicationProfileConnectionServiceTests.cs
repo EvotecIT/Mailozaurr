@@ -714,7 +714,11 @@ public sealed class ApplicationProfileConnectionServiceTests {
                 "\"myRights\":{\"mayReadItems\":true,\"mayAddItems\":false}}]},\"c2\"]]}"));
         using var httpClient = new HttpClient(handler);
         var factory = new DelegateJmapSessionFactory(profile => new JmapSession(
-            new JmapApiClient(new Uri(profile.Settings[MailProfileSettingsKeys.JmapSessionUrl]), "token", httpClient)));
+            new JmapApiClient(
+                new Uri(profile.Settings[MailProfileSettingsKeys.JmapSessionUrl]),
+                "token",
+                httpClient,
+                callerOwnedClientDisablesRedirects: true)));
         var service = MailProfileConnectionService.CreateWithJmap(
             new InMemoryProfileStore(new[] { CreateJmapProfile() }),
             factory);
