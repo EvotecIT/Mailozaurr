@@ -79,6 +79,7 @@ public static class MailCapabilityCatalog {
                 | MailCapability.UseThreads
                 | MailCapability.UseLabels
                 | MailCapability.InspectPermissions,
+            MailProfileKind.Jmap => MailCapability.UseThreads,
             MailProfileKind.Smtp => MailCapability.SendMessages,
             MailProfileKind.SendGrid => MailCapability.SendMessages,
             MailProfileKind.Mailgun => MailCapability.SendMessages,
@@ -99,6 +100,7 @@ public static class MailCapabilityCatalog {
         bool hasChangeFeedService = false,
         bool hasGraphMailboxService = false,
         bool hasGmailMailboxService = false,
+        bool hasJmapMailboxService = false,
         bool hasPermissionEvidenceService = false) {
         var result = new Dictionary<MailProfileKind, MailCapability>();
         Add(result, readHandlers.Select(handler => handler.Kind), ReadServiceCapabilities);
@@ -134,6 +136,11 @@ public static class MailCapabilityCatalog {
             hasGmailMailboxService,
             new[] { MailProfileKind.Gmail },
             MailCapability.ManageRules | MailCapability.UseThreads | MailCapability.UseLabels);
+        AddServiceOverrideCapabilities(
+            result,
+            hasJmapMailboxService,
+            new[] { MailProfileKind.Jmap },
+            MailCapability.UseThreads);
         AddServiceOverrideCapabilities(
             result,
             hasPermissionEvidenceService,

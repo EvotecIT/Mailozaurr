@@ -44,6 +44,17 @@ public static class MailProfileValidator {
             case MailProfileKind.Gmail:
                 RequireOneOf(profile, result, MailProfileSettingsKeys.Mailbox, "defaultMailbox");
                 break;
+            case MailProfileKind.Jmap:
+                RequireSetting(profile, MailProfileSettingsKeys.JmapSessionUrl, result);
+                if (profile.Settings.TryGetValue(MailProfileSettingsKeys.JmapSessionUrl, out var jmapSessionUrl) &&
+                    !IsValidJmapSessionUrl(jmapSessionUrl)) {
+                    result.Errors.Add($"Profile setting '{MailProfileSettingsKeys.JmapSessionUrl}' must be an absolute HTTPS URL without user information or a fragment.");
+                }
+                if (profile.Settings.TryGetValue(MailProfileSettingsKeys.JmapAllowCrossOriginApiUrl, out var allowCrossOrigin) &&
+                    !bool.TryParse(allowCrossOrigin, out _)) {
+                    result.Errors.Add($"Profile setting '{MailProfileSettingsKeys.JmapAllowCrossOriginApiUrl}' must be true or false.");
+                }
+                break;
         }
 
         if (profile.GetCapabilities().Supports(MailCapability.SendMessages) &&
@@ -52,6 +63,7 @@ public static class MailProfileValidator {
         }
 
         if (profile.GetCapabilities().Supports(MailCapability.ReadMessages) &&
+            profile.Kind != MailProfileKind.Jmap &&
             string.IsNullOrWhiteSpace(profile.DefaultMailbox) &&
             !profile.Settings.ContainsKey(MailProfileSettingsKeys.Mailbox)) {
             result.Warnings.Add("Read-capable profiles should define DefaultMailbox or a mailbox setting.");
@@ -63,6 +75,16 @@ public static class MailProfileValidator {
             ? (result.Warnings.Count == 0 ? "Profile is valid." : "Profile is valid with warnings.")
             : result.Errors[0];
         return result;
+    }
+
+    private static bool IsValidJmapSessionUrl(string value) {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)) return false;
+        try {
+            _ = JmapApiClient.ValidateSessionUrl(uri);
+            return true;
+        } catch (ArgumentException) {
+            return false;
+        }
     }
 
     private static void RequireSetting(MailProfile profile, string key, MailProfileValidationResult result) {

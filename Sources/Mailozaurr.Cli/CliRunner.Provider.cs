@@ -137,6 +137,42 @@ public static partial class CliRunner {
                 await application.GmailMailbox.DeleteThreadAsync(profile, RequireOption(parseResult, "thread-id"), mailbox).ConfigureAwait(false);
                 await output.WriteLineAsync("Gmail thread permanently deleted.").ConfigureAwait(false);
                 return 0;
+            case "jmap-session":
+                var jmapSession = await application.JmapMailbox.GetSessionAsync(profile).ConfigureAwait(false);
+                await WriteItemAsync(output, jmapSession, json, value => $"{value.UserName ?? "(unknown)"}; state={value.State ?? "(none)"}").ConfigureAwait(false);
+                return 0;
+            case "jmap-mailbox-list":
+                var jmapMailboxes = await application.JmapMailbox.ListMailboxesAsync(profile).ConfigureAwait(false);
+                await WriteSequenceAsync(output, jmapMailboxes, json, value => value.Name ?? value.Id ?? "(mailbox)").ConfigureAwait(false);
+                return 0;
+            case "jmap-email-query":
+                var jmapQuery = await application.JmapMailbox.QueryEmailsAsync(
+                    profile,
+                    string.IsNullOrWhiteSpace(parseResult.GetOption("query")) ? null : new JmapEmailFilter { Text = parseResult.GetOption("query") },
+                    position: parseResult.GetIntOption("position") ?? 0,
+                    limit: parseResult.GetIntOption("limit") ?? 100).ConfigureAwait(false);
+                await WriteItemAsync(output, jmapQuery, json, value => $"{value.Ids.Count} email id(s); position={value.Position}; hasMore={value.HasMore}; state={value.QueryState ?? "(none)"}").ConfigureAwait(false);
+                return 0;
+            case "jmap-email-get":
+                var jmapEmailIds = parseResult.GetOptionValues("message-id")
+                    .Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value!).ToArray();
+                var jmapEmails = await application.JmapMailbox.GetEmailsAsync(profile, jmapEmailIds).ConfigureAwait(false);
+                await WriteItemAsync(output, jmapEmails, json, value => $"{value.List.Count} email(s); state={value.State ?? "(none)"}").ConfigureAwait(false);
+                return 0;
+            case "jmap-email-changes":
+                var jmapChanges = await application.JmapMailbox.GetEmailChangesAsync(profile, RequireOption(parseResult, "cursor"), parseResult.GetIntOption("limit") ?? 1000).ConfigureAwait(false);
+                await WriteItemAsync(output, jmapChanges, json, value => $"created={value.Created.Count}; updated={value.Updated.Count}; destroyed={value.Destroyed.Count}; state={value.NewState ?? "(none)"}").ConfigureAwait(false);
+                return 0;
+            case "jmap-thread-get":
+                var jmapThreadIds = parseResult.GetOptionValues("thread-id")
+                    .Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value!).ToArray();
+                var jmapThreads = await application.JmapMailbox.GetThreadsAsync(profile, jmapThreadIds).ConfigureAwait(false);
+                await WriteSequenceAsync(output, jmapThreads, json, value => value.Id ?? "(thread)").ConfigureAwait(false);
+                return 0;
+            case "jmap-identity-list":
+                var jmapIdentities = await application.JmapMailbox.ListIdentitiesAsync(profile).ConfigureAwait(false);
+                await WriteSequenceAsync(output, jmapIdentities, json, value => value.Email ?? value.Name ?? value.Id ?? "(identity)").ConfigureAwait(false);
+                return 0;
             default:
                 return await WriteUnknownCommandAsync(command, error).ConfigureAwait(false);
         }

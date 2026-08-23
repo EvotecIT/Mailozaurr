@@ -24,6 +24,8 @@ public sealed class ApplicationProfileConnectionServiceTests {
 
         Assert.NotNull(method);
         Assert.True(method!.IsPublic);
+        Assert.Equal(15, method.GetParameters().Length);
+        Assert.Equal(typeof(Func<Smtp, CancellationToken, Task>), method.GetParameters()[14].ParameterType);
     }
 
     [Fact]
@@ -679,6 +681,93 @@ public sealed class ApplicationProfileConnectionServiceTests {
         Assert.Single(handler.Requests);
     }
 
+    [Fact]
+    public async Task JmapSendScopeFallsBackToAuthWhenSubmissionIsNotImplemented() {
+        var store = new InMemoryProfileStore(new[] {
+            CreateJmapProfile()
+        });
+        var service = new MailProfileConnectionService(store);
+
+        var result = await service.TestAsync("jmap-work", MailProfileConnectionTestScope.Send);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(MailProfileConnectionTestScope.Send, result.RequestedScope);
+        Assert.Equal(MailProfileConnectionTestScope.Auth, result.ExecutedScope);
+        Assert.Equal("connection_test_not_supported", result.Code);
+    }
+
+    [Fact]
+    public async Task JmapMailboxEvidenceSeparatesIdentityCapabilitiesAndEffectiveRights() {
+        var handler = new RecordingHandler(
+            JsonResponse(
+                "{\"capabilities\":{\"urn:ietf:params:jmap:core\":{\"maxObjectsInGet\":100,\"maxSizeRequest\":1000000},\"urn:ietf:params:jmap:mail\":{}}," +
+                "\"accounts\":{\"a1\":{\"name\":\"Primary\",\"isPersonal\":true,\"isReadOnly\":true," +
+                "\"accountCapabilities\":{\"urn:ietf:params:jmap:mail\":{}}}}," +
+                "\"primaryAccounts\":{\"urn:ietf:params:jmap:mail\":\"a1\"}," +
+                "\"username\":\"login-name\",\"apiUrl\":\"https://mail.example.test/jmap/api\",\"state\":\"s1\"}"),
+            JsonResponse(
+                "{\"methodResponses\":[[\"Mailbox/query\",{\"accountId\":\"a1\",\"queryState\":\"q1\",\"position\":0," +
+                "\"ids\":[\"inbox\"],\"total\":1},\"c1\"]]}"),
+            JsonResponse(
+                "{\"methodResponses\":[[\"Mailbox/get\",{\"accountId\":\"a1\",\"state\":\"m1\",\"list\":[" +
+                "{\"id\":\"inbox\",\"name\":\"Inbox\",\"role\":\"inbox\",\"totalEmails\":3," +
+                "\"myRights\":{\"mayReadItems\":true,\"mayAddItems\":false}}]},\"c2\"]]}"));
+        using var httpClient = new HttpClient(handler);
+        var factory = new DelegateJmapSessionFactory(profile => new JmapSession(
+            new JmapApiClient(
+                new Uri(profile.Settings[MailProfileSettingsKeys.JmapSessionUrl]),
+                "token",
+                httpClient,
+                callerOwnedClientDisablesRedirects: true)));
+        var service = MailProfileConnectionService.CreateWithJmap(
+            new InMemoryProfileStore(new[] { CreateJmapProfile() }),
+            factory);
+
+        var result = await service.TestAsync("jmap-work", MailProfileConnectionTestScope.Mailbox);
+
+        Assert.True(result.Succeeded);
+        var evidence = result.Stages[result.Stages.Count - 1].Evidence;
+        Assert.Equal("a1", evidence?.Identity?.Id);
+        Assert.Null(evidence?.Identity?.EmailAddress);
+        Assert.Contains("authentication identifier", evidence?.IdentityUnavailableReason);
+        Assert.True(evidence?.Permissions?.Authoritative);
+        var permissionNames = evidence?.Permissions?.Names ?? new List<string>();
+        Assert.Contains("account:isReadOnly", permissionNames);
+        Assert.Contains("mailbox:inbox:mayReadItems", permissionNames);
+        Assert.DoesNotContain(JmapCapabilities.Mail, permissionNames);
+        Assert.Equal(1, evidence?.Mailbox?.FolderCount);
+    }
+
+    [Fact]
+    public async Task JmapAuthProbeRejectsConfiguredAccountMissingFromSession() {
+        var profile = CreateJmapProfile();
+        profile.Settings[MailProfileSettingsKeys.JmapAccountId] = "missing";
+        var handler = new RecordingHandler(JsonResponse(
+            "{\"capabilities\":{\"urn:ietf:params:jmap:core\":{\"maxObjectsInGet\":100,\"maxSizeRequest\":1000000},\"urn:ietf:params:jmap:mail\":{}}," +
+            "\"accounts\":{\"a1\":{\"name\":\"Primary\",\"isPersonal\":true,\"isReadOnly\":false," +
+            "\"accountCapabilities\":{\"urn:ietf:params:jmap:mail\":{}}}}," +
+            "\"primaryAccounts\":{\"urn:ietf:params:jmap:mail\":\"a1\"}," +
+            "\"username\":\"login-name\",\"apiUrl\":\"https://mail.example.test/jmap/api\",\"state\":\"s1\"}"));
+        using var httpClient = new HttpClient(handler);
+        var factory = new DelegateJmapSessionFactory(current => new JmapSession(
+            new JmapApiClient(
+                new Uri(current.Settings[MailProfileSettingsKeys.JmapSessionUrl]),
+                "token",
+                httpClient,
+                callerOwnedClientDisablesRedirects: true),
+            current.Settings[MailProfileSettingsKeys.JmapAccountId]));
+        var service = MailProfileConnectionService.CreateWithJmap(
+            new InMemoryProfileStore(new[] { profile }),
+            factory);
+
+        var result = await service.TestAsync("jmap-work", MailProfileConnectionTestScope.Auth);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("connection_test_failed", result.Code);
+        Assert.Single(handler.Requests);
+        Assert.Null(result.Stages[result.Stages.Count - 1].Evidence);
+    }
+
     [Theory]
     [InlineData(-1, null)]
     [InlineData(0, 0L)]
@@ -868,6 +957,15 @@ public sealed class ApplicationProfileConnectionServiceTests {
         }
     });
 
+    private static MailProfile CreateJmapProfile() => new() {
+        Id = "jmap-work",
+        DisplayName = "Work JMAP",
+        Kind = MailProfileKind.Jmap,
+        Settings = new Dictionary<string, string> {
+            [MailProfileSettingsKeys.JmapSessionUrl] = "https://mail.example.test/.well-known/jmap"
+        }
+    };
+
     private const string GmailInsufficientPermissionsResponse =
         "{\"error\":{\"errors\":[{\"reason\":\"insufficientPermissions\"}],\"code\":403,\"status\":\"PERMISSION_DENIED\"}}";
 
@@ -949,6 +1047,19 @@ public sealed class ApplicationProfileConnectionServiceTests {
                 AccessToken = "token",
                 ExpiresOn = DateTimeOffset.MaxValue
             }), profile.DefaultMailbox ?? "me"));
+    }
+
+    private sealed class DelegateJmapSessionFactory : IJmapSessionFactory {
+        private readonly Func<MailProfile, JmapSession> _create;
+
+        public DelegateJmapSessionFactory(Func<MailProfile, JmapSession> create) {
+            _create = create;
+        }
+
+        public Task<JmapSession> ConnectAsync(MailProfile profile, CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(_create(profile));
+        }
     }
 
     private sealed class HttpGmailSessionFactory : IGmailSessionFactory {

@@ -27,6 +27,7 @@ public sealed class MailApplicationBuilder {
     private IMailChangeFeedService? _changeFeedService;
     private IGraphMailboxService? _graphMailboxService;
     private IGmailMailboxService? _gmailMailboxService;
+    private IJmapMailboxService? _jmapMailboxService;
     private IMailPermissionEvidenceService? _permissionEvidenceService;
     private IMailMessageActionPreviewService? _messageActionPreviewService;
     private IMailMessageActionPlanService? _messageActionPlanService;
@@ -43,6 +44,7 @@ public sealed class MailApplicationBuilder {
     private IPop3SessionFactory? _pop3SessionFactory;
     private IGraphSessionFactory? _graphSessionFactory;
     private IGmailSessionFactory? _gmailSessionFactory;
+    private IJmapSessionFactory? _jmapSessionFactory;
     private ISmtpSessionFactory? _smtpSessionFactory;
 
     /// <summary>
@@ -180,6 +182,12 @@ public sealed class MailApplicationBuilder {
         return this;
     }
 
+    /// <summary>Uses an explicit JMAP mailbox service.</summary>
+    public MailApplicationBuilder UseJmapMailboxService(IJmapMailboxService jmapMailboxService) {
+        _jmapMailboxService = jmapMailboxService ?? throw new ArgumentNullException(nameof(jmapMailboxService));
+        return this;
+    }
+
     /// <summary>Uses an explicit provider permission-evidence service.</summary>
     public MailApplicationBuilder UsePermissionEvidenceService(IMailPermissionEvidenceService permissionEvidenceService) {
         _permissionEvidenceService = permissionEvidenceService ?? throw new ArgumentNullException(nameof(permissionEvidenceService));
@@ -276,6 +284,12 @@ public sealed class MailApplicationBuilder {
         return this;
     }
 
+    /// <summary>Uses an explicit JMAP session factory.</summary>
+    public MailApplicationBuilder UseJmapSessionFactory(IJmapSessionFactory jmapSessionFactory) {
+        _jmapSessionFactory = jmapSessionFactory ?? throw new ArgumentNullException(nameof(jmapSessionFactory));
+        return this;
+    }
+
     /// <summary>Uses an explicit SMTP session factory.</summary>
     public MailApplicationBuilder UseSmtpSessionFactory(ISmtpSessionFactory smtpSessionFactory) {
         _smtpSessionFactory = smtpSessionFactory ?? throw new ArgumentNullException(nameof(smtpSessionFactory));
@@ -312,6 +326,7 @@ public sealed class MailApplicationBuilder {
         var pop3SessionFactory = _pop3SessionFactory ?? new Pop3SessionFactory(secretStore);
         var graphSessionFactory = _graphSessionFactory ?? new GraphSessionFactory(secretStore);
         var gmailSessionFactory = _gmailSessionFactory ?? new GmailSessionFactory(secretStore);
+        var jmapSessionFactory = _jmapSessionFactory ?? new JmapSessionFactory(secretStore);
         var smtpSessionFactory = _smtpSessionFactory ?? new SmtpSessionFactory(secretStore);
         var profileSecretService = _profileSecretService ?? new MailProfileSecretService(profileStore, secretStore);
         var profileSecretMaintenanceService = _profileSecretMaintenanceService ??
@@ -374,14 +389,16 @@ public sealed class MailApplicationBuilder {
             hasChangeFeedService: true,
             hasGraphMailboxService: true,
             hasGmailMailboxService: true,
+            hasJmapMailboxService: true,
             hasPermissionEvidenceService: true);
         var profileService = _profileService ?? new MailProfileService(
             profileStore, secretStore, availableCapabilities);
         var profileBootstrapService = _profileBootstrapService ?? new MailProfileBootstrapService(profileService, profileSecretService, secretStore);
         var profileAuthService = _profileAuthService ?? new MailProfileAuthService(profileService, profileSecretService, secretStore);
         var profileOverviewService = _profileOverviewService ?? new MailProfileOverviewService(profileService, profileAuthService);
-        var profileConnectionService = _profileConnectionService ?? MailProfileConnectionService.CreateWithPop3(
+        var profileConnectionService = _profileConnectionService ?? MailProfileConnectionService.CreateWithJmap(
             profileStore,
+            jmapSessionFactory,
             pop3SessionFactory,
             imapSessionFactory,
             graphSessionFactory,
@@ -405,6 +422,7 @@ public sealed class MailApplicationBuilder {
             gmailSessionFactory);
         var graphMailboxService = _graphMailboxService ?? new GraphMailboxService(profileStore, graphSessionFactory);
         var gmailMailboxService = _gmailMailboxService ?? new GmailMailboxService(profileStore, gmailSessionFactory);
+        var jmapMailboxService = _jmapMailboxService ?? new JmapMailboxService(profileStore, jmapSessionFactory);
         var permissionEvidenceService = _permissionEvidenceService ?? new MailPermissionEvidenceService(
             profileStore,
             graphSessionFactory,
@@ -440,6 +458,7 @@ public sealed class MailApplicationBuilder {
             changeFeedService,
             graphMailboxService,
             gmailMailboxService,
+            jmapMailboxService,
             permissionEvidenceService,
             messageActionPreviewService,
             messageActionPlanService,

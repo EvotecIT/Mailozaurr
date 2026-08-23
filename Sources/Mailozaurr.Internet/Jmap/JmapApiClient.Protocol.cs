@@ -1,0 +1,260 @@
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
+
+namespace Mailozaurr;
+
+public sealed partial class JmapApiClient {
+    private async Task<TResponse> CallAsync<TArguments, TResponse>(
+        JmapSessionResource session,
+        string methodName,
+        TArguments arguments,
+        JsonTypeInfo<TArguments> argumentsType,
+        JsonTypeInfo<TResponse> responseType,
+        CancellationToken cancellationToken) {
+        var apiUrl = ResolveApiUrl(session);
+        var callId = "c" + Interlocked.Increment(ref _callSequence).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        byte[] requestBody;
+        using (var buffer = new MemoryStream()) {
+            using (var writer = new Utf8JsonWriter(buffer)) {
+                writer.WriteStartObject();
+                writer.WritePropertyName("using");
+                writer.WriteStartArray();
+                writer.WriteStringValue(JmapCapabilities.Core);
+                writer.WriteStringValue(JmapCapabilities.Mail);
+                if (methodName.StartsWith("Identity/", StringComparison.Ordinal)) writer.WriteStringValue(JmapCapabilities.Submission);
+                writer.WriteEndArray();
+                writer.WritePropertyName("methodCalls");
+                writer.WriteStartArray();
+                writer.WriteStartArray();
+                writer.WriteStringValue(methodName);
+                writer.WriteRawValue(JsonSerializer.Serialize(arguments, argumentsType));
+                writer.WriteStringValue(callId);
+                writer.WriteEndArray();
+                writer.WriteEndArray();
+                writer.WriteEndObject();
+            }
+            requestBody = buffer.ToArray();
+        }
+        var maximumRequestBytes = ResolveMaxSizeRequest(session);
+        if (requestBody.LongLength > maximumRequestBytes) {
+            throw new JmapApiException(
+                "requestTooLarge",
+                $"JMAP method request exceeded the server's advertised {maximumRequestBytes}-byte limit.");
+        }
+
+        await _methodRequestGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try {
+            if (!ReferenceEquals(Volatile.Read(ref _session), session)) {
+                throw new JmapApiException("sessionStateChanged", "The JMAP Session resource changed before the method request could be sent; retry with fresh discovery data.");
+            }
+            using var request = CreateRequest(HttpMethod.Post, apiUrl);
+            request.Content = new ByteArrayContent(requestBody);
+            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+            using var response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode) {
+                throw new JmapApiException("requestFailed", $"JMAP method request failed ({(int)response.StatusCode}).");
+            }
+            var payload = await ReadBoundedAsync(response.Content, cancellationToken).ConfigureAwait(false);
+            try {
+                using var document = JsonDocument.Parse(payload);
+                if (document.RootElement.TryGetProperty("sessionState", out var returnedSessionState) &&
+                    returnedSessionState.ValueKind == JsonValueKind.String &&
+                    !string.Equals(returnedSessionState.GetString(), session.State, StringComparison.Ordinal)) {
+                    Interlocked.CompareExchange(ref _session, null, session);
+                }
+                if (!document.RootElement.TryGetProperty("methodResponses", out var responses) || responses.ValueKind != JsonValueKind.Array) {
+                    throw new JmapApiException("invalidResponse", "JMAP response did not contain methodResponses.");
+                }
+                var tuples = responses.EnumerateArray().ToArray();
+                if (tuples.Length != 1 || tuples[0].ValueKind != JsonValueKind.Array) {
+                    throw new JmapApiException("invalidResponse", "JMAP returned an unexpected method response count.");
+                }
+                var tuple = tuples[0].EnumerateArray().ToArray();
+                if (tuple.Length != 3 || tuple[0].ValueKind != JsonValueKind.String || tuple[2].ValueKind != JsonValueKind.String) {
+                    throw new JmapApiException("invalidResponse", "JMAP returned an invalid method response tuple.");
+                }
+                var returnedMethod = tuple[0].GetString();
+                var returnedCallId = tuple[2].GetString();
+                if (!string.Equals(returnedCallId, callId, StringComparison.Ordinal)) {
+                    throw new JmapApiException("invalidResponse", "JMAP returned a response for a different call identifier.");
+                }
+                if (string.Equals(returnedMethod, "error", StringComparison.Ordinal)) {
+                    var errorType = tuple[1].ValueKind == JsonValueKind.Object && tuple[1].TryGetProperty("type", out var type)
+                        ? type.GetString()
+                        : null;
+                    throw new JmapApiException(errorType ?? "methodError", $"JMAP method '{methodName}' failed with '{errorType ?? "methodError"}'.");
+                }
+                if (!string.Equals(returnedMethod, methodName, StringComparison.Ordinal)) {
+                    throw new JmapApiException("invalidResponse", "JMAP returned a response for a different method.");
+                }
+                return JsonSerializer.Deserialize(tuple[1].GetRawText(), responseType)
+                    ?? throw new JmapApiException("invalidResponse", $"JMAP method '{methodName}' returned an empty result.");
+            } catch (JsonException) {
+                throw new JmapApiException("invalidResponse", "JMAP returned invalid JSON.");
+            }
+        } finally {
+            _methodRequestGate.Release();
+        }
+    }
+
+    private async Task<(JmapSessionResource Session, string AccountId)> ResolveAccountAsync(
+        string? accountId,
+        string capability,
+        CancellationToken cancellationToken) {
+        var session = await GetTrustedSessionAsync(forceRefresh: false, cancellationToken: cancellationToken).ConfigureAwait(false);
+        string resolved;
+        if (!string.IsNullOrWhiteSpace(accountId)) {
+            resolved = accountId!;
+        } else if (!session.PrimaryAccounts.TryGetValue(capability, out resolved!) || string.IsNullOrWhiteSpace(resolved)) {
+            throw new JmapApiException("accountNotFound", $"The JMAP Session resource did not identify a primary account for '{capability}'.");
+        }
+        if (!session.Accounts.TryGetValue(resolved, out var account)) {
+            throw new JmapApiException("accountNotFound", "The selected JMAP account was not present in the Session resource.");
+        }
+        if (!account.AccountCapabilities.ContainsKey(capability)) {
+            throw new JmapApiException("accountCapabilityMissing", $"The selected JMAP account does not advertise '{capability}'.");
+        }
+        return (session, resolved);
+    }
+
+    private void ThrowIfSessionChanged(JmapSessionResource session) {
+        if (!ReferenceEquals(Volatile.Read(ref _session), session)) {
+            throw new JmapApiException("sessionStateChanged", "The JMAP Session resource changed during the multi-call operation; retry with fresh discovery data.");
+        }
+    }
+
+    private Uri ResolveApiUrl(JmapSessionResource session) {
+        if (!Uri.TryCreate(session.ApiUrl, UriKind.Absolute, out var apiUrl)) {
+            throw new JmapApiException("invalidSession", "The JMAP Session resource did not contain an absolute API URL.");
+        }
+        apiUrl = ValidateHttpsUri(apiUrl, "API URL");
+        if (!_allowCrossOriginApiUrl && !HasSameOrigin(SessionUrl, apiUrl)) {
+            throw new JmapApiException("crossOriginApiUrl", "The JMAP API URL uses a different origin; explicit cross-origin authorization is required.");
+        }
+        return apiUrl;
+    }
+
+    private void ValidateSession(JmapSessionResource? session) {
+        if (session == null) throw new JmapApiException("invalidSession", "JMAP returned an empty Session resource.");
+        if (!session.Capabilities.ContainsKey(JmapCapabilities.Core)) {
+            throw new JmapApiException("capabilityMissing", "The server does not advertise the JMAP core capability.");
+        }
+        if (!session.Capabilities.ContainsKey(JmapCapabilities.Mail)) {
+            throw new JmapApiException("capabilityMissing", "The server does not advertise JMAP mail.");
+        }
+        _ = ResolveApiUrl(session);
+    }
+
+    private HttpRequestMessage CreateRequest(HttpMethod method, Uri uri) {
+        var request = new HttpRequestMessage(method, uri);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        return request;
+    }
+
+    private async Task<byte[]> ReadBoundedAsync(HttpContent content, CancellationToken cancellationToken) {
+        var maximum = MaximumResponseBytes;
+#if NET5_0_OR_GREATER
+        using var stream = await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+#else
+        using var stream = await content.ReadAsStreamAsync().ConfigureAwait(false);
+#endif
+        using var output = new MemoryStream();
+        var buffer = new byte[81920];
+        while (true) {
+            var read = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
+            if (read == 0) break;
+            if (output.Length + read > maximum) throw new JmapApiException("responseTooLarge", "JMAP response exceeded the configured byte limit.");
+            output.Write(buffer, 0, read);
+        }
+        return output.ToArray();
+    }
+
+    /// <summary>Validates an operator-supplied JMAP Session resource URL.</summary>
+    public static Uri ValidateSessionUrl(Uri uri) =>
+        ValidateHttpsUri(uri ?? throw new ArgumentNullException(nameof(uri)), "session URL");
+
+    private static Uri ValidateHttpsUri(Uri uri, string label) {
+        if (!uri.IsAbsoluteUri || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(uri.Host) || !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Fragment)) {
+            throw new ArgumentException($"JMAP {label} must be an absolute HTTPS URL without user information or a fragment.", nameof(uri));
+        }
+        return uri;
+    }
+
+    private static bool HasSameOrigin(Uri left, Uri right) =>
+        string.Equals(left.Scheme, right.Scheme, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(left.Host, right.Host, StringComparison.OrdinalIgnoreCase) &&
+        left.Port == right.Port;
+
+    private static int ResolveMaxObjectsInGet(JmapSessionResource session) {
+        if (!session.Capabilities.TryGetValue(JmapCapabilities.Core, out var core) ||
+            core.ValueKind != JsonValueKind.Object ||
+            !core.TryGetProperty("maxObjectsInGet", out var value) ||
+            value.ValueKind != JsonValueKind.Number ||
+            !value.TryGetInt64(out var advertisedMaximum) ||
+            advertisedMaximum <= 0) {
+            throw new JmapApiException(
+                "invalidSession",
+                "The JMAP core capability did not report a valid maxObjectsInGet limit.");
+        }
+        return (int)Math.Min(advertisedMaximum, 5000L);
+    }
+
+    private static long ResolveMaxSizeRequest(JmapSessionResource session) {
+        if (!session.Capabilities.TryGetValue(JmapCapabilities.Core, out var core) ||
+            core.ValueKind != JsonValueKind.Object ||
+            !core.TryGetProperty("maxSizeRequest", out var value) ||
+            value.ValueKind != JsonValueKind.Number ||
+            !value.TryGetInt64(out var advertisedMaximum) ||
+            advertisedMaximum <= 0) {
+            throw new JmapApiException(
+                "invalidSession",
+                "The JMAP core capability did not report a valid maxSizeRequest limit.");
+        }
+        return advertisedMaximum;
+    }
+
+    private static string[] NormalizeIds(IReadOnlyCollection<string> ids, string parameterName, int maximum, bool allowEmpty = false) {
+        if (ids == null) throw new ArgumentNullException(parameterName);
+        if (ids.Count == 0) {
+            if (allowEmpty) return Array.Empty<string>();
+            throw new ArgumentException("At least one identifier is required.", parameterName);
+        }
+        if (ids.Any(string.IsNullOrWhiteSpace)) {
+            throw new ArgumentException("Identifiers must be non-empty opaque strings.", parameterName);
+        }
+        var normalized = ids
+            .Distinct(StringComparer.Ordinal)
+            .Take(maximum + 1)
+            .ToArray();
+        if (normalized.Length > maximum) {
+            throw new ArgumentOutOfRangeException(
+                parameterName,
+                $"The discovered JMAP server permits no more than {maximum} objects in one get request.");
+        }
+        return normalized;
+    }
+
+    private static string[]? NormalizeProperties(IReadOnlyCollection<string>? properties) {
+        if (properties == null) return null;
+        var normalized = properties.Where(property => !string.IsNullOrWhiteSpace(property))
+            .Distinct(StringComparer.Ordinal)
+            .Take(257)
+            .ToArray();
+        if (normalized.Length > 256) {
+            throw new ArgumentOutOfRangeException(nameof(properties), "No more than 256 JMAP properties may be requested.");
+        }
+        return normalized;
+    }
+
+    private static int Clamp(int value, int minimum, int maximum) =>
+        value < minimum ? minimum : value > maximum ? maximum : value;
+
+    private void ThrowIfDisposed() {
+        if (_disposed) throw new ObjectDisposedException(nameof(JmapApiClient));
+    }
+}

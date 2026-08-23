@@ -40,6 +40,9 @@ public static class MailProfileKindParser {
             case "gmail":
                 kind = MailProfileKind.Gmail;
                 return true;
+            case "jmap":
+                kind = MailProfileKind.Jmap;
+                return true;
             case "smtp":
                 kind = MailProfileKind.Smtp;
                 return true;
