@@ -185,6 +185,7 @@ internal static partial class CliCommandModel {
         "is-default" => "Make the profile the default.",
         "kind" => "Mail provider kind.",
         "limit" => "Maximum result count.",
+        "position" => "Zero-based JMAP query position; negative values address results from the end.",
         "label-id" => "Gmail label identifier.",
         "login" => "Interactive login user name.",
         "mailbox" => "Mailbox identifier or address.",

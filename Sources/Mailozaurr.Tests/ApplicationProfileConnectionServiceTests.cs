@@ -706,9 +706,12 @@ public sealed class ApplicationProfileConnectionServiceTests {
                 "\"primaryAccounts\":{\"urn:ietf:params:jmap:mail\":\"a1\"}," +
                 "\"username\":\"login-name\",\"apiUrl\":\"https://mail.example.test/jmap/api\",\"state\":\"s1\"}"),
             JsonResponse(
+                "{\"methodResponses\":[[\"Mailbox/query\",{\"accountId\":\"a1\",\"queryState\":\"q1\",\"position\":0," +
+                "\"ids\":[\"inbox\"],\"total\":1},\"c1\"]]}"),
+            JsonResponse(
                 "{\"methodResponses\":[[\"Mailbox/get\",{\"accountId\":\"a1\",\"state\":\"m1\",\"list\":[" +
                 "{\"id\":\"inbox\",\"name\":\"Inbox\",\"role\":\"inbox\",\"totalEmails\":3," +
-                "\"myRights\":{\"mayReadItems\":true,\"mayAddItems\":false}}]},\"c1\"]]}"));
+                "\"myRights\":{\"mayReadItems\":true,\"mayAddItems\":false}}]},\"c2\"]]}"));
         using var httpClient = new HttpClient(handler);
         var factory = new DelegateJmapSessionFactory(profile => new JmapSession(
             new JmapApiClient(new Uri(profile.Settings[MailProfileSettingsKeys.JmapSessionUrl]), "token", httpClient)));

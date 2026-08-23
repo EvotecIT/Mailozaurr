@@ -39,45 +39,55 @@ public sealed partial class JmapApiClient {
             requestBody = buffer.ToArray();
         }
 
-        using var request = CreateRequest(HttpMethod.Post, apiUrl);
-        request.Content = new ByteArrayContent(requestBody);
-        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-        using var response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode) {
-            throw new JmapApiException("requestFailed", $"JMAP method request failed ({(int)response.StatusCode}).");
-        }
-        var payload = await ReadBoundedAsync(response.Content, cancellationToken).ConfigureAwait(false);
+        await _methodRequestGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
-            using var document = JsonDocument.Parse(payload);
-            if (!document.RootElement.TryGetProperty("methodResponses", out var responses) || responses.ValueKind != JsonValueKind.Array) {
-                throw new JmapApiException("invalidResponse", "JMAP response did not contain methodResponses.");
+            using var request = CreateRequest(HttpMethod.Post, apiUrl);
+            request.Content = new ByteArrayContent(requestBody);
+            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+            using var response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode) {
+                throw new JmapApiException("requestFailed", $"JMAP method request failed ({(int)response.StatusCode}).");
             }
-            var tuples = responses.EnumerateArray().ToArray();
-            if (tuples.Length != 1 || tuples[0].ValueKind != JsonValueKind.Array) {
-                throw new JmapApiException("invalidResponse", "JMAP returned an unexpected method response count.");
+            var payload = await ReadBoundedAsync(response.Content, cancellationToken).ConfigureAwait(false);
+            try {
+                using var document = JsonDocument.Parse(payload);
+                if (document.RootElement.TryGetProperty("sessionState", out var returnedSessionState) &&
+                    returnedSessionState.ValueKind == JsonValueKind.String &&
+                    !string.Equals(returnedSessionState.GetString(), session.State, StringComparison.Ordinal)) {
+                    Interlocked.Exchange(ref _session, null);
+                }
+                if (!document.RootElement.TryGetProperty("methodResponses", out var responses) || responses.ValueKind != JsonValueKind.Array) {
+                    throw new JmapApiException("invalidResponse", "JMAP response did not contain methodResponses.");
+                }
+                var tuples = responses.EnumerateArray().ToArray();
+                if (tuples.Length != 1 || tuples[0].ValueKind != JsonValueKind.Array) {
+                    throw new JmapApiException("invalidResponse", "JMAP returned an unexpected method response count.");
+                }
+                var tuple = tuples[0].EnumerateArray().ToArray();
+                if (tuple.Length != 3 || tuple[0].ValueKind != JsonValueKind.String || tuple[2].ValueKind != JsonValueKind.String) {
+                    throw new JmapApiException("invalidResponse", "JMAP returned an invalid method response tuple.");
+                }
+                var returnedMethod = tuple[0].GetString();
+                var returnedCallId = tuple[2].GetString();
+                if (!string.Equals(returnedCallId, callId, StringComparison.Ordinal)) {
+                    throw new JmapApiException("invalidResponse", "JMAP returned a response for a different call identifier.");
+                }
+                if (string.Equals(returnedMethod, "error", StringComparison.Ordinal)) {
+                    var errorType = tuple[1].ValueKind == JsonValueKind.Object && tuple[1].TryGetProperty("type", out var type)
+                        ? type.GetString()
+                        : null;
+                    throw new JmapApiException(errorType ?? "methodError", $"JMAP method '{methodName}' failed with '{errorType ?? "methodError"}'.");
+                }
+                if (!string.Equals(returnedMethod, methodName, StringComparison.Ordinal)) {
+                    throw new JmapApiException("invalidResponse", "JMAP returned a response for a different method.");
+                }
+                return JsonSerializer.Deserialize(tuple[1].GetRawText(), responseType)
+                    ?? throw new JmapApiException("invalidResponse", $"JMAP method '{methodName}' returned an empty result.");
+            } catch (JsonException) {
+                throw new JmapApiException("invalidResponse", "JMAP returned invalid JSON.");
             }
-            var tuple = tuples[0].EnumerateArray().ToArray();
-            if (tuple.Length != 3 || tuple[0].ValueKind != JsonValueKind.String || tuple[2].ValueKind != JsonValueKind.String) {
-                throw new JmapApiException("invalidResponse", "JMAP returned an invalid method response tuple.");
-            }
-            var returnedMethod = tuple[0].GetString();
-            var returnedCallId = tuple[2].GetString();
-            if (!string.Equals(returnedCallId, callId, StringComparison.Ordinal)) {
-                throw new JmapApiException("invalidResponse", "JMAP returned a response for a different call identifier.");
-            }
-            if (string.Equals(returnedMethod, "error", StringComparison.Ordinal)) {
-                var errorType = tuple[1].ValueKind == JsonValueKind.Object && tuple[1].TryGetProperty("type", out var type)
-                    ? type.GetString()
-                    : null;
-                throw new JmapApiException(errorType ?? "methodError", $"JMAP method '{methodName}' failed with '{errorType ?? "methodError"}'.");
-            }
-            if (!string.Equals(returnedMethod, methodName, StringComparison.Ordinal)) {
-                throw new JmapApiException("invalidResponse", "JMAP returned a response for a different method.");
-            }
-            return JsonSerializer.Deserialize(tuple[1].GetRawText(), responseType)
-                ?? throw new JmapApiException("invalidResponse", $"JMAP method '{methodName}' returned an empty result.");
-        } catch (JsonException) {
-            throw new JmapApiException("invalidResponse", "JMAP returned invalid JSON.");
+        } finally {
+            _methodRequestGate.Release();
         }
     }
 
@@ -88,7 +98,7 @@ public sealed partial class JmapApiClient {
         var session = await GetSessionAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         string resolved;
         if (!string.IsNullOrWhiteSpace(accountId)) {
-            resolved = accountId!.Trim();
+            resolved = accountId!;
         } else if (!session.PrimaryAccounts.TryGetValue(capability, out resolved!) || string.IsNullOrWhiteSpace(resolved)) {
             throw new JmapApiException("accountNotFound", $"The JMAP Session resource did not identify a primary account for '{capability}'.");
         }
@@ -148,6 +158,10 @@ public sealed partial class JmapApiClient {
         return output.ToArray();
     }
 
+    /// <summary>Validates an operator-supplied JMAP Session resource URL.</summary>
+    public static Uri ValidateSessionUrl(Uri uri) =>
+        ValidateHttpsUri(uri ?? throw new ArgumentNullException(nameof(uri)), "session URL");
+
     private static Uri ValidateHttpsUri(Uri uri, string label) {
         if (!uri.IsAbsoluteUri || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
             string.IsNullOrWhiteSpace(uri.Host) || !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Fragment)) {
@@ -178,7 +192,6 @@ public sealed partial class JmapApiClient {
     private static string[] NormalizeIds(IReadOnlyCollection<string> ids, string parameterName, int maximum) {
         if (ids == null) throw new ArgumentNullException(parameterName);
         var normalized = ids.Where(id => !string.IsNullOrWhiteSpace(id))
-            .Select(id => id.Trim())
             .Distinct(StringComparer.Ordinal)
             .Take(maximum + 1)
             .ToArray();
@@ -194,11 +207,13 @@ public sealed partial class JmapApiClient {
     private static string[]? NormalizeProperties(IReadOnlyCollection<string>? properties) {
         if (properties == null) return null;
         var normalized = properties.Where(property => !string.IsNullOrWhiteSpace(property))
-            .Select(property => property.Trim())
             .Distinct(StringComparer.Ordinal)
-            .Take(256)
+            .Take(257)
             .ToArray();
-        return normalized.Length == 0 ? null : normalized;
+        if (normalized.Length > 256) {
+            throw new ArgumentOutOfRangeException(nameof(properties), "No more than 256 JMAP properties may be requested.");
+        }
+        return normalized;
     }
 
     private static int Clamp(int value, int minimum, int maximum) =>

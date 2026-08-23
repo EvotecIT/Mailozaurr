@@ -16,6 +16,9 @@ public sealed class JmapSessionRequest {
 
     /// <summary>Optional account override.</summary>
     public string? AccountId { get; set; }
+
+    /// <summary>Whether this profile explicitly authorizes cross-origin JMAP discovery and API URLs.</summary>
+    public bool AllowCrossOriginApiUrl { get; set; }
 }
 
 /// <summary>Connected JMAP client and optional account selection.</summary>
@@ -23,7 +26,7 @@ public sealed class JmapSession : IDisposable {
     /// <summary>Creates a JMAP session.</summary>
     public JmapSession(JmapApiClient client, string? accountId = null) {
         Client = client ?? throw new ArgumentNullException(nameof(client));
-        AccountId = string.IsNullOrWhiteSpace(accountId) ? null : accountId!.Trim();
+        AccountId = string.IsNullOrWhiteSpace(accountId) ? null : accountId;
     }
 
     /// <summary>JMAP protocol client.</summary>

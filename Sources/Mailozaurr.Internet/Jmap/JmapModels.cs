@@ -17,17 +17,30 @@ public static class JmapCapabilities {
 
 /// <summary>JMAP Session resource discovered through the configured HTTPS endpoint.</summary>
 public sealed class JmapSessionResource {
+    private Dictionary<string, JsonElement> _capabilities = new(StringComparer.Ordinal);
+    private Dictionary<string, JmapAccount> _accounts = new(StringComparer.Ordinal);
+    private Dictionary<string, string> _primaryAccounts = new(StringComparer.Ordinal);
+
     /// <summary>Server-wide capabilities.</summary>
     [JsonPropertyName("capabilities")]
-    public Dictionary<string, JsonElement> Capabilities { get; set; } = new(StringComparer.Ordinal);
+    public Dictionary<string, JsonElement> Capabilities {
+        get => _capabilities;
+        set => _capabilities = value ?? new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+    }
 
     /// <summary>Accounts available to the authenticated principal.</summary>
     [JsonPropertyName("accounts")]
-    public Dictionary<string, JmapAccount> Accounts { get; set; } = new(StringComparer.Ordinal);
+    public Dictionary<string, JmapAccount> Accounts {
+        get => _accounts;
+        set => _accounts = value ?? new Dictionary<string, JmapAccount>(StringComparer.Ordinal);
+    }
 
     /// <summary>Primary account identifiers keyed by capability.</summary>
     [JsonPropertyName("primaryAccounts")]
-    public Dictionary<string, string> PrimaryAccounts { get; set; } = new(StringComparer.Ordinal);
+    public Dictionary<string, string> PrimaryAccounts {
+        get => _primaryAccounts;
+        set => _primaryAccounts = value ?? new Dictionary<string, string>(StringComparer.Ordinal);
+    }
 
     /// <summary>Authenticated username reported by the server.</summary>
     [JsonPropertyName("username")]
@@ -41,6 +54,10 @@ public sealed class JmapSessionResource {
     [JsonPropertyName("downloadUrl")]
     public string? DownloadUrl { get; set; }
 
+    /// <summary>Blob upload URL template.</summary>
+    [JsonPropertyName("uploadUrl")]
+    public string? UploadUrl { get; set; }
+
     /// <summary>EventSource URL template when push is supported.</summary>
     [JsonPropertyName("eventSourceUrl")]
     public string? EventSourceUrl { get; set; }
@@ -52,6 +69,8 @@ public sealed class JmapSessionResource {
 
 /// <summary>One JMAP account and its authoritative account-scoped capabilities.</summary>
 public sealed class JmapAccount {
+    private Dictionary<string, JsonElement> _accountCapabilities = new(StringComparer.Ordinal);
+
     /// <summary>Human-readable account name.</summary>
     [JsonPropertyName("name")]
     public string? Name { get; set; }
@@ -66,7 +85,10 @@ public sealed class JmapAccount {
 
     /// <summary>Capabilities authorized for this account.</summary>
     [JsonPropertyName("accountCapabilities")]
-    public Dictionary<string, JsonElement> AccountCapabilities { get; set; } = new(StringComparer.Ordinal);
+    public Dictionary<string, JsonElement> AccountCapabilities {
+        get => _accountCapabilities;
+        set => _accountCapabilities = value ?? new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+    }
 }
 
 /// <summary>JMAP mailbox object.</summary>
@@ -86,6 +108,10 @@ public sealed class JmapMailbox {
     /// <summary>Standard mailbox role such as inbox, sent, or trash.</summary>
     [JsonPropertyName("role")]
     public string? Role { get; set; }
+
+    /// <summary>Whether the authenticated principal subscribes to this mailbox.</summary>
+    [JsonPropertyName("isSubscribed")]
+    public bool? IsSubscribed { get; set; }
 
     /// <summary>Server-defined mailbox sort order.</summary>
     [JsonPropertyName("sortOrder")]
@@ -164,6 +190,11 @@ public sealed class JmapEmailAddress {
 
 /// <summary>Common JMAP Email projection.</summary>
 public sealed class JmapEmail {
+    private Dictionary<string, bool> _mailboxIds = new(StringComparer.Ordinal);
+    private Dictionary<string, bool> _keywords = new(StringComparer.Ordinal);
+    private List<JmapEmailAddress> _from = new();
+    private List<JmapEmailAddress> _to = new();
+
     /// <summary>Stable email identifier.</summary>
     [JsonPropertyName("id")]
     public string? Id { get; set; }
@@ -178,11 +209,17 @@ public sealed class JmapEmail {
 
     /// <summary>Mailbox membership keyed by mailbox identifier.</summary>
     [JsonPropertyName("mailboxIds")]
-    public Dictionary<string, bool> MailboxIds { get; set; } = new(StringComparer.Ordinal);
+    public Dictionary<string, bool> MailboxIds {
+        get => _mailboxIds;
+        set => _mailboxIds = value ?? new Dictionary<string, bool>(StringComparer.Ordinal);
+    }
 
     /// <summary>Message keywords keyed by keyword name.</summary>
     [JsonPropertyName("keywords")]
-    public Dictionary<string, bool> Keywords { get; set; } = new(StringComparer.Ordinal);
+    public Dictionary<string, bool> Keywords {
+        get => _keywords;
+        set => _keywords = value ?? new Dictionary<string, bool>(StringComparer.Ordinal);
+    }
 
     /// <summary>Message subject.</summary>
     [JsonPropertyName("subject")]
@@ -190,11 +227,17 @@ public sealed class JmapEmail {
 
     /// <summary>Sender addresses.</summary>
     [JsonPropertyName("from")]
-    public List<JmapEmailAddress> From { get; set; } = new();
+    public List<JmapEmailAddress> From {
+        get => _from;
+        set => _from = value ?? new List<JmapEmailAddress>();
+    }
 
     /// <summary>Primary recipient addresses.</summary>
     [JsonPropertyName("to")]
-    public List<JmapEmailAddress> To { get; set; } = new();
+    public List<JmapEmailAddress> To {
+        get => _to;
+        set => _to = value ?? new List<JmapEmailAddress>();
+    }
 
     /// <summary>Server-reported receipt timestamp.</summary>
     [JsonPropertyName("receivedAt")]
@@ -211,21 +254,36 @@ public sealed class JmapEmail {
     /// <summary>Whether the message has an attachment.</summary>
     [JsonPropertyName("hasAttachment")]
     public bool HasAttachment { get; set; }
+
+    /// <summary>
+    /// Additional standard or extension properties explicitly requested by the caller and not
+    /// represented by the common projection above.
+    /// </summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? AdditionalProperties { get; set; }
 }
 
 /// <summary>JMAP thread with its email identifiers.</summary>
 public sealed class JmapThread {
+    private List<string> _emailIds = new();
+
     /// <summary>Stable thread identifier.</summary>
     [JsonPropertyName("id")]
     public string? Id { get; set; }
 
     /// <summary>Email identifiers in the thread.</summary>
     [JsonPropertyName("emailIds")]
-    public List<string> EmailIds { get; set; } = new();
+    public List<string> EmailIds {
+        get => _emailIds;
+        set => _emailIds = value ?? new List<string>();
+    }
 }
 
 /// <summary>JMAP sending identity.</summary>
 public sealed class JmapIdentity {
+    private List<JmapEmailAddress> _replyTo = new();
+    private List<JmapEmailAddress> _bcc = new();
+
     /// <summary>Stable identity identifier.</summary>
     [JsonPropertyName("id")]
     public string? Id { get; set; }
@@ -237,6 +295,28 @@ public sealed class JmapIdentity {
     /// <summary>Identity email address.</summary>
     [JsonPropertyName("email")]
     public string? Email { get; set; }
+
+    /// <summary>Default Reply-To addresses for this identity.</summary>
+    [JsonPropertyName("replyTo")]
+    public List<JmapEmailAddress> ReplyTo {
+        get => _replyTo;
+        set => _replyTo = value ?? new List<JmapEmailAddress>();
+    }
+
+    /// <summary>Default blind-copy addresses for this identity.</summary>
+    [JsonPropertyName("bcc")]
+    public List<JmapEmailAddress> Bcc {
+        get => _bcc;
+        set => _bcc = value ?? new List<JmapEmailAddress>();
+    }
+
+    /// <summary>Plain-text signature supplied by this identity.</summary>
+    [JsonPropertyName("textSignature")]
+    public string? TextSignature { get; set; }
+
+    /// <summary>HTML signature supplied by this identity.</summary>
+    [JsonPropertyName("htmlSignature")]
+    public string? HtmlSignature { get; set; }
 
     /// <summary>Whether the identity may be deleted.</summary>
     [JsonPropertyName("mayDelete")]
@@ -267,10 +347,12 @@ public sealed class JmapEmailFilter {
 
     /// <summary>Restricts results to messages received before this timestamp.</summary>
     [JsonPropertyName("before")]
+    [JsonConverter(typeof(JmapUtcDateTimeOffsetConverter))]
     public DateTimeOffset? Before { get; set; }
 
     /// <summary>Restricts results to messages received after this timestamp.</summary>
     [JsonPropertyName("after")]
+    [JsonConverter(typeof(JmapUtcDateTimeOffsetConverter))]
     public DateTimeOffset? After { get; set; }
 
     /// <summary>Restricts results by attachment presence.</summary>
@@ -286,11 +368,13 @@ public sealed class JmapComparator {
 
     /// <summary>Whether values are sorted in ascending order.</summary>
     [JsonPropertyName("isAscending")]
-    public bool IsAscending { get; set; }
+    public bool IsAscending { get; set; } = true;
 }
 
 /// <summary>Result of JMAP Email/query.</summary>
 public sealed class JmapEmailQueryResult {
+    private List<string> _ids = new();
+
     /// <summary>Account that produced the result.</summary>
     [JsonPropertyName("accountId")]
     public string? AccountId { get; set; }
@@ -309,7 +393,10 @@ public sealed class JmapEmailQueryResult {
 
     /// <summary>Matching email identifiers.</summary>
     [JsonPropertyName("ids")]
-    public List<string> Ids { get; set; } = new();
+    public List<string> Ids {
+        get => _ids;
+        set => _ids = value ?? new List<string>();
+    }
 
     /// <summary>Total matches when requested and available.</summary>
     [JsonPropertyName("total")]
@@ -322,6 +409,9 @@ public sealed class JmapEmailQueryResult {
 
 /// <summary>Result of JMAP Email/get.</summary>
 public sealed class JmapEmailGetResult {
+    private List<JmapEmail> _list = new();
+    private List<string> _notFound = new();
+
     /// <summary>Account that produced the result.</summary>
     [JsonPropertyName("accountId")]
     public string? AccountId { get; set; }
@@ -332,15 +422,25 @@ public sealed class JmapEmailGetResult {
 
     /// <summary>Returned email objects.</summary>
     [JsonPropertyName("list")]
-    public List<JmapEmail> List { get; set; } = new();
+    public List<JmapEmail> List {
+        get => _list;
+        set => _list = value ?? new List<JmapEmail>();
+    }
 
     /// <summary>Requested identifiers not found by the server.</summary>
     [JsonPropertyName("notFound")]
-    public List<string> NotFound { get; set; } = new();
+    public List<string> NotFound {
+        get => _notFound;
+        set => _notFound = value ?? new List<string>();
+    }
 }
 
 /// <summary>Result of JMAP Email/changes.</summary>
 public sealed class JmapEmailChangesResult {
+    private List<string> _created = new();
+    private List<string> _updated = new();
+    private List<string> _destroyed = new();
+
     /// <summary>Account that produced the result.</summary>
     [JsonPropertyName("accountId")]
     public string? AccountId { get; set; }
@@ -359,15 +459,60 @@ public sealed class JmapEmailChangesResult {
 
     /// <summary>Created email identifiers.</summary>
     [JsonPropertyName("created")]
-    public List<string> Created { get; set; } = new();
+    public List<string> Created {
+        get => _created;
+        set => _created = value ?? new List<string>();
+    }
 
     /// <summary>Updated email identifiers.</summary>
     [JsonPropertyName("updated")]
-    public List<string> Updated { get; set; } = new();
+    public List<string> Updated {
+        get => _updated;
+        set => _updated = value ?? new List<string>();
+    }
 
     /// <summary>Destroyed email identifiers.</summary>
     [JsonPropertyName("destroyed")]
-    public List<string> Destroyed { get; set; } = new();
+    public List<string> Destroyed {
+        get => _destroyed;
+        set => _destroyed = value ?? new List<string>();
+    }
+}
+
+internal sealed class JmapMailboxQueryArguments {
+    [JsonPropertyName("accountId")]
+    public string AccountId { get; set; } = string.Empty;
+
+    [JsonPropertyName("position")]
+    public int Position { get; set; }
+
+    [JsonPropertyName("limit")]
+    public int Limit { get; set; }
+
+    [JsonPropertyName("calculateTotal")]
+    public bool CalculateTotal { get; set; } = true;
+}
+
+internal sealed class JmapMailboxQueryResult {
+    private List<string> _ids = new();
+
+    [JsonPropertyName("accountId")]
+    public string? AccountId { get; set; }
+
+    [JsonPropertyName("queryState")]
+    public string? QueryState { get; set; }
+
+    [JsonPropertyName("position")]
+    public long Position { get; set; }
+
+    [JsonPropertyName("ids")]
+    public List<string> Ids {
+        get => _ids;
+        set => _ids = value ?? new List<string>();
+    }
+
+    [JsonPropertyName("total")]
+    public long? Total { get; set; }
 }
 
 internal sealed class JmapMailboxGetArguments {
@@ -379,6 +524,9 @@ internal sealed class JmapMailboxGetArguments {
 }
 
 internal sealed class JmapMailboxGetResponse {
+    private List<JmapMailbox> _list = new();
+    private List<string> _notFound = new();
+
     [JsonPropertyName("accountId")]
     public string? AccountId { get; set; }
 
@@ -386,7 +534,16 @@ internal sealed class JmapMailboxGetResponse {
     public string? State { get; set; }
 
     [JsonPropertyName("list")]
-    public List<JmapMailbox> List { get; set; } = new();
+    public List<JmapMailbox> List {
+        get => _list;
+        set => _list = value ?? new List<JmapMailbox>();
+    }
+
+    [JsonPropertyName("notFound")]
+    public List<string> NotFound {
+        get => _notFound;
+        set => _notFound = value ?? new List<string>();
+    }
 }
 
 internal sealed class JmapEmailQueryArguments {
@@ -443,6 +600,9 @@ internal sealed class JmapThreadGetArguments {
 }
 
 internal sealed class JmapThreadGetResponse {
+    private List<JmapThread> _list = new();
+    private List<string> _notFound = new();
+
     [JsonPropertyName("accountId")]
     public string? AccountId { get; set; }
 
@@ -450,7 +610,16 @@ internal sealed class JmapThreadGetResponse {
     public string? State { get; set; }
 
     [JsonPropertyName("list")]
-    public List<JmapThread> List { get; set; } = new();
+    public List<JmapThread> List {
+        get => _list;
+        set => _list = value ?? new List<JmapThread>();
+    }
+
+    [JsonPropertyName("notFound")]
+    public List<string> NotFound {
+        get => _notFound;
+        set => _notFound = value ?? new List<string>();
+    }
 }
 
 internal sealed class JmapIdentityGetArguments {
@@ -462,6 +631,8 @@ internal sealed class JmapIdentityGetArguments {
 }
 
 internal sealed class JmapIdentityGetResponse {
+    private List<JmapIdentity> _list = new();
+
     [JsonPropertyName("accountId")]
     public string? AccountId { get; set; }
 
@@ -469,5 +640,21 @@ internal sealed class JmapIdentityGetResponse {
     public string? State { get; set; }
 
     [JsonPropertyName("list")]
-    public List<JmapIdentity> List { get; set; } = new();
+    public List<JmapIdentity> List {
+        get => _list;
+        set => _list = value ?? new List<JmapIdentity>();
+    }
+}
+
+internal sealed class JmapUtcDateTimeOffsetConverter : JsonConverter<DateTimeOffset?> {
+    public override DateTimeOffset? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        reader.TokenType == JsonTokenType.Null ? null : reader.GetDateTimeOffset();
+
+    public override void Write(Utf8JsonWriter writer, DateTimeOffset? value, JsonSerializerOptions options) {
+        if (!value.HasValue) {
+            writer.WriteNullValue();
+            return;
+        }
+        writer.WriteStringValue(value.Value.UtcDateTime);
+    }
 }

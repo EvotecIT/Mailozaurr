@@ -400,6 +400,7 @@ public sealed class MailProfileAuthService : IMailProfileAuthService {
             MailProfileKind.Graph when hasAccessToken => "manualToken",
             MailProfileKind.Gmail when hasRefreshToken && hasClientSecret => "interactive",
             MailProfileKind.Gmail when hasAccessToken => "manualToken",
+            MailProfileKind.Jmap when hasAccessToken => "manualToken",
             MailProfileKind.Imap or MailProfileKind.Pop3 or MailProfileKind.Smtp
                 when string.Equals(authMode, "oauth2", StringComparison.OrdinalIgnoreCase) => "oauth2",
             MailProfileKind.Imap or MailProfileKind.Pop3 or MailProfileKind.Smtp

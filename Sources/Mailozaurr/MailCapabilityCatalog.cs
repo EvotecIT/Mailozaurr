@@ -79,10 +79,7 @@ public static class MailCapabilityCatalog {
                 | MailCapability.UseThreads
                 | MailCapability.UseLabels
                 | MailCapability.InspectPermissions,
-            MailProfileKind.Jmap => MailCapability.ListFolders
-                | MailCapability.SearchMessages
-                | MailCapability.ReadMessages
-                | MailCapability.UseThreads,
+            MailProfileKind.Jmap => MailCapability.UseThreads,
             MailProfileKind.Smtp => MailCapability.SendMessages,
             MailProfileKind.SendGrid => MailCapability.SendMessages,
             MailProfileKind.Mailgun => MailCapability.SendMessages,
@@ -143,7 +140,6 @@ public static class MailCapabilityCatalog {
             result,
             hasJmapMailboxService,
             new[] { MailProfileKind.Jmap },
-            MailCapability.ListFolders | MailCapability.SearchMessages | MailCapability.ReadMessages |
             MailCapability.UseThreads);
         AddServiceOverrideCapabilities(
             result,

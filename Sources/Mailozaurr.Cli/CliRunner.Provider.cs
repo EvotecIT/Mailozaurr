@@ -149,12 +149,13 @@ public static partial class CliRunner {
                 var jmapQuery = await application.JmapMailbox.QueryEmailsAsync(
                     profile,
                     string.IsNullOrWhiteSpace(parseResult.GetOption("query")) ? null : new JmapEmailFilter { Text = parseResult.GetOption("query") },
+                    position: parseResult.GetIntOption("position") ?? 0,
                     limit: parseResult.GetIntOption("limit") ?? 100).ConfigureAwait(false);
-                await WriteItemAsync(output, jmapQuery, json, value => $"{value.Ids.Count} email id(s); state={value.QueryState ?? "(none)"}").ConfigureAwait(false);
+                await WriteItemAsync(output, jmapQuery, json, value => $"{value.Ids.Count} email id(s); position={value.Position}; hasMore={value.HasMore}; state={value.QueryState ?? "(none)"}").ConfigureAwait(false);
                 return 0;
             case "jmap-email-get":
                 var jmapEmailIds = parseResult.GetOptionValues("message-id")
-                    .Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value!.Trim()).ToArray();
+                    .Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value!).ToArray();
                 var jmapEmails = await application.JmapMailbox.GetEmailsAsync(profile, jmapEmailIds).ConfigureAwait(false);
                 await WriteItemAsync(output, jmapEmails, json, value => $"{value.List.Count} email(s); state={value.State ?? "(none)"}").ConfigureAwait(false);
                 return 0;
@@ -164,7 +165,7 @@ public static partial class CliRunner {
                 return 0;
             case "jmap-thread-get":
                 var jmapThreadIds = parseResult.GetOptionValues("thread-id")
-                    .Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value!.Trim()).ToArray();
+                    .Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value!).ToArray();
                 var jmapThreads = await application.JmapMailbox.GetThreadsAsync(profile, jmapThreadIds).ConfigureAwait(false);
                 await WriteSequenceAsync(output, jmapThreads, json, value => value.Id ?? "(thread)").ConfigureAwait(false);
                 return 0;

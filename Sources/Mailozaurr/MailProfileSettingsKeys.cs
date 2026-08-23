@@ -96,4 +96,7 @@ public static class MailProfileSettingsKeys {
 
     /// <summary>Optional JMAP account identifier override.</summary>
     public const string JmapAccountId = "jmapAccountId";
+
+    /// <summary>Whether a JMAP profile explicitly authorizes HTTPS discovery and API URLs on another origin.</summary>
+    public const string JmapAllowCrossOriginApiUrl = "jmapAllowCrossOriginApiUrl";
 }

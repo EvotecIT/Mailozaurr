@@ -4,6 +4,8 @@ namespace Mailozaurr;
 
 [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(JmapSessionResource))]
+[JsonSerializable(typeof(JmapMailboxQueryArguments))]
+[JsonSerializable(typeof(JmapMailboxQueryResult))]
 [JsonSerializable(typeof(JmapMailboxGetArguments))]
 [JsonSerializable(typeof(JmapMailboxGetResponse))]
 [JsonSerializable(typeof(JmapEmailQueryArguments))]

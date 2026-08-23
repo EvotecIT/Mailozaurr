@@ -8,7 +8,7 @@ public sealed class ApplicationCapabilitiesTests {
     [InlineData(MailProfileKind.Pop3, MailCapability.ListFolders | MailCapability.SearchMessages | MailCapability.ReadMessages | MailCapability.SaveAttachments)]
     [InlineData(MailProfileKind.Graph, MailCapability.ListFolders | MailCapability.SendMessages | MailCapability.MarkMessages | MailCapability.WaitForMessages)]
     [InlineData(MailProfileKind.Gmail, MailCapability.SearchMessages | MailCapability.MarkMessages | MailCapability.MoveMessages | MailCapability.SendMessages | MailCapability.WaitForMessages)]
-    [InlineData(MailProfileKind.Jmap, MailCapability.ListFolders | MailCapability.SearchMessages | MailCapability.ReadMessages | MailCapability.UseThreads)]
+    [InlineData(MailProfileKind.Jmap, MailCapability.UseThreads)]
     [InlineData(MailProfileKind.Smtp, MailCapability.SendMessages)]
     [InlineData(MailProfileKind.SendGrid, MailCapability.SendMessages)]
     [InlineData(MailProfileKind.Mailgun, MailCapability.SendMessages)]
@@ -57,6 +57,9 @@ public sealed class ApplicationCapabilitiesTests {
 
             Assert.NotNull(capabilities);
             Assert.True(capabilities!.Supports(MailCapability.UseThreads));
+            Assert.False(capabilities.Supports(MailCapability.ListFolders));
+            Assert.False(capabilities.Supports(MailCapability.SearchMessages));
+            Assert.False(capabilities.Supports(MailCapability.ReadMessages));
             Assert.False(capabilities.Supports(MailCapability.WaitForMessages));
         } finally {
             Directory.Delete(directory, true);

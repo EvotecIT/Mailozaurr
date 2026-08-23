@@ -34,7 +34,7 @@ internal static partial class CliCommandModel {
         Leaf("gmail-thread-delete", "Permanently delete one Gmail thread.", required: ["profile", "thread-id"], optional: ["mailbox"]),
         Leaf("jmap-session", "Get the authoritative JMAP Session resource.", required: ["profile"]),
         Leaf("jmap-mailbox-list", "List JMAP mailboxes and effective rights.", required: ["profile"]),
-        Leaf("jmap-email-query", "Query JMAP email identifiers.", required: ["profile"], optional: ["query", "limit"]),
+        Leaf("jmap-email-query", "Query one bounded page of JMAP email identifiers.", required: ["profile"], optional: ["query", "position", "limit"]),
         Leaf("jmap-email-get", "Get JMAP email objects.", required: ["profile", "message-id"]),
         Leaf("jmap-email-changes", "Get JMAP Email changes since a state token.", required: ["profile", "cursor"], optional: ["limit"]),
         Leaf("jmap-thread-get", "Get JMAP threads.", required: ["profile", "thread-id"]),

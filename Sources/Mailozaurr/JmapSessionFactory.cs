@@ -18,24 +18,34 @@ public sealed class JmapSessionFactory : IJmapSessionFactory {
         if (profile == null) throw new ArgumentNullException(nameof(profile));
         if (profile.Kind != MailProfileKind.Jmap) throw new NotSupportedException("The profile is not a JMAP profile.");
         if (!profile.Settings.TryGetValue(MailProfileSettingsKeys.JmapSessionUrl, out var sessionUrlValue) ||
-            !Uri.TryCreate(sessionUrlValue, UriKind.Absolute, out var sessionUrl) ||
-            !string.Equals(sessionUrl.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)) {
-            throw new InvalidOperationException("JMAP profiles require an absolute HTTPS session URL.");
+            !Uri.TryCreate(sessionUrlValue, UriKind.Absolute, out var sessionUrl)) {
+            throw new InvalidOperationException("JMAP profiles require an absolute HTTPS session URL without user information or a fragment.");
+        }
+        try {
+            sessionUrl = JmapApiClient.ValidateSessionUrl(sessionUrl);
+        } catch (ArgumentException ex) {
+            throw new InvalidOperationException("JMAP profiles require an absolute HTTPS session URL without user information or a fragment.", ex);
         }
         var accessToken = await _secretStore.GetSecretAsync(profile.Id, MailSecretNames.AccessToken, cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(accessToken)) throw new InvalidOperationException("JMAP profiles require a stored bearer access token.");
         profile.Settings.TryGetValue(MailProfileSettingsKeys.JmapAccountId, out var accountId);
+        var allowCrossOriginApiUrl = false;
+        if (profile.Settings.TryGetValue(MailProfileSettingsKeys.JmapAllowCrossOriginApiUrl, out var crossOriginValue) &&
+            !bool.TryParse(crossOriginValue, out allowCrossOriginApiUrl)) {
+            throw new InvalidOperationException($"JMAP setting '{MailProfileSettingsKeys.JmapAllowCrossOriginApiUrl}' must be true or false.");
+        }
         return await _connectAsync(new JmapSessionRequest {
             SessionUrl = sessionUrl!,
             AccessToken = accessToken!.Trim(),
-            AccountId = accountId
+            AccountId = accountId,
+            AllowCrossOriginApiUrl = allowCrossOriginApiUrl
         }, cancellationToken).ConfigureAwait(false);
     }
 
     private static Task<JmapSession> DefaultConnectAsync(JmapSessionRequest request, CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(new JmapSession(
-            new JmapApiClient(request.SessionUrl, request.AccessToken),
+            new JmapApiClient(request.SessionUrl, request.AccessToken, allowCrossOriginApiUrl: request.AllowCrossOriginApiUrl),
             request.AccountId));
     }
 }
