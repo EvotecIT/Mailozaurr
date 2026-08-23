@@ -429,8 +429,7 @@ public static partial class CliRunner {
                     ProfileId = RequireOption(parseResult, "profile"),
                     MailboxId = parseResult.GetOption("mailbox"),
                     FolderIds = parseResult.GetOptionValues("folder")
-                        .Where(value => !string.IsNullOrWhiteSpace(value))
-                        .Select(value => value!.Trim())
+                        .Select(value => value ?? string.Empty)
                         .ToList(),
                     NotificationUrl = parseResult.GetOption("notification-url"),
                     ClientState = parseResult.GetOption("client-state"),

@@ -52,7 +52,7 @@ public sealed partial class MailMcpTools {
         _application.ChangeFeeds.SubscribeAsync(new MailChangeSubscriptionRequest {
             ProfileId = profileId,
             MailboxId = mailboxId,
-            FolderIds = folderIds?.Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()).ToList() ?? new List<string>(),
+            FolderIds = folderIds?.Select(value => value ?? string.Empty).ToList() ?? new List<string>(),
             NotificationUrl = notificationUrl,
             ClientState = clientState,
             Expiration = expiration,

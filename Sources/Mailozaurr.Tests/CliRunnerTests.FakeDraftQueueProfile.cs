@@ -476,6 +476,8 @@ public sealed partial class CliRunnerTests {
     private sealed class FakeChangeFeedService : IMailChangeFeedService {
         public MailChangeFeedRequest? LastRequest { get; private set; }
 
+        public MailChangeSubscriptionRequest? LastSubscriptionRequest { get; private set; }
+
         public Task<MailChangeFeedResult> GetChangesAsync(MailChangeFeedRequest request, CancellationToken cancellationToken = default) {
             LastRequest = request;
             return Task.FromResult(new MailChangeFeedResult {
@@ -493,8 +495,10 @@ public sealed partial class CliRunnerTests {
                 CursorKind = "ephemeral-idle"
             });
 
-        public Task<MailChangeSubscriptionResult> SubscribeAsync(MailChangeSubscriptionRequest request, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new MailChangeSubscriptionResult { ProfileId = request.ProfileId, Provider = MailProfileKind.Gmail, Succeeded = true });
+        public Task<MailChangeSubscriptionResult> SubscribeAsync(MailChangeSubscriptionRequest request, CancellationToken cancellationToken = default) {
+            LastSubscriptionRequest = request;
+            return Task.FromResult(new MailChangeSubscriptionResult { ProfileId = request.ProfileId, Provider = MailProfileKind.Gmail, Succeeded = true });
+        }
 
         public Task<MailChangeSubscriptionResult> UnsubscribeAsync(MailChangeUnsubscribeRequest request, CancellationToken cancellationToken = default) =>
             Task.FromResult(new MailChangeSubscriptionResult { ProfileId = request.ProfileId, Provider = MailProfileKind.Gmail, Succeeded = true });

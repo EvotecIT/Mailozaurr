@@ -35,5 +35,18 @@ public sealed partial class MailMcpToolsTests {
         Assert.Equal("projects/test/topics/mail", fixture.ChangeFeedService.LastSubscriptionRequest!.TopicName);
         Assert.Equal("user@example.test", fixture.ChangeFeedService.LastSubscriptionRequest.MailboxId);
     }
+
+    [Fact]
+    public async Task ChangeSubscriptionToolPreservesBlankFolderEvidence() {
+        using var fixture = new TestFixture();
+
+        await fixture.Tools.mail_changes_subscribe(
+            "gmail-work",
+            folderIds: new[] { " " },
+            topicName: "projects/test/topics/mail");
+
+        Assert.NotNull(fixture.ChangeFeedService.LastSubscriptionRequest);
+        Assert.Equal(new[] { " " }, fixture.ChangeFeedService.LastSubscriptionRequest!.FolderIds);
+    }
 }
 #endif

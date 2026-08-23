@@ -23,5 +23,25 @@ public sealed partial class CliRunnerTests {
         Assert.Contains("durable-history", stdout.ToString(), StringComparison.Ordinal);
         Assert.True(string.IsNullOrWhiteSpace(stderr.ToString()));
     }
+
+    [Fact]
+    public async Task ChangeSubscriptionCommandPreservesBlankFolderEvidence() {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+
+        var exitCode = await CliRunner.RunAsync(
+            new[] {
+                "mail", "subscribe-changes", "--profile", "gmail-work",
+                "--folder", " ", "--topic", "projects/test/topics/mail"
+            },
+            stdout,
+            stderr,
+            _ => fixture.CreateBuilder());
+
+        Assert.True(exitCode == 0, stderr.ToString());
+        Assert.NotNull(fixture.ChangeFeedService.LastSubscriptionRequest);
+        Assert.Equal(new[] { " " }, fixture.ChangeFeedService.LastSubscriptionRequest!.FolderIds);
+    }
 }
 #endif
