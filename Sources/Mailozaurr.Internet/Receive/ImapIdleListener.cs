@@ -19,10 +19,11 @@ namespace Mailozaurr;
 public class ImapIdleListener : IDisposable, IAsyncDisposable {
     private readonly ImapClient _client;
     private readonly string? _folderName;
-    private readonly List<IMessageSummary> _summaries = new();
+    private readonly List<UniqueId> _summaries = new();
     private readonly HashSet<UniqueId> _known = new();
-    private readonly FetchRequest _fetchRequest = new(MessageSummaryItems.Full | MessageSummaryItems.UniqueId);
+    private readonly FetchRequest _fetchRequest = new(MessageSummaryItems.UniqueId | MessageSummaryItems.Envelope);
     private readonly SearchQuery? _searchQuery;
+    private readonly bool _downloadMessageContent;
     private IMailFolder? _folder;
     private CancellationTokenSource? _cancel;
     private CancellationTokenSource? _done;
@@ -36,16 +37,33 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
     /// <param name="client">Connected IMAP client.</param>
     /// <param name="folder">Folder to monitor or <c>null</c> for the inbox.</param>
     /// <param name="searchQuery">Optional search query to filter incoming messages.</param>
-    public ImapIdleListener(ImapClient client, string? folder = null, SearchQuery? searchQuery = null) {
+    public ImapIdleListener(ImapClient client, string? folder = null, SearchQuery? searchQuery = null)
+        : this(client, folder, searchQuery, downloadMessageContent: true) {
+    }
+
+    /// <summary>
+    /// Initializes a listener with explicit control over full-message downloads.
+    /// </summary>
+    public ImapIdleListener(
+        ImapClient client,
+        string? folder,
+        SearchQuery? searchQuery,
+        bool downloadMessageContent) {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _folderName = folder;
         _searchQuery = searchQuery;
+        _downloadMessageContent = downloadMessageContent;
     }
 
     /// <summary>
     /// Occurs when a new message arrives.
     /// </summary>
     public event EventHandler<ImapEmailMessage>? MessageArrived;
+
+    /// <summary>
+    /// Occurs when a new message summary arrives, without requiring a MIME body download.
+    /// </summary>
+    public event EventHandler<ImapMessageSummaryEventArgs>? MessageSummaryArrived;
 
     /// <summary>
     /// Occurs when an error is encountered while idling.
@@ -71,14 +89,19 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
 
             var search = _searchQuery ?? SearchQuery.All;
             var initialUids = await _folder.SearchAsync(search, _cancel.Token).ConfigureAwait(false);
-            var initial = await _folder.FetchAsync(initialUids, _fetchRequest, _cancel.Token).ConfigureAwait(false);
-            foreach (var summary in initial) {
-                _summaries.Add(summary);
-                _known.Add(summary.UniqueId);
+            foreach (var uid in initialUids) {
+                _summaries.Add(uid);
+                _known.Add(uid);
             }
 
+            // Fix the baseline before subscribing, then reconcile once after the
+            // handlers are attached. This closes both setup windows: an arrival
+            // between the baseline search and subscription is found by the
+            // reconciliation search, while an arrival during reconciliation sets
+            // _messagesArrived and is checked again by the idle loop.
             _folder.CountChanged += OnCountChanged;
             _folder.MessageExpunged += OnMessageExpunged;
+            await FetchNewMessagesAsync().ConfigureAwait(false);
 
             _idleTask = IdleLoopAsync();
         } catch {
@@ -132,12 +155,13 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
         try {
             while (!_cancel!.IsCancellationRequested) {
                 try {
-                    await WaitForNewMessagesAsync().ConfigureAwait(false);
-
                     if (_messagesArrived) {
-                        await FetchNewMessagesAsync().ConfigureAwait(false);
                         _messagesArrived = false;
+                        await FetchNewMessagesAsync().ConfigureAwait(false);
+                        continue;
                     }
+
+                    await WaitForNewMessagesAsync().ConfigureAwait(false);
                 } catch (OperationCanceledException) when (_cancel.IsCancellationRequested) {
                     break;
                 } catch (Exception ex) {
@@ -174,18 +198,22 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
         var uids = await _folder!.SearchAsync(search, _cancel!.Token).ConfigureAwait(false);
         var newUids = new List<UniqueId>();
         foreach (var uid in uids) {
-            if (_known.Add(uid)) {
-                newUids.Add(uid);
-            }
+            if (!_known.Contains(uid)) newUids.Add(uid);
         }
 
         if (newUids.Count == 0) return;
 
         var fetched = await _folder.FetchAsync(newUids, _fetchRequest, _cancel.Token).ConfigureAwait(false);
         foreach (var summary in fetched) {
-            var message = await _folder.GetMessageAsync(summary.UniqueId, _cancel.Token).ConfigureAwait(false);
-            _summaries.Add(summary);
-            MessageArrived?.Invoke(this, new ImapEmailMessage(summary.UniqueId, message));
+            if (!_known.Add(summary.UniqueId)) continue;
+            _summaries.Add(summary.UniqueId);
+            MessageSummaryArrived?.Invoke(this, new ImapMessageSummaryEventArgs(
+                summary.UniqueId,
+                summary.Envelope?.Subject));
+            if (_downloadMessageContent && MessageArrived != null) {
+                var message = await _folder.GetMessageAsync(summary.UniqueId, _cancel.Token).ConfigureAwait(false);
+                MessageArrived.Invoke(this, new ImapEmailMessage(summary.UniqueId, message));
+            }
         }
     }
 
@@ -197,11 +225,11 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
     private void OnMessageExpunged(object? sender, MessageEventArgs e) {
         if (e.UniqueId.HasValue) {
             _known.Remove(e.UniqueId.Value);
-            _summaries.RemoveAll(s => s.UniqueId == e.UniqueId.Value);
+            _summaries.RemoveAll(uid => uid == e.UniqueId.Value);
         } else if (e.Index < _summaries.Count) {
             var removed = _summaries[e.Index];
             _summaries.RemoveAt(e.Index);
-            _known.Remove(removed.UniqueId);
+            _known.Remove(removed);
         }
     }
 

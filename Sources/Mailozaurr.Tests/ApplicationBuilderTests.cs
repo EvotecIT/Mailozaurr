@@ -29,6 +29,8 @@ public sealed class ApplicationBuilderTests {
         Assert.NotNull(app.ProfileAuth);
         Assert.NotNull(app.FolderAliases);
         Assert.NotNull(app.Read);
+        Assert.NotNull(app.EmlExport);
+        Assert.NotNull(app.ChangeFeeds);
         Assert.NotNull(app.MessageActionPreview);
         Assert.NotNull(app.MessageActionPlans);
         Assert.NotNull(app.MessageActionPlanExchange);

@@ -408,6 +408,8 @@ public sealed partial class CliRunnerTests {
 
         public FakeEmlExportService EmlExportService { get; } = new();
 
+        public FakeChangeFeedService ChangeFeedService { get; } = new();
+
         public FakeQueueService QueueService { get; } = new();
 
         public FakeSendService SendService { get; } = new();
@@ -439,6 +441,7 @@ public sealed partial class CliRunnerTests {
                 .UseDraftExchangeService(DraftExchangeService)
                 .UseReadService(ReadService)
                 .UseEmlExportService(EmlExportService)
+                .UseChangeFeedService(ChangeFeedService)
                 .UseMessageActionService(MessageActionService)
                 .UseMessageActionPlanExchangeService(MessageActionPlanExchangeService)
                 .UseMessageActionPlanRegistryService(MessageActionPlanRegistryService)
@@ -468,6 +471,37 @@ public sealed partial class CliRunnerTests {
                 Message = $"Exported {request.MessageIds.Count} EML message(s)."
             });
         }
+    }
+
+    private sealed class FakeChangeFeedService : IMailChangeFeedService {
+        public MailChangeFeedRequest? LastRequest { get; private set; }
+
+        public MailChangeSubscriptionRequest? LastSubscriptionRequest { get; private set; }
+
+        public Task<MailChangeFeedResult> GetChangesAsync(MailChangeFeedRequest request, CancellationToken cancellationToken = default) {
+            LastRequest = request;
+            return Task.FromResult(new MailChangeFeedResult {
+                ProfileId = request.ProfileId,
+                Provider = MailProfileKind.Gmail,
+                NextCursor = "next",
+                CursorKind = "durable-history"
+            });
+        }
+
+        public Task<MailChangeFeedResult> WaitForChangesAsync(MailChangeWaitRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new MailChangeFeedResult {
+                ProfileId = request.ProfileId,
+                Provider = MailProfileKind.Imap,
+                CursorKind = "ephemeral-idle"
+            });
+
+        public Task<MailChangeSubscriptionResult> SubscribeAsync(MailChangeSubscriptionRequest request, CancellationToken cancellationToken = default) {
+            LastSubscriptionRequest = request;
+            return Task.FromResult(new MailChangeSubscriptionResult { ProfileId = request.ProfileId, Provider = MailProfileKind.Gmail, Succeeded = true });
+        }
+
+        public Task<MailChangeSubscriptionResult> UnsubscribeAsync(MailChangeUnsubscribeRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new MailChangeSubscriptionResult { ProfileId = request.ProfileId, Provider = MailProfileKind.Gmail, Succeeded = true });
     }
 
     private static string CreateTemporaryFilePath(string fileName) {

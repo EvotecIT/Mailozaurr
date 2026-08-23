@@ -21,6 +21,7 @@ public sealed partial class MailMcpToolsTests {
             SecretStore = new InMemorySecretStore();
             ReadService = new FakeReadService();
             EmlExportService = new FakeEmlExportService();
+            ChangeFeedService = new FakeChangeFeedService();
             SendService = new FakeSendService();
             MessageActionService = new FakeMessageActionService();
             PlanExchangeService = new FakeMessageActionPlanExchangeService();
@@ -37,6 +38,7 @@ public sealed partial class MailMcpToolsTests {
                 .UseProfileConnectionService(ProfileConnectionService)
                 .UseReadService(ReadService)
                 .UseEmlExportService(EmlExportService)
+                .UseChangeFeedService(ChangeFeedService)
                 .UseMessageActionService(MessageActionService)
                 .UseMessageActionPlanExchangeService(PlanExchangeService)
                 .UseMessageActionPlanRegistryService(PlanRegistryService)
@@ -58,6 +60,8 @@ public sealed partial class MailMcpToolsTests {
         public FakeReadService ReadService { get; }
 
         public FakeEmlExportService EmlExportService { get; }
+
+        public FakeChangeFeedService ChangeFeedService { get; }
 
         public FakeSendService SendService { get; }
 
@@ -98,6 +102,46 @@ public sealed partial class MailMcpToolsTests {
                 Message = $"Exported {request.MessageIds.Count} EML message(s)."
             });
         }
+    }
+
+    private sealed class FakeChangeFeedService : IMailChangeFeedService {
+        public MailChangeFeedRequest? LastFeedRequest { get; private set; }
+
+        public MailChangeSubscriptionRequest? LastSubscriptionRequest { get; private set; }
+
+        public Task<MailChangeFeedResult> GetChangesAsync(MailChangeFeedRequest request, CancellationToken cancellationToken = default) {
+            LastFeedRequest = request;
+            return Task.FromResult(new MailChangeFeedResult {
+                ProfileId = request.ProfileId,
+                Provider = MailProfileKind.Gmail,
+                NextCursor = "next",
+                CursorKind = "durable-history"
+            });
+        }
+
+        public Task<MailChangeFeedResult> WaitForChangesAsync(MailChangeWaitRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new MailChangeFeedResult {
+                ProfileId = request.ProfileId,
+                Provider = MailProfileKind.Imap,
+                CursorKind = "ephemeral-idle"
+            });
+
+        public Task<MailChangeSubscriptionResult> SubscribeAsync(MailChangeSubscriptionRequest request, CancellationToken cancellationToken = default) {
+            LastSubscriptionRequest = request;
+            return Task.FromResult(new MailChangeSubscriptionResult {
+                ProfileId = request.ProfileId,
+                Provider = MailProfileKind.Gmail,
+                Succeeded = true,
+                Cursor = "watch"
+            });
+        }
+
+        public Task<MailChangeSubscriptionResult> UnsubscribeAsync(MailChangeUnsubscribeRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new MailChangeSubscriptionResult {
+                ProfileId = request.ProfileId,
+                Provider = MailProfileKind.Gmail,
+                Succeeded = true
+            });
     }
 }
 #endif

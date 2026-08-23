@@ -24,6 +24,7 @@ public sealed class MailApplicationBuilder {
     private IMailDraftExchangeService? _draftExchangeService;
     private IMailReadService? _readService;
     private IMailEmlExportService? _emlExportService;
+    private IMailChangeFeedService? _changeFeedService;
     private IMailMessageActionPreviewService? _messageActionPreviewService;
     private IMailMessageActionPlanService? _messageActionPlanService;
     private IMailMessageActionPlanExchangeService? _messageActionPlanExchangeService;
@@ -155,6 +156,12 @@ public sealed class MailApplicationBuilder {
     /// <summary>Uses an explicit provider-neutral EML export service.</summary>
     public MailApplicationBuilder UseEmlExportService(IMailEmlExportService emlExportService) {
         _emlExportService = emlExportService ?? throw new ArgumentNullException(nameof(emlExportService));
+        return this;
+    }
+
+    /// <summary>Uses an explicit normalized mailbox change-feed service.</summary>
+    public MailApplicationBuilder UseChangeFeedService(IMailChangeFeedService changeFeedService) {
+        _changeFeedService = changeFeedService ?? throw new ArgumentNullException(nameof(changeFeedService));
         return this;
     }
 
@@ -342,7 +349,8 @@ public sealed class MailApplicationBuilder {
             sendHandlers,
             hasReadServiceOverride: _readService != null,
             hasMessageActionServiceOverride: _messageActionService != null,
-            hasSendServiceOverride: _sendService != null);
+            hasSendServiceOverride: _sendService != null,
+            hasChangeFeedService: true);
         var profileService = _profileService ?? new MailProfileService(
             profileStore, secretStore, availableCapabilities);
         var profileBootstrapService = _profileBootstrapService ?? new MailProfileBootstrapService(profileService, profileSecretService, secretStore);
@@ -366,6 +374,11 @@ public sealed class MailApplicationBuilder {
             new GmailRawMailMessageSource(gmailSessionFactory)
         };
         var emlExportService = _emlExportService ?? new MailEmlExportService(profileStore, rawMessageSources);
+        var changeFeedService = _changeFeedService ?? new MailChangeFeedService(
+            profileStore,
+            imapSessionFactory,
+            graphSessionFactory,
+            gmailSessionFactory);
         var folderAliasService = _folderAliasService ?? new MailFolderAliasService(
             profileStore, readService, availableCapabilities);
         var messageActionPreviewService = _messageActionPreviewService ?? new MailMessageActionPreviewService(
@@ -394,6 +407,7 @@ public sealed class MailApplicationBuilder {
             draftExchangeService,
             readService,
             emlExportService,
+            changeFeedService,
             messageActionPreviewService,
             messageActionPlanService,
             messageActionPlanExchangeService,
