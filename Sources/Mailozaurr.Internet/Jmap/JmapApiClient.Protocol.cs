@@ -38,9 +38,18 @@ public sealed partial class JmapApiClient {
             }
             requestBody = buffer.ToArray();
         }
+        var maximumRequestBytes = ResolveMaxSizeRequest(session);
+        if (requestBody.LongLength > maximumRequestBytes) {
+            throw new JmapApiException(
+                "requestTooLarge",
+                $"JMAP method request exceeded the server's advertised {maximumRequestBytes}-byte limit.");
+        }
 
         await _methodRequestGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
+            if (!ReferenceEquals(Volatile.Read(ref _session), session)) {
+                throw new JmapApiException("sessionStateChanged", "The JMAP Session resource changed before the method request could be sent; retry with fresh discovery data.");
+            }
             using var request = CreateRequest(HttpMethod.Post, apiUrl);
             request.Content = new ByteArrayContent(requestBody);
             request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
@@ -54,7 +63,7 @@ public sealed partial class JmapApiClient {
                 if (document.RootElement.TryGetProperty("sessionState", out var returnedSessionState) &&
                     returnedSessionState.ValueKind == JsonValueKind.String &&
                     !string.Equals(returnedSessionState.GetString(), session.State, StringComparison.Ordinal)) {
-                    Interlocked.Exchange(ref _session, null);
+                    Interlocked.CompareExchange(ref _session, null, session);
                 }
                 if (!document.RootElement.TryGetProperty("methodResponses", out var responses) || responses.ValueKind != JsonValueKind.Array) {
                     throw new JmapApiException("invalidResponse", "JMAP response did not contain methodResponses.");
@@ -109,6 +118,12 @@ public sealed partial class JmapApiClient {
             throw new JmapApiException("accountCapabilityMissing", $"The selected JMAP account does not advertise '{capability}'.");
         }
         return (session, resolved);
+    }
+
+    private void ThrowIfSessionChanged(JmapSessionResource session) {
+        if (!ReferenceEquals(Volatile.Read(ref _session), session)) {
+            throw new JmapApiException("sessionStateChanged", "The JMAP Session resource changed during the multi-call operation; retry with fresh discovery data.");
+        }
     }
 
     private Uri ResolveApiUrl(JmapSessionResource session) {
@@ -187,6 +202,20 @@ public sealed partial class JmapApiClient {
                 "The JMAP core capability did not report a valid maxObjectsInGet limit.");
         }
         return (int)Math.Min(advertisedMaximum, 5000L);
+    }
+
+    private static long ResolveMaxSizeRequest(JmapSessionResource session) {
+        if (!session.Capabilities.TryGetValue(JmapCapabilities.Core, out var core) ||
+            core.ValueKind != JsonValueKind.Object ||
+            !core.TryGetProperty("maxSizeRequest", out var value) ||
+            value.ValueKind != JsonValueKind.Number ||
+            !value.TryGetInt64(out var advertisedMaximum) ||
+            advertisedMaximum <= 0) {
+            throw new JmapApiException(
+                "invalidSession",
+                "The JMAP core capability did not report a valid maxSizeRequest limit.");
+        }
+        return advertisedMaximum;
     }
 
     private static string[] NormalizeIds(IReadOnlyCollection<string> ids, string parameterName, int maximum, bool allowEmpty = false) {

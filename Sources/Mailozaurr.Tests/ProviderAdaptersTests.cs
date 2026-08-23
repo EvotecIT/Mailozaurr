@@ -83,7 +83,7 @@ public class ProviderAdaptersTests {
         var handler = new RecordingHandler(
             new HttpResponseMessage(HttpStatusCode.OK) {
                 Content = new StringContent(
-                    "{\"capabilities\":{\"urn:ietf:params:jmap:core\":{\"maxObjectsInGet\":100},\"urn:ietf:params:jmap:mail\":{}}," +
+                    "{\"capabilities\":{\"urn:ietf:params:jmap:core\":{\"maxObjectsInGet\":100,\"maxSizeRequest\":1000000},\"urn:ietf:params:jmap:mail\":{}}," +
                     "\"accounts\":{\"a1\":{\"accountCapabilities\":{\"urn:ietf:params:jmap:mail\":{}}}}," +
                     "\"primaryAccounts\":{\"urn:ietf:params:jmap:mail\":\"a1\"},\"apiUrl\":\"https://mail.example.test/jmap/api\",\"state\":\"s1\"}")
             },

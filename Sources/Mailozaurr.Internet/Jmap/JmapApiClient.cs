@@ -82,6 +82,17 @@ public sealed partial class JmapApiClient : IDisposable {
 
     /// <summary>Lists mailboxes for a mail-capable account.</summary>
     public async Task<IReadOnlyList<JmapMailbox>> ListMailboxesAsync(string? accountId = null, CancellationToken cancellationToken = default) {
+        var restarted = false;
+        while (true) {
+            try {
+                return await ListMailboxesCoreAsync(accountId, cancellationToken).ConfigureAwait(false);
+            } catch (JmapApiException ex) when (!restarted && string.Equals(ex.ErrorType, "sessionStateChanged", StringComparison.Ordinal)) {
+                restarted = true;
+            }
+        }
+    }
+
+    private async Task<IReadOnlyList<JmapMailbox>> ListMailboxesCoreAsync(string? accountId, CancellationToken cancellationToken) {
         var context = await ResolveAccountAsync(accountId, JmapCapabilities.Mail, cancellationToken).ConfigureAwait(false);
         var maximum = ResolveMaxObjectsInGet(context.Session);
         var mailboxes = new List<JmapMailbox>();
@@ -100,6 +111,7 @@ public sealed partial class JmapApiClient : IDisposable {
                 JmapJsonContext.Default.JmapMailboxQueryArguments,
                 JmapJsonContext.Default.JmapMailboxQueryResult,
                 cancellationToken).ConfigureAwait(false);
+            ThrowIfSessionChanged(context.Session);
             if (string.IsNullOrWhiteSpace(query.QueryState)) {
                 throw new JmapApiException("invalidResponse", "JMAP Mailbox/query did not return a query state.");
             }
@@ -130,6 +142,7 @@ public sealed partial class JmapApiClient : IDisposable {
                 JmapJsonContext.Default.JmapMailboxGetArguments,
                 JmapJsonContext.Default.JmapMailboxGetResponse,
                 cancellationToken).ConfigureAwait(false);
+            ThrowIfSessionChanged(context.Session);
             if (response.NotFound.Count > 0 || response.List.Count != query.Ids.Count) {
                 throw new JmapApiException("notFound", "JMAP did not return every mailbox selected by Mailbox/query.");
             }

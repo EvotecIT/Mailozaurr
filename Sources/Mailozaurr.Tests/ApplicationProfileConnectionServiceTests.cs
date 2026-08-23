@@ -700,7 +700,7 @@ public sealed class ApplicationProfileConnectionServiceTests {
     public async Task JmapMailboxEvidenceSeparatesIdentityCapabilitiesAndEffectiveRights() {
         var handler = new RecordingHandler(
             JsonResponse(
-                "{\"capabilities\":{\"urn:ietf:params:jmap:core\":{\"maxObjectsInGet\":100},\"urn:ietf:params:jmap:mail\":{}}," +
+                "{\"capabilities\":{\"urn:ietf:params:jmap:core\":{\"maxObjectsInGet\":100,\"maxSizeRequest\":1000000},\"urn:ietf:params:jmap:mail\":{}}," +
                 "\"accounts\":{\"a1\":{\"name\":\"Primary\",\"isPersonal\":true,\"isReadOnly\":true," +
                 "\"accountCapabilities\":{\"urn:ietf:params:jmap:mail\":{}}}}," +
                 "\"primaryAccounts\":{\"urn:ietf:params:jmap:mail\":\"a1\"}," +

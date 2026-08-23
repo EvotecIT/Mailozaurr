@@ -97,7 +97,7 @@ public sealed class JmapApiClientTests {
     };
 
     private static string SessionJson(string apiUrl) =>
-        "{\"capabilities\":{\"urn:ietf:params:jmap:core\":{\"maxObjectsInGet\":2},\"urn:ietf:params:jmap:mail\":{}}," +
+        "{\"capabilities\":{\"urn:ietf:params:jmap:core\":{\"maxObjectsInGet\":2,\"maxSizeRequest\":1000000},\"urn:ietf:params:jmap:mail\":{}}," +
         "\"accounts\":{\"a1\":{\"name\":\"Primary\",\"isPersonal\":true,\"isReadOnly\":false," +
         "\"accountCapabilities\":{\"urn:ietf:params:jmap:mail\":{}}}}," +
         "\"primaryAccounts\":{\"urn:ietf:params:jmap:mail\":\"a1\"}," +

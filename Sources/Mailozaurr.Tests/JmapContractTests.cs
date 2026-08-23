@@ -244,6 +244,38 @@ public sealed class JmapContractTests {
     }
 
     [Fact]
+    public async Task ListMailboxes_RestartsOnceWhenSessionResourceChanges() {
+        var handler = new RecordingHandler(
+            JsonResponse(SessionJson("https://mail.example.test/jmap/api", state: "s1")),
+            JsonResponse("{\"sessionState\":\"s2\",\"methodResponses\":[[\"Mailbox/query\",{\"accountId\":\"a1\",\"queryState\":\"q1\",\"position\":0,\"ids\":[\"stale\"],\"total\":1},\"c1\"]]}"),
+            JsonResponse(SessionJson("https://mail.example.test/jmap/api", state: "s2")),
+            MethodResponse("Mailbox/query", "{\"accountId\":\"a1\",\"queryState\":\"q2\",\"position\":0,\"ids\":[\"m1\"],\"total\":1}", "c2"),
+            MethodResponse("Mailbox/get", "{\"accountId\":\"a1\",\"state\":\"m1\",\"list\":[{\"id\":\"m1\",\"name\":\"Inbox\"}],\"notFound\":[]}", "c3"));
+        using var httpClient = new HttpClient(handler);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient, callerOwnedClientDisablesRedirects: true);
+
+        var mailbox = Assert.Single(await client.ListMailboxesAsync());
+
+        Assert.Equal("m1", mailbox.Id);
+        Assert.Equal(5, handler.Requests.Count);
+        Assert.Equal(2, handler.Requests.Count(request => request.Method == HttpMethod.Get));
+    }
+
+    [Fact]
+    public async Task MethodCall_RejectsBodyBeyondAdvertisedRequestLimitBeforeSend() {
+        var handler = new RecordingHandler(
+            JsonResponse(SessionJson("https://mail.example.test/jmap/api", maxSizeRequest: 128)));
+        using var httpClient = new HttpClient(handler);
+        using var client = new JmapApiClient(new Uri("https://mail.example.test/.well-known/jmap"), "token", httpClient, callerOwnedClientDisablesRedirects: true);
+
+        var exception = await Assert.ThrowsAsync<JmapApiException>(() => client.QueryEmailsAsync(
+            new JmapEmailFilter { Text = new string('x', 512) }));
+
+        Assert.Equal("requestTooLarge", exception.ErrorType);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
     public async Task GetThreads_FailsWhenAnyRequestedIdentifierIsMissing() {
         var handler = new RecordingHandler(
             JsonResponse(SessionJson("https://mail.example.test/jmap/api")),
@@ -354,11 +386,12 @@ public sealed class JmapContractTests {
         string apiUrl,
         string state = "s1",
         string? uploadUrl = null,
-        bool includeSubmission = false) {
+        bool includeSubmission = false,
+        long maxSizeRequest = 1_000_000) {
         var submission = includeSubmission ? ",\"" + JmapCapabilities.Submission + "\":{}" : string.Empty;
         var submissionPrimary = includeSubmission ? ",\"" + JmapCapabilities.Submission + "\":\"a1\"" : string.Empty;
         var upload = uploadUrl == null ? string.Empty : ",\"uploadUrl\":" + JsonSerializer.Serialize(uploadUrl);
-        return "{\"capabilities\":{\"" + JmapCapabilities.Core + "\":{\"maxObjectsInGet\":2,\"maxConcurrentRequests\":1},\"" + JmapCapabilities.Mail + "\":{}" + submission + "}," +
+        return "{\"capabilities\":{\"" + JmapCapabilities.Core + "\":{\"maxObjectsInGet\":2,\"maxConcurrentRequests\":1,\"maxSizeRequest\":" + maxSizeRequest + "},\"" + JmapCapabilities.Mail + "\":{}" + submission + "}," +
                "\"accounts\":{\"a1\":{\"name\":\"Primary\",\"isPersonal\":true,\"isReadOnly\":false,\"accountCapabilities\":{\"" + JmapCapabilities.Mail + "\":{}" + submission + "}}}," +
                "\"primaryAccounts\":{\"" + JmapCapabilities.Mail + "\":\"a1\"" + submissionPrimary + "}," +
                "\"username\":\"user@example.test\",\"apiUrl\":" + JsonSerializer.Serialize(apiUrl) + upload + ",\"state\":" + JsonSerializer.Serialize(state) + "}";
