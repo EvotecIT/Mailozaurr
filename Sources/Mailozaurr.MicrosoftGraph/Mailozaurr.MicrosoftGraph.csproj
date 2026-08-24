@@ -59,7 +59,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Identity.Client" Version="4.87.0" />
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.88.0" />
     <PackageReference Include="System.Text.Json" Version="10.0.11" Condition=" '$(TargetFramework)' != 'net8.0' " />
     <None Include="..\..\Mailozaurr.png" Pack="true" PackagePath="\" />
     <None Include="..\..\README.MD" Pack="true" PackagePath="\" />
