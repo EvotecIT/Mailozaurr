@@ -60,7 +60,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="EmailValidation" Version="1.3.0" />
+    <PackageReference Include="EmailValidation" Version="1.4.0" />
     <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="MimeKit" Version="4.17.0" />
     <PackageReference Include="NSspi" Version="0.3.1" />
