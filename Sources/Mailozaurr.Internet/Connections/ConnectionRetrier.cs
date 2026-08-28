@@ -46,8 +46,7 @@ internal static class ConnectionRetrier {
         CancellationToken cancellationToken = default)
         where TClient : MailService {
         int attempts = 0;
-        Exception? lastException = null;
-        do {
+        while (true) {
             var client = clientFactory();
             try {
                 // These options affect the TLS handshake and must be configured before ConnectAsync.
@@ -68,7 +67,6 @@ internal static class ConnectionRetrier {
                 }
                 return client;
             } catch (Exception ex) {
-                lastException = ex;
                 LoggingMessages.Logger.WriteWarning($"Connect-{protocolName} - {ex.Message}");
                 try {
                     if (client.IsConnected) {
@@ -97,7 +95,6 @@ internal static class ConnectionRetrier {
                 }
             }
             attempts++;
-        } while (attempts <= retryCount);
-        throw lastException ?? new InvalidOperationException("Operation failed without exception");
+        }
     }
 }

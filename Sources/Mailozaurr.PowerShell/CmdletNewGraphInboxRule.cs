@@ -224,7 +224,7 @@ public sealed class CmdletNewGraphInboxRule : AsyncPSCmdlet {
         }
         var uri = MicrosoftGraphUtils.JoinUriQuery(
             GraphEndpoint.V1,
-            $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules");
+            MicrosoftGraphUtils.BuildGraphPath("users", UserPrincipalName!, "mailFolders", "inbox", "messageRules"));
         var rulePayload = Rule ?? throw new PSArgumentNullException(nameof(Rule), "Rule has to be provided or built.");
         var bodyObj = RuleBuilder != null
             ? RuleBuilder.Build()

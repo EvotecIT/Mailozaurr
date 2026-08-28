@@ -807,20 +807,31 @@ public class GraphDraftTests {
     public void DraftMessageUris_BuildUploadSessionUri() {
         string uri = GraphDraftMessageUris.CreateUploadSession("from@example.com", "draft-id");
 
-        Assert.Equal("https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/attachments/createUploadSession", uri);
+        Assert.Equal("https://graph.microsoft.com/v1.0/users/from%40example.com/messages/draft-id/attachments/createUploadSession", uri);
     }
 
     [Fact]
     public void DraftMessageUris_BuildAttachmentsUri() {
         string uri = GraphDraftMessageUris.Attachments("from@example.com", "draft-id");
 
-        Assert.Equal("https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/attachments", uri);
+        Assert.Equal("https://graph.microsoft.com/v1.0/users/from%40example.com/messages/draft-id/attachments", uri);
     }
 
     [Fact]
     public void DraftMessageUris_BuildSendUri() {
         string uri = GraphDraftMessageUris.Send("from@example.com", "draft-id");
 
-        Assert.Equal("https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/send", uri);
+        Assert.Equal("https://graph.microsoft.com/v1.0/users/from%40example.com/messages/draft-id/send", uri);
+    }
+
+    [Fact]
+    public void DraftMessageUris_EscapeMailboxAndMessageSegments() {
+        string uri = GraphDraftMessageUris.Send(
+            "from@example.com/messages/other?x=1",
+            "draft/id#fragment");
+
+        Assert.Equal(
+            "https://graph.microsoft.com/v1.0/users/from%40example.com%2Fmessages%2Fother%3Fx%3D1/messages/draft%2Fid%23fragment/send",
+            uri);
     }
 }

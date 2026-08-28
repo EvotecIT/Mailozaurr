@@ -1,5 +1,6 @@
 using Mailozaurr.Definitions;
 using System.Net.Http;
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Threading;
 
@@ -276,7 +277,8 @@ public class SesClient : IDisposable {
                         mimeMessageBase64,
                         cancellationToken).ConfigureAwait(false);
                 if (ErrorAction == ActionPreference.Stop && lastException != null) {
-                    throw lastException;
+                    ExceptionDispatchInfo.Capture(lastException).Throw();
+                    throw new InvalidOperationException("The SES failure could not be rethrown.");
                 }
                 SmtpResult fail = new(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, lastException?.Message) {
                     MessageId = queuedMessageId,

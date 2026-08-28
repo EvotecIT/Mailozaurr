@@ -108,11 +108,17 @@ public class MicrosoftGraphUtilsPagingTests {
             "https://graph.microsoft.com");
         tokenCache[key] = new GraphAuthorization { AccessToken = "token", TokenType = "Bearer", ExpiresOn = DateTimeOffset.UtcNow.AddHours(1) };
         try {
-            var attachments = await MicrosoftGraphUtils.GetMailMessageAttachmentsAsync(cred, "u", "m");
+            var attachments = await MicrosoftGraphUtils.GetMailMessageAttachmentsAsync(
+                cred,
+                "u/path?x",
+                "m/id#fragment");
 
             Assert.Equal(2, attachments.Count);
             Assert.Equal("a1", attachments[0].Name);
             Assert.Equal("a2", attachments[1].Name);
+            Assert.Equal(
+                "https://graph.microsoft.com/v1.0/users/u%2Fpath%3Fx/messages/m%2Fid%23fragment/attachments",
+                handler.Requests[0].RequestUri!.AbsoluteUri);
             Assert.Equal("https://graph.microsoft.com/v1.0/users/u/messages/m/attachments?$skip=1", handler.Requests[1].RequestUri!.AbsoluteUri);
             Assert.Equal(2, handler.Requests.Count);
         } finally {

@@ -125,7 +125,7 @@ public class CmdletGetEmailGraphMessageAttachment : AsyncPSCmdlet {
             if (Property != null && Property.Length > 0) query["$select"] = string.Join(",", Property);
             var uri = MicrosoftGraphUtils.JoinUriQuery(
                 GraphEndpoint.V1,
-                $"/users/{UserPrincipalName}/messages/{MessageId}/attachments",
+                MicrosoftGraphUtils.BuildGraphPath("users", UserPrincipalName!, "messages", MessageId!, "attachments"),
                 query);
             var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
             ps.AddCommand("Invoke-MgGraphRequest").AddParameter("Method", "GET").AddParameter("Uri", uri);

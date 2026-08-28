@@ -96,7 +96,9 @@ public class GraphBatchAndRetryTests {
             Assert.Equal("POST", req.GetProperty("method").GetString());
             var msg = graph.MessageContainer?.Message;
             Assert.NotNull(msg);
-            Assert.Equal($"users/{msg!.From!.Email!.Address!}/sendMail", req.GetProperty("url").GetString());
+            Assert.Equal(
+                MicrosoftGraphUtils.BuildGraphPath("users", msg!.From!.Email!.Address!, "sendMail").TrimStart('/'),
+                req.GetProperty("url").GetString());
             Assert.Equal("application/json", req.GetProperty("headers").GetProperty("Content-Type").GetString());
             Assert.Equal("sub", req.GetProperty("body").GetProperty("message").GetProperty("subject").GetString());
         } finally {

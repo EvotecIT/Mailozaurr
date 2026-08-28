@@ -27,7 +27,10 @@ public partial class Graph {
         // Create the request URI outside the loop.
         var requestUri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
-            $"/users/{MessageContainer.Message.From!.Email.Address}/sendMail");
+            MicrosoftGraphUtils.BuildGraphPath(
+                "users",
+                MessageContainer.Message.From!.Email.Address,
+                "sendMail"));
 
         var policy = SendPolicy ?? MailozaurrOptions.DefaultGraphPolicy;
         if (policy != null && policy.MaxConcurrency > 0) {
@@ -198,7 +201,12 @@ public partial class Graph {
         // Send the draft message
         var sendRequestUri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
-            $"/users/{MessageContainer.Message.From!.Email.Address}/messages/{draftMessage.Id!}/send");
+            MicrosoftGraphUtils.BuildGraphPath(
+                "users",
+                MessageContainer.Message.From!.Email.Address,
+                "messages",
+                draftMessage.Id!,
+                "send"));
         using var sendRequest = new HttpRequestMessage(HttpMethod.Post, sendRequestUri);
 
         // Add the authorization header
@@ -311,7 +319,10 @@ public partial class Graph {
         return new GraphBatchRequest {
             Id = "1",
             Method = GraphHttpMethod.POST,
-            Url = $"/users/{MessageContainer.Message.From!.Email.Address}/sendMail",
+            Url = MicrosoftGraphUtils.BuildGraphPath(
+                "users",
+                MessageContainer.Message.From!.Email.Address,
+                "sendMail"),
             Headers = new Dictionary<string, string> { ["Content-Type"] = "application/json" },
             Body = bodyObj
         };
@@ -360,7 +371,12 @@ public partial class Graph {
 
         var draftRequestUri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
-            $"/users/{MessageContainer.Message.From!.Email.Address}/mailfolders/drafts/messages");
+            MicrosoftGraphUtils.BuildGraphPath(
+                "users",
+                MessageContainer.Message.From!.Email.Address,
+                "mailFolders",
+                "drafts",
+                "messages"));
         using var draftRequest = new HttpRequestMessage(HttpMethod.Post, draftRequestUri) {
             Content = new StringContent(messageJson, Encoding.UTF8, "application/json")
         };

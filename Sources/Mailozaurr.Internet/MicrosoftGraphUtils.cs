@@ -306,12 +306,10 @@ namespace Mailozaurr {
             string resource = "https://manage.office.com",
             CancellationToken cancellationToken = default) {
             int attempts = 0;
-            Exception? lastException = null;
-            do {
+            while (true) {
                 try {
                     return await ConnectO365GraphAsync(credential, tenantDomain, resource, cancellationToken).ConfigureAwait(false);
                 } catch (Exception ex) {
-                    lastException = ex;
                     LoggingMessages.Logger.WriteWarning($"Connect-EmailGraph - {ex.Message}");
                     if ((!Helpers.IsTransient(ex)) || attempts >= retryCount) {
                         throw;
@@ -322,8 +320,7 @@ namespace Mailozaurr {
                     }
                 }
                 attempts++;
-            } while (attempts <= retryCount);
-            throw lastException ?? new InvalidOperationException("Operation failed without exception");
+            }
         }
 
         /// <summary>
@@ -331,6 +328,24 @@ namespace Mailozaurr {
         /// </summary>
         public static string BuildGraphUri(GraphEndpoint endpoint, string path, IDictionary<string, string>? queryParameters = null) =>
             BuildGraphUri(GetEndpointBase(endpoint), path, queryParameters);
+
+        /// <summary>Builds a relative Microsoft Graph path from individually escaped path segments.</summary>
+        /// <param name="segments">Raw path segments. Separators, query delimiters, and fragments are escaped as data.</param>
+        /// <returns>A rooted relative path safe to append to a Microsoft Graph endpoint.</returns>
+        public static string BuildGraphPath(params string[] segments) {
+            if (segments == null) throw new ArgumentNullException(nameof(segments));
+            if (segments.Length == 0) return "/";
+
+            var builder = new StringBuilder();
+            foreach (string segment in segments) {
+                if (string.IsNullOrWhiteSpace(segment)) {
+                    throw new ArgumentException("Graph path segments cannot be empty.", nameof(segments));
+                }
+                builder.Append('/');
+                builder.Append(Uri.EscapeDataString(segment));
+            }
+            return builder.ToString();
+        }
 
         /// <summary>
         /// Builds a full URI from base, path, and query parameters.

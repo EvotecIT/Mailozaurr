@@ -11,7 +11,7 @@ public static class GraphDraftMessageUris {
     /// <param name="draftMessageId">Graph draft message identifier.</param>
     /// <returns>The absolute Microsoft Graph upload-session URI.</returns>
     public static string CreateUploadSession(string userPrincipalName, string draftMessageId) =>
-        BuildDraftActionUri(userPrincipalName, draftMessageId, "attachments/createUploadSession");
+        BuildDraftActionUri(userPrincipalName, draftMessageId, "attachments", "createUploadSession");
 
     /// <summary>
     /// Builds the URI used to add a small file attachment directly to a draft message.
@@ -28,7 +28,10 @@ public static class GraphDraftMessageUris {
     public static string Send(string userPrincipalName, string draftMessageId) =>
         BuildDraftActionUri(userPrincipalName, draftMessageId, "send");
 
-    private static string BuildDraftActionUri(string userPrincipalName, string draftMessageId, string actionPath) {
+    private static string BuildDraftActionUri(
+        string userPrincipalName,
+        string draftMessageId,
+        params string[] actionSegments) {
         if (string.IsNullOrWhiteSpace(userPrincipalName)) {
             throw new ArgumentException("User principal name must be provided.", nameof(userPrincipalName));
         }
@@ -36,9 +39,14 @@ public static class GraphDraftMessageUris {
             throw new ArgumentException("Draft message id must be provided.", nameof(draftMessageId));
         }
 
-        var escapedUser = userPrincipalName.Replace("'", "''");
+        var segments = new string[4 + actionSegments.Length];
+        segments[0] = "users";
+        segments[1] = userPrincipalName;
+        segments[2] = "messages";
+        segments[3] = draftMessageId;
+        Array.Copy(actionSegments, 0, segments, 4, actionSegments.Length);
         return MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
-            $"/users('{escapedUser}')/messages/{draftMessageId}/{actionPath}");
+            MicrosoftGraphUtils.BuildGraphPath(segments));
     }
 }

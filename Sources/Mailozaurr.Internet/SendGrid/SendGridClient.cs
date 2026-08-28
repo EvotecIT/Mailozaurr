@@ -1,4 +1,5 @@
 ﻿using Mailozaurr.Definitions;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 
 namespace Mailozaurr;
@@ -481,7 +482,8 @@ public sealed class SendGridClient : IDisposable {
                             apiKey,
                             cancellationToken).ConfigureAwait(false);
                     if (ErrorAction == ActionPreference.Stop && lastException != null) {
-                        throw lastException;
+                        ExceptionDispatchInfo.Capture(lastException).Throw();
+                        throw new InvalidOperationException("The SendGrid failure could not be rethrown.");
                     }
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message) {
                         MessageId = queuedMessageId,

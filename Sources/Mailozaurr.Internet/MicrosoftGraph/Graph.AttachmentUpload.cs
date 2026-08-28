@@ -386,16 +386,14 @@ public partial class Graph {
     private async Task SendAttachmentChunkWithRetryAsync(string uploadUrl, byte[] chunk, long offset, long fileSize, CancellationToken cancellationToken) {
         var policy = SendPolicy ?? MailozaurrOptions.DefaultGraphPolicy;
         int attempts = 0;
-        Exception? lastException = null;
         var maxRetries = policy?.MaxRetries ?? RetryCount;
-        do {
+        while (true) {
             try {
                 await SendAttachmentChunkOnceAsync(uploadUrl, chunk, offset, fileSize, cancellationToken);
                 return;
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 throw;
             } catch (Exception ex) {
-                lastException = ex;
                 var shouldRetry = (policy?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
                 if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
                     throw;
@@ -404,10 +402,6 @@ public partial class Graph {
                 await DelayWithBackoffAsync(policy, attempts, retryAfter, ex, cancellationToken);
             }
             attempts++;
-        } while (attempts <= maxRetries);
-
-        if (lastException != null) {
-            throw lastException;
         }
     }
 
@@ -422,9 +416,8 @@ public partial class Graph {
 
         var policy = SendPolicy ?? MailozaurrOptions.DefaultGraphPolicy;
         int attempts = 0;
-        Exception? lastException = null;
         var maxRetries = policy?.MaxRetries ?? RetryCount;
-        do {
+        while (true) {
             try {
                 var uploadUrl = await CreateUploadSession(draftMessage, attachmentItemJson.Json, cancellationToken);
                 await SendFileChunks(uploadUrl, attachmentItemJson.FilePath, attachmentItemJson.FileSize, cancellationToken);
@@ -434,7 +427,6 @@ public partial class Graph {
             } catch (FileNotFoundException) {
                 throw;
             } catch (Exception ex) {
-                lastException = ex;
                 var shouldRetry = (policy?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
                 if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
                     throw;
@@ -443,10 +435,6 @@ public partial class Graph {
                 await DelayWithBackoffAsync(policy, attempts, retryAfter, ex, cancellationToken);
             }
             attempts++;
-        } while (attempts <= maxRetries);
-
-        if (lastException != null) {
-            throw lastException;
         }
     }
 

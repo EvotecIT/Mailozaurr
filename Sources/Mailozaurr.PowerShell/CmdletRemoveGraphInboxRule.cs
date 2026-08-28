@@ -115,7 +115,7 @@ public sealed class CmdletRemoveGraphInboxRule : AsyncPSCmdlet {
         }
         var uri = MicrosoftGraphUtils.JoinUriQuery(
             GraphEndpoint.V1,
-            $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules/{RuleId}");
+            MicrosoftGraphUtils.BuildGraphPath("users", UserPrincipalName!, "mailFolders", "inbox", "messageRules", RuleId!));
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "DELETE")

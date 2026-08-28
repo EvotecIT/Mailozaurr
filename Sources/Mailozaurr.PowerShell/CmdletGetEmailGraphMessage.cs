@@ -219,7 +219,7 @@ public sealed class CmdletGetEmailGraphMessage : AsyncPSCmdlet {
         if (Limit.HasValue) query["$top"] = Limit.Value.ToString();
         var uri = MicrosoftGraphUtils.JoinUriQuery(
             GraphEndpoint.V1,
-            $"/users/{userPrincipalName}/messages",
+            MicrosoftGraphUtils.BuildGraphPath("users", userPrincipalName, "messages"),
             query);
 
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
