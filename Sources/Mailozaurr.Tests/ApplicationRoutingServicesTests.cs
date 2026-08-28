@@ -172,6 +172,7 @@ public sealed class ApplicationRoutingServicesTests {
         Assert.Equal(1, result.MatchedCount);
         Assert.Equal(1, result.SavedCount);
         Assert.Equal(0, result.FailedCount);
+        Assert.Equal(AttachmentDestinationKind.Directory, handler.LastSaveAttachmentRequest?.DestinationKind);
     }
 
     [Fact]
@@ -575,6 +576,8 @@ public sealed class ApplicationRoutingServicesTests {
 
         public int SaveAttachmentCalls { get; private set; }
 
+        public SaveAttachmentRequest? LastSaveAttachmentRequest { get; private set; }
+
         public Task<IReadOnlyList<FolderRef>> GetFoldersAsync(MailProfile profile, MailFolderQuery query, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<FolderRef>>(new[] {
                 new FolderRef {
@@ -609,6 +612,7 @@ public sealed class ApplicationRoutingServicesTests {
 
         public Task<OperationResult> SaveAttachmentAsync(MailProfile profile, SaveAttachmentRequest request, CancellationToken cancellationToken = default) {
             SaveAttachmentCalls++;
+            LastSaveAttachmentRequest = request;
             return Task.FromResult(OperationResult.Success());
         }
 

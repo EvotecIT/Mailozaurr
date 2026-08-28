@@ -151,25 +151,36 @@ public static partial class MicrosoftGraphUtils {
     /// Saves attachments to the specified directory.
     /// </summary>
     public static void SaveAttachments(IEnumerable<Attachment> attachments, string path) {
-        var resolvedPath = Path.GetFullPath(path);
-        if (!Directory.Exists(resolvedPath)) Directory.CreateDirectory(resolvedPath);
+        SaveAttachments(attachments, path, AttachmentFileConflictPolicy.Fail);
+    }
+
+    /// <summary>Saves Graph attachments with an explicit atomic conflict policy.</summary>
+    public static IReadOnlyList<AttachmentFileSaveResult> SaveAttachments(
+        IEnumerable<Attachment> attachments,
+        string path,
+        AttachmentFileConflictPolicy conflictPolicy) {
+        if (attachments == null) throw new ArgumentNullException(nameof(attachments));
+        var results = new List<AttachmentFileSaveResult>();
+        int index = 0;
         foreach (var att in attachments) {
             if (!string.IsNullOrWhiteSpace(att.ContentBytes) && !string.IsNullOrWhiteSpace(att.Name)) {
-                var filePath = Path.Combine(resolvedPath, att.Name);
                 try {
                     var bytes = Convert.FromBase64String(att.ContentBytes);
-                    File.WriteAllBytes(filePath, bytes);
+                    results.Add(AttachmentFileStore.SaveBytesToDirectory(
+                        path,
+                        att.Name,
+                        bytes,
+                        conflictPolicy,
+                        index.ToString(System.Globalization.CultureInfo.InvariantCulture)));
                 } catch (FormatException fex) {
                     // Invalid Base64 content
                     LoggingMessages.Logger.WriteWarning($"SaveAttachment - Invalid base64 content for {att.Name}. Error: {fex.Message}");
                     LoggingMessages.Logger.WriteWarning($"SaveAttachment - Possible issue: The attachment '{att.Name}' may be corrupted.");
-                } catch (IOException ex) {
-                    // Log or handle other errors
-                    LoggingMessages.Logger.WriteWarning($"SaveAttachment - Couldn't save file to {filePath}. Error: {ex.Message}");
-                    LoggingMessages.Logger.WriteWarning($"SaveAttachment - Possible issue: Verify the path '{filePath}' exists and you have write permissions.");
                 }
             }
+            index++;
         }
+        return results.AsReadOnly();
     }
 
     /// <summary>

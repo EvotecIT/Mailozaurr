@@ -175,12 +175,18 @@ public sealed class Pop3MailReadHandler : IMailReadHandler {
                 profile.Kind.ToString(),
                 folderId,
                 canonicalMessageId,
-                attachmentIndex.ToString(System.Globalization.CultureInfo.InvariantCulture)));
-        if (File.Exists(destinationPath) && !request.Overwrite) {
+                attachmentIndex.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            request.DestinationKind);
+        try {
+            MimeAttachmentStorage.SaveAttachment(
+                attachment,
+                destinationPath,
+                request.Overwrite
+                    ? AttachmentFileConflictPolicy.Replace
+                    : AttachmentFileConflictPolicy.Fail);
+        } catch (IOException) when (!request.Overwrite && File.Exists(destinationPath)) {
             return OperationResult.Failure("destination_exists", $"Destination '{destinationPath}' already exists.");
         }
-
-        MimeAttachmentStorage.SaveAttachment(attachment, destinationPath);
         return OperationResult.Success($"Attachment saved to '{destinationPath}'.");
     }
 

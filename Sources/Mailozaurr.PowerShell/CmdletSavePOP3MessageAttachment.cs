@@ -8,7 +8,7 @@ namespace Mailozaurr.PowerShell;
 /// <para type="synopsis">Saves attachments from a POP3 message to disk.</para>
 /// <para type="description">The <c>Save-POP3MessageAttachment</c> cmdlet saves all attachments from a POP3 message identified by its index to the specified directory.</para>
 /// </summary>
-[Cmdlet(VerbsData.Save, "POP3MessageAttachment")]
+[Cmdlet(VerbsData.Save, "POP3MessageAttachment", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 public sealed class CmdletSavePOP3MessageAttachment : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">The <see cref="PopConnectionInfo"/> object representing the active POP3 connection.</para>
@@ -30,6 +30,19 @@ public sealed class CmdletSavePOP3MessageAttachment : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? Path { get; set; }
 
+    /// <summary>Controls how existing destination files are handled.</summary>
+    [Parameter]
+    public AttachmentFileConflictPolicy ConflictPolicy { get; set; } = AttachmentFileConflictPolicy.Fail;
+
+    /// <summary>Replaces existing regular files. Equivalent to ConflictPolicy Replace.</summary>
+    [Parameter]
+    [Alias("Overwrite")]
+    public SwitchParameter Force { get; set; }
+
+    /// <summary>Writes one save result for each attachment.</summary>
+    [Parameter]
+    public SwitchParameter PassThru { get; set; }
+
     /// <summary>
     /// Saves attachments from the specified POP3 message to disk.
     /// </summary>
@@ -39,7 +52,17 @@ public sealed class CmdletSavePOP3MessageAttachment : AsyncPSCmdlet {
             if (Index < conn.Data.Count) {
                 var message = conn.Data.GetMessage(Index);
                 if (Path is not null) {
-                    MimeKitUtils.SaveAttachments(message.Attachments, Path);
+                    AttachmentFileConflictPolicy policy = AttachmentCmdletConflictPolicy.Resolve(
+                        this,
+                        Force,
+                        ConflictPolicy);
+                    if (ShouldProcess(Path, "Save POP3 message attachments")) {
+                        IReadOnlyList<AttachmentFileSaveResult> results = MimeKitUtils.SaveAttachments(
+                            message.Attachments,
+                            Path,
+                            policy);
+                        if (PassThru.IsPresent) WriteObject(results, enumerateCollection: true);
+                    }
                 }
             } else {
                 WriteWarning($"Save-POP3MessageAttachment - Index is out of range. Use index less than {conn.Data.Count}.");

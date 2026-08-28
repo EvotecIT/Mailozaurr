@@ -10,7 +10,7 @@ namespace Mailozaurr.PowerShell;
 /// <para type="synopsis">Saves attachments from an IMAP message to disk.</para>
 /// <para type="description">The <c>Save-IMAPMessageAttachment</c> cmdlet saves all attachments from an IMAP message identified by its UID to the specified directory.</para>
 /// </summary>
-[Cmdlet(VerbsData.Save, "IMAPMessageAttachment")]
+[Cmdlet(VerbsData.Save, "IMAPMessageAttachment", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
 public sealed class CmdletSaveIMAPMessageAttachment : AsyncPSCmdlet {
     /// <summary>
     /// <para type="description">The <see cref="ImapConnectionInfo"/> object representing the active IMAP connection.</para>
@@ -38,6 +38,19 @@ public sealed class CmdletSaveIMAPMessageAttachment : AsyncPSCmdlet {
     [ValidateNotNullOrEmpty]
     public string? Path { get; set; }
 
+    /// <summary>Controls how existing destination files are handled.</summary>
+    [Parameter]
+    public AttachmentFileConflictPolicy ConflictPolicy { get; set; } = AttachmentFileConflictPolicy.Fail;
+
+    /// <summary>Replaces existing regular files. Equivalent to ConflictPolicy Replace.</summary>
+    [Parameter]
+    [Alias("Overwrite")]
+    public SwitchParameter Force { get; set; }
+
+    /// <summary>Writes one save result for each attachment.</summary>
+    [Parameter]
+    public SwitchParameter PassThru { get; set; }
+
     /// <summary>
     /// Saves attachments from the specified IMAP message to disk.
     /// </summary>
@@ -49,7 +62,17 @@ public sealed class CmdletSaveIMAPMessageAttachment : AsyncPSCmdlet {
             conn.Folders[mailFolder.FullName] = (ImapFolder)mailFolder;
             var message = mailFolder.GetMessage(uid);
             if (Path is not null) {
-                MimeKitUtils.SaveAttachments(message.Attachments, Path);
+                AttachmentFileConflictPolicy policy = AttachmentCmdletConflictPolicy.Resolve(
+                    this,
+                    Force,
+                    ConflictPolicy);
+                if (ShouldProcess(Path, "Save IMAP message attachments")) {
+                    IReadOnlyList<AttachmentFileSaveResult> results = MimeKitUtils.SaveAttachments(
+                        message.Attachments,
+                        Path,
+                        policy);
+                    if (PassThru.IsPresent) WriteObject(results, enumerateCollection: true);
+                }
             }
         } else {
             ThrowTerminatingError(new ErrorRecord(

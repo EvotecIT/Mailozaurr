@@ -103,6 +103,7 @@ public sealed class RoutedMailReadService : IMailReadService {
                 MessageId = request.MessageId,
                 AttachmentId = attachment.Id,
                 DestinationPath = request.DestinationPath,
+                DestinationKind = AttachmentDestinationKind.Directory,
                 Overwrite = request.Overwrite
             }, cancellationToken).ConfigureAwait(false);
 

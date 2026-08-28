@@ -191,11 +191,8 @@ public sealed class GmailMailReadHandler : IMailReadHandler {
                 profile.Kind.ToString(),
                 session.UserId,
                 request.MessageId,
-                resolved.Id!.Trim()));
-        if (File.Exists(destinationPath) && !request.Overwrite) {
-            return OperationResult.Failure("destination_exists", $"Destination '{destinationPath}' already exists.");
-        }
-
+                resolved.Id!.Trim()),
+            request.DestinationKind);
         var bytes = await session.Client.DownloadAttachmentAsync(
             session.UserId,
             request.MessageId,
@@ -203,12 +200,15 @@ public sealed class GmailMailReadHandler : IMailReadHandler {
             cancellationToken).ConfigureAwait(false);
 
         cancellationToken.ThrowIfCancellationRequested();
-        using (var stream = File.Create(destinationPath)) {
-#if NET8_0_OR_GREATER
-            await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
-#else
-            await stream.WriteAsync(bytes, 0, bytes.Length, cancellationToken).ConfigureAwait(false);
-#endif
+        try {
+            AttachmentFileStore.SaveToFile(
+                destinationPath,
+                stream => stream.Write(bytes, 0, bytes.Length),
+                request.Overwrite
+                    ? AttachmentFileConflictPolicy.Replace
+                    : AttachmentFileConflictPolicy.Fail);
+        } catch (IOException) when (!request.Overwrite && File.Exists(destinationPath)) {
+            return OperationResult.Failure("destination_exists", $"Destination '{destinationPath}' already exists.");
         }
         return OperationResult.Success($"Attachment saved to '{destinationPath}'.");
     }

@@ -280,12 +280,18 @@ public sealed class GraphMailReadHandler : IMailReadHandler {
                 profile.Kind.ToString(),
                 CanonicalizeUserIdForStorage(profile, userId),
                 request.MessageId,
-                attachmentIndex.ToString(CultureInfo.InvariantCulture)));
-        if (File.Exists(destinationPath) && !request.Overwrite) {
+                attachmentIndex.ToString(CultureInfo.InvariantCulture)),
+            request.DestinationKind);
+        try {
+            MimeAttachmentStorage.SaveAttachment(
+                attachment,
+                destinationPath,
+                request.Overwrite
+                    ? AttachmentFileConflictPolicy.Replace
+                    : AttachmentFileConflictPolicy.Fail);
+        } catch (IOException) when (!request.Overwrite && File.Exists(destinationPath)) {
             return OperationResult.Failure("destination_exists", $"Destination '{destinationPath}' already exists.");
         }
-
-        MimeAttachmentStorage.SaveAttachment(attachment, destinationPath);
         return OperationResult.Success($"Attachment saved to '{destinationPath}'.");
     }
 

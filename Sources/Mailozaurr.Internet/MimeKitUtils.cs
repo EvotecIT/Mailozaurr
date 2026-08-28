@@ -15,27 +15,43 @@ public static class MimeKitUtils {
     /// <param name="attachments">Collection of MIME entities representing attachments.</param>
     /// <param name="path">Directory path where attachments should be saved.</param>
     public static void SaveAttachments(IEnumerable<MimeEntity> attachments, string path) {
-        var resolved = Path.GetFullPath(path);
-        if (!Directory.Exists(resolved)) Directory.CreateDirectory(resolved);
+        SaveAttachments(attachments, path, AttachmentFileConflictPolicy.Fail);
+    }
+
+    /// <summary>Saves MIME attachments with an explicit atomic conflict policy.</summary>
+    public static IReadOnlyList<AttachmentFileSaveResult> SaveAttachments(
+        IEnumerable<MimeEntity> attachments,
+        string path,
+        AttachmentFileConflictPolicy conflictPolicy) {
+        if (attachments == null) throw new ArgumentNullException(nameof(attachments));
+        var results = new List<AttachmentFileSaveResult>();
+        int index = 0;
         foreach (var attachment in attachments) {
             if (attachment is MimePart mp) {
-                var file = Path.Combine(resolved, mp.FileName ?? Path.GetRandomFileName());
-                using var fs = File.Create(file);
-                if (mp.Content != null) {
-                    mp.Content.DecodeTo(fs);
-                } else {
-                    mp.WriteTo(fs);
-                }
+                results.Add(AttachmentFileStore.SaveToDirectory(
+                    path,
+                    mp.FileName,
+                    stream => {
+                        if (mp.Content != null) mp.Content.DecodeTo(stream);
+                        else mp.WriteTo(stream);
+                    },
+                    conflictPolicy,
+                    index.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             } else if (attachment is MessagePart msgPart) {
-                var name = msgPart.ContentDisposition?.FileName ?? msgPart.ContentType.Name ?? Path.GetRandomFileName();
-                var file = Path.Combine(resolved, name);
-                if (msgPart.Message != null) {
-                    msgPart.Message.WriteTo(file);
-                } else {
-                    msgPart.WriteTo(file);
-                }
+                string? name = msgPart.ContentDisposition?.FileName ?? msgPart.ContentType.Name;
+                results.Add(AttachmentFileStore.SaveToDirectory(
+                    path,
+                    name,
+                    stream => {
+                        if (msgPart.Message != null) msgPart.Message.WriteTo(stream);
+                        else msgPart.WriteTo(stream);
+                    },
+                    conflictPolicy,
+                    index.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             }
+            index++;
         }
+        return results.AsReadOnly();
     }
 
     /// <summary>
