@@ -1,6 +1,6 @@
 using System.Net.Http;
-using System.Text.RegularExpressions;
 using System.Threading;
+using OfficeIMO.Email;
 
 namespace Mailozaurr;
 
@@ -15,8 +15,6 @@ public static class HtmlUtils {
     internal static HttpClient HttpClient { get; } = new HttpClient(new HttpClientHandler {
         AllowAutoRedirect = false
     });
-
-    private static readonly Regex ImageSrcRegex = new("(?<=<img[^>]+src=[\"'])([^\"']+)(?=[\"'])", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     static HtmlUtils() {
         AppDomain.CurrentDomain.ProcessExit += (_, _) => HttpClient.Dispose();
@@ -34,6 +32,21 @@ public static class HtmlUtils {
         /// <summary>MIME type of the image data.</summary>
         public string MediaType { get; set; } = string.Empty;
     }
+
+    /// <summary>Local image selected for inline attachment embedding.</summary>
+    public sealed class LocalImage {
+        internal LocalImage(string path, string contentId) {
+            Path = path;
+            ContentId = contentId;
+        }
+
+        /// <summary>Authorized local file path.</summary>
+        public string Path { get; }
+
+        /// <summary>Unique content identifier written into the HTML body.</summary>
+        public string ContentId { get; }
+    }
+
     /// <summary>
     /// Replaces local image <c>src</c> references with <c>cid:</c> links and returns the
     /// updated HTML and a collection of the embedded file paths.
@@ -41,26 +54,15 @@ public static class HtmlUtils {
     /// <param name="html">HTML content that may contain local image paths.</param>
     /// <returns>The updated HTML and list of file paths that were replaced.</returns>
     public static (string Html, List<string> Paths) ExtractLocalImagePaths(string html) {
-        var paths = new List<string>();
-        if (string.IsNullOrWhiteSpace(html)) return (html, paths);
-
-        html = ImageSrcRegex.Replace(html, match => {
-            var path = match.Value;
-            if (string.IsNullOrWhiteSpace(path)) return path;
-            if (path.StartsWith("http", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("cid:", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) {
-                return path;
-            }
-            if (File.Exists(path)) {
-                var fileName = Path.GetFileName(path);
-                paths.Add(path);
-                return $"cid:{fileName}";
-            }
-            return path;
-        });
-        return (html, paths);
+        (string rendered, List<LocalImage> images) = ExtractLocalImagesCore(html, uniqueContentIds: false);
+        return (rendered, images.Select(image => image.Path).ToList());
     }
+
+    /// <summary>
+    /// Rewrites authorized local image sources with unique CID references and returns their file mappings.
+    /// </summary>
+    public static (string Html, List<LocalImage> Images) ExtractLocalImages(string html) =>
+        ExtractLocalImagesCore(html, uniqueContentIds: true);
 
     /// <summary>
     /// Downloads externally referenced images and replaces their sources with cid links.
@@ -87,14 +89,14 @@ public static class HtmlUtils {
         var images = new List<RemoteImage>();
         if (string.IsNullOrWhiteSpace(html)) return (html, images);
 
-        var matches = ImageSrcRegex.Matches(html);
+        EmailHtmlImageDocument document = EmailHtmlImageDocument.Parse(html);
         var replacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var allocatedContentIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         long totalBytes = 0;
         int attemptedImages = 0;
 
-        foreach (Match match in matches) {
-            var url = match.Value;
+        foreach (EmailHtmlImageReference reference in document.Images) {
+            var url = reference.Source;
             if (string.IsNullOrWhiteSpace(url)) continue;
             if (replacements.ContainsKey(url)) continue;
             if (attemptedImages >= options.MaxImageCount) break;
@@ -129,8 +131,42 @@ public static class HtmlUtils {
             }
         }
 
-        html = ImageSrcRegex.Replace(html, m => replacements.TryGetValue(m.Value, out var value) ? value : m.Value);
+        foreach (EmailHtmlImageReference reference in document.Images) {
+            if (replacements.TryGetValue(reference.Source, out string? value)) {
+                document.SetImageSource(reference.Index, value);
+            }
+        }
 
-        return (html, images);
+        return (document.ToHtml(), images);
+    }
+
+    private static (string Html, List<LocalImage> Images) ExtractLocalImagesCore(
+        string html,
+        bool uniqueContentIds) {
+        var images = new List<LocalImage>();
+        if (string.IsNullOrWhiteSpace(html)) return (html, images);
+
+        EmailHtmlImageDocument document = EmailHtmlImageDocument.Parse(html);
+        var allocatedContentIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (EmailHtmlImageReference reference in document.Images) {
+            string path = reference.Source;
+            if (string.IsNullOrWhiteSpace(path) || IsNonLocalSource(path) || !File.Exists(path)) continue;
+
+            string fileName = Path.GetFileName(path);
+            string contentId = uniqueContentIds
+                ? RemoteImageDownloader.CreateContentId(fileName, Path.GetFullPath(path), "local-image", allocatedContentIds)
+                : fileName;
+            document.SetImageSource(reference.Index, "cid:" + contentId);
+            images.Add(new LocalImage(path, contentId));
+        }
+        return (document.ToHtml(), images);
+    }
+
+    private static bool IsNonLocalSource(string source) {
+        if (source.StartsWith("cid:", StringComparison.OrdinalIgnoreCase) ||
+            source.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) return true;
+        return Uri.TryCreate(source, UriKind.Absolute, out Uri? uri) &&
+            (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
     }
 }

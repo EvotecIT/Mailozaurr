@@ -5,7 +5,6 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -30,35 +29,45 @@ public class HtmlUtilsTests {
     }
 
     [Fact]
-    public void ExtractLocalImagePaths_PrecompiledRegex_MatchesInlineImplementation() {
+    public void ExtractLocalImagePaths_UsesHtmlDomForFlexibleAttributeSyntax() {
         var tmp = Path.GetTempFileName();
         File.WriteAllText(tmp, "data");
-        var html = $"<IMG SRC=\"{tmp}\"><p>{tmp}</p>";
-
-        var expectedPaths = new List<string>();
-        const string pattern = @"(?<=<img[^>]+src=['""])([^'""]+)(?=['""])";
-        var expectedHtml = Regex.Replace(html, pattern, match => {
-            var path = match.Value;
-            if (string.IsNullOrWhiteSpace(path)) return path;
-            if (path.StartsWith("http", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("cid:", StringComparison.OrdinalIgnoreCase) ||
-                path.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) {
-                return path;
-            }
-            if (File.Exists(path)) {
-                var fileName = Path.GetFileName(path);
-                expectedPaths.Add(path);
-                return $"cid:{fileName}";
-            }
-            return path;
-        }, RegexOptions.IgnoreCase);
+        var html = $"<p data-src=\"{tmp}\">before</p><IMG alt=\"src='{tmp}'\" SRC = \"{tmp}\"><p>{tmp}</p>";
 
         var (actualHtml, actualPaths) = HtmlUtils.ExtractLocalImagePaths(html);
 
-        Assert.Equal(expectedHtml, actualHtml);
-        Assert.Equal(expectedPaths, actualPaths);
+        Assert.Contains($"data-src=\"{tmp}\"", actualHtml, StringComparison.Ordinal);
+        Assert.Contains($"alt=\"src='{tmp}'\"", actualHtml, StringComparison.Ordinal);
+        Assert.Contains($"src=\"cid:{Path.GetFileName(tmp)}\"", actualHtml, StringComparison.Ordinal);
+        Assert.Contains($">{tmp}</p>", actualHtml, StringComparison.Ordinal);
+        Assert.Equal(new[] { tmp }, actualPaths);
 
         File.Delete(tmp);
+    }
+
+    [Fact]
+    public void ExtractLocalImages_AllocatesUniqueContentIdsForDuplicateFileNames() {
+        string root = Path.Combine(Path.GetTempPath(), "MailozaurrHtml-" + Guid.NewGuid().ToString("N"));
+        string firstDirectory = Path.Combine(root, "one");
+        string secondDirectory = Path.Combine(root, "two");
+        Directory.CreateDirectory(firstDirectory);
+        Directory.CreateDirectory(secondDirectory);
+        string first = Path.Combine(firstDirectory, "logo.png");
+        string second = Path.Combine(secondDirectory, "logo.png");
+        File.WriteAllBytes(first, new byte[] { 1 });
+        File.WriteAllBytes(second, new byte[] { 2 });
+        try {
+            var (rendered, images) = HtmlUtils.ExtractLocalImages(
+                $"<img src='{first}'><img src='{second}'>");
+
+            Assert.Equal(2, images.Count);
+            Assert.Equal(2, images.Select(image => image.ContentId)
+                .Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.Contains("src=\"cid:" + images[0].ContentId + "\"", rendered, StringComparison.Ordinal);
+            Assert.Contains("src=\"cid:" + images[1].ContentId + "\"", rendered, StringComparison.Ordinal);
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]

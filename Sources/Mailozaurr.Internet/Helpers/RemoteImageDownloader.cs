@@ -149,12 +149,20 @@ internal static class RemoteImageDownloader {
         } catch (UriFormatException) {
             candidate = Path.GetFileName(source.AbsolutePath);
         }
+        return CreateContentId(candidate, source.AbsoluteUri, "remote-image", allocatedContentIds);
+    }
+
+    internal static string CreateContentId(
+        string candidate,
+        string sourceIdentity,
+        string fallbackName,
+        ISet<string> allocatedContentIds) {
         candidate = SanitizeContentId(candidate);
-        if (string.IsNullOrWhiteSpace(candidate)) candidate = "remote-image";
+        if (string.IsNullOrWhiteSpace(candidate)) candidate = fallbackName;
         if (allocatedContentIds.Add(candidate)) return candidate;
 
         using var sha256 = SHA256.Create();
-        byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(source.AbsoluteUri));
+        byte[] hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(sourceIdentity));
         string suffix = BitConverter.ToString(hash, 0, 6).Replace("-", string.Empty).ToLowerInvariant();
         string extension = Path.GetExtension(candidate);
         string stem = Path.GetFileNameWithoutExtension(candidate);

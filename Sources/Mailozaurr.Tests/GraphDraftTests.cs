@@ -300,6 +300,43 @@ public class GraphDraftTests {
     }
 
     [Fact]
+    public async Task SendMessageAsync_LargeReopenableSourceStreamsThroughUploadSession() {
+        var source = new CountingAttachmentSource(new byte[3_100_000]);
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("{\"id\":\"draft-id\"}") },
+            new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("{\"uploadUrl\":\"https://upload.example/session\"}") },
+            new HttpResponseMessage(HttpStatusCode.Accepted),
+            new HttpResponseMessage(HttpStatusCode.Accepted));
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "large reopenable attachment",
+            HTML = "body",
+            ContentType = "HTML",
+            Attachments = new object[] {
+                new ContentSourceAttachmentDescriptor(source, "reopenable.bin")
+            },
+            AccessToken = "token",
+            TokenType = "Bearer"
+        };
+        SetHttpClient(graph, handler);
+
+        GraphSmtpResult result = await graph.SendMessageAsync();
+
+        Assert.True(result.Status);
+        Assert.True(graph.IsLargerAttachment);
+        Assert.Equal(1, source.OpenCount);
+        var draftRequest = Assert.Single(handler.Requests, request =>
+            request.RequestUri!.AbsolutePath.Contains("/mailfolders/drafts/messages", StringComparison.OrdinalIgnoreCase));
+        string draftBody = await draftRequest.Content!.ReadAsStringAsync();
+        Assert.DoesNotContain("reopenable.bin", draftBody, StringComparison.Ordinal);
+        Assert.Contains(handler.Requests, request =>
+            request.RequestUri!.AbsolutePath.EndsWith("/createUploadSession", StringComparison.OrdinalIgnoreCase));
+        var uploadRequest = Assert.Single(handler.Requests, request => request.Method == HttpMethod.Put);
+        Assert.Equal(3_100_000, uploadRequest.Content!.Headers.ContentRange!.Length);
+    }
+
+    [Fact]
     public async Task PrepareAttachments_LargeInMemoryAttachmentCreatesUploadPlaceholder() {
         var bytes = new byte[3_100_000];
         using var graph = new Graph {
@@ -833,5 +870,25 @@ public class GraphDraftTests {
         Assert.Equal(
             "https://graph.microsoft.com/v1.0/users/from%40example.com%2Fmessages%2Fother%3Fx%3D1/messages/draft%2Fid%23fragment/send",
             uri);
+    }
+
+    private sealed class CountingAttachmentSource : IAttachmentContentSource {
+        private readonly byte[] _content;
+
+        internal CountingAttachmentSource(byte[] content) => _content = content;
+
+        internal int OpenCount { get; private set; }
+
+        public long? Length => _content.LongLength;
+
+        public Stream OpenRead() {
+            OpenCount++;
+            return new MemoryStream(_content, writable: false);
+        }
+
+        public Task<Stream> OpenReadAsync(CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(OpenRead());
+        }
     }
 }

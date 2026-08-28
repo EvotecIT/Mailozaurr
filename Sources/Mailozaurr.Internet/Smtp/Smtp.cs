@@ -490,19 +490,19 @@ public partial class Smtp {
             return;
         }
 
-        var (html, paths) = HtmlUtils.ExtractLocalImagePaths(HtmlBody);
+        var (html, images) = HtmlUtils.ExtractLocalImages(HtmlBody);
         HtmlBody = html;
-        if (paths.Count <= 0) {
+        if (images.Count <= 0) {
             return;
         }
 
         InlineAttachments ??= new List<AttachmentDescriptor>();
-        foreach (var path in paths) {
-            if (InlineAttachments.Any(d => string.Equals(d.SourcePath, path, StringComparison.OrdinalIgnoreCase))) {
+        foreach (HtmlUtils.LocalImage image in images) {
+            if (InlineAttachments.Any(d => string.Equals(d.SourcePath, image.Path, StringComparison.OrdinalIgnoreCase))) {
                 continue;
             }
 
-            InlineAttachments.Add(new FileAttachmentDescriptor(path));
+            InlineAttachments.Add(new FileAttachmentDescriptor(image.Path) { ContentId = image.ContentId });
         }
     }
 

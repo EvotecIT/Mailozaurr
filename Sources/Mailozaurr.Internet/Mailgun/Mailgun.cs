@@ -172,7 +172,7 @@ public class MailgunClient : IDisposable {
                 FileShare.Read,
                 bufferSize: 8192,
                 options: FileOptions.Asynchronous | FileOptions.SequentialScan)
-            : new MemoryStream(descriptor.GetContentBytes(), writable: false);
+            : descriptor.OpenContentStream();
         var streamContent = new StreamContent(stream);
         var contentTypeSource = string.IsNullOrWhiteSpace(descriptor.FileName)
             ? descriptor.SourcePath

@@ -24,6 +24,9 @@
     <PackageTags>Windows;MacOS;Linux;Mail;Email;SMTP;IMAP;POP3;MIME;SendGrid;Mailgun;AmazonSES;DMARC;DKIM</PackageTags>
     <DefaultItemExcludes>$(DefaultItemExcludes);**/artifacts/**;**/Artifacts/**</DefaultItemExcludes>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <OfficeIMOVersion>3.2.6</OfficeIMOVersion>
+    <OfficeIMORoot Condition=" '$(OfficeIMORoot)' == '' ">..\..\..\OfficeIMO</OfficeIMORoot>
+    <UseOfficeIMOProjectReferences Condition=" '$(UseOfficeIMOProjectReferences)' == '' ">false</UseOfficeIMOProjectReferences>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(TargetFramework)' == 'net8.0' ">
@@ -65,6 +68,14 @@
     <PackageReference Include="MimeKit" Version="4.17.0" />
     <PackageReference Include="NSspi" Version="0.3.1" />
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.7.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseOfficeIMOProjectReferences)' == 'true' ">
+    <ProjectReference Include="$(OfficeIMORoot)\OfficeIMO.Email.Html\OfficeIMO.Email.Html.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseOfficeIMOProjectReferences)' != 'true' ">
+    <PackageReference Include="OfficeIMO.Email.Html" Version="$(OfficeIMOVersion)" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'netstandard2.0' ">

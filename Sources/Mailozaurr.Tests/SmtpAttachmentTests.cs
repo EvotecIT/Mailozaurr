@@ -99,6 +99,62 @@ public class SmtpAttachmentTests {
     }
 
     [Fact]
+    public void StreamAttachmentDescriptor_StagesLargeContentAndDeletesItOnDispose() {
+        string directory = Path.Combine(Path.GetTempPath(), "MailozaurrStage-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var source = new MemoryStream(new byte[] { 1, 2, 3, 4, 5 });
+            var descriptor = new StreamAttachmentDescriptor(
+                source,
+                "staged.bin",
+                stagingOptions: new AttachmentStreamStagingOptions {
+                    MemoryThresholdBytes = 2,
+                    MaxBytes = 10,
+                    TempDirectory = directory
+                });
+
+            using (Stream stream = descriptor.OpenContentStream()) {
+                Assert.IsType<FileStream>(stream);
+                Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, ReadAll(stream));
+            }
+            Assert.Single(Directory.GetFiles(directory));
+
+            descriptor.Dispose();
+
+            Assert.Empty(Directory.GetFiles(directory));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void StreamAttachmentDescriptor_RejectsContentPastItsBoundAndCleansStaging() {
+        string directory = Path.Combine(Path.GetTempPath(), "MailozaurrStage-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            using var descriptor = new StreamAttachmentDescriptor(
+                new MemoryStream(new byte[] { 1, 2, 3, 4, 5 }),
+                "too-large.bin",
+                stagingOptions: new AttachmentStreamStagingOptions {
+                    MemoryThresholdBytes = 2,
+                    MaxBytes = 4,
+                    TempDirectory = directory
+                });
+
+            Assert.Throws<InvalidDataException>(() => descriptor.OpenContentStream());
+            Assert.Empty(Directory.GetFiles(directory));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static byte[] ReadAll(Stream stream) {
+        using var memory = new MemoryStream();
+        stream.CopyTo(memory);
+        return memory.ToArray();
+    }
+
+    [Fact]
     public void CreateMessage_ByteArrayAttachmentDescriptor_AddsAttachment() {
         var data = new byte[] { 1, 2, 3, 4, 5 };
         var descriptor = new ByteArrayAttachmentDescriptor(data, "data.bin") {

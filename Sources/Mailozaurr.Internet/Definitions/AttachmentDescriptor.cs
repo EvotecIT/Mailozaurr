@@ -7,6 +7,9 @@ using MimeKit.Utils;
 /// Base descriptor describing an attachment that can be added to outbound messages.
 /// </summary>
 public abstract class AttachmentDescriptor {
+    /// <summary>Known content length, or null when it cannot be determined without reading.</summary>
+    public virtual long? Length => null;
+
     /// <summary>
     /// Gets or sets the file name used for the attachment.
     /// </summary>
@@ -53,7 +56,7 @@ public abstract class AttachmentDescriptor {
     /// <param name="inline">When set to <c>true</c>, the descriptor will be treated as an inline resource.</param>
     /// <returns>The created <see cref="MimeEntity"/>.</returns>
     internal virtual MimeEntity CreateMimeEntity(bool inline) {
-        var stream = CreateContentStream();
+        var stream = OpenContentStream();
         var mediaType = !string.IsNullOrWhiteSpace(ContentType)
             ? ContentType
             : !string.IsNullOrWhiteSpace(FileName)
@@ -104,15 +107,37 @@ public abstract class AttachmentDescriptor {
     /// <returns>A readable stream containing the attachment content.</returns>
     protected abstract Stream CreateContentStream();
 
+    /// <summary>Asynchronously creates a fresh readable content stream.</summary>
+    protected virtual Task<Stream> CreateContentStreamAsync(CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(CreateContentStream());
+    }
+
+    /// <summary>Opens a new readable attachment stream. The caller owns the returned stream.</summary>
+    public Stream OpenContentStream() => ValidateReadableStream(CreateContentStream());
+
+    /// <summary>Asynchronously opens a new readable attachment stream.</summary>
+    public async Task<Stream> OpenContentStreamAsync(CancellationToken cancellationToken = default) {
+        cancellationToken.ThrowIfCancellationRequested();
+        Stream stream = await CreateContentStreamAsync(cancellationToken).ConfigureAwait(false);
+        return ValidateReadableStream(stream);
+    }
+
     /// <summary>
     /// Returns the attachment content as a byte array.
     /// </summary>
     /// <returns>Attachment content represented as a byte array.</returns>
     internal virtual byte[] GetContentBytes() {
-        using var stream = CreateContentStream();
+        using var stream = OpenContentStream();
         using var memory = new MemoryStream();
         stream.CopyTo(memory);
         return memory.ToArray();
+    }
+
+    private static Stream ValidateReadableStream(Stream? stream) {
+        if (stream != null && stream.CanRead) return stream;
+        stream?.Dispose();
+        throw new InvalidDataException("The attachment content source did not return a readable stream.");
     }
 }
 
@@ -138,23 +163,38 @@ public sealed class FileAttachmentDescriptor : AttachmentDescriptor {
     /// </summary>
     public string FilePath { get; }
 
+    /// <inheritdoc />
+    public override long? Length => new FileInfo(FilePath).Length;
+
     internal override string? SourcePath => FilePath;
 
     /// <inheritdoc />
     protected override Stream CreateContentStream() {
-        var data = File.ReadAllBytes(FilePath);
-        return new MemoryStream(data, writable: false);
+        return new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete,
+            bufferSize: 64 * 1024, useAsync: false);
+    }
+
+    /// <inheritdoc />
+    protected override Task<Stream> CreateContentStreamAsync(CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
+        Stream stream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete,
+            bufferSize: 64 * 1024, useAsync: true);
+        return Task.FromResult(stream);
     }
 }
 
 /// <summary>
 /// Descriptor that sources attachment content from a <see cref="Stream"/>.
 /// </summary>
-public sealed class StreamAttachmentDescriptor : AttachmentDescriptor {
+public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposable {
     private readonly Stream _stream;
     private readonly bool _leaveStreamOpen;
+    private readonly AttachmentStreamStagingOptions _stagingOptions;
     private readonly object _materializationLock = new();
     private byte[]? _buffer;
+    private string? _stagedFilePath;
+    private long? _materializedLength;
+    private bool _disposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="StreamAttachmentDescriptor"/> class.
@@ -162,7 +202,12 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor {
     /// <param name="stream">Readable stream that provides the attachment content.</param>
     /// <param name="fileName">File name to associate with the attachment.</param>
     /// <param name="leaveStreamOpen">Whether the provided stream should remain open after being read.</param>
-    public StreamAttachmentDescriptor(Stream stream, string fileName, bool leaveStreamOpen = true) {
+    /// <param name="stagingOptions">Optional memory, temporary-file, and maximum-size staging limits.</param>
+    public StreamAttachmentDescriptor(
+        Stream stream,
+        string fileName,
+        bool leaveStreamOpen = true,
+        AttachmentStreamStagingOptions? stagingOptions = null) {
         _stream = stream ?? throw new ArgumentNullException(nameof(stream));
         if (!stream.CanRead) {
             throw new ArgumentException("Stream must be readable.", nameof(stream));
@@ -174,36 +219,144 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor {
 
         FileName = fileName;
         _leaveStreamOpen = leaveStreamOpen;
+        _stagingOptions = (stagingOptions ?? new AttachmentStreamStagingOptions()).CloneAndValidate();
+    }
+
+    /// <inheritdoc />
+    public override long? Length {
+        get {
+            lock (_materializationLock) {
+                if (_materializedLength.HasValue) return _materializedLength;
+                if (!_stream.CanSeek) return null;
+                try {
+                    return _stream.Length;
+                } catch (ObjectDisposedException) {
+                    return null;
+                } catch (NotSupportedException) {
+                    return null;
+                }
+            }
+        }
     }
 
     /// <inheritdoc />
     protected override Stream CreateContentStream() {
         lock (_materializationLock) {
-            if (_buffer == null) {
-                if (_stream.CanSeek) {
-                    _stream.Position = 0;
-                }
-
-                using var memory = new MemoryStream();
-                _stream.CopyTo(memory);
-                _buffer = memory.ToArray();
-
-                if (_stream.CanSeek) {
-                    try {
-                        _stream.Position = 0;
-                    } catch (ObjectDisposedException) {
-                        // The immutable copy remains usable when the source was disposed externally.
-                    }
-                }
-
-                if (!_leaveStreamOpen) {
-                    _stream.Dispose();
-                }
-            }
-
-            return new MemoryStream(_buffer, writable: false);
+            ThrowIfDisposed();
+            EnsureMaterialized();
+            if (_buffer != null) return new MemoryStream(_buffer, writable: false);
+            return new FileStream(_stagedFilePath!, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete,
+                bufferSize: 64 * 1024, useAsync: false);
         }
     }
+
+    /// <summary>Deletes any temporary staging file and optionally closes the supplied source stream.</summary>
+    public void Dispose() {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+
+    private void EnsureMaterialized() {
+        if (_buffer != null || _stagedFilePath != null) return;
+        if (_stream.CanSeek) _stream.Position = 0;
+
+        MemoryStream? memory = new MemoryStream((int)Math.Min(_stagingOptions.MemoryThresholdBytes, 64 * 1024));
+        FileStream? staged = null;
+        string? stagedPath = null;
+        long total = 0;
+        var copyBuffer = new byte[64 * 1024];
+        try {
+            while (true) {
+                int read = _stream.Read(copyBuffer, 0, copyBuffer.Length);
+                if (read == 0) break;
+                total = checked(total + read);
+                if (total > _stagingOptions.MaxBytes) {
+                    throw new InvalidDataException(
+                        $"Attachment stream exceeded the {_stagingOptions.MaxBytes} byte staging limit.");
+                }
+                if (staged == null && total > _stagingOptions.MemoryThresholdBytes) {
+                    staged = CreateStagingFile(out stagedPath);
+                    memory!.Position = 0;
+                    memory.CopyTo(staged);
+                    memory.Dispose();
+                    memory = null;
+                }
+                (staged as Stream ?? memory!).Write(copyBuffer, 0, read);
+            }
+
+            if (staged != null) {
+                staged.Flush();
+                staged.Dispose();
+                staged = null;
+                _stagedFilePath = stagedPath;
+            } else {
+                _buffer = memory!.ToArray();
+            }
+            _materializedLength = total;
+        } catch {
+            staged?.Dispose();
+            if (stagedPath != null) TryDeleteStagedFile(stagedPath);
+            throw;
+        } finally {
+            memory?.Dispose();
+            if (_stream.CanSeek) {
+                try {
+                    _stream.Position = 0;
+                } catch (ObjectDisposedException) {
+                    // Staged content remains independent of the original stream.
+                }
+            }
+            if (!_leaveStreamOpen) _stream.Dispose();
+        }
+    }
+
+    private FileStream CreateStagingFile(out string path) {
+        string directory = string.IsNullOrWhiteSpace(_stagingOptions.TempDirectory)
+            ? Path.Combine(Path.GetTempPath(), "Mailozaurr", "attachments")
+            : Path.GetFullPath(_stagingOptions.TempDirectory!);
+        Directory.CreateDirectory(directory);
+        UnixFilePermissions.RestrictDirectory(directory);
+        for (int attempt = 0; attempt < 32; attempt++) {
+            path = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp");
+            try {
+                var stream = new FileStream(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.Read | FileShare.Delete,
+                    bufferSize: 64 * 1024, useAsync: false);
+                UnixFilePermissions.RestrictFile(path);
+                return stream;
+            } catch (IOException) when (attempt < 31) {
+                // Extremely unlikely random-name collision; retry with a fresh name.
+            }
+        }
+        throw new IOException("Unable to create a unique attachment staging file.");
+    }
+
+    private void Dispose(bool disposing) {
+        lock (_materializationLock) {
+            if (_disposed) return;
+            _disposed = true;
+            if (disposing && !_leaveStreamOpen) _stream.Dispose();
+            if (_stagedFilePath != null) TryDeleteStagedFile(_stagedFilePath);
+            _stagedFilePath = null;
+            _buffer = null;
+        }
+    }
+
+    private void ThrowIfDisposed() {
+        if (_disposed) throw new ObjectDisposedException(nameof(StreamAttachmentDescriptor));
+    }
+
+    private static void TryDeleteStagedFile(string path) {
+        try {
+            File.Delete(path);
+        } catch (IOException) {
+            // Best effort during disposal/finalization; active reader streams may still own the file.
+        } catch (UnauthorizedAccessException) {
+            // Best effort during disposal/finalization.
+        }
+    }
+
+    /// <summary>Finalizer removes abandoned temporary staging files.</summary>
+    ~StreamAttachmentDescriptor() => Dispose(disposing: false);
 }
 
 /// <summary>
@@ -229,6 +382,9 @@ public sealed class ByteArrayAttachmentDescriptor : AttachmentDescriptor {
         _cloneBuffer = cloneBuffer;
         FileName = fileName;
     }
+
+    /// <inheritdoc />
+    public override long? Length => _buffer.LongLength;
 
     /// <inheritdoc />
     protected override Stream CreateContentStream() {

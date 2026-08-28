@@ -55,11 +55,11 @@ public partial class Graph : IDisposable {
     public long RawAttachmentSizeBytes { get; private set; }
 
     private long _inlineAttachmentSizeBytes;
-    private int _fileAttachmentCount;
-    private int _convertedFileAttachmentStartIndex = -1;
+    private int _streamableAttachmentCount;
+    private int _convertedStreamableAttachmentStartIndex = -1;
     private string? _autoEmbedOriginalHtml;
     private string? _autoEmbedRenderedHtml;
-    private readonly List<string> _autoEmbeddedImagePaths = new();
+    private readonly List<HtmlUtils.LocalImage> _autoEmbeddedImages = new();
     private readonly List<GraphAttachment> _deferredGraphAttachments = new();
 
     /// <summary>
@@ -414,7 +414,7 @@ public partial class Graph : IDisposable {
 
     internal void AddFileAttachmentSourcesToSmtpFallback(Smtp smtp) {
         foreach (var source in EnumerateFileAttachmentSources()) {
-            var descriptor = source.Descriptor ?? new Definitions.FileAttachmentDescriptor(source.Path);
+            var descriptor = source.Descriptor ?? new Definitions.FileAttachmentDescriptor(source.Path!);
             if (source.Descriptor != null && IsInlineDescriptor(source.Descriptor)) {
                 smtp.InlineAttachments ??= new List<Definitions.AttachmentDescriptor>();
                 smtp.InlineAttachments.Add(descriptor);
