@@ -3,6 +3,7 @@ using System.CommandLine;
 namespace Mailozaurr.Cli;
 
 internal static partial class CliCommandModel {
+    private static readonly char[] OptionValueSeparators = { '=', ':' };
     private static readonly Dictionary<string, string> CanonicalOptionAliases =
         new(StringComparer.OrdinalIgnoreCase) {
             ["--help"] = "--help",
@@ -18,7 +19,7 @@ internal static partial class CliCommandModel {
         var normalized = new string[arguments.Count];
         for (int index = 0; index < arguments.Count; index++) {
             string argument = arguments[index];
-            int separatorIndex = argument.IndexOfAny('=', ':');
+            int separatorIndex = argument.IndexOfAny(OptionValueSeparators);
             string alias = separatorIndex > 0 ? argument[..separatorIndex] : argument;
             normalized[index] = CanonicalOptionAliases.TryGetValue(alias, out string? canonical)
                 ? separatorIndex > 0

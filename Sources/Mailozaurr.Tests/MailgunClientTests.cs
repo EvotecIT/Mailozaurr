@@ -335,7 +335,7 @@ public class MailgunClientTests {
     }
 
     [Fact]
-    public async Task CreateContentAsync_RejectsMissingStructuredFileAttachment() {
+    public void CreateContentAsync_RejectsMissingStructuredFileAttachment() {
         string missing = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".txt");
         using var client = new MailgunClient {
             From = "sender@example.com",
