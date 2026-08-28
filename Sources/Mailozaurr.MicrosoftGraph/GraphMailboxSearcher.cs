@@ -20,7 +20,30 @@ public static class GraphMailboxSearcher {
         GraphCredential credential, string userPrincipalName, DateTime? since = null,
         DateTime? before = null, string? domain = null, int maxResults = 0,
         int parallelDownloadLimit = 4, long maxUncompressedSize = 10 * 1024 * 1024,
+        CancellationToken cancellationToken = default) => await SearchDmarcReportsAsync(
+            credential,
+            userPrincipalName,
+            DmarcReportInspectionOptions.FromLegacyLimit(maxUncompressedSize),
+            since,
+            before,
+            domain,
+            maxResults,
+            parallelDownloadLimit,
+            cancellationToken).ConfigureAwait(false);
+
+    /// <summary>Searches a Graph mailbox for DMARC aggregate reports using explicit attachment inspection limits.</summary>
+    public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
+        GraphCredential credential,
+        string userPrincipalName,
+        DmarcReportInspectionOptions inspectionOptions,
+        DateTime? since = null,
+        DateTime? before = null,
+        string? domain = null,
+        int maxResults = 0,
+        int parallelDownloadLimit = 4,
         CancellationToken cancellationToken = default) {
+        if (inspectionOptions == null) throw new ArgumentNullException(nameof(inspectionOptions));
+        var inspectionPolicy = inspectionOptions.CreatePolicy();
         var filters = new List<string> { "hasAttachments eq true", "contains(subject,'report domain')" };
         DateTime? sinceUtc = NormalizeToUtc(since);
         DateTime? beforeUtc = NormalizeToUtc(before);
@@ -35,7 +58,13 @@ public static class GraphMailboxSearcher {
             messageIds, parallelDownloadLimit,
             (id, token) => MicrosoftGraphUtils.GetMailMessageMimeAsync(
                 credential, userPrincipalName, id, token), cancellationToken).ConfigureAwait(false);
-        return MailboxSearcher.FilterDmarcReports(mimeMessages, since, before, domain, maxUncompressedSize);
+        return MailboxSearcher.FilterDmarcReports(
+            mimeMessages,
+            since,
+            before,
+            domain,
+            inspectionPolicy,
+            new SharedReadBudget(inspectionPolicy.MaxTotalUncompressedBytes));
     }
 
     /// <summary>Searches a Graph mailbox for non-delivery reports.</summary>

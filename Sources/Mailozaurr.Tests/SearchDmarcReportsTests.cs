@@ -24,7 +24,15 @@ public class SearchDmarcReportsTests {
         message.Date = date;
         message.From.Add(new MailboxAddress("reporter", "reporter@example.com"));
         var builder = new BodyBuilder();
-        var ms = new MemoryStream(Encoding.UTF8.GetBytes("dummy"));
+        var ms = new MemoryStream();
+        using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, true)) {
+            var entry = zip.CreateEntry("report.xml");
+            using var entryStream = entry.Open();
+            var bytes = Encoding.UTF8.GetBytes(
+                $"<feedback><policy_published><domain>{domain}</domain></policy_published></feedback>");
+            entryStream.Write(bytes, 0, bytes.Length);
+        }
+        ms.Position = 0;
         var part = new MimePart("application", "zip") {
             Content = new MimeContent(ms),
             FileName = $"{domain}.zip"
@@ -350,6 +358,133 @@ public class SearchDmarcReportsTests {
             LoggingMessages.Logger.OnErrorMessage -= Handler;
         }
     }
+
+    [Fact]
+    public void FilterDmarcReports_RejectsAggregateZipExpansionBeyondAttachmentLimit() {
+        var now = DateTimeOffset.UtcNow;
+        var message = CreateZipMessage(
+            "example.com.zip",
+            now,
+            ("first.xml", CreateXmlPayload("example.com", 300)),
+            ("second.xml", CreateXmlPayload("example.com", 300)));
+
+        var reports = MailboxSearcher.FilterDmarcReports(
+            new[] { message },
+            since: null,
+            before: null,
+            domain: "example.com",
+            maxUncompressedSize: 512);
+
+        Assert.Empty(reports);
+    }
+
+    [Fact]
+    public void FilterDmarcReports_RejectsZipWithTooManyEntries() {
+        var now = DateTimeOffset.UtcNow;
+        var message = CreateZipMessage(
+            "example.com.zip",
+            now,
+            ("first.xml", CreateXmlPayload("example.com", 0)),
+            ("second.xml", CreateXmlPayload("example.com", 0)));
+        var options = new DmarcReportInspectionOptions {
+            MaxArchiveEntriesPerAttachment = 1
+        };
+        var policy = options.CreatePolicy();
+
+        var reports = MailboxSearcher.FilterDmarcReports(
+            new[] { message },
+            since: null,
+            before: null,
+            domain: "example.com",
+            policy,
+            new SharedReadBudget(policy.MaxTotalUncompressedBytes));
+
+        Assert.Empty(reports);
+    }
+
+    [Fact]
+    public void FilterDmarcReports_SharesExpandedByteBudgetAcrossMessages() {
+        var now = DateTimeOffset.UtcNow;
+        var first = CreateXmlDmarc("example.com", now, "application", "xml", "example.com.xml");
+        var second = CreateXmlDmarc("example.com", now, "application", "xml", "example.com.xml");
+        var options = new DmarcReportInspectionOptions {
+            MaxUncompressedBytesPerAttachment = 100,
+            MaxTotalUncompressedBytes = 130
+        };
+        var policy = options.CreatePolicy();
+
+        var reports = MailboxSearcher.FilterDmarcReports(
+            new[] { first, second },
+            since: null,
+            before: null,
+            domain: "example.com",
+            policy,
+            new SharedReadBudget(policy.MaxTotalUncompressedBytes));
+
+        Assert.Single(reports);
+    }
+
+    [Fact]
+    public void FilterDmarcReports_RejectsGzipExpansionBeyondAttachmentLimit() {
+        var now = DateTimeOffset.UtcNow;
+        var message = new MimeMessage {
+            Subject = "Report",
+            Date = now
+        };
+        message.From.Add(new MailboxAddress("reporter", "reporter@example.com"));
+        var compressed = new MemoryStream();
+        using (var gzip = new GZipStream(compressed, CompressionMode.Compress, true)) {
+            byte[] payload = Encoding.UTF8.GetBytes(CreateXmlPayload("example.com", 2048));
+            gzip.Write(payload, 0, payload.Length);
+        }
+        compressed.Position = 0;
+        var builder = new BodyBuilder();
+        builder.Attachments.Add(new MimePart("application", "gzip") {
+            Content = new MimeContent(compressed),
+            FileName = "example.com.xml.gz"
+        });
+        message.Body = builder.ToMessageBody();
+
+        var reports = MailboxSearcher.FilterDmarcReports(
+            new[] { message },
+            since: null,
+            before: null,
+            domain: "example.com",
+            maxUncompressedSize: 512);
+
+        Assert.Empty(reports);
+    }
+
+    private static MimeMessage CreateZipMessage(
+        string fileName,
+        DateTimeOffset date,
+        params (string Name, string Content)[] entries) {
+        var message = new MimeMessage {
+            Subject = "Report",
+            Date = date
+        };
+        message.From.Add(new MailboxAddress("reporter", "reporter@example.com"));
+        var archive = new MemoryStream();
+        using (var zip = new ZipArchive(archive, ZipArchiveMode.Create, true)) {
+            foreach (var item in entries) {
+                var entry = zip.CreateEntry(item.Name);
+                using var entryStream = entry.Open();
+                byte[] bytes = Encoding.UTF8.GetBytes(item.Content);
+                entryStream.Write(bytes, 0, bytes.Length);
+            }
+        }
+        archive.Position = 0;
+        var builder = new BodyBuilder();
+        builder.Attachments.Add(new MimePart("application", "zip") {
+            Content = new MimeContent(archive),
+            FileName = fileName
+        });
+        message.Body = builder.ToMessageBody();
+        return message;
+    }
+
+    private static string CreateXmlPayload(string domain, int paddingLength) =>
+        $"<feedback><policy_published><domain>{domain}</domain></policy_published><data>{new string('x', paddingLength)}</data></feedback>";
 
     private static FieldInfo GetHandlerField() =>
         typeof(HttpMessageInvoker).GetField("_handler", BindingFlags.NonPublic | BindingFlags.Instance)

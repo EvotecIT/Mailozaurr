@@ -39,7 +39,31 @@ public static partial class MailboxSearcher {
         int maxResults = 0,
         int parallelDownloadLimit = 4,
         long maxUncompressedSize = 10 * 1024 * 1024,
+        CancellationToken cancellationToken = default) => await SearchDmarcReportsAsync(
+            client,
+            DmarcReportInspectionOptions.FromLegacyLimit(maxUncompressedSize),
+            folder,
+            since,
+            before,
+            domain,
+            maxResults,
+            parallelDownloadLimit,
+            cancellationToken).ConfigureAwait(false);
+
+    /// <summary>Searches for DMARC aggregate reports using explicit attachment inspection limits.</summary>
+    public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
+        ImapClient client,
+        DmarcReportInspectionOptions inspectionOptions,
+        string? folder = null,
+        DateTime? since = null,
+        DateTime? before = null,
+        string? domain = null,
+        int maxResults = 0,
+        int parallelDownloadLimit = 4,
         CancellationToken cancellationToken = default) {
+        if (inspectionOptions == null) throw new ArgumentNullException(nameof(inspectionOptions));
+        var inspectionPolicy = inspectionOptions.CreatePolicy();
+        var inspectionBudget = new SharedReadBudget(inspectionPolicy.MaxTotalUncompressedBytes);
         var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadOnly);
         var search = BuildDmarcReportSearchQuery(since, before, domain);
         var uids = await mailFolder.SearchAsync(search, cancellationToken).ConfigureAwait(false);
@@ -48,7 +72,7 @@ public static partial class MailboxSearcher {
             foreach (var uid in uids) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
-                var reports = FilterDmarcReports(new[] { msg }, since, before, domain, maxUncompressedSize);
+                var reports = FilterDmarcReports(new[] { msg }, since, before, domain, inspectionPolicy, inspectionBudget);
                 if (reports.Count > 0) {
                     foreach (var r in reports) {
                         if (maxResults > 0 && results.Count >= maxResults) break;
@@ -78,7 +102,7 @@ public static partial class MailboxSearcher {
                         } catch (OperationCanceledException) {
                             return;
                         }
-                        var reports = FilterDmarcReports(new[] { msg }, since, before, domain, maxUncompressedSize);
+                        var reports = FilterDmarcReports(new[] { msg }, since, before, domain, inspectionPolicy, inspectionBudget);
                         if (reports.Count == 0) continue;
                         lock (gate) {
                             foreach (var r in reports) {
@@ -125,13 +149,35 @@ public static partial class MailboxSearcher {
         int maxResults = 0,
         int parallelDownloadLimit = 4,
         long maxUncompressedSize = 10 * 1024 * 1024,
+        CancellationToken cancellationToken = default) => await SearchDmarcReportsAsync(
+            client,
+            DmarcReportInspectionOptions.FromLegacyLimit(maxUncompressedSize),
+            since,
+            before,
+            domain,
+            maxResults,
+            parallelDownloadLimit,
+            cancellationToken).ConfigureAwait(false);
+
+    /// <summary>Searches for DMARC aggregate reports using explicit attachment inspection limits.</summary>
+    public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
+        Pop3Client client,
+        DmarcReportInspectionOptions inspectionOptions,
+        DateTime? since = null,
+        DateTime? before = null,
+        string? domain = null,
+        int maxResults = 0,
+        int parallelDownloadLimit = 4,
         CancellationToken cancellationToken = default) {
+        if (inspectionOptions == null) throw new ArgumentNullException(nameof(inspectionOptions));
+        var inspectionPolicy = inspectionOptions.CreatePolicy();
+        var inspectionBudget = new SharedReadBudget(inspectionPolicy.MaxTotalUncompressedBytes);
         var results = new List<DmarcReport>();
         if (parallelDownloadLimit <= 1) {
             for (int idx = 0; idx < client.Count; idx++) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
-                var reports = FilterDmarcReports(new[] { msg }, since, before, domain, maxUncompressedSize);
+                var reports = FilterDmarcReports(new[] { msg }, since, before, domain, inspectionPolicy, inspectionBudget);
                 if (reports.Count > 0) {
                     foreach (var r in reports) {
                         if (maxResults > 0 && results.Count >= maxResults) break;
@@ -160,7 +206,7 @@ public static partial class MailboxSearcher {
                         } catch (OperationCanceledException) {
                             return;
                         }
-                        var reports = FilterDmarcReports(new[] { msg }, since, before, domain, maxUncompressedSize);
+                        var reports = FilterDmarcReports(new[] { msg }, since, before, domain, inspectionPolicy, inspectionBudget);
                         if (reports.Count == 0) continue;
                         lock (gate) {
                             foreach (var r in reports) {
@@ -202,6 +248,23 @@ public static partial class MailboxSearcher {
         DateTime? before,
         string? domain,
         long maxUncompressedSize = 10 * 1024 * 1024) {
+        var policy = DmarcReportInspectionOptions.FromLegacyLimit(maxUncompressedSize).CreatePolicy();
+        return FilterDmarcReports(
+            messages,
+            since,
+            before,
+            domain,
+            policy,
+            new SharedReadBudget(policy.MaxTotalUncompressedBytes));
+    }
+
+    internal static IList<DmarcReport> FilterDmarcReports(
+        IEnumerable<MimeMessage> messages,
+        DateTime? since,
+        DateTime? before,
+        string? domain,
+        DmarcReportInspectionPolicy inspectionPolicy,
+        SharedReadBudget inspectionBudget) {
         var results = new List<DmarcReport>();
         var sinceUtc = NormalizeToUtc(since);
         var beforeUtc = NormalizeToUtc(before);
@@ -215,16 +278,25 @@ public static partial class MailboxSearcher {
                 Date = message.Date
             };
             var domainMatched = string.IsNullOrWhiteSpace(domain);
+            int inspectedAttachments = 0;
             foreach (var att in message.Attachments) {
                 if (IsDmarcAttachment(att) && att is MimePart part) {
-                    if (!string.IsNullOrWhiteSpace(domain) && !AttachmentMatchesDomain(part, domain!, maxUncompressedSize)) continue;
+                    if (inspectedAttachments >= inspectionPolicy.MaxAttachmentsPerMessage) {
+                        LoggingMessages.Logger.WriteError(
+                            "DMARC message exceeds the attachment limit of {0}",
+                            inspectionPolicy.MaxAttachmentsPerMessage);
+                        break;
+                    }
+                    inspectedAttachments++;
+                    if (!InspectDmarcAttachment(part, domain, inspectionPolicy, inspectionBudget, out bool attachmentDomainMatched)) continue;
+                    if (!domainMatched && !attachmentDomainMatched) continue;
                     if (part.Content == null) {
                         continue;
                     }
 
                     var stream = part.Content.Open();
                     report.Attachments.Add(new DmarcReportAttachment(part.FileName ?? "report.zip", stream));
-                    if (!domainMatched) domainMatched = true;
+                    if (!domainMatched) domainMatched = attachmentDomainMatched;
                 }
             }
             if (report.Attachments.Count > 0 && domainMatched) results.Add(report);
@@ -232,47 +304,106 @@ public static partial class MailboxSearcher {
         return results;
     }
 
-    private static bool AttachmentMatchesDomain(MimePart part, string domain, long maxUncompressedSize) {
-        if (part.FileName?.IndexOf(domain, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+    private static bool InspectDmarcAttachment(
+        MimePart part,
+        string? domain,
+        DmarcReportInspectionPolicy inspectionPolicy,
+        SharedReadBudget inspectionBudget,
+        out bool domainMatched) {
+        domainMatched = !string.IsNullOrWhiteSpace(domain)
+            && part.FileName?.IndexOf(domain!, StringComparison.OrdinalIgnoreCase) >= 0;
         if (part.Content == null) {
             return false;
         }
 
         try {
             using var stream = part.Content.Open();
+            var attachmentBudget = new SharedReadBudget(inspectionPolicy.MaxUncompressedBytesPerAttachment);
             var name = part.FileName ?? string.Empty;
             if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) {
                 using var zip = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false);
+                if (zip.Entries.Count > inspectionPolicy.MaxArchiveEntriesPerAttachment) {
+                    LoggingMessages.Logger.WriteError(
+                        "DMARC ZIP attachment {0} exceeds the entry limit of {1}",
+                        name,
+                        inspectionPolicy.MaxArchiveEntriesPerAttachment);
+                    return false;
+                }
+
+                long declaredTotal = 0;
                 foreach (var entry in zip.Entries) {
-                    if (entry.Length > maxUncompressedSize) {
-                        LoggingMessages.Logger.WriteError("Zip entry {0} exceeds max size {1}", entry.FullName, maxUncompressedSize);
-                        continue;
+                    if (entry.Length < 0 || entry.Length > inspectionPolicy.MaxUncompressedBytesPerAttachment
+                        || declaredTotal > inspectionPolicy.MaxUncompressedBytesPerAttachment - entry.Length) {
+                        LoggingMessages.Logger.WriteError(
+                            "DMARC ZIP attachment {0} exceeds the expanded size limit of {1}",
+                            name,
+                            inspectionPolicy.MaxUncompressedBytesPerAttachment);
+                        return false;
                     }
+                    declaredTotal += entry.Length;
+                }
+
+                foreach (var entry in zip.Entries) {
                     using var entryStream = entry.Open();
-                    if (XmlStreamContainsDomain(entryStream, domain, maxUncompressedSize)) return true;
+                    if (string.IsNullOrWhiteSpace(domain) || domainMatched) {
+                        DrainStream(entryStream, attachmentBudget, inspectionBudget);
+                    } else if (XmlStreamContainsDomain(entryStream, domain!, attachmentBudget, inspectionBudget)) {
+                        domainMatched = true;
+                    }
                 }
             } else if (name.EndsWith(".gz", StringComparison.OrdinalIgnoreCase)) {
                 using var gz = new GZipStream(stream, CompressionMode.Decompress);
-                if (XmlStreamContainsDomain(gz, domain, maxUncompressedSize)) return true;
+                if (string.IsNullOrWhiteSpace(domain) || domainMatched) {
+                    DrainStream(gz, attachmentBudget, inspectionBudget);
+                } else {
+                    domainMatched = XmlStreamContainsDomain(gz, domain!, attachmentBudget, inspectionBudget);
+                }
             } else {
-                if (XmlStreamContainsDomain(stream, domain, maxUncompressedSize)) return true;
+                if (string.IsNullOrWhiteSpace(domain) || domainMatched) {
+                    DrainStream(stream, attachmentBudget, inspectionBudget);
+                } else {
+                    domainMatched = XmlStreamContainsDomain(stream, domain!, attachmentBudget, inspectionBudget);
+                }
             }
+            return string.IsNullOrWhiteSpace(domain) || domainMatched;
         } catch (Exception ex) {
             LoggingMessages.Logger.WriteError("Failed to process attachment {0}: {1}", part.FileName ?? string.Empty, ex.Message);
         }
         return false;
     }
 
-    private static bool XmlStreamContainsDomain(Stream stream, string domain, long maxUncompressedSize) {
-        var settings = new System.Xml.XmlReaderSettings { IgnoreComments = true, IgnoreWhitespace = true, CloseInput = true };
-        using var reader = System.Xml.XmlReader.Create(new LimitedStream(stream, maxUncompressedSize), settings);
+    private static bool XmlStreamContainsDomain(
+        Stream stream,
+        string domain,
+        SharedReadBudget attachmentBudget,
+        SharedReadBudget inspectionBudget) {
+        var settings = new System.Xml.XmlReaderSettings {
+            IgnoreComments = true,
+            IgnoreWhitespace = true,
+            CloseInput = false,
+            DtdProcessing = System.Xml.DtdProcessing.Prohibit,
+            XmlResolver = null
+        };
+        using var boundedStream = new SharedBudgetReadStream(stream, attachmentBudget, inspectionBudget);
+        using var reader = System.Xml.XmlReader.Create(boundedStream, settings);
+        bool matched = false;
         while (reader.Read()) {
             if (reader.NodeType == System.Xml.XmlNodeType.Element && reader.LocalName.Equals("domain", StringComparison.OrdinalIgnoreCase)) {
                 var value = reader.ReadElementContentAsString();
-                if (value.Equals(domain, StringComparison.OrdinalIgnoreCase)) return true;
+                if (value.Equals(domain, StringComparison.OrdinalIgnoreCase)) matched = true;
             }
         }
-        return false;
+        return matched;
+    }
+
+    private static void DrainStream(
+        Stream stream,
+        SharedReadBudget attachmentBudget,
+        SharedReadBudget inspectionBudget) {
+        using var boundedStream = new SharedBudgetReadStream(stream, attachmentBudget, inspectionBudget);
+        var buffer = new byte[81920];
+        while (boundedStream.Read(buffer, 0, buffer.Length) > 0) {
+        }
     }
 
     internal static SearchQuery BuildDmarcReportSearchQuery(DateTime? since, DateTime? before, string? domain) {

@@ -82,22 +82,52 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
     [ValidateRange(1, long.MaxValue)]
     public long MaxUncompressedSize { get; set; } = 10 * 1024 * 1024;
 
+    /// <summary>
+    /// <para type="description">Maximum uncompressed bytes inspected across the complete search.</para>
+    /// </summary>
+    [Parameter]
+    [ValidateRange(1, long.MaxValue)]
+    public long MaxTotalUncompressedSize { get; set; } = DmarcReportInspectionOptions.DefaultMaxTotalUncompressedBytes;
+
+    /// <summary>
+    /// <para type="description">Maximum number of DMARC attachments accepted from one message.</para>
+    /// </summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int MaxAttachmentsPerMessage { get; set; } = DmarcReportInspectionOptions.DefaultMaxAttachmentsPerMessage;
+
+    /// <summary>
+    /// <para type="description">Maximum number of entries accepted in one DMARC ZIP attachment.</para>
+    /// </summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int MaxArchiveEntriesPerAttachment { get; set; } = DmarcReportInspectionOptions.DefaultMaxArchiveEntriesPerAttachment;
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         int max = Count > 0 ? Count : int.MaxValue;
+        long totalUncompressedLimit = MyInvocation.BoundParameters.ContainsKey(nameof(MaxTotalUncompressedSize))
+            ? MaxTotalUncompressedSize
+            : Math.Max(MaxTotalUncompressedSize, MaxUncompressedSize);
+        var inspectionOptions = new DmarcReportInspectionOptions {
+            MaxUncompressedBytesPerAttachment = MaxUncompressedSize,
+            MaxTotalUncompressedBytes = totalUncompressedLimit,
+            MaxAttachmentsPerMessage = MaxAttachmentsPerMessage,
+            MaxArchiveEntriesPerAttachment = MaxArchiveEntriesPerAttachment
+        };
         switch (Protocol) {
             case EmailProtocol.Imap: {
                     var conn = DefaultSessions.ImapSession;
                     if (conn != null && conn.Data != null) {
                         var reports = await MailboxSearcher.SearchDmarcReportsAsync(
                             conn.Data,
-                            Folder,
-                            Since,
-                            Before,
-                            Domain,
-                            max,
+                            inspectionOptions,
+                            folder: Folder,
+                            since: Since,
+                            before: Before,
+                            domain: Domain,
+                            maxResults: max,
                             parallelDownloadLimit: ParallelDownloadLimit,
-                            maxUncompressedSize: MaxUncompressedSize,
                             cancellationToken: CancelToken);
                         foreach (var report in reports) WriteObject(report);
                     } else {
@@ -114,12 +144,12 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
                     if (conn != null && conn.Data != null) {
                         var reports = await MailboxSearcher.SearchDmarcReportsAsync(
                             conn.Data,
-                            Since,
-                            Before,
-                            Domain,
-                            max,
+                            inspectionOptions,
+                            since: Since,
+                            before: Before,
+                            domain: Domain,
+                            maxResults: max,
                             parallelDownloadLimit: ParallelDownloadLimit,
-                            maxUncompressedSize: MaxUncompressedSize,
                             cancellationToken: CancelToken);
                         foreach (var report in reports) WriteObject(report);
                     } else {
@@ -137,12 +167,12 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
                         var reports = await GraphMailboxSearcher.SearchDmarcReportsAsync(
                             conn.Credential,
                             UserPrincipalName!,
-                            Since,
-                            Before,
-                            Domain,
-                            max,
+                            inspectionOptions,
+                            since: Since,
+                            before: Before,
+                            domain: Domain,
+                            maxResults: max,
                             parallelDownloadLimit: ParallelDownloadLimit,
-                            maxUncompressedSize: MaxUncompressedSize,
                             cancellationToken: CancelToken);
                         foreach (var report in reports) WriteObject(report);
                     } else {
@@ -162,12 +192,12 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
                         var reports = await GmailMailboxSearcher.SearchDmarcReportsAsync(
                             client,
                             GmailAccount!,
-                            Since,
-                            Before,
-                            Domain,
-                            max,
+                            inspectionOptions,
+                            since: Since,
+                            before: Before,
+                            domain: Domain,
+                            maxResults: max,
                             parallelDownloadLimit: ParallelDownloadLimit,
-                            maxUncompressedSize: MaxUncompressedSize,
                             cancellationToken: CancelToken);
                         foreach (var report in reports) WriteObject(report);
                     } else {
