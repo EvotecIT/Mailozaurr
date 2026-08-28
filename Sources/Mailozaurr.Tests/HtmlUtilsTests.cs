@@ -342,6 +342,7 @@ public class HtmlUtilsTests {
         var handler = (HttpMessageHandler)GetHandlerField().GetValue(client!)!;
         var socketsHandler = Assert.IsType<SocketsHttpHandler>(handler);
         Assert.NotNull(socketsHandler.ConnectCallback);
+        Assert.False(socketsHandler.UseProxy);
 #else
         Assert.Null(client);
 #endif

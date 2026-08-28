@@ -197,6 +197,48 @@ public class SearchDmarcReportsTests {
     }
 
     [Fact]
+    public async Task DmarcMimeDownloadBudget_RetainsReservationWhenProviderParsingFails() {
+        var budget = new DmarcMimeDownloadBudget(maxBytesPerMessage: 5, maxTotalBytes: 7);
+
+        await Assert.ThrowsAsync<FormatException>(() => budget.DownloadAsync(
+            (_, _) => throw new FormatException("Malformed MIME payload."),
+            CancellationToken.None));
+
+        long secondLimit = 0;
+        MimeMessage second = await budget.DownloadAsync(
+            (limit, _) => {
+                secondLimit = limit;
+                return Task.FromResult(new BoundedMimeMessage(new MimeMessage(), limit));
+            },
+            CancellationToken.None);
+
+        Assert.NotNull(second);
+        Assert.Equal(2, secondLimit);
+        await Assert.ThrowsAsync<InvalidDataException>(() => budget.DownloadAsync(
+            (_, _) => Task.FromResult(new BoundedMimeMessage(new MimeMessage(), 0)),
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task DmarcMimeDownloadBudget_RefundsUnusedReservationAfterSuccess() {
+        var budget = new DmarcMimeDownloadBudget(maxBytesPerMessage: 5, maxTotalBytes: 7);
+
+        await budget.DownloadAsync(
+            (_, _) => Task.FromResult(new BoundedMimeMessage(new MimeMessage(), 2)),
+            CancellationToken.None);
+
+        long secondLimit = 0;
+        await budget.DownloadAsync(
+            (limit, _) => {
+                secondLimit = limit;
+                return Task.FromResult(new BoundedMimeMessage(new MimeMessage(), limit));
+            },
+            CancellationToken.None);
+
+        Assert.Equal(5, secondLimit);
+    }
+
+    [Fact]
     public void FilterDmarcReports_ExtractsAttachments() {
         var now = DateTimeOffset.UtcNow;
         var msg = CreateDmarc("example.com", now);

@@ -111,6 +111,9 @@ internal static class RemoteImageDownloader {
 #if NET8_0_OR_GREATER
         var handler = new SocketsHttpHandler {
             AllowAutoRedirect = false,
+            // A proxy would resolve the destination independently and turn the callback into
+            // validation of the proxy endpoint instead of the requested image host.
+            UseProxy = false,
             ConnectCallback = async (context, cancellationToken) => {
                 IPAddress[] addresses = await Dns.GetHostAddressesAsync(
                     context.DnsEndPoint.Host,
