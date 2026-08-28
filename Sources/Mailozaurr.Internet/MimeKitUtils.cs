@@ -54,6 +54,46 @@ public static class MimeKitUtils {
         return results.AsReadOnly();
     }
 
+    /// <summary>Asynchronously saves MIME attachments with an explicit atomic conflict policy.</summary>
+    public static async Task<IReadOnlyList<AttachmentFileSaveResult>> SaveAttachmentsAsync(
+        IEnumerable<MimeEntity> attachments,
+        string path,
+        AttachmentFileConflictPolicy conflictPolicy = AttachmentFileConflictPolicy.Fail,
+        CancellationToken cancellationToken = default) {
+        if (attachments == null) throw new ArgumentNullException(nameof(attachments));
+        var results = new List<AttachmentFileSaveResult>();
+        int index = 0;
+        foreach (var attachment in attachments) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (attachment is MimePart mp) {
+                results.Add(await AttachmentFileStore.SaveToDirectoryAsync(
+                    path,
+                    mp.FileName,
+                    async (stream, token) => {
+                        if (mp.Content != null) await mp.Content.DecodeToAsync(stream, token).ConfigureAwait(false);
+                        else await mp.WriteToAsync(stream, token).ConfigureAwait(false);
+                    },
+                    conflictPolicy,
+                    index.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    cancellationToken).ConfigureAwait(false));
+            } else if (attachment is MessagePart msgPart) {
+                string? name = msgPart.ContentDisposition?.FileName ?? msgPart.ContentType.Name;
+                results.Add(await AttachmentFileStore.SaveToDirectoryAsync(
+                    path,
+                    name,
+                    async (stream, token) => {
+                        if (msgPart.Message != null) await msgPart.Message.WriteToAsync(stream, token).ConfigureAwait(false);
+                        else await msgPart.WriteToAsync(stream, token).ConfigureAwait(false);
+                    },
+                    conflictPolicy,
+                    index.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    cancellationToken).ConfigureAwait(false));
+            }
+            index++;
+        }
+        return results.AsReadOnly();
+    }
+
     /// <summary>
     /// Attempts to extract all <see cref="NonDeliveryReport"/> instances from a message.
     /// </summary>

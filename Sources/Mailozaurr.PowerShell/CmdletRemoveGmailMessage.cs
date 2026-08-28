@@ -39,7 +39,7 @@ public sealed class CmdletRemoveGmailMessage : AsyncPSCmdlet {
             AccessToken = net.Password,
             ExpiresOn = System.DateTimeOffset.MaxValue
         };
-        var client = new GmailApiClient(oauth) { DryRun = dryRun };
+        using var client = new GmailApiClient(oauth) { DryRun = dryRun };
         await client.DeleteAsync(GmailAccount!, Id!, CancelToken);
     }
 }

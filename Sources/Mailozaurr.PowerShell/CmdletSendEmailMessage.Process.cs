@@ -228,7 +228,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
             ExpiresOn = System.DateTimeOffset.MaxValue
         };
 
-        var client = new GmailApiClient(oauth);
+        using var client = new GmailApiClient(oauth);
         try {
             if (ShouldProcess(smtp.SentTo, "Sending email message via Gmail API")) {
                 var account = GmailAccount;

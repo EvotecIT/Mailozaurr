@@ -46,21 +46,22 @@ public sealed class CmdletSavePOP3MessageAttachment : AsyncPSCmdlet {
     /// <summary>
     /// Saves attachments from the specified POP3 message to disk.
     /// </summary>
-    protected override Task ProcessRecordAsync() {
+    protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.Pop3Session;
         if (conn != null && conn.Data != null) {
             if (Index < conn.Data.Count) {
-                var message = conn.Data.GetMessage(Index);
+                var message = await conn.Data.GetMessageAsync(Index, CancelToken).ConfigureAwait(false);
                 if (Path is not null) {
                     AttachmentFileConflictPolicy policy = AttachmentCmdletConflictPolicy.Resolve(
                         this,
                         Force,
                         ConflictPolicy);
                     if (ShouldProcess(Path, "Save POP3 message attachments")) {
-                        IReadOnlyList<AttachmentFileSaveResult> results = MimeKitUtils.SaveAttachments(
-                            message.Attachments,
-                            Path,
-                            policy);
+                    IReadOnlyList<AttachmentFileSaveResult> results = await MimeKitUtils.SaveAttachmentsAsync(
+                        message.Attachments,
+                        Path,
+                        policy,
+                        CancelToken).ConfigureAwait(false);
                         if (PassThru.IsPresent) WriteObject(results, enumerateCollection: true);
                     }
                 }
@@ -74,6 +75,5 @@ public sealed class CmdletSavePOP3MessageAttachment : AsyncPSCmdlet {
                 ErrorCategory.InvalidOperation,
                 null));
         }
-        return Task.CompletedTask;
     }
 }

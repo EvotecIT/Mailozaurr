@@ -54,13 +54,13 @@ public sealed class CmdletSaveIMAPMessage : AsyncPSCmdlet {
     /// <summary>
     /// Saves the specified IMAP message to disk at the given path.
     /// </summary>
-    protected override Task ProcessRecordAsync() {
+    protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
             var uid = new UniqueId(Uid);
             var mailFolder = conn.Data.GetCachedFolder(Folder ?? conn.Folder?.FullName, FolderAccess.ReadOnly);
             conn.Folders[mailFolder.FullName] = (ImapFolder)mailFolder;
-            var message = mailFolder.GetMessage(uid);
+            var message = await mailFolder.GetMessageAsync(uid, CancelToken).ConfigureAwait(false);
 
             if (!string.IsNullOrEmpty(Path)) {
                 var fullPath = System.IO.Path.GetFullPath(Path);
@@ -72,15 +72,19 @@ public sealed class CmdletSaveIMAPMessage : AsyncPSCmdlet {
                 if (fullPath.EndsWith(".msg", System.StringComparison.OrdinalIgnoreCase)) {
                     var tempEml = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{System.Guid.NewGuid()}.eml");
                     try {
-                        message.WriteTo(tempEml);
-                        EmailMessage.ConvertEmlToMsg(new System.IO.FileInfo(tempEml), new System.IO.FileInfo(fullPath), true);
+                        await message.WriteToAsync(tempEml, CancelToken).ConfigureAwait(false);
+                        await EmailMessage.ConvertEmlToMsgAsync(
+                            new System.IO.FileInfo(tempEml),
+                            new System.IO.FileInfo(fullPath),
+                            true,
+                            CancelToken).ConfigureAwait(false);
                     } finally {
                         if (System.IO.File.Exists(tempEml)) {
                             System.IO.File.Delete(tempEml);
                         }
                     }
                 } else {
-                    message.WriteTo(fullPath);
+                    await message.WriteToAsync(fullPath, CancelToken).ConfigureAwait(false);
                 }
             }
         } else {
@@ -90,6 +94,5 @@ public sealed class CmdletSaveIMAPMessage : AsyncPSCmdlet {
                 ErrorCategory.InvalidOperation,
                 null));
         }
-        return Task.CompletedTask;
     }
 }

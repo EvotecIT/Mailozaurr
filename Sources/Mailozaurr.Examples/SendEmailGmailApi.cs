@@ -21,7 +21,7 @@ public static class SendEmailGmailApi {
                 AccessToken = accessToken,
                 ExpiresOn = DateTimeOffset.MaxValue
             };
-            var client = new GmailApiClient(cred);
+            using var client = new GmailApiClient(cred);
             var message = new MimeMessage();
             message.From.Add(MailboxAddress.Parse(gmailAccount));
             message.To.Add(MailboxAddress.Parse(recipient));

@@ -52,7 +52,7 @@ public sealed class CmdletGetGmailMessage : AsyncPSCmdlet {
             AccessToken = net.Password,
             ExpiresOn = System.DateTimeOffset.MaxValue
         };
-        var client = new GmailApiClient(oauth);
+        using var client = new GmailApiClient(oauth);
         if (ParameterSetName == "Id") {
             var msg = await client.GetAsync(GmailAccount!, Id!, CancelToken);
             WriteObject(msg);

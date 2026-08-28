@@ -54,23 +54,24 @@ public sealed class CmdletSaveIMAPMessageAttachment : AsyncPSCmdlet {
     /// <summary>
     /// Saves attachments from the specified IMAP message to disk.
     /// </summary>
-    protected override Task ProcessRecordAsync() {
+    protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
             var uid = new UniqueId(Uid);
             var mailFolder = conn.Data.GetCachedFolder(Folder ?? conn.Folder?.FullName, FolderAccess.ReadOnly);
             conn.Folders[mailFolder.FullName] = (ImapFolder)mailFolder;
-            var message = mailFolder.GetMessage(uid);
+            var message = await mailFolder.GetMessageAsync(uid, CancelToken).ConfigureAwait(false);
             if (Path is not null) {
                 AttachmentFileConflictPolicy policy = AttachmentCmdletConflictPolicy.Resolve(
                     this,
                     Force,
                     ConflictPolicy);
                 if (ShouldProcess(Path, "Save IMAP message attachments")) {
-                    IReadOnlyList<AttachmentFileSaveResult> results = MimeKitUtils.SaveAttachments(
+                    IReadOnlyList<AttachmentFileSaveResult> results = await MimeKitUtils.SaveAttachmentsAsync(
                         message.Attachments,
                         Path,
-                        policy);
+                        policy,
+                        CancelToken).ConfigureAwait(false);
                     if (PassThru.IsPresent) WriteObject(results, enumerateCollection: true);
                 }
             }
@@ -81,6 +82,5 @@ public sealed class CmdletSaveIMAPMessageAttachment : AsyncPSCmdlet {
                 ErrorCategory.InvalidOperation,
                 null));
         }
-        return Task.CompletedTask;
     }
 }

@@ -20,7 +20,7 @@ public static class FetchGmailMessages {
                 AccessToken = accessToken,
                 ExpiresOn = DateTimeOffset.MaxValue
             };
-            var client = new GmailApiClient(cred);
+            using var client = new GmailApiClient(cred);
             var messages = await client.ListAsync("me", maxResults: maxResults);
             Console.WriteLine($"Gmail API: fetched {messages.Count} messages");
         } catch (GmailAuthenticationException ex) {

@@ -46,11 +46,11 @@ public sealed class CmdletSavePOP3Message : AsyncPSCmdlet {
     /// <summary>
     /// Saves the specified POP3 message to disk at the given path.
     /// </summary>
-    protected override Task ProcessRecordAsync() {
+    protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.Pop3Session;
         if (conn != null && conn.Data != null) {
             if (Index < conn.Data.Count) {
-                var message = conn.Data.GetMessage(Index);
+                var message = await conn.Data.GetMessageAsync(Index, CancelToken).ConfigureAwait(false);
                 if (Path != null) {
                     var resolved = System.IO.Path.GetFullPath(Path);
                     var directory = System.IO.Path.GetDirectoryName(resolved);
@@ -60,15 +60,19 @@ public sealed class CmdletSavePOP3Message : AsyncPSCmdlet {
                     if (resolved.EndsWith(".msg", System.StringComparison.OrdinalIgnoreCase)) {
                         var tempEml = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{System.Guid.NewGuid()}.eml");
                         try {
-                            message.WriteTo(tempEml);
-                            EmailMessage.ConvertEmlToMsg(new System.IO.FileInfo(tempEml), new System.IO.FileInfo(resolved), true);
+                            await message.WriteToAsync(tempEml, CancelToken).ConfigureAwait(false);
+                            await EmailMessage.ConvertEmlToMsgAsync(
+                                new System.IO.FileInfo(tempEml),
+                                new System.IO.FileInfo(resolved),
+                                true,
+                                CancelToken).ConfigureAwait(false);
                         } finally {
                             if (System.IO.File.Exists(tempEml)) {
                                 System.IO.File.Delete(tempEml);
                             }
                         }
                     } else {
-                        message.WriteTo(resolved);
+                        await message.WriteToAsync(resolved, CancelToken).ConfigureAwait(false);
                     }
                 }
             } else {
@@ -81,6 +85,5 @@ public sealed class CmdletSavePOP3Message : AsyncPSCmdlet {
                 ErrorCategory.InvalidOperation,
                 null));
         }
-        return Task.CompletedTask;
     }
 }

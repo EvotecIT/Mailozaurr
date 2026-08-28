@@ -110,6 +110,28 @@ public sealed class AttachmentFileStoreTests {
     }
 
     [Fact]
+    public async Task Canceled_async_writers_leave_no_destination_or_staging_file() {
+        string directory = CreateTestDirectory();
+        using var cancellation = new CancellationTokenSource();
+        try {
+            Task<AttachmentFileSaveResult> save = AttachmentFileStore.SaveToDirectoryAsync(
+                directory,
+                "report.txt",
+                async (stream, token) => {
+                    await stream.WriteAsync(new byte[] { 1 }, 0, 1, token);
+                    cancellation.Cancel();
+                    await Task.Delay(Timeout.Infinite, token);
+                },
+                cancellationToken: cancellation.Token);
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => save);
+            Assert.Empty(Directory.GetFiles(directory));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Concurrent_rename_writers_commit_distinct_complete_files() {
         string directory = CreateTestDirectory();
         try {
@@ -219,6 +241,29 @@ public sealed class AttachmentFileStoreTests {
             Assert.Equal(directory, Path.GetDirectoryName(Assert.Single(mimeResults).Path));
             Assert.Equal(directory, Path.GetDirectoryName(Assert.Single(graphResults).Path));
             Assert.Equal(2, Directory.GetFiles(directory).Length);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Mime_async_helper_uses_the_shared_safe_store() {
+        string directory = CreateTestDirectory();
+        try {
+            var mime = new MimeKit.MimePart("text", "plain") {
+                FileName = "../mime.txt",
+                Content = new MimeKit.MimeContent(new MemoryStream(new byte[] { 1, 2, 3 }))
+            };
+
+            IReadOnlyList<AttachmentFileSaveResult> results = await MimeKitUtils.SaveAttachmentsAsync(
+                new MimeKit.MimeEntity[] { mime },
+                directory,
+                AttachmentFileConflictPolicy.Fail,
+                CancellationToken.None);
+
+            AttachmentFileSaveResult result = Assert.Single(results);
+            Assert.Equal(directory, Path.GetDirectoryName(result.Path));
+            Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(result.Path));
         } finally {
             Directory.Delete(directory, recursive: true);
         }

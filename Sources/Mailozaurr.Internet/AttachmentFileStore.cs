@@ -120,6 +120,25 @@ public static class AttachmentFileStore {
         return SaveToFile(destinationPath, writeContent, conflictPolicy);
     }
 
+    /// <summary>Asynchronously and atomically writes an attachment beneath an explicit destination directory.</summary>
+    public static Task<AttachmentFileSaveResult> SaveToDirectoryAsync(
+        string destinationDirectory,
+        string? remoteFileName,
+        Func<Stream, CancellationToken, Task> writeContentAsync,
+        AttachmentFileConflictPolicy conflictPolicy = AttachmentFileConflictPolicy.Fail,
+        string? attachmentIdentity = null,
+        CancellationToken cancellationToken = default) {
+        string destinationPath = ResolvePathInDirectory(
+            destinationDirectory,
+            remoteFileName,
+            attachmentIdentity);
+        return SaveToFileAsync(
+            destinationPath,
+            writeContentAsync,
+            conflictPolicy,
+            cancellationToken);
+    }
+
     /// <summary>Atomically writes an attachment to an explicit output file.</summary>
     public static AttachmentFileSaveResult SaveToFile(
         string outputPath,
@@ -147,6 +166,43 @@ public static class AttachmentFileStore {
                 writeContent(stream);
                 stream.Flush(true);
             }
+            return CommitTemporaryFile(temporaryPath, destinationPath, conflictPolicy);
+        } finally {
+            TryDeleteTemporaryFile(temporaryPath);
+        }
+    }
+
+    /// <summary>Asynchronously and atomically writes an attachment to an explicit output file.</summary>
+    public static async Task<AttachmentFileSaveResult> SaveToFileAsync(
+        string outputPath,
+        Func<Stream, CancellationToken, Task> writeContentAsync,
+        AttachmentFileConflictPolicy conflictPolicy = AttachmentFileConflictPolicy.Fail,
+        CancellationToken cancellationToken = default) {
+        if (string.IsNullOrWhiteSpace(outputPath)) {
+            throw new ArgumentException("An output path is required.", nameof(outputPath));
+        }
+        if (writeContentAsync == null) throw new ArgumentNullException(nameof(writeContentAsync));
+        ValidateConflictPolicy(conflictPolicy);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string destinationPath = Path.GetFullPath(outputPath);
+        string directory = Path.GetDirectoryName(destinationPath)
+            ?? throw new InvalidOperationException("The output path has no parent directory.");
+        EnsureDirectory(directory);
+        RejectReparsePoint(destinationPath);
+        if (conflictPolicy == AttachmentFileConflictPolicy.Skip && PathEntryExists(destinationPath)) {
+            return new AttachmentFileSaveResult(destinationPath, AttachmentFileSaveAction.Skipped);
+        }
+
+        string temporaryPath = string.Empty;
+        try {
+            using (FileStream stream = CreateTemporaryFile(directory, useAsync: true, out temporaryPath)) {
+                UnixFilePermissions.RestrictFile(temporaryPath);
+                await writeContentAsync(stream, cancellationToken).ConfigureAwait(false);
+                await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+                stream.Flush(true);
+            }
+            cancellationToken.ThrowIfCancellationRequested();
             return CommitTemporaryFile(temporaryPath, destinationPath, conflictPolicy);
         } finally {
             TryDeleteTemporaryFile(temporaryPath);
@@ -279,7 +335,10 @@ public static class AttachmentFileStore {
         }
     }
 
-    private static FileStream CreateTemporaryFile(string directory, out string path) {
+    private static FileStream CreateTemporaryFile(string directory, out string path) =>
+        CreateTemporaryFile(directory, useAsync: false, out path);
+
+    private static FileStream CreateTemporaryFile(string directory, bool useAsync, out string path) {
         using var random = RandomNumberGenerator.Create();
         var bytes = new byte[16];
         for (int attempt = 0; attempt < 128; attempt++) {
@@ -294,7 +353,7 @@ public static class AttachmentFileStore {
                     FileAccess.Write,
                     FileShare.None,
                     64 * 1024,
-                    FileOptions.WriteThrough);
+                    FileOptions.WriteThrough | (useAsync ? FileOptions.Asynchronous : 0));
             } catch (IOException) when (PathEntryExists(path)) {
             }
         }
