@@ -72,7 +72,8 @@ public static partial class MailboxSearcher {
             foreach (var uid in uids) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
-                var reports = FilterDmarcReports(new[] { msg }, since, before, domain, inspectionPolicy, inspectionBudget);
+                var reports = FilterDmarcReports(
+                    new[] { msg }, since, before, domain, inspectionPolicy, inspectionBudget, cancellationToken);
                 if (reports.Count > 0) {
                     foreach (var r in reports) {
                         if (maxResults > 0 && results.Count >= maxResults) break;
@@ -102,7 +103,8 @@ public static partial class MailboxSearcher {
                         } catch (OperationCanceledException) {
                             return;
                         }
-                        var reports = FilterDmarcReports(new[] { msg }, since, before, domain, inspectionPolicy, inspectionBudget);
+                        var reports = FilterDmarcReports(
+                            new[] { msg }, since, before, domain, inspectionPolicy, inspectionBudget, cts.Token);
                         if (reports.Count == 0) continue;
                         lock (gate) {
                             foreach (var r in reports) {
@@ -177,7 +179,8 @@ public static partial class MailboxSearcher {
             for (int idx = 0; idx < client.Count; idx++) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
-                var reports = FilterDmarcReports(new[] { msg }, since, before, domain, inspectionPolicy, inspectionBudget);
+                var reports = FilterDmarcReports(
+                    new[] { msg }, since, before, domain, inspectionPolicy, inspectionBudget, cancellationToken);
                 if (reports.Count > 0) {
                     foreach (var r in reports) {
                         if (maxResults > 0 && results.Count >= maxResults) break;
@@ -206,7 +209,8 @@ public static partial class MailboxSearcher {
                         } catch (OperationCanceledException) {
                             return;
                         }
-                        var reports = FilterDmarcReports(new[] { msg }, since, before, domain, inspectionPolicy, inspectionBudget);
+                        var reports = FilterDmarcReports(
+                            new[] { msg }, since, before, domain, inspectionPolicy, inspectionBudget, cts.Token);
                         if (reports.Count == 0) continue;
                         lock (gate) {
                             foreach (var r in reports) {
@@ -264,11 +268,13 @@ public static partial class MailboxSearcher {
         DateTime? before,
         string? domain,
         DmarcReportInspectionPolicy inspectionPolicy,
-        SharedReadBudget inspectionBudget) {
+        SharedReadBudget inspectionBudget,
+        CancellationToken cancellationToken = default) {
         var results = new List<DmarcReport>();
         var sinceUtc = NormalizeToUtc(since);
         var beforeUtc = NormalizeToUtc(before);
         foreach (var message in messages) {
+            cancellationToken.ThrowIfCancellationRequested();
             var msgDate = message.Date.UtcDateTime;
             if (sinceUtc.HasValue && msgDate < sinceUtc.Value) continue;
             if (beforeUtc.HasValue && msgDate > beforeUtc.Value) continue;
@@ -288,7 +294,13 @@ public static partial class MailboxSearcher {
                         break;
                     }
                     inspectedAttachments++;
-                    if (!InspectDmarcAttachment(part, domain, inspectionPolicy, inspectionBudget, out bool attachmentDomainMatched)) continue;
+                    if (!InspectDmarcAttachment(
+                            part,
+                            domain,
+                            inspectionPolicy,
+                            inspectionBudget,
+                            cancellationToken,
+                            out bool attachmentDomainMatched)) continue;
                     if (!domainMatched && !attachmentDomainMatched) continue;
                     if (part.Content == null) {
                         continue;
@@ -309,6 +321,7 @@ public static partial class MailboxSearcher {
         string? domain,
         DmarcReportInspectionPolicy inspectionPolicy,
         SharedReadBudget inspectionBudget,
+        CancellationToken cancellationToken,
         out bool domainMatched) {
         domainMatched = !string.IsNullOrWhiteSpace(domain)
             && part.FileName?.IndexOf(domain!, StringComparison.OrdinalIgnoreCase) >= 0;
@@ -346,26 +359,31 @@ public static partial class MailboxSearcher {
                 foreach (var entry in zip.Entries) {
                     using var entryStream = entry.Open();
                     if (string.IsNullOrWhiteSpace(domain) || domainMatched) {
-                        DrainStream(entryStream, attachmentBudget, inspectionBudget);
-                    } else if (XmlStreamContainsDomain(entryStream, domain!, attachmentBudget, inspectionBudget)) {
+                        DrainStream(entryStream, attachmentBudget, inspectionBudget, cancellationToken);
+                    } else if (XmlStreamContainsDomain(
+                                   entryStream, domain!, attachmentBudget, inspectionBudget, cancellationToken)) {
                         domainMatched = true;
                     }
                 }
             } else if (name.EndsWith(".gz", StringComparison.OrdinalIgnoreCase)) {
                 using var gz = new GZipStream(stream, CompressionMode.Decompress);
                 if (string.IsNullOrWhiteSpace(domain) || domainMatched) {
-                    DrainStream(gz, attachmentBudget, inspectionBudget);
+                    DrainStream(gz, attachmentBudget, inspectionBudget, cancellationToken);
                 } else {
-                    domainMatched = XmlStreamContainsDomain(gz, domain!, attachmentBudget, inspectionBudget);
+                    domainMatched = XmlStreamContainsDomain(
+                        gz, domain!, attachmentBudget, inspectionBudget, cancellationToken);
                 }
             } else {
                 if (string.IsNullOrWhiteSpace(domain) || domainMatched) {
-                    DrainStream(stream, attachmentBudget, inspectionBudget);
+                    DrainStream(stream, attachmentBudget, inspectionBudget, cancellationToken);
                 } else {
-                    domainMatched = XmlStreamContainsDomain(stream, domain!, attachmentBudget, inspectionBudget);
+                    domainMatched = XmlStreamContainsDomain(
+                        stream, domain!, attachmentBudget, inspectionBudget, cancellationToken);
                 }
             }
             return string.IsNullOrWhiteSpace(domain) || domainMatched;
+        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+            throw;
         } catch (Exception ex) {
             LoggingMessages.Logger.WriteError("Failed to process attachment {0}: {1}", part.FileName ?? string.Empty, ex.Message);
         }
@@ -376,7 +394,8 @@ public static partial class MailboxSearcher {
         Stream stream,
         string domain,
         SharedReadBudget attachmentBudget,
-        SharedReadBudget inspectionBudget) {
+        SharedReadBudget inspectionBudget,
+        CancellationToken cancellationToken) {
         var settings = new System.Xml.XmlReaderSettings {
             IgnoreComments = true,
             IgnoreWhitespace = true,
@@ -384,7 +403,8 @@ public static partial class MailboxSearcher {
             DtdProcessing = System.Xml.DtdProcessing.Prohibit,
             XmlResolver = null
         };
-        using var boundedStream = new SharedBudgetReadStream(stream, attachmentBudget, inspectionBudget);
+        using var boundedStream = new SharedBudgetReadStream(
+            stream, attachmentBudget, inspectionBudget, cancellationToken);
         using var reader = System.Xml.XmlReader.Create(boundedStream, settings);
         bool matched = false;
         while (reader.Read()) {
@@ -399,8 +419,10 @@ public static partial class MailboxSearcher {
     private static void DrainStream(
         Stream stream,
         SharedReadBudget attachmentBudget,
-        SharedReadBudget inspectionBudget) {
-        using var boundedStream = new SharedBudgetReadStream(stream, attachmentBudget, inspectionBudget);
+        SharedReadBudget inspectionBudget,
+        CancellationToken cancellationToken) {
+        using var boundedStream = new SharedBudgetReadStream(
+            stream, attachmentBudget, inspectionBudget, cancellationToken);
         var buffer = new byte[81920];
         while (boundedStream.Read(buffer, 0, buffer.Length) > 0) {
         }

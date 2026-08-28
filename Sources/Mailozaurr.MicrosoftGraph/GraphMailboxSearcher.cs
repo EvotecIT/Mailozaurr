@@ -64,7 +64,8 @@ public static class GraphMailboxSearcher {
             before,
             domain,
             inspectionPolicy,
-            new SharedReadBudget(inspectionPolicy.MaxTotalUncompressedBytes));
+            new SharedReadBudget(inspectionPolicy.MaxTotalUncompressedBytes),
+            cancellationToken);
     }
 
     /// <summary>Searches a Graph mailbox for non-delivery reports.</summary>

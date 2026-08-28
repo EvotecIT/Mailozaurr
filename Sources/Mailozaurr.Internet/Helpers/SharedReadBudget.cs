@@ -36,14 +36,17 @@ internal sealed class SharedBudgetReadStream : Stream {
     private readonly Stream _inner;
     private readonly SharedReadBudget _localBudget;
     private readonly SharedReadBudget _operationBudget;
+    private readonly CancellationToken _cancellationToken;
 
     internal SharedBudgetReadStream(
         Stream inner,
         SharedReadBudget localBudget,
-        SharedReadBudget operationBudget) {
+        SharedReadBudget operationBudget,
+        CancellationToken cancellationToken = default) {
         _inner = inner ?? throw new ArgumentNullException(nameof(inner));
         _localBudget = localBudget ?? throw new ArgumentNullException(nameof(localBudget));
         _operationBudget = operationBudget ?? throw new ArgumentNullException(nameof(operationBudget));
+        _cancellationToken = cancellationToken;
     }
 
     public override bool CanRead => _inner.CanRead;
@@ -63,6 +66,7 @@ internal sealed class SharedBudgetReadStream : Stream {
         if (count < 0) throw new ArgumentOutOfRangeException(nameof(count));
         if (buffer.Length - offset < count) throw new ArgumentException("The offset and count exceed the buffer length.");
         if (count == 0) return 0;
+        _cancellationToken.ThrowIfCancellationRequested();
 
         int localReservation = _localBudget.Reserve(count);
         if (localReservation == 0) return ProbeForLimitViolation();
@@ -92,6 +96,7 @@ internal sealed class SharedBudgetReadStream : Stream {
     }
 
     private int ProbeForLimitViolation() {
+        _cancellationToken.ThrowIfCancellationRequested();
         int value = _inner.ReadByte();
         if (value < 0) return 0;
         throw new InvalidDataException("Uncompressed DMARC attachment data exceeds the configured limit.");

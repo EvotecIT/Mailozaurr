@@ -455,6 +455,25 @@ public class SearchDmarcReportsTests {
         Assert.Empty(reports);
     }
 
+    [Fact]
+    public void FilterDmarcReports_PropagatesCancellationDuringAttachmentInspection() {
+        var now = DateTimeOffset.UtcNow;
+        var message = CreateXmlDmarc("example.com", now, "application", "xml", "example.com.xml");
+        var options = new DmarcReportInspectionOptions();
+        var policy = options.CreatePolicy();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => MailboxSearcher.FilterDmarcReports(
+            new[] { message },
+            since: null,
+            before: null,
+            domain: "example.com",
+            policy,
+            new SharedReadBudget(policy.MaxTotalUncompressedBytes),
+            cancellation.Token));
+    }
+
     private static MimeMessage CreateZipMessage(
         string fileName,
         DateTimeOffset date,

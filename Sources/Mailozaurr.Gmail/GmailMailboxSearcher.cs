@@ -59,7 +59,8 @@ public static class GmailMailboxSearcher {
             before,
             domain,
             inspectionPolicy,
-            new SharedReadBudget(inspectionPolicy.MaxTotalUncompressedBytes));
+            new SharedReadBudget(inspectionPolicy.MaxTotalUncompressedBytes),
+            cancellationToken);
     }
 
     /// <summary>Searches Gmail for non-delivery reports.</summary>
