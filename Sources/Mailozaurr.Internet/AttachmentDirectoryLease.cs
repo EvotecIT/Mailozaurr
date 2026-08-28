@@ -107,6 +107,9 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
                 }
                 throw new IOException("No collision-free attachment filename was available.");
             case AttachmentFileConflictPolicy.Replace:
+                if (TryLinkTemporary(directoryFd, temporaryName, destinationName)) {
+                    return new AttachmentFileSaveResult(destinationPath, AttachmentFileSaveAction.Created);
+                }
                 RejectUnixSymbolicLink(directoryFd, destinationName, allowMissing: true);
                 if (renameat(directoryFd, temporaryName, directoryFd, destinationName) != 0) {
                     ThrowUnixIOException("replace the attachment destination");
