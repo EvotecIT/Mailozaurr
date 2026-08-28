@@ -83,8 +83,29 @@ public sealed class PowerShellProfileJmapCmdletTests {
         Assert.Equal(1000, range.ConstructorArguments[1].Value);
     }
 
+    [Fact]
+    public void ModuleManifest_ExportsEveryProfileAndJmapCmdlet() {
+        string manifestPath = FindRepositoryFile("Mailozaurr.psd1");
+        string manifest = File.ReadAllText(manifestPath);
+
+        foreach (object[] contract in CmdletContracts()) {
+            string commandName = $"{contract[1]}-{contract[2]}";
+            Assert.Contains($"'{commandName}'", manifest, StringComparison.Ordinal);
+        }
+    }
+
     private static object[] Contract<T>(string verb, string noun, bool supportsShouldProcess) =>
         new object[] { typeof(T), verb, noun, supportsShouldProcess };
+
+    private static string FindRepositoryFile(string fileName) {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null) {
+            string candidate = Path.Combine(directory.FullName, fileName);
+            if (File.Exists(candidate)) return candidate;
+            directory = directory.Parent;
+        }
+        throw new FileNotFoundException($"Could not locate repository file '{fileName}'.");
+    }
 
     private static string? ParameterSetName(PropertyInfo property) => property.CustomAttributes
         .Single(value => value.AttributeType == typeof(ParameterAttribute))
