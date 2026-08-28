@@ -279,6 +279,7 @@ public sealed partial class CliRunnerTests {
                 "--client-id", "client-id",
                 "--tenant-id", "tenant-id",
                 "--client-secret-ref", $"shared-secrets:{MailSecretNames.ClientSecret}",
+                "--allow-cross-profile-secret-ref",
                 "--json"
             },
             stdout,
@@ -308,6 +309,7 @@ public sealed partial class CliRunnerTests {
                 "--client-id", "client-id",
                 "--client-secret-ref", $"shared-secrets:{MailSecretNames.ClientSecret}",
                 "--refresh-token-ref", $"shared-secrets:{MailSecretNames.RefreshToken}",
+                "--allow-cross-profile-secret-ref",
                 "--json"
             },
             stdout,
@@ -691,6 +693,7 @@ public sealed partial class CliRunnerTests {
                 "--profile", "work-imap",
                 "--name", MailSecretNames.Password,
                 "--value-ref", $"shared-secrets:{MailSecretNames.Password}",
+                "--allow-cross-profile-secret-ref",
                 "--json"
             },
             stdout,

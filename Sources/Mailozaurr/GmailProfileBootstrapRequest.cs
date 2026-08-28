@@ -42,4 +42,7 @@ public sealed class GmailProfileBootstrapRequest {
 
     /// <summary>Optional secret reference for the access token, in the form <c>&lt;profile-id&gt;:&lt;secret-name&gt;</c> or <c>&lt;secret-name&gt;</c>.</summary>
     public string? AccessTokenReference { get; set; }
+
+    /// <summary>Explicitly allows compatible same-name secret references to read from another profile.</summary>
+    public bool AllowCrossProfileSecretReferences { get; set; }
 }

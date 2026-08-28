@@ -164,7 +164,8 @@ public sealed partial class MailMcpToolsTests {
             mailbox: "shared@example.com",
             clientId: "client-id",
             tenantId: "tenant-id",
-            clientSecretReference: $"bootstrap-secrets:{MailSecretNames.ClientSecret}");
+            clientSecretReference: $"bootstrap-secrets:{MailSecretNames.ClientSecret}",
+            allowCrossProfileSecretReferences: true);
         var storedSecret = await fixture.SecretStore.GetSecretAsync("graph-work", MailSecretNames.ClientSecret);
 
         Assert.Equal("graph-work", profile.Id);
@@ -196,7 +197,8 @@ public sealed partial class MailMcpToolsTests {
             mailbox: "shared@example.com",
             clientId: "client-id",
             tenantId: "tenant-id",
-            clientSecretReference: $"shared-secrets:{MailSecretNames.ClientSecret}");
+            clientSecretReference: $"shared-secrets:{MailSecretNames.ClientSecret}",
+            allowCrossProfileSecretReferences: true);
         var storedSecret = await fixture.SecretStore.GetSecretAsync("graph-ref", MailSecretNames.ClientSecret);
 
         Assert.Equal("graph-ref", profile.Id);
@@ -217,7 +219,8 @@ public sealed partial class MailMcpToolsTests {
             mailbox: "me@example.com",
             clientId: "client-id",
             clientSecretReference: $"bootstrap-secrets:{MailSecretNames.ClientSecret}",
-            refreshTokenReference: $"bootstrap-secrets:{MailSecretNames.RefreshToken}");
+            refreshTokenReference: $"bootstrap-secrets:{MailSecretNames.RefreshToken}",
+            allowCrossProfileSecretReferences: true);
         var clientSecret = await fixture.SecretStore.GetSecretAsync("gmail-work", MailSecretNames.ClientSecret);
         var refreshToken = await fixture.SecretStore.GetSecretAsync("gmail-work", MailSecretNames.RefreshToken);
 

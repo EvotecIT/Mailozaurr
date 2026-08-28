@@ -9,6 +9,7 @@ using Org.BouncyCastle.Security;
 using System;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 
 namespace Mailozaurr;
 
@@ -44,23 +45,82 @@ public sealed class TemporaryPgpKeyPair : IDisposable {
     /// <param name="keySize">RSA key size.</param>
     /// <param name="outputDirectory">Optional output directory; if null, a random temp directory is used.</param>
     /// <param name="deleteOnDispose">When true, deletes the generated files on dispose.</param>
+    /// <param name="allowUnprotectedPrivateKey">When true, preserves an explicitly empty passphrase. Otherwise an empty passphrase is replaced with a cryptographically random value.</param>
     /// <returns>Instance representing the created key pair.</returns>
-    public static TemporaryPgpKeyPair Create(string identity = "Mailozaurr Test", string passPhrase = "", int keySize = 2048, string? outputDirectory = null, bool deleteOnDispose = true) {
-        string directory = outputDirectory ?? Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+    public static TemporaryPgpKeyPair Create(
+        string identity = "Mailozaurr Test",
+        string passPhrase = "",
+        int keySize = 2048,
+        string? outputDirectory = null,
+        bool deleteOnDispose = true,
+        bool allowUnprotectedPrivateKey = false) {
+        if (string.IsNullOrWhiteSpace(identity)) throw new ArgumentException("A key identity is required.", nameof(identity));
+        if (keySize < 2048) throw new ArgumentOutOfRangeException(nameof(keySize), "RSA keys must be at least 2048 bits.");
+        if (string.IsNullOrEmpty(passPhrase) && !allowUnprotectedPrivateKey) passPhrase = CreateRandomPassPhrase();
+
+        string directory = outputDirectory ?? Path.Combine(
+            Path.GetTempPath(),
+            "mailozaurr-pgp-" + Guid.NewGuid().ToString("N"));
         bool removeDir = outputDirectory is null;
+        bool directoryExisted = Directory.Exists(directory);
         Directory.CreateDirectory(directory);
+        if (!directoryExisted) UnixFilePermissions.RestrictDirectory(directory);
         var pair = new TemporaryPgpKeyPair(directory, removeDir, passPhrase, deleteOnDispose);
+        bool publicKeyCreated = false;
+        bool privateKeyCreated = false;
 
-        var generator = GenerateKeyRingGenerator(identity, passPhrase.ToCharArray(), keySize);
-        using (var pubOut = File.Create(pair.PublicKeyPath))
-        using (var armoredPubOut = new ArmoredOutputStream(pubOut))
-            generator.GeneratePublicKeyRing().Encode(armoredPubOut);
+        try {
+            var generator = GenerateKeyRingGenerator(identity, passPhrase.ToCharArray(), keySize);
+            using (var pubOut = CreateRestrictedFile(pair.PublicKeyPath)) {
+                publicKeyCreated = true;
+                using var armoredPubOut = new ArmoredOutputStream(pubOut);
+                generator.GeneratePublicKeyRing().Encode(armoredPubOut);
+            }
 
-        using (var secOut = File.Create(pair.PrivateKeyPath))
-        using (var armoredSecOut = new ArmoredOutputStream(secOut))
-            generator.GenerateSecretKeyRing().Encode(armoredSecOut);
+            using (var secOut = CreateRestrictedFile(pair.PrivateKeyPath)) {
+                privateKeyCreated = true;
+                using var armoredSecOut = new ArmoredOutputStream(secOut);
+                generator.GenerateSecretKeyRing().Encode(armoredSecOut);
+            }
 
-        return pair;
+            return pair;
+        } catch {
+            if (publicKeyCreated) TryDelete(pair.PublicKeyPath);
+            if (privateKeyCreated) TryDelete(pair.PrivateKeyPath);
+            if (removeDir) TryDeleteDirectory(directory);
+            throw;
+        }
+    }
+
+    private static FileStream CreateRestrictedFile(string path) {
+        return UnixFilePermissions.OpenRestrictedFile(
+            path,
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None);
+    }
+
+    private static string CreateRandomPassPhrase() {
+        using var random = RandomNumberGenerator.Create();
+        var bytes = new byte[32];
+        random.GetBytes(bytes);
+        return Convert.ToBase64String(bytes);
+    }
+
+    private static void TryDelete(string path) {
+        try {
+            if (File.Exists(path)) File.Delete(path);
+        } catch (IOException) {
+        } catch (UnauthorizedAccessException) {
+        }
+    }
+
+    private static void TryDeleteDirectory(string path) {
+        try {
+            if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+        } catch (IOException) {
+        } catch (UnauthorizedAccessException) {
+        }
     }
 
     private static PgpKeyRingGenerator GenerateKeyRingGenerator(string identity, char[] passPhrase, int keySize) {

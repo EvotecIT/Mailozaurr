@@ -7,6 +7,32 @@ namespace Mailozaurr.Tests;
 
 public class TemporarySmimeCertificateTests {
     [Fact]
+    public void CreateSelfSigned_RequiresAPasswordForPfxExport() {
+        Assert.Throws<ArgumentException>(() => TemporarySmimeCertificate.CreateSelfSigned(outputPath: "certificate.pfx"));
+    }
+
+    [Fact]
+    public void CreateSelfSigned_ExportsAPasswordProtectedPfxWithoutOverwriting() {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return;
+        string directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        string path = Path.Combine(directory, "certificate.pfx");
+        const string password = "correct horse battery staple";
+        try {
+            using X509Certificate2 certificate = TemporarySmimeCertificate.CreateSelfSigned(
+                outputPath: path,
+                outputPassword: password);
+            using var loaded = new X509Certificate2(path, password);
+
+            Assert.True(loaded.HasPrivateKey);
+            Assert.Throws<IOException>(() => TemporarySmimeCertificate.CreateSelfSigned(
+                outputPath: path,
+                outputPassword: password));
+        } finally {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void CreateSelfSigned_ReturnsUsableCertificate() {
         // Skip test on macOS due to certificate compatibility issues
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {

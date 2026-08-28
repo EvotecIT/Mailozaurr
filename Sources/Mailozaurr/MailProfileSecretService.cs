@@ -17,7 +17,7 @@ public sealed class MailProfileSecretService : IMailProfileSecretService {
 
     /// <inheritdoc />
     public Task<OperationResult> SetSecretAsync(string profileId, string secretName, string secretValue, CancellationToken cancellationToken = default) =>
-        SetSecretAsync(profileId, secretName, secretValue, null, cancellationToken);
+        SetSecretAsync(profileId, secretName, secretValue, null, false, cancellationToken);
 
     /// <inheritdoc />
     public async Task<OperationResult> SetSecretAsync(
@@ -25,6 +25,7 @@ public sealed class MailProfileSecretService : IMailProfileSecretService {
         string secretName,
         string? secretValue,
         string? secretReference,
+        bool allowCrossProfileReference = false,
         CancellationToken cancellationToken = default) {
         var validationResult = await ValidateAsync(profileId, secretName, cancellationToken).ConfigureAwait(false);
         if (!validationResult.Succeeded) {
@@ -39,6 +40,7 @@ public sealed class MailProfileSecretService : IMailProfileSecretService {
                 secretName,
                 secretValue,
                 secretReference,
+                allowCrossProfileReference,
                 cancellationToken).ConfigureAwait(false);
         } catch (InvalidOperationException ex) {
             return OperationResult.Failure("secret_reference_invalid", ex.Message);

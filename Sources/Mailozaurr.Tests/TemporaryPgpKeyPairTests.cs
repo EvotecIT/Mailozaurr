@@ -13,6 +13,24 @@ public class TemporaryPgpKeyPairTests {
         using var keys = TemporaryPgpKeyPair.Create("a@b.com");
         Assert.True(File.Exists(keys.PublicKeyPath));
         Assert.True(File.Exists(keys.PrivateKeyPath));
+        Assert.False(string.IsNullOrEmpty(keys.PassPhrase));
+    }
+
+    [Fact]
+    public void Create_RejectsWeakKeysAndExistingOutputFiles() {
+        Assert.Throws<ArgumentOutOfRangeException>(() => TemporaryPgpKeyPair.Create(keySize: 1024));
+
+        string directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string publicPath = Path.Combine(directory, "temp.pgp.pub");
+        File.WriteAllText(publicPath, "do-not-overwrite");
+        try {
+            Assert.Throws<IOException>(() => TemporaryPgpKeyPair.Create(outputDirectory: directory));
+            Assert.Equal("do-not-overwrite", File.ReadAllText(publicPath));
+            Assert.False(File.Exists(Path.Combine(directory, "temp.pgp.sec")));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     [Fact(Skip = "PGP sign and encrypt requires additional configuration in CI")]

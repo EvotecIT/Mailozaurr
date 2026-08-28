@@ -19,6 +19,9 @@ public sealed class GmailProfileLoginRequest {
     /// <summary>Optional secret reference for the client secret, in the form <c>&lt;profile-id&gt;:&lt;secret-name&gt;</c> or <c>&lt;secret-name&gt;</c>.</summary>
     public string? ClientSecretReference { get; set; }
 
+    /// <summary>Explicitly allows a compatible client-secret reference to read from another profile.</summary>
+    public bool AllowCrossProfileSecretReference { get; set; }
+
     /// <summary>Optional scopes override. Defaults to the Mailozaurr Gmail mail scope.</summary>
     public IReadOnlyList<string>? Scopes { get; set; }
 }

@@ -25,33 +25,59 @@ public static class TemporarySmimeCertificate {
     /// <param name="subjectName">Subject name of the certificate.</param>
     /// <param name="validDays">Number of days the certificate is valid.</param>
     /// <param name="outputPath">Optional path to save the PFX file.</param>
+    /// <param name="outputPassword">Password protecting the optional PFX file. Required when <paramref name="outputPath"/> is set.</param>
     /// <returns>A new <see cref="X509Certificate2"/> instance.</returns>
-    public static X509Certificate2 CreateSelfSigned(string subjectName = "CN=Mailozaurr Test", int validDays = 1, string? outputPath = null) {
+    public static X509Certificate2 CreateSelfSigned(
+        string subjectName = "CN=Mailozaurr Test",
+        int validDays = 1,
+        string? outputPath = null,
+        string? outputPassword = null) {
+        if (string.IsNullOrWhiteSpace(subjectName)) throw new ArgumentException("A certificate subject is required.", nameof(subjectName));
+        if (validDays <= 0) throw new ArgumentOutOfRangeException(nameof(validDays));
+        if (!string.IsNullOrWhiteSpace(outputPath) && string.IsNullOrEmpty(outputPassword)) {
+            throw new ArgumentException("A non-empty password is required when exporting a temporary PFX file.", nameof(outputPassword));
+        }
+
+        X509Certificate2 certificate;
 #if NETSTANDARD2_0
         throw new NotSupportedException("Temporary S/MIME certificates require .NET Framework 4.7.2 or later.");
 #elif NETFRAMEWORK
         // On .NET Framework, only use CertificateRequest on non-Windows platforms if available
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && Type.GetType("System.Security.Cryptography.X509Certificates.CertificateRequest") != null) {
-            return CreateWithCertificateRequest(subjectName, validDays, outputPath);
+            certificate = CreateWithCertificateRequest(subjectName, validDays);
+        } else {
+            certificate = CreateWithBouncyCastle(subjectName, validDays);
         }
-
-        return CreateWithBouncyCastle(subjectName, validDays, outputPath);
 #else
         // On .NET Core/.NET 5+, CertificateRequest is always available
         // ALWAYS use CertificateRequest on non-Windows systems to avoid Mono compatibility issues
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ||
             RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ||
             RuntimeInformation.IsOSPlatform(OSPlatform.FreeBSD)) {
-            return CreateWithCertificateRequest(subjectName, validDays, outputPath);
+            certificate = CreateWithCertificateRequest(subjectName, validDays);
+        } else {
+            certificate = CreateWithCertificateRequest(subjectName, validDays);
         }
-
-        // On Windows, use CertificateRequest by default
-        return CreateWithCertificateRequest(subjectName, validDays, outputPath);
 #endif
+        if (!string.IsNullOrWhiteSpace(outputPath)) {
+            byte[] exported = certificate.Export(X509ContentType.Pfx, outputPassword);
+            try {
+                AttachmentFileStore.SaveToFile(
+                    outputPath!,
+                    stream => stream.Write(exported, 0, exported.Length),
+                    AttachmentFileConflictPolicy.Fail);
+            } catch {
+                certificate.Dispose();
+                throw;
+            } finally {
+                Array.Clear(exported, 0, exported.Length);
+            }
+        }
+        return certificate;
     }
 
 #if !NETSTANDARD2_0
-    private static X509Certificate2 CreateWithCertificateRequest(string subjectName, int validDays, string? outputPath) {
+    private static X509Certificate2 CreateWithCertificateRequest(string subjectName, int validDays) {
         using RSA rsa = RSA.Create();
         rsa.KeySize = 2048;
         var req = new CertificateRequest(subjectName, rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -72,15 +98,11 @@ public static class TemporarySmimeCertificate {
         var notAfter = notBefore.AddDays(validDays);
         X509Certificate2 cert = req.CreateSelfSigned(notBefore, notAfter);
 
-        if (outputPath != null) {
-            File.WriteAllBytes(outputPath, cert.Export(X509ContentType.Pfx));
-        }
-
         return cert;
     }
 #endif
 
-    private static X509Certificate2 CreateWithBouncyCastle(string subjectName, int validDays, string? outputPath) {
+    private static X509Certificate2 CreateWithBouncyCastle(string subjectName, int validDays) {
         var random = new SecureRandom();
         var keyGen = new Org.BouncyCastle.Crypto.Generators.RsaKeyPairGenerator();
         keyGen.Init(new Org.BouncyCastle.Crypto.KeyGenerationParameters(random, 2048));
@@ -112,10 +134,6 @@ public static class TemporarySmimeCertificate {
         using var ms = new MemoryStream();
         store.Save(ms, pfxPassword.ToCharArray(), random);
         var raw = ms.ToArray();
-
-        if (outputPath != null) {
-            File.WriteAllBytes(outputPath, raw);
-        }
 
         // Try different approaches for better cross-platform compatibility
         return CreateCertificateWithFallbacks(raw, pfxPassword);

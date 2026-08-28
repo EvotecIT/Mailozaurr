@@ -53,13 +53,38 @@ public sealed class ApplicationProfileBootstrapServiceTests {
             Mailbox = "shared@example.com",
             ClientId = "client-id",
             TenantId = "tenant-id",
-            ClientSecretReference = $"shared-secrets:{MailSecretNames.ClientSecret}"
+            ClientSecretReference = $"shared-secrets:{MailSecretNames.ClientSecret}",
+            AllowCrossProfileSecretReferences = true
         });
 
         var clientSecret = await secretStore.GetSecretAsync("graph-work", MailSecretNames.ClientSecret);
 
         Assert.True(result.Succeeded);
         Assert.Equal("shared-client-secret", clientSecret);
+    }
+
+    [Fact]
+    public async Task SaveGraphProfileAsyncRejectsCrossProfileSecretReferencesWithoutExplicitConsent() {
+        var profileStore = new InMemoryProfileStore();
+        var secretStore = new InMemorySecretStore();
+        await secretStore.SetSecretAsync("shared-secrets", MailSecretNames.ClientSecret, "shared-client-secret");
+        var service = new MailProfileBootstrapService(
+            new MailProfileService(profileStore, secretStore),
+            new MailProfileSecretService(profileStore, secretStore),
+            secretStore);
+
+        var result = await service.SaveGraphProfileAsync(new GraphProfileBootstrapRequest {
+            ProfileId = "graph-work",
+            DisplayName = "Work Graph",
+            Mailbox = "shared@example.com",
+            ClientId = "client-id",
+            TenantId = "tenant-id",
+            ClientSecretReference = $"shared-secrets:{MailSecretNames.ClientSecret}"
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("secret_reference_invalid", result.Code);
+        Assert.Null(await secretStore.GetSecretAsync("graph-work", MailSecretNames.ClientSecret));
     }
 
     [Fact]
@@ -344,6 +369,7 @@ public sealed class ApplicationProfileBootstrapServiceTests {
             string secretName,
             string? secretValue,
             string? secretReference,
+            bool allowCrossProfileReference = false,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(OperationResult.Failure("secret_write_failed", "Simulated secret write failure."));
 

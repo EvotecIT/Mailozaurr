@@ -131,7 +131,7 @@ internal static partial class CliCommandModel {
     }
 
     private static bool IsFlag(string name) => name is
-        "access-token-stdin" or "can-read" or "can-send" or "certificate-password-stdin" or
+        "access-token-stdin" or "allow-cross-profile-secret-ref" or "can-read" or "can-send" or "certificate-password-stdin" or
         "client-secret-stdin" or "compact" or "default-only" or "desc" or "has-attachments" or
         "include-raw" or "is-default" or "json" or "overwrite" or "queue-on-failure" or
         "ready-only" or "refresh-token-stdin" or "root-only" or "stop-on-error" or "summary" or
@@ -157,6 +157,7 @@ internal static partial class CliCommandModel {
         "client-id" => "OAuth client or application identifier.",
         "client-secret-env" => "Environment variable containing the client secret.",
         "client-secret-ref" => "Stored client-secret reference.",
+        "allow-cross-profile-secret-ref" => "Explicitly allow compatible same-name secret references from another profile.",
         "client-secret-stdin" => "Read the client secret from standard input.",
         "compact" => "Return the compact response projection.",
         "confirm-token" => "Confirmation token from the matching preview.",

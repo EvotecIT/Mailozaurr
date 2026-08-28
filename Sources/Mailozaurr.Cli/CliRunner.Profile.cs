@@ -57,7 +57,8 @@ public static partial class CliRunner {
                     AccessTokenReference = parseResult.GetOption("access-token-ref"),
                     CertificatePath = parseResult.GetOption("certificate-path"),
                     CertificatePassword = await ResolveSensitiveOptionAsync(parseResult, "certificate-password", input).ConfigureAwait(false),
-                    CertificatePasswordReference = parseResult.GetOption("certificate-password-ref")
+                    CertificatePasswordReference = parseResult.GetOption("certificate-password-ref"),
+                    AllowCrossProfileSecretReferences = parseResult.HasFlag("allow-cross-profile-secret-ref")
                 }).ConfigureAwait(false);
                 await WriteItemAsync(output, graphBootstrapResult, json, value => value.Message ?? "Graph profile saved.").ConfigureAwait(false);
                 return graphBootstrapResult.Succeeded ? 0 : 1;
@@ -76,7 +77,8 @@ public static partial class CliRunner {
                     RefreshToken = await ResolveSensitiveOptionAsync(parseResult, "refresh-token", input).ConfigureAwait(false),
                     RefreshTokenReference = parseResult.GetOption("refresh-token-ref"),
                     AccessToken = await ResolveSensitiveOptionAsync(parseResult, "access-token", input).ConfigureAwait(false),
-                    AccessTokenReference = parseResult.GetOption("access-token-ref")
+                    AccessTokenReference = parseResult.GetOption("access-token-ref"),
+                    AllowCrossProfileSecretReferences = parseResult.HasFlag("allow-cross-profile-secret-ref")
                 }).ConfigureAwait(false);
                 await WriteItemAsync(output, gmailBootstrapResult, json, value => value.Message ?? "Gmail profile saved.").ConfigureAwait(false);
                 return gmailBootstrapResult.Succeeded ? 0 : 1;
@@ -102,6 +104,7 @@ public static partial class CliRunner {
                     ClientId = parseResult.GetOption("client-id"),
                     ClientSecret = await ResolveSensitiveOptionAsync(parseResult, "client-secret", input).ConfigureAwait(false),
                     ClientSecretReference = parseResult.GetOption("client-secret-ref"),
+                    AllowCrossProfileSecretReference = parseResult.HasFlag("allow-cross-profile-secret-ref"),
                     Scopes = parseResult.GetOptionValues("scope")
                         .Where(value => !string.IsNullOrWhiteSpace(value))
                         .Select(value => value!)
@@ -197,7 +200,8 @@ public static partial class CliRunner {
                     RequireOption(parseResult, "profile"),
                     RequireOption(parseResult, "name"),
                     secretValue,
-                    secretReference).ConfigureAwait(false);
+                    secretReference,
+                    parseResult.HasFlag("allow-cross-profile-secret-ref")).ConfigureAwait(false);
                 await WriteItemAsync(output, setSecretResult, json, value => value.Message ?? "Secret saved.").ConfigureAwait(false);
                 return setSecretResult.Succeeded ? 0 : 1;
             case "remove-secret":

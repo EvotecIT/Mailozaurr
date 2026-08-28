@@ -7,6 +7,7 @@ internal static class MailSecretReferenceResolver {
         string targetSecretName,
         string? inlineValue,
         string? secretReference,
+        bool allowCrossProfileReference = false,
         CancellationToken cancellationToken = default) {
         if (secretStore == null) {
             throw new ArgumentNullException(nameof(secretStore));
@@ -24,6 +25,15 @@ internal static class MailSecretReferenceResolver {
         }
 
         var (sourceProfileId, sourceSecretName) = Parse(secretReference!, targetProfileId);
+        if (!string.Equals(sourceSecretName, targetSecretName, StringComparison.OrdinalIgnoreCase)) {
+            throw new InvalidOperationException(
+                $"Secret reference '{secretReference}' is not compatible with target secret '{targetSecretName}'.");
+        }
+        if (!string.Equals(sourceProfileId, targetProfileId, StringComparison.OrdinalIgnoreCase)
+            && !allowCrossProfileReference) {
+            throw new InvalidOperationException(
+                $"Secret reference '{secretReference}' crosses profile boundaries. Explicit cross-profile sharing is required.");
+        }
         var resolved = await secretStore.GetSecretAsync(sourceProfileId, sourceSecretName, cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(resolved)) {
             throw new InvalidOperationException(

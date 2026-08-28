@@ -155,7 +155,8 @@ public sealed class ApplicationProfileAuthServiceTests {
 
         var result = await service.LoginGmailAsync(new GmailProfileLoginRequest {
             ProfileId = "gmail-work",
-            ClientSecretReference = $"shared-secrets:{MailSecretNames.ClientSecret}"
+            ClientSecretReference = $"shared-secrets:{MailSecretNames.ClientSecret}",
+            AllowCrossProfileSecretReference = true
         });
 
         Assert.True(result.Succeeded);

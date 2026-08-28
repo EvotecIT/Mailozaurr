@@ -110,6 +110,7 @@ public sealed class MailProfileAuthService : IMailProfileAuthService {
                 MailSecretNames.ClientSecret,
                 request.ClientSecret,
                 request.ClientSecretReference,
+                request.AllowCrossProfileSecretReference,
                 cancellationToken).ConfigureAwait(false);
         } catch (InvalidOperationException ex) {
             return Failure("secret_reference_invalid", ex.Message, profile.Id, MailProfileKind.Gmail);
@@ -141,6 +142,7 @@ public sealed class MailProfileAuthService : IMailProfileAuthService {
             ClientId = clientId,
             ClientSecret = clientSecret,
             ClientSecretReference = null,
+            AllowCrossProfileSecretReference = false,
             Scopes = NormalizeScopes(request.Scopes, ResolveStoredScopes(profile, MailProfileAuthDefaults.GmailScopes))
         };
         var credential = await _loginGmailAsync(effectiveRequest, cancellationToken).ConfigureAwait(false);

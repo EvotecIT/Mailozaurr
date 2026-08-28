@@ -7,7 +7,7 @@ namespace Mailozaurr;
 /// Options for configuring <see cref="FilePendingMessageRepository"/>.
 /// </summary>
 public sealed class PendingMessageRepositoryOptions {
-    private string directoryPath = Path.GetTempPath();
+    private string directoryPath = MailozaurrStoragePaths.ResolvePendingMessagesDirectory();
     private Func<string> fileNamingScheme = () => "pending.log";
 
     /// <summary>Directory where pending message data is stored.</summary>

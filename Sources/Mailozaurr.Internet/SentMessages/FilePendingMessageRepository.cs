@@ -27,7 +27,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
     /// </summary>
     /// <param name="filePath">Path to the file that stores pending messages.</param>
     public FilePendingMessageRepository(string filePath) {
-        this.filePath = filePath;
+        this.filePath = Path.GetFullPath(filePath ?? throw new ArgumentNullException(nameof(filePath)));
         if (File.Exists(filePath)) {
             BuildIndex();
         }
@@ -35,14 +35,26 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
 
     private static string GetFilePath(PendingMessageRepositoryOptions? options) {
         options ??= new PendingMessageRepositoryOptions();
-        var directory = string.IsNullOrWhiteSpace(options.DirectoryPath) ? Path.GetTempPath() : options.DirectoryPath;
+        var directory = options.DirectoryPath;
         string name;
         try {
             name = options.FileNamingScheme?.Invoke() ?? "pending.log";
         } catch (Exception ex) {
             throw new InvalidOperationException("FileNamingScheme failed to provide a file name", ex);
         }
-        return Path.Combine(directory, name);
+        ValidateFileName(name);
+        return Path.Combine(Path.GetFullPath(directory), name);
+    }
+
+    private static void ValidateFileName(string name) {
+        if (string.IsNullOrWhiteSpace(name)
+            || Path.IsPathRooted(name)
+            || name == "."
+            || name == ".."
+            || name.IndexOfAny(new[] { '/', '\\' }) >= 0
+            || !string.Equals(Path.GetFileName(name), name, StringComparison.Ordinal)) {
+            throw new InvalidOperationException("FileNamingScheme must return a single file name without directory components.");
+        }
     }
 
     private void BuildIndex() {
@@ -116,7 +128,11 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
     private async Task<long> AppendEnvelopeAsync(PendingMessageLogEnvelope envelope, CancellationToken cancellationToken) {
         var payload = SerializeEnvelope(envelope);
 
-        using var write = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read);
+        using var write = UnixFilePermissions.OpenRestrictedFile(
+            filePath,
+            FileMode.Append,
+            FileAccess.Write,
+            FileShare.Read);
         var offset = write.Position;
 
         await write.WriteAsync(payload, 0, payload.Length, cancellationToken).ConfigureAwait(false);
@@ -176,7 +192,11 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
         var newIndex = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 
         try {
-            using (var write = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None)) {
+            using (var write = UnixFilePermissions.OpenRestrictedFile(
+                temp,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.None)) {
                 long position = 0;
 
                 foreach (var id in orderedIds) {
@@ -314,6 +334,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
             var directory = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory)) {
                 Directory.CreateDirectory(directory);
+                UnixFilePermissions.RestrictDirectory(directory);
             }
 
             if (record.NextAttemptAt == default) {

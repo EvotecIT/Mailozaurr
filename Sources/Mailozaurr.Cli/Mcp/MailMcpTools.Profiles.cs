@@ -160,6 +160,7 @@ public sealed partial class MailMcpTools {
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Graph access token.")] string? accessTokenReference = null,
         [Description("Optional certificate path for certificate-based auth.")] string? certificatePath = null,
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the certificate password.")] string? certificatePasswordReference = null,
+        [Description("Explicitly allow compatible same-name secret references from another profile.")] bool allowCrossProfileSecretReferences = false,
         CancellationToken cancellationToken = default) {
         var result = await _application.ProfileBootstrap.SaveGraphProfileAsync(new GraphProfileBootstrapRequest {
             ProfileId = profileId,
@@ -173,7 +174,8 @@ public sealed partial class MailMcpTools {
             ClientSecretReference = clientSecretReference,
             AccessTokenReference = accessTokenReference,
             CertificatePath = certificatePath,
-            CertificatePasswordReference = certificatePasswordReference
+            CertificatePasswordReference = certificatePasswordReference,
+            AllowCrossProfileSecretReferences = allowCrossProfileSecretReferences
         }, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded) {
             throw new InvalidOperationException(result.Message ?? $"Graph profile '{profileId}' could not be saved.");
@@ -195,6 +197,7 @@ public sealed partial class MailMcpTools {
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Gmail client secret.")] string? clientSecretReference = null,
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Gmail refresh token.")] string? refreshTokenReference = null,
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Gmail access token.")] string? accessTokenReference = null,
+        [Description("Explicitly allow compatible same-name secret references from another profile.")] bool allowCrossProfileSecretReferences = false,
         CancellationToken cancellationToken = default) {
         var result = await _application.ProfileBootstrap.SaveGmailProfileAsync(new GmailProfileBootstrapRequest {
             ProfileId = profileId,
@@ -206,7 +209,8 @@ public sealed partial class MailMcpTools {
             ClientId = clientId,
             ClientSecretReference = clientSecretReference,
             RefreshTokenReference = refreshTokenReference,
-            AccessTokenReference = accessTokenReference
+            AccessTokenReference = accessTokenReference,
+            AllowCrossProfileSecretReferences = allowCrossProfileSecretReferences
         }, cancellationToken).ConfigureAwait(false);
         if (!result.Succeeded) {
             throw new InvalidOperationException(result.Message ?? $"Gmail profile '{profileId}' could not be saved.");
@@ -243,6 +247,7 @@ public sealed partial class MailMcpTools {
         [Description("Optional Gmail account override used for the login flow.")] string? mailbox = null,
         [Description("Optional OAuth client identifier override.")] string? clientId = null,
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Gmail client secret override.")] string? clientSecretReference = null,
+        [Description("Explicitly allow a compatible client-secret reference from another profile.")] bool allowCrossProfileSecretReference = false,
         [Description("Optional scopes override.")] string[]? scopes = null,
         CancellationToken cancellationToken = default) =>
         _application.ProfileAuth.LoginGmailAsync(new GmailProfileLoginRequest {
@@ -250,6 +255,7 @@ public sealed partial class MailMcpTools {
             GmailAccount = mailbox,
             ClientId = clientId,
             ClientSecretReference = clientSecretReference,
+            AllowCrossProfileSecretReference = allowCrossProfileSecretReference,
             Scopes = scopes
         }, cancellationToken);
 
@@ -303,6 +309,7 @@ public sealed partial class MailMcpTools {
             secretName,
             null,
             secretReference,
+            allowCrossProfileReference: true,
             cancellationToken);
 
     [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]

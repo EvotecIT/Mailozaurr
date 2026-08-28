@@ -55,11 +55,14 @@ public sealed class FilePendingMessageRepositoryTests {
     }
 
     [Fact]
-    public void DefaultsToTempPath() {
+    public void DefaultsToPerUserApplicationDataInsteadOfTheSharedTempDirectory() {
         var repo = new FilePendingMessageRepository();
         var field = typeof(FilePendingMessageRepository).GetField("filePath", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var path = (string)field.GetValue(repo)!;
-        Assert.StartsWith(Path.GetTempPath(), path, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(
+            Path.Combine(MailozaurrStoragePaths.ResolvePendingMessagesDirectory(), "pending.log"),
+            path);
+        Assert.False(path.StartsWith(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -77,6 +80,19 @@ public sealed class FilePendingMessageRepositoryTests {
         var ex = Assert.Throws<InvalidOperationException>(() => new FilePendingMessageRepository(options));
         Assert.Contains("FileNamingScheme", ex.Message);
         Assert.IsType<InvalidOperationException>(ex.InnerException);
+    }
+
+    [Theory]
+    [InlineData("../outside.log")]
+    [InlineData("..\\outside.log")]
+    [InlineData("..")]
+    public void FileNamingScheme_CannotEscapeTheQueueDirectory(string name) {
+        var options = new PendingMessageRepositoryOptions {
+            FileNamingScheme = () => name
+        };
+
+        Assert.Throws<InvalidOperationException>(() => new FilePendingMessageRepository(options));
+        Assert.Throws<InvalidOperationException>(() => new FilePendingMessageDeadLetterRepository(options));
     }
 
     [Fact]
