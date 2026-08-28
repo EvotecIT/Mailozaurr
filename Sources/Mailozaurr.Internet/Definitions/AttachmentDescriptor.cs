@@ -239,6 +239,8 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
         }
     }
 
+    internal bool ReleaseAfterSend => !_stagingOptions.RetainStagedContentAfterSend;
+
     /// <inheritdoc />
     protected override Stream CreateContentStream() {
         lock (_materializationLock) {
@@ -365,7 +367,7 @@ internal static class AttachmentDescriptorLifetime {
         foreach (IEnumerable<AttachmentDescriptor>? collection in collections) {
             if (collection == null) continue;
             foreach (StreamAttachmentDescriptor descriptor in collection.OfType<StreamAttachmentDescriptor>()) {
-                if (released.Add(descriptor)) descriptor.Dispose();
+                if (descriptor.ReleaseAfterSend && released.Add(descriptor)) descriptor.Dispose();
             }
         }
     }

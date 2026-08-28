@@ -1,3 +1,4 @@
+using Mailozaurr.Definitions;
 using System;
 using System.Buffers;
 using System.Diagnostics;
@@ -12,6 +13,14 @@ public partial class Graph {
     /// </summary>
     /// <returns>The result of the send operation.</returns>
     public async Task<GraphSmtpResult> SendMessageAsync(CancellationToken cancellationToken = default) {
+        try {
+            return await SendMessageCoreAsync(cancellationToken).ConfigureAwait(false);
+        } finally {
+            AttachmentDescriptorLifetime.ReleaseStaging(Attachments?.OfType<Mailozaurr.Definitions.AttachmentDescriptor>());
+        }
+    }
+
+    private async Task<GraphSmtpResult> SendMessageCoreAsync(CancellationToken cancellationToken) {
         var operationStopwatch = StartOperationTimer();
         // create message
         CreateMessage();
@@ -111,7 +120,11 @@ public partial class Graph {
     /// </summary>
     /// <returns>The result of the send operation.</returns>
     public async Task<GraphSmtpResult> SendMessageDraftAsync(CancellationToken cancellationToken = default) {
-        return await SendMessageDraftAsync(messagePrepared: false, cancellationToken);
+        try {
+            return await SendMessageDraftAsync(messagePrepared: false, cancellationToken).ConfigureAwait(false);
+        } finally {
+            AttachmentDescriptorLifetime.ReleaseStaging(Attachments?.OfType<Mailozaurr.Definitions.AttachmentDescriptor>());
+        }
     }
 
     private async Task<GraphSmtpResult> SendMessageDraftAsync(bool messagePrepared, CancellationToken cancellationToken) {

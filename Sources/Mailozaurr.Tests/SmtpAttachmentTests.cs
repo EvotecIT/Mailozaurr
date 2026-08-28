@@ -156,6 +156,72 @@ public class SmtpAttachmentTests {
     }
 
     [Fact]
+    public void SmtpSend_ReleasesStreamAttachmentStagingOnCompletion() {
+        string directory = Path.Combine(Path.GetTempPath(), "MailozaurrStage-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var descriptor = new StreamAttachmentDescriptor(
+                new MemoryStream(new byte[] { 1, 2, 3, 4, 5 }),
+                "staged.bin",
+                stagingOptions: new AttachmentStreamStagingOptions {
+                    MemoryThresholdBytes = 2,
+                    MaxBytes = 10,
+                    TempDirectory = directory
+                });
+            var smtp = new Smtp {
+                DryRun = true,
+                Attachments = new List<AttachmentDescriptor> { descriptor }
+            };
+            try {
+                descriptor.GetContentBytes();
+
+                smtp.Send();
+
+                Assert.Empty(Directory.GetFiles(directory));
+                Assert.Throws<ObjectDisposedException>(() => descriptor.OpenContentStream());
+            } finally {
+                smtp.Dispose();
+            }
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void SmtpSend_RetainsStagingOnlyWhenCallerExplicitlyOwnsCleanup() {
+        string directory = Path.Combine(Path.GetTempPath(), "MailozaurrStage-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var descriptor = new StreamAttachmentDescriptor(
+            new MemoryStream(new byte[] { 1, 2, 3, 4, 5 }),
+            "staged.bin",
+            stagingOptions: new AttachmentStreamStagingOptions {
+                MemoryThresholdBytes = 2,
+                MaxBytes = 10,
+                TempDirectory = directory,
+                RetainStagedContentAfterSend = true
+            });
+        try {
+            var smtp = new Smtp {
+                DryRun = true,
+                Attachments = new List<AttachmentDescriptor> { descriptor }
+            };
+            try {
+                descriptor.GetContentBytes();
+
+                smtp.Send();
+
+                Assert.Single(Directory.GetFiles(directory));
+                Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, descriptor.GetContentBytes());
+            } finally {
+                smtp.Dispose();
+            }
+        } finally {
+            descriptor.Dispose();
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void StreamAttachmentDescriptor_RejectsContentPastItsBoundAndCleansStaging() {
         string directory = Path.Combine(Path.GetTempPath(), "MailozaurrStage-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

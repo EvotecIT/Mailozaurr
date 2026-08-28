@@ -308,6 +308,14 @@ public class SesClient : IDisposable {
     /// Sends the email using Amazon SES.
     /// </summary>
     public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken) {
+        try {
+            return await SendEmailCoreAsync(cancellationToken).ConfigureAwait(false);
+        } finally {
+            AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
+        }
+    }
+
+    private async Task<SmtpResult> SendEmailCoreAsync(CancellationToken cancellationToken) {
         ThrowIfDisposed();
         MimeMessage message = BuildMessage();
         using MemoryStream stream = new();
@@ -326,6 +334,14 @@ public class SesClient : IDisposable {
     /// Sends a templated email using Amazon SES.
     /// </summary>
     public async Task<SmtpResult> SendTemplatedEmailAsync(CancellationToken cancellationToken) {
+        try {
+            return await SendTemplatedEmailCoreAsync(cancellationToken).ConfigureAwait(false);
+        } finally {
+            AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
+        }
+    }
+
+    private async Task<SmtpResult> SendTemplatedEmailCoreAsync(CancellationToken cancellationToken) {
         ThrowIfDisposed();
         StringBuilder sb = new("Action=SendTemplatedEmail&Version=2010-12-01");
         if (!string.IsNullOrEmpty(TemplateName)) sb.Append("&Template=").Append(Uri.EscapeDataString(TemplateName));

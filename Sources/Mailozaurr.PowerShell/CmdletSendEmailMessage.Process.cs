@@ -83,6 +83,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
                 ProcessSmtp(fromEmail, fromName);
             }
         } finally {
+            AttachmentInputConverter.ReleaseStaging(Attachment);
+            AttachmentInputConverter.ReleaseStaging(InlineAttachment);
             if (_logCollector != null) {
                 LogEmitter.EmitLogs(_logCollector, this);
             }

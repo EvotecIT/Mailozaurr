@@ -377,6 +377,14 @@ public class MailgunClient : IDisposable {
     /// </summary>
     /// <returns>The result of the send operation.</returns>
     public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken) {
+        try {
+            return await SendEmailCoreAsync(cancellationToken).ConfigureAwait(false);
+        } finally {
+            AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
+        }
+    }
+
+    private async Task<SmtpResult> SendEmailCoreAsync(CancellationToken cancellationToken) {
         ThrowIfDisposed();
         if (DryRun) {
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Mailgun send.");

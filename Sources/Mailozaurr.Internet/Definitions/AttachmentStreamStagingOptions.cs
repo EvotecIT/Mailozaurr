@@ -11,6 +11,12 @@ public sealed class AttachmentStreamStagingOptions {
     /// <summary>Optional directory for staged files. A private Mailozaurr temp directory is used by default.</summary>
     public string? TempDirectory { get; set; }
 
+    /// <summary>
+    /// Retains materialized content after a send so the descriptor can be reused explicitly.
+    /// The caller must dispose the descriptor. The secure default releases staging when the send finishes.
+    /// </summary>
+    public bool RetainStagedContentAfterSend { get; set; }
+
     internal AttachmentStreamStagingOptions CloneAndValidate() {
         if (MemoryThresholdBytes < 0) throw new ArgumentOutOfRangeException(nameof(MemoryThresholdBytes));
         if (MaxBytes <= 0) throw new ArgumentOutOfRangeException(nameof(MaxBytes));
@@ -19,7 +25,8 @@ public sealed class AttachmentStreamStagingOptions {
         return new AttachmentStreamStagingOptions {
             MemoryThresholdBytes = MemoryThresholdBytes,
             MaxBytes = MaxBytes,
-            TempDirectory = TempDirectory
+            TempDirectory = TempDirectory,
+            RetainStagedContentAfterSend = RetainStagedContentAfterSend
         };
     }
 }

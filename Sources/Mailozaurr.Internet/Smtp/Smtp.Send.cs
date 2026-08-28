@@ -1,3 +1,4 @@
+using Mailozaurr.Definitions;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,6 +19,7 @@ public partial class Smtp {
         try {
             return SendCoreAsync().GetAwaiter().GetResult();
         } finally {
+            AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
             _sendLock.Release();
         }
     }
@@ -35,6 +37,7 @@ public partial class Smtp {
         try {
             return await SendCoreAsync(cancellationToken);
         } finally {
+            AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
             _sendLock.Release();
         }
     }

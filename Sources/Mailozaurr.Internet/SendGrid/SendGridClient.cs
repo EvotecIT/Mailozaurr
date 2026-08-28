@@ -388,6 +388,14 @@ public sealed class SendGridClient : IDisposable {
     /// </summary>
     /// <returns>A Task that represents the asynchronous operation. The task result contains the result of the email sending operation.</returns>
     public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken) {
+        try {
+            return await SendEmailCoreAsync(cancellationToken).ConfigureAwait(false);
+        } finally {
+            AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
+        }
+    }
+
+    private async Task<SmtpResult> SendEmailCoreAsync(CancellationToken cancellationToken) {
         ThrowIfDisposed();
         if (DryRun) {
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping SendGrid send.");
