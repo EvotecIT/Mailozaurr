@@ -29,10 +29,10 @@ internal static class MailSecretReferenceResolver {
             throw new InvalidOperationException(
                 $"Secret reference '{secretReference}' is not compatible with target secret '{targetSecretName}'.");
         }
-        if (!string.Equals(sourceProfileId, targetProfileId, StringComparison.OrdinalIgnoreCase)
-            && !allowCrossProfileReference) {
+        if (!string.Equals(sourceProfileId, targetProfileId, StringComparison.OrdinalIgnoreCase)) {
             throw new InvalidOperationException(
-                $"Secret reference '{secretReference}' crosses profile boundaries. Explicit cross-profile sharing is required.");
+                $"Secret reference '{secretReference}' crosses profile boundaries. " +
+                "Cross-profile secret references are not supported without owner-enforced audience metadata.");
         }
         var resolved = await secretStore.GetSecretAsync(sourceProfileId, sourceSecretName, cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(resolved)) {

@@ -45,13 +45,21 @@ public static class GmailMailboxSearcher {
         if (client == null) throw new ArgumentNullException(nameof(client));
         if (inspectionOptions == null) throw new ArgumentNullException(nameof(inspectionOptions));
         var inspectionPolicy = inspectionOptions.CreatePolicy();
+        var mimeBudget = new DmarcMimeDownloadBudget(
+            inspectionPolicy.MaxMimeBytesPerMessage,
+            inspectionPolicy.MaxTotalMimeBytes);
         string query = MailboxSearcher.BuildGmailDmarcReportQuery(since, before, domain);
+        int providerLimit = Math.Min(
+            maxResults > 0 ? maxResults : inspectionPolicy.MaxMessagesScanned,
+            inspectionPolicy.MaxMessagesScanned);
         IList<GmailMessage> messages = await client.ListAsync(userId, query,
-            maxResults > 0 ? maxResults : (int?)null, cancellationToken).ConfigureAwait(false);
+            providerLimit, cancellationToken).ConfigureAwait(false);
         string[] messageIds = GetMessageIds(messages);
         IReadOnlyList<MimeMessage> mimeMessages = await DownloadMimeMessagesAsync(
             messageIds, parallelDownloadLimit,
-            (id, token) => client.GetMimeMessageAsync(userId, id, token), cancellationToken)
+            (id, token) => mimeBudget.DownloadAsync(
+                (limit, innerToken) => client.GetMimeMessageBoundedAsync(userId, id, limit, innerToken),
+                token), cancellationToken)
             .ConfigureAwait(false);
         return MailboxSearcher.FilterDmarcReports(
             mimeMessages,

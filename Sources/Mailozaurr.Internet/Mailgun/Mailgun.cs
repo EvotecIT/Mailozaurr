@@ -455,6 +455,7 @@ public class MailgunClient : IDisposable {
     /// <param name="disposing">When true, disposes managed resources as well.</param>
     protected virtual void Dispose(bool disposing) {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        if (disposing) AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
         if (disposing && _ownsClient) {
             _client.Dispose();
         }

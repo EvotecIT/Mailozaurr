@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Runtime.InteropServices;
 
 namespace Mailozaurr;
 
@@ -153,22 +154,25 @@ public static class AttachmentFileStore {
         string destinationPath = Path.GetFullPath(outputPath);
         string directory = Path.GetDirectoryName(destinationPath)
             ?? throw new InvalidOperationException("The output path has no parent directory.");
-        EnsureDirectory(directory);
-        RejectReparsePoint(destinationPath);
-        if (conflictPolicy == AttachmentFileConflictPolicy.Skip && PathEntryExists(destinationPath)) {
+        using var directoryLease = AttachmentDirectoryLease.Acquire(directory);
+        if (!directoryLease.UsesNativeRelativePaths) RejectReparsePoint(destinationPath);
+        if (!directoryLease.UsesNativeRelativePaths &&
+            conflictPolicy == AttachmentFileConflictPolicy.Skip && PathEntryExists(destinationPath)) {
             return new AttachmentFileSaveResult(destinationPath, AttachmentFileSaveAction.Skipped);
         }
 
         string temporaryPath = string.Empty;
         try {
-            using (FileStream stream = CreateTemporaryFile(directory, out temporaryPath)) {
+            using (FileStream stream = directoryLease.CreateTemporaryFile(useAsync: false, out temporaryPath)) {
                 UnixFilePermissions.RestrictFile(temporaryPath);
                 writeContent(stream);
                 stream.Flush(true);
             }
-            return CommitTemporaryFile(temporaryPath, destinationPath, conflictPolicy);
+            return directoryLease.UsesNativeRelativePaths
+                ? directoryLease.Commit(temporaryPath, destinationPath, conflictPolicy)
+                : CommitTemporaryFile(temporaryPath, destinationPath, conflictPolicy);
         } finally {
-            TryDeleteTemporaryFile(temporaryPath);
+            directoryLease.DeleteTemporary(temporaryPath);
         }
     }
 
@@ -188,24 +192,27 @@ public static class AttachmentFileStore {
         string destinationPath = Path.GetFullPath(outputPath);
         string directory = Path.GetDirectoryName(destinationPath)
             ?? throw new InvalidOperationException("The output path has no parent directory.");
-        EnsureDirectory(directory);
-        RejectReparsePoint(destinationPath);
-        if (conflictPolicy == AttachmentFileConflictPolicy.Skip && PathEntryExists(destinationPath)) {
+        using var directoryLease = AttachmentDirectoryLease.Acquire(directory);
+        if (!directoryLease.UsesNativeRelativePaths) RejectReparsePoint(destinationPath);
+        if (!directoryLease.UsesNativeRelativePaths &&
+            conflictPolicy == AttachmentFileConflictPolicy.Skip && PathEntryExists(destinationPath)) {
             return new AttachmentFileSaveResult(destinationPath, AttachmentFileSaveAction.Skipped);
         }
 
         string temporaryPath = string.Empty;
         try {
-            using (FileStream stream = CreateTemporaryFile(directory, useAsync: true, out temporaryPath)) {
+            using (FileStream stream = directoryLease.CreateTemporaryFile(useAsync: true, out temporaryPath)) {
                 UnixFilePermissions.RestrictFile(temporaryPath);
                 await writeContentAsync(stream, cancellationToken).ConfigureAwait(false);
                 await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
                 stream.Flush(true);
             }
             cancellationToken.ThrowIfCancellationRequested();
-            return CommitTemporaryFile(temporaryPath, destinationPath, conflictPolicy);
+            return directoryLease.UsesNativeRelativePaths
+                ? directoryLease.Commit(temporaryPath, destinationPath, conflictPolicy)
+                : CommitTemporaryFile(temporaryPath, destinationPath, conflictPolicy);
         } finally {
-            TryDeleteTemporaryFile(temporaryPath);
+            directoryLease.DeleteTemporary(temporaryPath);
         }
     }
 
@@ -282,7 +289,16 @@ public static class AttachmentFileStore {
 
             RejectReparsePoint(destinationPath);
             try {
-                File.Replace(temporaryPath, destinationPath, null);
+                if (!MoveFileEx(
+                        temporaryPath,
+                        destinationPath,
+                        MoveFileReplaceExisting | MoveFileWriteThrough)) {
+                    int error = Marshal.GetLastWin32Error();
+                    if (error == 2 || error == 3) continue;
+                    throw new IOException(
+                        "Unable to atomically replace the attachment destination.",
+                        new System.ComponentModel.Win32Exception(error));
+                }
                 return new AttachmentFileSaveResult(
                     destinationPath,
                     AttachmentFileSaveAction.Replaced);
@@ -335,6 +351,8 @@ public static class AttachmentFileStore {
         }
     }
 
+    internal static bool PathEntryExistsForLease(string path) => PathEntryExists(path);
+
     private static FileStream CreateTemporaryFile(string directory, out string path) =>
         CreateTemporaryFile(directory, useAsync: false, out path);
 
@@ -368,6 +386,8 @@ public static class AttachmentFileStore {
         } catch (UnauthorizedAccessException) {
         }
     }
+
+    internal static void TryDeleteTemporaryFileForLease(string path) => TryDeleteTemporaryFile(path);
 
     private static void ValidateConflictPolicy(AttachmentFileConflictPolicy conflictPolicy) {
         if (!Enum.IsDefined(typeof(AttachmentFileConflictPolicy), conflictPolicy)) {
@@ -447,4 +467,11 @@ public static class AttachmentFileStore {
         }
         return builder.ToString();
     }
+
+    private const uint MoveFileReplaceExisting = 0x1;
+    private const uint MoveFileWriteThrough = 0x8;
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool MoveFileEx(string existingFileName, string newFileName, uint flags);
 }

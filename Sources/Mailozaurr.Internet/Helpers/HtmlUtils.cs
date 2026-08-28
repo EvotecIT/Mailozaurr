@@ -62,7 +62,15 @@ public static class HtmlUtils {
     /// Rewrites authorized local image sources with unique CID references and returns their file mappings.
     /// </summary>
     public static (string Html, List<LocalImage> Images) ExtractLocalImages(string html) =>
-        ExtractLocalImagesCore(html, uniqueContentIds: true);
+        ExtractLocalImages(html, Array.Empty<string>());
+
+    /// <summary>
+    /// Rewrites authorized local image sources while avoiding content identifiers already used by the message.
+    /// </summary>
+    public static (string Html, List<LocalImage> Images) ExtractLocalImages(
+        string html,
+        IEnumerable<string> reservedContentIds) =>
+        ExtractLocalImagesCore(html, uniqueContentIds: true, reservedContentIds);
 
     /// <summary>
     /// Downloads externally referenced images and replaces their sources with cid links.
@@ -84,27 +92,43 @@ public static class HtmlUtils {
         string html,
         RemoteImageDownloadOptions options,
         CancellationToken cancellationToken = default) {
+        return await DownloadRemoteImagesAsync(
+            html,
+            options,
+            Array.Empty<string>(),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Downloads safe, bounded remote images while avoiding content identifiers already used by the message.</summary>
+    public static async Task<(string Html, List<RemoteImage> Images)> DownloadRemoteImagesAsync(
+        string html,
+        RemoteImageDownloadOptions options,
+        IEnumerable<string> reservedContentIds,
+        CancellationToken cancellationToken = default) {
         if (options == null) throw new ArgumentNullException(nameof(options));
+        if (reservedContentIds == null) throw new ArgumentNullException(nameof(reservedContentIds));
         options.Validate();
         var images = new List<RemoteImage>();
         if (string.IsNullOrWhiteSpace(html)) return (html, images);
 
         EmailHtmlImageDocument document = EmailHtmlImageDocument.Parse(html);
-        var replacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var allocatedContentIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var replacements = new Dictionary<Uri, string>();
+        var allocatedContentIds = new HashSet<string>(
+            reservedContentIds.Where(value => !string.IsNullOrWhiteSpace(value)),
+            StringComparer.OrdinalIgnoreCase);
         long totalBytes = 0;
         int attemptedImages = 0;
 
         foreach (EmailHtmlImageReference reference in document.Images) {
             var url = reference.Source;
             if (string.IsNullOrWhiteSpace(url)) continue;
-            if (replacements.ContainsKey(url)) continue;
             if (attemptedImages >= options.MaxImageCount) break;
             if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? sourceUri)
                 || !(string.Equals(sourceUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
                     || options.AllowHttp && string.Equals(sourceUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))) {
                 continue;
             }
+            if (replacements.ContainsKey(sourceUri)) continue;
             attemptedImages++;
             try {
                 RemoteImageDownloader.DownloadResult? downloaded = await RemoteImageDownloader.DownloadAsync(
@@ -115,7 +139,7 @@ public static class HtmlUtils {
                     cancellationToken).ConfigureAwait(false);
                 if (downloaded == null) continue;
                 string contentId = RemoteImageDownloader.CreateContentId(downloaded.Source, allocatedContentIds);
-                replacements[url] = $"cid:{contentId}";
+                replacements[sourceUri] = $"cid:{contentId}";
                 images.Add(new RemoteImage {
                     ContentId = contentId,
                     Data = downloaded.Data,
@@ -132,7 +156,8 @@ public static class HtmlUtils {
         }
 
         foreach (EmailHtmlImageReference reference in document.Images) {
-            if (replacements.TryGetValue(reference.Source, out string? value)) {
+            if (Uri.TryCreate(reference.Source, UriKind.Absolute, out Uri? sourceUri) &&
+                replacements.TryGetValue(sourceUri, out string? value)) {
                 document.SetImageSource(reference.Index, value);
             }
         }
@@ -142,12 +167,15 @@ public static class HtmlUtils {
 
     private static (string Html, List<LocalImage> Images) ExtractLocalImagesCore(
         string html,
-        bool uniqueContentIds) {
+        bool uniqueContentIds,
+        IEnumerable<string>? reservedContentIds = null) {
         var images = new List<LocalImage>();
         if (string.IsNullOrWhiteSpace(html)) return (html, images);
 
         EmailHtmlImageDocument document = EmailHtmlImageDocument.Parse(html);
-        var allocatedContentIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var allocatedContentIds = new HashSet<string>(
+            reservedContentIds?.Where(value => !string.IsNullOrWhiteSpace(value)) ?? Enumerable.Empty<string>(),
+            StringComparer.OrdinalIgnoreCase);
         foreach (EmailHtmlImageReference reference in document.Images) {
             string path = reference.Source;
             if (string.IsNullOrWhiteSpace(path) || IsNonLocalSource(path) || !File.Exists(path)) continue;

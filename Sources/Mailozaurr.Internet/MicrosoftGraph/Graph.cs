@@ -1,3 +1,4 @@
+using Mailozaurr.Definitions;
 using System;
 using System.Buffers;
 using System.Diagnostics;
@@ -463,6 +464,7 @@ public partial class Graph : IDisposable {
     /// Releases resources used by the Graph client.
     /// </summary>
     public void Dispose() {
+        AttachmentDescriptorLifetime.ReleaseStaging(Attachments?.OfType<AttachmentDescriptor>());
         _client.Dispose();
     }
 }

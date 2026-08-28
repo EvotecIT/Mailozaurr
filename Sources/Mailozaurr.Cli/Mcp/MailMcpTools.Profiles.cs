@@ -160,7 +160,7 @@ public sealed partial class MailMcpTools {
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Graph access token.")] string? accessTokenReference = null,
         [Description("Optional certificate path for certificate-based auth.")] string? certificatePath = null,
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the certificate password.")] string? certificatePasswordReference = null,
-        [Description("Explicitly allow compatible same-name secret references from another profile.")] bool allowCrossProfileSecretReferences = false,
+        [Description("Compatibility parameter. Cross-profile secret references are rejected until typed audience policy is available.")] bool allowCrossProfileSecretReferences = false,
         CancellationToken cancellationToken = default) {
         var result = await _application.ProfileBootstrap.SaveGraphProfileAsync(new GraphProfileBootstrapRequest {
             ProfileId = profileId,
@@ -197,7 +197,7 @@ public sealed partial class MailMcpTools {
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Gmail client secret.")] string? clientSecretReference = null,
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Gmail refresh token.")] string? refreshTokenReference = null,
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Gmail access token.")] string? accessTokenReference = null,
-        [Description("Explicitly allow compatible same-name secret references from another profile.")] bool allowCrossProfileSecretReferences = false,
+        [Description("Compatibility parameter. Cross-profile secret references are rejected until typed audience policy is available.")] bool allowCrossProfileSecretReferences = false,
         CancellationToken cancellationToken = default) {
         var result = await _application.ProfileBootstrap.SaveGmailProfileAsync(new GmailProfileBootstrapRequest {
             ProfileId = profileId,
@@ -247,7 +247,7 @@ public sealed partial class MailMcpTools {
         [Description("Optional Gmail account override used for the login flow.")] string? mailbox = null,
         [Description("Optional OAuth client identifier override.")] string? clientId = null,
         [Description("Optional secret reference in the form '<profile-id>:<secret-name>' or '<secret-name>' for the Gmail client secret override.")] string? clientSecretReference = null,
-        [Description("Explicitly allow a compatible client-secret reference from another profile.")] bool allowCrossProfileSecretReference = false,
+        [Description("Compatibility parameter. Cross-profile secret references are rejected until typed audience policy is available.")] bool allowCrossProfileSecretReference = false,
         [Description("Optional scopes override.")] string[]? scopes = null,
         CancellationToken cancellationToken = default) =>
         _application.ProfileAuth.LoginGmailAsync(new GmailProfileLoginRequest {
@@ -298,7 +298,7 @@ public sealed partial class MailMcpTools {
         _application.Profiles.SetDefaultAsync(profileId, cancellationToken);
 
     [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
-    [Description("Copies an existing stored secret to another Mailozaurr profile without exposing its value to MCP.")]
+    [Description("Copies an existing stored secret reference within the same Mailozaurr profile without exposing its value to MCP. Cross-profile copies are rejected.")]
     public Task<OperationResult> mail_profile_secret_copy(
         [Description("The profile identifier that owns the secret.")] string profileId,
         [Description("The stable secret name, such as password, client-secret, or refresh-token.")] string secretName,
@@ -309,7 +309,7 @@ public sealed partial class MailMcpTools {
             secretName,
             null,
             secretReference,
-            allowCrossProfileReference: true,
+            allowCrossProfileReference: false,
             cancellationToken);
 
     [McpServerTool(ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]

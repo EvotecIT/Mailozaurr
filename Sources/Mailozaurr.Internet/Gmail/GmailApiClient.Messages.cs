@@ -12,6 +12,8 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Mailozaurr.DmarcReports;
+
 namespace Mailozaurr;
 
 public sealed partial class GmailApiClient {
@@ -248,6 +250,31 @@ public sealed partial class GmailApiClient {
         var bytes = Convert.FromBase64String(data);
         using var ms = new MemoryStream(bytes);
         return MimeMessage.Load(ms);
+    }
+
+    internal async Task<BoundedMimeMessage> GetMimeMessageBoundedAsync(
+        string userId,
+        string id,
+        long maxDecodedBytes,
+        CancellationToken cancellationToken = default) {
+        GmailMessage msg = await GetRawBoundedAsync(
+            userId,
+            id,
+            maxDecodedBytes,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (string.IsNullOrEmpty(msg.Raw)) throw new InvalidDataException("Gmail API returned an invalid message response.");
+        string data = msg.Raw!.Replace('-', '+').Replace('_', '/');
+        int padding = (4 - data.Length % 4) % 4;
+        if (padding > 0) data = data.PadRight(data.Length + padding, '=');
+        int paddingCharacters = data.Length > 0 && data[data.Length - 1] == '=' ? 1 : 0;
+        if (data.Length > 1 && data[data.Length - 2] == '=') paddingCharacters++;
+        long decodedLength = (data.Length / 4L) * 3L - paddingCharacters;
+        if (decodedLength > maxDecodedBytes) {
+            throw new InvalidDataException($"Gmail MIME message exceeded the {maxDecodedBytes} byte limit.");
+        }
+        byte[] bytes = Convert.FromBase64String(data);
+        using var stream = new MemoryStream(bytes, writable: false);
+        return new BoundedMimeMessage(MimeMessage.Load(stream), bytes.LongLength);
     }
 
     /// <summary>

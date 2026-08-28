@@ -358,6 +358,7 @@ public class SesClient : IDisposable {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) {
             return;
         }
+        AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
         if (_ownsClient) {
             _client.Dispose();
         }

@@ -255,7 +255,7 @@ public sealed partial class CliRunnerTests {
     }
 
     [Fact]
-    public async Task ProfileGraphBootstrapSupportsSecretReferences() {
+    public async Task ProfileGraphBootstrapRejectsCrossProfileReferencesEvenWithLegacyFlag() {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
         var fixture = CreateFixture();
@@ -288,12 +288,13 @@ public sealed partial class CliRunnerTests {
 
         var clientSecret = await fixture.SecretStore.GetSecretAsync("graph-ref", MailSecretNames.ClientSecret);
 
-        Assert.Equal(0, exitCode);
-        Assert.Equal("shared-client-secret", clientSecret);
+        Assert.Equal(1, exitCode);
+        Assert.Null(clientSecret);
+        Assert.Contains("crosses profile boundaries", stdout.ToString() + stderr.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task ProfileGmailBootstrapSavesProfileAndSecretsThroughApplicationServices() {
+    public async Task ProfileGmailBootstrapRejectsCrossProfileSecretsThroughApplicationServices() {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
         var fixture = CreateFixture();
@@ -320,14 +321,11 @@ public sealed partial class CliRunnerTests {
         var clientSecret = await fixture.SecretStore.GetSecretAsync("gmail-work", MailSecretNames.ClientSecret);
         var refreshToken = await fixture.SecretStore.GetSecretAsync("gmail-work", MailSecretNames.RefreshToken);
 
-        Assert.Equal(0, exitCode);
-        Assert.NotNull(profile);
-        Assert.Equal(MailProfileKind.Gmail, profile!.Kind);
-        Assert.Equal("me@example.com", profile.DefaultMailbox);
-        Assert.Equal("me@example.com", profile.Settings[MailProfileSettingsKeys.Mailbox]);
-        Assert.Equal("client-id", profile.Settings[MailProfileSettingsKeys.ClientId]);
-        Assert.Equal("client-secret", clientSecret);
-        Assert.Equal("refresh-token", refreshToken);
+        Assert.Equal(1, exitCode);
+        Assert.Null(profile);
+        Assert.Null(clientSecret);
+        Assert.Null(refreshToken);
+        Assert.Contains("crosses profile boundaries", stdout.ToString() + stderr.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -672,7 +670,7 @@ public sealed partial class CliRunnerTests {
     }
 
     [Fact]
-    public async Task ProfileSetSecretSupportsReferenceCopy() {
+    public async Task ProfileSetSecretRejectsCrossProfileReferenceCopy() {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();
         var fixture = CreateFixture();
@@ -702,8 +700,9 @@ public sealed partial class CliRunnerTests {
 
         var secretValue = await fixture.SecretStore.GetSecretAsync("work-imap", MailSecretNames.Password);
 
-        Assert.Equal(0, exitCode);
-        Assert.Equal("copied-secret", secretValue);
+        Assert.Equal(1, exitCode);
+        Assert.Equal("secret", secretValue);
+        Assert.Contains("crosses profile boundaries", stdout.ToString() + stderr.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -202,13 +202,17 @@ public partial class Graph {
     /// Splits <paramref name="filePath"/> into chunks no larger than <see cref="MaxChunkSize"/>.
     /// </summary>
     /// <param name="filePath">Path to the file to split.</param>
+    /// <param name="expectedLength">Length captured when the attachment metadata was created.</param>
     /// <param name="chunkSize">Desired size of each chunk in bytes.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     /// <returns>List of stream contents representing file chunks.</returns>
-    private List<StreamContent> PrepareByteArrayContentForUpload(string filePath, int chunkSize = MaxChunkSize, CancellationToken cancellationToken = default) {
+    private List<StreamContent> PrepareByteArrayContentForUpload(
+        string filePath,
+        long expectedLength,
+        int chunkSize = MaxChunkSize,
+        CancellationToken cancellationToken = default) {
         chunkSize = Math.Min(chunkSize, MaxChunkSize);
         var fileContents = new List<StreamContent>();
-        var fileSize = new FileInfo(filePath).Length;
 
         using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         var buffer = ArrayPool<byte>.Shared.Rent(chunkSize);
@@ -218,16 +222,21 @@ public partial class Graph {
             cancellationToken.ThrowIfCancellationRequested();
             while ((bytesRead = fileStream.Read(buffer, 0, chunkSize)) > 0) {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (offset + bytesRead > expectedLength) throw ContentLengthMismatch(expectedLength, offset + bytesRead);
 
                 var chunk = new byte[bytesRead];
                 Array.Copy(buffer, chunk, bytesRead);
                 var memoryStream = new MemoryStream(chunk, writable: false);
-                var contentRange = $"bytes {offset}-{offset + bytesRead - 1}/{fileSize}";
+                var contentRange = $"bytes {offset}-{offset + bytesRead - 1}/{expectedLength}";
                 var streamContent = new StreamContent(memoryStream);
                 streamContent.Headers.Add("Content-Range", contentRange);
                 fileContents.Add(streamContent);
                 offset += bytesRead;
             }
+            if (offset != expectedLength) throw ContentLengthMismatch(expectedLength, offset);
+        } catch {
+            foreach (StreamContent content in fileContents) content.Dispose();
+            throw;
         } finally {
             ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
         }
@@ -239,7 +248,11 @@ public partial class Graph {
         GraphFileAttachmentSource source,
         int chunkSize = MaxChunkSize,
         CancellationToken cancellationToken = default) {
-        if (source.Path != null) return PrepareByteArrayContentForUpload(source.Path, chunkSize, cancellationToken);
+        if (source.Path != null) return PrepareByteArrayContentForUpload(
+            source.Path,
+            source.Length,
+            chunkSize,
+            cancellationToken);
 
         chunkSize = Math.Min(chunkSize, MaxChunkSize);
         var chunks = new List<StreamContent>();
@@ -345,11 +358,13 @@ public partial class Graph {
         using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         int bytesRead;
         while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0) {
+            if (offset + bytesRead > fileSize) throw ContentLengthMismatch(fileSize, offset + bytesRead);
             var chunk = new byte[bytesRead];
             Buffer.BlockCopy(buffer, 0, chunk, 0, bytesRead);
             await SendAttachmentChunkWithRetryAsync(uploadUrl, chunk, offset, fileSize, cancellationToken);
             offset += bytesRead;
         }
+        if (offset != fileSize) throw ContentLengthMismatch(fileSize, offset);
     }
 
     private async Task SendFileChunks(

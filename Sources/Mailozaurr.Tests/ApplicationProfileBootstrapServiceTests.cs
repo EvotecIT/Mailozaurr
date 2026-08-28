@@ -38,7 +38,7 @@ public sealed class ApplicationProfileBootstrapServiceTests {
     }
 
     [Fact]
-    public async Task SaveGraphProfileAsyncSupportsSecretReferences() {
+    public async Task SaveGraphProfileAsyncRejectsCrossProfileSecretReferencesEvenWithLegacyConsent() {
         var profileStore = new InMemoryProfileStore();
         var secretStore = new InMemorySecretStore();
         await secretStore.SetSecretAsync("shared-secrets", MailSecretNames.ClientSecret, "shared-client-secret");
@@ -59,8 +59,9 @@ public sealed class ApplicationProfileBootstrapServiceTests {
 
         var clientSecret = await secretStore.GetSecretAsync("graph-work", MailSecretNames.ClientSecret);
 
-        Assert.True(result.Succeeded);
-        Assert.Equal("shared-client-secret", clientSecret);
+        Assert.False(result.Succeeded);
+        Assert.Contains("crosses profile boundaries", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(clientSecret);
     }
 
     [Fact]

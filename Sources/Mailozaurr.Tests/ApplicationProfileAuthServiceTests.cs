@@ -124,7 +124,7 @@ public sealed class ApplicationProfileAuthServiceTests {
     }
 
     [Fact]
-    public async Task LoginGmailAsyncSupportsClientSecretReferences() {
+    public async Task LoginGmailAsyncRejectsCrossProfileClientSecretReferencesEvenWithLegacyConsent() {
         var profileStore = new InMemoryProfileStore(new[] {
             new MailProfile {
                 Id = "gmail-work",
@@ -159,10 +159,9 @@ public sealed class ApplicationProfileAuthServiceTests {
             AllowCrossProfileSecretReference = true
         });
 
-        Assert.True(result.Succeeded);
-        Assert.NotNull(capturedRequest);
-        Assert.Equal("client-secret-from-reference", capturedRequest!.ClientSecret);
-        Assert.Null(capturedRequest.ClientSecretReference);
+        Assert.False(result.Succeeded);
+        Assert.Contains("crosses profile boundaries", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(capturedRequest);
     }
 
     [Fact]

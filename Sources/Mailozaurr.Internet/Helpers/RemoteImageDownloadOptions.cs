@@ -23,6 +23,12 @@ public sealed class RemoteImageDownloadOptions {
     /// </summary>
     public bool AllowPrivateNetworkAddresses { get; set; }
 
+    /// <summary>
+    /// Allows hostname downloads on runtimes that cannot bind a validated DNS answer to the socket.
+    /// This weakens SSRF protection and should be enabled only for trusted HTML and DNS.
+    /// </summary>
+    public bool AllowUnpinnedDnsResolution { get; set; }
+
     /// <summary>Allowed image media types. SVG is excluded because it may contain active content.</summary>
     public ISet<string> AllowedMediaTypes { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
         "image/png",

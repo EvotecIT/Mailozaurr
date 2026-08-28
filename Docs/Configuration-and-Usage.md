@@ -201,7 +201,7 @@ Get-JMAPMailbox -ProfileId work-jmap
 Search-JMAPEmail -ProfileId work-jmap -Subject Invoice -Limit 25
 ```
 
-Profile mutation commands support `-WhatIf`; destructive removal commands also use PowerShell confirmation semantics. `-ProfileDirectory` and `-SecretDirectory` are available on these cmdlets for isolated automation or test stores. Cross-profile secret references are rejected by default and require an explicit `-AllowCrossProfileReference` decision.
+Profile mutation commands support `-WhatIf`; destructive removal commands also use PowerShell confirmation semantics. `-ProfileDirectory` and `-SecretDirectory` are available on these cmdlets for isolated automation or test stores. Secret references may reuse a same-name secret within the same profile. Cross-profile references are rejected, including when the legacy `-AllowCrossProfileReference` compatibility switch is supplied, because Mailozaurr cannot safely infer provider, tenant, client, origin, and purpose compatibility from a secret name.
 
 ## CLI usage overview
 

@@ -37,11 +37,11 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
     public DateTime? Before { get; set; }
 
     /// <summary>
-    /// <para type="description">Maximum number of reports to return. Default is unlimited.</para>
+    /// <para type="description">Maximum number of reports to return. Defaults to 1000.</para>
     /// </summary>
     [Parameter]
     [ValidateRange(1, int.MaxValue)]
-    public int Count { get; set; }
+    public int Count { get; set; } = DmarcReportInspectionOptions.DefaultMaxMessagesScanned;
 
     /// <summary>
     /// <para type="description">IMAP folder to search.</para>
@@ -103,9 +103,24 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
     [ValidateRange(1, int.MaxValue)]
     public int MaxArchiveEntriesPerAttachment { get; set; } = DmarcReportInspectionOptions.DefaultMaxArchiveEntriesPerAttachment;
 
+    /// <summary><para type="description">Maximum number of candidate mailbox messages inspected.</para></summary>
+    [Parameter]
+    [ValidateRange(1, int.MaxValue)]
+    public int MaxMessagesScanned { get; set; } = DmarcReportInspectionOptions.DefaultMaxMessagesScanned;
+
+    /// <summary><para type="description">Maximum downloaded MIME bytes for one candidate message.</para></summary>
+    [Parameter]
+    [ValidateRange(1, long.MaxValue)]
+    public long MaxMimeBytesPerMessage { get; set; } = DmarcReportInspectionOptions.DefaultMaxMimeBytesPerMessage;
+
+    /// <summary><para type="description">Maximum downloaded MIME bytes across the search.</para></summary>
+    [Parameter]
+    [ValidateRange(1, long.MaxValue)]
+    public long MaxTotalMimeBytes { get; set; } = DmarcReportInspectionOptions.DefaultMaxTotalMimeBytes;
+
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
-        int max = Count > 0 ? Count : int.MaxValue;
+        int max = Count;
         long totalUncompressedLimit = MyInvocation.BoundParameters.ContainsKey(nameof(MaxTotalUncompressedSize))
             ? MaxTotalUncompressedSize
             : Math.Max(MaxTotalUncompressedSize, MaxUncompressedSize);
@@ -113,7 +128,10 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
             MaxUncompressedBytesPerAttachment = MaxUncompressedSize,
             MaxTotalUncompressedBytes = totalUncompressedLimit,
             MaxAttachmentsPerMessage = MaxAttachmentsPerMessage,
-            MaxArchiveEntriesPerAttachment = MaxArchiveEntriesPerAttachment
+            MaxArchiveEntriesPerAttachment = MaxArchiveEntriesPerAttachment,
+            MaxMessagesScanned = MaxMessagesScanned,
+            MaxMimeBytesPerMessage = MaxMimeBytesPerMessage,
+            MaxTotalMimeBytes = MaxTotalMimeBytes
         };
         switch (Protocol) {
             case EmailProtocol.Imap: {

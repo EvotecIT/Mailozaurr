@@ -36,6 +36,22 @@ public class GraphDraftTests {
     }
 
     [Fact]
+    public async Task SendFileChunks_RejectsFileGrowthBeyondCapturedLengthBeforeUpload() {
+        string path = Path.GetTempFileName();
+        File.WriteAllBytes(path, new byte[] { 1, 2, 3, 4 });
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.Accepted));
+        using var graph = new Graph();
+        SetHttpClient(graph, handler);
+        try {
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                graph.SendFileChunks("https://upload.test/session", path, fileSize: 2));
+            Assert.Empty(handler.Requests);
+        } finally {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void CreateDraft_LargeAttachments_ExcludesAttachments() {
         string tmp = Path.GetTempFileName();
         File.WriteAllBytes(tmp, new byte[4_100_000]);

@@ -27,7 +27,10 @@ public sealed class CmdletSetMailProfileSecret : MailApplicationCmdletBase {
     [Parameter(Mandatory = true, ParameterSetName = ReferenceParameterSet)]
     public string? Reference { get; set; }
 
-    /// <summary>Explicitly permits a reference owned by another profile.</summary>
+    /// <summary>
+    /// Compatibility switch retained for scripts. Cross-profile references remain rejected until
+    /// Mailozaurr can enforce typed provider, tenant, client, origin, and purpose metadata.
+    /// </summary>
     [Parameter(ParameterSetName = ReferenceParameterSet)]
     public SwitchParameter AllowCrossProfileReference { get; set; }
 

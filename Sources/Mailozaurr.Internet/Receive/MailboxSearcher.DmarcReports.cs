@@ -64,14 +64,22 @@ public static partial class MailboxSearcher {
         if (inspectionOptions == null) throw new ArgumentNullException(nameof(inspectionOptions));
         var inspectionPolicy = inspectionOptions.CreatePolicy();
         var inspectionBudget = new SharedReadBudget(inspectionPolicy.MaxTotalUncompressedBytes);
+        var mimeBudget = new DmarcMimeDownloadBudget(
+            inspectionPolicy.MaxMimeBytesPerMessage,
+            inspectionPolicy.MaxTotalMimeBytes);
         var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadOnly);
         var search = BuildDmarcReportSearchQuery(since, before, domain);
-        var uids = await mailFolder.SearchAsync(search, cancellationToken).ConfigureAwait(false);
+        var uids = (await mailFolder.SearchAsync(search, cancellationToken).ConfigureAwait(false))
+            .Take(inspectionPolicy.MaxMessagesScanned)
+            .ToArray();
         var results = new List<DmarcReport>();
         if (parallelDownloadLimit <= 1) {
             foreach (var uid in uids) {
                 cancellationToken.ThrowIfCancellationRequested();
-                var msg = await mailFolder.GetMessageAsync(uid, cancellationToken).ConfigureAwait(false);
+                var msg = await mailFolder.GetMessageAsync(
+                    uid,
+                    cancellationToken,
+                    mimeBudget.CreateTransferProgress()).ConfigureAwait(false);
                 var reports = FilterDmarcReports(
                     new[] { msg }, since, before, domain, inspectionPolicy, inspectionBudget, cancellationToken);
                 if (reports.Count > 0) {
@@ -83,7 +91,7 @@ public static partial class MailboxSearcher {
                 }
             }
         } else {
-            var uidArray = uids.ToArray();
+            var uidArray = uids;
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             var workers = new Task[Math.Min(parallelDownloadLimit, uidArray.Length)];
             int next = 0;
@@ -99,7 +107,10 @@ public static partial class MailboxSearcher {
                         }
                         MimeMessage msg;
                         try {
-                            msg = await mailFolder.GetMessageAsync(uidArray[current], cts.Token).ConfigureAwait(false);
+                            msg = await mailFolder.GetMessageAsync(
+                                uidArray[current],
+                                cts.Token,
+                                mimeBudget.CreateTransferProgress()).ConfigureAwait(false);
                         } catch (OperationCanceledException) {
                             return;
                         }
@@ -127,6 +138,7 @@ public static partial class MailboxSearcher {
                 await Task.WhenAll(workers).ConfigureAwait(false);
             } catch (OperationCanceledException) {
             }
+            cancellationToken.ThrowIfCancellationRequested();
         }
 
         return maxResults > 0 && results.Count > maxResults ? results.GetRange(0, maxResults) : results;
@@ -174,11 +186,18 @@ public static partial class MailboxSearcher {
         if (inspectionOptions == null) throw new ArgumentNullException(nameof(inspectionOptions));
         var inspectionPolicy = inspectionOptions.CreatePolicy();
         var inspectionBudget = new SharedReadBudget(inspectionPolicy.MaxTotalUncompressedBytes);
+        var mimeBudget = new DmarcMimeDownloadBudget(
+            inspectionPolicy.MaxMimeBytesPerMessage,
+            inspectionPolicy.MaxTotalMimeBytes);
+        int messagesToScan = Math.Min(client.Count, inspectionPolicy.MaxMessagesScanned);
         var results = new List<DmarcReport>();
         if (parallelDownloadLimit <= 1) {
-            for (int idx = 0; idx < client.Count; idx++) {
+            for (int idx = 0; idx < messagesToScan; idx++) {
                 cancellationToken.ThrowIfCancellationRequested();
-                var msg = await client.GetMessageAsync(idx, cancellationToken).ConfigureAwait(false);
+                var msg = await client.GetMessageAsync(
+                    idx,
+                    cancellationToken,
+                    mimeBudget.CreateTransferProgress()).ConfigureAwait(false);
                 var reports = FilterDmarcReports(
                     new[] { msg }, since, before, domain, inspectionPolicy, inspectionBudget, cancellationToken);
                 if (reports.Count > 0) {
@@ -191,7 +210,7 @@ public static partial class MailboxSearcher {
             }
         } else {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            var workers = new Task[Math.Min(parallelDownloadLimit, client.Count)];
+            var workers = new Task[Math.Min(parallelDownloadLimit, messagesToScan)];
             int next = 0;
             int resultCount = 0;
             var gate = new object();
@@ -200,12 +219,15 @@ public static partial class MailboxSearcher {
                     while (true) {
                         int current;
                         lock (gate) {
-                            if (cts.IsCancellationRequested || next >= client.Count || (maxResults > 0 && resultCount >= maxResults)) return;
+                            if (cts.IsCancellationRequested || next >= messagesToScan || (maxResults > 0 && resultCount >= maxResults)) return;
                             current = next++;
                         }
                         MimeMessage msg;
                         try {
-                            msg = await client.GetMessageAsync(current, cts.Token).ConfigureAwait(false);
+                            msg = await client.GetMessageAsync(
+                                current,
+                                cts.Token,
+                                mimeBudget.CreateTransferProgress()).ConfigureAwait(false);
                         } catch (OperationCanceledException) {
                             return;
                         }
@@ -233,6 +255,7 @@ public static partial class MailboxSearcher {
                 await Task.WhenAll(workers).ConfigureAwait(false);
             } catch (OperationCanceledException) {
             }
+            cancellationToken.ThrowIfCancellationRequested();
         }
 
         return maxResults > 0 && results.Count > maxResults ? results.GetRange(0, maxResults) : results;

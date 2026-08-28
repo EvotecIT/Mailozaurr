@@ -188,6 +188,35 @@ public sealed class AttachmentFileStoreTests {
 
 #if NET8_0_OR_GREATER
     [Fact]
+    public void Reparse_directory_ancestor_is_rejected_without_writing_through_it() {
+        string root = CreateTestDirectory();
+        string outside = CreateTestDirectory();
+        string link = Path.Combine(root, "linked-directory");
+        try {
+            try {
+                Directory.CreateSymbolicLink(link, outside);
+            } catch (UnauthorizedAccessException) {
+                return;
+            } catch (PlatformNotSupportedException) {
+                return;
+            }
+
+            Assert.Throws<IOException>(() => AttachmentFileStore.SaveBytesToDirectory(
+                link,
+                "report.txt",
+                new byte[] { 9 }));
+            Assert.Empty(Directory.GetFiles(outside));
+        } finally {
+            try {
+                if (Directory.Exists(link)) Directory.Delete(link);
+            } catch (IOException) {
+            }
+            Directory.Delete(root, recursive: true);
+            Directory.Delete(outside, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Reparse_destination_is_rejected_without_changing_its_target() {
         string directory = CreateTestDirectory();
         try {

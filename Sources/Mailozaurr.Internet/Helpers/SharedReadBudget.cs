@@ -7,6 +7,7 @@ using System.Threading;
 /// <summary>Thread-safe byte budget shared by bounded stream readers.</summary>
 internal sealed class SharedReadBudget {
     private long _remaining;
+    private readonly SemaphoreSlim _readGate = new(1, 1);
 
     internal SharedReadBudget(long maximumBytes) {
         if (maximumBytes <= 0) throw new ArgumentOutOfRangeException(nameof(maximumBytes));
@@ -29,6 +30,10 @@ internal sealed class SharedReadBudget {
     internal void Refund(int count) {
         if (count > 0) Interlocked.Add(ref _remaining, count);
     }
+
+    internal void EnterRead(CancellationToken cancellationToken) => _readGate.Wait(cancellationToken);
+
+    internal void ExitRead() => _readGate.Release();
 }
 
 /// <summary>Read-only stream that consumes both local and operation-wide byte budgets.</summary>
@@ -68,31 +73,36 @@ internal sealed class SharedBudgetReadStream : Stream {
         if (count == 0) return 0;
         _cancellationToken.ThrowIfCancellationRequested();
 
-        int localReservation = _localBudget.Reserve(count);
-        if (localReservation == 0) return ProbeForLimitViolation();
-
-        int operationReservation = _operationBudget.Reserve(localReservation);
-        if (operationReservation == 0) {
-            _localBudget.Refund(localReservation);
-            return ProbeForLimitViolation();
-        }
-        if (operationReservation < localReservation) {
-            _localBudget.Refund(localReservation - operationReservation);
-        }
-
-        int read;
+        _operationBudget.EnterRead(_cancellationToken);
         try {
-            read = _inner.Read(buffer, offset, operationReservation);
-        } catch {
-            _localBudget.Refund(operationReservation);
-            _operationBudget.Refund(operationReservation);
-            throw;
-        }
+            int localReservation = _localBudget.Reserve(count);
+            if (localReservation == 0) return ProbeForLimitViolation();
 
-        int unused = operationReservation - read;
-        _localBudget.Refund(unused);
-        _operationBudget.Refund(unused);
-        return read;
+            int operationReservation = _operationBudget.Reserve(localReservation);
+            if (operationReservation == 0) {
+                _localBudget.Refund(localReservation);
+                return ProbeForLimitViolation();
+            }
+            if (operationReservation < localReservation) {
+                _localBudget.Refund(localReservation - operationReservation);
+            }
+
+            int read;
+            try {
+                read = _inner.Read(buffer, offset, operationReservation);
+            } catch {
+                _localBudget.Refund(operationReservation);
+                _operationBudget.Refund(operationReservation);
+                throw;
+            }
+
+            int unused = operationReservation - read;
+            _localBudget.Refund(unused);
+            _operationBudget.Refund(unused);
+            return read;
+        } finally {
+            _operationBudget.ExitRead();
+        }
     }
 
     private int ProbeForLimitViolation() {

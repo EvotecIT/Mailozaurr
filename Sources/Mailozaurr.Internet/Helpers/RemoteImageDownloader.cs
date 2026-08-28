@@ -26,10 +26,13 @@ internal static class RemoteImageDownloader {
         long responseLimit = Math.Min(options.MaxImageBytes, remainingTotalBytes);
         if (responseLimit <= 0) return null;
 
+        using HttpClient? pinnedClient = CreatePinnedClient(options);
+        HttpClient transport = pinnedClient ?? client;
+
         for (int redirects = 0; ; redirects++) {
             await ValidateDestinationAsync(current, options, cancellationToken).ConfigureAwait(false);
             using var request = new HttpRequestMessage(HttpMethod.Get, current);
-            using HttpResponseMessage response = await client.SendAsync(
+            using HttpResponseMessage response = await transport.SendAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken).ConfigureAwait(false);
@@ -70,6 +73,7 @@ internal static class RemoteImageDownloader {
         Uri uri,
         RemoteImageDownloadOptions options,
         CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
         bool validScheme = string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
             || options.AllowHttp && string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase);
         if (!validScheme || string.IsNullOrWhiteSpace(uri.Host) || !string.IsNullOrEmpty(uri.UserInfo)) {
@@ -82,8 +86,17 @@ internal static class RemoteImageDownloader {
             addresses = new[] { literalAddress };
         } else {
 #if NET8_0_OR_GREATER
+            if (!options.AllowUnpinnedDnsResolution) {
+                // SocketsHttpHandler.ConnectCallback resolves, validates, and connects to the same address.
+                return;
+            }
             addresses = await Dns.GetHostAddressesAsync(uri.DnsSafeHost, cancellationToken).ConfigureAwait(false);
 #else
+            if (!options.AllowUnpinnedDnsResolution) {
+                throw new PlatformNotSupportedException(
+                    "Secure remote-image hostname downloads require a runtime with DNS-pinned sockets. " +
+                    "Use an IP literal or explicitly enable AllowUnpinnedDnsResolution for trusted DNS.");
+            }
             cancellationToken.ThrowIfCancellationRequested();
             addresses = await Task.Run(() => Dns.GetHostAddresses(uri.DnsSafeHost), cancellationToken).ConfigureAwait(false);
 #endif
@@ -91,6 +104,42 @@ internal static class RemoteImageDownloader {
         if (addresses.Length == 0 || addresses.Any(address => !IsPublicAddress(address))) {
             throw new InvalidOperationException("Remote image URL resolved to a non-public network address.");
         }
+    }
+
+    internal static HttpClient? CreatePinnedClient(RemoteImageDownloadOptions options) {
+        if (options.AllowPrivateNetworkAddresses || options.AllowUnpinnedDnsResolution) return null;
+#if NET8_0_OR_GREATER
+        var handler = new SocketsHttpHandler {
+            AllowAutoRedirect = false,
+            ConnectCallback = async (context, cancellationToken) => {
+                IPAddress[] addresses = await Dns.GetHostAddressesAsync(
+                    context.DnsEndPoint.Host,
+                    cancellationToken).ConfigureAwait(false);
+                if (addresses.Length == 0 || addresses.Any(address => !IsPublicAddress(address))) {
+                    throw new InvalidOperationException("Remote image URL resolved to a non-public network address.");
+                }
+
+                Exception? lastFailure = null;
+                foreach (IPAddress address in addresses) {
+                    var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                    try {
+                        await socket.ConnectAsync(
+                            new IPEndPoint(address, context.DnsEndPoint.Port),
+                            cancellationToken).ConfigureAwait(false);
+                        return new NetworkStream(socket, ownsSocket: true);
+                    } catch (Exception ex) when (ex is SocketException or OperationCanceledException) {
+                        socket.Dispose();
+                        if (ex is OperationCanceledException) throw;
+                        lastFailure = ex;
+                    }
+                }
+                throw new HttpRequestException("Unable to connect to a validated remote image address.", lastFailure);
+            }
+        };
+        return new HttpClient(handler, disposeHandler: true);
+#else
+        return null;
+#endif
     }
 
     internal static bool IsPublicAddress(IPAddress address) {

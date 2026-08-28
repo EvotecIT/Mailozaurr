@@ -98,6 +98,104 @@ public class SearchDmarcReportsTests {
         }
     }
 
+    private sealed class CancelablePop3Client : Pop3Client {
+        public override bool IsConnected => true;
+        public override bool IsAuthenticated => true;
+        public override int Count => 4;
+        public override async Task<MimeMessage> GetMessageAsync(
+            int index,
+            CancellationToken cancellationToken = default,
+            ITransferProgress? progress = null) {
+            await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("Unreachable");
+        }
+    }
+
+    private sealed class BlockingReadStream : MemoryStream {
+        private readonly ManualResetEventSlim _release = new(false);
+        internal TaskCompletionSource<object?> Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal BlockingReadStream(byte[] content) : base(content, writable: false) { }
+
+        internal void Release() => _release.Set();
+
+        public override int Read(byte[] buffer, int offset, int count) {
+            Started.TrySetResult(null);
+            _release.Wait();
+            return base.Read(buffer, offset, count);
+        }
+    }
+
+    [Fact]
+    public async Task SharedReadBudget_SerializesReservationsAndRefundsUnusedBytes() {
+        var operation = new SharedReadBudget(2);
+        var firstSource = new BlockingReadStream(new byte[] { 1 });
+        using var first = new SharedBudgetReadStream(
+            firstSource,
+            new SharedReadBudget(2),
+            operation);
+        using var second = new SharedBudgetReadStream(
+            new MemoryStream(new byte[] { 2 }),
+            new SharedReadBudget(2),
+            operation);
+        var firstBuffer = new byte[2];
+        var secondBuffer = new byte[1];
+
+        Task<int> firstRead = Task.Run(() => first.Read(firstBuffer, 0, firstBuffer.Length));
+        await firstSource.Started.Task;
+        Task<int> secondRead = Task.Run(() => second.Read(secondBuffer, 0, secondBuffer.Length));
+        Assert.False(secondRead.IsCompleted);
+
+        firstSource.Release();
+        Assert.Equal(1, await firstRead);
+        Assert.Equal(1, await secondRead);
+        Assert.Equal((byte)2, secondBuffer[0]);
+    }
+
+    [Fact]
+    public async Task SearchDmarcReportsAsync_PropagatesCallerCancellationFromParallelPop3Workers() {
+        using var client = new CancelablePop3Client();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            MailboxSearcher.SearchDmarcReportsAsync(
+                client,
+                new DmarcReportInspectionOptions(),
+                parallelDownloadLimit: 2,
+                cancellationToken: cancellation.Token));
+    }
+
+    [Fact]
+    public async Task SearchDmarcReportsAsync_StopsAtConfiguredMessageScanLimit() {
+        var now = DateTimeOffset.UtcNow;
+        using var client = new TrackingPop3Client(new[] {
+            CreateDmarc("one.example", now),
+            CreateDmarc("two.example", now),
+            CreateDmarc("three.example", now)
+        });
+        var options = new DmarcReportInspectionOptions { MaxMessagesScanned = 1 };
+
+        IList<DmarcReport> reports = await MailboxSearcher.SearchDmarcReportsAsync(
+            client,
+            options,
+            parallelDownloadLimit: 1);
+
+        Assert.Single(reports);
+        Assert.Equal(1, client.FetchCount);
+    }
+
+    [Fact]
+    public void DmarcMimeDownloadBudget_RejectsPerMessageAndAggregateOverruns() {
+        var budget = new DmarcMimeDownloadBudget(maxBytesPerMessage: 5, maxTotalBytes: 7);
+        ITransferProgress first = budget.CreateTransferProgress();
+        first.Report(5, 5);
+        ITransferProgress second = budget.CreateTransferProgress();
+
+        Assert.Throws<InvalidDataException>(() => second.Report(3, 3));
+        Assert.Throws<InvalidDataException>(() =>
+            budget.CreateTransferProgress().Report(6, 6));
+    }
+
     [Fact]
     public void FilterDmarcReports_ExtractsAttachments() {
         var now = DateTimeOffset.UtcNow;

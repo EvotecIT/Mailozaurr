@@ -158,7 +158,7 @@ internal static partial class CliCommandModel {
         "client-id" => "OAuth client or application identifier.",
         "client-secret-env" => "Environment variable containing the client secret.",
         "client-secret-ref" => "Stored client-secret reference.",
-        "allow-cross-profile-secret-ref" => "Explicitly allow compatible same-name secret references from another profile.",
+        "allow-cross-profile-secret-ref" => "Compatibility option. Cross-profile secret references remain rejected until typed audience policy is available.",
         "client-secret-stdin" => "Read the client secret from standard input.",
         "compact" => "Return the compact response projection.",
         "confirm-token" => "Confirmation token from the matching preview.",

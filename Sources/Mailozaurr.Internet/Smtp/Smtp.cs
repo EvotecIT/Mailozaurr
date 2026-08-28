@@ -490,7 +490,11 @@ public partial class Smtp {
             return;
         }
 
-        var (html, images) = HtmlUtils.ExtractLocalImages(HtmlBody);
+        var (html, images) = HtmlUtils.ExtractLocalImages(
+            HtmlBody,
+            InlineAttachments?
+                .Select(descriptor => descriptor.ContentId ?? string.Empty)
+                ?? Enumerable.Empty<string>());
         HtmlBody = html;
         if (images.Count <= 0) {
             return;
@@ -989,6 +993,7 @@ public partial class Smtp {
     /// Releases the SMTP connection and associated resources.
     /// </summary>
     public void Dispose() {
+        AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
         var clientToDispose = Client;
         if (Client.IsConnected) {
             if (IsConnectionPoolingEnabled) {

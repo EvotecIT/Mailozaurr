@@ -94,7 +94,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
             throw new InvalidOperationException("Credential is required for SendGrid processing.");
         }
         var logCollector = new LogCollector();
-        SendGridClient sendGrid = new SendGridClient();
+        using SendGridClient sendGrid = new SendGridClient();
         sendGrid.LogCollector = logCollector;
         sendGrid.From = Helpers.GetFromObject(fromEmail, fromName);
         if (Bcc != null) sendGrid.Bcc = Bcc.ToList();

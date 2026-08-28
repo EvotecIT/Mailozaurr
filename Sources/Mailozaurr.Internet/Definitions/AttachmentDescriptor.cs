@@ -359,6 +359,18 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
     ~StreamAttachmentDescriptor() => Dispose(disposing: false);
 }
 
+internal static class AttachmentDescriptorLifetime {
+    internal static void ReleaseStaging(params IEnumerable<AttachmentDescriptor>?[] collections) {
+        var released = new HashSet<StreamAttachmentDescriptor>();
+        foreach (IEnumerable<AttachmentDescriptor>? collection in collections) {
+            if (collection == null) continue;
+            foreach (StreamAttachmentDescriptor descriptor in collection.OfType<StreamAttachmentDescriptor>()) {
+                if (released.Add(descriptor)) descriptor.Dispose();
+            }
+        }
+    }
+}
+
 /// <summary>
 /// Descriptor that sources attachment content from a byte array.
 /// </summary>

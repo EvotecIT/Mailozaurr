@@ -29,7 +29,7 @@ public class GraphChunkSizeLimitTests {
         Assert.NotNull(method);
         List<StreamContent> chunks = (List<StreamContent>)method!.Invoke(
             graph,
-            new object[] { tmp, graph.ChunkSize * 2, default(System.Threading.CancellationToken) })!;
+            new object[] { tmp, (long)fileSize, graph.ChunkSize * 2, default(System.Threading.CancellationToken) })!;
         File.Delete(tmp);
         Assert.Equal(2, chunks.Count);
         byte[] chunk0 = await chunks[0].ReadAsByteArrayAsync();

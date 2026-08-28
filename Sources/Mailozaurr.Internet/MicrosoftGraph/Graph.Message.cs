@@ -70,7 +70,11 @@ public partial class Graph {
                          string.Equals(HTML, _autoEmbedRenderedHtml, StringComparison.Ordinal)
             ? _autoEmbedOriginalHtml ?? HTML
             : HTML;
-        var (renderedHtml, images) = HtmlUtils.ExtractLocalImages(sourceHtml);
+        var (renderedHtml, images) = HtmlUtils.ExtractLocalImages(
+            sourceHtml,
+            ConvertedAttachments
+                .Where(attachment => attachment.IsInline)
+                .Select(attachment => attachment.ContentId ?? string.Empty));
         _autoEmbedOriginalHtml = sourceHtml;
         _autoEmbedRenderedHtml = renderedHtml;
         _autoEmbeddedImages.Clear();

@@ -13,6 +13,8 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Mailozaurr.DmarcReports;
+
 namespace Mailozaurr;
 
 public static partial class MicrosoftGraphUtils {
@@ -363,6 +365,56 @@ public static partial class MicrosoftGraphUtils {
             response.EnsureSuccessStatusCode();
             using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
             return await MimeMessage.LoadAsync(stream, cancellationToken).ConfigureAwait(false);
+        } finally {
+            ConcurrencySemaphore.Release();
+        }
+    }
+
+    internal static async Task<BoundedMimeMessage> GetMailMessageMimeBoundedAsync(
+        GraphCredential credential,
+        string userPrincipalName,
+        string messageId,
+        long maxBytes,
+        CancellationToken cancellationToken = default) {
+        if (maxBytes <= 0 || maxBytes > int.MaxValue) throw new ArgumentOutOfRangeException(nameof(maxBytes));
+        var token = await ConnectO365GraphAsync(
+            credential,
+            credential.DirectoryId,
+            "https://graph.microsoft.com",
+            cancellationToken).ConfigureAwait(false);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"https://graph.microsoft.com/v1.0/users/{userPrincipalName}/messages/{messageId}/$value");
+        request.Headers.TryAddWithoutValidation("Authorization", token);
+        await ConcurrencySemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try {
+            using var response = await HttpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            if (response.Content.Headers.ContentLength is long declared && declared > maxBytes) {
+                throw new InvalidDataException($"Graph MIME message exceeded the {maxBytes} byte limit.");
+            }
+#if NET5_0_OR_GREATER
+            await using Stream source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+#else
+            using Stream source = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+#endif
+            using var buffer = new MemoryStream((int)Math.Min(maxBytes, 64L * 1024L));
+            var chunk = new byte[81920];
+            while (true) {
+                int read = await source.ReadAsync(chunk, 0, chunk.Length, cancellationToken).ConfigureAwait(false);
+                if (read == 0) break;
+                if (buffer.Length + read > maxBytes) {
+                    throw new InvalidDataException($"Graph MIME message exceeded the {maxBytes} byte limit.");
+                }
+                buffer.Write(chunk, 0, read);
+            }
+            long byteCount = buffer.Length;
+            buffer.Position = 0;
+            MimeMessage message = await MimeMessage.LoadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            return new BoundedMimeMessage(message, byteCount);
         } finally {
             ConcurrencySemaphore.Release();
         }

@@ -21,7 +21,7 @@ public class GraphUploadRangeTests {
             BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.NotNull(method);
         var nonNullMethod = method!;
-        List<StreamContent> chunks = (List<StreamContent>)nonNullMethod.Invoke(graph, new object[] { tmp, 10, CancellationToken.None })!;
+        List<StreamContent> chunks = (List<StreamContent>)nonNullMethod.Invoke(graph, new object[] { tmp, 25L, 10, CancellationToken.None })!;
         File.Delete(tmp);
         Assert.Equal(3, chunks.Count);
         Assert.Equal("bytes 0-9/25", chunks[0].Headers.GetValues("Content-Range").First());
@@ -42,7 +42,7 @@ public class GraphUploadRangeTests {
         var nonNullMethod = method!;
         List<StreamContent> chunks = (List<StreamContent>)nonNullMethod.Invoke(
             graph,
-            new object[] { tmp, 10, CancellationToken.None })!;
+            new object[] { tmp, 25L, 10, CancellationToken.None })!;
         File.Delete(tmp);
         byte[] chunk0 = await chunks[0].ReadAsByteArrayAsync();
         byte[] chunk1 = await chunks[1].ReadAsByteArrayAsync();
@@ -67,7 +67,7 @@ public class GraphUploadRangeTests {
             BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.NotNull(method);
         var nonNullMethod = method!;
-        List<StreamContent> chunks = (List<StreamContent>)nonNullMethod.Invoke(graph, new object[] { tmp, Graph.MaxChunkSize * 2, CancellationToken.None })!;
+        List<StreamContent> chunks = (List<StreamContent>)nonNullMethod.Invoke(graph, new object[] { tmp, (long)fileSize, Graph.MaxChunkSize * 2, CancellationToken.None })!;
         File.Delete(tmp);
         Assert.Equal(2, chunks.Count);
         Assert.Equal($"bytes 0-{Graph.MaxChunkSize - 1}/{fileSize}", chunks[0].Headers.GetValues("Content-Range").First());

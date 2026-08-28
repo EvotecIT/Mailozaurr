@@ -560,6 +560,7 @@ public sealed class SendGridClient : IDisposable {
             return;
         }
 
+        if (disposing) AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
         if (disposing && _ownsClient) {
             _client.Dispose();
         }

@@ -224,6 +224,9 @@ public partial class ClientSmtp : SmtpClient {
             var (html, images) = await HtmlUtils.DownloadRemoteImagesAsync(
                 htmlBody,
                 RemoteImageDownloadOptions,
+                bodyBuilder.LinkedResources
+                    .OfType<MimePart>()
+                    .Select(part => part.ContentId ?? string.Empty),
                 cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             bodyBuilder.HtmlBody = html;

@@ -1,0 +1,285 @@
+using Microsoft.Win32.SafeHandles;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+
+namespace Mailozaurr;
+
+/// <summary>Binds attachment creation and commit to a validated directory object.</summary>
+internal sealed class AttachmentDirectoryLease : IDisposable {
+    private const uint FileReadAttributes = 0x80;
+    private const uint OpenExisting = 3;
+    private const uint FileFlagBackupSemantics = 0x02000000;
+    private const uint FileFlagOpenReparsePoint = 0x00200000;
+    private const int AtSymlinkNoFollow = 0x100;
+    private readonly List<SafeFileHandle> _windowsHandles = new();
+    private SafeFileHandle? _unixDirectory;
+
+    private AttachmentDirectoryLease(string directoryPath) => DirectoryPath = directoryPath;
+
+    internal string DirectoryPath { get; }
+    internal bool UsesNativeRelativePaths => !RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+
+    internal static AttachmentDirectoryLease Acquire(string directory) {
+        string fullPath = Path.GetFullPath(directory);
+        var lease = new AttachmentDirectoryLease(fullPath);
+        try {
+            if (lease.UsesNativeRelativePaths) lease.AcquireUnix();
+            else lease.AcquireWindows();
+            return lease;
+        } catch {
+            lease.Dispose();
+            throw;
+        }
+    }
+
+    internal FileStream CreateTemporaryFile(bool useAsync, out string path) {
+        using var random = RandomNumberGenerator.Create();
+        var bytes = new byte[16];
+        for (int attempt = 0; attempt < 128; attempt++) {
+            random.GetBytes(bytes);
+            string name = ".mailozaurr-attachment-" +
+                BitConverter.ToString(bytes).Replace("-", string.Empty).ToLowerInvariant() + ".tmp";
+            path = Path.Combine(DirectoryPath, name);
+            if (!UsesNativeRelativePaths) {
+                try {
+                    return new FileStream(
+                        path,
+                        FileMode.CreateNew,
+                        FileAccess.Write,
+                        FileShare.None,
+                        64 * 1024,
+                        FileOptions.WriteThrough | (useAsync ? FileOptions.Asynchronous : 0));
+                } catch (IOException) when (AttachmentFileStore.PathEntryExistsForLease(path)) {
+                    continue;
+                }
+            }
+
+            int fd = openat(
+                _unixDirectory!.DangerousGetHandle().ToInt32(),
+                name,
+                UnixOpenWriteFlags(),
+                Convert.ToUInt32("600", 8));
+            if (fd >= 0) {
+                var handle = new SafeFileHandle(new IntPtr(fd), ownsHandle: true);
+                // POSIX descriptors do not use Windows overlapped-I/O metadata. FileStream still
+                // provides its asynchronous API over this synchronous, directory-bound handle.
+                return new FileStream(handle, FileAccess.Write, 64 * 1024, isAsync: false);
+            }
+            if (Marshal.GetLastWin32Error() != 17) ThrowUnixIOException("create a temporary attachment file");
+        }
+        path = string.Empty;
+        throw new IOException("Unable to allocate a temporary attachment file.");
+    }
+
+    internal AttachmentFileSaveResult Commit(
+        string temporaryPath,
+        string destinationPath,
+        AttachmentFileConflictPolicy conflictPolicy) {
+        if (!UsesNativeRelativePaths) throw new InvalidOperationException("Native relative commit is only used on Unix.");
+        string temporaryName = Path.GetFileName(temporaryPath);
+        string destinationName = Path.GetFileName(destinationPath);
+        int directoryFd = _unixDirectory!.DangerousGetHandle().ToInt32();
+
+        switch (conflictPolicy) {
+            case AttachmentFileConflictPolicy.Fail:
+                LinkTemporary(directoryFd, temporaryName, destinationName);
+                return new AttachmentFileSaveResult(destinationPath, AttachmentFileSaveAction.Created);
+            case AttachmentFileConflictPolicy.Skip:
+                if (TryLinkTemporary(directoryFd, temporaryName, destinationName)) {
+                    return new AttachmentFileSaveResult(destinationPath, AttachmentFileSaveAction.Created);
+                }
+                RejectUnixSymbolicLink(directoryFd, destinationName);
+                return new AttachmentFileSaveResult(destinationPath, AttachmentFileSaveAction.Skipped);
+            case AttachmentFileConflictPolicy.Rename:
+                string extension = Path.GetExtension(destinationName);
+                string stem = Path.GetFileNameWithoutExtension(destinationName);
+                for (int suffix = 0; suffix < 10_000; suffix++) {
+                    string candidate = suffix == 0
+                        ? destinationName
+                        : stem + " (" + suffix.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")" + extension;
+                    if (!TryLinkTemporary(directoryFd, temporaryName, candidate)) {
+                        RejectUnixSymbolicLink(directoryFd, candidate);
+                        continue;
+                    }
+                    return new AttachmentFileSaveResult(
+                        Path.Combine(DirectoryPath, candidate),
+                        suffix == 0 ? AttachmentFileSaveAction.Created : AttachmentFileSaveAction.Renamed);
+                }
+                throw new IOException("No collision-free attachment filename was available.");
+            case AttachmentFileConflictPolicy.Replace:
+                RejectUnixSymbolicLink(directoryFd, destinationName, allowMissing: true);
+                if (renameat(directoryFd, temporaryName, directoryFd, destinationName) != 0) {
+                    ThrowUnixIOException("replace the attachment destination");
+                }
+                return new AttachmentFileSaveResult(
+                    destinationPath,
+                    AttachmentFileSaveAction.Replaced);
+            default:
+                throw new ArgumentOutOfRangeException(nameof(conflictPolicy));
+        }
+    }
+
+    internal void DeleteTemporary(string path) {
+        if (!UsesNativeRelativePaths) {
+            AttachmentFileStore.TryDeleteTemporaryFileForLease(path);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(path)) return;
+        unlinkat(_unixDirectory!.DangerousGetHandle().ToInt32(), Path.GetFileName(path), 0);
+    }
+
+    private void AcquireWindows() {
+        string root = Path.GetPathRoot(DirectoryPath)
+            ?? throw new IOException("Attachment directory has no filesystem root.");
+        string current = root;
+        OpenWindowsDirectory(current);
+        string relative = DirectoryPath.Substring(root.Length);
+        foreach (string component in relative.Split(
+                     new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                     StringSplitOptions.RemoveEmptyEntries)) {
+            current = Path.Combine(current, component);
+            if (!Directory.Exists(current)) {
+                Directory.CreateDirectory(current);
+                UnixFilePermissions.RestrictDirectory(current);
+            }
+            OpenWindowsDirectory(current);
+        }
+    }
+
+    private void OpenWindowsDirectory(string path) {
+        SafeFileHandle handle = CreateFileW(
+            path,
+            FileReadAttributes,
+            FileShare.Read | FileShare.Write,
+            IntPtr.Zero,
+            OpenExisting,
+            FileFlagBackupSemantics | FileFlagOpenReparsePoint,
+            IntPtr.Zero);
+        if (handle.IsInvalid) {
+            handle.Dispose();
+            throw new IOException($"Unable to bind attachment directory '{path}'.", new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()));
+        }
+        if (!GetFileInformationByHandle(handle, out ByHandleFileInformation information) ||
+            (information.FileAttributes & FileAttributes.Directory) == 0 ||
+            (information.FileAttributes & FileAttributes.ReparsePoint) != 0) {
+            handle.Dispose();
+            throw new IOException("Attachment destination directories cannot be symbolic links or reparse points.");
+        }
+        _windowsHandles.Add(handle);
+    }
+
+    private void AcquireUnix() {
+        int flags = UnixOpenDirectoryFlags();
+        int current = open("/", flags);
+        if (current < 0) ThrowUnixIOException("open the filesystem root");
+        var currentHandle = new SafeFileHandle(new IntPtr(current), ownsHandle: true);
+        try {
+            foreach (string component in DirectoryPath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries)) {
+                int next = openat(currentHandle.DangerousGetHandle().ToInt32(), component, flags, 0);
+                if (next < 0 && Marshal.GetLastWin32Error() == 2) {
+                    if (mkdirat(
+                            currentHandle.DangerousGetHandle().ToInt32(),
+                            component,
+                            Convert.ToUInt32("700", 8)) != 0 && Marshal.GetLastWin32Error() != 17) {
+                        ThrowUnixIOException("create an attachment directory");
+                    }
+                    next = openat(currentHandle.DangerousGetHandle().ToInt32(), component, flags, 0);
+                }
+                if (next < 0) ThrowUnixIOException("open an attachment directory without following links");
+                var nextHandle = new SafeFileHandle(new IntPtr(next), ownsHandle: true);
+                currentHandle.Dispose();
+                currentHandle = nextHandle;
+            }
+            _unixDirectory = currentHandle;
+            currentHandle = null!;
+        } finally {
+            currentHandle?.Dispose();
+        }
+    }
+
+    private static bool TryLinkTemporary(int directoryFd, string temporaryName, string destinationName) {
+        if (linkat(directoryFd, temporaryName, directoryFd, destinationName, 0) == 0) {
+            if (unlinkat(directoryFd, temporaryName, 0) != 0) ThrowUnixIOException("remove a committed temporary attachment link");
+            return true;
+        }
+        int error = Marshal.GetLastWin32Error();
+        if (error == 17) return false;
+        ThrowUnixIOException("commit an attachment file");
+        return false;
+    }
+
+    private static void LinkTemporary(int directoryFd, string temporaryName, string destinationName) {
+        if (!TryLinkTemporary(directoryFd, temporaryName, destinationName)) {
+            throw new IOException("The attachment destination already exists.");
+        }
+    }
+
+    private static void RejectUnixSymbolicLink(int directoryFd, string name, bool allowMissing = false) {
+        var buffer = new byte[1];
+        long result = readlinkat(directoryFd, name, buffer, new UIntPtr(1));
+        if (result >= 0) {
+            throw new IOException("Attachment destinations cannot be symbolic links or reparse points.");
+        }
+        int error = Marshal.GetLastWin32Error();
+        if (error == 22 || allowMissing && error == 2) return;
+        if (error == 2) return;
+        ThrowUnixIOException("inspect an attachment destination without following links");
+    }
+
+    private static int UnixOpenDirectoryFlags() => RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+        ? 0x100000 | 0x100 | 0x1000000
+        : 0x10000 | 0x20000 | 0x80000;
+
+    private static int UnixOpenWriteFlags() => RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+        ? 0x0001 | 0x0200 | 0x0800 | 0x0100 | 0x1000000
+        : 0x0001 | 0x0040 | 0x0080 | 0x20000 | 0x80000;
+
+    private static void ThrowUnixIOException(string operation) =>
+        throw new IOException($"Unable to {operation} (errno {Marshal.GetLastWin32Error()}).");
+
+    public void Dispose() {
+        _unixDirectory?.Dispose();
+        _unixDirectory = null;
+        foreach (SafeFileHandle handle in _windowsHandles) handle.Dispose();
+        _windowsHandles.Clear();
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern SafeFileHandle CreateFileW(
+        string fileName,
+        uint desiredAccess,
+        FileShare shareMode,
+        IntPtr securityAttributes,
+        uint creationDisposition,
+        uint flagsAndAttributes,
+        IntPtr templateFile);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetFileInformationByHandle(
+        SafeFileHandle file,
+        out ByHandleFileInformation information);
+
+    [DllImport("libc", SetLastError = true)] private static extern int open(string path, int flags);
+    [DllImport("libc", SetLastError = true)] private static extern int openat(int directoryFd, string path, int flags, uint mode);
+    [DllImport("libc", SetLastError = true)] private static extern int mkdirat(int directoryFd, string path, uint mode);
+    [DllImport("libc", SetLastError = true)] private static extern int linkat(int oldDirectoryFd, string oldPath, int newDirectoryFd, string newPath, int flags);
+    [DllImport("libc", SetLastError = true)] private static extern int unlinkat(int directoryFd, string path, int flags);
+    [DllImport("libc", SetLastError = true)] private static extern int renameat(int oldDirectoryFd, string oldPath, int newDirectoryFd, string newPath);
+    [DllImport("libc", SetLastError = true)] private static extern long readlinkat(int directoryFd, string path, byte[] buffer, UIntPtr bufferSize);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ByHandleFileInformation {
+        internal FileAttributes FileAttributes;
+        private readonly System.Runtime.InteropServices.ComTypes.FILETIME _creationTime;
+        private readonly System.Runtime.InteropServices.ComTypes.FILETIME _lastAccessTime;
+        private readonly System.Runtime.InteropServices.ComTypes.FILETIME _lastWriteTime;
+        private readonly uint _volumeSerialNumber;
+        private readonly uint _fileSizeHigh;
+        private readonly uint _fileSizeLow;
+        private readonly uint _numberOfLinks;
+        private readonly uint _fileIndexHigh;
+        private readonly uint _fileIndexLow;
+    }
+
+}

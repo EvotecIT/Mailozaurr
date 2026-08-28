@@ -71,6 +71,23 @@ public class HtmlUtilsTests {
     }
 
     [Fact]
+    public void ExtractLocalImages_AvoidsContentIdsAlreadyUsedByTheMessage() {
+        string file = Path.Combine(Path.GetTempPath(), "logo.png");
+        File.WriteAllBytes(file, new byte[] { 1 });
+        try {
+            var (rendered, images) = HtmlUtils.ExtractLocalImages(
+                $"<img src='{file}'>",
+                new[] { "logo.png" });
+
+            HtmlUtils.LocalImage image = Assert.Single(images);
+            Assert.False(string.Equals("logo.png", image.ContentId, StringComparison.OrdinalIgnoreCase));
+            Assert.Contains("cid:" + image.ContentId, rendered, StringComparison.Ordinal);
+        } finally {
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
     public async Task DownloadRemoteImagesAsync_ReplacesOnlySrcValuesAsync() {
         const string url = "https://example.com/img.png";
         var html = $"<img src=\"{url}\"><p>{url}</p>";
@@ -195,7 +212,10 @@ public class HtmlUtilsTests {
         };
         var handler = new RecordingHandler(redirect);
         await WithHandlerAsync(handler, async () => {
-            var (result, images) = await HtmlUtils.DownloadRemoteImagesAsync($"<img src=\"{source}\">");
+            var options = new RemoteImageDownloadOptions { AllowUnpinnedDnsResolution = true };
+            var (result, images) = await HtmlUtils.DownloadRemoteImagesAsync(
+                $"<img src=\"{source}\">",
+                options);
 
             Assert.Contains(source, result, StringComparison.Ordinal);
             Assert.Empty(images);
@@ -250,6 +270,29 @@ public class HtmlUtilsTests {
     }
 
     [Fact]
+    public async Task DownloadRemoteImagesAsync_KeepsCaseDistinctPathsDistinctAndAvoidsReservedIds() {
+        const string first = "https://example.com/Logo.png";
+        const string second = "https://example.com/logo.png";
+        var handler = new RecordingHandler(
+            ImageResponse(new byte[] { 1 }),
+            ImageResponse(new byte[] { 2 }));
+        await WithHandlerAsync(handler, async () => {
+            var (result, images) = await HtmlUtils.DownloadRemoteImagesAsync(
+                $"<img src=\"{first}\"><img src=\"{second}\">",
+                TrustedTestOptions(),
+                new[] { "Logo.png" });
+
+            Assert.Equal(2, images.Count);
+            Assert.Equal(2, handler.Requests.Count);
+            Assert.All(images, image =>
+                Assert.False(string.Equals("Logo.png", image.ContentId, StringComparison.OrdinalIgnoreCase)));
+            Assert.Equal(2, images.Select(image => image.ContentId).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.DoesNotContain(first, result, StringComparison.Ordinal);
+            Assert.DoesNotContain(second, result, StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
     public async Task DownloadRemoteImagesAsync_EnforcesTheAggregateBudgetAcrossImages() {
         const string first = "https://one.example/first.png";
         const string second = "https://two.example/second.png";
@@ -290,6 +333,20 @@ public class HtmlUtilsTests {
     public void Remote_address_policy_distinguishes_public_destinations(string value, bool expected) =>
         Assert.Equal(expected, RemoteImageDownloader.IsPublicAddress(IPAddress.Parse(value)));
 
+    [Fact]
+    public void SecureRemoteImageTransport_IsPinnedOnSupportedRuntimesAndFailsClosedElsewhere() {
+        var options = new RemoteImageDownloadOptions();
+        using HttpClient? client = RemoteImageDownloader.CreatePinnedClient(options);
+#if NET8_0_OR_GREATER
+        Assert.NotNull(client);
+        var handler = (HttpMessageHandler)GetHandlerField().GetValue(client!)!;
+        var socketsHandler = Assert.IsType<SocketsHttpHandler>(handler);
+        Assert.NotNull(socketsHandler.ConnectCallback);
+#else
+        Assert.Null(client);
+#endif
+    }
+
     private static RemoteImageDownloadOptions TrustedTestOptions() => new() {
         AllowPrivateNetworkAddresses = true
     };
@@ -312,4 +369,9 @@ public class HtmlUtilsTests {
             handlerField.SetValue(client, original);
         }
     }
+
+    private static FieldInfo GetHandlerField() =>
+        typeof(HttpMessageInvoker).GetField("_handler", BindingFlags.Instance | BindingFlags.NonPublic)
+        ?? typeof(HttpMessageInvoker).GetField("handler", BindingFlags.Instance | BindingFlags.NonPublic)
+        ?? throw new InvalidOperationException("HttpClient handler field not found.");
 }

@@ -16,6 +16,15 @@ public sealed class DmarcReportInspectionOptions {
     /// <summary>Default maximum number of entries accepted in one ZIP attachment.</summary>
     public const int DefaultMaxArchiveEntriesPerAttachment = 100;
 
+    /// <summary>Default maximum number of candidate mailbox messages inspected by one search.</summary>
+    public const int DefaultMaxMessagesScanned = 1000;
+
+    /// <summary>Default maximum downloaded MIME bytes for one candidate message.</summary>
+    public const long DefaultMaxMimeBytesPerMessage = 25L * 1024 * 1024;
+
+    /// <summary>Default maximum downloaded MIME bytes across one search.</summary>
+    public const long DefaultMaxTotalMimeBytes = 100L * 1024 * 1024;
+
     /// <summary>Maximum expanded bytes inspected for one attachment.</summary>
     public long MaxUncompressedBytesPerAttachment { get; set; } = DefaultMaxUncompressedBytesPerAttachment;
 
@@ -27,6 +36,15 @@ public sealed class DmarcReportInspectionOptions {
 
     /// <summary>Maximum number of entries accepted in one ZIP attachment.</summary>
     public int MaxArchiveEntriesPerAttachment { get; set; } = DefaultMaxArchiveEntriesPerAttachment;
+
+    /// <summary>Maximum number of candidate mailbox messages inspected by one search.</summary>
+    public int MaxMessagesScanned { get; set; } = DefaultMaxMessagesScanned;
+
+    /// <summary>Maximum downloaded MIME bytes for one candidate message.</summary>
+    public long MaxMimeBytesPerMessage { get; set; } = DefaultMaxMimeBytesPerMessage;
+
+    /// <summary>Maximum downloaded MIME bytes across the complete search operation.</summary>
+    public long MaxTotalMimeBytes { get; set; } = DefaultMaxTotalMimeBytes;
 
     internal DmarcReportInspectionPolicy CreatePolicy() {
         if (MaxUncompressedBytesPerAttachment <= 0) {
@@ -46,12 +64,22 @@ public sealed class DmarcReportInspectionOptions {
         if (MaxArchiveEntriesPerAttachment <= 0) {
             throw new ArgumentOutOfRangeException(nameof(MaxArchiveEntriesPerAttachment));
         }
+        if (MaxMessagesScanned <= 0) throw new ArgumentOutOfRangeException(nameof(MaxMessagesScanned));
+        if (MaxMimeBytesPerMessage <= 0) throw new ArgumentOutOfRangeException(nameof(MaxMimeBytesPerMessage));
+        if (MaxTotalMimeBytes < MaxMimeBytesPerMessage) {
+            throw new ArgumentException(
+                $"{nameof(MaxTotalMimeBytes)} must be greater than or equal to {nameof(MaxMimeBytesPerMessage)}.",
+                nameof(MaxTotalMimeBytes));
+        }
 
         return new DmarcReportInspectionPolicy(
             MaxUncompressedBytesPerAttachment,
             MaxTotalUncompressedBytes,
             MaxAttachmentsPerMessage,
-            MaxArchiveEntriesPerAttachment);
+            MaxArchiveEntriesPerAttachment,
+            MaxMessagesScanned,
+            MaxMimeBytesPerMessage,
+            MaxTotalMimeBytes);
     }
 
     internal static DmarcReportInspectionOptions FromLegacyLimit(long maxUncompressedSize) {
@@ -71,15 +99,24 @@ internal readonly struct DmarcReportInspectionPolicy {
         long maxUncompressedBytesPerAttachment,
         long maxTotalUncompressedBytes,
         int maxAttachmentsPerMessage,
-        int maxArchiveEntriesPerAttachment) {
+        int maxArchiveEntriesPerAttachment,
+        int maxMessagesScanned,
+        long maxMimeBytesPerMessage,
+        long maxTotalMimeBytes) {
         MaxUncompressedBytesPerAttachment = maxUncompressedBytesPerAttachment;
         MaxTotalUncompressedBytes = maxTotalUncompressedBytes;
         MaxAttachmentsPerMessage = maxAttachmentsPerMessage;
         MaxArchiveEntriesPerAttachment = maxArchiveEntriesPerAttachment;
+        MaxMessagesScanned = maxMessagesScanned;
+        MaxMimeBytesPerMessage = maxMimeBytesPerMessage;
+        MaxTotalMimeBytes = maxTotalMimeBytes;
     }
 
     internal long MaxUncompressedBytesPerAttachment { get; }
     internal long MaxTotalUncompressedBytes { get; }
     internal int MaxAttachmentsPerMessage { get; }
     internal int MaxArchiveEntriesPerAttachment { get; }
+    internal int MaxMessagesScanned { get; }
+    internal long MaxMimeBytesPerMessage { get; }
+    internal long MaxTotalMimeBytes { get; }
 }
