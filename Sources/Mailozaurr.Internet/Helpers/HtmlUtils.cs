@@ -12,7 +12,9 @@ namespace Mailozaurr;
 /// performing minor HTML transformations.
 /// </remarks>
 public static class HtmlUtils {
-    internal static HttpClient HttpClient { get; } = new HttpClient();
+    internal static HttpClient HttpClient { get; } = new HttpClient(new HttpClientHandler {
+        AllowAutoRedirect = false
+    });
 
     private static readonly Regex ImageSrcRegex = new("(?<=<img[^>]+src=[\"'])([^\"']+)(?=[\"'])", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -66,35 +68,64 @@ public static class HtmlUtils {
     /// <param name="html">HTML content to inspect.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     /// <returns>Modified HTML and list of downloaded images.</returns>
-    public static async Task<(string Html, List<RemoteImage> Images)> DownloadRemoteImagesAsync(string html, CancellationToken cancellationToken = default) {
+    public static Task<(string Html, List<RemoteImage> Images)> DownloadRemoteImagesAsync(
+        string html,
+        CancellationToken cancellationToken = default) =>
+        DownloadRemoteImagesAsync(html, new RemoteImageDownloadOptions(), cancellationToken);
+
+    /// <summary>Downloads safe, bounded remote images and replaces their sources with cid links.</summary>
+    /// <param name="html">HTML content to inspect.</param>
+    /// <param name="options">Network and resource policy for remote image retrieval.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    /// <returns>Modified HTML and list of downloaded images.</returns>
+    public static async Task<(string Html, List<RemoteImage> Images)> DownloadRemoteImagesAsync(
+        string html,
+        RemoteImageDownloadOptions options,
+        CancellationToken cancellationToken = default) {
+        if (options == null) throw new ArgumentNullException(nameof(options));
+        options.Validate();
         var images = new List<RemoteImage>();
         if (string.IsNullOrWhiteSpace(html)) return (html, images);
 
         var matches = ImageSrcRegex.Matches(html);
         var replacements = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var allocatedContentIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        long totalBytes = 0;
+        int attemptedImages = 0;
 
         foreach (Match match in matches) {
             var url = match.Value;
             if (string.IsNullOrWhiteSpace(url)) continue;
-            if (!url.StartsWith("http", StringComparison.OrdinalIgnoreCase)) continue;
             if (replacements.ContainsKey(url)) continue;
+            if (attemptedImages >= options.MaxImageCount) break;
+            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? sourceUri)
+                || !(string.Equals(sourceUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+                    || options.AllowHttp && string.Equals(sourceUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))) {
+                continue;
+            }
+            attemptedImages++;
             try {
-                using var response = await HttpClient.GetAsync(url, cancellationToken).ConfigureAwait(false);
-                if (!response.IsSuccessStatusCode) continue;
-#if NETFRAMEWORK || NETSTANDARD2_0
-                var data = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
-#else
-                var data = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-#endif
-                var mediaType = response.Content.Headers.ContentType?.MediaType ?? MimeTypes.GetMimeType(Path.GetFileName(url));
-                var fileName = Path.GetFileName(new Uri(url).AbsolutePath);
-                if (string.IsNullOrEmpty(fileName)) fileName = Guid.NewGuid().ToString("N");
-                replacements[url] = $"cid:{fileName}";
-                images.Add(new RemoteImage { ContentId = fileName, Data = data, MediaType = mediaType });
+                RemoteImageDownloader.DownloadResult? downloaded = await RemoteImageDownloader.DownloadAsync(
+                    url,
+                    options,
+                    options.MaxTotalBytes - totalBytes,
+                    HttpClient,
+                    cancellationToken).ConfigureAwait(false);
+                if (downloaded == null) continue;
+                string contentId = RemoteImageDownloader.CreateContentId(downloaded.Source, allocatedContentIds);
+                replacements[url] = $"cid:{contentId}";
+                images.Add(new RemoteImage {
+                    ContentId = contentId,
+                    Data = downloaded.Data,
+                    MediaType = downloaded.MediaType
+                });
+                totalBytes += downloaded.Data.LongLength;
+                if (totalBytes >= options.MaxTotalBytes) break;
             } catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested) {
                 throw new OperationCanceledException(ex.Message, ex, cancellationToken);
             } catch (Exception ex) {
-                LoggingMessages.Logger.WriteWarning($"Failed to download image '{url}': {ex.Message}");
+                LoggingMessages.Logger.WriteWarning(
+                    $"Failed to download a remote image from host '{sourceUri.Host}': {ex.Message}");
             }
         }
 

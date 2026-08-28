@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -75,7 +76,7 @@ public class HtmlUtilsTests {
         var original = (HttpMessageHandler)handlerField!.GetValue(client)!;
         handlerField.SetValue(client, handler);
         try {
-            var (result, images) = await HtmlUtils.DownloadRemoteImagesAsync(html);
+            var (result, images) = await HtmlUtils.DownloadRemoteImagesAsync(html, TrustedTestOptions());
 
             Assert.Contains("cid:img.png", result);
             Assert.Contains($"<p>{url}</p>", result);
@@ -101,8 +102,8 @@ public class HtmlUtilsTests {
         var original = (HttpMessageHandler)handlerField!.GetValue(client)!;
         handlerField.SetValue(client, handler);
         try {
-            await HtmlUtils.DownloadRemoteImagesAsync(html);
-            await HtmlUtils.DownloadRemoteImagesAsync(html);
+            await HtmlUtils.DownloadRemoteImagesAsync(html, TrustedTestOptions());
+            await HtmlUtils.DownloadRemoteImagesAsync(html, TrustedTestOptions());
 
             Assert.Equal(2, handler.Requests.Count);
             Assert.Same(handler, handlerField!.GetValue(HtmlUtils.HttpClient));
@@ -133,7 +134,7 @@ public class HtmlUtilsTests {
         var original = (HttpMessageHandler)handlerField!.GetValue(client)!;
         handlerField.SetValue(client, handler);
         try {
-            var (result, images) = await HtmlUtils.DownloadRemoteImagesAsync(html);
+            var (result, images) = await HtmlUtils.DownloadRemoteImagesAsync(html, TrustedTestOptions());
 
             Assert.Contains("cid:img.png", result);
             Assert.Contains("cid:photo.jpg", result);
@@ -154,5 +155,152 @@ public class HtmlUtilsTests {
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
             await HtmlUtils.DownloadRemoteImagesAsync("<img src=\"https://example.com/img.png\">", cts.Token));
+    }
+
+    [Theory]
+    [InlineData("https://127.0.0.1/image.png")]
+    [InlineData("https://10.0.0.1/image.png")]
+    [InlineData("https://169.254.169.254/latest/meta-data/")]
+    [InlineData("https://[::1]/image.png")]
+    [InlineData("https://[fd00::1]/image.png")]
+    public async Task DownloadRemoteImagesAsync_RejectsNonPublicDestinations(string url) {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new ByteArrayContent(new byte[] { 1 }) {
+                Headers = { ContentType = new MediaTypeHeaderValue("image/png") }
+            }
+        });
+        await WithHandlerAsync(handler, async () => {
+            var (result, images) = await HtmlUtils.DownloadRemoteImagesAsync($"<img src=\"{url}\">");
+
+            Assert.Contains(url, result, StringComparison.Ordinal);
+            Assert.Empty(images);
+            Assert.Empty(handler.Requests);
+        });
+    }
+
+    [Fact]
+    public async Task DownloadRemoteImagesAsync_ValidatesEveryRedirectDestination() {
+        const string source = "https://93.184.216.34/image.png";
+        var redirect = new HttpResponseMessage(HttpStatusCode.Redirect) {
+            Headers = { Location = new Uri("https://127.0.0.1/private.png") }
+        };
+        var handler = new RecordingHandler(redirect);
+        await WithHandlerAsync(handler, async () => {
+            var (result, images) = await HtmlUtils.DownloadRemoteImagesAsync($"<img src=\"{source}\">");
+
+            Assert.Contains(source, result, StringComparison.Ordinal);
+            Assert.Empty(images);
+            Assert.Single(handler.Requests);
+        });
+    }
+
+    [Fact]
+    public async Task DownloadRemoteImagesAsync_RejectsOversizedAndActiveContent() {
+        const string oversized = "https://example.com/large.png";
+        const string svg = "https://example.com/active.svg";
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.OK) {
+                Content = new ByteArrayContent(new byte[] { 1, 2, 3, 4 }) {
+                    Headers = { ContentType = new MediaTypeHeaderValue("image/png") }
+                }
+            },
+            new HttpResponseMessage(HttpStatusCode.OK) {
+                Content = new ByteArrayContent(Encoding.UTF8.GetBytes("<svg><script/></svg>")) {
+                    Headers = { ContentType = new MediaTypeHeaderValue("image/svg+xml") }
+                }
+            });
+        var options = TrustedTestOptions();
+        options.MaxImageBytes = 3;
+        await WithHandlerAsync(handler, async () => {
+            var (result, images) = await HtmlUtils.DownloadRemoteImagesAsync(
+                $"<img src=\"{oversized}\"><img src=\"{svg}\">",
+                options);
+
+            Assert.Contains(oversized, result, StringComparison.Ordinal);
+            Assert.Contains(svg, result, StringComparison.Ordinal);
+            Assert.Empty(images);
+        });
+    }
+
+    [Fact]
+    public async Task DownloadRemoteImagesAsync_AllocatesUniqueContentIdsForDuplicateFileNames() {
+        const string first = "https://one.example/image.png";
+        const string second = "https://two.example/image.png";
+        var handler = new RecordingHandler(
+            ImageResponse(new byte[] { 1 }),
+            ImageResponse(new byte[] { 2 }));
+        await WithHandlerAsync(handler, async () => {
+            var (result, images) = await HtmlUtils.DownloadRemoteImagesAsync(
+                $"<img src=\"{first}\"><img src=\"{second}\">",
+                TrustedTestOptions());
+
+            Assert.Equal(2, images.Count);
+            Assert.Equal(2, images.Select(image => image.ContentId).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.Contains("cid:image.png", result, StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
+    public async Task DownloadRemoteImagesAsync_EnforcesTheAggregateBudgetAcrossImages() {
+        const string first = "https://one.example/first.png";
+        const string second = "https://two.example/second.png";
+        var handler = new RecordingHandler(
+            ImageResponse(new byte[] { 1, 2 }),
+            ImageResponse(new byte[] { 3, 4 }));
+        var options = TrustedTestOptions();
+        options.MaxTotalBytes = 3;
+        await WithHandlerAsync(handler, async () => {
+            var (result, images) = await HtmlUtils.DownloadRemoteImagesAsync(
+                $"<img src=\"{first}\"><img src=\"{second}\">",
+                options);
+
+            var image = Assert.Single(images);
+            Assert.Equal(new byte[] { 1, 2 }, image.Data);
+            Assert.Contains("cid:first.png", result, StringComparison.Ordinal);
+            Assert.Contains(second, result, StringComparison.Ordinal);
+        });
+    }
+
+    [Theory]
+    [InlineData("127.0.0.1", false)]
+    [InlineData("10.2.3.4", false)]
+    [InlineData("172.31.255.255", false)]
+    [InlineData("192.168.1.1", false)]
+    [InlineData("100.100.0.1", false)]
+    [InlineData("169.254.1.1", false)]
+    [InlineData("192.0.2.1", false)]
+    [InlineData("198.18.0.1", false)]
+    [InlineData("198.51.100.1", false)]
+    [InlineData("203.0.113.1", false)]
+    [InlineData("::1", false)]
+    [InlineData("fe80::1", false)]
+    [InlineData("fd00::1", false)]
+    [InlineData("2001:db8::1", false)]
+    [InlineData("8.8.8.8", true)]
+    [InlineData("2606:4700:4700::1111", true)]
+    public void Remote_address_policy_distinguishes_public_destinations(string value, bool expected) =>
+        Assert.Equal(expected, RemoteImageDownloader.IsPublicAddress(IPAddress.Parse(value)));
+
+    private static RemoteImageDownloadOptions TrustedTestOptions() => new() {
+        AllowPrivateNetworkAddresses = true
+    };
+
+    private static HttpResponseMessage ImageResponse(byte[] content) => new(HttpStatusCode.OK) {
+        Content = new ByteArrayContent(content) {
+            Headers = { ContentType = new MediaTypeHeaderValue("image/png") }
+        }
+    };
+
+    private static async Task WithHandlerAsync(RecordingHandler handler, Func<Task> action) {
+        var client = HtmlUtils.HttpClient;
+        var handlerField = typeof(HttpMessageInvoker).GetField("_handler", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? typeof(HttpMessageInvoker).GetField("handler", BindingFlags.Instance | BindingFlags.NonPublic);
+        var original = (HttpMessageHandler)handlerField!.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        try {
+            await action();
+        } finally {
+            handlerField.SetValue(client, original);
+        }
     }
 }

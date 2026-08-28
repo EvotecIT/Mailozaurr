@@ -101,7 +101,12 @@ public class HtmlAutoEmbedImageTests {
         var original = (HttpMessageHandler)handlerField!.GetValue(client)!;
         handlerField.SetValue(client, handler);
         try {
-            var smtp = new Smtp { AutoEmbedRemoteImages = true };
+            var smtp = new Smtp {
+                AutoEmbedRemoteImages = true,
+                RemoteImageDownloadOptions = new RemoteImageDownloadOptions {
+                    AllowPrivateNetworkAddresses = true
+                }
+            };
             smtp.From = "a@b.com";
             smtp.To = new object[] { "c@d.com" };
             smtp.Subject = "test";

@@ -226,6 +226,12 @@ public partial class Smtp {
         set => Client.AutoEmbedRemoteImages = value;
     }
 
+    /// <summary>Security and resource limits used when downloading remote images.</summary>
+    public RemoteImageDownloadOptions RemoteImageDownloadOptions {
+        get => Client.RemoteImageDownloadOptions;
+        set => Client.RemoteImageDownloadOptions = value ?? throw new ArgumentNullException(nameof(value));
+    }
+
     /// <summary>
     /// Forces retries even when the encountered error is not considered
     /// transient. By default retries occur only for transient failures.
