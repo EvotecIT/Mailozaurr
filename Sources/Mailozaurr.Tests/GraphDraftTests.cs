@@ -85,6 +85,9 @@ public class GraphDraftTests {
         Assert.True(graph.IsLargerAttachment);
         Assert.Equal(2, graph.AttachmentsPlaceHolders.Count);
         Assert.All(graph.AttachmentsPlaceHolders, p => Assert.False(string.IsNullOrWhiteSpace(p.FileName)));
+        Assert.All(
+            graph.AttachmentsPlaceHolders.Where(p => string.IsNullOrEmpty(p.DirectAttachmentJson)),
+            p => Assert.NotEmpty(p.Content));
     }
 
     [Fact]
@@ -382,7 +385,7 @@ public class GraphDraftTests {
             Assert.Empty(graph.ConvertedAttachments);
             Assert.Equal(0, source.ReadCount);
 
-            await graph.PrepareAttachments();
+            await graph.PrepareAttachmentsForStreaming();
 
             var placeholder = Assert.Single(graph.AttachmentsPlaceHolders);
             Assert.Empty(placeholder.Content);

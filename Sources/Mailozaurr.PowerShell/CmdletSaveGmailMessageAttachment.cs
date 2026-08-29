@@ -72,6 +72,13 @@ public sealed class CmdletSaveGmailMessageAttachment : AsyncPSCmdlet {
                 fileName,
                 att.Id);
             if (!ShouldProcess(destinationPath, "Save Gmail message attachment")) continue;
+            AttachmentFileSaveResult? skipped = AttachmentFileStore.TryPreflightSkip(
+                destinationPath,
+                policy);
+            if (skipped != null) {
+                if (PassThru.IsPresent) WriteObject(skipped);
+                continue;
+            }
             var bytes = await client.DownloadAttachmentAsync(GmailAccount!, Id!, att.Id!, CancelToken);
             AttachmentFileSaveResult result = AttachmentFileStore.SaveToFile(
                 destinationPath,

@@ -419,7 +419,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
                 LogEmitter.EmitLogs(graph.LogCollector, this);
                 return;
             }
-            await graph.PrepareAttachments();
+            await graph.PrepareAttachmentsForStreaming();
             foreach (var attachment in graph.AttachmentsPlaceHolders) {
                 if (!string.IsNullOrEmpty(attachment.DirectAttachmentJson)) {
                     var attachmentUri = GraphDraftMessageUris.Attachments(graph.SentFrom, draftMessageId);

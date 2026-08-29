@@ -44,6 +44,31 @@ public sealed class AttachmentFileSaveResult {
 /// Canonical attachment filename, containment, collision, and atomic-write owner shared by providers.
 /// </summary>
 public static class AttachmentFileStore {
+    /// <summary>
+    /// Returns a completed Skip result when the destination already exists, without
+    /// invoking a provider download or content producer.
+    /// </summary>
+    internal static AttachmentFileSaveResult? TryPreflightSkip(
+        string outputPath,
+        AttachmentFileConflictPolicy conflictPolicy) {
+        if (conflictPolicy != AttachmentFileConflictPolicy.Skip) return null;
+        if (string.IsNullOrWhiteSpace(outputPath)) {
+            throw new ArgumentException("An output path is required.", nameof(outputPath));
+        }
+
+        string destinationPath = Path.GetFullPath(outputPath);
+        string directory = Path.GetDirectoryName(destinationPath)
+            ?? throw new InvalidOperationException("The output path has no parent directory.");
+        using var directoryLease = AttachmentDirectoryLease.Acquire(directory);
+        if (!directoryLease.UsesNativeRelativePaths) RejectReparsePoint(destinationPath);
+        bool exists = directoryLease.UsesNativeRelativePaths
+            ? directoryLease.TrySkipExisting(destinationPath)
+            : PathEntryExists(destinationPath);
+        return exists
+            ? new AttachmentFileSaveResult(destinationPath, AttachmentFileSaveAction.Skipped)
+            : null;
+    }
+
     /// <summary>Resolves a remote attachment name beneath an explicit destination directory.</summary>
     public static string ResolvePathInDirectory(
         string destinationDirectory,
@@ -157,9 +182,7 @@ public static class AttachmentFileStore {
         using var directoryLease = AttachmentDirectoryLease.Acquire(directory);
         if (!directoryLease.UsesNativeRelativePaths) RejectReparsePoint(destinationPath);
         if (conflictPolicy == AttachmentFileConflictPolicy.Skip &&
-            (directoryLease.UsesNativeRelativePaths
-                ? directoryLease.TrySkipExisting(destinationPath)
-                : PathEntryExists(destinationPath))) {
+            IsExistingSkipDestination(directoryLease, destinationPath)) {
             return new AttachmentFileSaveResult(destinationPath, AttachmentFileSaveAction.Skipped);
         }
 
@@ -197,9 +220,7 @@ public static class AttachmentFileStore {
         using var directoryLease = AttachmentDirectoryLease.Acquire(directory);
         if (!directoryLease.UsesNativeRelativePaths) RejectReparsePoint(destinationPath);
         if (conflictPolicy == AttachmentFileConflictPolicy.Skip &&
-            (directoryLease.UsesNativeRelativePaths
-                ? directoryLease.TrySkipExisting(destinationPath)
-                : PathEntryExists(destinationPath))) {
+            IsExistingSkipDestination(directoryLease, destinationPath)) {
             return new AttachmentFileSaveResult(destinationPath, AttachmentFileSaveAction.Skipped);
         }
 
@@ -219,6 +240,12 @@ public static class AttachmentFileStore {
             directoryLease.DeleteTemporary(temporaryPath);
         }
     }
+
+    private static bool IsExistingSkipDestination(
+        AttachmentDirectoryLease directoryLease,
+        string destinationPath) => directoryLease.UsesNativeRelativePaths
+        ? directoryLease.TrySkipExisting(destinationPath)
+        : PathEntryExists(destinationPath);
 
     private static AttachmentFileSaveResult CommitTemporaryFile(
         string temporaryPath,

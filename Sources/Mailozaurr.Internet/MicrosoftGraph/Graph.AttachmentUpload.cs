@@ -323,13 +323,29 @@ public partial class Graph {
     /// </summary>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     public async Task PrepareAttachments(CancellationToken cancellationToken = default) {
+        await PrepareAttachmentsCore(preloadFileAndDescriptorContent: true, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>Prepares placeholders whose reopenable sources are streamed on demand.</summary>
+    internal async Task PrepareAttachmentsForStreaming(CancellationToken cancellationToken = default) {
+        await PrepareAttachmentsCore(preloadFileAndDescriptorContent: false, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task PrepareAttachmentsCore(
+        bool preloadFileAndDescriptorContent,
+        CancellationToken cancellationToken) {
         AttachmentsPlaceHolders.Clear();
         foreach (var attachment in _deferredGraphAttachments) {
             AttachmentsPlaceHolders.Add(CreateGraphAttachment(attachment, preloadContent: true, cancellationToken));
         }
         foreach (var source in EnumerateFileAttachmentSources()) {
             try {
-                var attachmentItemJson = await CreateGraphAttachment(source, cancellationToken, preloadContent: false);
+                var attachmentItemJson = await CreateGraphAttachment(
+                    source,
+                    cancellationToken,
+                    preloadContent: preloadFileAndDescriptorContent).ConfigureAwait(false);
                 AttachmentsPlaceHolders.Add(attachmentItemJson);
             } catch (FileNotFoundException) {
                 // Already logged by CreateGraphAttachment.

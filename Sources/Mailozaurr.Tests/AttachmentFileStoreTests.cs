@@ -147,6 +147,27 @@ public sealed class AttachmentFileStoreTests {
     }
 
     [Fact]
+    public void Skip_preflight_returns_existing_result_before_provider_content_is_requested() {
+        string directory = CreateTestDirectory();
+        string destination = AttachmentFileStore.ResolvePathInDirectory(directory, "report.txt", "same");
+        File.WriteAllText(destination, "original");
+        try {
+            AttachmentFileSaveResult? result = AttachmentFileStore.TryPreflightSkip(
+                destination,
+                AttachmentFileConflictPolicy.Skip);
+
+            Assert.NotNull(result);
+            Assert.Equal(AttachmentFileSaveAction.Skipped, result.Action);
+            Assert.Equal(Path.GetFullPath(destination), result.Path);
+            Assert.Null(AttachmentFileStore.TryPreflightSkip(
+                destination,
+                AttachmentFileConflictPolicy.Replace));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Canceled_async_writers_leave_no_destination_or_staging_file() {
         string directory = CreateTestDirectory();
         using var cancellation = new CancellationTokenSource();
