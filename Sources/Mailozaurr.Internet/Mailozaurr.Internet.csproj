@@ -24,7 +24,7 @@
     <PackageTags>Windows;MacOS;Linux;Mail;Email;SMTP;IMAP;POP3;MIME;SendGrid;Mailgun;AmazonSES;DMARC;DKIM</PackageTags>
     <DefaultItemExcludes>$(DefaultItemExcludes);**/artifacts/**;**/Artifacts/**</DefaultItemExcludes>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <OfficeIMOVersion>3.2.6</OfficeIMOVersion>
+    <OfficeIMOVersion>3.2.7</OfficeIMOVersion>
     <OfficeIMORoot Condition=" '$(OfficeIMORoot)' == '' ">..\..\..\OfficeIMO</OfficeIMORoot>
     <UseOfficeIMOProjectReferences Condition=" '$(UseOfficeIMOProjectReferences)' == '' ">false</UseOfficeIMOProjectReferences>
   </PropertyGroup>

@@ -4,114 +4,34 @@ Module Name: Mailozaurr
 online version: https://github.com/EvotecIT/MailoZaurr
 schema: 2.0.0
 ---
-# Save-GmailMessageAttachment
+# Get-JMAPEmailChange
 ## SYNOPSIS
-Saves attachments from a Gmail message to disk.
+Gets bounded JMAP email changes since an opaque state token.
 
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Save-GmailMessageAttachment -GmailAccount <string> -Credential <pscredential> -Id <string> -Path <string> [-ConflictPolicy <AttachmentFileConflictPolicy>] [-Force] [-PassThru] [-WhatIf] [-Confirm] [<CommonParameters>]
+Get-JMAPEmailChange [-ProfileId] <string> [-SinceState] <string> [-MaxChanges <int>] [-ProfileDirectory <string>] [-SecretDirectory <string>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Saves attachments from a Gmail message to disk.
+Gets bounded JMAP email changes since an opaque state token.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```powershell
-Save-GmailMessageAttachment -GmailAccount 'Value' -Credential Get-Credential -Id 'Value' -Path 'C:\Path'
+Get-JMAPEmailChange -MaxChanges 1
 ```
 
 
 ## PARAMETERS
 
-### -ConflictPolicy
-Controls how existing destination files are handled.
+### -MaxChanges
+Maximum changes returned by the server.
 
 ```yaml
-Type: AttachmentFileConflictPolicy
-Parameter Sets: __AllParameterSets
-Aliases: None
-Possible values: Fail, Skip, Rename, Replace
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Credential
-OAuth credential used for authentication.
-
-```yaml
-Type: PSCredential
-Parameter Sets: __AllParameterSets
-Aliases: None
-Possible values:
-
-Required: True
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Force
-Replaces existing regular files. Equivalent to ConflictPolicy Replace.
-
-```yaml
-Type: SwitchParameter
-Parameter Sets: __AllParameterSets
-Aliases: Overwrite
-Possible values:
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -GmailAccount
-Gmail account containing the message.
-
-```yaml
-Type: String
-Parameter Sets: __AllParameterSets
-Aliases: None
-Possible values:
-
-Required: True
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Id
-Identifier of the Gmail message.
-
-```yaml
-Type: String
-Parameter Sets: __AllParameterSets
-Aliases: None
-Possible values:
-
-Required: True
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -PassThru
-Writes one save result for each attachment.
-
-```yaml
-Type: SwitchParameter
+Type: Int32
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
@@ -123,8 +43,56 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Path
-Destination path for saving attachments.
+### -ProfileDirectory
+Optional directory containing the profile store.
+
+```yaml
+Type: String
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ProfileId
+JMAP profile identifier.
+
+```yaml
+Type: String
+Parameter Sets: __AllParameterSets
+Aliases: Id
+Possible values:
+
+Required: True
+Position: 0
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -SecretDirectory
+Optional directory containing the protected secret store.
+
+```yaml
+Type: String
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -SinceState
+Opaque prior Email state token.
 
 ```yaml
 Type: String
@@ -133,7 +101,7 @@ Aliases: None
 Possible values:
 
 Required: True
-Position: named
+Position: 1
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
@@ -148,7 +116,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-- `None`
+- `Mailozaurr.JmapEmailChangesResult`
 
 ## RELATED LINKS
 

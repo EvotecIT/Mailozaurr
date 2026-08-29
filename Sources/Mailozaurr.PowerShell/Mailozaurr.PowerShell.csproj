@@ -20,7 +20,7 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <OfficeIMOVersion Condition=" '$(OfficeIMOVersion)' == '' ">3.2.6</OfficeIMOVersion>
+        <OfficeIMOVersion Condition=" '$(OfficeIMOVersion)' == '' ">3.2.7</OfficeIMOVersion>
         <OfficeIMORoot Condition=" '$(OfficeIMORoot)' == '' ">..\..\..\OfficeIMO</OfficeIMORoot>
         <UseOfficeIMOProjectReferences Condition=" '$(UseOfficeIMOProjectReferences)' == '' ">false</UseOfficeIMOProjectReferences>
     </PropertyGroup>

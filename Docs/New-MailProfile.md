@@ -4,46 +4,35 @@ Module Name: Mailozaurr
 online version: https://github.com/EvotecIT/MailoZaurr
 schema: 2.0.0
 ---
-# New-TemporaryMailCrypto
+# New-MailProfile
 ## SYNOPSIS
-Creates temporary cryptographic material for testing mail encryption.
+Creates a provider profile over the reusable Mailozaurr profile service.
 
 ## SYNTAX
-### Pgp
+### __AllParameterSets
 ```powershell
-New-TemporaryMailCrypto -Pgp [-Identity <string>] [-PassPhrase <string>] [-KeySize <int>] [-OutputPath <string>] [-NoDispose] [<CommonParameters>]
-```
-
-### Smime
-```powershell
-New-TemporaryMailCrypto -Smime [-OutputPath <string>] [-NoDispose] [-SubjectName <string>] [-ValidDays <int>] [-OutputPassword <securestring>] [<CommonParameters>]
+New-MailProfile [-ProfileId] <string> -DisplayName <string> -Kind <MailProfileKind> [-Description <string>] [-DefaultSender <string>] [-DefaultMailbox <string>] [-Settings <IDictionary>] [-IsDefault] [-Force] [-ProfileDirectory <string>] [-SecretDirectory <string>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Creates temporary cryptographic material for testing mail encryption.
+Creates a provider profile over the reusable Mailozaurr profile service.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```powershell
-New-TemporaryMailCrypto -Pgp
-```
-
-
-### EXAMPLE 2
-```powershell
-New-TemporaryMailCrypto -Smime
+New-MailProfile -DisplayName 'Name' -Kind 'Value'
 ```
 
 
 ## PARAMETERS
 
-### -Identity
-Identity for the PGP key.
+### -DefaultMailbox
+Default mailbox or principal.
 
 ```yaml
 Type: String
-Parameter Sets: Pgp
+Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
 
@@ -54,60 +43,12 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -KeySize
-Size of the RSA key.
-
-```yaml
-Type: Int32
-Parameter Sets: Pgp
-Aliases: None
-Possible values:
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -NoDispose
-Do not delete generated files when disposed.
-
-```yaml
-Type: SwitchParameter
-Parameter Sets: Pgp, Smime
-Aliases: None
-Possible values:
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -OutputPassword
-Password protecting an exported S/MIME PFX file.
-
-```yaml
-Type: SecureString
-Parameter Sets: Smime
-Aliases: None
-Possible values:
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -OutputPath
-Optional path where the generated data should be stored.
+### -DefaultSender
+Default sender address.
 
 ```yaml
 Type: String
-Parameter Sets: Pgp, Smime
+Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
 
@@ -118,12 +59,12 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -PassPhrase
-Passphrase for the private key.
+### -Description
+Optional description.
 
 ```yaml
 Type: String
-Parameter Sets: Pgp
+Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
 
@@ -134,12 +75,12 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Pgp
-Generate a PGP key pair.
+### -DisplayName
+User-facing profile name.
 
 ```yaml
-Type: SwitchParameter
-Parameter Sets: Pgp
+Type: String
+Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
 
@@ -150,28 +91,12 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Smime
-Generate an S/MIME certificate.
+### -Force
+Allows replacement of an existing profile with the same id.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: Smime
-Aliases: None
-Possible values:
-
-Required: True
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -SubjectName
-Subject for the certificate.
-
-```yaml
-Type: String
-Parameter Sets: Smime
+Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
 
@@ -182,13 +107,93 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -ValidDays
-Number of days the certificate is valid.
+### -IsDefault
+Makes this the default profile.
 
 ```yaml
-Type: Int32
-Parameter Sets: Smime
+Type: SwitchParameter
+Parameter Sets: __AllParameterSets
 Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Kind
+Provider or protocol kind.
+
+```yaml
+Type: MailProfileKind
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values: Unknown, Imap, Pop3, Graph, Gmail, Smtp, SendGrid, Mailgun, Ses, Jmap
+
+Required: True
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ProfileDirectory
+Optional directory containing the profile store.
+
+```yaml
+Type: String
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ProfileId
+Stable profile identifier.
+
+```yaml
+Type: String
+Parameter Sets: __AllParameterSets
+Aliases: Id
+Possible values:
+
+Required: True
+Position: 0
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -SecretDirectory
+Optional directory containing the protected secret store.
+
+```yaml
+Type: String
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Settings
+Non-secret provider settings such as server, port, client id, or JMAP session URL.
+
+```yaml
+Type: IDictionary
+Parameter Sets: __AllParameterSets
+Aliases: Setting
 Possible values:
 
 Required: False
@@ -207,8 +212,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-- `Mailozaurr.TemporaryPgpKeyPair`
-- `System.Security.Cryptography.X509Certificates.X509Certificate2`
+- `Mailozaurr.OperationResult`
 
 ## RELATED LINKS
 

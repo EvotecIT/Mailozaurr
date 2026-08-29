@@ -13,7 +13,7 @@ The Save-IMAPMessageAttachment cmdlet saves all attachments from an IMAP message
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Save-IMAPMessageAttachment [[-Client] <ImapConnectionInfo>] [-Uid] <uint> [[-Folder] <string>] [-Path] <string> [<CommonParameters>]
+Save-IMAPMessageAttachment [[-Client] <ImapConnectionInfo>] [-Uid] <uint> [[-Folder] <string>] [-Path] <string> [-ConflictPolicy <AttachmentFileConflictPolicy>] [-Force] [-PassThru] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -47,6 +47,22 @@ Accept pipeline input: True (ByValue)
 Accept wildcard characters: False
 ```
 
+### -ConflictPolicy
+Controls how existing destination files are handled.
+
+```yaml
+Type: AttachmentFileConflictPolicy
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values: Fail, Skip, Rename, Replace
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -Folder
 Optional folder from which to retrieve the message. Defaults to Inbox.
 
@@ -58,6 +74,38 @@ Possible values:
 
 Required: False
 Position: 2
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Force
+Replaces existing regular files. Equivalent to ConflictPolicy Replace.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: __AllParameterSets
+Aliases: Overwrite
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -PassThru
+Writes one save result for each attachment.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False

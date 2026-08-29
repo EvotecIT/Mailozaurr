@@ -4,39 +4,51 @@ Module Name: Mailozaurr
 online version: https://github.com/EvotecIT/MailoZaurr
 schema: 2.0.0
 ---
-# Get-DmarcReport
+# Search-JMAPEmail
 ## SYNOPSIS
-Searches for DMARC aggregate reports in a mailbox.
-
-The Get-DmarcReport cmdlet queries IMAP, POP3, Microsoft Graph, or Gmail API to find DMARC aggregate reports and expose zipped XML attachments.
+Queries a bounded page of JMAP email identifiers.
 
 ## SYNTAX
-### GmailApi
+### __AllParameterSets
 ```powershell
-Get-DmarcReport -Protocol <EmailProtocol> -GmailAccount <string> -Credential <pscredential> [-Domain <string>] [-Since <DateTime>] [-Before <DateTime>] [-Count <int>] [-Folder <string>] [-UserPrincipalName <string>] [-ParallelDownloadLimit <int>] [-MaxUncompressedSize <long>] [-MaxTotalUncompressedSize <long>] [-MaxAttachmentsPerMessage <int>] [-MaxArchiveEntriesPerAttachment <int>] [-MaxMessagesScanned <int>] [-MaxMimeBytesPerMessage <long>] [-MaxTotalMimeBytes <long>] [<CommonParameters>]
+Search-JMAPEmail [-ProfileId] <string> [-MailboxId <string>] [-Text <string>] [-From <string>] [-To <string>] [-Subject <string>] [-Before <DateTimeOffset>] [-After <DateTimeOffset>] [-HasAttachment <Boolean>] [-Position <int>] [-Limit <int>] [-CollapseThreads] [-SortProperty <string>] [-Descending] [-ProfileDirectory <string>] [-SecretDirectory <string>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Searches for DMARC aggregate reports in a mailbox.
-
-The Get-DmarcReport cmdlet queries IMAP, POP3, Microsoft Graph, or Gmail API to find DMARC aggregate reports and expose zipped XML attachments.
+Queries a bounded page of JMAP email identifiers.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```powershell
-Get-DmarcReport -Protocol 'Value' -GmailAccount 'Value' -Credential Get-Credential
+Search-JMAPEmail -After 'Value'
 ```
 
 
 ## PARAMETERS
 
+### -After
+Restricts results to messages received after this timestamp.
+
+```yaml
+Type: DateTimeOffset
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -Before
-Only reports before this time are returned.
+Restricts results to messages received before this timestamp.
 
 ```yaml
-Type: DateTime
-Parameter Sets: GmailApi
+Type: DateTimeOffset
+Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
 
@@ -47,12 +59,76 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Count
-Maximum number of reports to return. Defaults to 1000.
+### -CollapseThreads
+Collapses results by JMAP thread when supported.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Descending
+Sorts the selected property in descending order.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -From
+Matches sender text.
+
+```yaml
+Type: String
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -HasAttachment
+Restricts results by attachment presence.
+
+```yaml
+Type: Boolean
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Limit
+Maximum identifiers returned by this page.
 
 ```yaml
 Type: Int32
-Parameter Sets: GmailApi
+Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
 
@@ -63,28 +139,76 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Credential
-OAuth credential used for Gmail API authentication.
+### -MailboxId
+Restricts results to one mailbox id.
 
 ```yaml
-Type: PSCredential
-Parameter Sets: GmailApi
+Type: String
+Parameter Sets: __AllParameterSets
 Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Position
+Query position; negative values address results relative to the end.
+
+```yaml
+Type: Int32
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ProfileDirectory
+Optional directory containing the profile store.
+
+```yaml
+Type: String
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ProfileId
+JMAP profile identifier.
+
+```yaml
+Type: String
+Parameter Sets: __AllParameterSets
+Aliases: Id
 Possible values:
 
 Required: True
-Position: named
+Position: 0
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Domain
-Optional domain filter.
+### -SecretDirectory
+Optional directory containing the protected secret store.
 
 ```yaml
 Type: String
-Parameter Sets: GmailApi
+Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
 
@@ -95,12 +219,12 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Folder
-IMAP folder to search.
+### -SortProperty
+JMAP property used to order results.
 
 ```yaml
 Type: String
-Parameter Sets: GmailApi
+Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
 
@@ -111,28 +235,12 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -GmailAccount
-Gmail account address when using Gmail API.
+### -Subject
+Matches subject text.
 
 ```yaml
 Type: String
-Parameter Sets: GmailApi
-Aliases: None
-Possible values:
-
-Required: True
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -MaxArchiveEntriesPerAttachment
-Maximum number of entries accepted in one DMARC ZIP attachment.
-
-```yaml
-Type: Int32
-Parameter Sets: GmailApi
+Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
 
@@ -143,156 +251,28 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -MaxAttachmentsPerMessage
-Maximum number of DMARC attachments accepted from one message.
-
-```yaml
-Type: Int32
-Parameter Sets: GmailApi
-Aliases: None
-Possible values:
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -MaxMessagesScanned
-Maximum number of candidate mailbox messages inspected.
-
-```yaml
-Type: Int32
-Parameter Sets: GmailApi
-Aliases: None
-Possible values:
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -MaxMimeBytesPerMessage
-Maximum downloaded MIME bytes for one candidate message.
-
-```yaml
-Type: Int64
-Parameter Sets: GmailApi
-Aliases: None
-Possible values:
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -MaxTotalMimeBytes
-Maximum downloaded MIME bytes across the search.
-
-```yaml
-Type: Int64
-Parameter Sets: GmailApi
-Aliases: None
-Possible values:
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -MaxTotalUncompressedSize
-Maximum uncompressed bytes inspected across the complete search.
-
-```yaml
-Type: Int64
-Parameter Sets: GmailApi
-Aliases: None
-Possible values:
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -MaxUncompressedSize
-Maximum uncompressed attachment size to inspect, in bytes.
-
-```yaml
-Type: Int64
-Parameter Sets: GmailApi
-Aliases: None
-Possible values:
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -ParallelDownloadLimit
-Maximum concurrent MIME downloads; set to 1 to disable parallelism.
-
-```yaml
-Type: Int32
-Parameter Sets: GmailApi
-Aliases: None
-Possible values:
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Protocol
-Mail protocol to use.
-
-```yaml
-Type: EmailProtocol
-Parameter Sets: GmailApi
-Aliases: None
-Possible values: Imap, Pop3, Graph, GmailApi
-
-Required: True
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Since
-Only reports since this time are returned.
-
-```yaml
-Type: DateTime
-Parameter Sets: GmailApi
-Aliases: None
-Possible values:
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -UserPrincipalName
-User principal name when using Microsoft Graph.
+### -Text
+Matches server-supported text fields.
 
 ```yaml
 Type: String
-Parameter Sets: GmailApi
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -To
+Matches recipient text.
+
+```yaml
+Type: String
+Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
 
@@ -312,7 +292,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## OUTPUTS
 
-- `Mailozaurr.DmarcReports.DmarcReport`
+- `Mailozaurr.JmapEmailQueryResult`
 
 ## RELATED LINKS
 

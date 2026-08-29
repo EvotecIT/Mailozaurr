@@ -4,95 +4,31 @@ Module Name: Mailozaurr
 online version: https://github.com/EvotecIT/MailoZaurr
 schema: 2.0.0
 ---
-# Save-GraphMessageAttachment
+# Get-JMAPThread
 ## SYNOPSIS
-Saves attachments from Microsoft Graph message objects.
+Gets JMAP threads by id.
 
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Save-GraphMessageAttachment -Attachment <Attachment[]> -Path <string> [-ConflictPolicy <AttachmentFileConflictPolicy>] [-Force] [-PassThru] [-WhatIf] [-Confirm] [<CommonParameters>]
+Get-JMAPThread [-ProfileId] <string> [-ThreadId] <string[]> [-ProfileDirectory <string>] [-SecretDirectory <string>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Saves attachments from Microsoft Graph message objects.
+Gets JMAP threads by id.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```powershell
-Save-GraphMessageAttachment -Attachment @('Value') -Path 'C:\Path'
+Get-JMAPThread -ProfileDirectory 'Value'
 ```
 
 
 ## PARAMETERS
 
-### -Attachment
-Attachments to save from the message.
-
-```yaml
-Type: Attachment[]
-Parameter Sets: __AllParameterSets
-Aliases: None
-Possible values:
-
-Required: True
-Position: named
-Default value: None
-Accept pipeline input: True (ByValue)
-Accept wildcard characters: False
-```
-
-### -ConflictPolicy
-Controls how existing destination files are handled.
-
-```yaml
-Type: AttachmentFileConflictPolicy
-Parameter Sets: __AllParameterSets
-Aliases: None
-Possible values: Fail, Skip, Rename, Replace
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Force
-Replaces existing regular files. Equivalent to ConflictPolicy Replace.
-
-```yaml
-Type: SwitchParameter
-Parameter Sets: __AllParameterSets
-Aliases: Overwrite
-Possible values:
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -PassThru
-Writes one save result for each attachment.
-
-```yaml
-Type: SwitchParameter
-Parameter Sets: __AllParameterSets
-Aliases: None
-Possible values:
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Path
-Destination path for saved attachments.
+### -ProfileDirectory
+Optional directory containing the profile store.
 
 ```yaml
 Type: String
@@ -100,10 +36,58 @@ Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
 
-Required: True
+Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ProfileId
+JMAP profile identifier.
+
+```yaml
+Type: String
+Parameter Sets: __AllParameterSets
+Aliases: Id
+Possible values:
+
+Required: True
+Position: 0
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -SecretDirectory
+Optional directory containing the protected secret store.
+
+```yaml
+Type: String
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ThreadId
+Thread identifiers.
+
+```yaml
+Type: String[]
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: True
+Position: 1
+Default value: None
+Accept pipeline input: True (ByValue)
 Accept wildcard characters: False
 ```
 
@@ -112,11 +96,11 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-- `Mailozaurr.Attachment[]`
+- `System.String[]`
 
 ## OUTPUTS
 
-- `None`
+- `Mailozaurr.JmapThread`
 
 ## RELATED LINKS
 

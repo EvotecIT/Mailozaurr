@@ -4,111 +4,31 @@ Module Name: Mailozaurr
 online version: https://github.com/EvotecIT/MailoZaurr
 schema: 2.0.0
 ---
-# Save-GmailMessageAttachment
+# Test-MailProfile
 ## SYNOPSIS
-Saves attachments from a Gmail message to disk.
+Diagnoses stored profile readiness or performs a live connection probe.
 
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Save-GmailMessageAttachment -GmailAccount <string> -Credential <pscredential> -Id <string> -Path <string> [-ConflictPolicy <AttachmentFileConflictPolicy>] [-Force] [-PassThru] [-WhatIf] [-Confirm] [<CommonParameters>]
+Test-MailProfile [-ProfileId] <string> [-Connection] [-Scope <MailProfileConnectionTestScope>] [-ProfileDirectory <string>] [-SecretDirectory <string>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Saves attachments from a Gmail message to disk.
+Diagnoses stored profile readiness or performs a live connection probe.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```powershell
-Save-GmailMessageAttachment -GmailAccount 'Value' -Credential Get-Credential -Id 'Value' -Path 'C:\Path'
+Test-MailProfile -Connection
 ```
 
 
 ## PARAMETERS
 
-### -ConflictPolicy
-Controls how existing destination files are handled.
-
-```yaml
-Type: AttachmentFileConflictPolicy
-Parameter Sets: __AllParameterSets
-Aliases: None
-Possible values: Fail, Skip, Rename, Replace
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Credential
-OAuth credential used for authentication.
-
-```yaml
-Type: PSCredential
-Parameter Sets: __AllParameterSets
-Aliases: None
-Possible values:
-
-Required: True
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Force
-Replaces existing regular files. Equivalent to ConflictPolicy Replace.
-
-```yaml
-Type: SwitchParameter
-Parameter Sets: __AllParameterSets
-Aliases: Overwrite
-Possible values:
-
-Required: False
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -GmailAccount
-Gmail account containing the message.
-
-```yaml
-Type: String
-Parameter Sets: __AllParameterSets
-Aliases: None
-Possible values:
-
-Required: True
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -Id
-Identifier of the Gmail message.
-
-```yaml
-Type: String
-Parameter Sets: __AllParameterSets
-Aliases: None
-Possible values:
-
-Required: True
-Position: named
-Default value: None
-Accept pipeline input: False
-Accept wildcard characters: False
-```
-
-### -PassThru
-Writes one save result for each attachment.
+### -Connection
+Runs a live provider connection probe instead of stored readiness diagnosis.
 
 ```yaml
 Type: SwitchParameter
@@ -123,8 +43,8 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -Path
-Destination path for saving attachments.
+### -ProfileDirectory
+Optional directory containing the profile store.
 
 ```yaml
 Type: String
@@ -132,7 +52,55 @@ Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
 
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -ProfileId
+Profile identifier.
+
+```yaml
+Type: String
+Parameter Sets: __AllParameterSets
+Aliases: Id
+Possible values:
+
 Required: True
+Position: 0
+Default value: None
+Accept pipeline input: True (ByValue, ByPropertyName)
+Accept wildcard characters: False
+```
+
+### -Scope
+Depth of the live connection probe.
+
+```yaml
+Type: MailProfileConnectionTestScope
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values: Auto, Auth, Mailbox, Send
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -SecretDirectory
+Optional directory containing the protected secret store.
+
+```yaml
+Type: String
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
@@ -144,11 +112,12 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-- `None`
+- `System.String`
 
 ## OUTPUTS
 
-- `None`
+- `Mailozaurr.MailProfileValidationResult`
+- `Mailozaurr.MailProfileConnectionTestResult`
 
 ## RELATED LINKS
 
