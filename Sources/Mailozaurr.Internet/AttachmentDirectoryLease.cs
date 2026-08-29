@@ -180,7 +180,8 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
         if (current < 0) ThrowUnixIOException("open the filesystem root");
         var currentHandle = new SafeFileHandle(new IntPtr(current), ownsHandle: true);
         try {
-            foreach (string component in DirectoryPath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries)) {
+            string leasePath = NormalizeDarwinSystemAlias(DirectoryPath);
+            foreach (string component in leasePath.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries)) {
                 int next = openat(currentHandle.DangerousGetHandle().ToInt32(), component, flags, 0);
                 if (next < 0 && Marshal.GetLastWin32Error() == 2) {
                     if (mkdirat(
@@ -201,6 +202,24 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
         } finally {
             currentHandle?.Dispose();
         }
+    }
+
+    /// <summary>
+    /// Resolves only macOS's fixed root aliases before the no-follow walk. Darwin exposes
+    /// <c>/etc</c>, <c>/tmp</c>, and <c>/var</c> as links into <c>/private</c>; in particular,
+    /// <see cref="Path.GetTempPath"/> normally returns a path beneath <c>/var</c>. All
+    /// caller-controlled descendants are still opened component-by-component with
+    /// <c>O_NOFOLLOW</c>.
+    /// </summary>
+    private static string NormalizeDarwinSystemAlias(string path) {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return path;
+        foreach (string alias in new[] { "/etc", "/tmp", "/var" }) {
+            if (string.Equals(path, alias, StringComparison.Ordinal) ||
+                path.StartsWith(alias + "/", StringComparison.Ordinal)) {
+                return "/private" + path;
+            }
+        }
+        return path;
     }
 
     private static bool TryLinkTemporary(int directoryFd, string temporaryName, string destinationName) {
