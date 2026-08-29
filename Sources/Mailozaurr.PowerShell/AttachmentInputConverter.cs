@@ -44,6 +44,15 @@ internal static class AttachmentInputConverter {
                 .OfType<AttachmentDescriptor>());
     }
 
+    internal static void MarkSendAttempted(object[]? attachments) {
+        if (attachments == null) return;
+        AttachmentDescriptorLifetime.MarkSendAttempted(
+            attachments
+                .Where(entry => entry != null)
+                .Select(entry => UnwrapPowerShellObject(entry!))
+                .OfType<AttachmentDescriptor>());
+    }
+
     private static object UnwrapPowerShellObject(object entry) {
         while (entry is PSObject powerShellObject &&
                powerShellObject.BaseObject != null &&

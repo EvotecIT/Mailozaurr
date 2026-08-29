@@ -22,4 +22,9 @@ public class GraphAttachmentPlaceHolder {
     /// Serialized file attachment payload used when the file is too small for an upload session.
     /// </summary>
     public string DirectAttachmentJson { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Descriptor used to reopen attachment content while an upload is in progress.
+    /// </summary>
+    internal Definitions.AttachmentDescriptor? ContentDescriptor { get; set; }
 }

@@ -70,7 +70,8 @@ public partial class Graph {
             FilePath = attachmentPath ?? string.Empty,
             FileSize = fileSize,
             FileName = fileName,
-            DirectAttachmentJson = directAttachmentJson
+            DirectAttachmentJson = directAttachmentJson,
+            ContentDescriptor = source.Descriptor
         };
 
         return Task.FromResult(placeholder);
@@ -328,12 +329,63 @@ public partial class Graph {
         }
         foreach (var source in EnumerateFileAttachmentSources()) {
             try {
-                var attachmentItemJson = await CreateGraphAttachment(source, cancellationToken);
+                var attachmentItemJson = await CreateGraphAttachment(source, cancellationToken, preloadContent: false);
                 AttachmentsPlaceHolders.Add(attachmentItemJson);
             } catch (FileNotFoundException) {
                 // Already logged by CreateGraphAttachment.
             }
         }
+    }
+
+    internal bool ForEachPreparedAttachmentChunk(
+        GraphAttachmentPlaceHolder attachment,
+        Func<byte[], ContentRangeHeaderValue?, bool> sendChunk,
+        CancellationToken cancellationToken = default) {
+        if (attachment == null) throw new ArgumentNullException(nameof(attachment));
+        if (sendChunk == null) throw new ArgumentNullException(nameof(sendChunk));
+
+        if (attachment.ContentDescriptor != null || !string.IsNullOrWhiteSpace(attachment.FilePath)) {
+            var source = attachment.ContentDescriptor != null
+                ? new GraphFileAttachmentSource(attachment.ContentDescriptor, attachment.FileSize)
+                : new GraphFileAttachmentSource(attachment.FilePath, descriptor: null, attachment.FileSize);
+            var chunkSize = Math.Min(ChunkSize, MaxChunkSize);
+            var buffer = ArrayPool<byte>.Shared.Rent(chunkSize);
+            long offset = 0;
+            try {
+                cancellationToken.ThrowIfCancellationRequested();
+                using Stream stream = source.Descriptor?.OpenContentStream() ??
+                    new FileStream(source.Path!, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete,
+                        bufferSize: 64 * 1024, useAsync: false);
+                while (true) {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    int bytesRead = stream.Read(buffer, 0, chunkSize);
+                    if (bytesRead == 0) break;
+                    if (offset + bytesRead > source.Length) {
+                        throw ContentLengthMismatch(source.Length, offset + bytesRead);
+                    }
+
+                    var chunk = new byte[bytesRead];
+                    Buffer.BlockCopy(buffer, 0, chunk, 0, bytesRead);
+                    var contentRange = new ContentRangeHeaderValue(
+                        offset,
+                        offset + bytesRead - 1,
+                        source.Length);
+                    if (!sendChunk(chunk, contentRange)) return false;
+                    offset += bytesRead;
+                }
+                if (offset != source.Length) throw ContentLengthMismatch(source.Length, offset);
+                return true;
+            } finally {
+                ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
+            }
+        }
+
+        foreach (StreamContent content in attachment.Content) {
+            cancellationToken.ThrowIfCancellationRequested();
+            byte[] body = content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+            if (!sendChunk(body, content.Headers.ContentRange)) return false;
+        }
+        return true;
     }
 
     /// <summary>

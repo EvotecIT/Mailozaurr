@@ -353,6 +353,90 @@ public class GraphDraftTests {
     }
 
     [Fact]
+    public async Task PrepareAttachments_LargeStreamDescriptorDefersReadsAndStreamsChunks() {
+        string directory = Path.Combine(Path.GetTempPath(), "MailozaurrGraphStage-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var source = new CountingMemoryStream(new byte[3_100_000]);
+        var descriptor = new StreamAttachmentDescriptor(
+            source,
+            "large-stream.bin",
+            stagingOptions: new AttachmentStreamStagingOptions {
+                MemoryThresholdBytes = 1024,
+                MaxBytes = 4_000_000,
+                TempDirectory = directory
+            });
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "large stream",
+            HTML = "body",
+            ContentType = "HTML",
+            Attachments = new object[] { descriptor },
+            ChunkSize = 1024 * 1024
+        };
+
+        try {
+            graph.CreateMessage();
+
+            Assert.True(graph.IsLargerAttachment);
+            Assert.Empty(graph.ConvertedAttachments);
+            Assert.Equal(0, source.ReadCount);
+
+            await graph.PrepareAttachments();
+
+            var placeholder = Assert.Single(graph.AttachmentsPlaceHolders);
+            Assert.Empty(placeholder.Content);
+            Assert.Equal(0, source.ReadCount);
+
+            long uploaded = 0;
+            int chunks = 0;
+            bool completed = graph.ForEachPreparedAttachmentChunk(
+                placeholder,
+                (body, range) => {
+                    Assert.NotNull(range);
+                    uploaded += body.LongLength;
+                    chunks++;
+                    return true;
+                });
+
+            Assert.True(completed);
+            Assert.Equal(3_100_000, uploaded);
+            Assert.True(chunks > 1);
+            Assert.True(source.ReadCount > 0);
+            Assert.Single(Directory.GetFiles(directory));
+        } finally {
+            descriptor.Dispose();
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task PreparedFileChunksRejectContentGrowthAfterMetadataCapture() {
+        string path = Path.GetTempFileName();
+        File.WriteAllBytes(path, new byte[3_100_000]);
+        using var graph = new Graph {
+            Attachments = new object[] { path },
+            ChunkSize = 1024 * 1024
+        };
+
+        try {
+            graph.CreateAttachments();
+            await graph.PrepareAttachments();
+            using (var append = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read)) {
+                append.WriteByte(1);
+            }
+
+            var placeholder = Assert.Single(graph.AttachmentsPlaceHolders);
+            InvalidDataException exception = Assert.Throws<InvalidDataException>(() =>
+                graph.ForEachPreparedAttachmentChunk(placeholder, (_, _) => true));
+
+            Assert.Contains("declared 3100000, observed 3100001", exception.Message, StringComparison.Ordinal);
+        } finally {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public async Task PrepareAttachments_LargeInMemoryAttachmentCreatesUploadPlaceholder() {
         var bytes = new byte[3_100_000];
         using var graph = new Graph {
@@ -905,6 +989,18 @@ public class GraphDraftTests {
         public Task<Stream> OpenReadAsync(CancellationToken cancellationToken = default) {
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(OpenRead());
+        }
+    }
+
+    private sealed class CountingMemoryStream : MemoryStream {
+        internal CountingMemoryStream(byte[] content) : base(content, writable: false) {
+        }
+
+        internal int ReadCount { get; private set; }
+
+        public override int Read(byte[] buffer, int offset, int count) {
+            ReadCount++;
+            return base.Read(buffer, offset, count);
         }
     }
 }

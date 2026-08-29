@@ -42,7 +42,7 @@ public partial class Graph {
                     if (descriptor.SourcePath is string descriptorPath) {
                         var seenPaths = IsInlineDescriptor(descriptor) ? inlineFilePaths : regularFilePaths;
                         TrackFileAttachment(descriptorPath, descriptor, streamableAttachments, seenPaths, ref fileTotalBytes, ref rawAttachmentBytes);
-                    } else if (descriptor is Definitions.ContentSourceAttachmentDescriptor) {
+                    } else if (IsStreamableDescriptor(descriptor)) {
                         long descriptorLength = ResolveAttachmentLength(descriptor);
                         var source = new GraphFileAttachmentSource(descriptor, descriptorLength);
                         streamableAttachments.Add(source);
@@ -142,7 +142,7 @@ public partial class Graph {
                     }
                     continue;
                 }
-                if (descriptor is Definitions.ContentSourceAttachmentDescriptor) {
+                if (IsStreamableDescriptor(descriptor)) {
                     long descriptorLength = ResolveAttachmentLength(descriptor);
                     yield return new GraphFileAttachmentSource(descriptor, descriptorLength);
                 }
@@ -171,11 +171,17 @@ public partial class Graph {
         return resolvedLength;
     }
 
+    private static bool IsStreamableDescriptor(Definitions.AttachmentDescriptor descriptor) =>
+        descriptor is Definitions.ContentSourceAttachmentDescriptor or Definitions.StreamAttachmentDescriptor;
+
     private sealed class GraphFileAttachmentSource {
-        internal GraphFileAttachmentSource(string path, Definitions.AttachmentDescriptor? descriptor) {
+        internal GraphFileAttachmentSource(
+            string path,
+            Definitions.AttachmentDescriptor? descriptor,
+            long? length = null) {
             Path = path;
             Descriptor = descriptor;
-            Length = File.Exists(path) ? new FileInfo(path).Length : 0;
+            Length = length ?? (File.Exists(path) ? new FileInfo(path).Length : 0);
         }
 
         internal GraphFileAttachmentSource(Definitions.AttachmentDescriptor descriptor, long length) {
