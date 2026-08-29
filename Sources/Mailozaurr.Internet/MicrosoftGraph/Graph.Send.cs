@@ -62,6 +62,8 @@ public partial class Graph {
 
                 await WaitForConcurrencyAsync(operationStopwatch, cancellationToken);
                 try {
+                    AttachmentDescriptorLifetime.MarkSendAttempted(
+                        Attachments?.OfType<Mailozaurr.Definitions.AttachmentDescriptor>());
                     using var response = await _client.SendAsync(request, cancellationToken);
                     var content = await response.Content.ReadAsStringAsync();
                     if (response.IsSuccessStatusCode) {
@@ -291,6 +293,8 @@ public partial class Graph {
             }
             return await SendMessageDraftAsync(messagePrepared: true, cancellationToken);
         }
+        AttachmentDescriptorLifetime.MarkSendAttempted(
+            Attachments?.OfType<Mailozaurr.Definitions.AttachmentDescriptor>());
         var results = await MicrosoftGraphUtils.SendBatchAsync(credential, new[] { request }, cancellationToken);
         var response = results.FirstOrDefault();
         var success = response != null && response.Status >= 200 && response.Status < 300;
@@ -401,6 +405,8 @@ public partial class Graph {
         await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
         HttpResponseMessage draftResponse;
         try {
+            AttachmentDescriptorLifetime.MarkSendAttempted(
+                Attachments?.OfType<Mailozaurr.Definitions.AttachmentDescriptor>());
             draftResponse = await _client.SendAsync(draftRequest, cancellationToken);
         } finally {
             MicrosoftGraphUtils.ConcurrencySemaphore.Release();

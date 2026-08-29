@@ -401,6 +401,7 @@ public class MailgunClient : IDisposable {
                     Content = content
                 };
                 request.Headers.Authorization = new AuthenticationHeaderValue("Basic", auth);
+                AttachmentDescriptorLifetime.MarkSendAttempted(Attachments, InlineAttachments);
                 using var response = await _client.SendAsync(request, cancellationToken).ConfigureAwait(false);
                 var responseContent = await ProviderResponseParser
                     .ReadContentAsync(response, cancellationToken)

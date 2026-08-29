@@ -15,7 +15,6 @@ internal readonly struct BoundedMimeMessage {
 internal sealed class DmarcMimeDownloadBudget {
     private readonly long _maxBytesPerMessage;
     private long _remainingBytes;
-    private readonly SemaphoreSlim _downloadGate = new(1, 1);
 
     internal DmarcMimeDownloadBudget(long maxBytesPerMessage, long maxTotalBytes) {
         _maxBytesPerMessage = maxBytesPerMessage;
@@ -28,22 +27,29 @@ internal sealed class DmarcMimeDownloadBudget {
     internal async Task<MimeMessage> DownloadAsync(
         Func<long, CancellationToken, Task<BoundedMimeMessage>> download,
         CancellationToken cancellationToken) {
-        await _downloadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try {
-            long limit = Math.Min(_maxBytesPerMessage, Interlocked.Read(ref _remainingBytes));
-            if (limit <= 0) throw new InvalidDataException("DMARC MIME downloads exceeded the configured total byte limit.");
-            // Reserve the complete per-message allowance before any provider I/O. Successful
-            // downloads refund unused bytes, while malformed, truncated, or canceled transfers
-            // retain the reservation so repeated failures cannot bypass the aggregate limit.
-            Interlocked.Add(ref _remainingBytes, -limit);
-            BoundedMimeMessage result = await download(limit, cancellationToken).ConfigureAwait(false);
-            if (result.ByteCount < 0 || result.ByteCount > limit) {
-                throw new InvalidDataException("DMARC MIME message exceeded the configured byte limit.");
+        cancellationToken.ThrowIfCancellationRequested();
+        long limit = ReserveAllowance();
+        // Reserve the complete per-message allowance before any provider I/O. Successful
+        // downloads refund unused bytes, while malformed, truncated, or canceled transfers
+        // retain the reservation so repeated failures cannot bypass the aggregate limit.
+        BoundedMimeMessage result = await download(limit, cancellationToken).ConfigureAwait(false);
+        if (result.ByteCount < 0 || result.ByteCount > limit) {
+            throw new InvalidDataException("DMARC MIME message exceeded the configured byte limit.");
+        }
+        Interlocked.Add(ref _remainingBytes, limit - result.ByteCount);
+        return result.Message;
+    }
+
+    private long ReserveAllowance() {
+        while (true) {
+            long remaining = Interlocked.Read(ref _remainingBytes);
+            long limit = Math.Min(_maxBytesPerMessage, remaining);
+            if (limit <= 0) {
+                throw new InvalidDataException("DMARC MIME downloads exceeded the configured total byte limit.");
             }
-            Interlocked.Add(ref _remainingBytes, limit - result.ByteCount);
-            return result.Message;
-        } finally {
-            _downloadGate.Release();
+            if (Interlocked.CompareExchange(ref _remainingBytes, remaining - limit, remaining) == remaining) {
+                return limit;
+            }
         }
     }
 

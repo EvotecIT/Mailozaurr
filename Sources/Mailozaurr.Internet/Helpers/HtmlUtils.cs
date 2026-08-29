@@ -176,14 +176,21 @@ public static class HtmlUtils {
         var allocatedContentIds = new HashSet<string>(
             reservedContentIds?.Where(value => !string.IsNullOrWhiteSpace(value)) ?? Enumerable.Empty<string>(),
             StringComparer.OrdinalIgnoreCase);
+        var contentIdsByPath = new Dictionary<string, string>(Definitions.AttachmentPathIdentity.Comparer);
         foreach (EmailHtmlImageReference reference in document.Images) {
             string path = reference.Source;
             if (string.IsNullOrWhiteSpace(path) || IsNonLocalSource(path) || !File.Exists(path)) continue;
 
+            string canonicalPath = Definitions.AttachmentPathIdentity.Normalize(path);
+            if (uniqueContentIds && contentIdsByPath.TryGetValue(canonicalPath, out string? existingContentId)) {
+                document.SetImageSource(reference.Index, "cid:" + existingContentId);
+                continue;
+            }
             string fileName = Path.GetFileName(path);
             string contentId = uniqueContentIds
-                ? RemoteImageDownloader.CreateContentId(fileName, Path.GetFullPath(path), "local-image", allocatedContentIds)
+                ? RemoteImageDownloader.CreateContentId(fileName, canonicalPath, "local-image", allocatedContentIds)
                 : fileName;
+            if (uniqueContentIds) contentIdsByPath.Add(canonicalPath, contentId);
             document.SetImageSource(reference.Index, "cid:" + contentId);
             images.Add(new LocalImage(path, contentId));
         }

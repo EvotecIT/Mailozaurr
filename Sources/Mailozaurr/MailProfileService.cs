@@ -68,7 +68,15 @@ public sealed class MailProfileService : IMailProfileService {
             return validation;
         }
 
-        await _profileStore.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
+        MailProfile? existing = await _profileStore.GetByIdAsync(profile.Id, cancellationToken).ConfigureAwait(false);
+        if (existing != null && MailProfileKindGuard.IsChanged(existing, profile)) {
+            return KindChangeFailure(existing.Kind, profile.Kind);
+        }
+        try {
+            await _profileStore.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
+        } catch (MailProfileKindChangeException ex) {
+            return KindChangeFailure(ex.ExistingKind, ex.RequestedKind);
+        }
         return OperationResult.Success("Profile saved.");
     }
 
@@ -226,4 +234,9 @@ public sealed class MailProfileService : IMailProfileService {
         result.Errors.Add(message);
         return result;
     }
+
+    private static OperationResult KindChangeFailure(MailProfileKind existingKind, MailProfileKind requestedKind) =>
+        OperationResult.Failure(
+            "profile_kind_change_not_allowed",
+            $"Changing an existing profile provider from '{existingKind}' to '{requestedKind}' is not allowed. Delete and recreate the profile so provider secrets are removed first.");
 }

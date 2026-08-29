@@ -41,6 +41,9 @@ public sealed class InMemoryMailProfileStore : IMailProfileStore, IMailProfileMa
             MailProfile profileToStore = MailProfileCloner.Clone(profile);
             profileToStore.Id = profileToStore.Id.Trim();
             profileToStore.DisplayName = profileToStore.DisplayName.Trim();
+            if (_profiles.TryGetValue(profileToStore.Id, out MailProfile? existingProfile)) {
+                MailProfileKindGuard.EnsureUnchanged(existingProfile, profileToStore);
+            }
 
             if (profileToStore.IsDefault) {
                 foreach (MailProfile existing in _profiles.Values) {

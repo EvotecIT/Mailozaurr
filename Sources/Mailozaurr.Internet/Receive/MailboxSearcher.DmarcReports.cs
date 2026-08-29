@@ -69,8 +69,11 @@ public static partial class MailboxSearcher {
             inspectionPolicy.MaxTotalMimeBytes);
         var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadOnly);
         var search = BuildDmarcReportSearchQuery(since, before, domain);
-        var uids = (await mailFolder.SearchAsync(search, cancellationToken).ConfigureAwait(false))
-            .Take(inspectionPolicy.MaxMessagesScanned)
+        var matchingUids = (await mailFolder.SearchAsync(search, cancellationToken).ConfigureAwait(false))
+            .ToArray();
+        var uids = matchingUids
+            .Skip(Math.Max(0, matchingUids.Length - inspectionPolicy.MaxMessagesScanned))
+            .Reverse()
             .ToArray();
         var results = new List<DmarcReport>();
         if (parallelDownloadLimit <= 1) {
@@ -190,9 +193,10 @@ public static partial class MailboxSearcher {
             inspectionPolicy.MaxMimeBytesPerMessage,
             inspectionPolicy.MaxTotalMimeBytes);
         int messagesToScan = Math.Min(client.Count, inspectionPolicy.MaxMessagesScanned);
+        int firstMessageIndex = client.Count - messagesToScan;
         var results = new List<DmarcReport>();
         if (parallelDownloadLimit <= 1) {
-            for (int idx = 0; idx < messagesToScan; idx++) {
+            for (int idx = client.Count - 1; idx >= firstMessageIndex; idx--) {
                 cancellationToken.ThrowIfCancellationRequested();
                 var msg = await client.GetMessageAsync(
                     idx,
@@ -211,7 +215,7 @@ public static partial class MailboxSearcher {
         } else {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             var workers = new Task[Math.Min(parallelDownloadLimit, messagesToScan)];
-            int next = 0;
+            int next = client.Count - 1;
             int resultCount = 0;
             var gate = new object();
             for (int i = 0; i < workers.Length; i++) {
@@ -219,8 +223,8 @@ public static partial class MailboxSearcher {
                     while (true) {
                         int current;
                         lock (gate) {
-                            if (cts.IsCancellationRequested || next >= messagesToScan || (maxResults > 0 && resultCount >= maxResults)) return;
-                            current = next++;
+                            if (cts.IsCancellationRequested || next < firstMessageIndex || (maxResults > 0 && resultCount >= maxResults)) return;
+                            current = next--;
                         }
                         MimeMessage msg;
                         try {

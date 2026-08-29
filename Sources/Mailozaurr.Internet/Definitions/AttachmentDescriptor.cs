@@ -242,6 +242,7 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
     private byte[]? _buffer;
     private string? _stagedFilePath;
     private long? _materializedLength;
+    private bool _sendAttempted;
     private bool _disposed;
 
     /// <summary>
@@ -287,7 +288,20 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
         }
     }
 
-    internal bool ReleaseAfterSend => !_stagingOptions.RetainStagedContentAfterSend;
+    internal bool ReleaseAfterSend {
+        get {
+            lock (_materializationLock) {
+                return _sendAttempted && !_stagingOptions.RetainStagedContentAfterSend;
+            }
+        }
+    }
+
+    internal void MarkSendAttempted() {
+        lock (_materializationLock) {
+            ThrowIfDisposed();
+            _sendAttempted = true;
+        }
+    }
 
     /// <inheritdoc />
     protected override Stream CreateContentStream() {
@@ -410,6 +424,16 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
 }
 
 internal static class AttachmentDescriptorLifetime {
+    internal static void MarkSendAttempted(params IEnumerable<AttachmentDescriptor>?[] collections) {
+        var marked = new HashSet<StreamAttachmentDescriptor>();
+        foreach (IEnumerable<AttachmentDescriptor>? collection in collections) {
+            if (collection == null) continue;
+            foreach (StreamAttachmentDescriptor descriptor in collection.OfType<StreamAttachmentDescriptor>()) {
+                if (marked.Add(descriptor)) descriptor.MarkSendAttempted();
+            }
+        }
+    }
+
     internal static void ReleaseStaging(params IEnumerable<AttachmentDescriptor>?[] collections) {
         var released = new HashSet<StreamAttachmentDescriptor>();
         foreach (IEnumerable<AttachmentDescriptor>? collection in collections) {

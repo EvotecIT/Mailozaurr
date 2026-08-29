@@ -241,6 +241,7 @@ public class SesClient : IDisposable {
         while (true) {
             try {
                 using HttpRequestMessage request = CreateRequest(body, DateTime.UtcNow);
+                AttachmentDescriptorLifetime.MarkSendAttempted(Attachments, InlineAttachments);
                 using HttpResponseMessage response = await _client.SendAsync(request, cancellationToken);
                 string respContent = await ProviderResponseParser
                     .ReadContentAsync(response, cancellationToken)

@@ -71,6 +71,27 @@ public class HtmlUtilsTests {
     }
 
     [Fact]
+    public void ExtractLocalImages_ReusesContentIdForRepeatedCanonicalPath() {
+        string root = Path.Combine(Path.GetTempPath(), "MailozaurrHtml-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string file = Path.Combine(root, "logo.png");
+        File.WriteAllBytes(file, new byte[] { 1 });
+        try {
+            string equivalentPath = Path.Combine(root, ".", "logo.png");
+
+            var (rendered, images) = HtmlUtils.ExtractLocalImages(
+                $"<img src='{file}'><img src='{equivalentPath}'>");
+
+            HtmlUtils.LocalImage image = Assert.Single(images);
+            Assert.Equal(
+                2,
+                rendered.Split(new[] { "cid:" + image.ContentId }, StringSplitOptions.None).Length - 1);
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ExtractLocalImages_AvoidsContentIdsAlreadyUsedByTheMessage() {
         string file = Path.Combine(Path.GetTempPath(), "logo.png");
         File.WriteAllBytes(file, new byte[] { 1 });

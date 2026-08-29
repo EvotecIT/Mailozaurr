@@ -429,6 +429,7 @@ public sealed class SendGridClient : IDisposable {
                     CancellationTokenSource.CreateLinkedTokenSource(
                         cancellationToken);
                 requestTimeout.CancelAfter(RequestTimeout);
+                AttachmentDescriptorLifetime.MarkSendAttempted(Attachments, InlineAttachments);
                 using var response = await _client.SendAsync(
                     request,
                     requestTimeout.Token).ConfigureAwait(false);

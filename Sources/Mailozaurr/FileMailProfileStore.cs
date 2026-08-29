@@ -47,6 +47,9 @@ public sealed class FileMailProfileStore : IMailProfileStore, IMailProfileMainte
         await _store.UpdateAsync(document => {
             var existingIndex = document.Profiles.FindIndex(p => string.Equals(p.Id, profile.Id, StringComparison.OrdinalIgnoreCase));
             var profileToStore = MailProfileCloner.Clone(profile);
+            if (existingIndex >= 0) {
+                MailProfileKindGuard.EnsureUnchanged(document.Profiles[existingIndex], profileToStore);
+            }
 
             if (profileToStore.IsDefault) {
                 foreach (var existing in document.Profiles) {

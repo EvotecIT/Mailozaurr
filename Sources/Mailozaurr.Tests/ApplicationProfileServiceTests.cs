@@ -168,6 +168,58 @@ public sealed class ApplicationProfileServiceTests {
         Assert.Null(await secretStore.GetSecretAsync("provider", secretName));
     }
 
+    [Fact]
+    public async Task SaveAsyncRejectsProviderKindChangesWithoutReusingSecrets() {
+        var profileStore = new InMemoryMailProfileStore();
+        var secretStore = new BasicSecretStore();
+        var service = new MailProfileService(profileStore, secretStore);
+        await service.SaveAsync(new MailProfile {
+            Id = "provider",
+            DisplayName = "SMTP",
+            Kind = MailProfileKind.Smtp,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Server] = "smtp.example.com"
+            }
+        });
+        await secretStore.SetSecretAsync("provider", MailSecretNames.Password, "smtp-secret");
+
+        OperationResult result = await service.SaveAsync(new MailProfile {
+            Id = "provider",
+            DisplayName = "SendGrid",
+            Kind = MailProfileKind.SendGrid
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("profile_kind_change_not_allowed", result.Code);
+        Assert.Equal(MailProfileKind.Smtp, (await service.GetProfileAsync("provider"))!.Kind);
+        Assert.Equal("smtp-secret", await secretStore.GetSecretAsync("provider", MailSecretNames.Password));
+    }
+
+    [Fact]
+    public async Task InMemoryProfileStoreRejectsProviderKindChangesAtomically() =>
+        await AssertProfileStoreRejectsProviderKindChangeAsync(new InMemoryMailProfileStore());
+
+    [Fact]
+    public async Task FileProfileStoreRejectsProviderKindChangesAtomically() =>
+        await AssertProfileStoreRejectsProviderKindChangeAsync(
+            new FileMailProfileStore(CreateTemporaryFilePath("profiles.json")));
+
+    private static async Task AssertProfileStoreRejectsProviderKindChangeAsync(IMailProfileStore store) {
+        await store.SaveAsync(new MailProfile {
+            Id = "provider",
+            DisplayName = "SMTP",
+            Kind = MailProfileKind.Smtp
+        });
+
+        await Assert.ThrowsAsync<MailProfileKindChangeException>(() => store.SaveAsync(new MailProfile {
+            Id = "provider",
+            DisplayName = "Graph",
+            Kind = MailProfileKind.Graph
+        }));
+
+        Assert.Equal(MailProfileKind.Smtp, (await store.GetByIdAsync("provider"))!.Kind);
+    }
+
     private static string CreateTemporaryFilePath(string fileName) {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

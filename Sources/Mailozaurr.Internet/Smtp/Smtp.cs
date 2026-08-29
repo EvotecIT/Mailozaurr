@@ -502,7 +502,10 @@ public partial class Smtp {
 
         InlineAttachments ??= new List<AttachmentDescriptor>();
         foreach (HtmlUtils.LocalImage image in images) {
-            if (InlineAttachments.Any(d => string.Equals(d.SourcePath, image.Path, StringComparison.OrdinalIgnoreCase))) {
+            if (InlineAttachments.Any(d => d.SourcePath != null &&
+                Definitions.AttachmentPathIdentity.Comparer.Equals(
+                    Definitions.AttachmentPathIdentity.Normalize(d.SourcePath),
+                    Definitions.AttachmentPathIdentity.Normalize(image.Path)))) {
                 continue;
             }
 

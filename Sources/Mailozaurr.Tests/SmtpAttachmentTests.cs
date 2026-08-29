@@ -128,7 +128,7 @@ public class SmtpAttachmentTests {
     }
 
     [Fact]
-    public void SmtpDispose_ReleasesStreamAttachmentStagingOwnedByTheSendOperation() {
+    public void SmtpDispose_PreservesStreamAttachmentStagingWhenNoSendWasAttempted() {
         string directory = Path.Combine(Path.GetTempPath(), "MailozaurrStage-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try {
@@ -148,15 +148,17 @@ public class SmtpAttachmentTests {
 
             smtp.Dispose();
 
+            Assert.Single(Directory.GetFiles(directory));
+            Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, descriptor.GetContentBytes());
+            descriptor.Dispose();
             Assert.Empty(Directory.GetFiles(directory));
-            Assert.Throws<ObjectDisposedException>(() => descriptor.OpenContentStream());
         } finally {
             Directory.Delete(directory, recursive: true);
         }
     }
 
     [Fact]
-    public void SmtpSend_ReleasesStreamAttachmentStagingOnCompletion() {
+    public void SmtpDryRun_PreservesStreamAttachmentStaging() {
         string directory = Path.Combine(Path.GetTempPath(), "MailozaurrStage-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try {
@@ -177,11 +179,13 @@ public class SmtpAttachmentTests {
 
                 smtp.Send();
 
-                Assert.Empty(Directory.GetFiles(directory));
-                Assert.Throws<ObjectDisposedException>(() => descriptor.OpenContentStream());
+                Assert.Single(Directory.GetFiles(directory));
+                Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, descriptor.GetContentBytes());
             } finally {
                 smtp.Dispose();
+                descriptor.Dispose();
             }
+            Assert.Empty(Directory.GetFiles(directory));
         } finally {
             Directory.Delete(directory, recursive: true);
         }
@@ -201,22 +205,39 @@ public class SmtpAttachmentTests {
                 RetainStagedContentAfterSend = true
             });
         try {
-            var smtp = new Smtp {
-                DryRun = true,
-                Attachments = new List<AttachmentDescriptor> { descriptor }
-            };
-            try {
-                descriptor.GetContentBytes();
+            descriptor.GetContentBytes();
+            AttachmentDescriptorLifetime.MarkSendAttempted(new[] { descriptor });
+            AttachmentDescriptorLifetime.ReleaseStaging(new[] { descriptor });
 
-                smtp.Send();
-
-                Assert.Single(Directory.GetFiles(directory));
-                Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, descriptor.GetContentBytes());
-            } finally {
-                smtp.Dispose();
-            }
+            Assert.Single(Directory.GetFiles(directory));
+            Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, descriptor.GetContentBytes());
         } finally {
             descriptor.Dispose();
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void AttachmentDescriptorLifetime_ReleasesStagingAfterTransportAttempt() {
+        string directory = Path.Combine(Path.GetTempPath(), "MailozaurrStage-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var descriptor = new StreamAttachmentDescriptor(
+                new MemoryStream(new byte[] { 1, 2, 3, 4, 5 }),
+                "staged.bin",
+                stagingOptions: new AttachmentStreamStagingOptions {
+                    MemoryThresholdBytes = 2,
+                    MaxBytes = 10,
+                    TempDirectory = directory
+                });
+            descriptor.GetContentBytes();
+
+            AttachmentDescriptorLifetime.MarkSendAttempted(new[] { descriptor });
+            AttachmentDescriptorLifetime.ReleaseStaging(new[] { descriptor });
+
+            Assert.Empty(Directory.GetFiles(directory));
+            Assert.Throws<ObjectDisposedException>(() => descriptor.OpenContentStream());
+        } finally {
             Directory.Delete(directory, recursive: true);
         }
     }

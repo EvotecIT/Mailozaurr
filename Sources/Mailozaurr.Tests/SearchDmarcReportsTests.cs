@@ -84,7 +84,13 @@ public class SearchDmarcReportsTests {
 
     private class TrackingPop3Client : Pop3Client {
         private readonly List<MimeMessage> _messages;
-        public int FetchCount { get; private set; }
+        private readonly object _fetchGate = new();
+        public List<int> FetchedIndexes { get; } = new();
+        public int FetchCount {
+            get {
+                lock (_fetchGate) return FetchedIndexes.Count;
+            }
+        }
         public TrackingPop3Client(IEnumerable<MimeMessage> messages) {
             _messages = new List<MimeMessage>(messages);
         }
@@ -93,7 +99,7 @@ public class SearchDmarcReportsTests {
         public override int Count => _messages.Count;
         public override async Task<MimeMessage> GetMessageAsync(int index, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
             await Task.Yield();
-            FetchCount++;
+            lock (_fetchGate) FetchedIndexes.Add(index);
             return _messages[index];
         }
     }
@@ -182,6 +188,28 @@ public class SearchDmarcReportsTests {
 
         Assert.Single(reports);
         Assert.Equal(1, client.FetchCount);
+        Assert.Equal(new[] { 2 }, client.FetchedIndexes);
+    }
+
+    [Fact]
+    public async Task SearchDmarcReportsAsync_ParallelScanUsesNewestPop3Messages() {
+        var now = DateTimeOffset.UtcNow;
+        using var client = new TrackingPop3Client(new[] {
+            CreateDmarc("one.example", now),
+            CreateDmarc("two.example", now),
+            CreateDmarc("three.example", now),
+            CreateDmarc("four.example", now),
+            CreateDmarc("five.example", now)
+        });
+        var options = new DmarcReportInspectionOptions { MaxMessagesScanned = 2 };
+
+        IList<DmarcReport> reports = await MailboxSearcher.SearchDmarcReportsAsync(
+            client,
+            options,
+            parallelDownloadLimit: 2);
+
+        Assert.Equal(2, reports.Count);
+        Assert.Equal(new[] { 3, 4 }, client.FetchedIndexes.OrderBy(index => index));
     }
 
     [Fact]
@@ -236,6 +264,34 @@ public class SearchDmarcReportsTests {
             CancellationToken.None);
 
         Assert.Equal(5, secondLimit);
+    }
+
+    [Fact]
+    public async Task DmarcMimeDownloadBudget_AllowsReservedDownloadsToRunConcurrently() {
+        var budget = new DmarcMimeDownloadBudget(maxBytesPerMessage: 5, maxTotalBytes: 10);
+        var firstStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        Task<MimeMessage> first = budget.DownloadAsync(
+            async (limit, _) => {
+                firstStarted.TrySetResult(null);
+                await release.Task;
+                return new BoundedMimeMessage(new MimeMessage(), limit);
+            },
+            CancellationToken.None);
+        Task<MimeMessage> second = budget.DownloadAsync(
+            async (limit, _) => {
+                secondStarted.TrySetResult(null);
+                await release.Task;
+                return new BoundedMimeMessage(new MimeMessage(), limit);
+            },
+            CancellationToken.None);
+
+        Task bothStarted = Task.WhenAll(firstStarted.Task, secondStarted.Task);
+        Assert.Same(bothStarted, await Task.WhenAny(bothStarted, Task.Delay(TimeSpan.FromSeconds(2))));
+        release.TrySetResult(null);
+        await Task.WhenAll(first, second);
     }
 
     [Fact]
