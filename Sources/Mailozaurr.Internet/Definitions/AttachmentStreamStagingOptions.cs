@@ -2,11 +2,13 @@ namespace Mailozaurr.Definitions;
 
 /// <summary>Limits legacy one-shot stream materialization into reopenable attachment content.</summary>
 public sealed class AttachmentStreamStagingOptions {
+    internal const long DefaultMaxBytes = 1024L * 1024 * 1024;
+
     /// <summary>Maximum bytes retained in memory before staging switches to a private temporary file.</summary>
     public long MemoryThresholdBytes { get; set; } = 4L * 1024 * 1024;
 
     /// <summary>Maximum bytes accepted from the source stream.</summary>
-    public long MaxBytes { get; set; } = 1024L * 1024 * 1024;
+    public long MaxBytes { get; set; } = DefaultMaxBytes;
 
     /// <summary>Optional directory for staged files. A private Mailozaurr temp directory is used by default.</summary>
     public string? TempDirectory { get; set; }

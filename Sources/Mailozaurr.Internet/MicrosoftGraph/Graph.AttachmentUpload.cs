@@ -56,7 +56,7 @@ public partial class Graph {
         if (fileSize < MinimumUploadSessionAttachmentSize) {
             var directAttachment = source.Descriptor == null
                 ? GraphAttachment.FromFile(attachmentPath!)
-                : GraphAttachment.FromDescriptor(source.Descriptor);
+                : GraphAttachment.FromDescriptor(source.Descriptor, fileSize);
             directAttachmentJson = JsonSerializer.Serialize(directAttachment, GraphJsonContext.Default.GraphAttachment);
         }
 

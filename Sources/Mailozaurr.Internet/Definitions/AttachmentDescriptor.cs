@@ -128,11 +128,59 @@ public abstract class AttachmentDescriptor {
     /// </summary>
     /// <returns>Attachment content represented as a byte array.</returns>
     internal virtual byte[] GetContentBytes() {
+        return GetContentBytes(AttachmentStreamStagingOptions.DefaultMaxBytes, expectedLength: Length);
+    }
+
+    internal virtual byte[] GetContentBytes(long maxBytes, long? expectedLength) {
+        if (maxBytes <= 0) throw new ArgumentOutOfRangeException(nameof(maxBytes));
+        if (expectedLength is < 0) throw new ArgumentOutOfRangeException(nameof(expectedLength));
+        if (expectedLength > maxBytes) {
+            throw new InvalidDataException($"Attachment content exceeds the {maxBytes} byte materialization limit.");
+        }
+
         using var stream = OpenContentStream();
-        using var memory = new MemoryStream();
-        stream.CopyTo(memory);
+        int capacity = expectedLength is > 0
+            ? (int)Math.Min(expectedLength.Value, 64 * 1024)
+            : 0;
+        using var memory = capacity > 0 ? new MemoryStream(capacity) : new MemoryStream();
+        var buffer = new byte[64 * 1024];
+        long total = 0;
+        while (true) {
+            int read = stream.Read(buffer, 0, buffer.Length);
+            if (read == 0) break;
+            total = checked(total + read);
+            if (total > maxBytes) {
+                throw new InvalidDataException($"Attachment content exceeds the {maxBytes} byte materialization limit.");
+            }
+            if (expectedLength.HasValue && total > expectedLength.Value) {
+                throw ContentLengthMismatch(expectedLength.Value, total);
+            }
+            memory.Write(buffer, 0, read);
+        }
+        if (expectedLength.HasValue && total != expectedLength.Value) {
+            throw ContentLengthMismatch(expectedLength.Value, total);
+        }
         return memory.ToArray();
     }
+
+    internal long MeasureContentLength(long maxBytes) {
+        if (maxBytes <= 0) throw new ArgumentOutOfRangeException(nameof(maxBytes));
+        using var stream = OpenContentStream();
+        var buffer = new byte[64 * 1024];
+        long total = 0;
+        while (true) {
+            int read = stream.Read(buffer, 0, buffer.Length);
+            if (read == 0) return total;
+            total = checked(total + read);
+            if (total > maxBytes) {
+                throw new InvalidDataException($"Attachment content exceeds the {maxBytes} byte read limit.");
+            }
+        }
+    }
+
+    private static InvalidDataException ContentLengthMismatch(long declared, long observed) =>
+        new InvalidDataException(
+            $"Attachment content length changed while materializing content (declared {declared}, observed {observed}).");
 
     private static Stream ValidateReadableStream(Stream? stream) {
         if (stream != null && stream.CanRead) return stream;
