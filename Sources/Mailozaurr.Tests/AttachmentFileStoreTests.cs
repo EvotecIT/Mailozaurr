@@ -243,6 +243,33 @@ public sealed class AttachmentFileStoreTests {
             Directory.Delete(directory, recursive: true);
         }
     }
+
+    [Fact]
+    public void Replace_rejects_unix_fifo_without_removing_it() {
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                System.Runtime.InteropServices.OSPlatform.Windows)) return;
+
+        string directory = CreateTestDirectory();
+        string destination = AttachmentFileStore.ResolvePathInDirectory(directory, "report.pipe", "fifo");
+        try {
+            if (mkfifo(destination, Convert.ToUInt32("600", 8)) != 0) {
+                throw new IOException(
+                    "Unable to create the FIFO test fixture.",
+                    new System.ComponentModel.Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error()));
+            }
+
+            Assert.Throws<IOException>(() => AttachmentFileStore.SaveBytesToDirectory(
+                directory,
+                "report.pipe",
+                new byte[] { 9 },
+                AttachmentFileConflictPolicy.Replace,
+                "fifo"));
+            Assert.True(AttachmentFileStore.PathEntryExistsForLease(destination));
+        } finally {
+            File.Delete(destination);
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 #endif
 
     [Fact]
@@ -306,4 +333,7 @@ public sealed class AttachmentFileStoreTests {
         Directory.CreateDirectory(directory);
         return directory;
     }
+
+    [System.Runtime.InteropServices.DllImport("libc", SetLastError = true)]
+    private static extern int mkfifo(string path, uint mode);
 }

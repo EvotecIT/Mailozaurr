@@ -385,7 +385,7 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
     private FileStream CreateStagingFile(out string path) {
         bool usesOwnedDirectory = string.IsNullOrWhiteSpace(_stagingOptions.TempDirectory);
         string directory = usesOwnedDirectory
-            ? Path.Combine(Path.GetTempPath(), "Mailozaurr", "attachments")
+            ? GetDefaultStagingDirectory()
             : Path.GetFullPath(_stagingOptions.TempDirectory!);
         bool directoryExisted = Directory.Exists(directory);
         Directory.CreateDirectory(directory);
@@ -403,6 +403,19 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
         }
         throw new IOException("Unable to create a unique attachment staging file.");
     }
+
+    private static string GetDefaultStagingDirectory() {
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                System.Runtime.InteropServices.OSPlatform.Windows)) {
+            return Path.Combine(Path.GetTempPath(), "Mailozaurr", "attachments");
+        }
+
+        string userDirectory = "Mailozaurr-" + geteuid().ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return Path.Combine(Path.GetTempPath(), userDirectory, "attachments");
+    }
+
+    [System.Runtime.InteropServices.DllImport("libc")]
+    private static extern uint geteuid();
 
     private void Dispose(bool disposing) {
         lock (_materializationLock) {

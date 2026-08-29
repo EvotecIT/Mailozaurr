@@ -10,7 +10,10 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
     private const uint OpenExisting = 3;
     private const uint FileFlagBackupSemantics = 0x02000000;
     private const uint FileFlagOpenReparsePoint = 0x00200000;
-    private const int AtSymlinkNoFollow = 0x100;
+    private const int LinuxAtSymlinkNoFollow = 0x100;
+    private const int DarwinAtSymlinkNoFollow = 0x0020;
+    private const uint UnixFileTypeMask = 0xF000;
+    private const uint UnixRegularFile = 0x8000;
     private readonly List<SafeFileHandle> _windowsHandles = new();
     private SafeFileHandle? _unixDirectory;
 
@@ -110,7 +113,7 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
                 if (TryLinkTemporary(directoryFd, temporaryName, destinationName)) {
                     return new AttachmentFileSaveResult(destinationPath, AttachmentFileSaveAction.Created);
                 }
-                RejectUnixSymbolicLink(directoryFd, destinationName, allowMissing: true);
+                RequireUnixRegularFile(directoryFd, destinationName);
                 if (renameat(directoryFd, temporaryName, directoryFd, destinationName) != 0) {
                     ThrowUnixIOException("replace the attachment destination");
                 }
@@ -217,16 +220,52 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
         }
     }
 
-    private static void RejectUnixSymbolicLink(int directoryFd, string name, bool allowMissing = false) {
+    private static void RejectUnixSymbolicLink(int directoryFd, string name) {
         var buffer = new byte[1];
         long result = readlinkat(directoryFd, name, buffer, new UIntPtr(1));
         if (result >= 0) {
             throw new IOException("Attachment destinations cannot be symbolic links or reparse points.");
         }
         int error = Marshal.GetLastWin32Error();
-        if (error == 22 || allowMissing && error == 2) return;
-        if (error == 2) return;
+        if (error == 22 || error == 2) return;
         ThrowUnixIOException("inspect an attachment destination without following links");
+    }
+
+    /// <summary>
+    /// Verifies the replacement target through the leased directory without following links.
+    /// Native <c>stat</c> layouts expose the file-type bits at architecture-specific offsets.
+    /// Unsupported Unix architectures fail closed rather than replacing an unclassified entry.
+    /// </summary>
+    private static void RequireUnixRegularFile(int directoryFd, string name) {
+        const int statBufferSize = 256;
+        IntPtr statBuffer = Marshal.AllocHGlobal(statBufferSize);
+        try {
+            int noFollowFlag = RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+                ? DarwinAtSymlinkNoFollow
+                : LinuxAtSymlinkNoFollow;
+            if (fstatat(directoryFd, name, statBuffer, noFollowFlag) != 0) {
+                ThrowUnixIOException("inspect an attachment replacement target without following links");
+            }
+
+            uint mode;
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
+                mode = unchecked((ushort)Marshal.ReadInt16(statBuffer, 4));
+            } else {
+                int modeOffset = RuntimeInformation.ProcessArchitecture switch {
+                    Architecture.X64 => 24,
+                    Architecture.Arm64 => 16,
+                    _ => throw new PlatformNotSupportedException(
+                        $"Atomic attachment replacement is not supported on Unix architecture '{RuntimeInformation.ProcessArchitecture}'.")
+                };
+                mode = unchecked((uint)Marshal.ReadInt32(statBuffer, modeOffset));
+            }
+
+            if ((mode & UnixFileTypeMask) != UnixRegularFile) {
+                throw new IOException("Only regular files can be replaced as attachment destinations.");
+            }
+        } finally {
+            Marshal.FreeHGlobal(statBuffer);
+        }
     }
 
     private static int UnixOpenDirectoryFlags() => RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
@@ -270,6 +309,7 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
     [DllImport("libc", SetLastError = true)] private static extern int unlinkat(int directoryFd, string path, int flags);
     [DllImport("libc", SetLastError = true)] private static extern int renameat(int oldDirectoryFd, string oldPath, int newDirectoryFd, string newPath);
     [DllImport("libc", SetLastError = true)] private static extern long readlinkat(int directoryFd, string path, byte[] buffer, UIntPtr bufferSize);
+    [DllImport("libc", SetLastError = true)] private static extern int fstatat(int directoryFd, string path, IntPtr statBuffer, int flags);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct ByHandleFileInformation {

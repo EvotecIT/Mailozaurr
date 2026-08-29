@@ -262,6 +262,15 @@ public partial class Graph {
     /// Sends the current message using Microsoft Graph batch requests.
     /// </summary>
     public async Task<GraphSmtpResult> SendMessageBatchAsync(CancellationToken cancellationToken = default) {
+        try {
+            return await SendMessageBatchCoreAsync(cancellationToken).ConfigureAwait(false);
+        } finally {
+            AttachmentDescriptorLifetime.ReleaseStaging(
+                Attachments?.OfType<Mailozaurr.Definitions.AttachmentDescriptor>());
+        }
+    }
+
+    private async Task<GraphSmtpResult> SendMessageBatchCoreAsync(CancellationToken cancellationToken) {
         var operationStopwatch = StartOperationTimer();
         CreateMessage();
         if (DryRun) {

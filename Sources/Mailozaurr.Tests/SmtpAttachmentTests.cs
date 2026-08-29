@@ -281,6 +281,39 @@ public class SmtpAttachmentTests {
 
 #if NET8_0_OR_GREATER
     [Fact]
+    public void StreamAttachmentDescriptor_UsesPerUserDefaultStagingDirectoryOnUnix() {
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                System.Runtime.InteropServices.OSPlatform.Windows)) return;
+
+        using var source = new MemoryStream(new byte[] { 1, 2, 3, 4, 5 });
+        var descriptor = new StreamAttachmentDescriptor(
+            source,
+            "staged.bin",
+            stagingOptions: new AttachmentStreamStagingOptions {
+                MemoryThresholdBytes = 2,
+                MaxBytes = 10
+            });
+        string stagedPath;
+        try {
+            descriptor.GetContentBytes();
+            var stagedPathField = typeof(StreamAttachmentDescriptor).GetField(
+                "_stagedFilePath",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            stagedPath = Assert.IsType<string>(stagedPathField.GetValue(descriptor));
+
+            Assert.True(File.Exists(stagedPath));
+            Assert.Equal("attachments", Path.GetFileName(Path.GetDirectoryName(stagedPath)));
+            Assert.Equal(
+                "Mailozaurr-" + geteuid().ToString(System.Globalization.CultureInfo.InvariantCulture),
+                Directory.GetParent(Path.GetDirectoryName(stagedPath)!)!.Name);
+        } finally {
+            descriptor.Dispose();
+        }
+
+        Assert.False(File.Exists(stagedPath));
+    }
+
+    [Fact]
     public void StreamAttachmentDescriptor_PreservesExistingCallerDirectoryPermissions() {
         if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
             System.Runtime.InteropServices.OSPlatform.Windows)) return;
@@ -307,6 +340,9 @@ public class SmtpAttachmentTests {
             Directory.Delete(directory, recursive: true);
         }
     }
+
+    [System.Runtime.InteropServices.DllImport("libc")]
+    private static extern uint geteuid();
 #endif
 
     private sealed class NonSeekableReadStream : Stream {

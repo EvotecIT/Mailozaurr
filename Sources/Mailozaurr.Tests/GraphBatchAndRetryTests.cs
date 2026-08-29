@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
@@ -40,6 +41,10 @@ public class GraphBatchAndRetryTests {
     }
 
     private class BatchHandler : HttpMessageHandler {
+        private readonly int _batchStatus;
+
+        internal BatchHandler(int batchStatus = 202) => _batchStatus = batchStatus;
+
         public HttpRequestMessage? BatchRequest;
         public string? BatchPayload;
 
@@ -55,7 +60,7 @@ public class GraphBatchAndRetryTests {
                 if (request.Content is not null) {
                     BatchPayload = await request.Content.ReadAsStringAsync().ConfigureAwait(false);
                 }
-                var json = "{\"responses\":[{\"id\":\"1\",\"status\":202}]}";
+                var json = $"{{\"responses\":[{{\"id\":\"1\",\"status\":{_batchStatus}}}]}}";
                 return new HttpResponseMessage(HttpStatusCode.OK) {
                     Content = new StringContent(json)
                 };
@@ -103,6 +108,51 @@ public class GraphBatchAndRetryTests {
             Assert.Equal("sub", req.GetProperty("body").GetProperty("message").GetProperty("subject").GetString());
         } finally {
             handlerField.SetValue(client, original);
+        }
+    }
+
+    [Theory]
+    [InlineData(202, true)]
+    [InlineData(500, false)]
+    public async Task SendMessageBatchAsync_ReleasesStagedStreamAttachmentAfterTransportAttempt(
+        int batchStatus,
+        bool expectedSuccess) {
+        string directory = Path.Combine(Path.GetTempPath(), "MailozaurrStage-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var handler = new BatchHandler(batchStatus);
+        var field = typeof(MicrosoftGraphUtils).GetField("HttpClient", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var client = (HttpClient)field.GetValue(null)!;
+        var handlerField = GetHandlerField();
+        var original = (HttpMessageHandler)handlerField.GetValue(client)!;
+        handlerField.SetValue(client, handler);
+        try {
+            var descriptor = new Mailozaurr.Definitions.StreamAttachmentDescriptor(
+                new MemoryStream(new byte[] { 1, 2, 3, 4, 5 }),
+                "staged.bin",
+                leaveStreamOpen: false,
+                stagingOptions: new Mailozaurr.Definitions.AttachmentStreamStagingOptions {
+                    MemoryThresholdBytes = 2,
+                    MaxBytes = 10,
+                    TempDirectory = directory
+                });
+            using var graph = new Graph {
+                From = "sender@example.com",
+                To = new object[] { "recipient@example.com" },
+                Subject = "staged batch",
+                HTML = "body",
+                ContentType = "HTML",
+                Attachments = new object[] { descriptor }
+            };
+            graph.Authenticate(new System.Net.NetworkCredential("id@tenant", "secret"));
+
+            GraphSmtpResult result = await graph.SendMessageBatchAsync();
+
+            Assert.Equal(expectedSuccess, result.Status);
+            Assert.Empty(Directory.GetFiles(directory));
+            Assert.Throws<ObjectDisposedException>(() => descriptor.OpenContentStream());
+        } finally {
+            handlerField.SetValue(client, original);
+            Directory.Delete(directory, recursive: true);
         }
     }
 
