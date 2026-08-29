@@ -4,6 +4,21 @@ namespace Mailozaurr.Tests;
 
 public sealed class ApplicationProfileSecretServiceTests {
     [Fact]
+    public void InterfacePreservesLegacySecretReferenceOverload() {
+        var method = typeof(IMailProfileSecretService).GetMethod(
+            nameof(IMailProfileSecretService.SetSecretAsync),
+            new[] {
+                typeof(string),
+                typeof(string),
+                typeof(string),
+                typeof(string),
+                typeof(CancellationToken)
+            });
+
+        Assert.NotNull(method);
+    }
+
+    [Fact]
     public async Task SetSecretAsyncRequiresExistingProfile() {
         var profileStore = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
         var secretStore = new FileMailSecretStore(CreateTemporaryFilePath("secrets.json"), new TestCredentialProtector());

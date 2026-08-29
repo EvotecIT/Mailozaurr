@@ -2,12 +2,21 @@ using Mailozaurr.Definitions;
 using MimeKit;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using Xunit;
 
 namespace Mailozaurr.Tests;
 
 public class SmtpAttachmentTests {
+    [Fact]
+    public void StreamAttachmentDescriptor_PreservesLegacyThreeParameterConstructor() {
+        ConstructorInfo? constructor = typeof(StreamAttachmentDescriptor).GetConstructor(
+            new[] { typeof(Stream), typeof(string), typeof(bool) });
+
+        Assert.NotNull(constructor);
+    }
+
     [Fact]
     public void CreateMessage_MissingAttachment_Throws() {
         var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());

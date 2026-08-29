@@ -20,12 +20,21 @@ public sealed class MailProfileSecretService : IMailProfileSecretService {
         SetSecretAsync(profileId, secretName, secretValue, null, false, cancellationToken);
 
     /// <inheritdoc />
+    public Task<OperationResult> SetSecretAsync(
+        string profileId,
+        string secretName,
+        string? secretValue,
+        string? secretReference,
+        CancellationToken cancellationToken = default) =>
+        SetSecretAsync(profileId, secretName, secretValue, secretReference, false, cancellationToken);
+
+    /// <inheritdoc />
     public async Task<OperationResult> SetSecretAsync(
         string profileId,
         string secretName,
         string? secretValue,
         string? secretReference,
-        bool allowCrossProfileReference = false,
+        bool allowCrossProfileReference,
         CancellationToken cancellationToken = default) {
         var validationResult = await ValidateAsync(profileId, secretName, cancellationToken).ConfigureAwait(false);
         if (!validationResult.Succeeded) {

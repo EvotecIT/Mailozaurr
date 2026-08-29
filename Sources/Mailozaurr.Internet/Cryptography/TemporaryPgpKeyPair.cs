@@ -45,6 +45,23 @@ public sealed class TemporaryPgpKeyPair : IDisposable {
     /// <param name="keySize">RSA key size.</param>
     /// <param name="outputDirectory">Optional output directory; if null, a random temp directory is used.</param>
     /// <param name="deleteOnDispose">When true, deletes the generated files on dispose.</param>
+    /// <returns>Instance representing the created key pair.</returns>
+    public static TemporaryPgpKeyPair Create(
+        string identity,
+        string passPhrase,
+        int keySize,
+        string? outputDirectory,
+        bool deleteOnDispose) =>
+        Create(identity, passPhrase, keySize, outputDirectory, deleteOnDispose, allowUnprotectedPrivateKey: false);
+
+    /// <summary>
+    /// Generates a temporary PGP key pair stored in a transient directory.
+    /// </summary>
+    /// <param name="identity">Identity for the key pair.</param>
+    /// <param name="passPhrase">Passphrase protecting the private key.</param>
+    /// <param name="keySize">RSA key size.</param>
+    /// <param name="outputDirectory">Optional output directory; if null, a random temp directory is used.</param>
+    /// <param name="deleteOnDispose">When true, deletes the generated files on dispose.</param>
     /// <param name="allowUnprotectedPrivateKey">When true, preserves an explicitly empty passphrase. Otherwise an empty passphrase is replaced with a cryptographically random value.</param>
     /// <returns>Instance representing the created key pair.</returns>
     public static TemporaryPgpKeyPair Create(

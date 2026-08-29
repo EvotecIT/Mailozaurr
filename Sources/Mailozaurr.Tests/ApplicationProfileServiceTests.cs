@@ -195,6 +195,78 @@ public sealed class ApplicationProfileServiceTests {
         Assert.Equal("smtp-secret", await secretStore.GetSecretAsync("provider", MailSecretNames.Password));
     }
 
+    [Theory]
+    [InlineData(MailProfileKind.Smtp, MailProfileSettingsKeys.Server, "smtp.example.com", "smtp.attacker.example")]
+    [InlineData(MailProfileKind.Imap, MailProfileSettingsKeys.Port, "993", "143")]
+    [InlineData(MailProfileKind.Pop3, MailProfileSettingsKeys.SecureSocketOptions, "SslOnConnect", "None")]
+    [InlineData(MailProfileKind.Smtp, MailProfileSettingsKeys.UseSsl, "true", "false")]
+    [InlineData(MailProfileKind.Pop3, MailProfileSettingsKeys.SkipCertificateRevocation, "false", "true")]
+    [InlineData(MailProfileKind.Imap, MailProfileSettingsKeys.SkipCertificateValidation, "false", "true")]
+    [InlineData(MailProfileKind.Jmap, MailProfileSettingsKeys.JmapSessionUrl, "https://mail.example.com/.well-known/jmap", "https://mail.attacker.example/.well-known/jmap")]
+    [InlineData(MailProfileKind.Jmap, MailProfileSettingsKeys.JmapAllowCrossOriginApiUrl, "false", "true")]
+    public async Task SaveAsyncRejectsCredentialContextChangesWithoutRedirectingSecrets(
+        MailProfileKind kind,
+        string setting,
+        string originalValue,
+        string changedValue) {
+        var profileStore = new InMemoryMailProfileStore();
+        var secretStore = new BasicSecretStore();
+        var service = new MailProfileService(profileStore, secretStore);
+        var originalSettings = CreateValidSettings(kind);
+        originalSettings[setting] = originalValue;
+        await service.SaveAsync(new MailProfile {
+            Id = "provider",
+            DisplayName = kind.ToString(),
+            Kind = kind,
+            Settings = originalSettings
+        });
+        await secretStore.SetSecretAsync("provider", MailSecretNames.Password, "retained-secret");
+
+        var changedSettings = CreateValidSettings(kind);
+        changedSettings[setting] = changedValue;
+        OperationResult result = await service.SaveAsync(new MailProfile {
+            Id = "provider",
+            DisplayName = "Changed",
+            Kind = kind,
+            Settings = changedSettings
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("profile_credential_context_change_not_allowed", result.Code);
+        Assert.Equal(originalValue, (await service.GetProfileAsync("provider"))!.Settings[setting]);
+        Assert.Equal("retained-secret", await secretStore.GetSecretAsync("provider", MailSecretNames.Password));
+    }
+
+    [Fact]
+    public async Task SaveAsyncAllowsNonCredentialSettingsAndEquivalentEndpointFormatting() {
+        var store = new InMemoryMailProfileStore();
+        var service = new MailProfileService(store);
+        await service.SaveAsync(new MailProfile {
+            Id = "imap",
+            DisplayName = "IMAP",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Server] = "IMAP.Example.com",
+                [MailProfileSettingsKeys.Port] = "0993",
+                [MailProfileSettingsKeys.Folder] = "Inbox"
+            }
+        });
+
+        OperationResult result = await service.SaveAsync(new MailProfile {
+            Id = "imap",
+            DisplayName = "Updated IMAP",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Server] = "imap.example.com",
+                [MailProfileSettingsKeys.Port] = "993",
+                [MailProfileSettingsKeys.Folder] = "Archive"
+            }
+        });
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("Archive", (await service.GetProfileAsync("imap"))!.Settings[MailProfileSettingsKeys.Folder]);
+    }
+
     [Fact]
     public async Task InMemoryProfileStoreRejectsProviderKindChangesAtomically() =>
         await AssertProfileStoreRejectsProviderKindChangeAsync(new InMemoryMailProfileStore());
@@ -202,6 +274,15 @@ public sealed class ApplicationProfileServiceTests {
     [Fact]
     public async Task FileProfileStoreRejectsProviderKindChangesAtomically() =>
         await AssertProfileStoreRejectsProviderKindChangeAsync(
+            new FileMailProfileStore(CreateTemporaryFilePath("profiles.json")));
+
+    [Fact]
+    public async Task InMemoryProfileStoreRejectsCredentialContextChangesAtomically() =>
+        await AssertProfileStoreRejectsCredentialContextChangeAsync(new InMemoryMailProfileStore());
+
+    [Fact]
+    public async Task FileProfileStoreRejectsCredentialContextChangesAtomically() =>
+        await AssertProfileStoreRejectsCredentialContextChangeAsync(
             new FileMailProfileStore(CreateTemporaryFilePath("profiles.json")));
 
     private static async Task AssertProfileStoreRejectsProviderKindChangeAsync(IMailProfileStore store) {
@@ -219,6 +300,39 @@ public sealed class ApplicationProfileServiceTests {
 
         Assert.Equal(MailProfileKind.Smtp, (await store.GetByIdAsync("provider"))!.Kind);
     }
+
+    private static async Task AssertProfileStoreRejectsCredentialContextChangeAsync(IMailProfileStore store) {
+        await store.SaveAsync(new MailProfile {
+            Id = "provider",
+            DisplayName = "JMAP",
+            Kind = MailProfileKind.Jmap,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.JmapSessionUrl] = "https://mail.example.com/.well-known/jmap"
+            }
+        });
+
+        await Assert.ThrowsAsync<MailProfileCredentialContextChangeException>(() => store.SaveAsync(new MailProfile {
+            Id = "provider",
+            DisplayName = "Redirected JMAP",
+            Kind = MailProfileKind.Jmap,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.JmapSessionUrl] = "https://mail.attacker.example/.well-known/jmap"
+            }
+        }));
+
+        Assert.Equal(
+            "https://mail.example.com/.well-known/jmap",
+            (await store.GetByIdAsync("provider"))!.Settings[MailProfileSettingsKeys.JmapSessionUrl]);
+    }
+
+    private static Dictionary<string, string> CreateValidSettings(MailProfileKind kind) =>
+        kind == MailProfileKind.Jmap
+            ? new Dictionary<string, string> {
+                [MailProfileSettingsKeys.JmapSessionUrl] = "https://mail.example.com/.well-known/jmap"
+            }
+            : new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Server] = "mail.example.com"
+            };
 
     private static string CreateTemporaryFilePath(string fileName) {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));

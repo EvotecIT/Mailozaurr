@@ -20,6 +20,16 @@ namespace Mailozaurr;
 /// </summary>
 public static class TemporarySmimeCertificate {
     /// <summary>
+    /// Creates a self-signed certificate for testing purposes using the legacy signature.
+    /// </summary>
+    /// <param name="subjectName">Subject name of the certificate.</param>
+    /// <param name="validDays">Number of days the certificate is valid.</param>
+    /// <param name="outputPath">Optional path to save the PFX file. File export requires the password-aware overload.</param>
+    /// <returns>A new <see cref="X509Certificate2"/> instance.</returns>
+    public static X509Certificate2 CreateSelfSigned(string subjectName, int validDays, string? outputPath) =>
+        CreateSelfSigned(subjectName, validDays, outputPath, outputPassword: null);
+
+    /// <summary>
     /// Creates a self-signed certificate for testing purposes.
     /// </summary>
     /// <param name="subjectName">Subject name of the certificate.</param>

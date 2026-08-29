@@ -49,6 +49,7 @@ public sealed class FileMailProfileStore : IMailProfileStore, IMailProfileMainte
             var profileToStore = MailProfileCloner.Clone(profile);
             if (existingIndex >= 0) {
                 MailProfileKindGuard.EnsureUnchanged(document.Profiles[existingIndex], profileToStore);
+                MailProfileCredentialContextGuard.EnsureUnchanged(document.Profiles[existingIndex], profileToStore);
             }
 
             if (profileToStore.IsDefault) {

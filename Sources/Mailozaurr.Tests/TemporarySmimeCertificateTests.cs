@@ -1,4 +1,5 @@
 using Mailozaurr;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using Xunit;
@@ -6,6 +7,21 @@ using Xunit;
 namespace Mailozaurr.Tests;
 
 public class TemporarySmimeCertificateTests {
+    [Fact]
+    public void CreateSelfSigned_PreservesLegacyThreeParameterSignature() {
+        MethodInfo? method = typeof(TemporarySmimeCertificate).GetMethod(
+            nameof(TemporarySmimeCertificate.CreateSelfSigned),
+            new[] { typeof(string), typeof(int), typeof(string) });
+
+        Assert.NotNull(method);
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return;
+        using X509Certificate2 certificate = TemporarySmimeCertificate.CreateSelfSigned(
+            "CN=Legacy Mailozaurr Test",
+            1,
+            null);
+        Assert.True(certificate.HasPrivateKey);
+    }
+
     [Fact]
     public void CreateSelfSigned_RequiresAPasswordForPfxExport() {
         Assert.Throws<ArgumentException>(() => TemporarySmimeCertificate.CreateSelfSigned(outputPath: "certificate.pfx"));

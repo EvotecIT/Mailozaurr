@@ -9,6 +9,17 @@ namespace Mailozaurr.Tests;
 
 public class TemporaryPgpKeyPairTests {
     [Fact]
+    public void Create_PreservesLegacyFiveParameterSignature() {
+        MethodInfo? method = typeof(TemporaryPgpKeyPair).GetMethod(
+            nameof(TemporaryPgpKeyPair.Create),
+            new[] { typeof(string), typeof(string), typeof(int), typeof(string), typeof(bool) });
+
+        Assert.NotNull(method);
+        using var keys = TemporaryPgpKeyPair.Create("legacy@example.test", "", 2048, null, true);
+        Assert.False(string.IsNullOrEmpty(keys.PassPhrase));
+    }
+
+    [Fact]
     public void Create_ReturnsFiles() {
         using var keys = TemporaryPgpKeyPair.Create("a@b.com");
         Assert.True(File.Exists(keys.PublicKeyPath));

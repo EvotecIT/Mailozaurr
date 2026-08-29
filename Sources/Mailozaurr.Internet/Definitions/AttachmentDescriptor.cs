@@ -252,6 +252,16 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
     /// <param name="stream">Readable stream that provides the attachment content.</param>
     /// <param name="fileName">File name to associate with the attachment.</param>
     /// <param name="leaveStreamOpen">Whether the provided stream should remain open after being read.</param>
+    public StreamAttachmentDescriptor(Stream stream, string fileName, bool leaveStreamOpen) :
+        this(stream, fileName, leaveStreamOpen, stagingOptions: null) {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="StreamAttachmentDescriptor"/> class.
+    /// </summary>
+    /// <param name="stream">Readable stream that provides the attachment content.</param>
+    /// <param name="fileName">File name to associate with the attachment.</param>
+    /// <param name="leaveStreamOpen">Whether the provided stream should remain open after being read.</param>
     /// <param name="stagingOptions">Optional memory, temporary-file, and maximum-size staging limits.</param>
     public StreamAttachmentDescriptor(
         Stream stream,

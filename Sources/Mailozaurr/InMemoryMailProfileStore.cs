@@ -43,6 +43,7 @@ public sealed class InMemoryMailProfileStore : IMailProfileStore, IMailProfileMa
             profileToStore.DisplayName = profileToStore.DisplayName.Trim();
             if (_profiles.TryGetValue(profileToStore.Id, out MailProfile? existingProfile)) {
                 MailProfileKindGuard.EnsureUnchanged(existingProfile, profileToStore);
+                MailProfileCredentialContextGuard.EnsureUnchanged(existingProfile, profileToStore);
             }
 
             if (profileToStore.IsDefault) {

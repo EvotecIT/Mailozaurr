@@ -13,7 +13,15 @@ public interface IMailProfileSecretService {
         string secretName,
         string? secretValue,
         string? secretReference,
-        bool allowCrossProfileReference = false,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Saves or replaces a secret for an existing profile, optionally by copying from another stored secret reference.</summary>
+    Task<OperationResult> SetSecretAsync(
+        string profileId,
+        string secretName,
+        string? secretValue,
+        string? secretReference,
+        bool allowCrossProfileReference,
         CancellationToken cancellationToken = default);
 
     /// <summary>Removes a secret from an existing profile.</summary>

@@ -370,7 +370,15 @@ public sealed class ApplicationProfileBootstrapServiceTests {
             string secretName,
             string? secretValue,
             string? secretReference,
-            bool allowCrossProfileReference = false,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(OperationResult.Failure("secret_write_failed", "Simulated secret write failure."));
+
+        public Task<OperationResult> SetSecretAsync(
+            string profileId,
+            string secretName,
+            string? secretValue,
+            string? secretReference,
+            bool allowCrossProfileReference,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(OperationResult.Failure("secret_write_failed", "Simulated secret write failure."));
 

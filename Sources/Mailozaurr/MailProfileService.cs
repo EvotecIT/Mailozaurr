@@ -72,10 +72,18 @@ public sealed class MailProfileService : IMailProfileService {
         if (existing != null && MailProfileKindGuard.IsChanged(existing, profile)) {
             return KindChangeFailure(existing.Kind, profile.Kind);
         }
+        if (existing != null) {
+            string? changedSetting = MailProfileCredentialContextGuard.GetChangedSetting(existing, profile);
+            if (changedSetting != null) {
+                return CredentialContextChangeFailure(existing.Kind, changedSetting);
+            }
+        }
         try {
             await _profileStore.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
         } catch (MailProfileKindChangeException ex) {
             return KindChangeFailure(ex.ExistingKind, ex.RequestedKind);
+        } catch (MailProfileCredentialContextChangeException ex) {
+            return CredentialContextChangeFailure(ex.ProfileKind, ex.ChangedSetting);
         }
         return OperationResult.Success("Profile saved.");
     }
@@ -239,4 +247,9 @@ public sealed class MailProfileService : IMailProfileService {
         OperationResult.Failure(
             "profile_kind_change_not_allowed",
             $"Changing an existing profile provider from '{existingKind}' to '{requestedKind}' is not allowed. Delete and recreate the profile so provider secrets are removed first.");
+
+    private static OperationResult CredentialContextChangeFailure(MailProfileKind profileKind, string changedSetting) =>
+        OperationResult.Failure(
+            "profile_credential_context_change_not_allowed",
+            $"Changing credential-context setting '{changedSetting}' on an existing {profileKind} profile is not allowed. Delete and recreate the profile so stored credentials are removed first.");
 }
