@@ -25,6 +25,9 @@ namespace Mailozaurr;
 /// are serialized so that only one send executes at a time per instance.</para>
 /// </remarks>
 public partial class Smtp {
+    internal void MarkTransportAttempted() =>
+        AttachmentDescriptorLifetime.MarkSendAttempted(Attachments, InlineAttachments);
+
     private static ClientSmtp CreateDefaultClient(ProtocolLogger? logger) => logger == null ? new ClientSmtp() : new ClientSmtp(logger);
 
     /// <summary>Factory used to create <see cref="ClientSmtp"/> instances.</summary>

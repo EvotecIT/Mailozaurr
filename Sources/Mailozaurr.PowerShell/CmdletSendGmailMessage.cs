@@ -97,7 +97,11 @@ public sealed class CmdletSendGmailMessage : AsyncPSCmdlet {
             smtp.CreateMessage();
             using var client = new GmailApiClient(oauth);
             if (ShouldProcess(GmailAccount!, "Sending email message via Gmail API")) {
-                var result = await client.SendAsync(GmailAccount!, smtp.Message, CancelToken);
+                var result = await client.SendAsync(
+                    GmailAccount!,
+                    smtp.Message,
+                    smtp.MarkTransportAttempted,
+                    CancelToken);
                 WriteObject(result);
             } else {
                 WriteObject(new SmtpResult(false, EmailAction.Send, smtp.SentTo, smtp.SentFrom, "GmailApi", 0, smtp.Stopwatch.Elapsed, string.Empty, "Email not sent (WhatIf)"));

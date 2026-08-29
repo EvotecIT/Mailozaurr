@@ -295,6 +295,35 @@ public class SearchDmarcReportsTests {
     }
 
     [Fact]
+    public async Task DmarcMimeDownloadBudget_WaitsForInFlightRefundBeforeRejecting() {
+        var budget = new DmarcMimeDownloadBudget(maxBytesPerMessage: 5, maxTotalBytes: 5);
+        var firstStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        long secondLimit = 0;
+
+        Task<MimeMessage> first = budget.DownloadAsync(
+            async (limit, _) => {
+                firstStarted.TrySetResult(null);
+                await releaseFirst.Task;
+                return new BoundedMimeMessage(new MimeMessage(), 1);
+            },
+            CancellationToken.None);
+        await firstStarted.Task;
+        Task<MimeMessage> second = budget.DownloadAsync(
+            (limit, _) => {
+                secondLimit = limit;
+                return Task.FromResult(new BoundedMimeMessage(new MimeMessage(), limit));
+            },
+            CancellationToken.None);
+
+        Assert.False(second.IsCompleted);
+        releaseFirst.TrySetResult(null);
+        await Task.WhenAll(first, second);
+
+        Assert.Equal(4, secondLimit);
+    }
+
+    [Fact]
     public void FilterDmarcReports_ExtractsAttachments() {
         var now = DateTimeOffset.UtcNow;
         var msg = CreateDmarc("example.com", now);
@@ -476,7 +505,7 @@ public class SearchDmarcReportsTests {
             using var cts = new CancellationTokenSource();
             var searchTask = GraphMailboxSearcher.SearchDmarcReportsAsync(
                 cred,
-                "user@example.com",
+                "user/name@example.com",
                 cancellationToken: cts.Token);
 
             var startedTask = handler.MimeStarted.Task;
@@ -488,6 +517,8 @@ public class SearchDmarcReportsTests {
             await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await searchTask);
 
             Assert.True(handler.MimeRequestCanceled);
+            Assert.Contains("user%2Fname%40example.com", handler.MimeRequestUri!.AbsoluteUri, StringComparison.Ordinal);
+            Assert.Contains("A%2FB%23C", handler.MimeRequestUri.AbsoluteUri, StringComparison.Ordinal);
         } finally {
             handlerField.SetValue(client, original);
         }
@@ -709,6 +740,7 @@ public class SearchDmarcReportsTests {
     private sealed class CancelDuringGraphMimeHandler : HttpMessageHandler {
         public TaskCompletionSource<object?> MimeStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool MimeRequestCanceled { get; private set; }
+        public Uri? MimeRequestUri { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
             var uri = request.RequestUri!;
@@ -718,11 +750,12 @@ public class SearchDmarcReportsTests {
             }
 
             if (uri.AbsolutePath.EndsWith("/messages", StringComparison.Ordinal)) {
-                var json = "{\"value\":[{\"id\":\"1\"}]}";
+                var json = "{\"value\":[{\"id\":\"A/B#C\"}]}";
                 return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) };
             }
 
             if (uri.AbsolutePath.IndexOf("/messages/", StringComparison.Ordinal) >= 0 && uri.AbsolutePath.EndsWith("/$value", StringComparison.Ordinal)) {
+                MimeRequestUri = uri;
                 MimeStarted.TrySetResult(null);
                 try {
                     await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken).ConfigureAwait(false);

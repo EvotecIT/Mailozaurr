@@ -449,7 +449,7 @@ public partial class Smtp {
         if (readinessResult != null) {
             return readinessResult;
         }
-        AttachmentDescriptorLifetime.MarkSendAttempted(Attachments, InlineAttachments);
+        MarkTransportAttempted();
 
         do {
             try {

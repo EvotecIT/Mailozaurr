@@ -13,8 +13,12 @@ internal readonly struct BoundedMimeMessage {
 }
 
 internal sealed class DmarcMimeDownloadBudget {
+    private readonly object _reservationGate = new();
+    private readonly SemaphoreSlim _reservationChanged = new(0, int.MaxValue);
     private readonly long _maxBytesPerMessage;
     private long _remainingBytes;
+    private int _activeReservations;
+    private int _waitingReservations;
 
     internal DmarcMimeDownloadBudget(long maxBytesPerMessage, long maxTotalBytes) {
         _maxBytesPerMessage = maxBytesPerMessage;
@@ -28,29 +32,62 @@ internal sealed class DmarcMimeDownloadBudget {
         Func<long, CancellationToken, Task<BoundedMimeMessage>> download,
         CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
-        long limit = ReserveAllowance();
+        long limit = await ReserveAllowanceAsync(cancellationToken).ConfigureAwait(false);
+        long refund = 0;
         // Reserve the complete per-message allowance before any provider I/O. Successful
         // downloads refund unused bytes, while malformed, truncated, or canceled transfers
         // retain the reservation so repeated failures cannot bypass the aggregate limit.
-        BoundedMimeMessage result = await download(limit, cancellationToken).ConfigureAwait(false);
-        if (result.ByteCount < 0 || result.ByteCount > limit) {
-            throw new InvalidDataException("DMARC MIME message exceeded the configured byte limit.");
+        try {
+            BoundedMimeMessage result = await download(limit, cancellationToken).ConfigureAwait(false);
+            if (result.ByteCount < 0 || result.ByteCount > limit) {
+                throw new InvalidDataException("DMARC MIME message exceeded the configured byte limit.");
+            }
+            refund = limit - result.ByteCount;
+            return result.Message;
+        } finally {
+            CompleteReservation(refund);
         }
-        Interlocked.Add(ref _remainingBytes, limit - result.ByteCount);
-        return result.Message;
     }
 
-    private long ReserveAllowance() {
+    private async Task<long> ReserveAllowanceAsync(CancellationToken cancellationToken) {
+        bool registeredWaiter = false;
         while (true) {
-            long remaining = Interlocked.Read(ref _remainingBytes);
-            long limit = Math.Min(_maxBytesPerMessage, remaining);
-            if (limit <= 0) {
-                throw new InvalidDataException("DMARC MIME downloads exceeded the configured total byte limit.");
+            lock (_reservationGate) {
+                if (registeredWaiter) {
+                    _waitingReservations--;
+                    registeredWaiter = false;
+                }
+                long limit = Math.Min(_maxBytesPerMessage, _remainingBytes);
+                if (limit > 0) {
+                    _remainingBytes -= limit;
+                    _activeReservations++;
+                    return limit;
+                }
+                if (_activeReservations == 0) {
+                    throw new InvalidDataException("DMARC MIME downloads exceeded the configured total byte limit.");
+                }
+                _waitingReservations++;
+                registeredWaiter = true;
             }
-            if (Interlocked.CompareExchange(ref _remainingBytes, remaining - limit, remaining) == remaining) {
-                return limit;
+            try {
+                await _reservationChanged.WaitAsync(cancellationToken).ConfigureAwait(false);
+            } catch {
+                lock (_reservationGate) {
+                    if (registeredWaiter) _waitingReservations--;
+                }
+                throw;
             }
         }
+    }
+
+    private void CompleteReservation(long refund) {
+        int waiting;
+        lock (_reservationGate) {
+            _remainingBytes += refund;
+            _activeReservations--;
+            waiting = _waitingReservations;
+        }
+        if (waiting > 0) _reservationChanged.Release(waiting);
     }
 
     private void Consume(long count) {

@@ -237,7 +237,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
                 if (account == null || account.Length == 0) {
                     throw new ArgumentException("GmailAccount is required when using Gmail API.", nameof(GmailAccount));
                 }
-                var msg = client.SendAsync(account, smtp.Message).GetAwaiter().GetResult();
+                var msg = client.SendAsync(account, smtp.Message, smtp.MarkTransportAttempted).GetAwaiter().GetResult();
                 if (!Suppress) {
                     WriteObject(new SmtpResult(true, EmailAction.Send, smtp.SentTo, smtp.SentFrom, "GmailApi", 0, smtp.Stopwatch.Elapsed, msg.Id));
                 }

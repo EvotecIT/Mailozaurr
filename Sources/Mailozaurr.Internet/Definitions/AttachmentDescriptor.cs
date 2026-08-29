@@ -242,6 +242,7 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
     private byte[]? _buffer;
     private string? _stagedFilePath;
     private long? _materializedLength;
+    private Exception? _materializationFailure;
     private bool _sendAttempted;
     private bool _disposed;
 
@@ -321,8 +322,14 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
     }
 
     private void EnsureMaterialized() {
+        if (_materializationFailure != null) {
+            throw new InvalidOperationException(
+                "Attachment stream materialization previously failed and this descriptor cannot be reused.",
+                _materializationFailure);
+        }
         if (_buffer != null || _stagedFilePath != null) return;
-        if (_stream.CanSeek) _stream.Position = 0;
+        bool sourceCanSeek = _stream.CanSeek;
+        if (sourceCanSeek) _stream.Position = 0;
 
         MemoryStream? memory = new MemoryStream((int)Math.Min(_stagingOptions.MemoryThresholdBytes, 64 * 1024));
         FileStream? staged = null;
@@ -357,13 +364,14 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
                 _buffer = memory!.ToArray();
             }
             _materializedLength = total;
-        } catch {
+        } catch (Exception ex) {
             staged?.Dispose();
             if (stagedPath != null) TryDeleteStagedFile(stagedPath);
+            if (!sourceCanSeek || !_leaveStreamOpen) _materializationFailure = ex;
             throw;
         } finally {
             memory?.Dispose();
-            if (_stream.CanSeek) {
+            if (sourceCanSeek) {
                 try {
                     _stream.Position = 0;
                 } catch (ObjectDisposedException) {
@@ -375,11 +383,13 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
     }
 
     private FileStream CreateStagingFile(out string path) {
-        string directory = string.IsNullOrWhiteSpace(_stagingOptions.TempDirectory)
+        bool usesOwnedDirectory = string.IsNullOrWhiteSpace(_stagingOptions.TempDirectory);
+        string directory = usesOwnedDirectory
             ? Path.Combine(Path.GetTempPath(), "Mailozaurr", "attachments")
             : Path.GetFullPath(_stagingOptions.TempDirectory!);
+        bool directoryExisted = Directory.Exists(directory);
         Directory.CreateDirectory(directory);
-        UnixFilePermissions.RestrictDirectory(directory);
+        if (usesOwnedDirectory || !directoryExisted) UnixFilePermissions.RestrictDirectory(directory);
         for (int attempt = 0; attempt < 32; attempt++) {
             path = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp");
             try {

@@ -263,6 +263,78 @@ public class SmtpAttachmentTests {
         }
     }
 
+    [Fact]
+    public void StreamAttachmentDescriptor_PoisonsNonSeekableSourceAfterStagingFailure() {
+        using var descriptor = new StreamAttachmentDescriptor(
+            new NonSeekableReadStream(new byte[] { 1, 2, 3, 4, 5 }),
+            "too-large.bin",
+            leaveStreamOpen: false,
+            stagingOptions: new AttachmentStreamStagingOptions {
+                MemoryThresholdBytes = 2,
+                MaxBytes = 4
+            });
+
+        Assert.Throws<InvalidDataException>(() => descriptor.OpenContentStream());
+        var retry = Assert.Throws<InvalidOperationException>(() => descriptor.OpenContentStream());
+        Assert.IsType<InvalidDataException>(retry.InnerException);
+    }
+
+#if NET8_0_OR_GREATER
+    [Fact]
+    public void StreamAttachmentDescriptor_PreservesExistingCallerDirectoryPermissions() {
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+            System.Runtime.InteropServices.OSPlatform.Windows)) return;
+
+        string directory = Path.Combine(Path.GetTempPath(), "MailozaurrStage-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        const UnixFileMode originalMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+            UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute;
+        File.SetUnixFileMode(directory, originalMode);
+        try {
+            using var descriptor = new StreamAttachmentDescriptor(
+                new MemoryStream(new byte[] { 1, 2, 3, 4, 5 }),
+                "staged.bin",
+                stagingOptions: new AttachmentStreamStagingOptions {
+                    MemoryThresholdBytes = 2,
+                    MaxBytes = 10,
+                    TempDirectory = directory
+                });
+
+            descriptor.GetContentBytes();
+
+            Assert.Equal(originalMode, File.GetUnixFileMode(directory));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+#endif
+
+    private sealed class NonSeekableReadStream : Stream {
+        private readonly MemoryStream _inner;
+
+        internal NonSeekableReadStream(byte[] content) =>
+            _inner = new MemoryStream(content, writable: false);
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing) {
+            if (disposing) _inner.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+
     private static byte[] ReadAll(Stream stream) {
         using var memory = new MemoryStream();
         stream.CopyTo(memory);

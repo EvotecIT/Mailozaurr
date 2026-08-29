@@ -210,7 +210,21 @@ public sealed partial class GmailApiClient : IDisposable {
     /// <summary>
     /// Sends the specified MIME message via Gmail API.
     /// </summary>
-    public async Task<GmailMessage> SendAsync(string userId, MimeMessage message, CancellationToken cancellationToken = default) {
+    public Task<GmailMessage> SendAsync(string userId, MimeMessage message, CancellationToken cancellationToken = default) =>
+        SendCoreAsync(userId, message, onTransportAttempt: null, cancellationToken);
+
+    internal Task<GmailMessage> SendAsync(
+        string userId,
+        MimeMessage message,
+        Action onTransportAttempt,
+        CancellationToken cancellationToken = default) =>
+        SendCoreAsync(userId, message, onTransportAttempt ?? throw new ArgumentNullException(nameof(onTransportAttempt)), cancellationToken);
+
+    private async Task<GmailMessage> SendCoreAsync(
+        string userId,
+        MimeMessage message,
+        Action? onTransportAttempt,
+        CancellationToken cancellationToken) {
         ThrowIfDisposed();
         if (message == null) {
             throw new ArgumentNullException(nameof(message));
@@ -226,6 +240,7 @@ public sealed partial class GmailApiClient : IDisposable {
             .Replace("=", string.Empty);
         var json = JsonSerializer.Serialize(new GmailRawRequest(raw), GmailJsonContext.Default.GmailRawRequest);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
+        onTransportAttempt?.Invoke();
         using var response = await _client.PostAsync($"users/{userId}/messages/send", content, cancellationToken).ConfigureAwait(false);
         var queued = false;
         try {

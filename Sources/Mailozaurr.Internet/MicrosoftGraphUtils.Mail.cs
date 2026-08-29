@@ -357,7 +357,9 @@ public static partial class MicrosoftGraphUtils {
         string messageId,
         CancellationToken cancellationToken = default) {
         var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com", cancellationToken).ConfigureAwait(false);
-        var request = new HttpRequestMessage(HttpMethod.Get, $"https://graph.microsoft.com/v1.0/users/{userPrincipalName}/messages/{messageId}/$value");
+        var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            BuildGraphUri(GraphEndpoint.V1, BuildGraphPath("users", userPrincipalName, "messages", messageId) + "/$value"));
         request.Headers.TryAddWithoutValidation("Authorization", token);
         await ConcurrencySemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
@@ -384,7 +386,7 @@ public static partial class MicrosoftGraphUtils {
             cancellationToken).ConfigureAwait(false);
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
-            $"https://graph.microsoft.com/v1.0/users/{userPrincipalName}/messages/{messageId}/$value");
+            BuildGraphUri(GraphEndpoint.V1, BuildGraphPath("users", userPrincipalName, "messages", messageId) + "/$value"));
         request.Headers.TryAddWithoutValidation("Authorization", token);
         await ConcurrencySemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
