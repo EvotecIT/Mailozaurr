@@ -56,13 +56,58 @@ public sealed class FilePendingMessageRepositoryTests {
 
     [Fact]
     public void DefaultsToPerUserApplicationDataInsteadOfTheSharedTempDirectory() {
-        var repo = new FilePendingMessageRepository();
-        var field = typeof(FilePendingMessageRepository).GetField("filePath", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var path = (string)field.GetValue(repo)!;
-        Assert.Equal(
-            Path.Combine(MailozaurrStoragePaths.ResolvePendingMessagesDirectory(), "pending.log"),
-            path);
+        var options = new PendingMessageRepositoryOptions();
+        string path = options.DirectoryPath;
+
+        Assert.Equal(MailozaurrStoragePaths.ResolvePendingMessagesDirectory(), path);
         Assert.False(path.StartsWith(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void DefaultStorageMigration_PreservesLegacyQueueContents() {
+        string root = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        string legacyPath = Path.Combine(root, "legacy", "pending.log");
+        string targetPath = Path.Combine(root, "current", "pending.log");
+        Directory.CreateDirectory(Path.GetDirectoryName(legacyPath)!);
+        File.WriteAllText(legacyPath, "legacy-message");
+
+        try {
+            string resolved = MailozaurrStoragePaths.ResolveDefaultStorageFile(targetPath, legacyPath);
+
+            Assert.Equal(Path.GetFullPath(targetPath), resolved);
+            Assert.Equal("legacy-message", File.ReadAllText(targetPath));
+            Assert.False(File.Exists(legacyPath));
+        } finally {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void DefaultStorageMigration_UsesLegacyQueueWhileItIsInUse() {
+        string root = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        string legacyPath = Path.Combine(root, "legacy", "pending.log");
+        string targetPath = Path.Combine(root, "current", "pending.log");
+        Directory.CreateDirectory(Path.GetDirectoryName(legacyPath)!);
+        File.WriteAllText(legacyPath, "legacy-message");
+
+        try {
+            using var activeWriter = new FileStream(legacyPath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+            string resolved = MailozaurrStoragePaths.ResolveDefaultStorageFile(targetPath, legacyPath);
+
+            Assert.Equal(Path.GetFullPath(legacyPath), resolved);
+            Assert.False(File.Exists(targetPath));
+        } finally {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ExplicitStorageDirectory_DoesNotUseLegacyMigration() {
+        var options = new PendingMessageRepositoryOptions {
+            DirectoryPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
+        };
+
+        Assert.False(options.UsesDefaultDirectory);
     }
 
     [Fact]

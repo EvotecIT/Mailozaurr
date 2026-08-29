@@ -43,7 +43,12 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
             throw new InvalidOperationException("FileNamingScheme failed to provide a file name", ex);
         }
         ValidateFileName(name);
-        return Path.Combine(Path.GetFullPath(directory), name);
+        string targetPath = Path.Combine(Path.GetFullPath(directory), name);
+        return options.UsesDefaultDirectory
+            ? MailozaurrStoragePaths.ResolveDefaultStorageFile(
+                targetPath,
+                Path.Combine(Path.GetTempPath(), name))
+            : targetPath;
     }
 
     private static void ValidateFileName(string name) {

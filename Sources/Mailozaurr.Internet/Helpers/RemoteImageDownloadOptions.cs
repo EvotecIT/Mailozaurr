@@ -25,9 +25,16 @@ public sealed class RemoteImageDownloadOptions {
 
     /// <summary>
     /// Allows hostname downloads on runtimes that cannot bind a validated DNS answer to the socket.
-    /// This weakens SSRF protection and should be enabled only for trusted HTML and DNS.
+    /// This weakens protection against DNS rebinding and should be enabled only for trusted DNS.
+    /// It defaults to <see langword="true"/> on .NET Framework and .NET Standard 2.0, where
+    /// socket-level DNS pinning is unavailable, so remote-image embedding remains compatible.
+    /// Modern targets use DNS-pinned sockets and default this option to <see langword="false"/>.
     /// </summary>
+#if NETFRAMEWORK || NETSTANDARD2_0
+    public bool AllowUnpinnedDnsResolution { get; set; } = true;
+#else
     public bool AllowUnpinnedDnsResolution { get; set; }
+#endif
 
     /// <summary>Allowed image media types. SVG is excluded because it may contain active content.</summary>
     public ISet<string> AllowedMediaTypes { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {

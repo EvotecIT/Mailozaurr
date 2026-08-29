@@ -355,16 +355,18 @@ public class HtmlUtilsTests {
         Assert.Equal(expected, RemoteImageDownloader.IsPublicAddress(IPAddress.Parse(value)));
 
     [Fact]
-    public void SecureRemoteImageTransport_IsPinnedOnSupportedRuntimesAndFailsClosedElsewhere() {
+    public void SecureRemoteImageTransport_IsPinnedWhenSupportedAndCompatibleOnLegacyTargets() {
         var options = new RemoteImageDownloadOptions();
         using HttpClient? client = RemoteImageDownloader.CreatePinnedClient(options);
 #if NET8_0_OR_GREATER
+        Assert.False(options.AllowUnpinnedDnsResolution);
         Assert.NotNull(client);
         var handler = (HttpMessageHandler)GetHandlerField().GetValue(client!)!;
         var socketsHandler = Assert.IsType<SocketsHttpHandler>(handler);
         Assert.NotNull(socketsHandler.ConnectCallback);
         Assert.False(socketsHandler.UseProxy);
 #else
+        Assert.True(options.AllowUnpinnedDnsResolution);
         Assert.Null(client);
 #endif
     }

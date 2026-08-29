@@ -47,7 +47,13 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
             || !string.Equals(Path.GetFileName(name), name, StringComparison.Ordinal)) {
             throw new InvalidOperationException("FileNamingScheme must return a single file name without directory components.");
         }
-        return Path.Combine(Path.GetFullPath(directory), CreateDeadLetterFileName(name));
+        string deadLetterFileName = CreateDeadLetterFileName(name);
+        string targetPath = Path.Combine(Path.GetFullPath(directory), deadLetterFileName);
+        return options.UsesDefaultDirectory
+            ? MailozaurrStoragePaths.ResolveDefaultStorageFile(
+                targetPath,
+                Path.Combine(Path.GetTempPath(), deadLetterFileName))
+            : targetPath;
     }
 
     private static string CreateDeadLetterFileName(string? pendingFileName) {
