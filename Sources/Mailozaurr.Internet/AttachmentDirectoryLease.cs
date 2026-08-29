@@ -12,6 +12,7 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
     private const uint FileFlagOpenReparsePoint = 0x00200000;
     private const int LinuxAtSymlinkNoFollow = 0x100;
     private const int DarwinAtSymlinkNoFollow = 0x0020;
+    private const uint RenameExchange = 0x00000002;
     private const uint UnixFileTypeMask = 0xF000;
     private const uint UnixRegularFile = 0x8000;
     private readonly List<SafeFileHandle> _windowsHandles = new();
@@ -113,9 +114,21 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
                 if (TryLinkTemporary(directoryFd, temporaryName, destinationName)) {
                     return new AttachmentFileSaveResult(destinationPath, AttachmentFileSaveAction.Created);
                 }
+                // Reject a stable non-regular entry before mutating either name. The
+                // exchange and second validation below close a concurrent final-entry swap.
                 RequireUnixRegularFile(directoryFd, destinationName);
-                if (renameat(directoryFd, temporaryName, directoryFd, destinationName) != 0) {
-                    ThrowUnixIOException("replace the attachment destination");
+                ExchangeUnixEntries(directoryFd, temporaryName, destinationName);
+                try {
+                    RequireUnixRegularFile(directoryFd, temporaryName);
+                } catch (Exception validationFailure) {
+                    try {
+                        ExchangeUnixEntries(directoryFd, temporaryName, destinationName);
+                    } catch (Exception rollbackFailure) {
+                        throw new IOException(
+                            "The attachment replacement target changed type and the atomic exchange could not be rolled back.",
+                            new AggregateException(validationFailure, rollbackFailure));
+                    }
+                    throw;
                 }
                 return new AttachmentFileSaveResult(
                     destinationPath,
@@ -131,7 +144,28 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
             return;
         }
         if (string.IsNullOrWhiteSpace(path)) return;
-        unlinkat(_unixDirectory!.DangerousGetHandle().ToInt32(), Path.GetFileName(path), 0);
+        int directoryFd = _unixDirectory!.DangerousGetHandle().ToInt32();
+        string name = Path.GetFileName(path);
+        try {
+            if (!TryGetUnixFileMode(directoryFd, name, out uint mode) ||
+                (mode & UnixFileTypeMask) != UnixRegularFile) return;
+            unlinkat(directoryFd, name, 0);
+        } catch (IOException) {
+            // Cleanup must never unlink an entry that another process substituted.
+        }
+    }
+
+    internal bool TrySkipExisting(string destinationPath) {
+        if (!UsesNativeRelativePaths) {
+            throw new InvalidOperationException("Native relative inspection is only used on Unix.");
+        }
+        int directoryFd = _unixDirectory!.DangerousGetHandle().ToInt32();
+        string name = Path.GetFileName(destinationPath);
+        if (!TryGetUnixFileMode(directoryFd, name, out uint mode)) return false;
+        if ((mode & UnixFileTypeMask) != UnixRegularFile) {
+            throw new IOException("Only regular files can be retained as existing attachment destinations.");
+        }
+        return true;
     }
 
     private void AcquireWindows() {
@@ -239,6 +273,38 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
         }
     }
 
+    private static void ExchangeUnixEntries(int directoryFd, string temporaryName, string destinationName) {
+        int result;
+        try {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
+                try {
+                    result = renameat2(directoryFd, temporaryName, directoryFd, destinationName, RenameExchange);
+                } catch (EntryPointNotFoundException) {
+                    long syscallNumber = RuntimeInformation.ProcessArchitecture switch {
+                        Architecture.X64 => 316,
+                        Architecture.Arm64 => 276,
+                        _ => throw new PlatformNotSupportedException(
+                            $"Atomic attachment replacement is not supported on Linux architecture '{RuntimeInformation.ProcessArchitecture}'.")
+                    };
+                    result = checked((int)syscallRenameAt2(
+                        syscallNumber,
+                        directoryFd,
+                        temporaryName,
+                        directoryFd,
+                        destinationName,
+                        RenameExchange));
+                }
+            } else {
+                result = renameatx_np(directoryFd, temporaryName, directoryFd, destinationName, RenameExchange);
+            }
+        } catch (EntryPointNotFoundException exception) {
+            throw new PlatformNotSupportedException(
+                "Atomic attachment replacement requires an operating-system rename-exchange primitive.",
+                exception);
+        }
+        if (result != 0) ThrowUnixIOException("atomically exchange the attachment destination");
+    }
+
     private static void RejectUnixSymbolicLink(int directoryFd, string name) {
         var buffer = new byte[1];
         long result = readlinkat(directoryFd, name, buffer, new UIntPtr(1));
@@ -256,6 +322,15 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
     /// Unsupported Unix architectures fail closed rather than replacing an unclassified entry.
     /// </summary>
     private static void RequireUnixRegularFile(int directoryFd, string name) {
+        if (!TryGetUnixFileMode(directoryFd, name, out uint mode)) {
+            throw new IOException("The attachment replacement target no longer exists.");
+        }
+        if ((mode & UnixFileTypeMask) != UnixRegularFile) {
+            throw new IOException("Only regular files can be replaced as attachment destinations.");
+        }
+    }
+
+    private static bool TryGetUnixFileMode(int directoryFd, string name, out uint mode) {
         const int statBufferSize = 256;
         IntPtr statBuffer = Marshal.AllocHGlobal(statBufferSize);
         try {
@@ -263,10 +338,13 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
                 ? DarwinAtSymlinkNoFollow
                 : LinuxAtSymlinkNoFollow;
             if (fstatat(directoryFd, name, statBuffer, noFollowFlag) != 0) {
+                if (Marshal.GetLastWin32Error() == 2) {
+                    mode = 0;
+                    return false;
+                }
                 ThrowUnixIOException("inspect an attachment replacement target without following links");
             }
 
-            uint mode;
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
                 mode = unchecked((ushort)Marshal.ReadInt16(statBuffer, 4));
             } else {
@@ -279,9 +357,7 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
                 mode = unchecked((uint)Marshal.ReadInt32(statBuffer, modeOffset));
             }
 
-            if ((mode & UnixFileTypeMask) != UnixRegularFile) {
-                throw new IOException("Only regular files can be replaced as attachment destinations.");
-            }
+            return true;
         } finally {
             Marshal.FreeHGlobal(statBuffer);
         }
@@ -326,7 +402,9 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
     [DllImport("libc", SetLastError = true)] private static extern int mkdirat(int directoryFd, string path, uint mode);
     [DllImport("libc", SetLastError = true)] private static extern int linkat(int oldDirectoryFd, string oldPath, int newDirectoryFd, string newPath, int flags);
     [DllImport("libc", SetLastError = true)] private static extern int unlinkat(int directoryFd, string path, int flags);
-    [DllImport("libc", SetLastError = true)] private static extern int renameat(int oldDirectoryFd, string oldPath, int newDirectoryFd, string newPath);
+    [DllImport("libc", SetLastError = true)] private static extern int renameat2(int oldDirectoryFd, string oldPath, int newDirectoryFd, string newPath, uint flags);
+    [DllImport("libc", SetLastError = true)] private static extern int renameatx_np(int oldDirectoryFd, string oldPath, int newDirectoryFd, string newPath, uint flags);
+    [DllImport("libc", EntryPoint = "syscall", SetLastError = true)] private static extern long syscallRenameAt2(long number, int oldDirectoryFd, string oldPath, int newDirectoryFd, string newPath, uint flags);
     [DllImport("libc", SetLastError = true)] private static extern long readlinkat(int directoryFd, string path, byte[] buffer, UIntPtr bufferSize);
     [DllImport("libc", SetLastError = true)] private static extern int fstatat(int directoryFd, string path, IntPtr statBuffer, int flags);
 

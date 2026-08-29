@@ -27,6 +27,13 @@ public partial class Graph {
             var streamableAttachments = new List<GraphFileAttachmentSource>();
             var regularFilePaths = Definitions.AttachmentPathIdentity.CreateSet();
             var inlineFilePaths = Definitions.AttachmentPathIdentity.CreateSet();
+            var allocatedInlineContentIds = new HashSet<string>(
+                Attachments
+                    .OfType<Definitions.AttachmentDescriptor>()
+                    .Where(descriptor => IsInlineDescriptor(descriptor) &&
+                                         !string.IsNullOrWhiteSpace(descriptor.ContentId))
+                    .Select(descriptor => descriptor.ContentId!),
+                StringComparer.OrdinalIgnoreCase);
             long fileTotalBytes = 0;
             long inMemoryTotalBytes = 0;
             long rawAttachmentBytes = 0;
@@ -40,6 +47,14 @@ public partial class Graph {
                     rawAttachmentBytes += EstimateRawAttachmentSize(ga);
                 } else if (item is Definitions.AttachmentDescriptor descriptor) {
                     if (descriptor.SourcePath is string descriptorPath) {
+                        if (IsInlineDescriptor(descriptor) && string.IsNullOrWhiteSpace(descriptor.ContentId)) {
+                            string canonicalPath = Definitions.AttachmentPathIdentity.Normalize(descriptorPath);
+                            descriptor.ContentId = RemoteImageDownloader.CreateContentId(
+                                Path.GetFileName(descriptorPath),
+                                canonicalPath,
+                                "inline-attachment",
+                                allocatedInlineContentIds);
+                        }
                         var seenPaths = IsInlineDescriptor(descriptor) ? inlineFilePaths : regularFilePaths;
                         TrackFileAttachment(descriptorPath, descriptor, streamableAttachments, seenPaths, ref fileTotalBytes, ref rawAttachmentBytes);
                     } else if (IsStreamableDescriptor(descriptor)) {

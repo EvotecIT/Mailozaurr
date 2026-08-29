@@ -78,6 +78,17 @@ public class SesClientSendEmailAsyncTests {
     }
 
     [Fact]
+    public async Task SendEmailAsync_RejectsRegionUriDelimitersBeforeTransport() {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK));
+        using var client = CreateClient(handler);
+        client.Region = "evil.example#";
+
+        await Assert.ThrowsAsync<ArgumentException>(() => client.SendEmailAsync());
+
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
     public async Task SendEmailAsync_WithToken_Succeeds() {
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") });
         using var client = CreateClient(handler);

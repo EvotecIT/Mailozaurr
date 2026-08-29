@@ -493,11 +493,32 @@ public partial class Smtp {
             return;
         }
 
+        IEnumerable<AttachmentDescriptor> existingAttachments = InlineAttachments
+            ?? Enumerable.Empty<AttachmentDescriptor>();
+        var allocatedContentIds = new HashSet<string>(
+            existingAttachments
+                .Where(descriptor => !string.IsNullOrWhiteSpace(descriptor.ContentId))
+                .Select(descriptor => descriptor.ContentId!),
+            StringComparer.OrdinalIgnoreCase);
+        foreach (AttachmentDescriptor descriptor in existingAttachments) {
+            if (string.IsNullOrWhiteSpace(descriptor.SourcePath) ||
+                !string.IsNullOrWhiteSpace(descriptor.ContentId)) continue;
+            string canonicalPath = Definitions.AttachmentPathIdentity.Normalize(descriptor.SourcePath!);
+            descriptor.ContentId = RemoteImageDownloader.CreateContentId(
+                Path.GetFileName(descriptor.SourcePath!),
+                canonicalPath,
+                "local-image",
+                allocatedContentIds);
+        }
+        HtmlUtils.LocalImage[] existingImages = existingAttachments
+            .Where(descriptor => !string.IsNullOrWhiteSpace(descriptor.SourcePath) &&
+                                 !string.IsNullOrWhiteSpace(descriptor.ContentId))
+            .Select(descriptor => new HtmlUtils.LocalImage(descriptor.SourcePath!, descriptor.ContentId!))
+            .ToArray();
         var (html, images) = HtmlUtils.ExtractLocalImages(
             HtmlBody,
-            InlineAttachments?
-                .Select(descriptor => descriptor.ContentId ?? string.Empty)
-                ?? Enumerable.Empty<string>());
+            existingAttachments.Select(descriptor => descriptor.ContentId ?? string.Empty),
+            existingImages);
         HtmlBody = html;
         if (images.Count <= 0) {
             return;

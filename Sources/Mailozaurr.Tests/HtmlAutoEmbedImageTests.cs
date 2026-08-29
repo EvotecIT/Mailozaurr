@@ -7,6 +7,7 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using System.Threading;
 using Xunit;
+using Mailozaurr.Definitions;
 
 namespace Mailozaurr.Tests;
 
@@ -30,6 +31,39 @@ public class HtmlAutoEmbedImageTests {
         Assert.Contains("cid:" + Path.GetFileName(tmp), smtp.HtmlBody);
     }
 
+    [Theory]
+    [InlineData("logo.png")]
+    [InlineData(null)]
+    public void Smtp_CreateMessage_ReusesExistingInlineAttachmentContentIdForTheSameFile(string? existingContentId) {
+        string root = Path.Combine(Path.GetTempPath(), "MailozaurrHtml-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string imagePath = Path.Combine(root, "logo.png");
+        File.WriteAllText(imagePath, "data");
+        var smtp = new Smtp {
+            AutoEmbedImages = true,
+            From = "a@b.com",
+            To = new object[] { "c@d.com" },
+            Subject = "test",
+            HtmlBody = $"<img src=\"{imagePath}\">",
+            InlineAttachments = new List<AttachmentDescriptor> {
+                new FileAttachmentDescriptor(imagePath) { ContentId = existingContentId }
+            }
+        };
+
+        try {
+            smtp.CreateMessage(CancellationToken.None);
+
+            var body = Assert.IsType<MultipartRelated>(smtp.Message!.Body!);
+            MimePart inline = Assert.Single(
+                body.OfType<MimePart>(),
+                part => part.ContentDisposition?.Disposition == ContentDisposition.Inline);
+            Assert.Equal("logo.png", inline.ContentId);
+            Assert.Contains("cid:logo.png", smtp.HtmlBody, StringComparison.Ordinal);
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public void Graph_CreateMessage_AutoEmbedsImages() {
         var tmp = Path.GetTempFileName();
@@ -49,6 +83,81 @@ public class HtmlAutoEmbedImageTests {
         var attachment = Assert.Single(message!.Attachments!);
         Assert.True(attachment.IsInline);
         Assert.Contains("cid:" + attachment.ContentId, graph.HTML);
+    }
+
+    [Theory]
+    [InlineData("logo.png")]
+    [InlineData(null)]
+    public void Graph_CreateMessage_ReusesExistingInlineAttachmentContentIdForTheSameFile(string? existingContentId) {
+        string root = Path.Combine(Path.GetTempPath(), "MailozaurrGraphHtml-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string imagePath = Path.Combine(root, "logo.png");
+        File.WriteAllText(imagePath, "data");
+        var descriptor = new FileAttachmentDescriptor(imagePath) {
+            ContentId = existingContentId,
+            ContentDisposition = new ContentDisposition(ContentDisposition.Inline)
+        };
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "subject",
+            HTML = $"<img src=\"{imagePath}\">",
+            ContentType = "HTML",
+            AutoEmbedImages = true,
+            Attachments = new object[] { descriptor }
+        };
+
+        try {
+            graph.CreateMessage();
+
+            GraphAttachment attachment = Assert.Single(graph.MessageContainer.Message.Attachments!);
+            Assert.True(attachment.IsInline);
+            Assert.Equal("logo.png", attachment.ContentId);
+            Assert.Contains("cid:logo.png", graph.HTML, StringComparison.Ordinal);
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Graph_CreateMessage_AssignsDistinctContentIdsToExistingInlineFilesWithTheSameName() {
+        string root = Path.Combine(Path.GetTempPath(), "MailozaurrGraphHtml-" + Guid.NewGuid().ToString("N"));
+        string firstDirectory = Path.Combine(root, "one");
+        string secondDirectory = Path.Combine(root, "two");
+        Directory.CreateDirectory(firstDirectory);
+        Directory.CreateDirectory(secondDirectory);
+        string firstPath = Path.Combine(firstDirectory, "logo.png");
+        string secondPath = Path.Combine(secondDirectory, "logo.png");
+        File.WriteAllText(firstPath, "one");
+        File.WriteAllText(secondPath, "two");
+        var first = new FileAttachmentDescriptor(firstPath) {
+            ContentDisposition = new ContentDisposition(ContentDisposition.Inline)
+        };
+        var second = new FileAttachmentDescriptor(secondPath) {
+            ContentDisposition = new ContentDisposition(ContentDisposition.Inline)
+        };
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "subject",
+            HTML = $"<img src=\"{firstPath}\"><img src=\"{secondPath}\">",
+            ContentType = "HTML",
+            AutoEmbedImages = true,
+            Attachments = new object[] { first, second }
+        };
+
+        try {
+            graph.CreateMessage();
+
+            List<GraphAttachment> attachments = graph.MessageContainer.Message.Attachments!;
+            Assert.Equal(2, attachments.Count);
+            Assert.Equal(2, attachments.Select(attachment => attachment.ContentId)
+                .Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.All(attachments, attachment =>
+                Assert.Contains("cid:" + attachment.ContentId, graph.HTML, StringComparison.Ordinal));
+        } finally {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]

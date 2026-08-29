@@ -349,6 +349,11 @@ public class HtmlUtilsTests {
     [InlineData("fe80::1", false)]
     [InlineData("fd00::1", false)]
     [InlineData("2001:db8::1", false)]
+    [InlineData("64:ff9b::a9fe:a9fe", false)]
+    [InlineData("64:ff9b:1::a9fe:a9fe", false)]
+    [InlineData("2002:a9fe:a9fe::1", false)]
+    [InlineData("2001:0:4136:e378:8000:63bf:3fff:fdd2", false)]
+    [InlineData("2001:4860:0:1:0:5efe:a9fe:a9fe", false)]
     [InlineData("8.8.8.8", true)]
     [InlineData("2606:4700:4700::1111", true)]
     public void Remote_address_policy_distinguishes_public_destinations(string value, bool expected) =>

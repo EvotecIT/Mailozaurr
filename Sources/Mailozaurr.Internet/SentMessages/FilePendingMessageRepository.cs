@@ -12,6 +12,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
     private const int DefaultCompactionThreshold = 64;
 
     private readonly string filePath;
+    private readonly string conflictPath = string.Empty;
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly Dictionary<string, long> index = new(StringComparer.OrdinalIgnoreCase);
     private static readonly byte[] NewlineBytes = Encoding.UTF8.GetBytes(Environment.NewLine);
@@ -20,7 +21,10 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
     /// <summary>Creates a new repository using the specified options.</summary>
     /// <param name="options">Configuration for directory and file naming.</param>
     public FilePendingMessageRepository(PendingMessageRepositoryOptions? options = null)
-        : this(GetFilePath(options)) { }
+        : this(GetStorageFiles(options)) { }
+
+    private FilePendingMessageRepository((string Path, string ConflictPath) storageFiles)
+        : this(storageFiles.Path) => conflictPath = storageFiles.ConflictPath;
 
     /// <summary>
     /// Creates a new repository using the specified file path.
@@ -33,7 +37,10 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
         }
     }
 
-    private static string GetFilePath(PendingMessageRepositoryOptions? options) {
+    internal FilePendingMessageRepository(string filePath, string conflictPath)
+        : this(filePath) => this.conflictPath = Path.GetFullPath(conflictPath);
+
+    private static (string Path, string ConflictPath) GetStorageFiles(PendingMessageRepositoryOptions? options) {
         options ??= new PendingMessageRepositoryOptions();
         var directory = options.DirectoryPath;
         string name;
@@ -45,11 +52,14 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
         ValidateFileName(name);
         string targetPath = Path.Combine(Path.GetFullPath(directory), name);
         return options.UsesDefaultDirectory
-            ? MailozaurrStoragePaths.ResolveDefaultStorageFile(
+            ? MailozaurrStoragePaths.ResolveDefaultStorageFiles(
                 targetPath,
                 Path.Combine(Path.GetTempPath(), name))
-            : targetPath;
+            : (targetPath, string.Empty);
     }
+
+    private void ThrowIfDefaultQueueConflictAppeared() =>
+        MailozaurrStoragePaths.ThrowIfConflictingQueueAppeared(filePath, conflictPath);
 
     private static void ValidateFileName(string name) {
         if (string.IsNullOrWhiteSpace(name)
@@ -336,6 +346,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
     public async Task SaveAsync(PendingMessageRecord record, CancellationToken cancellationToken = default) {
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
+            ThrowIfDefaultQueueConflictAppeared();
             var directory = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory)) {
                 Directory.CreateDirectory(directory);
@@ -371,6 +382,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
         CancellationToken cancellationToken = default) {
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
+            ThrowIfDefaultQueueConflictAppeared();
             var current = await GetByMessageIdCoreAsync(messageId, cancellationToken).ConfigureAwait(false);
             if (current == null || current.NextAttemptAt > dueBeforeOrAt) {
                 return null;
@@ -395,11 +407,13 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
 
     /// <summary>Retrieves a pending message by its ID.</summary>
     public async Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) {
+        ThrowIfDefaultQueueConflictAppeared();
         if (!File.Exists(filePath)) {
             return null;
         }
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
+            ThrowIfDefaultQueueConflictAppeared();
             return await GetByMessageIdCoreAsync(messageId, cancellationToken).ConfigureAwait(false);
         } catch (FileNotFoundException) {
             return null;
@@ -437,6 +451,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
 
     /// <summary>Enumerates all pending messages.</summary>
     public async IAsyncEnumerable<PendingMessageRecord> GetAllAsync([EnumeratorCancellation] CancellationToken cancellationToken = default) {
+        ThrowIfDefaultQueueConflictAppeared();
         if (!File.Exists(filePath)) {
             yield break;
         }
@@ -444,6 +459,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
 
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
+            ThrowIfDefaultQueueConflictAppeared();
             var orderedIds = new List<string>();
             var recordsById = new Dictionary<string, PendingMessageRecord>(StringComparer.OrdinalIgnoreCase);
             using var read = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
@@ -493,6 +509,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository {
     public async Task RemoveAsync(string messageId, CancellationToken cancellationToken = default) {
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
+            ThrowIfDefaultQueueConflictAppeared();
             if (!index.ContainsKey(messageId)) {
                 return;
             }

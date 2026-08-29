@@ -21,58 +21,40 @@ public static class MailozaurrStoragePaths {
     }
 
     /// <summary>
-    /// Moves a legacy default queue file out of the shared temporary directory when possible.
-    /// If another process is still using the legacy file, that path remains the compatibility
-    /// fallback so queued messages do not become invisible during an upgrade.
+    /// Keeps using a legacy default queue while that file exists. This lets old and new
+    /// processes append to one queue during a rolling upgrade; an operator can move the file
+    /// to the per-user target after all legacy processes have stopped. Repositories retain
+    /// the alternate path and fail closed if it appears after construction.
     /// </summary>
     internal static string ResolveDefaultStorageFile(string targetPath, string legacyPath) {
+        return ResolveDefaultStorageFiles(targetPath, legacyPath).Path;
+    }
+
+    internal static (string Path, string ConflictPath) ResolveDefaultStorageFiles(
+        string targetPath,
+        string legacyPath) {
         targetPath = Path.GetFullPath(targetPath);
         legacyPath = Path.GetFullPath(legacyPath);
-        if (string.Equals(targetPath, legacyPath, StringComparison.OrdinalIgnoreCase)
-            || File.Exists(targetPath)
-            || !File.Exists(legacyPath)) {
-            return targetPath;
+        if (string.Equals(targetPath, legacyPath, StringComparison.OrdinalIgnoreCase)) {
+            return (targetPath, string.Empty);
         }
 
-        if (!IsRegularFileWithoutReparsePoint(legacyPath)) return targetPath;
-
-        string? directory = Path.GetDirectoryName(targetPath);
-        bool createdTarget = false;
-        try {
-            if (!string.IsNullOrWhiteSpace(directory)) {
-                bool existed = Directory.Exists(directory);
-                Directory.CreateDirectory(directory);
-                if (!existed) UnixFilePermissions.RestrictDirectory(directory);
-            }
-
-            using (var source = new FileStream(legacyPath, FileMode.Open, FileAccess.Read, FileShare.None))
-            using (var destination = UnixFilePermissions.OpenRestrictedFile(
-                targetPath,
-                FileMode.CreateNew,
-                FileAccess.Write,
-                FileShare.None)) {
-                createdTarget = true;
-                source.CopyTo(destination);
-                destination.Flush();
-            }
-
-            try {
-                File.Delete(legacyPath);
-            } catch (IOException) {
-                // The migrated copy is complete. Leaving the legacy copy is safer than
-                // deleting data another process may still expect.
-            } catch (UnauthorizedAccessException) {
-            }
-            return targetPath;
-        } catch (IOException) {
-            if (createdTarget) DeleteIncompleteTarget(targetPath);
-            if (File.Exists(targetPath)) return targetPath;
-            return legacyPath;
-        } catch (UnauthorizedAccessException) {
-            if (createdTarget) DeleteIncompleteTarget(targetPath);
-            if (File.Exists(targetPath)) return targetPath;
-            return legacyPath;
+        bool targetExists = File.Exists(targetPath);
+        bool legacyExists = File.Exists(legacyPath);
+        if (targetExists && legacyExists && IsRegularFileWithoutReparsePoint(legacyPath)) {
+            throw new InvalidOperationException(
+                "Both the per-user and legacy Mailozaurr queue files exist. Stop legacy processes and reconcile the files before continuing so queued messages are not hidden.");
         }
+        if (!legacyExists) return (targetPath, legacyPath);
+        return IsRegularFileWithoutReparsePoint(legacyPath)
+            ? (legacyPath, targetPath)
+            : (targetPath, legacyPath);
+    }
+
+    internal static void ThrowIfConflictingQueueAppeared(string path, string conflictPath) {
+        if (string.IsNullOrWhiteSpace(conflictPath) || !File.Exists(conflictPath)) return;
+        throw new InvalidOperationException(
+            $"Mailozaurr queue '{conflictPath}' appeared after '{path}' was selected. Stop legacy processes and reconcile the files before continuing so queued messages are not hidden.");
     }
 
     private static bool IsRegularFileWithoutReparsePoint(string path) {
@@ -86,11 +68,4 @@ public static class MailozaurrStoragePaths {
         }
     }
 
-    private static void DeleteIncompleteTarget(string path) {
-        try {
-            if (File.Exists(path)) File.Delete(path);
-        } catch (IOException) {
-        } catch (UnauthorizedAccessException) {
-        }
-    }
 }

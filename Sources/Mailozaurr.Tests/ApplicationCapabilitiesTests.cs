@@ -121,4 +121,23 @@ public sealed class ApplicationCapabilitiesTests {
         Assert.True(result.Succeeded);
         Assert.Contains(result.Warnings, warning => warning.Contains("DefaultSender", StringComparison.Ordinal));
     }
+
+    [Theory]
+    [InlineData("evil.example#")]
+    [InlineData("us-east-1@evil.example")]
+    [InlineData("US-EAST-1")]
+    [InlineData("-us-east-1")]
+    public void SesProfileRejectsRegionValuesThatCannotBeAnAwsDnsLabel(string region) {
+        var profile = new MailProfile {
+            Id = "ses",
+            DisplayName = "SES",
+            Kind = MailProfileKind.Ses
+        };
+        profile.Settings[MailProfileSettingsKeys.Region] = region;
+
+        MailProfileValidationResult result = MailProfileValidator.Validate(profile);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Contains(MailProfileSettingsKeys.Region, StringComparison.Ordinal));
+    }
 }

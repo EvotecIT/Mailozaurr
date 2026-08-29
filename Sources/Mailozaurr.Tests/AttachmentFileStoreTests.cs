@@ -110,6 +110,43 @@ public sealed class AttachmentFileStoreTests {
     }
 
     [Fact]
+    public async Task Skip_existing_destination_does_not_invoke_sync_or_async_content_producers() {
+        string directory = CreateTestDirectory();
+        string destination = AttachmentFileStore.ResolvePathInDirectory(directory, "report.txt", "same");
+        File.WriteAllText(destination, "original");
+        bool syncInvoked = false;
+        bool asyncInvoked = false;
+        try {
+            AttachmentFileSaveResult sync = AttachmentFileStore.SaveToDirectory(
+                directory,
+                "report.txt",
+                _ => {
+                    syncInvoked = true;
+                    throw new InvalidDataException("content should not be opened");
+                },
+                AttachmentFileConflictPolicy.Skip,
+                "same");
+            AttachmentFileSaveResult asyncResult = await AttachmentFileStore.SaveToDirectoryAsync(
+                directory,
+                "report.txt",
+                (_, _) => {
+                    asyncInvoked = true;
+                    return Task.FromException(new InvalidDataException("content should not be opened"));
+                },
+                AttachmentFileConflictPolicy.Skip,
+                "same");
+
+            Assert.Equal(AttachmentFileSaveAction.Skipped, sync.Action);
+            Assert.Equal(AttachmentFileSaveAction.Skipped, asyncResult.Action);
+            Assert.False(syncInvoked);
+            Assert.False(asyncInvoked);
+            Assert.Equal("original", File.ReadAllText(destination));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Canceled_async_writers_leave_no_destination_or_staging_file() {
         string directory = CreateTestDirectory();
         using var cancellation = new CancellationTokenSource();

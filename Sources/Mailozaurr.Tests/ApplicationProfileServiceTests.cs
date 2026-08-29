@@ -204,6 +204,7 @@ public sealed class ApplicationProfileServiceTests {
     [InlineData(MailProfileKind.Imap, MailProfileSettingsKeys.SkipCertificateValidation, "false", "true")]
     [InlineData(MailProfileKind.Jmap, MailProfileSettingsKeys.JmapSessionUrl, "https://mail.example.com/.well-known/jmap", "https://mail.attacker.example/.well-known/jmap")]
     [InlineData(MailProfileKind.Jmap, MailProfileSettingsKeys.JmapAllowCrossOriginApiUrl, "false", "true")]
+    [InlineData(MailProfileKind.Ses, MailProfileSettingsKeys.Region, "us-east-1", "eu-central-1")]
     public async Task SaveAsyncRejectsCredentialContextChangesWithoutRedirectingSecrets(
         MailProfileKind kind,
         string setting,
@@ -265,6 +266,32 @@ public sealed class ApplicationProfileServiceTests {
 
         Assert.True(result.Succeeded);
         Assert.Equal("Archive", (await service.GetProfileAsync("imap"))!.Settings[MailProfileSettingsKeys.Folder]);
+    }
+
+    [Fact]
+    public async Task SaveAsyncAllowsExplicitSesDefaultRegionWhenItWasPreviouslyOmitted() {
+        var store = new InMemoryMailProfileStore();
+        var secretStore = new BasicSecretStore();
+        var service = new MailProfileService(store, secretStore);
+        await service.SaveAsync(new MailProfile {
+            Id = "ses",
+            DisplayName = "SES",
+            Kind = MailProfileKind.Ses
+        });
+        await secretStore.SetSecretAsync("ses", MailSecretNames.Password, "retained-secret");
+
+        OperationResult result = await service.SaveAsync(new MailProfile {
+            Id = "ses",
+            DisplayName = "SES explicit default",
+            Kind = MailProfileKind.Ses,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Region] = "us-east-1"
+            }
+        });
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("us-east-1", (await service.GetProfileAsync("ses"))!.Settings[MailProfileSettingsKeys.Region]);
+        Assert.Equal("retained-secret", await secretStore.GetSecretAsync("ses", MailSecretNames.Password));
     }
 
     [Fact]

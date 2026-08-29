@@ -15,10 +15,15 @@ internal static class MailProfileCredentialContextGuard {
         MailProfileSettingsKeys.JmapAllowCrossOriginApiUrl
     };
 
+    private static readonly string[] SesCredentialContextKeys = {
+        MailProfileSettingsKeys.Region
+    };
+
     internal static string? GetChangedSetting(MailProfile existing, MailProfile candidate) {
         string[] keys = existing.Kind switch {
             MailProfileKind.Smtp or MailProfileKind.Imap or MailProfileKind.Pop3 => ServerCredentialContextKeys,
             MailProfileKind.Jmap => JmapCredentialContextKeys,
+            MailProfileKind.Ses => SesCredentialContextKeys,
             _ => Array.Empty<string>()
         };
 
@@ -43,6 +48,10 @@ internal static class MailProfileCredentialContextGuard {
     private static bool AreEquivalent(string key, string? first, string? second) {
         string? normalizedFirst = Normalize(first);
         string? normalizedSecond = Normalize(second);
+        if (string.Equals(key, MailProfileSettingsKeys.Region, StringComparison.OrdinalIgnoreCase)) {
+            normalizedFirst ??= "us-east-1";
+            normalizedSecond ??= "us-east-1";
+        }
         if (normalizedFirst == null || normalizedSecond == null) {
             return normalizedFirst == normalizedSecond;
         }

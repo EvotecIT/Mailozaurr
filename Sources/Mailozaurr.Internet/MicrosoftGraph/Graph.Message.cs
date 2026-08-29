@@ -70,11 +70,22 @@ public partial class Graph {
                          string.Equals(HTML, _autoEmbedRenderedHtml, StringComparison.Ordinal)
             ? _autoEmbedOriginalHtml ?? HTML
             : HTML;
+        HtmlUtils.LocalImage[] existingImages = (Attachments ?? Array.Empty<object>())
+            .OfType<Definitions.AttachmentDescriptor>()
+            .Where(descriptor => IsInlineDescriptor(descriptor) &&
+                                 !string.IsNullOrWhiteSpace(descriptor.SourcePath))
+            .Select(descriptor => new HtmlUtils.LocalImage(
+                descriptor.SourcePath!,
+                string.IsNullOrWhiteSpace(descriptor.ContentId)
+                    ? Path.GetFileName(descriptor.SourcePath!)
+                    : descriptor.ContentId!))
+            .ToArray();
         var (renderedHtml, images) = HtmlUtils.ExtractLocalImages(
             sourceHtml,
             ConvertedAttachments
                 .Where(attachment => attachment.IsInline)
-                .Select(attachment => attachment.ContentId ?? string.Empty));
+                .Select(attachment => attachment.ContentId ?? string.Empty),
+            existingImages);
         _autoEmbedOriginalHtml = sourceHtml;
         _autoEmbedRenderedHtml = renderedHtml;
         _autoEmbeddedImages.Clear();

@@ -156,8 +156,10 @@ public static class AttachmentFileStore {
             ?? throw new InvalidOperationException("The output path has no parent directory.");
         using var directoryLease = AttachmentDirectoryLease.Acquire(directory);
         if (!directoryLease.UsesNativeRelativePaths) RejectReparsePoint(destinationPath);
-        if (!directoryLease.UsesNativeRelativePaths &&
-            conflictPolicy == AttachmentFileConflictPolicy.Skip && PathEntryExists(destinationPath)) {
+        if (conflictPolicy == AttachmentFileConflictPolicy.Skip &&
+            (directoryLease.UsesNativeRelativePaths
+                ? directoryLease.TrySkipExisting(destinationPath)
+                : PathEntryExists(destinationPath))) {
             return new AttachmentFileSaveResult(destinationPath, AttachmentFileSaveAction.Skipped);
         }
 
@@ -194,8 +196,10 @@ public static class AttachmentFileStore {
             ?? throw new InvalidOperationException("The output path has no parent directory.");
         using var directoryLease = AttachmentDirectoryLease.Acquire(directory);
         if (!directoryLease.UsesNativeRelativePaths) RejectReparsePoint(destinationPath);
-        if (!directoryLease.UsesNativeRelativePaths &&
-            conflictPolicy == AttachmentFileConflictPolicy.Skip && PathEntryExists(destinationPath)) {
+        if (conflictPolicy == AttachmentFileConflictPolicy.Skip &&
+            (directoryLease.UsesNativeRelativePaths
+                ? directoryLease.TrySkipExisting(destinationPath)
+                : PathEntryExists(destinationPath))) {
             return new AttachmentFileSaveResult(destinationPath, AttachmentFileSaveAction.Skipped);
         }
 

@@ -72,6 +72,12 @@ public static class HtmlUtils {
         IEnumerable<string> reservedContentIds) =>
         ExtractLocalImagesCore(html, uniqueContentIds: true, reservedContentIds);
 
+    internal static (string Html, List<LocalImage> Images) ExtractLocalImages(
+        string html,
+        IEnumerable<string> reservedContentIds,
+        IEnumerable<LocalImage> existingImages) =>
+        ExtractLocalImagesCore(html, uniqueContentIds: true, reservedContentIds, existingImages);
+
     /// <summary>
     /// Downloads externally referenced images and replaces their sources with cid links.
     /// </summary>
@@ -168,7 +174,8 @@ public static class HtmlUtils {
     private static (string Html, List<LocalImage> Images) ExtractLocalImagesCore(
         string html,
         bool uniqueContentIds,
-        IEnumerable<string>? reservedContentIds = null) {
+        IEnumerable<string>? reservedContentIds = null,
+        IEnumerable<LocalImage>? existingImages = null) {
         var images = new List<LocalImage>();
         if (string.IsNullOrWhiteSpace(html)) return (html, images);
 
@@ -177,6 +184,15 @@ public static class HtmlUtils {
             reservedContentIds?.Where(value => !string.IsNullOrWhiteSpace(value)) ?? Enumerable.Empty<string>(),
             StringComparer.OrdinalIgnoreCase);
         var contentIdsByPath = new Dictionary<string, string>(Definitions.AttachmentPathIdentity.Comparer);
+        foreach (LocalImage existingImage in existingImages ?? Enumerable.Empty<LocalImage>()) {
+            if (string.IsNullOrWhiteSpace(existingImage.Path) ||
+                string.IsNullOrWhiteSpace(existingImage.ContentId)) continue;
+            string canonicalPath = Definitions.AttachmentPathIdentity.Normalize(existingImage.Path);
+            if (!contentIdsByPath.ContainsKey(canonicalPath)) {
+                contentIdsByPath.Add(canonicalPath, existingImage.ContentId);
+            }
+            allocatedContentIds.Add(existingImage.ContentId);
+        }
         foreach (EmailHtmlImageReference reference in document.Images) {
             string path = reference.Source;
             if (string.IsNullOrWhiteSpace(path) || IsNonLocalSource(path) || !File.Exists(path)) continue;

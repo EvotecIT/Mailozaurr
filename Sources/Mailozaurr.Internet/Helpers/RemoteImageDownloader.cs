@@ -166,10 +166,33 @@ internal static class RemoteImageDownloader {
         }
         if (address.AddressFamily != AddressFamily.InterNetworkV6) return false;
         if (address.IsIPv6LinkLocal || address.IsIPv6Multicast || address.IsIPv6SiteLocal) return false;
+        if (IsIpv4TransitionAddress(bytes)) return false;
         if ((bytes[0] & 0xfe) == 0xfc) return false;
         if (bytes[0] == 0x01 && bytes.Skip(1).Take(7).All(value => value == 0)) return false;
         if (bytes[0] == 0x20 && bytes[1] == 0x01 && bytes[2] == 0x0d && bytes[3] == 0xb8) return false;
         return true;
+    }
+
+    private static bool IsIpv4TransitionAddress(byte[] bytes) {
+        // Translation and tunnel formats can carry an otherwise blocked IPv4 destination.
+        // Reject the standardized forms rather than allowing the network translator to
+        // reinterpret an address that passed the native IPv6 policy.
+        bool ipv4Compatible = bytes.Take(12).All(value => value == 0);
+        bool ipv4Translatable = bytes.Take(8).All(value => value == 0) &&
+                                bytes[8] == 0xff && bytes[9] == 0xff;
+        bool wellKnownNat64 = bytes[0] == 0x00 && bytes[1] == 0x64 &&
+                              bytes[2] == 0xff && bytes[3] == 0x9b &&
+                              bytes.Skip(4).Take(8).All(value => value == 0);
+        bool localUseNat64 = bytes[0] == 0x00 && bytes[1] == 0x64 &&
+                             bytes[2] == 0xff && bytes[3] == 0x9b &&
+                             bytes[4] == 0x00 && bytes[5] == 0x01;
+        bool sixToFour = bytes[0] == 0x20 && bytes[1] == 0x02;
+        bool teredo = bytes[0] == 0x20 && bytes[1] == 0x01 &&
+                      bytes[2] == 0x00 && bytes[3] == 0x00;
+        bool isatap = (bytes[8] == 0x00 || bytes[8] == 0x02) &&
+                      bytes[9] == 0x00 && bytes[10] == 0x5e && bytes[11] == 0xfe;
+        return ipv4Compatible || ipv4Translatable || wellKnownNat64 || localUseNat64 ||
+               sixToFour || teredo || isatap;
     }
 
     private static bool IsRedirect(HttpStatusCode statusCode) => statusCode is
