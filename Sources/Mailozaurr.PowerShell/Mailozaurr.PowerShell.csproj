@@ -41,6 +41,12 @@
         <PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
     </ItemGroup>
 
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+            <_Parameter1>Mailozaurr.Tests</_Parameter1>
+        </AssemblyAttribute>
+    </ItemGroup>
+
     <!-- Make sure the output DLL's from library are included in the output -->
     <PropertyGroup>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>

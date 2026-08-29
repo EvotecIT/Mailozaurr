@@ -15,7 +15,7 @@ on:
   workflow_dispatch:  # Manual trigger only
 
 env:
-  DOTNET_VERSION: '10.x'
+  DOTNET_VERSION: '10.0.300'
   BUILD_CONFIGURATION: 'Debug'
   TEST_VERBOSITY: minimal # set to 'detailed' to restore full test output
   SUMMARIZE_FAILURES: true # set to 'false' to disable summarizing failing tests

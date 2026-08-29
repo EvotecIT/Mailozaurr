@@ -121,9 +121,14 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
         int max = Count;
-        long totalUncompressedLimit = MyInvocation.BoundParameters.ContainsKey(nameof(MaxTotalUncompressedSize))
-            ? MaxTotalUncompressedSize
-            : Math.Max(MaxTotalUncompressedSize, MaxUncompressedSize);
+        long totalUncompressedLimit = ResolveTotalLimit(
+            MaxTotalUncompressedSize,
+            MaxUncompressedSize,
+            MyInvocation.BoundParameters.ContainsKey(nameof(MaxTotalUncompressedSize)));
+        long totalMimeLimit = ResolveTotalLimit(
+            MaxTotalMimeBytes,
+            MaxMimeBytesPerMessage,
+            MyInvocation.BoundParameters.ContainsKey(nameof(MaxTotalMimeBytes)));
         var inspectionOptions = new DmarcReportInspectionOptions {
             MaxUncompressedBytesPerAttachment = MaxUncompressedSize,
             MaxTotalUncompressedBytes = totalUncompressedLimit,
@@ -131,7 +136,7 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
             MaxArchiveEntriesPerAttachment = MaxArchiveEntriesPerAttachment,
             MaxMessagesScanned = MaxMessagesScanned,
             MaxMimeBytesPerMessage = MaxMimeBytesPerMessage,
-            MaxTotalMimeBytes = MaxTotalMimeBytes
+            MaxTotalMimeBytes = totalMimeLimit
         };
         switch (Protocol) {
             case EmailProtocol.Imap: {
@@ -229,4 +234,7 @@ public sealed class CmdletGetDmarcReport : AsyncPSCmdlet {
                 }
         }
     }
+
+    internal static long ResolveTotalLimit(long configuredTotal, long perItem, bool totalWasExplicitlyBound) =>
+        totalWasExplicitlyBound ? configuredTotal : Math.Max(configuredTotal, perItem);
 }

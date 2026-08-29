@@ -41,9 +41,9 @@ public sealed class CmdletSearchJmapEmail : MailApplicationCmdletBase {
     [Parameter]
     public bool? HasAttachment { get; set; }
 
-    /// <summary>Zero-based query position.</summary>
+    /// <summary>Query position; negative values address results relative to the end.</summary>
     [Parameter]
-    [ValidateRange(0, int.MaxValue)]
+    [ValidateRange(int.MinValue, int.MaxValue)]
     public int Position { get; set; }
 
     /// <summary>Maximum identifiers returned by this page.</summary>

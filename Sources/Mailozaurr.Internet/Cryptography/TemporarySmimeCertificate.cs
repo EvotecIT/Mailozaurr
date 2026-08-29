@@ -38,10 +38,11 @@ public static class TemporarySmimeCertificate {
             throw new ArgumentException("A non-empty password is required when exporting a temporary PFX file.", nameof(outputPassword));
         }
 
-        X509Certificate2 certificate;
 #if NETSTANDARD2_0
         throw new NotSupportedException("Temporary S/MIME certificates require .NET Framework 4.7.2 or later.");
-#elif NETFRAMEWORK
+#else
+        X509Certificate2 certificate;
+#if NETFRAMEWORK
         // On .NET Framework, only use CertificateRequest on non-Windows platforms if available
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && Type.GetType("System.Security.Cryptography.X509Certificates.CertificateRequest") != null) {
             certificate = CreateWithCertificateRequest(subjectName, validDays);
@@ -74,6 +75,7 @@ public static class TemporarySmimeCertificate {
             }
         }
         return certificate;
+#endif
     }
 
 #if !NETSTANDARD2_0

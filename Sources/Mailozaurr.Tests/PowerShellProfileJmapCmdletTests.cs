@@ -84,6 +84,16 @@ public sealed class PowerShellProfileJmapCmdletTests {
     }
 
     [Fact]
+    public void SearchJmapEmail_AllowsPositionsRelativeToTheEnd() {
+        PropertyInfo position = typeof(CmdletSearchJmapEmail).GetProperty(nameof(CmdletSearchJmapEmail.Position))!;
+        CustomAttributeData range = Assert.Single(position.CustomAttributes, value =>
+            value.AttributeType == typeof(ValidateRangeAttribute));
+
+        Assert.Equal(int.MinValue, range.ConstructorArguments[0].Value);
+        Assert.Equal(int.MaxValue, range.ConstructorArguments[1].Value);
+    }
+
+    [Fact]
     public void ModuleManifest_ExportsEveryProfileAndJmapCmdlet() {
         string manifestPath = FindRepositoryFile("Mailozaurr.psd1");
         string manifest = File.ReadAllText(manifestPath);
