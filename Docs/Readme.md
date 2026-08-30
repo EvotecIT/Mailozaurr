@@ -2,7 +2,7 @@
 Module Name: Mailozaurr
 Module Guid: 2b0ea9f1-3ff1-4300-b939-106d5da608fa
 Download Help Link: https://github.com/EvotecIT/MailoZaurr
-Help Version: 3.0.0
+Help Version: 3.0.1
 Locale: en-US
 ---
 # Mailozaurr Module
@@ -213,6 +213,27 @@ Retrieves messages from an IMAP folder using optional filters.
 
 The Get-IMAPMessage cmdlet fetches messages from the current IMAP folder associated with the provided ImapConnectionInfo object. You can filter by subject, sender, recipients, priority, date range and attachment presence. Messages can also be deleted after retrieval.
 
+### [Get-JMAPEmail](Get-JMAPEmail.md)
+Gets a bounded set of JMAP email objects by id.
+
+### [Get-JMAPEmailChange](Get-JMAPEmailChange.md)
+Gets bounded JMAP email changes since an opaque state token.
+
+### [Get-JMAPIdentity](Get-JMAPIdentity.md)
+Lists JMAP sending identities when submission is available.
+
+### [Get-JMAPMailbox](Get-JMAPMailbox.md)
+Lists JMAP mailboxes and effective rights for a saved profile.
+
+### [Get-JMAPSession](Get-JMAPSession.md)
+Gets the authoritative JMAP Session resource for a saved profile.
+
+### [Get-JMAPThread](Get-JMAPThread.md)
+Gets JMAP threads by id.
+
+### [Get-MailProfile](Get-MailProfile.md)
+Gets one or more saved Mailozaurr profiles without exposing secret values.
+
 ### [Get-MailStoreFolder](Get-MailStoreFolder.md)
 Lists folders from an imported PST, OST, OLM, Mbox, EMLX, or mailbox directory.
 
@@ -295,6 +316,9 @@ Creates a GraphMailboxPermission object.
 ### [New-IMAPSearchQuery](New-IMAPSearchQuery.md)
 Creates a Mailozaurr IMAP search query without requiring callers to construct MailKit types directly.
 
+### [New-MailProfile](New-MailProfile.md)
+Creates a provider profile over the reusable Mailozaurr profile service.
+
 ### [New-MimeMessage](New-MimeMessage.md)
 Creates a MIME message without requiring callers to construct MimeKit types directly.
 
@@ -333,6 +357,12 @@ Removes messages from an IMAP folder by UID.
 
 ### [Remove-IMAPMessageAttachment](Remove-IMAPMessageAttachment.md)
 Removes attachments from an IMAP MimeMessage instance.
+
+### [Remove-MailProfile](Remove-MailProfile.md)
+Removes a profile and its owned protected secrets.
+
+### [Remove-MailProfileSecret](Remove-MailProfileSecret.md)
+Removes a protected secret from a saved mail profile.
 
 ### [Remove-POP3Message](Remove-POP3Message.md)
 Removes messages from a POP3 mailbox by index.
@@ -388,6 +418,9 @@ The Search-GraphMailbox cmdlet queries Microsoft Graph using application permiss
 ### [Search-IMAPMailbox](Search-IMAPMailbox.md)
 Searches an IMAP mailbox and returns matching messages.
 
+### [Search-JMAPEmail](Search-JMAPEmail.md)
+Queries a bounded page of JMAP email identifiers.
+
 ### [Search-MailStore](Search-MailStore.md)
 Searches mail-store metadata or selected message content.
 
@@ -424,6 +457,12 @@ Sets the working IMAP folder for subsequent operations.
 ### [Set-IMAPMessage](Set-IMAPMessage.md)
 Updates flags on an IMAP message.
 
+### [Set-MailProfile](Set-MailProfile.md)
+Updates non-secret fields of an existing Mailozaurr profile.
+
+### [Set-MailProfileSecret](Set-MailProfileSecret.md)
+Stores or copies a protected secret for a saved mail profile.
+
 ### [Set-POP3Message](Set-POP3Message.md)
 Updates local flags on a POP3 message.
 
@@ -431,6 +470,9 @@ Updates local flags on a POP3 message.
 Validates one or more email addresses for format and standards compliance.
 
 The Test-EmailAddress cmdlet checks if one or more email addresses are valid according to standard email address rules. Supports validation for international addresses and top-level domains. Returns validation results for each address.
+
+### [Test-MailProfile](Test-MailProfile.md)
+Diagnoses stored profile readiness or performs a live connection probe.
 
 ### [Test-MailStore](Test-MailStore.md)
 Runs bounded validation against an imported mail store.

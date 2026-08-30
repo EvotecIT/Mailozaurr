@@ -55,6 +55,12 @@ public static class MailProfileValidator {
                     result.Errors.Add($"Profile setting '{MailProfileSettingsKeys.JmapAllowCrossOriginApiUrl}' must be true or false.");
                 }
                 break;
+            case MailProfileKind.Ses:
+                if (profile.Settings.TryGetValue(MailProfileSettingsKeys.Region, out var region) &&
+                    !SesRegionName.IsValid(region)) {
+                    result.Errors.Add($"Profile setting '{MailProfileSettingsKeys.Region}' must be a valid Amazon SES region name.");
+                }
+                break;
         }
 
         if (profile.GetCapabilities().Supports(MailCapability.SendMessages) &&

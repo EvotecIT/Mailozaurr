@@ -221,7 +221,7 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
         if (SkipHasAttachment.IsPresent || SkipAttachmentExtension != null) select.Add("hasAttachments");
         var listUri = MicrosoftGraphUtils.JoinUriQuery(
             GraphEndpoint.V1,
-            $"/users/{UserPrincipalName}/mailFolders/junkemail/messages",
+            MicrosoftGraphUtils.BuildGraphPath("users", UserPrincipalName!, "mailFolders", "junkemail", "messages"),
             new Dictionary<string, object> { ["$select"] = string.Join(",", select) });
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
@@ -245,7 +245,7 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
                             "Uri",
                             MicrosoftGraphUtils.JoinUriQuery(
                                 GraphEndpoint.V1,
-                                $"/users/{UserPrincipalName}/messages/{id}/attachments",
+                                MicrosoftGraphUtils.BuildGraphPath("users", UserPrincipalName!, "messages", id, "attachments"),
                                 new Dictionary<string, object> { ["$select"] = "name" }));
                     var attRes = attPs.Invoke();
                     var names = attRes
@@ -273,7 +273,7 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
                     "Uri",
                     MicrosoftGraphUtils.BuildGraphUri(
                         GraphEndpoint.V1,
-                        $"/users/{UserPrincipalName}/messages/{id}"))
+                        MicrosoftGraphUtils.BuildGraphPath("users", UserPrincipalName!, "messages", id!)))
                 .AddParameter("ContentType", "application/json");
             delPs.Invoke();
         }
@@ -289,7 +289,7 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
         if ((SkipHasAttachment.IsPresent || SkipAttachmentExtension != null) && !props.Contains("hasAttachments")) props.Add("hasAttachments");
         var listUri = MicrosoftGraphUtils.JoinUriQuery(
             GraphEndpoint.V1,
-            $"/users/{UserPrincipalName}/mailFolders/junkemail/messages",
+            MicrosoftGraphUtils.BuildGraphPath("users", UserPrincipalName!, "mailFolders", "junkemail", "messages"),
             new Dictionary<string, object> { ["$select"] = string.Join(",", props) });
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
@@ -313,7 +313,7 @@ public sealed class CmdletClearGraphJunk : AsyncPSCmdlet {
                             "Uri",
                             MicrosoftGraphUtils.JoinUriQuery(
                                 GraphEndpoint.V1,
-                                $"/users/{UserPrincipalName}/messages/{id}/attachments",
+                                MicrosoftGraphUtils.BuildGraphPath("users", UserPrincipalName!, "messages", id, "attachments"),
                                 new Dictionary<string, object> { ["$select"] = "name" }));
                     var attRes = attPs.Invoke();
                     var names = attRes

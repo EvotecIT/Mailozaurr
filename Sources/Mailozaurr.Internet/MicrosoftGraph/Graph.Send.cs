@@ -1,3 +1,4 @@
+using Mailozaurr.Definitions;
 using System;
 using System.Buffers;
 using System.Diagnostics;
@@ -12,6 +13,14 @@ public partial class Graph {
     /// </summary>
     /// <returns>The result of the send operation.</returns>
     public async Task<GraphSmtpResult> SendMessageAsync(CancellationToken cancellationToken = default) {
+        try {
+            return await SendMessageCoreAsync(cancellationToken).ConfigureAwait(false);
+        } finally {
+            AttachmentDescriptorLifetime.ReleaseStaging(Attachments?.OfType<Mailozaurr.Definitions.AttachmentDescriptor>());
+        }
+    }
+
+    private async Task<GraphSmtpResult> SendMessageCoreAsync(CancellationToken cancellationToken) {
         var operationStopwatch = StartOperationTimer();
         // create message
         CreateMessage();
@@ -27,7 +36,10 @@ public partial class Graph {
         // Create the request URI outside the loop.
         var requestUri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
-            $"/users/{MessageContainer.Message.From!.Email.Address}/sendMail");
+            MicrosoftGraphUtils.BuildGraphPath(
+                "users",
+                MessageContainer.Message.From!.Email.Address,
+                "sendMail"));
 
         var policy = SendPolicy ?? MailozaurrOptions.DefaultGraphPolicy;
         if (policy != null && policy.MaxConcurrency > 0) {
@@ -50,6 +62,8 @@ public partial class Graph {
 
                 await WaitForConcurrencyAsync(operationStopwatch, cancellationToken);
                 try {
+                    AttachmentDescriptorLifetime.MarkSendAttempted(
+                        Attachments?.OfType<Mailozaurr.Definitions.AttachmentDescriptor>());
                     using var response = await _client.SendAsync(request, cancellationToken);
                     var content = await response.Content.ReadAsStringAsync();
                     if (response.IsSuccessStatusCode) {
@@ -108,7 +122,11 @@ public partial class Graph {
     /// </summary>
     /// <returns>The result of the send operation.</returns>
     public async Task<GraphSmtpResult> SendMessageDraftAsync(CancellationToken cancellationToken = default) {
-        return await SendMessageDraftAsync(messagePrepared: false, cancellationToken);
+        try {
+            return await SendMessageDraftAsync(messagePrepared: false, cancellationToken).ConfigureAwait(false);
+        } finally {
+            AttachmentDescriptorLifetime.ReleaseStaging(Attachments?.OfType<Mailozaurr.Definitions.AttachmentDescriptor>());
+        }
     }
 
     private async Task<GraphSmtpResult> SendMessageDraftAsync(bool messagePrepared, CancellationToken cancellationToken) {
@@ -198,7 +216,12 @@ public partial class Graph {
         // Send the draft message
         var sendRequestUri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
-            $"/users/{MessageContainer.Message.From!.Email.Address}/messages/{draftMessage.Id!}/send");
+            MicrosoftGraphUtils.BuildGraphPath(
+                "users",
+                MessageContainer.Message.From!.Email.Address,
+                "messages",
+                draftMessage.Id!,
+                "send"));
         using var sendRequest = new HttpRequestMessage(HttpMethod.Post, sendRequestUri);
 
         // Add the authorization header
@@ -239,6 +262,15 @@ public partial class Graph {
     /// Sends the current message using Microsoft Graph batch requests.
     /// </summary>
     public async Task<GraphSmtpResult> SendMessageBatchAsync(CancellationToken cancellationToken = default) {
+        try {
+            return await SendMessageBatchCoreAsync(cancellationToken).ConfigureAwait(false);
+        } finally {
+            AttachmentDescriptorLifetime.ReleaseStaging(
+                Attachments?.OfType<Mailozaurr.Definitions.AttachmentDescriptor>());
+        }
+    }
+
+    private async Task<GraphSmtpResult> SendMessageBatchCoreAsync(CancellationToken cancellationToken) {
         var operationStopwatch = StartOperationTimer();
         CreateMessage();
         if (DryRun) {
@@ -270,6 +302,8 @@ public partial class Graph {
             }
             return await SendMessageDraftAsync(messagePrepared: true, cancellationToken);
         }
+        AttachmentDescriptorLifetime.MarkSendAttempted(
+            Attachments?.OfType<Mailozaurr.Definitions.AttachmentDescriptor>());
         var results = await MicrosoftGraphUtils.SendBatchAsync(credential, new[] { request }, cancellationToken);
         var response = results.FirstOrDefault();
         var success = response != null && response.Status >= 200 && response.Status < 300;
@@ -311,7 +345,10 @@ public partial class Graph {
         return new GraphBatchRequest {
             Id = "1",
             Method = GraphHttpMethod.POST,
-            Url = $"/users/{MessageContainer.Message.From!.Email.Address}/sendMail",
+            Url = MicrosoftGraphUtils.BuildGraphPath(
+                "users",
+                MessageContainer.Message.From!.Email.Address,
+                "sendMail"),
             Headers = new Dictionary<string, string> { ["Content-Type"] = "application/json" },
             Body = bodyObj
         };
@@ -360,7 +397,12 @@ public partial class Graph {
 
         var draftRequestUri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
-            $"/users/{MessageContainer.Message.From!.Email.Address}/mailfolders/drafts/messages");
+            MicrosoftGraphUtils.BuildGraphPath(
+                "users",
+                MessageContainer.Message.From!.Email.Address,
+                "mailFolders",
+                "drafts",
+                "messages"));
         using var draftRequest = new HttpRequestMessage(HttpMethod.Post, draftRequestUri) {
             Content = new StringContent(messageJson, Encoding.UTF8, "application/json")
         };
@@ -372,6 +414,8 @@ public partial class Graph {
         await MicrosoftGraphUtils.ConcurrencySemaphore.WaitAsync(cancellationToken);
         HttpResponseMessage draftResponse;
         try {
+            AttachmentDescriptorLifetime.MarkSendAttempted(
+                Attachments?.OfType<Mailozaurr.Definitions.AttachmentDescriptor>());
             draftResponse = await _client.SendAsync(draftRequest, cancellationToken);
         } finally {
             MicrosoftGraphUtils.ConcurrencySemaphore.Release();

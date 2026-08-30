@@ -18,7 +18,7 @@ internal static partial class CliCommandModel {
                 "client-secret-env", "client-secret-stdin", "client-secret-ref",
                 "access-token-env", "access-token-stdin", "access-token-ref",
                 "certificate-path", "certificate-password-env", "certificate-password-stdin",
-                "certificate-password-ref"
+                "certificate-password-ref", "allow-cross-profile-secret-ref"
             ]),
         Leaf("gmail-bootstrap", "Create a Gmail profile using secret-safe inputs.",
             required: ["profile", "name"],
@@ -26,7 +26,8 @@ internal static partial class CliCommandModel {
                 "mailbox", "description", "default-sender", "is-default", "client-id",
                 "client-secret-env", "client-secret-stdin", "client-secret-ref",
                 "refresh-token-env", "refresh-token-stdin", "refresh-token-ref",
-                "access-token-env", "access-token-stdin", "access-token-ref"
+                "access-token-env", "access-token-stdin", "access-token-ref",
+                "allow-cross-profile-secret-ref"
             ]),
         Leaf("graph-login", "Authenticate an existing Microsoft Graph profile interactively.",
             required: ["profile"],
@@ -35,7 +36,7 @@ internal static partial class CliCommandModel {
             required: ["profile"],
             optional: [
                 "mailbox", "client-id", "client-secret-env", "client-secret-stdin",
-                "client-secret-ref", "scope"
+                "client-secret-ref", "allow-cross-profile-secret-ref", "scope"
             ]),
         Leaf("refresh-auth", "Refresh saved authentication for a profile.", required: ["profile"]),
         Leaf("auth-status", "Show persisted authentication status.", required: ["profile"]),
@@ -52,7 +53,7 @@ internal static partial class CliCommandModel {
         Leaf("set-default", "Set the default profile.", required: ["profile"]),
         Leaf("set-secret", "Store or copy a protected secret without a command-line value.",
             required: ["profile", "name"],
-            optional: ["value-env", "value-stdin", "value-ref"]),
+            optional: ["value-env", "value-stdin", "value-ref", "allow-cross-profile-secret-ref"]),
         Leaf("remove-secret", "Remove a protected profile secret.",
             required: ["profile", "name"]),
         Leaf("inspect-orphan-secrets", "Inspect structured orphan-secret sets without exposing values."),

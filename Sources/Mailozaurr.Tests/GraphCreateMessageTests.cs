@@ -335,6 +335,48 @@ public class GraphCreateMessageTests {
     }
 
     [Fact]
+    public void CreateAttachments_UnknownLengthContentSourceIsMeasuredAndRouted() {
+        var source = new VariableLengthAttachmentSource(new byte[3_100_000], reportedLength: null);
+        using var graph = new Graph {
+            Attachments = new object[] { new ContentSourceAttachmentDescriptor(source, "unknown.bin") }
+        };
+
+        graph.CreateAttachments();
+
+        Assert.Equal(1, source.OpenCount);
+        Assert.Equal(3_100_000, graph.RawAttachmentSizeBytes);
+        Assert.True(graph.IsLargerAttachment);
+        Assert.Empty(graph.ConvertedAttachments);
+    }
+
+    [Fact]
+    public void CreateAttachments_RejectsContentSourceThatExceedsDeclaredLength() {
+        var source = new VariableLengthAttachmentSource(new byte[] { 1, 2, 3, 4 }, reportedLength: 3);
+        using var graph = new Graph {
+            Attachments = new object[] { new ContentSourceAttachmentDescriptor(source, "underreported.bin") }
+        };
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() => graph.CreateAttachments());
+
+        Assert.Contains("declared 3, observed 4", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(1, source.OpenCount);
+    }
+
+    [Fact]
+    public void FromDescriptor_HugeFalseLengthDoesNotAllocateDeclaredCapacity() {
+        var source = new VariableLengthAttachmentSource(
+            new byte[] { 1 },
+            AttachmentStreamStagingOptions.DefaultMaxBytes);
+        var descriptor = new ContentSourceAttachmentDescriptor(source, "false-length.bin");
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(
+            () => GraphAttachment.FromDescriptor(descriptor));
+
+        Assert.Contains("declared 1073741824, observed 1", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(1, source.OpenCount);
+    }
+
+    [Fact]
     public void CreateAttachments_RoutesBase64ExpandedInMemoryAttachmentAwayFromSimpleSend() {
         using var graph = new Graph {
             Attachments = new object[] {
@@ -424,5 +466,29 @@ public class GraphCreateMessageTests {
         };
 
         Assert.Throws<InvalidOperationException>(() => graph.CreateMessage());
+    }
+
+    private sealed class VariableLengthAttachmentSource : IAttachmentContentSource {
+        private readonly byte[] _content;
+        private readonly long? _reportedLength;
+
+        internal VariableLengthAttachmentSource(byte[] content, long? reportedLength) {
+            _content = content;
+            _reportedLength = reportedLength;
+        }
+
+        internal int OpenCount { get; private set; }
+
+        public long? Length => _reportedLength;
+
+        public Stream OpenRead() {
+            OpenCount++;
+            return new MemoryStream(_content, writable: false);
+        }
+
+        public Task<Stream> OpenReadAsync(CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(OpenRead());
+        }
     }
 }

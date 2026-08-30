@@ -123,6 +123,9 @@ public class ClientSmtpTests {
     private static ClientSmtp CreateClientForTest(string html) {
         return new ClientSmtp {
             AutoEmbedRemoteImages = true,
+            RemoteImageDownloadOptions = new RemoteImageDownloadOptions {
+                AllowPrivateNetworkAddresses = true
+            },
             HtmlBody = html,
             Subject = "Hello",
             From = "sender@example.com",

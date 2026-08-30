@@ -3,7 +3,11 @@ namespace Mailozaurr;
 /// <summary>
 /// Stores mail profiles in process memory for transient applications, tests, and one-shot delivery workflows.
 /// </summary>
-public sealed class InMemoryMailProfileStore : IMailProfileStore, IMailProfileMaintenanceCoordinator {
+public sealed class InMemoryMailProfileStore :
+    IMailProfileStore,
+    IMailProfileMaintenanceCoordinator,
+    IMailProfileStoreCreateCoordinator,
+    IMailProfileStoreCredentialContextCoordinator {
     private readonly Dictionary<string, MailProfile> _profiles = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _gate = new(1, 1);
 
@@ -38,20 +42,67 @@ public sealed class InMemoryMailProfileStore : IMailProfileStore, IMailProfileMa
         MailProfileCloner.Validate(profile);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
-            MailProfile profileToStore = MailProfileCloner.Clone(profile);
-            profileToStore.Id = profileToStore.Id.Trim();
-            profileToStore.DisplayName = profileToStore.DisplayName.Trim();
-
-            if (profileToStore.IsDefault) {
-                foreach (MailProfile existing in _profiles.Values) {
-                    existing.IsDefault = false;
-                }
-            }
-
-            _profiles[profileToStore.Id] = profileToStore;
+            SaveLocked(profile, allowCredentialContextChange: false);
         } finally {
             _gate.Release();
         }
+    }
+
+    async Task<MailProfileCreateOutcome> IMailProfileStoreCreateCoordinator.TryCreateAsync(
+        MailProfile profile,
+        CancellationToken cancellationToken) {
+        MailProfileCloner.Validate(profile);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try {
+            if (_profiles.ContainsKey(profile.Id.Trim())) return MailProfileCreateOutcome.AlreadyExists;
+            SaveLocked(profile, allowCredentialContextChange: false);
+            return MailProfileCreateOutcome.Created;
+        } finally {
+            _gate.Release();
+        }
+    }
+
+    async Task<MailProfileCredentialContextSaveOutcome>
+        IMailProfileStoreCredentialContextCoordinator.SaveCredentialContextChangeAsync(
+            MailProfile profile,
+            IMailSecretStore secretStore,
+            CancellationToken cancellationToken) {
+        MailProfileCloner.Validate(profile);
+        if (secretStore is not IMailSecretStoreCredentialContextCoordinator secretCoordinator) {
+            return MailProfileCredentialContextSaveOutcome.Unsupported;
+        }
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try {
+            return await secretCoordinator.ExecuteWithProfileSecretsLockedAsync(
+                profile.Id,
+                (hasSecrets, _) => {
+                    if (hasSecrets) {
+                        return Task.FromResult(MailProfileCredentialContextSaveOutcome.HasSecrets);
+                    }
+                    SaveLocked(profile, allowCredentialContextChange: true);
+                    return Task.FromResult(MailProfileCredentialContextSaveOutcome.Saved);
+                },
+                cancellationToken).ConfigureAwait(false);
+        } finally {
+            _gate.Release();
+        }
+    }
+
+    private void SaveLocked(MailProfile profile, bool allowCredentialContextChange) {
+        MailProfile profileToStore = MailProfileCloner.Clone(profile);
+        profileToStore.Id = profileToStore.Id.Trim();
+        profileToStore.DisplayName = profileToStore.DisplayName.Trim();
+        if (_profiles.TryGetValue(profileToStore.Id, out MailProfile? existingProfile)) {
+            MailProfileKindGuard.EnsureUnchanged(existingProfile, profileToStore);
+            if (!allowCredentialContextChange) {
+                MailProfileCredentialContextGuard.EnsureUnchanged(existingProfile, profileToStore);
+            }
+        }
+
+        if (profileToStore.IsDefault) {
+            foreach (MailProfile existing in _profiles.Values) existing.IsDefault = false;
+        }
+        _profiles[profileToStore.Id] = profileToStore;
     }
 
     /// <inheritdoc />

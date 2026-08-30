@@ -1,0 +1,37 @@
+namespace Mailozaurr.Definitions;
+
+/// <summary>Limits legacy one-shot stream materialization into reopenable attachment content.</summary>
+public sealed class AttachmentStreamStagingOptions {
+    internal const long DefaultMaxBytes = 1024L * 1024 * 1024;
+
+    /// <summary>Maximum bytes retained in memory before staging switches to a private temporary file.</summary>
+    public long MemoryThresholdBytes { get; set; } = 4L * 1024 * 1024;
+
+    /// <summary>Maximum bytes accepted from the source stream.</summary>
+    public long MaxBytes { get; set; } = DefaultMaxBytes;
+
+    /// <summary>
+    /// Optional parent directory for staged files. Unix staging uses an owner-only private child directory;
+    /// a private per-user Mailozaurr temp parent is used by default.
+    /// </summary>
+    public string? TempDirectory { get; set; }
+
+    /// <summary>
+    /// Retains materialized content after a send so the descriptor can be reused explicitly.
+    /// The caller must dispose the descriptor. The secure default releases staging when the send finishes.
+    /// </summary>
+    public bool RetainStagedContentAfterSend { get; set; }
+
+    internal AttachmentStreamStagingOptions CloneAndValidate() {
+        if (MemoryThresholdBytes < 0) throw new ArgumentOutOfRangeException(nameof(MemoryThresholdBytes));
+        if (MaxBytes <= 0) throw new ArgumentOutOfRangeException(nameof(MaxBytes));
+        if (MemoryThresholdBytes > MaxBytes) throw new ArgumentException(
+            "The memory threshold cannot exceed the maximum attachment size.", nameof(MemoryThresholdBytes));
+        return new AttachmentStreamStagingOptions {
+            MemoryThresholdBytes = MemoryThresholdBytes,
+            MaxBytes = MaxBytes,
+            TempDirectory = TempDirectory,
+            RetainStagedContentAfterSend = RetainStagedContentAfterSend
+        };
+    }
+}

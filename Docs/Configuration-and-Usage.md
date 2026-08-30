@@ -39,6 +39,7 @@ Current shared profile kinds are:
 - `pop3`
 - `graph`
 - `gmail`
+- `jmap`
 - `smtp`
 - `sendgrid`
 - `mailgun`
@@ -58,6 +59,7 @@ In practice:
 | `pop3` | Yes | Virtual `INBOX` only | No normalized actions | No | UIDL-backed ids with content-hash fallback |
 | `graph` | Yes | Yes | Yes | Yes | also supports rules/events/permissions |
 | `gmail` | Yes | Yes | Yes | Yes | Gmail-specific threads/labels |
+| `jmap` | Yes | Yes | No normalized actions | No | native mailboxes, email queries, changes, threads, and identities |
 | `smtp` | No | No | No | Yes | send only |
 | `sendgrid` | No | No | No | Yes | send only |
 | `mailgun` | No | No | No | Yes | send only |
@@ -139,6 +141,16 @@ Then choose one auth story:
 - access token
 - `clientId` + `clientSecret` + `refreshToken`
 
+### JMAP
+
+Define:
+
+- `kind=jmap`
+- `jmapSessionUrl` as the provider's absolute HTTPS Session resource
+- an `accessToken` secret
+
+Optional settings include `jmapAccountId`. Cross-origin API discovery is rejected unless the profile explicitly sets `jmapAllowCrossOriginApiUrl=true`; use that override only for a provider whose deployment you trust.
+
 ### SendGrid / Mailgun / SES
 
 These are send-only profiles. The exact provider-specific settings are still best treated as provider-specific recipes, but they fit the same profile model and shared send surface.
@@ -169,6 +181,27 @@ The CLI also supports per-run overrides:
 - `--secrets-dir`
 - `--drafts-dir`
 - `--plan-batches-dir`
+
+## PowerShell profile and JMAP usage
+
+PowerShell 5.1 and PowerShell 7 use the same profile and protected-secret stores as the application layer. Create and diagnose a JMAP profile without putting the bearer token in command history:
+
+```powershell
+$settings = @{
+    jmapSessionUrl = 'https://mail.example.com/.well-known/jmap'
+}
+New-MailProfile -ProfileId work-jmap -DisplayName 'Work JMAP' -Kind Jmap -Settings $settings
+
+$token = Read-Host 'JMAP access token' -AsSecureString
+Set-MailProfileSecret -ProfileId work-jmap -Name accessToken -Value $token
+
+Test-MailProfile -ProfileId work-jmap
+Get-JMAPSession -ProfileId work-jmap
+Get-JMAPMailbox -ProfileId work-jmap
+Search-JMAPEmail -ProfileId work-jmap -Subject Invoice -Limit 25
+```
+
+Profile mutation commands support `-WhatIf`; destructive removal commands also use PowerShell confirmation semantics. `-ProfileDirectory` and `-SecretDirectory` are available on these cmdlets for isolated automation or test stores. Secret references may reuse a same-name secret within the same profile. Cross-profile references are rejected, including when the legacy `-AllowCrossProfileReference` compatibility switch is supplied, because Mailozaurr cannot safely infer provider, tenant, client, origin, and purpose compatibility from a secret name.
 
 ## CLI usage overview
 

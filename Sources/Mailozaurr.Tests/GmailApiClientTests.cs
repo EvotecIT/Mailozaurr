@@ -596,6 +596,52 @@ public class GmailApiClientTests {
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task SendAsync_MarksExternalSmtpStagingAtTransportAttempt() {
+        string directory = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(),
+            "MailozaurrStage-" + System.Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(directory);
+        try {
+            var descriptor = new Mailozaurr.Definitions.StreamAttachmentDescriptor(
+                new System.IO.MemoryStream(new byte[] { 1, 2, 3, 4, 5 }),
+                "staged.bin",
+                stagingOptions: new Mailozaurr.Definitions.AttachmentStreamStagingOptions {
+                    MemoryThresholdBytes = 2,
+                    MaxBytes = 10,
+                    TempDirectory = directory
+                });
+            var smtp = new Smtp {
+                From = "sender@example.com",
+                To = new object[] { "recipient@example.com" },
+                Attachments = new List<Mailozaurr.Definitions.AttachmentDescriptor> { descriptor }
+            };
+            smtp.CreateMessage();
+            Assert.Single(System.IO.Directory.GetFiles(
+                directory,
+                "*",
+                System.IO.SearchOption.AllDirectories));
+            var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) {
+                Content = new System.Net.Http.StringContent("{\"id\":\"sent\"}")
+            });
+            using var httpClient = new System.Net.Http.HttpClient(handler) {
+                BaseAddress = new System.Uri("https://gmail.googleapis.com/gmail/v1/")
+            };
+            using var client = new GmailApiClient(httpClient);
+
+            await client.SendAsync("me", smtp.Message, smtp.MarkTransportAttempted);
+            smtp.Dispose();
+
+            Assert.Empty(System.IO.Directory.GetFiles(
+                directory,
+                "*",
+                System.IO.SearchOption.AllDirectories));
+            Assert.Throws<ObjectDisposedException>(() => descriptor.OpenContentStream());
+        } finally {
+            System.IO.Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task SendAsync_ExpiredToken_InvokesRefresh() {
         var handler = new RecordingHandler(
             new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.Unauthorized) { Content = new System.Net.Http.StringContent("error") },

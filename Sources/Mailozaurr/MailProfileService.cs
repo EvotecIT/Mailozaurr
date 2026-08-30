@@ -3,7 +3,7 @@ namespace Mailozaurr;
 /// <summary>
 /// Default implementation of profile lifecycle operations.
 /// </summary>
-public sealed class MailProfileService : IMailProfileService {
+public sealed class MailProfileService : IMailProfileService, IMailProfileCreationService {
     private static readonly string[] KnownSecretNames = {
         MailSecretNames.Password,
         MailSecretNames.ClientSecret,
@@ -68,8 +68,60 @@ public sealed class MailProfileService : IMailProfileService {
             return validation;
         }
 
-        await _profileStore.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
+        MailProfile? existing = await _profileStore.GetByIdAsync(profile.Id, cancellationToken).ConfigureAwait(false);
+        if (existing != null && MailProfileKindGuard.IsChanged(existing, profile)) {
+            return KindChangeFailure(existing.Kind, profile.Kind);
+        }
+        if (existing != null) {
+            string? changedSetting = MailProfileCredentialContextGuard.GetChangedSetting(existing, profile);
+            if (changedSetting != null) {
+                if (_secretStore == null ||
+                    _profileStore is not IMailProfileStoreCredentialContextCoordinator coordinator) {
+                    return CredentialContextChangeFailure(existing.Kind, changedSetting);
+                }
+                try {
+                    MailProfileCredentialContextSaveOutcome outcome = await coordinator
+                        .SaveCredentialContextChangeAsync(profile, _secretStore, cancellationToken)
+                        .ConfigureAwait(false);
+                    return outcome == MailProfileCredentialContextSaveOutcome.Saved
+                        ? OperationResult.Success("Profile saved.")
+                        : CredentialContextChangeFailure(existing.Kind, changedSetting);
+                } catch (MailProfileKindChangeException ex) {
+                    return KindChangeFailure(ex.ExistingKind, ex.RequestedKind);
+                } catch (MailProfileCredentialContextChangeException ex) {
+                    return CredentialContextChangeFailure(ex.ProfileKind, ex.ChangedSetting);
+                }
+            }
+        }
+        try {
+            await _profileStore.SaveAsync(profile, cancellationToken).ConfigureAwait(false);
+        } catch (MailProfileKindChangeException ex) {
+            return KindChangeFailure(ex.ExistingKind, ex.RequestedKind);
+        } catch (MailProfileCredentialContextChangeException ex) {
+            return CredentialContextChangeFailure(ex.ProfileKind, ex.ChangedSetting);
+        }
         return OperationResult.Success("Profile saved.");
+    }
+
+    /// <inheritdoc />
+    public async Task<OperationResult> CreateAsync(
+        MailProfile profile,
+        CancellationToken cancellationToken = default) {
+        MailProfileValidationResult validation = MailProfileValidator.Validate(profile);
+        if (!validation.Succeeded) return validation;
+        if (_profileStore is not IMailProfileStoreCreateCoordinator coordinator) {
+            return OperationResult.Failure(
+                "profile_create_not_supported",
+                "The configured profile store does not support atomic create-only operations.");
+        }
+
+        MailProfileCreateOutcome outcome = await coordinator.TryCreateAsync(profile, cancellationToken)
+            .ConfigureAwait(false);
+        return outcome == MailProfileCreateOutcome.Created
+            ? OperationResult.Success("Profile created.")
+            : OperationResult.Failure(
+                "profile_already_exists",
+                $"Mail profile '{profile.Id.Trim()}' already exists. Use replacement explicitly to update it.");
     }
 
     /// <inheritdoc />
@@ -226,4 +278,14 @@ public sealed class MailProfileService : IMailProfileService {
         result.Errors.Add(message);
         return result;
     }
+
+    private static OperationResult KindChangeFailure(MailProfileKind existingKind, MailProfileKind requestedKind) =>
+        OperationResult.Failure(
+            "profile_kind_change_not_allowed",
+            $"Changing an existing profile provider from '{existingKind}' to '{requestedKind}' is not allowed. Delete and recreate the profile so provider secrets are removed first.");
+
+    private static OperationResult CredentialContextChangeFailure(MailProfileKind profileKind, string changedSetting) =>
+        OperationResult.Failure(
+            "profile_credential_context_change_not_allowed",
+            $"Changing credential-context setting '{changedSetting}' on an existing {profileKind} profile is not allowed. Delete and recreate the profile so stored credentials are removed first.");
 }

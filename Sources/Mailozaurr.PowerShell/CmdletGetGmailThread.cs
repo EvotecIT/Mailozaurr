@@ -53,7 +53,7 @@ public sealed class CmdletGetGmailThread : AsyncPSCmdlet {
             AccessToken = net.Password,
             ExpiresOn = System.DateTimeOffset.MaxValue
         };
-        var client = new GmailApiClient(oauth);
+        using var client = new GmailApiClient(oauth);
         if (ParameterSetName == "Id") {
             var thread = await client.GetThreadAsync(GmailAccount!, Id!, CancelToken);
             WriteObject(thread);

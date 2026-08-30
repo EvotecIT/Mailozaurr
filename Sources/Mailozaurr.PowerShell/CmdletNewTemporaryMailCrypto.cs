@@ -1,6 +1,7 @@
 namespace Mailozaurr.PowerShell;
 
 using System.Management.Automation;
+using System.Security;
 using System.Security.Cryptography.X509Certificates;
 
 /// <summary>
@@ -48,12 +49,21 @@ public sealed class CmdletNewTemporaryMailCrypto : PSCmdlet {
     [Parameter(ParameterSetName = "Smime")]
     public int ValidDays { get; set; } = 1;
 
+    /// <summary>Password protecting an exported S/MIME PFX file.</summary>
+    [Parameter(ParameterSetName = "Smime")]
+    public SecureString? OutputPassword { get; set; }
+
     /// <inheritdoc />
     protected override void ProcessRecord() {
         if (ParameterSetName == "Pgp") {
             WriteObject(TemporaryPgpKeyPair.Create(Identity, PassPhrase, KeySize, OutputPath == string.Empty ? null : OutputPath, !NoDispose.IsPresent));
         } else {
-            WriteObject(TemporarySmimeCertificate.CreateSelfSigned(SubjectName, ValidDays, OutputPath == string.Empty ? null : OutputPath));
+            string? outputPassword = OutputPassword == null ? null : CredentialHelpers.ToPlainText(OutputPassword);
+            WriteObject(TemporarySmimeCertificate.CreateSelfSigned(
+                SubjectName,
+                ValidDays,
+                OutputPath == string.Empty ? null : OutputPath,
+                outputPassword));
         }
     }
 }

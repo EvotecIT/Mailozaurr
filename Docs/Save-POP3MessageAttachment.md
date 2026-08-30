@@ -13,7 +13,7 @@ The Save-POP3MessageAttachment cmdlet saves all attachments from a POP3 message 
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Save-POP3MessageAttachment [[-Client] <PopConnectionInfo>] [-Index] <int> [-Path] <string> [<CommonParameters>]
+Save-POP3MessageAttachment [[-Client] <PopConnectionInfo>] [-Index] <int> [-Path] <string> [-ConflictPolicy <AttachmentFileConflictPolicy>] [-Force] [-PassThru] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -47,6 +47,38 @@ Accept pipeline input: True (ByValue)
 Accept wildcard characters: False
 ```
 
+### -ConflictPolicy
+Controls how existing destination files are handled.
+
+```yaml
+Type: AttachmentFileConflictPolicy
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values: Fail, Skip, Rename, Replace
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Force
+Replaces existing regular files. Equivalent to ConflictPolicy Replace.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: __AllParameterSets
+Aliases: Overwrite
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -Index
 Specifies the index of the message to process.
 
@@ -58,6 +90,22 @@ Possible values:
 
 Required: True
 Position: 1
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -PassThru
+Writes one save result for each attachment.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
 Default value: None
 Accept pipeline input: False
 Accept wildcard characters: False

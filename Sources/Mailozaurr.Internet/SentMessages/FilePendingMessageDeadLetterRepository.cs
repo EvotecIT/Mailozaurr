@@ -16,22 +16,29 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
     private const string DefaultDeadLetterFileName = "dead-letter.log";
 
     private readonly string filePath;
+    private readonly string conflictPath = string.Empty;
     private readonly SemaphoreSlim gate = new(1, 1);
     private static readonly byte[] NewlineBytes = Encoding.UTF8.GetBytes(Environment.NewLine);
 
     /// <summary>Creates a repository using pending-message options and a dead-letter file name.</summary>
     public FilePendingMessageDeadLetterRepository(PendingMessageRepositoryOptions? options = null)
-        : this(GetFilePath(options)) {
+        : this(GetStorageFiles(options)) {
     }
+
+    private FilePendingMessageDeadLetterRepository((string Path, string ConflictPath) storageFiles)
+        : this(storageFiles.Path) => conflictPath = storageFiles.ConflictPath;
 
     /// <summary>Creates a repository using an explicit file path.</summary>
     public FilePendingMessageDeadLetterRepository(string filePath) {
         this.filePath = Path.GetFullPath(filePath ?? throw new ArgumentNullException(nameof(filePath)));
     }
 
-    private static string GetFilePath(PendingMessageRepositoryOptions? options) {
+    internal FilePendingMessageDeadLetterRepository(string filePath, string conflictPath)
+        : this(filePath) => this.conflictPath = Path.GetFullPath(conflictPath);
+
+    private static (string Path, string ConflictPath) GetStorageFiles(PendingMessageRepositoryOptions? options) {
         options ??= new PendingMessageRepositoryOptions();
-        var directory = string.IsNullOrWhiteSpace(options.DirectoryPath) ? Path.GetTempPath() : options.DirectoryPath;
+        var directory = options.DirectoryPath;
         string name;
         try {
             name = options.FileNamingScheme?.Invoke() ?? DefaultPendingFileName;
@@ -39,8 +46,25 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
             throw new InvalidOperationException("FileNamingScheme failed to provide a file name", ex);
         }
 
-        return Path.Combine(directory, CreateDeadLetterFileName(name));
+        if (string.IsNullOrWhiteSpace(name)
+            || Path.IsPathRooted(name)
+            || name == "."
+            || name == ".."
+            || name.IndexOfAny(new[] { '/', '\\' }) >= 0
+            || !string.Equals(Path.GetFileName(name), name, StringComparison.Ordinal)) {
+            throw new InvalidOperationException("FileNamingScheme must return a single file name without directory components.");
+        }
+        string deadLetterFileName = CreateDeadLetterFileName(name);
+        string targetPath = Path.Combine(Path.GetFullPath(directory), deadLetterFileName);
+        return options.UsesDefaultDirectory
+            ? MailozaurrStoragePaths.ResolveDefaultStorageFiles(
+                targetPath,
+                Path.Combine(Path.GetTempPath(), deadLetterFileName))
+            : (targetPath, string.Empty);
     }
+
+    private void ThrowIfDefaultQueueConflictAppeared() =>
+        MailozaurrStoragePaths.ThrowIfConflictingQueueAppeared(filePath, conflictPath);
 
     private static string CreateDeadLetterFileName(string? pendingFileName) {
         if (string.IsNullOrWhiteSpace(pendingFileName)) {
@@ -76,13 +100,20 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
 
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
+            ThrowIfDefaultQueueConflictAppeared();
             var directory = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrWhiteSpace(directory)) {
+                bool directoryExisted = Directory.Exists(directory);
                 Directory.CreateDirectory(directory);
+                if (!directoryExisted) UnixFilePermissions.RestrictDirectory(directory);
             }
 
             var payload = JsonSerializer.SerializeToUtf8Bytes(record, MailozaurrJsonContext.Default.PendingMessageDeadLetterRecord);
-            using var write = new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.Read);
+            using var write = UnixFilePermissions.OpenRestrictedFile(
+                filePath,
+                FileMode.Append,
+                FileAccess.Write,
+                FileShare.Read);
             await write.WriteAsync(payload, 0, payload.Length, cancellationToken).ConfigureAwait(false);
             await write.WriteAsync(NewlineBytes, 0, NewlineBytes.Length, cancellationToken).ConfigureAwait(false);
             await write.FlushAsync(cancellationToken).ConfigureAwait(false);
@@ -109,6 +140,7 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
 
     /// <inheritdoc />
     public async IAsyncEnumerable<PendingMessageDeadLetterRecord> GetAllAsync([EnumeratorCancellation] CancellationToken cancellationToken = default) {
+        ThrowIfDefaultQueueConflictAppeared();
         if (!File.Exists(filePath)) {
             yield break;
         }
@@ -116,6 +148,7 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
         List<PendingMessageDeadLetterRecord> snapshot = new();
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
+            ThrowIfDefaultQueueConflictAppeared();
             using var read = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             using var reader = new StreamReader(read, Encoding.UTF8, false, 1024, leaveOpen: true);
             string? line;
@@ -156,6 +189,7 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
 
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
+            ThrowIfDefaultQueueConflictAppeared();
             if (!File.Exists(filePath)) {
                 return;
             }
@@ -198,7 +232,11 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
         var tempPath = filePath + ".tmp";
         var backupPath = filePath + ".bak";
         try {
-            using (var write = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None)) {
+            using (var write = UnixFilePermissions.OpenRestrictedFile(
+                tempPath,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.None)) {
                 foreach (var record in records) {
                     var payload = JsonSerializer.SerializeToUtf8Bytes(record, MailozaurrJsonContext.Default.PendingMessageDeadLetterRecord);
                     await write.WriteAsync(payload, 0, payload.Length, cancellationToken).ConfigureAwait(false);

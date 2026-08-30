@@ -139,7 +139,7 @@ public class CmdletSetGraphMessage : AsyncPSCmdlet {
         }
         var uri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
-            $"/users/{UserPrincipalName}/messages/{MessageId}");
+            MicrosoftGraphUtils.BuildGraphPath("users", UserPrincipalName!, "messages", MessageId!));
         var body = JsonSerializer.Serialize(new GraphMarkReadRequest { IsRead = Read.IsPresent }, GraphJsonContext.Default.GraphMarkReadRequest);
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")

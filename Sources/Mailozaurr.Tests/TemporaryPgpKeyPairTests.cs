@@ -9,10 +9,39 @@ namespace Mailozaurr.Tests;
 
 public class TemporaryPgpKeyPairTests {
     [Fact]
+    public void Create_PreservesLegacyFiveParameterSignature() {
+        MethodInfo? method = typeof(TemporaryPgpKeyPair).GetMethod(
+            nameof(TemporaryPgpKeyPair.Create),
+            new[] { typeof(string), typeof(string), typeof(int), typeof(string), typeof(bool) });
+
+        Assert.NotNull(method);
+        using var keys = TemporaryPgpKeyPair.Create("legacy@example.test", "", 2048, null, true);
+        Assert.False(string.IsNullOrEmpty(keys.PassPhrase));
+    }
+
+    [Fact]
     public void Create_ReturnsFiles() {
         using var keys = TemporaryPgpKeyPair.Create("a@b.com");
         Assert.True(File.Exists(keys.PublicKeyPath));
         Assert.True(File.Exists(keys.PrivateKeyPath));
+        Assert.False(string.IsNullOrEmpty(keys.PassPhrase));
+    }
+
+    [Fact]
+    public void Create_RejectsWeakKeysAndExistingOutputFiles() {
+        Assert.Throws<ArgumentOutOfRangeException>(() => TemporaryPgpKeyPair.Create(keySize: 1024));
+
+        string directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string publicPath = Path.Combine(directory, "temp.pgp.pub");
+        File.WriteAllText(publicPath, "do-not-overwrite");
+        try {
+            Assert.Throws<IOException>(() => TemporaryPgpKeyPair.Create(outputDirectory: directory));
+            Assert.Equal("do-not-overwrite", File.ReadAllText(publicPath));
+            Assert.False(File.Exists(Path.Combine(directory, "temp.pgp.sec")));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     [Fact(Skip = "PGP sign and encrypt requires additional configuration in CI")]

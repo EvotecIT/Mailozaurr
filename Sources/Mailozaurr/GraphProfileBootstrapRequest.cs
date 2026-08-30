@@ -48,4 +48,7 @@ public sealed class GraphProfileBootstrapRequest {
 
     /// <summary>Optional secret reference for the certificate password, in the form <c>&lt;profile-id&gt;:&lt;secret-name&gt;</c> or <c>&lt;secret-name&gt;</c>.</summary>
     public string? CertificatePasswordReference { get; set; }
+
+    /// <summary>Compatibility-only flag. Cross-profile secret references remain rejected.</summary>
+    public bool AllowCrossProfileSecretReferences { get; set; }
 }

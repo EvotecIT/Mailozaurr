@@ -3,7 +3,11 @@ namespace Mailozaurr;
 /// <summary>
 /// Stores profiles in a JSON document on disk.
 /// </summary>
-public sealed class FileMailProfileStore : IMailProfileStore, IMailProfileMaintenanceCoordinator {
+public sealed class FileMailProfileStore :
+    IMailProfileStore,
+    IMailProfileMaintenanceCoordinator,
+    IMailProfileStoreCreateCoordinator,
+    IMailProfileStoreCredentialContextCoordinator {
     private readonly JsonFileDocumentStore<MailProfileStoreDocument> _store;
     /// <summary>
     /// Creates a new store using the provided options.
@@ -44,22 +48,66 @@ public sealed class FileMailProfileStore : IMailProfileStore, IMailProfileMainte
     public async Task SaveAsync(MailProfile profile, CancellationToken cancellationToken = default) {
         MailProfileCloner.Validate(profile);
 
-        await _store.UpdateAsync(document => {
-            var existingIndex = document.Profiles.FindIndex(p => string.Equals(p.Id, profile.Id, StringComparison.OrdinalIgnoreCase));
-            var profileToStore = MailProfileCloner.Clone(profile);
+        await _store.UpdateAsync(
+            document => SaveDocument(document, profile, allowCredentialContextChange: false),
+            cancellationToken).ConfigureAwait(false);
+    }
 
-            if (profileToStore.IsDefault) {
-                foreach (var existing in document.Profiles) {
-                    existing.IsDefault = false;
-                }
-            }
+    Task<MailProfileCreateOutcome> IMailProfileStoreCreateCoordinator.TryCreateAsync(
+        MailProfile profile,
+        CancellationToken cancellationToken) {
+        MailProfileCloner.Validate(profile);
+        return _store.UpdateUnderWriterLockAsync(document => {
+            bool exists = document.Profiles.Any(candidate =>
+                string.Equals(candidate.Id, profile.Id, StringComparison.OrdinalIgnoreCase));
+            if (exists) return Task.FromResult(MailProfileCreateOutcome.AlreadyExists);
+            SaveDocument(document, profile, allowCredentialContextChange: false);
+            return Task.FromResult(MailProfileCreateOutcome.Created);
+        }, cancellationToken);
+    }
 
-            if (existingIndex >= 0) {
-                document.Profiles[existingIndex] = profileToStore;
-            } else {
-                document.Profiles.Add(profileToStore);
+    Task<MailProfileCredentialContextSaveOutcome>
+        IMailProfileStoreCredentialContextCoordinator.SaveCredentialContextChangeAsync(
+            MailProfile profile,
+            IMailSecretStore secretStore,
+            CancellationToken cancellationToken) {
+        MailProfileCloner.Validate(profile);
+        if (secretStore is not IMailSecretStoreCredentialContextCoordinator secretCoordinator) {
+            return Task.FromResult(MailProfileCredentialContextSaveOutcome.Unsupported);
+        }
+        return _store.UpdateUnderWriterLockAsync(document =>
+            secretCoordinator.ExecuteWithProfileSecretsLockedAsync(
+                profile.Id,
+                (hasSecrets, _) => {
+                    if (hasSecrets) {
+                        return Task.FromResult(MailProfileCredentialContextSaveOutcome.HasSecrets);
+                    }
+                    SaveDocument(document, profile, allowCredentialContextChange: true);
+                    return Task.FromResult(MailProfileCredentialContextSaveOutcome.Saved);
+                },
+                cancellationToken),
+            cancellationToken);
+    }
+
+    private static void SaveDocument(
+        MailProfileStoreDocument document,
+        MailProfile profile,
+        bool allowCredentialContextChange) {
+        int existingIndex = document.Profiles.FindIndex(candidate =>
+            string.Equals(candidate.Id, profile.Id, StringComparison.OrdinalIgnoreCase));
+        var profileToStore = MailProfileCloner.Clone(profile);
+        if (existingIndex >= 0) {
+            MailProfileKindGuard.EnsureUnchanged(document.Profiles[existingIndex], profileToStore);
+            if (!allowCredentialContextChange) {
+                MailProfileCredentialContextGuard.EnsureUnchanged(document.Profiles[existingIndex], profileToStore);
             }
-        }, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (profileToStore.IsDefault) {
+            foreach (MailProfile existing in document.Profiles) existing.IsDefault = false;
+        }
+        if (existingIndex >= 0) document.Profiles[existingIndex] = profileToStore;
+        else document.Profiles.Add(profileToStore);
     }
 
     /// <inheritdoc />

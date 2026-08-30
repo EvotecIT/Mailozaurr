@@ -167,7 +167,7 @@ public sealed class CmdletGetEmailDeliveryStatus : AsyncPSCmdlet {
                     if (Credential != null && !string.IsNullOrWhiteSpace(GmailAccount)) {
                         var net = Credential.GetNetworkCredential();
                         var oauth = new OAuthCredential { UserName = net.UserName, AccessToken = net.Password, ExpiresOn = DateTimeOffset.MaxValue };
-                        var client = new GmailApiClient(oauth);
+                        using var client = new GmailApiClient(oauth);
                         var reports = await GmailMailboxSearcher.SearchNonDeliveryReportsAsync(
                             client,
                             GmailAccount!,

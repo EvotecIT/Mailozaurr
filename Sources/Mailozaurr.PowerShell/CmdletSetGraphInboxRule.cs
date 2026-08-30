@@ -136,7 +136,7 @@ public sealed class CmdletSetGraphInboxRule : AsyncPSCmdlet {
         }
         var uri = MicrosoftGraphUtils.JoinUriQuery(
             GraphEndpoint.V1,
-            $"/users/{UserPrincipalName}/mailFolders/inbox/messageRules/{RuleId}");
+            MicrosoftGraphUtils.BuildGraphPath("users", UserPrincipalName!, "mailFolders", "inbox", "messageRules", RuleId!));
         var rulePayload = Rule ?? throw new PSArgumentNullException(nameof(Rule), "Rule has to be provided or built.");
         var bodyObj = RuleObject ?? JsonSerializer.Deserialize(JsonSerializer.Serialize(rulePayload, MailozaurrJsonContext.Default.Object), GraphJsonContext.Default.GraphInboxRule);
         if (bodyObj is null) {

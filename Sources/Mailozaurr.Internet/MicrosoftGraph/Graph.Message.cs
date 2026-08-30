@@ -70,17 +70,32 @@ public partial class Graph {
                          string.Equals(HTML, _autoEmbedRenderedHtml, StringComparison.Ordinal)
             ? _autoEmbedOriginalHtml ?? HTML
             : HTML;
-        var (renderedHtml, paths) = HtmlUtils.ExtractLocalImagePaths(sourceHtml);
+        HtmlUtils.LocalImage[] existingImages = (Attachments ?? Array.Empty<object>())
+            .OfType<Definitions.AttachmentDescriptor>()
+            .Where(descriptor => IsInlineDescriptor(descriptor) &&
+                                 !string.IsNullOrWhiteSpace(descriptor.SourcePath))
+            .Select(descriptor => new HtmlUtils.LocalImage(
+                descriptor.SourcePath!,
+                string.IsNullOrWhiteSpace(descriptor.ContentId)
+                    ? Path.GetFileName(descriptor.SourcePath!)
+                    : descriptor.ContentId!))
+            .ToArray();
+        var (renderedHtml, images) = HtmlUtils.ExtractLocalImages(
+            sourceHtml,
+            ConvertedAttachments
+                .Where(attachment => attachment.IsInline)
+                .Select(attachment => attachment.ContentId ?? string.Empty),
+            existingImages);
         _autoEmbedOriginalHtml = sourceHtml;
         _autoEmbedRenderedHtml = renderedHtml;
-        _autoEmbeddedImagePaths.Clear();
-        _autoEmbeddedImagePaths.AddRange(paths);
+        _autoEmbeddedImages.Clear();
+        _autoEmbeddedImages.AddRange(images);
         HTML = renderedHtml;
 
-        foreach (var path in _autoEmbeddedImagePaths) {
-            var attachment = GraphAttachment.FromFile(path);
+        foreach (HtmlUtils.LocalImage image in _autoEmbeddedImages) {
+            var attachment = GraphAttachment.FromFile(image.Path);
             attachment.IsInline = true;
-            attachment.ContentId = Path.GetFileName(path);
+            attachment.ContentId = image.ContentId;
             ConvertedAttachments.Add(attachment);
             var size = EstimateAttachmentSize(attachment);
             _inlineAttachmentSizeBytes += size;
@@ -92,7 +107,7 @@ public partial class Graph {
     private void ClearAutoEmbeddedImageState() {
         _autoEmbedOriginalHtml = null;
         _autoEmbedRenderedHtml = null;
-        _autoEmbeddedImagePaths.Clear();
+        _autoEmbeddedImages.Clear();
     }
 
     /// <summary>

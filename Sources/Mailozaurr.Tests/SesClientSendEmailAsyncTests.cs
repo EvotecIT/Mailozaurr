@@ -78,6 +78,17 @@ public class SesClientSendEmailAsyncTests {
     }
 
     [Fact]
+    public async Task SendEmailAsync_RejectsRegionUriDelimitersBeforeTransport() {
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK));
+        using var client = CreateClient(handler);
+        client.Region = "evil.example#";
+
+        await Assert.ThrowsAsync<ArgumentException>(() => client.SendEmailAsync());
+
+        Assert.Empty(handler.Requests);
+    }
+
+    [Fact]
     public async Task SendEmailAsync_WithToken_Succeeds() {
         var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("ok") });
         using var client = CreateClient(handler);
@@ -116,6 +127,33 @@ public class SesClientSendEmailAsyncTests {
 
         Assert.False(result.Status);
         Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task SendEmailAsync_TimeoutRethrowPreservesProviderStack() {
+        using var client = CreateClient(new TimeoutThrowingHandler());
+        client.RetryCount = 0;
+        client.ErrorAction = ActionPreference.Stop;
+
+        TaskCanceledException exception = await Assert.ThrowsAsync<TaskCanceledException>(
+            () => client.SendEmailAsync());
+
+        Assert.Contains(nameof(TimeoutThrowingHandler.ThrowTimeout), exception.StackTrace);
+    }
+
+    private sealed class TimeoutThrowingHandler : HttpMessageHandler {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) {
+            try {
+                ThrowTimeout();
+                throw new InvalidOperationException("Unreachable.");
+            } catch (TaskCanceledException exception) {
+                return Task.FromException<HttpResponseMessage>(exception);
+            }
+        }
+
+        internal static void ThrowTimeout() => throw new TaskCanceledException("provider timeout");
     }
 
     [Fact]

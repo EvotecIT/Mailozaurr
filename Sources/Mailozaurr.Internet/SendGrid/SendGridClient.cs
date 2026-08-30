@@ -1,4 +1,5 @@
 ﻿using Mailozaurr.Definitions;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 
 namespace Mailozaurr;
@@ -387,6 +388,14 @@ public sealed class SendGridClient : IDisposable {
     /// </summary>
     /// <returns>A Task that represents the asynchronous operation. The task result contains the result of the email sending operation.</returns>
     public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken) {
+        try {
+            return await SendEmailCoreAsync(cancellationToken).ConfigureAwait(false);
+        } finally {
+            AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
+        }
+    }
+
+    private async Task<SmtpResult> SendEmailCoreAsync(CancellationToken cancellationToken) {
         ThrowIfDisposed();
         if (DryRun) {
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping SendGrid send.");
@@ -420,6 +429,7 @@ public sealed class SendGridClient : IDisposable {
                     CancellationTokenSource.CreateLinkedTokenSource(
                         cancellationToken);
                 requestTimeout.CancelAfter(RequestTimeout);
+                AttachmentDescriptorLifetime.MarkSendAttempted(Attachments, InlineAttachments);
                 using var response = await _client.SendAsync(
                     request,
                     requestTimeout.Token).ConfigureAwait(false);
@@ -481,7 +491,8 @@ public sealed class SendGridClient : IDisposable {
                             apiKey,
                             cancellationToken).ConfigureAwait(false);
                     if (ErrorAction == ActionPreference.Stop && lastException != null) {
-                        throw lastException;
+                        ExceptionDispatchInfo.Capture(lastException).Throw();
+                        throw new InvalidOperationException("The SendGrid failure could not be rethrown.");
                     }
                     var failResult = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, "SendGridApi", 0, Stopwatch.Elapsed, lastContent, lastException?.Message) {
                         MessageId = queuedMessageId,
@@ -558,6 +569,7 @@ public sealed class SendGridClient : IDisposable {
             return;
         }
 
+        if (disposing) AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
         if (disposing && _ownsClient) {
             _client.Dispose();
         }

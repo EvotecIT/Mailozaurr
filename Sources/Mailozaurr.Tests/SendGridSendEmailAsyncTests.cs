@@ -64,6 +64,18 @@ public sealed class SendGridSendEmailAsyncTests {
         Assert.True(client.Stopwatch.Elapsed < TimeSpan.FromSeconds(5));
     }
 
+    [Fact]
+    public async Task SendEmailAsync_TimeoutRethrowPreservesProviderStack() {
+        using var client = CreateClient(new TimeoutThrowingHandler());
+        client.RetryCount = 0;
+        client.ErrorAction = ActionPreference.Stop;
+
+        TaskCanceledException exception = await Assert.ThrowsAsync<TaskCanceledException>(
+            () => client.SendEmailAsync());
+
+        Assert.Contains(nameof(TimeoutThrowingHandler.ThrowTimeout), exception.StackTrace);
+    }
+
     private static SendGridClient CreateClient(HttpMessageHandler handler) {
         var client = new SendGridClient(handler) {
             From = "sender@example.com",
@@ -86,5 +98,20 @@ public sealed class SendGridSendEmailAsyncTests {
                 cancellationToken);
             return new HttpResponseMessage(HttpStatusCode.Accepted);
         }
+    }
+
+    private sealed class TimeoutThrowingHandler : HttpMessageHandler {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) {
+            try {
+                ThrowTimeout();
+                throw new InvalidOperationException("Unreachable.");
+            } catch (TaskCanceledException exception) {
+                return Task.FromException<HttpResponseMessage>(exception);
+            }
+        }
+
+        internal static void ThrowTimeout() => throw new TaskCanceledException("provider timeout");
     }
 }

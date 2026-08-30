@@ -172,7 +172,7 @@ public class MailgunClient : IDisposable {
                 FileShare.Read,
                 bufferSize: 8192,
                 options: FileOptions.Asynchronous | FileOptions.SequentialScan)
-            : new MemoryStream(descriptor.GetContentBytes(), writable: false);
+            : descriptor.OpenContentStream();
         var streamContent = new StreamContent(stream);
         var contentTypeSource = string.IsNullOrWhiteSpace(descriptor.FileName)
             ? descriptor.SourcePath
@@ -377,6 +377,14 @@ public class MailgunClient : IDisposable {
     /// </summary>
     /// <returns>The result of the send operation.</returns>
     public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken) {
+        try {
+            return await SendEmailCoreAsync(cancellationToken).ConfigureAwait(false);
+        } finally {
+            AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
+        }
+    }
+
+    private async Task<SmtpResult> SendEmailCoreAsync(CancellationToken cancellationToken) {
         ThrowIfDisposed();
         if (DryRun) {
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Mailgun send.");
@@ -393,6 +401,7 @@ public class MailgunClient : IDisposable {
                     Content = content
                 };
                 request.Headers.Authorization = new AuthenticationHeaderValue("Basic", auth);
+                AttachmentDescriptorLifetime.MarkSendAttempted(Attachments, InlineAttachments);
                 using var response = await _client.SendAsync(request, cancellationToken).ConfigureAwait(false);
                 var responseContent = await ProviderResponseParser
                     .ReadContentAsync(response, cancellationToken)
@@ -455,6 +464,7 @@ public class MailgunClient : IDisposable {
     /// <param name="disposing">When true, disposes managed resources as well.</param>
     protected virtual void Dispose(bool disposing) {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        if (disposing) AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
         if (disposing && _ownsClient) {
             _client.Dispose();
         }

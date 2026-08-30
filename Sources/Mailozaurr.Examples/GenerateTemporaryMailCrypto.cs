@@ -9,7 +9,10 @@ public static class GenerateTemporaryMailCrypto {
     public static void Run() {
         using var keys = TemporaryPgpKeyPair.Create(outputDirectory: "pgp", deleteOnDispose: false);
         Console.WriteLine($"PGP public key: {keys.PublicKeyPath}");
-        using var cert = TemporarySmimeCertificate.CreateSelfSigned(outputPath: "cert.pfx");
+        string certificatePassword = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24));
+        using var cert = TemporarySmimeCertificate.CreateSelfSigned(
+            outputPath: "cert.pfx",
+            outputPassword: certificatePassword);
         Console.WriteLine($"S/MIME certificate: {cert.Subject}");
     }
 }

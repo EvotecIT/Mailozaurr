@@ -25,6 +25,9 @@ namespace Mailozaurr;
 /// are serialized so that only one send executes at a time per instance.</para>
 /// </remarks>
 public partial class Smtp {
+    internal void MarkTransportAttempted() =>
+        AttachmentDescriptorLifetime.MarkSendAttempted(Attachments, InlineAttachments);
+
     private static ClientSmtp CreateDefaultClient(ProtocolLogger? logger) => logger == null ? new ClientSmtp() : new ClientSmtp(logger);
 
     /// <summary>Factory used to create <see cref="ClientSmtp"/> instances.</summary>
@@ -224,6 +227,12 @@ public partial class Smtp {
     public bool AutoEmbedRemoteImages {
         get => Client.AutoEmbedRemoteImages;
         set => Client.AutoEmbedRemoteImages = value;
+    }
+
+    /// <summary>Security and resource limits used when downloading remote images.</summary>
+    public RemoteImageDownloadOptions RemoteImageDownloadOptions {
+        get => Client.RemoteImageDownloadOptions;
+        set => Client.RemoteImageDownloadOptions = value ?? throw new ArgumentNullException(nameof(value));
     }
 
     /// <summary>
@@ -484,19 +493,47 @@ public partial class Smtp {
             return;
         }
 
-        var (html, paths) = HtmlUtils.ExtractLocalImagePaths(HtmlBody);
+        IEnumerable<AttachmentDescriptor> existingAttachments = InlineAttachments
+            ?? Enumerable.Empty<AttachmentDescriptor>();
+        var allocatedContentIds = new HashSet<string>(
+            existingAttachments
+                .Where(descriptor => !string.IsNullOrWhiteSpace(descriptor.ContentId))
+                .Select(descriptor => descriptor.ContentId!),
+            StringComparer.OrdinalIgnoreCase);
+        foreach (AttachmentDescriptor descriptor in existingAttachments) {
+            if (string.IsNullOrWhiteSpace(descriptor.SourcePath) ||
+                !string.IsNullOrWhiteSpace(descriptor.ContentId)) continue;
+            string canonicalPath = Definitions.AttachmentPathIdentity.Normalize(descriptor.SourcePath!);
+            descriptor.ContentId = RemoteImageDownloader.CreateContentId(
+                Path.GetFileName(descriptor.SourcePath!),
+                canonicalPath,
+                "local-image",
+                allocatedContentIds);
+        }
+        HtmlUtils.LocalImage[] existingImages = existingAttachments
+            .Where(descriptor => !string.IsNullOrWhiteSpace(descriptor.SourcePath) &&
+                                 !string.IsNullOrWhiteSpace(descriptor.ContentId))
+            .Select(descriptor => new HtmlUtils.LocalImage(descriptor.SourcePath!, descriptor.ContentId!))
+            .ToArray();
+        var (html, images) = HtmlUtils.ExtractLocalImages(
+            HtmlBody,
+            existingAttachments.Select(descriptor => descriptor.ContentId ?? string.Empty),
+            existingImages);
         HtmlBody = html;
-        if (paths.Count <= 0) {
+        if (images.Count <= 0) {
             return;
         }
 
         InlineAttachments ??= new List<AttachmentDescriptor>();
-        foreach (var path in paths) {
-            if (InlineAttachments.Any(d => string.Equals(d.SourcePath, path, StringComparison.OrdinalIgnoreCase))) {
+        foreach (HtmlUtils.LocalImage image in images) {
+            if (InlineAttachments.Any(d => d.SourcePath != null &&
+                Definitions.AttachmentPathIdentity.Comparer.Equals(
+                    Definitions.AttachmentPathIdentity.Normalize(d.SourcePath),
+                    Definitions.AttachmentPathIdentity.Normalize(image.Path)))) {
                 continue;
             }
 
-            InlineAttachments.Add(new FileAttachmentDescriptor(path));
+            InlineAttachments.Add(new FileAttachmentDescriptor(image.Path) { ContentId = image.ContentId });
         }
     }
 
@@ -983,6 +1020,7 @@ public partial class Smtp {
     /// Releases the SMTP connection and associated resources.
     /// </summary>
     public void Dispose() {
+        AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
         var clientToDispose = Client;
         if (Client.IsConnected) {
             if (IsConnectionPoolingEnabled) {

@@ -3,6 +3,7 @@ using System.CommandLine;
 namespace Mailozaurr.Cli;
 
 internal static partial class CliCommandModel {
+    private static readonly char[] OptionValueSeparators = { '=', ':' };
     private static readonly Dictionary<string, string> CanonicalOptionAliases =
         new(StringComparer.OrdinalIgnoreCase) {
             ["--help"] = "--help",
@@ -18,7 +19,7 @@ internal static partial class CliCommandModel {
         var normalized = new string[arguments.Count];
         for (int index = 0; index < arguments.Count; index++) {
             string argument = arguments[index];
-            int separatorIndex = argument.IndexOfAny('=', ':');
+            int separatorIndex = argument.IndexOfAny(OptionValueSeparators);
             string alias = separatorIndex > 0 ? argument[..separatorIndex] : argument;
             normalized[index] = CanonicalOptionAliases.TryGetValue(alias, out string? canonical)
                 ? separatorIndex > 0
@@ -131,7 +132,7 @@ internal static partial class CliCommandModel {
     }
 
     private static bool IsFlag(string name) => name is
-        "access-token-stdin" or "can-read" or "can-send" or "certificate-password-stdin" or
+        "access-token-stdin" or "allow-cross-profile-secret-ref" or "can-read" or "can-send" or "certificate-password-stdin" or
         "client-secret-stdin" or "compact" or "default-only" or "desc" or "has-attachments" or
         "include-raw" or "is-default" or "json" or "overwrite" or "queue-on-failure" or
         "ready-only" or "refresh-token-stdin" or "root-only" or "stop-on-error" or "summary" or
@@ -157,6 +158,7 @@ internal static partial class CliCommandModel {
         "client-id" => "OAuth client or application identifier.",
         "client-secret-env" => "Environment variable containing the client secret.",
         "client-secret-ref" => "Stored client-secret reference.",
+        "allow-cross-profile-secret-ref" => "Compatibility option. Cross-profile secret references remain rejected until typed audience policy is available.",
         "client-secret-stdin" => "Read the client secret from standard input.",
         "compact" => "Return the compact response projection.",
         "confirm-token" => "Confirmation token from the matching preview.",

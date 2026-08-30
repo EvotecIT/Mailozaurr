@@ -70,6 +70,13 @@ internal sealed class JsonFileDocumentStore<TDocument> where TDocument : class {
         return ExecuteLockedReadAsync(operation, cancellationToken);
     }
 
+    internal Task<TResult> UpdateUnderWriterLockAsync<TResult>(
+        Func<TDocument, Task<TResult>> operation,
+        CancellationToken cancellationToken = default) {
+        if (operation == null) throw new ArgumentNullException(nameof(operation));
+        return ExecuteUpdateAsync(operation, cancellationToken);
+    }
+
     private async Task<bool> ExecuteConditionalUpdateAsync(
         Func<TDocument, bool> update,
         CancellationToken cancellationToken) {

@@ -10,11 +10,38 @@ public interface IMailProfileStore {
     /// <summary>Returns a profile by identifier.</summary>
     Task<MailProfile?> GetByIdAsync(string profileId, CancellationToken cancellationToken = default);
 
-    /// <summary>Saves or updates a profile.</summary>
+    /// <summary>
+    /// Saves or updates a profile. An existing profile identifier must retain its provider kind;
+    /// delete and recreate the profile when changing providers so its secrets are removed first.
+    /// </summary>
     Task SaveAsync(MailProfile profile, CancellationToken cancellationToken = default);
 
     /// <summary>Removes a profile by identifier.</summary>
     Task<bool> RemoveAsync(string profileId, CancellationToken cancellationToken = default);
+}
+
+internal enum MailProfileCredentialContextSaveOutcome {
+    Saved,
+    HasSecrets,
+    Unsupported
+}
+
+internal enum MailProfileCreateOutcome {
+    Created,
+    AlreadyExists
+}
+
+internal interface IMailProfileStoreCreateCoordinator {
+    Task<MailProfileCreateOutcome> TryCreateAsync(
+        MailProfile profile,
+        CancellationToken cancellationToken = default);
+}
+
+internal interface IMailProfileStoreCredentialContextCoordinator {
+    Task<MailProfileCredentialContextSaveOutcome> SaveCredentialContextChangeAsync(
+        MailProfile profile,
+        IMailSecretStore secretStore,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

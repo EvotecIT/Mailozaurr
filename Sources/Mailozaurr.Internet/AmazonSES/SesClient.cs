@@ -1,5 +1,6 @@
 using Mailozaurr.Definitions;
 using System.Net.Http;
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using System.Threading;
 
@@ -240,6 +241,7 @@ public class SesClient : IDisposable {
         while (true) {
             try {
                 using HttpRequestMessage request = CreateRequest(body, DateTime.UtcNow);
+                AttachmentDescriptorLifetime.MarkSendAttempted(Attachments, InlineAttachments);
                 using HttpResponseMessage response = await _client.SendAsync(request, cancellationToken);
                 string respContent = await ProviderResponseParser
                     .ReadContentAsync(response, cancellationToken)
@@ -276,7 +278,8 @@ public class SesClient : IDisposable {
                         mimeMessageBase64,
                         cancellationToken).ConfigureAwait(false);
                 if (ErrorAction == ActionPreference.Stop && lastException != null) {
-                    throw lastException;
+                    ExceptionDispatchInfo.Capture(lastException).Throw();
+                    throw new InvalidOperationException("The SES failure could not be rethrown.");
                 }
                 SmtpResult fail = new(false, EmailAction.Send, SentTo, SentFrom, "SESApi", 0, Stopwatch.Elapsed, string.Empty, lastException?.Message) {
                     MessageId = queuedMessageId,
@@ -306,6 +309,14 @@ public class SesClient : IDisposable {
     /// Sends the email using Amazon SES.
     /// </summary>
     public async Task<SmtpResult> SendEmailAsync(CancellationToken cancellationToken) {
+        try {
+            return await SendEmailCoreAsync(cancellationToken).ConfigureAwait(false);
+        } finally {
+            AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
+        }
+    }
+
+    private async Task<SmtpResult> SendEmailCoreAsync(CancellationToken cancellationToken) {
         ThrowIfDisposed();
         MimeMessage message = BuildMessage();
         using MemoryStream stream = new();
@@ -324,6 +335,14 @@ public class SesClient : IDisposable {
     /// Sends a templated email using Amazon SES.
     /// </summary>
     public async Task<SmtpResult> SendTemplatedEmailAsync(CancellationToken cancellationToken) {
+        try {
+            return await SendTemplatedEmailCoreAsync(cancellationToken).ConfigureAwait(false);
+        } finally {
+            AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
+        }
+    }
+
+    private async Task<SmtpResult> SendTemplatedEmailCoreAsync(CancellationToken cancellationToken) {
         ThrowIfDisposed();
         StringBuilder sb = new("Action=SendTemplatedEmail&Version=2010-12-01");
         if (!string.IsNullOrEmpty(TemplateName)) sb.Append("&Template=").Append(Uri.EscapeDataString(TemplateName));
@@ -356,6 +375,7 @@ public class SesClient : IDisposable {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) {
             return;
         }
+        AttachmentDescriptorLifetime.ReleaseStaging(Attachments, InlineAttachments);
         if (_ownsClient) {
             _client.Dispose();
         }

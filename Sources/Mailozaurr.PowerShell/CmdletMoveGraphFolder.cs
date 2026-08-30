@@ -125,7 +125,7 @@ public class CmdletMoveGraphFolder : AsyncPSCmdlet {
         var dest = ParameterSetName == RootParameterSet ? "msgfolderroot" : DestinationFolderId;
         var uri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
-            $"/users/{UserPrincipalName}/mailFolders/{FolderId}/move");
+            MicrosoftGraphUtils.BuildGraphPath("users", UserPrincipalName!, "mailFolders", FolderId!, "move"));
         var body = JsonSerializer.Serialize(new GraphDestinationRequest { DestinationId = dest }, GraphJsonContext.Default.GraphDestinationRequest);
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")

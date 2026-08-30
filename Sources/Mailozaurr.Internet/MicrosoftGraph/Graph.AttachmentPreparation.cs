@@ -7,6 +7,8 @@ using System.Threading;
 namespace Mailozaurr;
 
 public partial class Graph {
+    private readonly Dictionary<Definitions.AttachmentDescriptor, long> _resolvedAttachmentLengths = new();
+
     /// <summary>
     /// Converts the <see cref="Attachments"/> collection into <see cref="GraphAttachment"/> instances.
     /// </summary>
@@ -18,12 +20,20 @@ public partial class Graph {
         RawAttachmentSizeBytes = 0;
         IsLargerAttachment = false;
         _inlineAttachmentSizeBytes = 0;
-        _fileAttachmentCount = 0;
-        _convertedFileAttachmentStartIndex = -1;
+        _streamableAttachmentCount = 0;
+        _convertedStreamableAttachmentStartIndex = -1;
+        _resolvedAttachmentLengths.Clear();
         if (Attachments != null && Attachments.Any()) {
-            var fileAttachments = new List<KeyValuePair<string, Definitions.AttachmentDescriptor?>>();
+            var streamableAttachments = new List<GraphFileAttachmentSource>();
             var regularFilePaths = Definitions.AttachmentPathIdentity.CreateSet();
             var inlineFilePaths = Definitions.AttachmentPathIdentity.CreateSet();
+            var allocatedInlineContentIds = new HashSet<string>(
+                Attachments
+                    .OfType<Definitions.AttachmentDescriptor>()
+                    .Where(descriptor => IsInlineDescriptor(descriptor) &&
+                                         !string.IsNullOrWhiteSpace(descriptor.ContentId))
+                    .Select(descriptor => descriptor.ContentId!),
+                StringComparer.OrdinalIgnoreCase);
             long fileTotalBytes = 0;
             long inMemoryTotalBytes = 0;
             long rawAttachmentBytes = 0;
@@ -37,16 +47,31 @@ public partial class Graph {
                     rawAttachmentBytes += EstimateRawAttachmentSize(ga);
                 } else if (item is Definitions.AttachmentDescriptor descriptor) {
                     if (descriptor.SourcePath is string descriptorPath) {
+                        if (IsInlineDescriptor(descriptor) && string.IsNullOrWhiteSpace(descriptor.ContentId)) {
+                            string canonicalPath = Definitions.AttachmentPathIdentity.Normalize(descriptorPath);
+                            descriptor.ContentId = RemoteImageDownloader.CreateContentId(
+                                Path.GetFileName(descriptorPath),
+                                canonicalPath,
+                                "inline-attachment",
+                                allocatedInlineContentIds);
+                        }
                         var seenPaths = IsInlineDescriptor(descriptor) ? inlineFilePaths : regularFilePaths;
-                        TrackFileAttachment(descriptorPath, descriptor, fileAttachments, seenPaths, ref fileTotalBytes, ref rawAttachmentBytes);
+                        TrackFileAttachment(descriptorPath, descriptor, streamableAttachments, seenPaths, ref fileTotalBytes, ref rawAttachmentBytes);
+                    } else if (IsStreamableDescriptor(descriptor)) {
+                        long descriptorLength = ResolveAttachmentLength(descriptor);
+                        var source = new GraphFileAttachmentSource(descriptor, descriptorLength);
+                        streamableAttachments.Add(source);
+                        fileTotalBytes += EstimateStreamableAttachmentSize(source);
+                        rawAttachmentBytes += descriptorLength;
+                        _streamableAttachmentCount++;
                     } else {
-                        var converted = GraphAttachment.FromDescriptor(descriptor);
+                        var converted = GraphAttachment.FromDescriptor(descriptor, descriptor.Length);
                         ConvertedAttachments.Add(converted);
                         inMemoryTotalBytes += EstimateAttachmentSize(converted);
                         rawAttachmentBytes += EstimateRawAttachmentSize(converted);
                     }
                 } else if (TryGetAttachmentPath(item, out var path)) {
-                    TrackFileAttachment(path, null, fileAttachments, regularFilePaths, ref fileTotalBytes, ref rawAttachmentBytes);
+                    TrackFileAttachment(path, null, streamableAttachments, regularFilePaths, ref fileTotalBytes, ref rawAttachmentBytes);
                 }
             }
 
@@ -56,12 +81,12 @@ public partial class Graph {
             IsLargerAttachment = TotalAttachmentSizeBytes > GraphPayloadLimitBytes;
 
             // Only load file attachments into memory when they fit in a simple send payload.
-            if (!IsLargerAttachment && fileAttachments.Count > 0) {
-                _convertedFileAttachmentStartIndex = ConvertedAttachments.Count;
-                foreach (var source in fileAttachments) {
-                    ConvertedAttachments.Add(source.Value == null
-                        ? GraphAttachment.FromFile(source.Key)
-                        : GraphAttachment.FromDescriptor(source.Value));
+            if (!IsLargerAttachment && streamableAttachments.Count > 0) {
+                _convertedStreamableAttachmentStartIndex = ConvertedAttachments.Count;
+                foreach (GraphFileAttachmentSource source in streamableAttachments) {
+                    ConvertedAttachments.Add(source.Descriptor == null
+                        ? GraphAttachment.FromFile(source.Path!)
+                        : GraphAttachment.FromDescriptor(source.Descriptor, source.Length));
                 }
             }
 
@@ -74,7 +99,7 @@ public partial class Graph {
     private void TrackFileAttachment(
         string path,
         Definitions.AttachmentDescriptor? descriptor,
-        ICollection<KeyValuePair<string, Definitions.AttachmentDescriptor?>> fileAttachments,
+        ICollection<GraphFileAttachmentSource> fileAttachments,
         ISet<string> seenFilePaths,
         ref long fileTotalBytes,
         ref long rawAttachmentBytes) {
@@ -87,10 +112,11 @@ public partial class Graph {
             if (!Definitions.AttachmentPathIdentity.Add(seenFilePaths, path)) {
                 return;
             }
-            fileAttachments.Add(new KeyValuePair<string, Definitions.AttachmentDescriptor?>(path, descriptor));
-            fileTotalBytes += EstimateFileAttachmentSize(path, descriptor);
-            rawAttachmentBytes += new FileInfo(path).Length;
-            _fileAttachmentCount++;
+            var source = new GraphFileAttachmentSource(path, descriptor);
+            fileAttachments.Add(source);
+            fileTotalBytes += EstimateStreamableAttachmentSize(source);
+            rawAttachmentBytes += source.Length;
+            _streamableAttachmentCount++;
         } catch (Exception ex) {
             LogCollector.LogError($"Send-EmailMessage - Failed to read attachment '{path}': {ex.Message}");
         }
@@ -129,6 +155,11 @@ public partial class Graph {
                     if (Definitions.AttachmentPathIdentity.Add(seenPaths, descriptorPath)) {
                         yield return new GraphFileAttachmentSource(descriptorPath, descriptor);
                     }
+                    continue;
+                }
+                if (IsStreamableDescriptor(descriptor)) {
+                    long descriptorLength = ResolveAttachmentLength(descriptor);
+                    yield return new GraphFileAttachmentSource(descriptor, descriptorLength);
                 }
                 continue;
             }
@@ -140,14 +171,50 @@ public partial class Graph {
         }
     }
 
-    private sealed class GraphFileAttachmentSource {
-        internal GraphFileAttachmentSource(string path, Definitions.AttachmentDescriptor? descriptor) {
-            Path = path;
-            Descriptor = descriptor;
+    private long ResolveAttachmentLength(Definitions.AttachmentDescriptor descriptor) {
+        if (_resolvedAttachmentLengths.TryGetValue(descriptor, out long resolvedLength)) {
+            return resolvedLength;
         }
 
-        internal string Path { get; }
+        resolvedLength = descriptor.Length ?? descriptor.MeasureContentLength(
+            Definitions.AttachmentStreamStagingOptions.DefaultMaxBytes);
+        if (resolvedLength < 0 || resolvedLength > Definitions.AttachmentStreamStagingOptions.DefaultMaxBytes) {
+            throw new InvalidDataException(
+                $"Attachment content exceeds the {Definitions.AttachmentStreamStagingOptions.DefaultMaxBytes} byte Graph read limit.");
+        }
+        _resolvedAttachmentLengths.Add(descriptor, resolvedLength);
+        return resolvedLength;
+    }
+
+    private static bool IsStreamableDescriptor(Definitions.AttachmentDescriptor descriptor) =>
+        descriptor is Definitions.ContentSourceAttachmentDescriptor or Definitions.StreamAttachmentDescriptor;
+
+    private sealed class GraphFileAttachmentSource {
+        internal GraphFileAttachmentSource(
+            string path,
+            Definitions.AttachmentDescriptor? descriptor,
+            long? length = null) {
+            Path = path;
+            Descriptor = descriptor;
+            Length = length ?? (File.Exists(path) ? new FileInfo(path).Length : 0);
+        }
+
+        internal GraphFileAttachmentSource(Definitions.AttachmentDescriptor descriptor, long length) {
+            Descriptor = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
+            Length = length >= 0 ? length : throw new ArgumentOutOfRangeException(nameof(length));
+        }
+
+        internal string? Path { get; }
         internal Definitions.AttachmentDescriptor? Descriptor { get; }
+        internal long Length { get; }
+
+        internal Task<Stream> OpenReadAsync(CancellationToken cancellationToken) {
+            if (Descriptor != null) return Descriptor.OpenContentStreamAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            Stream stream = new FileStream(Path!, FileMode.Open, FileAccess.Read,
+                FileShare.Read | FileShare.Delete, bufferSize: 64 * 1024, useAsync: true);
+            return Task.FromResult(stream);
+        }
     }
 
     private static long EstimateTotalSize(IEnumerable<GraphAttachment> attachments) {
@@ -197,13 +264,14 @@ public partial class Graph {
             : encodedCharacters / 4 * 3 - Math.Min(paddingCharacters, 2);
     }
 
-    private static long EstimateFileAttachmentSize(string path, Definitions.AttachmentDescriptor? descriptor) {
-        var fileLength = new FileInfo(path).Length;
+    private static long EstimateStreamableAttachmentSize(GraphFileAttachmentSource source) {
+        var fileLength = source.Length;
+        Definitions.AttachmentDescriptor? descriptor = source.Descriptor;
         var encodedLength = fileLength > (long.MaxValue - 2) / 4 * 3
             ? long.MaxValue
             : ((fileLength + 2) / 3) * 4;
         var fileName = string.IsNullOrWhiteSpace(descriptor?.FileName)
-            ? Path.GetFileName(path)
+            ? Path.GetFileName(source.Path) ?? "attachment"
             : descriptor!.FileName!;
         var contentType = string.IsNullOrWhiteSpace(descriptor?.ContentType)
             ? MimeKit.MimeTypes.GetMimeType(fileName)
@@ -245,13 +313,13 @@ public partial class Graph {
             : System.Text.Json.JsonEncodedText.Encode(value!).EncodedUtf8Bytes.Length;
 
     private bool TryRouteConvertedFileAttachmentsThroughUploadSession() {
-        if (_convertedFileAttachmentStartIndex < 0 || _fileAttachmentCount <= 0 ||
-            _convertedFileAttachmentStartIndex + _fileAttachmentCount > ConvertedAttachments.Count) {
+        if (_convertedStreamableAttachmentStartIndex < 0 || _streamableAttachmentCount <= 0 ||
+            _convertedStreamableAttachmentStartIndex + _streamableAttachmentCount > ConvertedAttachments.Count) {
             return false;
         }
 
-        ConvertedAttachments.RemoveRange(_convertedFileAttachmentStartIndex, _fileAttachmentCount);
-        _convertedFileAttachmentStartIndex = -1;
+        ConvertedAttachments.RemoveRange(_convertedStreamableAttachmentStartIndex, _streamableAttachmentCount);
+        _convertedStreamableAttachmentStartIndex = -1;
         IsLargerAttachment = true;
         MessageContainer.Message.Attachments = ConvertedAttachments.Count == 0 ? null : ConvertedAttachments;
         MessageJson = JsonSerializer.Serialize(MessageContainer, GraphJsonContext.Default.GraphMessageContainer);

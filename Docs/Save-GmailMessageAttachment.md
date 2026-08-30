@@ -11,7 +11,7 @@ Saves attachments from a Gmail message to disk.
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Save-GmailMessageAttachment -GmailAccount <string> -Credential <pscredential> -Id <string> -Path <string> [<CommonParameters>]
+Save-GmailMessageAttachment -GmailAccount <string> -Credential <pscredential> -Id <string> -Path <string> [-ConflictPolicy <AttachmentFileConflictPolicy>] [-Force] [-PassThru] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -27,6 +27,22 @@ Save-GmailMessageAttachment -GmailAccount 'Value' -Credential Get-Credential -Id
 
 ## PARAMETERS
 
+### -ConflictPolicy
+Controls how existing destination files are handled.
+
+```yaml
+Type: AttachmentFileConflictPolicy
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values: Fail, Skip, Rename, Replace
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -Credential
 OAuth credential used for authentication.
 
@@ -37,6 +53,22 @@ Aliases: None
 Possible values:
 
 Required: True
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Force
+Replaces existing regular files. Equivalent to ConflictPolicy Replace.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: __AllParameterSets
+Aliases: Overwrite
+Possible values:
+
+Required: False
 Position: named
 Default value: None
 Accept pipeline input: False
@@ -69,6 +101,22 @@ Aliases: None
 Possible values:
 
 Required: True
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -PassThru
+Writes one save result for each attachment.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
 Position: named
 Default value: None
 Accept pipeline input: False

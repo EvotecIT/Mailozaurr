@@ -34,12 +34,11 @@ public class EphemeralOpenPgpContext : GnuPGContext, IDisposable {
     private static string CreateTempDirectory(out string path) {
         var temp = Path.GetTempPath();
         while (true) {
-            path = Path.Combine(temp, Path.GetRandomFileName());
+            path = Path.Combine(temp, "mailozaurr-openpgp-" + Guid.NewGuid().ToString("N"));
             try {
-                using var fs = new FileStream(path, FileMode.CreateNew);
-                fs.Close();
-                File.Delete(path);
+                if (Directory.Exists(path) || File.Exists(path)) continue;
                 Directory.CreateDirectory(path);
+                UnixFilePermissions.RestrictDirectory(path);
                 return path;
             } catch (IOException) {
                 // Collision occurred, retry with a new path

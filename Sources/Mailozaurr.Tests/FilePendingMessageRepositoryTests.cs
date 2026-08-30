@@ -55,11 +55,127 @@ public sealed class FilePendingMessageRepositoryTests {
     }
 
     [Fact]
-    public void DefaultsToTempPath() {
-        var repo = new FilePendingMessageRepository();
-        var field = typeof(FilePendingMessageRepository).GetField("filePath", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var path = (string)field.GetValue(repo)!;
-        Assert.StartsWith(Path.GetTempPath(), path, StringComparison.OrdinalIgnoreCase);
+    public void DefaultsToPerUserApplicationDataInsteadOfTheSharedTempDirectory() {
+        var options = new PendingMessageRepositoryOptions();
+        string path = options.DirectoryPath;
+
+        Assert.Equal(MailozaurrStoragePaths.ResolvePendingMessagesDirectory(), path);
+        Assert.False(path.StartsWith(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void DefaultStorageMigration_UsesOneLegacyQueueUntilItIsRetired() {
+        string root = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        string legacyPath = Path.Combine(root, "legacy", "pending.log");
+        string targetPath = Path.Combine(root, "current", "pending.log");
+        Directory.CreateDirectory(Path.GetDirectoryName(legacyPath)!);
+        File.WriteAllText(legacyPath, "legacy-message");
+
+        try {
+            string resolved = MailozaurrStoragePaths.ResolveDefaultStorageFile(targetPath, legacyPath);
+
+            Assert.Equal(Path.GetFullPath(legacyPath), resolved);
+            File.AppendAllText(legacyPath, "-new-message");
+            Assert.Equal("legacy-message-new-message", File.ReadAllText(resolved));
+            Assert.False(File.Exists(targetPath));
+        } finally {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void DefaultStorageMigration_UsesLegacyQueueWhileItIsInUse() {
+        string root = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        string legacyPath = Path.Combine(root, "legacy", "pending.log");
+        string targetPath = Path.Combine(root, "current", "pending.log");
+        Directory.CreateDirectory(Path.GetDirectoryName(legacyPath)!);
+        File.WriteAllText(legacyPath, "legacy-message");
+
+        try {
+            using var activeWriter = new FileStream(legacyPath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+            string resolved = MailozaurrStoragePaths.ResolveDefaultStorageFile(targetPath, legacyPath);
+
+            Assert.Equal(Path.GetFullPath(legacyPath), resolved);
+            Assert.False(File.Exists(targetPath));
+        } finally {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void DefaultStorageMigration_UsesPerUserTargetAfterLegacyQueueIsMoved() {
+        string root = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        string legacyPath = Path.Combine(root, "legacy", "pending.log");
+        string targetPath = Path.Combine(root, "current", "pending.log");
+        Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+        File.WriteAllText(targetPath, "migrated-message");
+
+        try {
+            string resolved = MailozaurrStoragePaths.ResolveDefaultStorageFile(targetPath, legacyPath);
+
+            Assert.Equal(Path.GetFullPath(targetPath), resolved);
+            Assert.Equal("migrated-message", File.ReadAllText(resolved));
+        } finally {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void DefaultStorageMigration_FailsClosedWhenLegacyAndPerUserQueuesDiverge() {
+        string root = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        string legacyPath = Path.Combine(root, "legacy", "pending.log");
+        string targetPath = Path.Combine(root, "current", "pending.log");
+        Directory.CreateDirectory(Path.GetDirectoryName(legacyPath)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+        File.WriteAllText(legacyPath, "legacy-message");
+        File.WriteAllText(targetPath, "current-message");
+
+        try {
+            InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() =>
+                MailozaurrStoragePaths.ResolveDefaultStorageFile(targetPath, legacyPath));
+
+            Assert.Contains("Both the per-user and legacy", exception.Message, StringComparison.Ordinal);
+            Assert.Equal("legacy-message", File.ReadAllText(legacyPath));
+            Assert.Equal("current-message", File.ReadAllText(targetPath));
+        } finally {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task DefaultRepositories_FailClosedWhenAlternateQueueAppearsAfterConstruction() {
+        string root = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        string targetPending = Path.Combine(root, "current", "pending.log");
+        string legacyPending = Path.Combine(root, "legacy", "pending.log");
+        string targetDeadLetter = Path.Combine(root, "current", "dead-letter.log");
+        string legacyDeadLetter = Path.Combine(root, "legacy", "dead-letter.log");
+        var pending = new FilePendingMessageRepository(targetPending, legacyPending);
+        var deadLetter = new FilePendingMessageDeadLetterRepository(targetDeadLetter, legacyDeadLetter);
+        Directory.CreateDirectory(Path.GetDirectoryName(legacyPending)!);
+        File.WriteAllText(legacyPending, "legacy-message");
+        File.WriteAllText(legacyDeadLetter, "legacy-dead-letter");
+
+        try {
+            await Assert.ThrowsAsync<InvalidOperationException>(async () => {
+                await foreach (PendingMessageRecord _ in pending.GetAllAsync()) { }
+            });
+            await Assert.ThrowsAsync<InvalidOperationException>(async () => {
+                await foreach (PendingMessageDeadLetterRecord _ in deadLetter.GetAllAsync()) { }
+            });
+            Assert.False(File.Exists(targetPending));
+            Assert.False(File.Exists(targetDeadLetter));
+        } finally {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ExplicitStorageDirectory_DoesNotUseLegacyMigration() {
+        var options = new PendingMessageRepositoryOptions {
+            DirectoryPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName())
+        };
+
+        Assert.False(options.UsesDefaultDirectory);
     }
 
     [Fact]
@@ -77,6 +193,19 @@ public sealed class FilePendingMessageRepositoryTests {
         var ex = Assert.Throws<InvalidOperationException>(() => new FilePendingMessageRepository(options));
         Assert.Contains("FileNamingScheme", ex.Message);
         Assert.IsType<InvalidOperationException>(ex.InnerException);
+    }
+
+    [Theory]
+    [InlineData("../outside.log")]
+    [InlineData("..\\outside.log")]
+    [InlineData("..")]
+    public void FileNamingScheme_CannotEscapeTheQueueDirectory(string name) {
+        var options = new PendingMessageRepositoryOptions {
+            FileNamingScheme = () => name
+        };
+
+        Assert.Throws<InvalidOperationException>(() => new FilePendingMessageRepository(options));
+        Assert.Throws<InvalidOperationException>(() => new FilePendingMessageDeadLetterRepository(options));
     }
 
     [Fact]

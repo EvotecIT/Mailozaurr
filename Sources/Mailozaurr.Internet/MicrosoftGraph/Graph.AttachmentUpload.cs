@@ -29,15 +29,15 @@ public partial class Graph {
         CancellationToken cancellationToken = default,
         bool preloadContent = true) {
         cancellationToken.ThrowIfCancellationRequested();
-        string attachmentPath = source.Path;
-        if (!File.Exists(attachmentPath)) {
+        string? attachmentPath = source.Path;
+        if (attachmentPath != null && !File.Exists(attachmentPath)) {
             LogMissingAttachmentWarning(attachmentPath);
             throw new FileNotFoundException($"Send-EmailMessage - Attachment file not found: {attachmentPath}", attachmentPath);
         }
         var fileName = string.IsNullOrWhiteSpace(source.Descriptor?.FileName)
-            ? Path.GetFileName(attachmentPath)
+            ? Path.GetFileName(attachmentPath) ?? "attachment"
             : source.Descriptor!.FileName!;
-        var fileSize = new FileInfo(attachmentPath).Length;
+        var fileSize = source.Length;
         var isInline = source.Descriptor != null && IsInlineDescriptor(source.Descriptor);
 
         var attachmentItem = new GraphAttachmentItem("file", fileName, fileSize) {
@@ -55,22 +55,23 @@ public partial class Graph {
         var directAttachmentJson = string.Empty;
         if (fileSize < MinimumUploadSessionAttachmentSize) {
             var directAttachment = source.Descriptor == null
-                ? GraphAttachment.FromFile(attachmentPath)
-                : GraphAttachment.FromDescriptor(source.Descriptor);
+                ? GraphAttachment.FromFile(attachmentPath!)
+                : GraphAttachment.FromDescriptor(source.Descriptor, fileSize);
             directAttachmentJson = JsonSerializer.Serialize(directAttachment, GraphJsonContext.Default.GraphAttachment);
         }
 
         List<StreamContent> content = preloadContent && fileSize >= MinimumUploadSessionAttachmentSize
-            ? PrepareByteArrayContentForUpload(attachmentPath, ChunkSize, cancellationToken)
+            ? PrepareStreamSourceContentForUpload(source, ChunkSize, cancellationToken)
             : new List<StreamContent>();
 
         var placeholder = new GraphAttachmentPlaceHolder {
             Json = attachmentItemJson,
             Content = content,
-            FilePath = attachmentPath,
+            FilePath = attachmentPath ?? string.Empty,
             FileSize = fileSize,
             FileName = fileName,
-            DirectAttachmentJson = directAttachmentJson
+            DirectAttachmentJson = directAttachmentJson,
+            ContentDescriptor = source.Descriptor
         };
 
         return Task.FromResult(placeholder);
@@ -202,13 +203,17 @@ public partial class Graph {
     /// Splits <paramref name="filePath"/> into chunks no larger than <see cref="MaxChunkSize"/>.
     /// </summary>
     /// <param name="filePath">Path to the file to split.</param>
+    /// <param name="expectedLength">Length captured when the attachment metadata was created.</param>
     /// <param name="chunkSize">Desired size of each chunk in bytes.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     /// <returns>List of stream contents representing file chunks.</returns>
-    private List<StreamContent> PrepareByteArrayContentForUpload(string filePath, int chunkSize = MaxChunkSize, CancellationToken cancellationToken = default) {
+    private List<StreamContent> PrepareByteArrayContentForUpload(
+        string filePath,
+        long expectedLength,
+        int chunkSize = MaxChunkSize,
+        CancellationToken cancellationToken = default) {
         chunkSize = Math.Min(chunkSize, MaxChunkSize);
         var fileContents = new List<StreamContent>();
-        var fileSize = new FileInfo(filePath).Length;
 
         using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         var buffer = ArrayPool<byte>.Shared.Rent(chunkSize);
@@ -218,21 +223,64 @@ public partial class Graph {
             cancellationToken.ThrowIfCancellationRequested();
             while ((bytesRead = fileStream.Read(buffer, 0, chunkSize)) > 0) {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (offset + bytesRead > expectedLength) throw ContentLengthMismatch(expectedLength, offset + bytesRead);
 
                 var chunk = new byte[bytesRead];
                 Array.Copy(buffer, chunk, bytesRead);
                 var memoryStream = new MemoryStream(chunk, writable: false);
-                var contentRange = $"bytes {offset}-{offset + bytesRead - 1}/{fileSize}";
+                var contentRange = $"bytes {offset}-{offset + bytesRead - 1}/{expectedLength}";
                 var streamContent = new StreamContent(memoryStream);
                 streamContent.Headers.Add("Content-Range", contentRange);
                 fileContents.Add(streamContent);
                 offset += bytesRead;
             }
+            if (offset != expectedLength) throw ContentLengthMismatch(expectedLength, offset);
+        } catch {
+            foreach (StreamContent content in fileContents) content.Dispose();
+            throw;
         } finally {
             ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
         }
 
         return fileContents;
+    }
+
+    private List<StreamContent> PrepareStreamSourceContentForUpload(
+        GraphFileAttachmentSource source,
+        int chunkSize = MaxChunkSize,
+        CancellationToken cancellationToken = default) {
+        if (source.Path != null) return PrepareByteArrayContentForUpload(
+            source.Path,
+            source.Length,
+            chunkSize,
+            cancellationToken);
+
+        chunkSize = Math.Min(chunkSize, MaxChunkSize);
+        var chunks = new List<StreamContent>();
+        using Stream stream = source.Descriptor!.OpenContentStream();
+        var buffer = ArrayPool<byte>.Shared.Rent(chunkSize);
+        long offset = 0;
+        try {
+            while (true) {
+                cancellationToken.ThrowIfCancellationRequested();
+                int read = stream.Read(buffer, 0, chunkSize);
+                if (read == 0) break;
+                if (offset + read > source.Length) throw ContentLengthMismatch(source.Length, offset + read);
+                var chunk = new byte[read];
+                Buffer.BlockCopy(buffer, 0, chunk, 0, read);
+                var content = new StreamContent(new MemoryStream(chunk, writable: false));
+                content.Headers.Add("Content-Range", $"bytes {offset}-{offset + read - 1}/{source.Length}");
+                chunks.Add(content);
+                offset += read;
+            }
+            if (offset != source.Length) throw ContentLengthMismatch(source.Length, offset);
+            return chunks;
+        } catch {
+            foreach (StreamContent chunk in chunks) chunk.Dispose();
+            throw;
+        } finally {
+            ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
+        }
     }
 
     private static List<StreamContent> PrepareByteArrayContentForUpload(byte[] bytes, int chunkSize = MaxChunkSize, CancellationToken cancellationToken = default) {
@@ -275,18 +323,85 @@ public partial class Graph {
     /// </summary>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     public async Task PrepareAttachments(CancellationToken cancellationToken = default) {
+        await PrepareAttachmentsCore(preloadFileAndDescriptorContent: true, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>Prepares placeholders whose reopenable sources are streamed on demand.</summary>
+    internal async Task PrepareAttachmentsForStreaming(CancellationToken cancellationToken = default) {
+        await PrepareAttachmentsCore(preloadFileAndDescriptorContent: false, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task PrepareAttachmentsCore(
+        bool preloadFileAndDescriptorContent,
+        CancellationToken cancellationToken) {
         AttachmentsPlaceHolders.Clear();
         foreach (var attachment in _deferredGraphAttachments) {
             AttachmentsPlaceHolders.Add(CreateGraphAttachment(attachment, preloadContent: true, cancellationToken));
         }
         foreach (var source in EnumerateFileAttachmentSources()) {
             try {
-                var attachmentItemJson = await CreateGraphAttachment(source, cancellationToken);
+                var attachmentItemJson = await CreateGraphAttachment(
+                    source,
+                    cancellationToken,
+                    preloadContent: preloadFileAndDescriptorContent).ConfigureAwait(false);
                 AttachmentsPlaceHolders.Add(attachmentItemJson);
             } catch (FileNotFoundException) {
                 // Already logged by CreateGraphAttachment.
             }
         }
+    }
+
+    internal bool ForEachPreparedAttachmentChunk(
+        GraphAttachmentPlaceHolder attachment,
+        Func<byte[], ContentRangeHeaderValue?, bool> sendChunk,
+        CancellationToken cancellationToken = default) {
+        if (attachment == null) throw new ArgumentNullException(nameof(attachment));
+        if (sendChunk == null) throw new ArgumentNullException(nameof(sendChunk));
+
+        if (attachment.ContentDescriptor != null || !string.IsNullOrWhiteSpace(attachment.FilePath)) {
+            var source = attachment.ContentDescriptor != null
+                ? new GraphFileAttachmentSource(attachment.ContentDescriptor, attachment.FileSize)
+                : new GraphFileAttachmentSource(attachment.FilePath, descriptor: null, attachment.FileSize);
+            var chunkSize = Math.Min(ChunkSize, MaxChunkSize);
+            var buffer = ArrayPool<byte>.Shared.Rent(chunkSize);
+            long offset = 0;
+            try {
+                cancellationToken.ThrowIfCancellationRequested();
+                using Stream stream = source.Descriptor?.OpenContentStream() ??
+                    new FileStream(source.Path!, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete,
+                        bufferSize: 64 * 1024, useAsync: false);
+                while (true) {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    int bytesRead = stream.Read(buffer, 0, chunkSize);
+                    if (bytesRead == 0) break;
+                    if (offset + bytesRead > source.Length) {
+                        throw ContentLengthMismatch(source.Length, offset + bytesRead);
+                    }
+
+                    var chunk = new byte[bytesRead];
+                    Buffer.BlockCopy(buffer, 0, chunk, 0, bytesRead);
+                    var contentRange = new ContentRangeHeaderValue(
+                        offset,
+                        offset + bytesRead - 1,
+                        source.Length);
+                    if (!sendChunk(chunk, contentRange)) return false;
+                    offset += bytesRead;
+                }
+                if (offset != source.Length) throw ContentLengthMismatch(source.Length, offset);
+                return true;
+            } finally {
+                ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
+            }
+        }
+
+        foreach (StreamContent content in attachment.Content) {
+            cancellationToken.ThrowIfCancellationRequested();
+            byte[] body = content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+            if (!sendChunk(body, content.Headers.ContentRange)) return false;
+        }
+        return true;
     }
 
     /// <summary>
@@ -311,11 +426,34 @@ public partial class Graph {
         using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         int bytesRead;
         while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0) {
+            if (offset + bytesRead > fileSize) throw ContentLengthMismatch(fileSize, offset + bytesRead);
             var chunk = new byte[bytesRead];
             Buffer.BlockCopy(buffer, 0, chunk, 0, bytesRead);
             await SendAttachmentChunkWithRetryAsync(uploadUrl, chunk, offset, fileSize, cancellationToken);
             offset += bytesRead;
         }
+        if (offset != fileSize) throw ContentLengthMismatch(fileSize, offset);
+    }
+
+    private async Task SendFileChunks(
+        string uploadUrl,
+        GraphFileAttachmentSource source,
+        CancellationToken cancellationToken) {
+        var chunkSize = Math.Min(ChunkSize, MaxChunkSize);
+        var buffer = new byte[chunkSize];
+        long offset = 0;
+        using Stream stream = await source.OpenReadAsync(cancellationToken).ConfigureAwait(false);
+        while (true) {
+            int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
+            if (bytesRead == 0) break;
+            if (offset + bytesRead > source.Length) throw ContentLengthMismatch(source.Length, offset + bytesRead);
+            var chunk = new byte[bytesRead];
+            Buffer.BlockCopy(buffer, 0, chunk, 0, bytesRead);
+            await SendAttachmentChunkWithRetryAsync(uploadUrl, chunk, offset, source.Length, cancellationToken)
+                .ConfigureAwait(false);
+            offset += bytesRead;
+        }
+        if (offset != source.Length) throw ContentLengthMismatch(source.Length, offset);
     }
 
     private async Task SendFileChunks(string uploadUrl, byte[] bytes, CancellationToken cancellationToken) {
@@ -386,16 +524,14 @@ public partial class Graph {
     private async Task SendAttachmentChunkWithRetryAsync(string uploadUrl, byte[] chunk, long offset, long fileSize, CancellationToken cancellationToken) {
         var policy = SendPolicy ?? MailozaurrOptions.DefaultGraphPolicy;
         int attempts = 0;
-        Exception? lastException = null;
         var maxRetries = policy?.MaxRetries ?? RetryCount;
-        do {
+        while (true) {
             try {
                 await SendAttachmentChunkOnceAsync(uploadUrl, chunk, offset, fileSize, cancellationToken);
                 return;
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 throw;
             } catch (Exception ex) {
-                lastException = ex;
                 var shouldRetry = (policy?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
                 if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
                     throw;
@@ -404,10 +540,6 @@ public partial class Graph {
                 await DelayWithBackoffAsync(policy, attempts, retryAfter, ex, cancellationToken);
             }
             attempts++;
-        } while (attempts <= maxRetries);
-
-        if (lastException != null) {
-            throw lastException;
         }
     }
 
@@ -422,19 +554,17 @@ public partial class Graph {
 
         var policy = SendPolicy ?? MailozaurrOptions.DefaultGraphPolicy;
         int attempts = 0;
-        Exception? lastException = null;
         var maxRetries = policy?.MaxRetries ?? RetryCount;
-        do {
+        while (true) {
             try {
                 var uploadUrl = await CreateUploadSession(draftMessage, attachmentItemJson.Json, cancellationToken);
-                await SendFileChunks(uploadUrl, attachmentItemJson.FilePath, attachmentItemJson.FileSize, cancellationToken);
+                await SendFileChunks(uploadUrl, source, cancellationToken);
                 return;
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 throw;
             } catch (FileNotFoundException) {
                 throw;
             } catch (Exception ex) {
-                lastException = ex;
                 var shouldRetry = (policy?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
                 if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
                     throw;
@@ -443,12 +573,12 @@ public partial class Graph {
                 await DelayWithBackoffAsync(policy, attempts, retryAfter, ex, cancellationToken);
             }
             attempts++;
-        } while (attempts <= maxRetries);
-
-        if (lastException != null) {
-            throw lastException;
         }
     }
+
+    private static InvalidDataException ContentLengthMismatch(long declared, long observed) =>
+        new InvalidDataException(
+            $"Attachment content length changed while preparing a Graph upload (declared {declared}, observed {observed}).");
 
     private async Task SendAttachmentChunkOnceAsync(string uploadUrl, byte[] chunk, long offset, long fileSize, CancellationToken cancellationToken) {
         using var content = new StreamContent(new MemoryStream(chunk, writable: false));

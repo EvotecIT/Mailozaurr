@@ -7,8 +7,10 @@ namespace Mailozaurr;
 /// Options for configuring <see cref="FilePendingMessageRepository"/>.
 /// </summary>
 public sealed class PendingMessageRepositoryOptions {
-    private string directoryPath = Path.GetTempPath();
+    private string directoryPath = MailozaurrStoragePaths.ResolvePendingMessagesDirectory();
     private Func<string> fileNamingScheme = () => "pending.log";
+
+    internal bool UsesDefaultDirectory { get; private set; } = true;
 
     /// <summary>Directory where pending message data is stored.</summary>
     public string DirectoryPath {
@@ -18,6 +20,7 @@ public sealed class PendingMessageRepositoryOptions {
                 throw new ArgumentException("DirectoryPath cannot be null or empty", nameof(value));
             }
             directoryPath = value;
+            UsesDefaultDirectory = false;
         }
     }
 

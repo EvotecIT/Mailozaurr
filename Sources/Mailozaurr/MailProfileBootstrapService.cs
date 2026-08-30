@@ -58,6 +58,7 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
                 MailSecretNames.ClientSecret,
                 request.ClientSecret,
                 request.ClientSecretReference,
+                request.AllowCrossProfileSecretReferences,
                 cancellationToken).ConfigureAwait(false);
             accessToken = await MailSecretReferenceResolver.ResolveAsync(
                 _secretStore,
@@ -65,6 +66,7 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
                 MailSecretNames.AccessToken,
                 request.AccessToken,
                 request.AccessTokenReference,
+                request.AllowCrossProfileSecretReferences,
                 cancellationToken).ConfigureAwait(false);
             certificatePassword = await MailSecretReferenceResolver.ResolveAsync(
                 _secretStore,
@@ -72,6 +74,7 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
                 MailSecretNames.CertificatePassword,
                 request.CertificatePassword,
                 request.CertificatePasswordReference,
+                request.AllowCrossProfileSecretReferences,
                 cancellationToken).ConfigureAwait(false);
         } catch (InvalidOperationException ex) {
             return OperationResult.Failure("secret_reference_invalid", ex.Message);
@@ -154,6 +157,7 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
                 MailSecretNames.ClientSecret,
                 request.ClientSecret,
                 request.ClientSecretReference,
+                request.AllowCrossProfileSecretReferences,
                 cancellationToken).ConfigureAwait(false);
             refreshToken = await MailSecretReferenceResolver.ResolveAsync(
                 _secretStore,
@@ -161,6 +165,7 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
                 MailSecretNames.RefreshToken,
                 request.RefreshToken,
                 request.RefreshTokenReference,
+                request.AllowCrossProfileSecretReferences,
                 cancellationToken).ConfigureAwait(false);
             accessToken = await MailSecretReferenceResolver.ResolveAsync(
                 _secretStore,
@@ -168,6 +173,7 @@ public sealed class MailProfileBootstrapService : IMailProfileBootstrapService {
                 MailSecretNames.AccessToken,
                 request.AccessToken,
                 request.AccessTokenReference,
+                request.AllowCrossProfileSecretReferences,
                 cancellationToken).ConfigureAwait(false);
         } catch (InvalidOperationException ex) {
             return OperationResult.Failure("secret_reference_invalid", ex.Message);

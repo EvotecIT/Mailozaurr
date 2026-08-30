@@ -19,17 +19,56 @@ public static class GmailMailboxSearcher {
     public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
         GmailApiClient client, string userId, DateTime? since = null, DateTime? before = null,
         string? domain = null, int maxResults = 0, int parallelDownloadLimit = 4,
-        long maxUncompressedSize = 10 * 1024 * 1024, CancellationToken cancellationToken = default) {
+        long maxUncompressedSize = 10 * 1024 * 1024, CancellationToken cancellationToken = default) =>
+        await SearchDmarcReportsAsync(
+            client,
+            userId,
+            DmarcReportInspectionOptions.FromLegacyLimit(maxUncompressedSize),
+            since,
+            before,
+            domain,
+            maxResults,
+            parallelDownloadLimit,
+            cancellationToken).ConfigureAwait(false);
+
+    /// <summary>Searches Gmail for DMARC aggregate reports using explicit attachment inspection limits.</summary>
+    public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
+        GmailApiClient client,
+        string userId,
+        DmarcReportInspectionOptions inspectionOptions,
+        DateTime? since = null,
+        DateTime? before = null,
+        string? domain = null,
+        int maxResults = 0,
+        int parallelDownloadLimit = 4,
+        CancellationToken cancellationToken = default) {
         if (client == null) throw new ArgumentNullException(nameof(client));
+        if (inspectionOptions == null) throw new ArgumentNullException(nameof(inspectionOptions));
+        var inspectionPolicy = inspectionOptions.CreatePolicy();
+        var mimeBudget = new DmarcMimeDownloadBudget(
+            inspectionPolicy.MaxMimeBytesPerMessage,
+            inspectionPolicy.MaxTotalMimeBytes);
         string query = MailboxSearcher.BuildGmailDmarcReportQuery(since, before, domain);
+        int providerLimit = Math.Min(
+            maxResults > 0 ? maxResults : inspectionPolicy.MaxMessagesScanned,
+            inspectionPolicy.MaxMessagesScanned);
         IList<GmailMessage> messages = await client.ListAsync(userId, query,
-            maxResults > 0 ? maxResults : (int?)null, cancellationToken).ConfigureAwait(false);
+            providerLimit, cancellationToken).ConfigureAwait(false);
         string[] messageIds = GetMessageIds(messages);
         IReadOnlyList<MimeMessage> mimeMessages = await DownloadMimeMessagesAsync(
             messageIds, parallelDownloadLimit,
-            (id, token) => client.GetMimeMessageAsync(userId, id, token), cancellationToken)
+            (id, token) => mimeBudget.DownloadAsync(
+                (limit, innerToken) => client.GetMimeMessageBoundedAsync(userId, id, limit, innerToken),
+                token), cancellationToken)
             .ConfigureAwait(false);
-        return MailboxSearcher.FilterDmarcReports(mimeMessages, since, before, domain, maxUncompressedSize);
+        return MailboxSearcher.FilterDmarcReports(
+            mimeMessages,
+            since,
+            before,
+            domain,
+            inspectionPolicy,
+            new SharedReadBudget(inspectionPolicy.MaxTotalUncompressedBytes),
+            cancellationToken);
     }
 
     /// <summary>Searches Gmail for non-delivery reports.</summary>

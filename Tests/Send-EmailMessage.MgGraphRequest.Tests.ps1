@@ -7,6 +7,73 @@ if ($env:MAILOZAURR_TEST_MODULE_PATH) {
 }
 
 Describe 'Send-EmailMessage - MgGraphRequest attachments' {
+    It 'releases staged streams only after an actual MgGraphRequest send attempt' {
+        function global:Invoke-MgGraphRequest {
+            param(
+                [string] $Method,
+                [string] $Uri,
+                [string] $ContentType,
+                [object] $Body,
+                [hashtable] $Headers
+            )
+            return @{}
+        }
+
+        $directory = Join-Path $TestDrive 'staged-send'
+        [System.IO.Directory]::CreateDirectory($directory) | Out-Null
+        $options = [Mailozaurr.Definitions.AttachmentStreamStagingOptions]::new()
+        $options.MemoryThresholdBytes = 2
+        $options.MaxBytes = 10
+        $options.TempDirectory = $directory
+        $descriptor = [Mailozaurr.Definitions.StreamAttachmentDescriptor]::new(
+            [System.IO.MemoryStream]::new([byte[]] (1, 2, 3, 4, 5)),
+            'staged.bin',
+            $false,
+            $options)
+        $descriptor.OpenContentStream().Dispose()
+        (Get-ChildItem -LiteralPath $directory -File).Count | Should -Be 1
+
+        try {
+            Send-EmailMessage -From 'from@example.com' -To 'to@example.com' -Subject 's' -Body 'b' -MgGraphRequest -Attachment $descriptor -Confirm:$false | Out-Null
+        } finally {
+            Remove-Item -Path function:global:Invoke-MgGraphRequest -ErrorAction SilentlyContinue
+        }
+
+        (Get-ChildItem -LiteralPath $directory -File).Count | Should -Be 0
+        { $descriptor.OpenContentStream() } | Should -Throw
+    }
+
+    It 'preserves staged streams when MgGraphRequest is skipped by WhatIf' {
+        $directory = Join-Path $TestDrive 'staged-whatif'
+        [System.IO.Directory]::CreateDirectory($directory) | Out-Null
+        $options = [Mailozaurr.Definitions.AttachmentStreamStagingOptions]::new()
+        $options.MemoryThresholdBytes = 2
+        $options.MaxBytes = 10
+        $options.TempDirectory = $directory
+        $descriptor = [Mailozaurr.Definitions.StreamAttachmentDescriptor]::new(
+            [System.IO.MemoryStream]::new([byte[]] (1, 2, 3, 4, 5)),
+            'staged.bin',
+            $false,
+            $options)
+        $descriptor.OpenContentStream().Dispose()
+
+        try {
+            Send-EmailMessage -From 'from@example.com' -To 'to@example.com' -Subject 's' -Body 'b' -MgGraphRequest -Attachment $descriptor -WhatIf | Out-Null
+
+            (Get-ChildItem -LiteralPath $directory -File).Count | Should -Be 1
+            $stream = $descriptor.OpenContentStream()
+            try {
+                $stream.Length | Should -Be 5
+            } finally {
+                $stream.Dispose()
+            }
+        } finally {
+            $descriptor.Dispose()
+        }
+
+        (Get-ChildItem -LiteralPath $directory -File).Count | Should -Be 0
+    }
+
     It 'Uploads large attachments to the draft before sending' {
         $script:mgGraphRequestCalls = [System.Collections.Generic.List[object]]::new()
 
@@ -49,11 +116,11 @@ Describe 'Send-EmailMessage - MgGraphRequest attachments' {
 
         $script:mgGraphRequestCalls.Count | Should -Be 4
         $script:mgGraphRequestCalls[0].Uri | Should -Be 'v1.0/users/from@example.com/mailfolders/drafts/messages'
-        $script:mgGraphRequestCalls[1].Uri | Should -Be "https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/attachments/createUploadSession"
+        $script:mgGraphRequestCalls[1].Uri | Should -Be 'https://graph.microsoft.com/v1.0/users/from%40example.com/messages/draft-id/attachments/createUploadSession'
         $script:mgGraphRequestCalls[2].Method | Should -Be 'PUT'
         $script:mgGraphRequestCalls[2].Uri | Should -Be 'https://upload.example/session'
         $script:mgGraphRequestCalls[2].Headers['Content-Range'].ToString() | Should -Match '^bytes 0-'
-        $script:mgGraphRequestCalls[3].Uri | Should -Be "https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/send"
+        $script:mgGraphRequestCalls[3].Uri | Should -Be 'https://graph.microsoft.com/v1.0/users/from%40example.com/messages/draft-id/send'
     }
 
     It 'adds a sub-3MB file directly when the complete request requires a draft' {
@@ -90,11 +157,11 @@ Describe 'Send-EmailMessage - MgGraphRequest attachments' {
         }
 
         $script:mgGraphRequestCalls.Count | Should -Be 3
-        $script:mgGraphRequestCalls.Uri | Should -Not -Contain "https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/attachments/createUploadSession"
+        $script:mgGraphRequestCalls.Uri | Should -Not -Contain 'https://graph.microsoft.com/v1.0/users/from%40example.com/messages/draft-id/attachments/createUploadSession'
         $script:mgGraphRequestCalls[0].Body | Should -Not -Match '"attachments"'
-        $script:mgGraphRequestCalls[1].Uri | Should -Be "https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/attachments"
+        $script:mgGraphRequestCalls[1].Uri | Should -Be 'https://graph.microsoft.com/v1.0/users/from%40example.com/messages/draft-id/attachments'
         $script:mgGraphRequestCalls[1].Body | Should -Match '"contentBytes"'
-        $script:mgGraphRequestCalls[2].Uri | Should -Be "https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/send"
+        $script:mgGraphRequestCalls[2].Uri | Should -Be 'https://graph.microsoft.com/v1.0/users/from%40example.com/messages/draft-id/send'
     }
 
     It 'maps PSCustomObject text-only content to a Graph text body' {

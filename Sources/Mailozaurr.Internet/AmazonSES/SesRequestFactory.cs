@@ -17,6 +17,7 @@ internal static class SesRequestFactory {
         string region,
         string content,
         DateTime utcNow) {
+        SesRegionName.Validate(region, nameof(region));
         var amzDate = utcNow.ToString("yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture);
         var dateStamp = utcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
         var canonicalHeaders =

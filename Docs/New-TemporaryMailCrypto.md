@@ -16,7 +16,7 @@ New-TemporaryMailCrypto -Pgp [-Identity <string>] [-PassPhrase <string>] [-KeySi
 
 ### Smime
 ```powershell
-New-TemporaryMailCrypto -Smime [-OutputPath <string>] [-NoDispose] [-SubjectName <string>] [-ValidDays <int>] [<CommonParameters>]
+New-TemporaryMailCrypto -Smime [-OutputPath <string>] [-NoDispose] [-SubjectName <string>] [-ValidDays <int>] [-OutputPassword <securestring>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -76,6 +76,22 @@ Do not delete generated files when disposed.
 ```yaml
 Type: SwitchParameter
 Parameter Sets: Pgp, Smime
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -OutputPassword
+Password protecting an exported S/MIME PFX file.
+
+```yaml
+Type: SecureString
+Parameter Sets: Smime
 Aliases: None
 Possible values:
 

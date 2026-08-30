@@ -36,6 +36,22 @@ public class GraphDraftTests {
     }
 
     [Fact]
+    public async Task SendFileChunks_RejectsFileGrowthBeyondCapturedLengthBeforeUpload() {
+        string path = Path.GetTempFileName();
+        File.WriteAllBytes(path, new byte[] { 1, 2, 3, 4 });
+        var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.Accepted));
+        using var graph = new Graph();
+        SetHttpClient(graph, handler);
+        try {
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                graph.SendFileChunks("https://upload.test/session", path, fileSize: 2));
+            Assert.Empty(handler.Requests);
+        } finally {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void CreateDraft_LargeAttachments_ExcludesAttachments() {
         string tmp = Path.GetTempFileName();
         File.WriteAllBytes(tmp, new byte[4_100_000]);
@@ -69,6 +85,9 @@ public class GraphDraftTests {
         Assert.True(graph.IsLargerAttachment);
         Assert.Equal(2, graph.AttachmentsPlaceHolders.Count);
         Assert.All(graph.AttachmentsPlaceHolders, p => Assert.False(string.IsNullOrWhiteSpace(p.FileName)));
+        Assert.All(
+            graph.AttachmentsPlaceHolders.Where(p => string.IsNullOrEmpty(p.DirectAttachmentJson)),
+            p => Assert.NotEmpty(p.Content));
     }
 
     [Fact]
@@ -297,6 +316,127 @@ public class GraphDraftTests {
         Assert.Contains("\"contentId\":\"memory-inline\"", sessionBody, StringComparison.OrdinalIgnoreCase);
         var uploadRequest = Assert.Single(handler.Requests, request => request.Method == HttpMethod.Put);
         Assert.NotNull(uploadRequest.Content!.Headers.ContentRange);
+    }
+
+    [Fact]
+    public async Task SendMessageAsync_LargeReopenableSourceStreamsThroughUploadSession() {
+        var source = new CountingAttachmentSource(new byte[3_100_000]);
+        var handler = new RecordingHandler(
+            new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("{\"id\":\"draft-id\"}") },
+            new HttpResponseMessage(HttpStatusCode.Created) { Content = new StringContent("{\"uploadUrl\":\"https://upload.example/session\"}") },
+            new HttpResponseMessage(HttpStatusCode.Accepted),
+            new HttpResponseMessage(HttpStatusCode.Accepted));
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "large reopenable attachment",
+            HTML = "body",
+            ContentType = "HTML",
+            Attachments = new object[] {
+                new ContentSourceAttachmentDescriptor(source, "reopenable.bin")
+            },
+            AccessToken = "token",
+            TokenType = "Bearer"
+        };
+        SetHttpClient(graph, handler);
+
+        GraphSmtpResult result = await graph.SendMessageAsync();
+
+        Assert.True(result.Status);
+        Assert.True(graph.IsLargerAttachment);
+        Assert.Equal(1, source.OpenCount);
+        var draftRequest = Assert.Single(handler.Requests, request =>
+            request.RequestUri!.AbsolutePath.Contains("/mailfolders/drafts/messages", StringComparison.OrdinalIgnoreCase));
+        string draftBody = await draftRequest.Content!.ReadAsStringAsync();
+        Assert.DoesNotContain("reopenable.bin", draftBody, StringComparison.Ordinal);
+        Assert.Contains(handler.Requests, request =>
+            request.RequestUri!.AbsolutePath.EndsWith("/createUploadSession", StringComparison.OrdinalIgnoreCase));
+        var uploadRequest = Assert.Single(handler.Requests, request => request.Method == HttpMethod.Put);
+        Assert.Equal(3_100_000, uploadRequest.Content!.Headers.ContentRange!.Length);
+    }
+
+    [Fact]
+    public async Task PrepareAttachments_LargeStreamDescriptorDefersReadsAndStreamsChunks() {
+        string directory = Path.Combine(Path.GetTempPath(), "MailozaurrGraphStage-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var source = new CountingMemoryStream(new byte[3_100_000]);
+        var descriptor = new StreamAttachmentDescriptor(
+            source,
+            "large-stream.bin",
+            stagingOptions: new AttachmentStreamStagingOptions {
+                MemoryThresholdBytes = 1024,
+                MaxBytes = 4_000_000,
+                TempDirectory = directory
+            });
+        using var graph = new Graph {
+            From = "from@example.com",
+            To = new object[] { "to@example.com" },
+            Subject = "large stream",
+            HTML = "body",
+            ContentType = "HTML",
+            Attachments = new object[] { descriptor },
+            ChunkSize = 1024 * 1024
+        };
+
+        try {
+            graph.CreateMessage();
+
+            Assert.True(graph.IsLargerAttachment);
+            Assert.Empty(graph.ConvertedAttachments);
+            Assert.Equal(0, source.ReadCount);
+
+            await graph.PrepareAttachmentsForStreaming();
+
+            var placeholder = Assert.Single(graph.AttachmentsPlaceHolders);
+            Assert.Empty(placeholder.Content);
+            Assert.Equal(0, source.ReadCount);
+
+            long uploaded = 0;
+            int chunks = 0;
+            bool completed = graph.ForEachPreparedAttachmentChunk(
+                placeholder,
+                (body, range) => {
+                    Assert.NotNull(range);
+                    uploaded += body.LongLength;
+                    chunks++;
+                    return true;
+                });
+
+            Assert.True(completed);
+            Assert.Equal(3_100_000, uploaded);
+            Assert.True(chunks > 1);
+            Assert.True(source.ReadCount > 0);
+            Assert.Single(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
+        } finally {
+            descriptor.Dispose();
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task PreparedFileChunksRejectContentGrowthAfterMetadataCapture() {
+        string path = Path.GetTempFileName();
+        File.WriteAllBytes(path, new byte[3_100_000]);
+        using var graph = new Graph {
+            Attachments = new object[] { path },
+            ChunkSize = 1024 * 1024
+        };
+
+        try {
+            graph.CreateAttachments();
+            await graph.PrepareAttachments();
+            using (var append = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.Read)) {
+                append.WriteByte(1);
+            }
+
+            var placeholder = Assert.Single(graph.AttachmentsPlaceHolders);
+            InvalidDataException exception = Assert.Throws<InvalidDataException>(() =>
+                graph.ForEachPreparedAttachmentChunk(placeholder, (_, _) => true));
+
+            Assert.Contains("declared 3100000, observed 3100001", exception.Message, StringComparison.Ordinal);
+        } finally {
+            File.Delete(path);
+        }
     }
 
     [Fact]
@@ -807,20 +947,63 @@ public class GraphDraftTests {
     public void DraftMessageUris_BuildUploadSessionUri() {
         string uri = GraphDraftMessageUris.CreateUploadSession("from@example.com", "draft-id");
 
-        Assert.Equal("https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/attachments/createUploadSession", uri);
+        Assert.Equal("https://graph.microsoft.com/v1.0/users/from%40example.com/messages/draft-id/attachments/createUploadSession", uri);
     }
 
     [Fact]
     public void DraftMessageUris_BuildAttachmentsUri() {
         string uri = GraphDraftMessageUris.Attachments("from@example.com", "draft-id");
 
-        Assert.Equal("https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/attachments", uri);
+        Assert.Equal("https://graph.microsoft.com/v1.0/users/from%40example.com/messages/draft-id/attachments", uri);
     }
 
     [Fact]
     public void DraftMessageUris_BuildSendUri() {
         string uri = GraphDraftMessageUris.Send("from@example.com", "draft-id");
 
-        Assert.Equal("https://graph.microsoft.com/v1.0/users('from@example.com')/messages/draft-id/send", uri);
+        Assert.Equal("https://graph.microsoft.com/v1.0/users/from%40example.com/messages/draft-id/send", uri);
+    }
+
+    [Fact]
+    public void DraftMessageUris_EscapeMailboxAndMessageSegments() {
+        string uri = GraphDraftMessageUris.Send(
+            "from@example.com/messages/other?x=1",
+            "draft/id#fragment");
+
+        Assert.Equal(
+            "https://graph.microsoft.com/v1.0/users/from%40example.com%2Fmessages%2Fother%3Fx%3D1/messages/draft%2Fid%23fragment/send",
+            uri);
+    }
+
+    private sealed class CountingAttachmentSource : IAttachmentContentSource {
+        private readonly byte[] _content;
+
+        internal CountingAttachmentSource(byte[] content) => _content = content;
+
+        internal int OpenCount { get; private set; }
+
+        public long? Length => _content.LongLength;
+
+        public Stream OpenRead() {
+            OpenCount++;
+            return new MemoryStream(_content, writable: false);
+        }
+
+        public Task<Stream> OpenReadAsync(CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(OpenRead());
+        }
+    }
+
+    private sealed class CountingMemoryStream : MemoryStream {
+        internal CountingMemoryStream(byte[] content) : base(content, writable: false) {
+        }
+
+        internal int ReadCount { get; private set; }
+
+        public override int Read(byte[] buffer, int offset, int count) {
+            ReadCount++;
+            return base.Read(buffer, offset, count);
+        }
     }
 }

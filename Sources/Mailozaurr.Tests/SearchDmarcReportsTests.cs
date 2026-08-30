@@ -24,7 +24,15 @@ public class SearchDmarcReportsTests {
         message.Date = date;
         message.From.Add(new MailboxAddress("reporter", "reporter@example.com"));
         var builder = new BodyBuilder();
-        var ms = new MemoryStream(Encoding.UTF8.GetBytes("dummy"));
+        var ms = new MemoryStream();
+        using (var zip = new ZipArchive(ms, ZipArchiveMode.Create, true)) {
+            var entry = zip.CreateEntry("report.xml");
+            using var entryStream = entry.Open();
+            var bytes = Encoding.UTF8.GetBytes(
+                $"<feedback><policy_published><domain>{domain}</domain></policy_published></feedback>");
+            entryStream.Write(bytes, 0, bytes.Length);
+        }
+        ms.Position = 0;
         var part = new MimePart("application", "zip") {
             Content = new MimeContent(ms),
             FileName = $"{domain}.zip"
@@ -76,7 +84,13 @@ public class SearchDmarcReportsTests {
 
     private class TrackingPop3Client : Pop3Client {
         private readonly List<MimeMessage> _messages;
-        public int FetchCount { get; private set; }
+        private readonly object _fetchGate = new();
+        public List<int> FetchedIndexes { get; } = new();
+        public int FetchCount {
+            get {
+                lock (_fetchGate) return FetchedIndexes.Count;
+            }
+        }
         public TrackingPop3Client(IEnumerable<MimeMessage> messages) {
             _messages = new List<MimeMessage>(messages);
         }
@@ -85,9 +99,296 @@ public class SearchDmarcReportsTests {
         public override int Count => _messages.Count;
         public override async Task<MimeMessage> GetMessageAsync(int index, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
             await Task.Yield();
-            FetchCount++;
+            lock (_fetchGate) FetchedIndexes.Add(index);
             return _messages[index];
         }
+    }
+
+    private sealed class CancelablePop3Client : Pop3Client {
+        public override bool IsConnected => true;
+        public override bool IsAuthenticated => true;
+        public override int Count => 4;
+        public override async Task<MimeMessage> GetMessageAsync(
+            int index,
+            CancellationToken cancellationToken = default,
+            ITransferProgress? progress = null) {
+            await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("Unreachable");
+        }
+    }
+
+    private sealed class BlockingReadStream : MemoryStream {
+        private readonly ManualResetEventSlim _release = new(false);
+        internal TaskCompletionSource<object?> Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal BlockingReadStream(byte[] content) : base(content, writable: false) { }
+
+        internal void Release() => _release.Set();
+
+        public override int Read(byte[] buffer, int offset, int count) {
+            Started.TrySetResult(null);
+            _release.Wait();
+            return base.Read(buffer, offset, count);
+        }
+    }
+
+    [Fact]
+    public async Task SharedReadBudget_SerializesReservationsAndRefundsUnusedBytes() {
+        var operation = new SharedReadBudget(2);
+        var firstSource = new BlockingReadStream(new byte[] { 1 });
+        using var first = new SharedBudgetReadStream(
+            firstSource,
+            new SharedReadBudget(2),
+            operation);
+        using var second = new SharedBudgetReadStream(
+            new MemoryStream(new byte[] { 2 }),
+            new SharedReadBudget(2),
+            operation);
+        var firstBuffer = new byte[2];
+        var secondBuffer = new byte[1];
+
+        Task<int> firstRead = Task.Run(() => first.Read(firstBuffer, 0, firstBuffer.Length));
+        await firstSource.Started.Task;
+        Task<int> secondRead = Task.Run(() => second.Read(secondBuffer, 0, secondBuffer.Length));
+        Assert.False(secondRead.IsCompleted);
+
+        firstSource.Release();
+        Assert.Equal(1, await firstRead);
+        Assert.Equal(1, await secondRead);
+        Assert.Equal((byte)2, secondBuffer[0]);
+    }
+
+    [Fact]
+    public async Task SearchDmarcReportsAsync_PropagatesCallerCancellationFromParallelPop3Workers() {
+        using var client = new CancelablePop3Client();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            MailboxSearcher.SearchDmarcReportsAsync(
+                client,
+                new DmarcReportInspectionOptions(),
+                parallelDownloadLimit: 2,
+                cancellationToken: cancellation.Token));
+    }
+
+    [Fact]
+    public async Task SearchDmarcReportsAsync_StopsAtConfiguredMessageScanLimit() {
+        var now = DateTimeOffset.UtcNow;
+        using var client = new TrackingPop3Client(new[] {
+            CreateDmarc("one.example", now),
+            CreateDmarc("two.example", now),
+            CreateDmarc("three.example", now)
+        });
+        var options = new DmarcReportInspectionOptions { MaxMessagesScanned = 1 };
+
+        IList<DmarcReport> reports = await MailboxSearcher.SearchDmarcReportsAsync(
+            client,
+            options,
+            parallelDownloadLimit: 1);
+
+        Assert.Single(reports);
+        Assert.Equal(1, client.FetchCount);
+        Assert.Equal(new[] { 2 }, client.FetchedIndexes);
+    }
+
+    [Fact]
+    public async Task SearchDmarcReportsAsync_ParallelScanUsesNewestPop3Messages() {
+        var now = DateTimeOffset.UtcNow;
+        using var client = new TrackingPop3Client(new[] {
+            CreateDmarc("one.example", now),
+            CreateDmarc("two.example", now),
+            CreateDmarc("three.example", now),
+            CreateDmarc("four.example", now),
+            CreateDmarc("five.example", now)
+        });
+        var options = new DmarcReportInspectionOptions { MaxMessagesScanned = 2 };
+
+        IList<DmarcReport> reports = await MailboxSearcher.SearchDmarcReportsAsync(
+            client,
+            options,
+            parallelDownloadLimit: 2);
+
+        Assert.Equal(2, reports.Count);
+        Assert.Equal(new[] { 3, 4 }, client.FetchedIndexes.OrderBy(index => index));
+    }
+
+    [Fact]
+    public void DmarcMimeDownloadBudget_RejectsPerMessageAndAggregateOverruns() {
+        var budget = new DmarcMimeDownloadBudget(maxBytesPerMessage: 5, maxTotalBytes: 7);
+        ITransferProgress first = budget.CreateTransferProgress();
+        first.Report(5, 5);
+        ITransferProgress second = budget.CreateTransferProgress();
+
+        Assert.Throws<InvalidDataException>(() => second.Report(3, 3));
+        Assert.Throws<InvalidDataException>(() =>
+            budget.CreateTransferProgress().Report(6, 6));
+    }
+
+    [Fact]
+    public async Task DmarcMimeDownloadBudget_RetainsReservationWhenProviderParsingFails() {
+        var budget = new DmarcMimeDownloadBudget(maxBytesPerMessage: 5, maxTotalBytes: 7);
+
+        await Assert.ThrowsAsync<FormatException>(() => budget.DownloadAsync(
+            (_, _) => throw new FormatException("Malformed MIME payload."),
+            CancellationToken.None));
+
+        long secondLimit = 0;
+        MimeMessage second = await budget.DownloadAsync(
+            (limit, _) => {
+                secondLimit = limit;
+                return Task.FromResult(new BoundedMimeMessage(new MimeMessage(), limit));
+            },
+            CancellationToken.None);
+
+        Assert.NotNull(second);
+        Assert.Equal(2, secondLimit);
+        await Assert.ThrowsAsync<InvalidDataException>(() => budget.DownloadAsync(
+            (_, _) => Task.FromResult(new BoundedMimeMessage(new MimeMessage(), 0)),
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task DmarcMimeDownloadBudget_RefundsUnusedReservationAfterSuccess() {
+        var budget = new DmarcMimeDownloadBudget(maxBytesPerMessage: 5, maxTotalBytes: 7);
+
+        await budget.DownloadAsync(
+            (_, _) => Task.FromResult(new BoundedMimeMessage(new MimeMessage(), 2)),
+            CancellationToken.None);
+
+        long secondLimit = 0;
+        await budget.DownloadAsync(
+            (limit, _) => {
+                secondLimit = limit;
+                return Task.FromResult(new BoundedMimeMessage(new MimeMessage(), limit));
+            },
+            CancellationToken.None);
+
+        Assert.Equal(5, secondLimit);
+    }
+
+    [Fact]
+    public async Task DmarcMimeDownloadBudget_AllowsReservedDownloadsToRunConcurrently() {
+        var budget = new DmarcMimeDownloadBudget(maxBytesPerMessage: 5, maxTotalBytes: 10);
+        var firstStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        Task<MimeMessage> first = budget.DownloadAsync(
+            async (limit, _) => {
+                firstStarted.TrySetResult(null);
+                await release.Task;
+                return new BoundedMimeMessage(new MimeMessage(), limit);
+            },
+            CancellationToken.None);
+        Task<MimeMessage> second = budget.DownloadAsync(
+            async (limit, _) => {
+                secondStarted.TrySetResult(null);
+                await release.Task;
+                return new BoundedMimeMessage(new MimeMessage(), limit);
+            },
+            CancellationToken.None);
+
+        Task bothStarted = Task.WhenAll(firstStarted.Task, secondStarted.Task);
+        Assert.Same(bothStarted, await Task.WhenAny(bothStarted, Task.Delay(TimeSpan.FromSeconds(2))));
+        release.TrySetResult(null);
+        await Task.WhenAll(first, second);
+    }
+
+    [Fact]
+    public async Task DmarcMimeDownloadBudget_WaitsForInFlightRefundBeforeRejecting() {
+        var budget = new DmarcMimeDownloadBudget(maxBytesPerMessage: 5, maxTotalBytes: 5);
+        var firstStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        long secondLimit = 0;
+
+        Task<MimeMessage> first = budget.DownloadAsync(
+            async (limit, _) => {
+                firstStarted.TrySetResult(null);
+                await releaseFirst.Task;
+                return new BoundedMimeMessage(new MimeMessage(), 1);
+            },
+            CancellationToken.None);
+        await firstStarted.Task;
+        Task<MimeMessage> second = budget.DownloadAsync(
+            (limit, _) => {
+                secondLimit = limit;
+                return Task.FromResult(new BoundedMimeMessage(new MimeMessage(), limit));
+            },
+            CancellationToken.None);
+
+        Assert.False(second.IsCompleted);
+        releaseFirst.TrySetResult(null);
+        await Task.WhenAll(first, second);
+
+        Assert.Equal(4, secondLimit);
+    }
+
+    [Fact]
+    public async Task DmarcMimeDownloadBudget_WaitsForFullAllowanceWhileRefundsRemainPossible() {
+        var budget = new DmarcMimeDownloadBudget(maxBytesPerMessage: 5, maxTotalBytes: 7);
+        var firstStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        long secondLimit = 0;
+
+        Task<MimeMessage> first = budget.DownloadAsync(
+            async (limit, _) => {
+                firstStarted.TrySetResult(null);
+                await releaseFirst.Task;
+                return new BoundedMimeMessage(new MimeMessage(), 1);
+            },
+            CancellationToken.None);
+        await firstStarted.Task;
+        Task<MimeMessage> second = budget.DownloadAsync(
+            (limit, _) => {
+                secondLimit = limit;
+                return Task.FromResult(new BoundedMimeMessage(new MimeMessage(), limit));
+            },
+            CancellationToken.None);
+
+        Assert.False(second.IsCompleted);
+        releaseFirst.TrySetResult(null);
+        await Task.WhenAll(first, second);
+
+        Assert.Equal(5, secondLimit);
+    }
+
+    [Fact]
+    public async Task DmarcMimeDownloadBudget_GrantsWaitingReservationsInArrivalOrder() {
+        var budget = new DmarcMimeDownloadBudget(maxBytesPerMessage: 5, maxTotalBytes: 5);
+        var firstStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thirdStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSecond = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        Task<MimeMessage> first = budget.DownloadAsync(
+            async (_, _) => {
+                firstStarted.TrySetResult(null);
+                await releaseFirst.Task;
+                return new BoundedMimeMessage(new MimeMessage(), 0);
+            },
+            CancellationToken.None);
+        await firstStarted.Task;
+        Task<MimeMessage> second = budget.DownloadAsync(
+            async (_, _) => {
+                secondStarted.TrySetResult(null);
+                await releaseSecond.Task;
+                return new BoundedMimeMessage(new MimeMessage(), 0);
+            },
+            CancellationToken.None);
+        Task<MimeMessage> third = budget.DownloadAsync(
+            (limit, _) => {
+                thirdStarted.TrySetResult(null);
+                return Task.FromResult(new BoundedMimeMessage(new MimeMessage(), limit));
+            },
+            CancellationToken.None);
+
+        releaseFirst.TrySetResult(null);
+        await secondStarted.Task;
+        Assert.False(thirdStarted.Task.IsCompleted);
+        releaseSecond.TrySetResult(null);
+        await Task.WhenAll(first, second, third);
+        Assert.True(thirdStarted.Task.IsCompleted);
     }
 
     [Fact]
@@ -272,7 +573,7 @@ public class SearchDmarcReportsTests {
             using var cts = new CancellationTokenSource();
             var searchTask = GraphMailboxSearcher.SearchDmarcReportsAsync(
                 cred,
-                "user@example.com",
+                "user/name@example.com",
                 cancellationToken: cts.Token);
 
             var startedTask = handler.MimeStarted.Task;
@@ -284,6 +585,8 @@ public class SearchDmarcReportsTests {
             await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await searchTask);
 
             Assert.True(handler.MimeRequestCanceled);
+            Assert.Contains("user%2Fname%40example.com", handler.MimeRequestUri!.AbsoluteUri, StringComparison.Ordinal);
+            Assert.Contains("A%2FB%23C", handler.MimeRequestUri.AbsoluteUri, StringComparison.Ordinal);
         } finally {
             handlerField.SetValue(client, original);
         }
@@ -351,6 +654,165 @@ public class SearchDmarcReportsTests {
         }
     }
 
+    [Fact]
+    public void FilterDmarcReports_RejectsAggregateZipExpansionBeyondAttachmentLimit() {
+        var now = DateTimeOffset.UtcNow;
+        var message = CreateZipMessage(
+            "example.com.zip",
+            now,
+            ("first.xml", CreateXmlPayload("example.com", 300)),
+            ("second.xml", CreateXmlPayload("example.com", 300)));
+
+        var reports = MailboxSearcher.FilterDmarcReports(
+            new[] { message },
+            since: null,
+            before: null,
+            domain: "example.com",
+            maxUncompressedSize: 512);
+
+        Assert.Empty(reports);
+    }
+
+    [Fact]
+    public void FilterDmarcReports_RejectsZipWithTooManyEntries() {
+        var now = DateTimeOffset.UtcNow;
+        var message = CreateZipMessage(
+            "example.com.zip",
+            now,
+            ("first.xml", CreateXmlPayload("example.com", 0)),
+            ("second.xml", CreateXmlPayload("example.com", 0)));
+        var options = new DmarcReportInspectionOptions {
+            MaxArchiveEntriesPerAttachment = 1
+        };
+        var policy = options.CreatePolicy();
+
+        var reports = MailboxSearcher.FilterDmarcReports(
+            new[] { message },
+            since: null,
+            before: null,
+            domain: "example.com",
+            policy,
+            new SharedReadBudget(policy.MaxTotalUncompressedBytes));
+
+        Assert.Empty(reports);
+    }
+
+    [Fact]
+    public void FilterDmarcReports_SharesExpandedByteBudgetAcrossMessages() {
+        var now = DateTimeOffset.UtcNow;
+        var first = CreateXmlDmarc("example.com", now, "application", "xml", "example.com.xml");
+        var second = CreateXmlDmarc("example.com", now, "application", "xml", "example.com.xml");
+        var options = new DmarcReportInspectionOptions {
+            MaxUncompressedBytesPerAttachment = 100,
+            MaxTotalUncompressedBytes = 130
+        };
+        var policy = options.CreatePolicy();
+
+        var reports = MailboxSearcher.FilterDmarcReports(
+            new[] { first, second },
+            since: null,
+            before: null,
+            domain: "example.com",
+            policy,
+            new SharedReadBudget(policy.MaxTotalUncompressedBytes));
+
+        Assert.Single(reports);
+    }
+
+    [Fact]
+    public void InspectionPolicyRejectsMimeLimitThatGraphAndGmailCannotRepresent() {
+        var options = new DmarcReportInspectionOptions {
+            MaxMimeBytesPerMessage = (long)int.MaxValue + 1,
+            MaxTotalMimeBytes = (long)int.MaxValue + 1
+        };
+
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            options.CreatePolicy());
+
+        Assert.Equal(nameof(DmarcReportInspectionOptions.MaxMimeBytesPerMessage), exception.ParamName);
+    }
+
+    [Fact]
+    public void FilterDmarcReports_RejectsGzipExpansionBeyondAttachmentLimit() {
+        var now = DateTimeOffset.UtcNow;
+        var message = new MimeMessage {
+            Subject = "Report",
+            Date = now
+        };
+        message.From.Add(new MailboxAddress("reporter", "reporter@example.com"));
+        var compressed = new MemoryStream();
+        using (var gzip = new GZipStream(compressed, CompressionMode.Compress, true)) {
+            byte[] payload = Encoding.UTF8.GetBytes(CreateXmlPayload("example.com", 2048));
+            gzip.Write(payload, 0, payload.Length);
+        }
+        compressed.Position = 0;
+        var builder = new BodyBuilder();
+        builder.Attachments.Add(new MimePart("application", "gzip") {
+            Content = new MimeContent(compressed),
+            FileName = "example.com.xml.gz"
+        });
+        message.Body = builder.ToMessageBody();
+
+        var reports = MailboxSearcher.FilterDmarcReports(
+            new[] { message },
+            since: null,
+            before: null,
+            domain: "example.com",
+            maxUncompressedSize: 512);
+
+        Assert.Empty(reports);
+    }
+
+    [Fact]
+    public void FilterDmarcReports_PropagatesCancellationDuringAttachmentInspection() {
+        var now = DateTimeOffset.UtcNow;
+        var message = CreateXmlDmarc("example.com", now, "application", "xml", "example.com.xml");
+        var options = new DmarcReportInspectionOptions();
+        var policy = options.CreatePolicy();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => MailboxSearcher.FilterDmarcReports(
+            new[] { message },
+            since: null,
+            before: null,
+            domain: "example.com",
+            policy,
+            new SharedReadBudget(policy.MaxTotalUncompressedBytes),
+            cancellation.Token));
+    }
+
+    private static MimeMessage CreateZipMessage(
+        string fileName,
+        DateTimeOffset date,
+        params (string Name, string Content)[] entries) {
+        var message = new MimeMessage {
+            Subject = "Report",
+            Date = date
+        };
+        message.From.Add(new MailboxAddress("reporter", "reporter@example.com"));
+        var archive = new MemoryStream();
+        using (var zip = new ZipArchive(archive, ZipArchiveMode.Create, true)) {
+            foreach (var item in entries) {
+                var entry = zip.CreateEntry(item.Name);
+                using var entryStream = entry.Open();
+                byte[] bytes = Encoding.UTF8.GetBytes(item.Content);
+                entryStream.Write(bytes, 0, bytes.Length);
+            }
+        }
+        archive.Position = 0;
+        var builder = new BodyBuilder();
+        builder.Attachments.Add(new MimePart("application", "zip") {
+            Content = new MimeContent(archive),
+            FileName = fileName
+        });
+        message.Body = builder.ToMessageBody();
+        return message;
+    }
+
+    private static string CreateXmlPayload(string domain, int paddingLength) =>
+        $"<feedback><policy_published><domain>{domain}</domain></policy_published><data>{new string('x', paddingLength)}</data></feedback>";
+
     private static FieldInfo GetHandlerField() =>
         typeof(HttpMessageInvoker).GetField("_handler", BindingFlags.NonPublic | BindingFlags.Instance)
         ?? typeof(HttpMessageInvoker).GetField("handler", BindingFlags.NonPublic | BindingFlags.Instance)
@@ -359,6 +821,7 @@ public class SearchDmarcReportsTests {
     private sealed class CancelDuringGraphMimeHandler : HttpMessageHandler {
         public TaskCompletionSource<object?> MimeStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool MimeRequestCanceled { get; private set; }
+        public Uri? MimeRequestUri { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
             var uri = request.RequestUri!;
@@ -368,11 +831,12 @@ public class SearchDmarcReportsTests {
             }
 
             if (uri.AbsolutePath.EndsWith("/messages", StringComparison.Ordinal)) {
-                var json = "{\"value\":[{\"id\":\"1\"}]}";
+                var json = "{\"value\":[{\"id\":\"A/B#C\"}]}";
                 return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) };
             }
 
             if (uri.AbsolutePath.IndexOf("/messages/", StringComparison.Ordinal) >= 0 && uri.AbsolutePath.EndsWith("/$value", StringComparison.Ordinal)) {
+                MimeRequestUri = uri;
                 MimeStarted.TrySetResult(null);
                 try {
                     await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken).ConfigureAwait(false);

@@ -89,7 +89,7 @@ public class CmdletGetGraphMailboxPermission : AsyncPSCmdlet {
     private void ProcessMgGraph() {
         var uri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
-            $"/users/{UserPrincipalName}/permissions");
+            MicrosoftGraphUtils.BuildGraphPath("users", UserPrincipalName!, "permissions"));
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "GET")

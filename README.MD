@@ -182,7 +182,7 @@ OST input is read-only: Mailozaurr does not pretend to reconstruct server-only c
 ## Architecture notes
 
 - [Platform Architecture](Docs/Platform-Architecture.md) - layering and reuse rules for future library, PowerShell, CLI, MCP, and GUI work
-- [Configuration and Usage](Docs/Configuration-and-Usage.md) - profile model, provider setup guidance, CLI storage, recipes, and MCP usage
+- [Configuration and Usage](Docs/Configuration-and-Usage.md) - profile model, PowerShell setup, provider guidance, CLI recipes, and MCP usage
 
 ## Additional surfaces
 
@@ -194,6 +194,8 @@ Mailozaurr is no longer only a library and PowerShell module. The repository now
 - `mailozaurr mcp serve` for MCP-based integrations
 
 CLI and MCP are intended to sit on top of shared Mailozaurr services instead of duplicating mailbox, draft, queue, send, and message-action behavior independently.
+
+PowerShell 5.1 and PowerShell 7 can use that same profile layer through `Get/New/Set/Remove/Test-MailProfile`, protected `Set/Remove-MailProfileSecret`, and native JMAP discovery, mailbox, email, change, thread, and identity cmdlets. See [Configuration and Usage](Docs/Configuration-and-Usage.md#powershell-profile-and-jmap-usage) for a secure setup example.
 
 If you want the placement rules and longer-term cross-surface direction, see [Platform Architecture](Docs/Platform-Architecture.md).
 If you want practical profile setup and usage guidance for CLI and MCP, see [Configuration and Usage](Docs/Configuration-and-Usage.md).
@@ -224,6 +226,7 @@ The executable currently supports:
 - `send ...` for sending from a stored draft, a draft file, or direct command-line fields
 - `queue ...` for viewing and processing queued outbound messages
 - `mail ...` for folders, folder aliases, search, message retrieval, attachment export, mailbox actions, previews, and reusable action-plan batches
+- `provider ...` for Graph, Gmail, and JMAP provider-native operations
 - `mcp serve` for exposing the same shared services as MCP tools over stdio
 
 Most list and inspection commands support `--json`, which makes the executable useful in scripts, CI, and other automation surfaces.

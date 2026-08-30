@@ -11,7 +11,7 @@ Saves attachments from Microsoft Graph message objects.
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Save-GraphMessageAttachment -Attachment <Attachment[]> -Path <string> [<CommonParameters>]
+Save-GraphMessageAttachment -Attachment <Attachment[]> -Path <string> [-ConflictPolicy <AttachmentFileConflictPolicy>] [-Force] [-PassThru] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -40,6 +40,54 @@ Required: True
 Position: named
 Default value: None
 Accept pipeline input: True (ByValue)
+Accept wildcard characters: False
+```
+
+### -ConflictPolicy
+Controls how existing destination files are handled.
+
+```yaml
+Type: AttachmentFileConflictPolicy
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values: Fail, Skip, Rename, Replace
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Force
+Replaces existing regular files. Equivalent to ConflictPolicy Replace.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: __AllParameterSets
+Aliases: Overwrite
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -PassThru
+Writes one save result for each attachment.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
 Accept wildcard characters: False
 ```
 

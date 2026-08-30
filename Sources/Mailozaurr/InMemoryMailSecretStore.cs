@@ -4,7 +4,10 @@ namespace Mailozaurr;
 /// Stores profile secrets in process memory for transient applications, tests, and one-shot delivery workflows.
 /// Values are not persisted or protected outside the current process.
 /// </summary>
-public sealed class InMemoryMailSecretStore : IMailSecretStore, IMailProfileSecretCleanup {
+public sealed class InMemoryMailSecretStore :
+    IMailSecretStore,
+    IMailProfileSecretCleanup,
+    IMailSecretStoreCredentialContextCoordinator {
     private readonly Dictionary<string, Dictionary<string, string>> _profileSecrets =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -97,6 +100,23 @@ public sealed class InMemoryMailSecretStore : IMailSecretStore, IMailProfileSecr
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             _profileSecrets.Remove(profileId.Trim());
+        } finally {
+            _gate.Release();
+        }
+    }
+
+    async Task<TResult> IMailSecretStoreCredentialContextCoordinator.ExecuteWithProfileSecretsLockedAsync<TResult>(
+        string profileId,
+        Func<bool, CancellationToken, Task<TResult>> operation,
+        CancellationToken cancellationToken) {
+        ValidateKeyPart(profileId, nameof(profileId));
+        if (operation == null) throw new ArgumentNullException(nameof(operation));
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try {
+            bool hasSecrets = _profileSecrets.TryGetValue(
+                profileId.Trim(),
+                out Dictionary<string, string>? secrets) && secrets.Count > 0;
+            return await operation(hasSecrets, cancellationToken).ConfigureAwait(false);
         } finally {
             _gate.Release();
         }

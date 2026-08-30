@@ -20,22 +20,64 @@ public static class GraphMailboxSearcher {
         GraphCredential credential, string userPrincipalName, DateTime? since = null,
         DateTime? before = null, string? domain = null, int maxResults = 0,
         int parallelDownloadLimit = 4, long maxUncompressedSize = 10 * 1024 * 1024,
+        CancellationToken cancellationToken = default) => await SearchDmarcReportsAsync(
+            credential,
+            userPrincipalName,
+            DmarcReportInspectionOptions.FromLegacyLimit(maxUncompressedSize),
+            since,
+            before,
+            domain,
+            maxResults,
+            parallelDownloadLimit,
+            cancellationToken).ConfigureAwait(false);
+
+    /// <summary>Searches a Graph mailbox for DMARC aggregate reports using explicit attachment inspection limits.</summary>
+    public static async Task<IList<DmarcReport>> SearchDmarcReportsAsync(
+        GraphCredential credential,
+        string userPrincipalName,
+        DmarcReportInspectionOptions inspectionOptions,
+        DateTime? since = null,
+        DateTime? before = null,
+        string? domain = null,
+        int maxResults = 0,
+        int parallelDownloadLimit = 4,
         CancellationToken cancellationToken = default) {
+        if (inspectionOptions == null) throw new ArgumentNullException(nameof(inspectionOptions));
+        var inspectionPolicy = inspectionOptions.CreatePolicy();
+        var mimeBudget = new DmarcMimeDownloadBudget(
+            inspectionPolicy.MaxMimeBytesPerMessage,
+            inspectionPolicy.MaxTotalMimeBytes);
         var filters = new List<string> { "hasAttachments eq true", "contains(subject,'report domain')" };
         DateTime? sinceUtc = NormalizeToUtc(since);
         DateTime? beforeUtc = NormalizeToUtc(before);
         if (sinceUtc.HasValue) filters.Add($"receivedDateTime ge {sinceUtc.Value:o}");
         if (beforeUtc.HasValue) filters.Add($"receivedDateTime le {beforeUtc.Value:o}");
         if (!string.IsNullOrWhiteSpace(domain)) filters.Add($"contains(subject,'{domain!.Replace("'", "''")}')");
+        int providerLimit = Math.Min(
+            maxResults > 0 ? maxResults : inspectionPolicy.MaxMessagesScanned,
+            inspectionPolicy.MaxMessagesScanned);
         IList<Dictionary<string, object>> messages = await MicrosoftGraphUtils.GetMailMessagesAsync(
             credential, userPrincipalName, new[] { "id" }, string.Join(" and ", filters),
-            maxResults > 0 ? maxResults : (int?)null, cancellationToken).ConfigureAwait(false);
+            providerLimit, cancellationToken).ConfigureAwait(false);
         string[] messageIds = GetMessageIds(messages);
         IReadOnlyList<MimeMessage> mimeMessages = await DownloadMimeMessagesAsync(
             messageIds, parallelDownloadLimit,
-            (id, token) => MicrosoftGraphUtils.GetMailMessageMimeAsync(
-                credential, userPrincipalName, id, token), cancellationToken).ConfigureAwait(false);
-        return MailboxSearcher.FilterDmarcReports(mimeMessages, since, before, domain, maxUncompressedSize);
+            (id, token) => mimeBudget.DownloadAsync(
+                (limit, innerToken) => MicrosoftGraphUtils.GetMailMessageMimeBoundedAsync(
+                    credential,
+                    userPrincipalName,
+                    id,
+                    limit,
+                    innerToken),
+                token), cancellationToken).ConfigureAwait(false);
+        return MailboxSearcher.FilterDmarcReports(
+            mimeMessages,
+            since,
+            before,
+            domain,
+            inspectionPolicy,
+            new SharedReadBudget(inspectionPolicy.MaxTotalUncompressedBytes),
+            cancellationToken);
     }
 
     /// <summary>Searches a Graph mailbox for non-delivery reports.</summary>

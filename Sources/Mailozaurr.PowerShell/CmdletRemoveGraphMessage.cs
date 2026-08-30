@@ -113,7 +113,7 @@ public class CmdletRemoveGraphMessage : AsyncPSCmdlet {
         }
         var uri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
-            $"/users/{UserPrincipalName}/messages/{MessageId}");
+            MicrosoftGraphUtils.BuildGraphPath("users", UserPrincipalName!, "messages", MessageId!));
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "DELETE")

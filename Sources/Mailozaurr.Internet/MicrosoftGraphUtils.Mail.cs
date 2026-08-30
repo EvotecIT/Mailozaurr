@@ -13,6 +13,8 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Mailozaurr.DmarcReports;
+
 namespace Mailozaurr;
 
 public static partial class MicrosoftGraphUtils {
@@ -27,7 +29,7 @@ public static partial class MicrosoftGraphUtils {
         var queryParams = new Dictionary<string, object>();
         if (!string.IsNullOrWhiteSpace(filter)) queryParams["$filter"] = filter!;
         if (properties != null && properties.Any()) queryParams["$select"] = string.Join(",", properties);
-        var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages", queryParams);
+        var uri = JoinUriQuery(GraphEndpoint.V1, BuildGraphPath("users", userPrincipalName, "messages"), queryParams);
         var messages = new List<Dictionary<string, object>>();
         while (!string.IsNullOrEmpty(uri)) {
             cancellationToken.ThrowIfCancellationRequested();
@@ -66,7 +68,10 @@ public static partial class MicrosoftGraphUtils {
         headers["Authorization"] = token;
         var queryParams = new Dictionary<string, object>();
         if (properties != null && properties.Any()) queryParams["$select"] = string.Join(",", properties);
-        var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages/{messageId}/attachments", queryParams);
+        var uri = JoinUriQuery(
+            GraphEndpoint.V1,
+            BuildGraphPath("users", userPrincipalName, "messages", messageId, "attachments"),
+            queryParams);
         var attachments = new List<Attachment>();
         while (!string.IsNullOrEmpty(uri)) {
             cancellationToken.ThrowIfCancellationRequested();
@@ -101,7 +106,7 @@ public static partial class MicrosoftGraphUtils {
         var headers = new Dictionary<string, string>();
         var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com", cancellationToken).ConfigureAwait(false);
         headers["Authorization"] = token;
-        var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/mailFolders");
+        var uri = JoinUriQuery(GraphEndpoint.V1, BuildGraphPath("users", userPrincipalName, "mailFolders"));
         var folders = new List<JsonElement>();
         while (!string.IsNullOrEmpty(uri)) {
             cancellationToken.ThrowIfCancellationRequested();
@@ -151,25 +156,38 @@ public static partial class MicrosoftGraphUtils {
     /// Saves attachments to the specified directory.
     /// </summary>
     public static void SaveAttachments(IEnumerable<Attachment> attachments, string path) {
-        var resolvedPath = Path.GetFullPath(path);
-        if (!Directory.Exists(resolvedPath)) Directory.CreateDirectory(resolvedPath);
+        SaveAttachments(attachments, path, AttachmentFileConflictPolicy.Fail);
+    }
+
+    /// <summary>Saves Graph attachments with an explicit atomic conflict policy.</summary>
+    public static IReadOnlyList<AttachmentFileSaveResult> SaveAttachments(
+        IEnumerable<Attachment> attachments,
+        string path,
+        AttachmentFileConflictPolicy conflictPolicy) {
+        if (attachments == null) throw new ArgumentNullException(nameof(attachments));
+        var results = new List<AttachmentFileSaveResult>();
+        int index = 0;
         foreach (var att in attachments) {
             if (!string.IsNullOrWhiteSpace(att.ContentBytes) && !string.IsNullOrWhiteSpace(att.Name)) {
-                var filePath = Path.Combine(resolvedPath, att.Name);
                 try {
-                    var bytes = Convert.FromBase64String(att.ContentBytes);
-                    File.WriteAllBytes(filePath, bytes);
+                    results.Add(AttachmentFileStore.SaveToDirectory(
+                        path,
+                        att.Name,
+                        stream => {
+                            byte[] bytes = Convert.FromBase64String(att.ContentBytes);
+                            stream.Write(bytes, 0, bytes.Length);
+                        },
+                        conflictPolicy,
+                        index.ToString(System.Globalization.CultureInfo.InvariantCulture)));
                 } catch (FormatException fex) {
                     // Invalid Base64 content
                     LoggingMessages.Logger.WriteWarning($"SaveAttachment - Invalid base64 content for {att.Name}. Error: {fex.Message}");
                     LoggingMessages.Logger.WriteWarning($"SaveAttachment - Possible issue: The attachment '{att.Name}' may be corrupted.");
-                } catch (IOException ex) {
-                    // Log or handle other errors
-                    LoggingMessages.Logger.WriteWarning($"SaveAttachment - Couldn't save file to {filePath}. Error: {ex.Message}");
-                    LoggingMessages.Logger.WriteWarning($"SaveAttachment - Possible issue: Verify the path '{filePath}' exists and you have write permissions.");
                 }
             }
+            index++;
         }
+        return results.AsReadOnly();
     }
 
     /// <summary>
@@ -252,18 +270,18 @@ public static partial class MicrosoftGraphUtils {
             case GraphMessageAction.Move:
                 if (string.IsNullOrWhiteSpace(destinationFolderId)) throw new ArgumentNullException(nameof(destinationFolderId));
                 method = "POST";
-                uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages/{messageId}/move");
+                uri = JoinUriQuery(GraphEndpoint.V1, BuildGraphPath("users", userPrincipalName, "messages", messageId, "move"));
                 body = JsonSerializer.Serialize(new GraphDestinationRequest { DestinationId = destinationFolderId }, GraphJsonContext.Default.GraphDestinationRequest);
                 break;
             case GraphMessageAction.Copy:
                 if (string.IsNullOrWhiteSpace(destinationFolderId)) throw new ArgumentNullException(nameof(destinationFolderId));
                 method = "POST";
-                uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages/{messageId}/copy");
+                uri = JoinUriQuery(GraphEndpoint.V1, BuildGraphPath("users", userPrincipalName, "messages", messageId, "copy"));
                 body = JsonSerializer.Serialize(new GraphDestinationRequest { DestinationId = destinationFolderId }, GraphJsonContext.Default.GraphDestinationRequest);
                 break;
             case GraphMessageAction.Delete:
                 method = "DELETE";
-                uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages/{messageId}");
+                uri = JoinUriQuery(GraphEndpoint.V1, BuildGraphPath("users", userPrincipalName, "messages", messageId));
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(action), action, null);
@@ -311,7 +329,7 @@ public static partial class MicrosoftGraphUtils {
         var headers = new Dictionary<string, string>();
         var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com").ConfigureAwait(false);
         headers["Authorization"] = token;
-        var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/messages/{messageId}");
+        var uri = JoinUriQuery(GraphEndpoint.V1, BuildGraphPath("users", userPrincipalName, "messages", messageId));
         var body = JsonSerializer.Serialize(new GraphMarkReadRequest { IsRead = isRead }, GraphJsonContext.Default.GraphMarkReadRequest);
         await InvokeGraphApiAsync("PATCH", uri, headers, body).ConfigureAwait(false);
     }
@@ -341,7 +359,9 @@ public static partial class MicrosoftGraphUtils {
         string messageId,
         CancellationToken cancellationToken = default) {
         var token = await ConnectO365GraphAsync(credential, credential.DirectoryId, "https://graph.microsoft.com", cancellationToken).ConfigureAwait(false);
-        var request = new HttpRequestMessage(HttpMethod.Get, $"https://graph.microsoft.com/v1.0/users/{userPrincipalName}/messages/{messageId}/$value");
+        var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            BuildGraphUri(GraphEndpoint.V1, BuildGraphPath("users", userPrincipalName, "messages", messageId) + "/$value"));
         request.Headers.TryAddWithoutValidation("Authorization", token);
         await ConcurrencySemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
@@ -349,6 +369,56 @@ public static partial class MicrosoftGraphUtils {
             response.EnsureSuccessStatusCode();
             using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
             return await MimeMessage.LoadAsync(stream, cancellationToken).ConfigureAwait(false);
+        } finally {
+            ConcurrencySemaphore.Release();
+        }
+    }
+
+    internal static async Task<BoundedMimeMessage> GetMailMessageMimeBoundedAsync(
+        GraphCredential credential,
+        string userPrincipalName,
+        string messageId,
+        long maxBytes,
+        CancellationToken cancellationToken = default) {
+        if (maxBytes <= 0 || maxBytes > int.MaxValue) throw new ArgumentOutOfRangeException(nameof(maxBytes));
+        var token = await ConnectO365GraphAsync(
+            credential,
+            credential.DirectoryId,
+            "https://graph.microsoft.com",
+            cancellationToken).ConfigureAwait(false);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            BuildGraphUri(GraphEndpoint.V1, BuildGraphPath("users", userPrincipalName, "messages", messageId) + "/$value"));
+        request.Headers.TryAddWithoutValidation("Authorization", token);
+        await ConcurrencySemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try {
+            using var response = await HttpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            if (response.Content.Headers.ContentLength is long declared && declared > maxBytes) {
+                throw new InvalidDataException($"Graph MIME message exceeded the {maxBytes} byte limit.");
+            }
+#if NET5_0_OR_GREATER
+            await using Stream source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+#else
+            using Stream source = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+#endif
+            using var buffer = new MemoryStream((int)Math.Min(maxBytes, 64L * 1024L));
+            var chunk = new byte[81920];
+            while (true) {
+                int read = await source.ReadAsync(chunk, 0, chunk.Length, cancellationToken).ConfigureAwait(false);
+                if (read == 0) break;
+                if (buffer.Length + read > maxBytes) {
+                    throw new InvalidDataException($"Graph MIME message exceeded the {maxBytes} byte limit.");
+                }
+                buffer.Write(chunk, 0, read);
+            }
+            long byteCount = buffer.Length;
+            buffer.Position = 0;
+            MimeMessage message = await MimeMessage.LoadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            return new BoundedMimeMessage(message, byteCount);
         } finally {
             ConcurrencySemaphore.Release();
         }
@@ -515,7 +585,10 @@ public static partial class MicrosoftGraphUtils {
         }
         var query = new Dictionary<string, object>();
         if (props.Count > 0) query["$select"] = string.Join(",", props);
-        var uri = JoinUriQuery(GraphEndpoint.V1, $"/users/{userPrincipalName}/mailFolders/junkemail/messages", query);
+        var uri = JoinUriQuery(
+            GraphEndpoint.V1,
+            BuildGraphPath("users", userPrincipalName, "mailFolders", "junkemail", "messages"),
+            query);
         var messages = new List<Dictionary<string, object>>();
         while (!string.IsNullOrWhiteSpace(uri)) {
             var doc = await InvokeGraphApiAsync("GET", uri!, headers).ConfigureAwait(false);

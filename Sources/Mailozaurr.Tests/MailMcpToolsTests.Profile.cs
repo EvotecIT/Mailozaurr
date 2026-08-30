@@ -153,31 +153,28 @@ public sealed partial class MailMcpToolsTests {
     }
 
     [Fact]
-    public async Task MailProfileGraphBootstrapCreatesProfileAndStoresSecrets() {
+    public async Task MailProfileGraphBootstrapRejectsCrossProfileSecretsEvenWithLegacyConsent() {
         using var fixture = new TestFixture();
         await fixture.SecretStore.SetSecretAsync(
             "bootstrap-secrets", MailSecretNames.ClientSecret, "client-secret");
 
-        var profile = await fixture.Tools.mail_profile_graph_bootstrap(
-            profileId: "graph-work",
-            displayName: "Work Graph",
-            mailbox: "shared@example.com",
-            clientId: "client-id",
-            tenantId: "tenant-id",
-            clientSecretReference: $"bootstrap-secrets:{MailSecretNames.ClientSecret}");
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            fixture.Tools.mail_profile_graph_bootstrap(
+                profileId: "graph-work",
+                displayName: "Work Graph",
+                mailbox: "shared@example.com",
+                clientId: "client-id",
+                tenantId: "tenant-id",
+                clientSecretReference: $"bootstrap-secrets:{MailSecretNames.ClientSecret}",
+                allowCrossProfileSecretReferences: true));
         var storedSecret = await fixture.SecretStore.GetSecretAsync("graph-work", MailSecretNames.ClientSecret);
 
-        Assert.Equal("graph-work", profile.Id);
-        Assert.Equal(MailProfileKind.Graph, profile.Kind);
-        Assert.Equal("shared@example.com", profile.DefaultMailbox);
-        Assert.Equal("shared@example.com", profile.Settings[MailProfileSettingsKeys.Mailbox]);
-        Assert.Equal("client-id", profile.Settings[MailProfileSettingsKeys.ClientId]);
-        Assert.Equal("tenant-id", profile.Settings[MailProfileSettingsKeys.TenantId]);
-        Assert.Equal("client-secret", storedSecret);
+        Assert.Contains("crosses profile boundaries", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(storedSecret);
     }
 
     [Fact]
-    public async Task MailProfileGraphBootstrapSupportsSecretReferences() {
+    public async Task MailProfileGraphBootstrapRejectsCrossProfileReferences() {
         using var fixture = new TestFixture();
         await fixture.ProfileStore.SaveAsync(new MailProfile {
             Id = "shared-secrets",
@@ -190,44 +187,44 @@ public sealed partial class MailMcpToolsTests {
         });
         await fixture.SecretStore.SetSecretAsync("shared-secrets", MailSecretNames.ClientSecret, "shared-client-secret");
 
-        var profile = await fixture.Tools.mail_profile_graph_bootstrap(
-            profileId: "graph-ref",
-            displayName: "Graph Ref",
-            mailbox: "shared@example.com",
-            clientId: "client-id",
-            tenantId: "tenant-id",
-            clientSecretReference: $"shared-secrets:{MailSecretNames.ClientSecret}");
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            fixture.Tools.mail_profile_graph_bootstrap(
+                profileId: "graph-ref",
+                displayName: "Graph Ref",
+                mailbox: "shared@example.com",
+                clientId: "client-id",
+                tenantId: "tenant-id",
+                clientSecretReference: $"shared-secrets:{MailSecretNames.ClientSecret}",
+                allowCrossProfileSecretReferences: true));
         var storedSecret = await fixture.SecretStore.GetSecretAsync("graph-ref", MailSecretNames.ClientSecret);
 
-        Assert.Equal("graph-ref", profile.Id);
-        Assert.Equal("shared-client-secret", storedSecret);
+        Assert.Contains("crosses profile boundaries", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(storedSecret);
     }
 
     [Fact]
-    public async Task MailProfileGmailBootstrapCreatesProfileAndStoresSecrets() {
+    public async Task MailProfileGmailBootstrapRejectsCrossProfileSecrets() {
         using var fixture = new TestFixture();
         await fixture.SecretStore.SetSecretAsync(
             "bootstrap-secrets", MailSecretNames.ClientSecret, "client-secret");
         await fixture.SecretStore.SetSecretAsync(
             "bootstrap-secrets", MailSecretNames.RefreshToken, "refresh-token");
 
-        var profile = await fixture.Tools.mail_profile_gmail_bootstrap(
-            profileId: "gmail-work",
-            displayName: "Work Gmail",
-            mailbox: "me@example.com",
-            clientId: "client-id",
-            clientSecretReference: $"bootstrap-secrets:{MailSecretNames.ClientSecret}",
-            refreshTokenReference: $"bootstrap-secrets:{MailSecretNames.RefreshToken}");
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            fixture.Tools.mail_profile_gmail_bootstrap(
+                profileId: "gmail-work",
+                displayName: "Work Gmail",
+                mailbox: "me@example.com",
+                clientId: "client-id",
+                clientSecretReference: $"bootstrap-secrets:{MailSecretNames.ClientSecret}",
+                refreshTokenReference: $"bootstrap-secrets:{MailSecretNames.RefreshToken}",
+                allowCrossProfileSecretReferences: true));
         var clientSecret = await fixture.SecretStore.GetSecretAsync("gmail-work", MailSecretNames.ClientSecret);
         var refreshToken = await fixture.SecretStore.GetSecretAsync("gmail-work", MailSecretNames.RefreshToken);
 
-        Assert.Equal("gmail-work", profile.Id);
-        Assert.Equal(MailProfileKind.Gmail, profile.Kind);
-        Assert.Equal("me@example.com", profile.DefaultMailbox);
-        Assert.Equal("me@example.com", profile.Settings[MailProfileSettingsKeys.Mailbox]);
-        Assert.Equal("client-id", profile.Settings[MailProfileSettingsKeys.ClientId]);
-        Assert.Equal("client-secret", clientSecret);
-        Assert.Equal("refresh-token", refreshToken);
+        Assert.Contains("crosses profile boundaries", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(clientSecret);
+        Assert.Null(refreshToken);
     }
 
     [Fact]
@@ -468,24 +465,20 @@ public sealed partial class MailMcpToolsTests {
     }
 
     [Fact]
-    public async Task MailProfileSecretCopyAndRemoveUseSharedSecretStore() {
+    public async Task MailProfileSecretCopyRejectsCrossProfileReference() {
         using var fixture = new TestFixture();
         await fixture.SecretStore.SetSecretAsync("source", "refresh-token", "secret-value");
 
         var setResult = await fixture.Tools.mail_profile_secret_copy(
             "gmail-work", "refresh-token", "source:refresh-token");
         var storedSecret = await fixture.SecretStore.GetSecretAsync("gmail-work", "refresh-token");
-        var removeResult = await fixture.Tools.mail_profile_secret_remove("gmail-work", "refresh-token");
-        var removedSecret = await fixture.SecretStore.GetSecretAsync("gmail-work", "refresh-token");
-
-        Assert.True(setResult.Succeeded);
-        Assert.Equal("secret-value", storedSecret);
-        Assert.True(removeResult.Succeeded);
-        Assert.Null(removedSecret);
+        Assert.False(setResult.Succeeded);
+        Assert.Contains("crosses profile boundaries", setResult.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(storedSecret);
     }
 
     [Fact]
-    public async Task MailProfileSecretCopySupportsReferenceCopy() {
+    public async Task MailProfileSecretCopyRejectsCrossProfileReferenceWithMatchingName() {
         using var fixture = new TestFixture();
         await fixture.ProfileStore.SaveAsync(new MailProfile {
             Id = "shared-secrets",
@@ -504,8 +497,9 @@ public sealed partial class MailMcpToolsTests {
             secretReference: $"shared-secrets:{MailSecretNames.RefreshToken}");
         var storedSecret = await fixture.SecretStore.GetSecretAsync("gmail-work", MailSecretNames.RefreshToken);
 
-        Assert.True(setResult.Succeeded);
-        Assert.Equal("copied-secret", storedSecret);
+        Assert.False(setResult.Succeeded);
+        Assert.Contains("crosses profile boundaries", setResult.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(storedSecret);
     }
 
     [Fact]

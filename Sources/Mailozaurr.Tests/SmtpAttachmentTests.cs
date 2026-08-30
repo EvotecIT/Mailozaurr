@@ -2,12 +2,21 @@ using Mailozaurr.Definitions;
 using MimeKit;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using Xunit;
 
 namespace Mailozaurr.Tests;
 
 public class SmtpAttachmentTests {
+    [Fact]
+    public void StreamAttachmentDescriptor_PreservesLegacyThreeParameterConstructor() {
+        ConstructorInfo? constructor = typeof(StreamAttachmentDescriptor).GetConstructor(
+            new[] { typeof(Stream), typeof(string), typeof(bool) });
+
+        Assert.NotNull(constructor);
+    }
+
     [Fact]
     public void CreateMessage_MissingAttachment_Throws() {
         var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
@@ -96,6 +105,305 @@ public class SmtpAttachmentTests {
         Assert.Equal(bytes, first);
         Assert.Equal(bytes, second);
         Assert.False(source.CanRead);
+    }
+
+    [Fact]
+    public void StreamAttachmentDescriptor_StagesLargeContentAndDeletesItOnDispose() {
+        string directory = Path.Combine(Path.GetTempPath(), "MailozaurrStage-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var source = new MemoryStream(new byte[] { 1, 2, 3, 4, 5 });
+            using var descriptor = new StreamAttachmentDescriptor(
+                source,
+                "staged.bin",
+                stagingOptions: new AttachmentStreamStagingOptions {
+                    MemoryThresholdBytes = 2,
+                    MaxBytes = 10,
+                    TempDirectory = directory
+                });
+
+            using (Stream stream = descriptor.OpenContentStream()) {
+                Assert.IsType<FileStream>(stream);
+                Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, ReadAll(stream));
+            }
+            Assert.Single(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
+
+            descriptor.Dispose();
+
+            Assert.Empty(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void SmtpDispose_PreservesStreamAttachmentStagingWhenNoSendWasAttempted() {
+        string directory = Path.Combine(Path.GetTempPath(), "MailozaurrStage-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var descriptor = new StreamAttachmentDescriptor(
+                new MemoryStream(new byte[] { 1, 2, 3, 4, 5 }),
+                "staged.bin",
+                stagingOptions: new AttachmentStreamStagingOptions {
+                    MemoryThresholdBytes = 2,
+                    MaxBytes = 10,
+                    TempDirectory = directory
+                });
+            var smtp = new Smtp {
+                Attachments = new List<AttachmentDescriptor> { descriptor }
+            };
+            descriptor.GetContentBytes();
+            Assert.Single(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
+
+            smtp.Dispose();
+
+            Assert.Single(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
+            Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, descriptor.GetContentBytes());
+            descriptor.Dispose();
+            Assert.Empty(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void SmtpDryRun_PreservesStreamAttachmentStaging() {
+        string directory = Path.Combine(Path.GetTempPath(), "MailozaurrStage-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var descriptor = new StreamAttachmentDescriptor(
+                new MemoryStream(new byte[] { 1, 2, 3, 4, 5 }),
+                "staged.bin",
+                stagingOptions: new AttachmentStreamStagingOptions {
+                    MemoryThresholdBytes = 2,
+                    MaxBytes = 10,
+                    TempDirectory = directory
+                });
+            var smtp = new Smtp {
+                DryRun = true,
+                Attachments = new List<AttachmentDescriptor> { descriptor }
+            };
+            try {
+                descriptor.GetContentBytes();
+
+                smtp.Send();
+
+                Assert.Single(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
+                Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, descriptor.GetContentBytes());
+            } finally {
+                smtp.Dispose();
+                descriptor.Dispose();
+            }
+            Assert.Empty(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void SmtpSend_RetainsStagingOnlyWhenCallerExplicitlyOwnsCleanup() {
+        string directory = Path.Combine(Path.GetTempPath(), "MailozaurrStage-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var descriptor = new StreamAttachmentDescriptor(
+            new MemoryStream(new byte[] { 1, 2, 3, 4, 5 }),
+            "staged.bin",
+            stagingOptions: new AttachmentStreamStagingOptions {
+                MemoryThresholdBytes = 2,
+                MaxBytes = 10,
+                TempDirectory = directory,
+                RetainStagedContentAfterSend = true
+            });
+        try {
+            descriptor.GetContentBytes();
+            AttachmentDescriptorLifetime.MarkSendAttempted(new[] { descriptor });
+            AttachmentDescriptorLifetime.ReleaseStaging(new[] { descriptor });
+
+            Assert.Single(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
+            Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, descriptor.GetContentBytes());
+        } finally {
+            descriptor.Dispose();
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void AttachmentDescriptorLifetime_ReleasesStagingAfterTransportAttempt() {
+        string directory = Path.Combine(Path.GetTempPath(), "MailozaurrStage-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var descriptor = new StreamAttachmentDescriptor(
+                new MemoryStream(new byte[] { 1, 2, 3, 4, 5 }),
+                "staged.bin",
+                stagingOptions: new AttachmentStreamStagingOptions {
+                    MemoryThresholdBytes = 2,
+                    MaxBytes = 10,
+                    TempDirectory = directory
+                });
+            descriptor.GetContentBytes();
+
+            AttachmentDescriptorLifetime.MarkSendAttempted(new[] { descriptor });
+            AttachmentDescriptorLifetime.ReleaseStaging(new[] { descriptor });
+
+            Assert.Empty(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
+            Assert.Throws<ObjectDisposedException>(() => descriptor.OpenContentStream());
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void StreamAttachmentDescriptor_RejectsContentPastItsBoundAndCleansStaging() {
+        string directory = Path.Combine(Path.GetTempPath(), "MailozaurrStage-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            using var descriptor = new StreamAttachmentDescriptor(
+                new MemoryStream(new byte[] { 1, 2, 3, 4, 5 }),
+                "too-large.bin",
+                stagingOptions: new AttachmentStreamStagingOptions {
+                    MemoryThresholdBytes = 2,
+                    MaxBytes = 4,
+                    TempDirectory = directory
+                });
+
+            Assert.Throws<InvalidDataException>(() => descriptor.OpenContentStream());
+            Assert.Empty(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void StreamAttachmentDescriptor_PoisonsNonSeekableSourceAfterStagingFailure() {
+        using var descriptor = new StreamAttachmentDescriptor(
+            new NonSeekableReadStream(new byte[] { 1, 2, 3, 4, 5 }),
+            "too-large.bin",
+            leaveStreamOpen: false,
+            stagingOptions: new AttachmentStreamStagingOptions {
+                MemoryThresholdBytes = 2,
+                MaxBytes = 4
+            });
+
+        Assert.Throws<InvalidDataException>(() => descriptor.OpenContentStream());
+        var retry = Assert.Throws<InvalidOperationException>(() => descriptor.OpenContentStream());
+        Assert.IsType<InvalidDataException>(retry.InnerException);
+    }
+
+#if NET8_0_OR_GREATER
+    [Fact]
+    public void StreamAttachmentDescriptor_UsesPerUserDefaultStagingDirectoryOnUnix() {
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                System.Runtime.InteropServices.OSPlatform.Windows)) return;
+
+        using var source = new MemoryStream(new byte[] { 1, 2, 3, 4, 5 });
+        var descriptor = new StreamAttachmentDescriptor(
+            source,
+            "staged.bin",
+            stagingOptions: new AttachmentStreamStagingOptions {
+                MemoryThresholdBytes = 2,
+                MaxBytes = 10
+            });
+        string stagedPath;
+        try {
+            descriptor.GetContentBytes();
+            var stagedPathField = typeof(StreamAttachmentDescriptor).GetField(
+                "_stagedFilePath",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            stagedPath = Assert.IsType<string>(stagedPathField.GetValue(descriptor));
+
+            Assert.True(File.Exists(stagedPath));
+            string stagingDirectory = Path.GetDirectoryName(stagedPath)!;
+            Assert.StartsWith(".mailozaurr-staging-", Path.GetFileName(stagingDirectory), StringComparison.Ordinal);
+            Assert.Equal(
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute,
+                File.GetUnixFileMode(stagingDirectory));
+            stagingDirectory = Path.GetDirectoryName(stagingDirectory)!;
+            Assert.Equal("attachments", Path.GetFileName(stagingDirectory));
+            Assert.Equal(
+                "Mailozaurr-" + geteuid().ToString(System.Globalization.CultureInfo.InvariantCulture),
+                Directory.GetParent(stagingDirectory)!.Name);
+        } finally {
+            descriptor.Dispose();
+        }
+
+        Assert.False(File.Exists(stagedPath));
+    }
+
+    [Fact]
+    public void StreamAttachmentDescriptor_PreservesExistingCallerDirectoryPermissions() {
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+            System.Runtime.InteropServices.OSPlatform.Windows)) return;
+
+        string directory = Path.Combine(Path.GetTempPath(), "MailozaurrStage-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        const UnixFileMode originalMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+            UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute;
+        File.SetUnixFileMode(directory, originalMode);
+        try {
+            using var descriptor = new StreamAttachmentDescriptor(
+                new MemoryStream(new byte[] { 1, 2, 3, 4, 5 }),
+                "staged.bin",
+                stagingOptions: new AttachmentStreamStagingOptions {
+                    MemoryThresholdBytes = 2,
+                    MaxBytes = 10,
+                    TempDirectory = directory
+                });
+
+            descriptor.GetContentBytes();
+
+            Assert.Equal(originalMode, File.GetUnixFileMode(directory));
+            string stagedPath = Assert.Single(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
+            Assert.Equal(
+                UnixFileMode.UserRead | UnixFileMode.UserWrite,
+                File.GetUnixFileMode(stagedPath));
+            Assert.StartsWith(
+                ".mailozaurr-staging-",
+                Path.GetFileName(Path.GetDirectoryName(stagedPath)!),
+                StringComparison.Ordinal);
+            Assert.Equal(
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute,
+                File.GetUnixFileMode(Path.GetDirectoryName(stagedPath)!));
+
+            descriptor.Dispose();
+            Assert.Empty(Directory.GetFileSystemEntries(directory));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("libc")]
+    private static extern uint geteuid();
+#endif
+
+    private sealed class NonSeekableReadStream : Stream {
+        private readonly MemoryStream _inner;
+
+        internal NonSeekableReadStream(byte[] content) =>
+            _inner = new MemoryStream(content, writable: false);
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing) {
+            if (disposing) _inner.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+
+    private static byte[] ReadAll(Stream stream) {
+        using var memory = new MemoryStream();
+        stream.CopyTo(memory);
+        return memory.ToArray();
     }
 
     [Fact]

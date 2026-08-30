@@ -13,7 +13,7 @@ The Get-DmarcReport cmdlet queries IMAP, POP3, Microsoft Graph, or Gmail API to 
 ## SYNTAX
 ### GmailApi
 ```powershell
-Get-DmarcReport -Protocol <EmailProtocol> -GmailAccount <string> -Credential <pscredential> [-Domain <string>] [-Since <DateTime>] [-Before <DateTime>] [-Count <int>] [-Folder <string>] [-UserPrincipalName <string>] [-ParallelDownloadLimit <int>] [-MaxUncompressedSize <long>] [<CommonParameters>]
+Get-DmarcReport -Protocol <EmailProtocol> -GmailAccount <string> -Credential <pscredential> [-Domain <string>] [-Since <DateTime>] [-Before <DateTime>] [-Count <int>] [-Folder <string>] [-UserPrincipalName <string>] [-ParallelDownloadLimit <int>] [-MaxUncompressedSize <long>] [-MaxTotalUncompressedSize <long>] [-MaxAttachmentsPerMessage <int>] [-MaxArchiveEntriesPerAttachment <int>] [-MaxMessagesScanned <int>] [-MaxMimeBytesPerMessage <long>] [-MaxTotalMimeBytes <long>] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -48,7 +48,7 @@ Accept wildcard characters: False
 ```
 
 ### -Count
-Maximum number of reports to return. Default is unlimited.
+Maximum number of reports to return. Defaults to 1000.
 
 ```yaml
 Type: Int32
@@ -121,6 +121,102 @@ Aliases: None
 Possible values:
 
 Required: True
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaxArchiveEntriesPerAttachment
+Maximum number of entries accepted in one DMARC ZIP attachment.
+
+```yaml
+Type: Int32
+Parameter Sets: GmailApi
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaxAttachmentsPerMessage
+Maximum number of DMARC attachments accepted from one message.
+
+```yaml
+Type: Int32
+Parameter Sets: GmailApi
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaxMessagesScanned
+Maximum number of candidate mailbox messages inspected.
+
+```yaml
+Type: Int32
+Parameter Sets: GmailApi
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaxMimeBytesPerMessage
+Maximum downloaded MIME bytes for one candidate message.
+
+```yaml
+Type: Int64
+Parameter Sets: GmailApi
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaxTotalMimeBytes
+Maximum downloaded MIME bytes across the search.
+
+```yaml
+Type: Int64
+Parameter Sets: GmailApi
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -MaxTotalUncompressedSize
+Maximum uncompressed bytes inspected across the complete search.
+
+```yaml
+Type: Int64
+Parameter Sets: GmailApi
+Aliases: None
+Possible values:
+
+Required: False
 Position: named
 Default value: None
 Accept pipeline input: False

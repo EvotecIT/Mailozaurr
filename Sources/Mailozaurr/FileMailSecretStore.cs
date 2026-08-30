@@ -7,7 +7,8 @@ public sealed class FileMailSecretStore :
     IMailSecretStore,
     IMailProfileSecretContextCleanup,
     IMailProfileSecretSnapshotStore,
-    IMailProfileSecretMaintenanceStore {
+    IMailProfileSecretMaintenanceStore,
+    IMailSecretStoreCredentialContextCoordinator {
     private readonly JsonFileDocumentStore<MailSecretStoreDocument> _store;
     private readonly ICredentialProtector _protector;
     /// <summary>
@@ -199,6 +200,26 @@ public sealed class FileMailSecretStore :
             document.ProfileSecrets[normalizedProfileId] = restoredSecrets;
 
             RestoreLegacySecrets(document, fileSnapshot.LegacySecrets);
+        }, cancellationToken);
+    }
+
+    Task<TResult> IMailSecretStoreCredentialContextCoordinator.ExecuteWithProfileSecretsLockedAsync<TResult>(
+        string profileId,
+        Func<bool, CancellationToken, Task<TResult>> operation,
+        CancellationToken cancellationToken) {
+        ValidateKeyPart(profileId, nameof(profileId));
+        if (operation == null) throw new ArgumentNullException(nameof(operation));
+        string normalizedProfileId = profileId.Trim();
+        return _store.ExecuteUnderWriterLockAsync(document => {
+            bool hasSecrets = TryGetProfileSecrets(document, normalizedProfileId, out Dictionary<string, string> secrets) &&
+                              secrets.Count > 0;
+            if (!hasSecrets && document.Secrets != null) {
+                string legacyPrefix = string.Concat(normalizedProfileId, "::");
+                hasSecrets = document.Secrets.Keys.Any(key =>
+                    key.Length > legacyPrefix.Length &&
+                    key.StartsWith(legacyPrefix, StringComparison.OrdinalIgnoreCase));
+            }
+            return operation(hasSecrets, cancellationToken);
         }, cancellationToken);
     }
 

@@ -54,7 +54,10 @@ public class GraphAttachment {
     /// <returns>The created attachment.</returns>
     public static GraphAttachment FromFile(string filePath) {
         var fileInfo = new FileInfo(filePath);
-        var fileBytes = File.ReadAllBytes(filePath);
+        var descriptor = new Definitions.FileAttachmentDescriptor(filePath);
+        var fileBytes = descriptor.GetContentBytes(
+            Definitions.AttachmentStreamStagingOptions.DefaultMaxBytes,
+            fileInfo.Length);
         var fileContentBase64 = Convert.ToBase64String(fileBytes);
 
         return new GraphAttachment {
@@ -70,6 +73,13 @@ public class GraphAttachment {
     /// <param name="inline">Optional override indicating whether the attachment is inline.</param>
     /// <returns>The created Graph attachment.</returns>
     public static GraphAttachment FromDescriptor(Definitions.AttachmentDescriptor descriptor, bool? inline = null) {
+        return FromDescriptor(descriptor, descriptor?.Length, inline);
+    }
+
+    internal static GraphAttachment FromDescriptor(
+        Definitions.AttachmentDescriptor descriptor,
+        long? expectedLength,
+        bool? inline = null) {
         if (descriptor == null) {
             throw new ArgumentNullException(nameof(descriptor));
         }
@@ -88,7 +98,9 @@ public class GraphAttachment {
         return new GraphAttachment {
             Name = fileName,
             ContentType = string.IsNullOrWhiteSpace(descriptor.ContentType) ? MimeKit.MimeTypes.GetMimeType(fileName) : descriptor.ContentType,
-            ContentBytes = Convert.ToBase64String(descriptor.GetContentBytes()),
+            ContentBytes = Convert.ToBase64String(descriptor.GetContentBytes(
+                Definitions.AttachmentStreamStagingOptions.DefaultMaxBytes,
+                expectedLength)),
             IsInline = isInline,
             ContentId = string.IsNullOrWhiteSpace(descriptor.ContentId) ? (isInline ? fileName : null) : descriptor.ContentId
         };

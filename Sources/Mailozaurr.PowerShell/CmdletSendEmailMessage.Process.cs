@@ -43,7 +43,10 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         // Get the error action preference as user requested
         // It first sets the error action to the default error action preference
         // If the user has specified the error action, it will set the error action to the user specified error action
-        errorAction = (ActionPreference)this.SessionState.PSVariable.GetValue("ErrorActionPreference");
+        object? preferenceValue = this.SessionState.PSVariable.GetValue("ErrorActionPreference");
+        if (!Enum.TryParse(preferenceValue?.ToString(), ignoreCase: true, out errorAction)) {
+            errorAction = ActionPreference.Continue;
+        }
         if (this.MyInvocation.BoundParameters.ContainsKey("ErrorAction")) {
             string? errorActionString = this.MyInvocation.BoundParameters["ErrorAction"]?.ToString();
             if (errorActionString != null && Enum.TryParse(errorActionString, true, out ActionPreference actionPreference)) {
@@ -83,6 +86,8 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
                 ProcessSmtp(fromEmail, fromName);
             }
         } finally {
+            AttachmentInputConverter.ReleaseStaging(Attachment);
+            AttachmentInputConverter.ReleaseStaging(InlineAttachment);
             if (_logCollector != null) {
                 LogEmitter.EmitLogs(_logCollector, this);
             }
@@ -94,7 +99,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
             throw new InvalidOperationException("Credential is required for SendGrid processing.");
         }
         var logCollector = new LogCollector();
-        SendGridClient sendGrid = new SendGridClient();
+        using SendGridClient sendGrid = new SendGridClient();
         sendGrid.LogCollector = logCollector;
         sendGrid.From = Helpers.GetFromObject(fromEmail, fromName);
         if (Bcc != null) sendGrid.Bcc = Bcc.ToList();
@@ -228,14 +233,14 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
             ExpiresOn = System.DateTimeOffset.MaxValue
         };
 
-        var client = new GmailApiClient(oauth);
+        using var client = new GmailApiClient(oauth);
         try {
             if (ShouldProcess(smtp.SentTo, "Sending email message via Gmail API")) {
                 var account = GmailAccount;
                 if (account == null || account.Length == 0) {
                     throw new ArgumentException("GmailAccount is required when using Gmail API.", nameof(GmailAccount));
                 }
-                var msg = client.SendAsync(account, smtp.Message).GetAwaiter().GetResult();
+                var msg = client.SendAsync(account, smtp.Message, smtp.MarkTransportAttempted).GetAwaiter().GetResult();
                 if (!Suppress) {
                     WriteObject(new SmtpResult(true, EmailAction.Send, smtp.SentTo, smtp.SentFrom, "GmailApi", 0, smtp.Stopwatch.Elapsed, msg.Id));
                 }
@@ -408,12 +413,13 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         }
         if (graph.IsLargerAttachment) {
             var json = graph.CreatePreparedDraft();
+            MarkMgGraphTransportAttempted();
             var draftMessageId = InvokeMgGraphRequestPOST1($"v1.0/users/{graph.SentFrom}/mailfolders/drafts/messages", EmailAction.SendDraftMessage, json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
             if (draftMessageId == string.Empty) {
                 LogEmitter.EmitLogs(graph.LogCollector, this);
                 return;
             }
-            await graph.PrepareAttachments();
+            await graph.PrepareAttachmentsForStreaming();
             foreach (var attachment in graph.AttachmentsPlaceHolders) {
                 if (!string.IsNullOrEmpty(attachment.DirectAttachmentJson)) {
                     var attachmentUri = GraphDraftMessageUris.Attachments(graph.SentFrom, draftMessageId);
@@ -427,7 +433,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
                 var uploadSessionUri = GraphDraftMessageUris.CreateUploadSession(graph.SentFrom, draftMessageId);
                 var uploadUrl = InvokeMgGraphRequestPOST(uploadSessionUri, EmailAction.SendAttachment, attachment.Json, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
                 if (uploadUrl != string.Empty) {
-                    var uploaded = await InvokeMgGraphRequestPUT(uploadUrl, EmailAction.SendAttachment, attachment, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
+                    var uploaded = await InvokeMgGraphRequestPUT(graph, uploadUrl, EmailAction.SendAttachment, attachment, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
                     if (!uploaded) {
                         LogEmitter.EmitLogs(graph.LogCollector, this);
                         return;
@@ -442,6 +448,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
             InvokeMgGraphRequest(sendUri, EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
             LogEmitter.EmitLogs(graph.LogCollector, this);
         } else {
+            MarkMgGraphTransportAttempted();
             InvokeMgGraphRequest($"v1.0/users/{fromEmail}/sendMail", EmailAction.Send, graph.MessageJson, graph.SentFrom, graph.SentTo, graph.Stopwatch.Elapsed);
             LogEmitter.EmitLogs(graph.LogCollector, this);
         }
@@ -635,15 +642,15 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         }
     }
 
-    private async Task<bool> InvokeMgGraphRequestPUT(string uri, EmailAction action, GraphAttachmentPlaceHolder attachment, string sentFrom, string sentTo, TimeSpan elapsed) {
-        foreach (var body in attachment.Content) {
+    private Task<bool> InvokeMgGraphRequestPUT(Graph graph, string uri, EmailAction action, GraphAttachmentPlaceHolder attachment, string sentFrom, string sentTo, TimeSpan elapsed) {
+        bool result = graph.ForEachPreparedAttachmentChunk(attachment, (body, contentRange) => {
             var parameters = new Hashtable {
                 { "Method", "PUT" },
                 { "Uri", uri },
                 { "ContentType", "application/json; charset=UTF-8" },
-                { "Body",  await body.ReadAsByteArrayAsync() },
+                { "Body", body },
                 { "Headers", new Hashtable {
-                         { "Content-Range", body.Headers.ContentRange },
+                         { "Content-Range", contentRange },
                         // { "AnchorMailbox", sentFrom }
                     }
                 }
@@ -669,9 +676,14 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
                     return false;
                 }
             }
-        }
+            return true;
+        });
+        return Task.FromResult(result);
+    }
 
-        return true;
+    private void MarkMgGraphTransportAttempted() {
+        AttachmentInputConverter.MarkSendAttempted(Attachment);
+        AttachmentInputConverter.MarkSendAttempted(InlineAttachment);
     }
 
 

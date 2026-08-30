@@ -114,7 +114,7 @@ public class CmdletRemoveGraphFolder : AsyncPSCmdlet {
         }
         var uri = MicrosoftGraphUtils.BuildGraphUri(
             GraphEndpoint.V1,
-            $"/users/{UserPrincipalName}/mailFolders/{FolderId}");
+            MicrosoftGraphUtils.BuildGraphPath("users", UserPrincipalName!, "mailFolders", FolderId!));
         var ps = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         ps.AddCommand("Invoke-MgGraphRequest")
             .AddParameter("Method", "DELETE")

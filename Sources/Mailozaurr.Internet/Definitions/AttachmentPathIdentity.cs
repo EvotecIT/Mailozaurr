@@ -16,11 +16,15 @@ internal static class AttachmentPathIdentity {
     internal static HashSet<string> CreateSet() => new(Comparer);
 
     internal static bool Add(ISet<string> paths, string path) {
+        return paths.Add(Normalize(path));
+    }
+
+    internal static string Normalize(string path) {
         var fullPath = Path.GetFullPath(path);
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
             fullPath = ResolveExistingPathCasing(fullPath);
         }
-        return paths.Add(fullPath);
+        return fullPath;
     }
 
     private static string ResolveExistingPathCasing(string fullPath) {

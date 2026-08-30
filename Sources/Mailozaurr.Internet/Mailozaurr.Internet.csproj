@@ -24,6 +24,9 @@
     <PackageTags>Windows;MacOS;Linux;Mail;Email;SMTP;IMAP;POP3;MIME;SendGrid;Mailgun;AmazonSES;DMARC;DKIM</PackageTags>
     <DefaultItemExcludes>$(DefaultItemExcludes);**/artifacts/**;**/Artifacts/**</DefaultItemExcludes>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <OfficeIMOVersion>3.2.7</OfficeIMOVersion>
+    <OfficeIMORoot Condition=" '$(OfficeIMORoot)' == '' ">..\..\..\OfficeIMO</OfficeIMORoot>
+    <UseOfficeIMOProjectReferences Condition=" '$(UseOfficeIMOProjectReferences)' == '' ">false</UseOfficeIMOProjectReferences>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(TargetFramework)' == 'net8.0' ">
@@ -67,6 +70,14 @@
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.7.0" />
   </ItemGroup>
 
+  <ItemGroup Condition=" '$(UseOfficeIMOProjectReferences)' == 'true' ">
+    <ProjectReference Include="$(OfficeIMORoot)\OfficeIMO.Email.Html\OfficeIMO.Email.Html.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(UseOfficeIMOProjectReferences)' != 'true' ">
+    <PackageReference Include="OfficeIMO.Email.Html" Version="$(OfficeIMOVersion)" />
+  </ItemGroup>
+
   <ItemGroup Condition=" '$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'netstandard2.0' ">
     <PackageReference Include="System.Text.Json" Version="10.0.11" />
   </ItemGroup>
@@ -89,6 +100,9 @@
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>Mailozaurr.Tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Mailozaurr</_Parameter1>
     </AssemblyAttribute>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>Mailozaurr.PowerShell</_Parameter1>

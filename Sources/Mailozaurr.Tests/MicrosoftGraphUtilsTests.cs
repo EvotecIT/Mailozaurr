@@ -20,6 +20,26 @@ public class MicrosoftGraphUtilsTests {
     }
 
     [Fact]
+    public void BuildGraphPath_EscapesEveryDynamicSegment() {
+        string path = MicrosoftGraphUtils.BuildGraphPath(
+            "users",
+            "user@example.com/messages/other?x=1#fragment",
+            "messages",
+            "AAMk+/=%value");
+
+        Assert.Equal(
+            "/users/user%40example.com%2Fmessages%2Fother%3Fx%3D1%23fragment/messages/AAMk%2B%2F%3D%25value",
+            path);
+        Assert.DoesNotContain("?", path, StringComparison.Ordinal);
+        Assert.DoesNotContain("#", path, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildGraphPath_RejectsEmptySegments() {
+        Assert.Throws<ArgumentException>(() => MicrosoftGraphUtils.BuildGraphPath("users", string.Empty));
+    }
+
+    [Fact]
     public void JoinUriQuery_JoinsUriCorrectly() {
         string uri = MicrosoftGraphUtils.JoinUriQuery(GraphEndpoint.V1, "users/me");
         Assert.Equal("https://graph.microsoft.com/v1.0/users/me", uri);
