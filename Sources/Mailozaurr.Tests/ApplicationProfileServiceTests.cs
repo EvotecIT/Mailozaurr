@@ -205,6 +205,11 @@ public sealed class ApplicationProfileServiceTests {
     [InlineData(MailProfileKind.Smtp, MailProfileSettingsKeys.UseSsl, "true", "false")]
     [InlineData(MailProfileKind.Pop3, MailProfileSettingsKeys.SkipCertificateRevocation, "false", "true")]
     [InlineData(MailProfileKind.Imap, MailProfileSettingsKeys.SkipCertificateValidation, "false", "true")]
+    [InlineData(MailProfileKind.Graph, MailProfileSettingsKeys.Mailbox, "user@example.com", "other@example.com")]
+    [InlineData(MailProfileKind.Graph, MailProfileSettingsKeys.ClientId, "graph-client", "other-client")]
+    [InlineData(MailProfileKind.Graph, MailProfileSettingsKeys.TenantId, "tenant-a", "tenant-b")]
+    [InlineData(MailProfileKind.Gmail, MailProfileSettingsKeys.Mailbox, "user@gmail.com", "other@gmail.com")]
+    [InlineData(MailProfileKind.Gmail, MailProfileSettingsKeys.ClientId, "gmail-client", "other-client")]
     [InlineData(MailProfileKind.Jmap, MailProfileSettingsKeys.JmapSessionUrl, "https://mail.example.com/.well-known/jmap", "https://mail.attacker.example/.well-known/jmap")]
     [InlineData(MailProfileKind.Jmap, MailProfileSettingsKeys.JmapAllowCrossOriginApiUrl, "false", "true")]
     [InlineData(MailProfileKind.Ses, MailProfileSettingsKeys.Region, "us-east-1", "eu-central-1")]
@@ -224,7 +229,10 @@ public sealed class ApplicationProfileServiceTests {
             Kind = kind,
             Settings = originalSettings
         });
-        await secretStore.SetSecretAsync("provider", MailSecretNames.Password, "retained-secret");
+        string secretName = kind is MailProfileKind.Graph or MailProfileKind.Gmail
+            ? MailSecretNames.AccessToken
+            : MailSecretNames.Password;
+        await secretStore.SetSecretAsync("provider", secretName, "retained-secret");
 
         var changedSettings = CreateValidSettings(kind);
         changedSettings[setting] = changedValue;
@@ -238,7 +246,168 @@ public sealed class ApplicationProfileServiceTests {
         Assert.False(result.Succeeded);
         Assert.Equal("profile_credential_context_change_not_allowed", result.Code);
         Assert.Equal(originalValue, (await service.GetProfileAsync("provider"))!.Settings[setting]);
-        Assert.Equal("retained-secret", await secretStore.GetSecretAsync("provider", MailSecretNames.Password));
+        Assert.Equal("retained-secret", await secretStore.GetSecretAsync("provider", secretName));
+    }
+
+    [Fact]
+    public async Task SaveAsyncAllowsGraphContextBindingWhenNoSecretsExist() {
+        var store = new InMemoryMailProfileStore();
+        var secretStore = new InMemoryMailSecretStore();
+        var service = new MailProfileService(store, secretStore);
+        await service.SaveAsync(new MailProfile {
+            Id = "graph",
+            DisplayName = "Graph",
+            Kind = MailProfileKind.Graph,
+            DefaultMailbox = "user@example.com",
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.ClientId] = "client-a",
+                [MailProfileSettingsKeys.TenantId] = "tenant-a"
+            }
+        });
+
+        OperationResult result = await service.SaveAsync(new MailProfile {
+            Id = "graph",
+            DisplayName = "Graph bound",
+            Kind = MailProfileKind.Graph,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Mailbox] = "user@example.com",
+                [MailProfileSettingsKeys.ClientId] = "client-b",
+                [MailProfileSettingsKeys.TenantId] = "tenant-b"
+            }
+        });
+
+        Assert.True(result.Succeeded);
+        MailProfile saved = (await service.GetProfileAsync("graph"))!;
+        Assert.Equal("client-b", saved.Settings[MailProfileSettingsKeys.ClientId]);
+        Assert.Equal("tenant-b", saved.Settings[MailProfileSettingsKeys.TenantId]);
+    }
+
+    [Fact]
+    public async Task SaveAsyncAllowsFileStoredGraphContextBindingWhenNoSecretsExist() {
+        var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
+        var secretStore = new FileMailSecretStore(
+            CreateTemporaryFilePath("secrets.json"),
+            new TestCredentialProtector());
+        var service = new MailProfileService(store, secretStore);
+        await service.SaveAsync(new MailProfile {
+            Id = "graph",
+            DisplayName = "Graph",
+            Kind = MailProfileKind.Graph,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.ClientId] = "client-a",
+                [MailProfileSettingsKeys.TenantId] = "tenant-a"
+            }
+        });
+
+        OperationResult result = await service.SaveAsync(new MailProfile {
+            Id = "graph",
+            DisplayName = "Graph rebound",
+            Kind = MailProfileKind.Graph,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.ClientId] = "client-b",
+                [MailProfileSettingsKeys.TenantId] = "tenant-b"
+            }
+        });
+
+        Assert.True(result.Succeeded);
+        MailProfile saved = (await service.GetProfileAsync("graph"))!;
+        Assert.Equal("client-b", saved.Settings[MailProfileSettingsKeys.ClientId]);
+        Assert.Equal("tenant-b", saved.Settings[MailProfileSettingsKeys.TenantId]);
+    }
+
+    [Fact]
+    public async Task SaveAsyncRejectsGraphContextChangeWhenAnyCustomSecretExists() {
+        var store = new InMemoryMailProfileStore();
+        var secretStore = new InMemoryMailSecretStore();
+        var service = new MailProfileService(store, secretStore);
+        await service.SaveAsync(new MailProfile {
+            Id = "graph",
+            DisplayName = "Graph",
+            Kind = MailProfileKind.Graph,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.ClientId] = "client-a",
+                [MailProfileSettingsKeys.TenantId] = "tenant-a"
+            }
+        });
+        await secretStore.SetSecretAsync("graph", "custom-token", "retained-secret");
+
+        OperationResult result = await service.SaveAsync(new MailProfile {
+            Id = "graph",
+            DisplayName = "Redirected Graph",
+            Kind = MailProfileKind.Graph,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.ClientId] = "client-b",
+                [MailProfileSettingsKeys.TenantId] = "tenant-a"
+            }
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("profile_credential_context_change_not_allowed", result.Code);
+        Assert.Equal("client-a", (await service.GetProfileAsync("graph"))!.Settings[MailProfileSettingsKeys.ClientId]);
+        Assert.Equal("retained-secret", await secretStore.GetSecretAsync("graph", "custom-token"));
+    }
+
+    [Fact]
+    public async Task SaveAsyncFailsClosedWhenSecretStoreCannotCoordinateContextBinding() {
+        var store = new InMemoryMailProfileStore();
+        var service = new MailProfileService(store, new BasicSecretStore());
+        await service.SaveAsync(new MailProfile {
+            Id = "graph",
+            DisplayName = "Graph",
+            Kind = MailProfileKind.Graph,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.ClientId] = "client-a",
+                [MailProfileSettingsKeys.TenantId] = "tenant-a"
+            }
+        });
+
+        OperationResult result = await service.SaveAsync(new MailProfile {
+            Id = "graph",
+            DisplayName = "Graph rebound",
+            Kind = MailProfileKind.Graph,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.ClientId] = "client-b",
+                [MailProfileSettingsKeys.TenantId] = "tenant-a"
+            }
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("profile_credential_context_change_not_allowed", result.Code);
+    }
+
+    [Fact]
+    public async Task SaveAsyncSerializesContextBindingWithConcurrentSecretWrites() {
+        var store = new InMemoryMailProfileStore();
+        var secretStore = new BlockingCoordinatedSecretStore();
+        var service = new MailProfileService(store, secretStore);
+        await service.SaveAsync(new MailProfile {
+            Id = "graph",
+            DisplayName = "Graph",
+            Kind = MailProfileKind.Graph,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.ClientId] = "client-a",
+                [MailProfileSettingsKeys.TenantId] = "tenant-a"
+            }
+        });
+
+        Task<OperationResult> save = service.SaveAsync(new MailProfile {
+            Id = "graph",
+            DisplayName = "Graph rebound",
+            Kind = MailProfileKind.Graph,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.ClientId] = "client-b",
+                [MailProfileSettingsKeys.TenantId] = "tenant-b"
+            }
+        });
+        await secretStore.WaitForContextBindingAsync();
+        Task concurrentSecretWrite = secretStore.SetSecretAsync("graph", "custom-token", "new-context-secret");
+
+        Assert.False(concurrentSecretWrite.IsCompleted);
+        secretStore.AllowContextBinding();
+        Assert.True((await save).Succeeded);
+        await concurrentSecretWrite;
+        Assert.Equal("client-b", (await service.GetProfileAsync("graph"))!.Settings[MailProfileSettingsKeys.ClientId]);
+        Assert.Equal("new-context-secret", await secretStore.GetSecretAsync("graph", "custom-token"));
     }
 
     [Fact]
@@ -358,6 +527,41 @@ public sealed class ApplicationProfileServiceTests {
         await AssertProfileStoreRejectsCredentialContextChangeAsync(
             new FileMailProfileStore(CreateTemporaryFilePath("profiles.json")));
 
+    [Theory]
+    [InlineData(false, MailProfileKind.Graph, MailProfileSettingsKeys.TenantId, "tenant-a", "tenant-b")]
+    [InlineData(false, MailProfileKind.Gmail, MailProfileSettingsKeys.ClientId, "client-a", "client-b")]
+    [InlineData(true, MailProfileKind.Graph, MailProfileSettingsKeys.Mailbox, "user@example.com", "other@example.com")]
+    [InlineData(true, MailProfileKind.Gmail, MailProfileSettingsKeys.Mailbox, "user@gmail.com", "other@gmail.com")]
+    public async Task ProfileStoresRejectCloudCredentialContextChangesAtomically(
+        bool useFileStore,
+        MailProfileKind kind,
+        string setting,
+        string originalValue,
+        string changedValue) {
+        IMailProfileStore store = useFileStore
+            ? new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"))
+            : new InMemoryMailProfileStore();
+        Dictionary<string, string> originalSettings = CreateValidSettings(kind);
+        originalSettings[setting] = originalValue;
+        await store.SaveAsync(new MailProfile {
+            Id = "provider",
+            DisplayName = kind.ToString(),
+            Kind = kind,
+            Settings = originalSettings
+        });
+        Dictionary<string, string> changedSettings = CreateValidSettings(kind);
+        changedSettings[setting] = changedValue;
+
+        await Assert.ThrowsAsync<MailProfileCredentialContextChangeException>(() => store.SaveAsync(new MailProfile {
+            Id = "provider",
+            DisplayName = "Changed",
+            Kind = kind,
+            Settings = changedSettings
+        }));
+
+        Assert.Equal(originalValue, (await store.GetByIdAsync("provider"))!.Settings[setting]);
+    }
+
     private static async Task AssertProfileStoreRejectsProviderKindChangeAsync(IMailProfileStore store) {
         await store.SaveAsync(new MailProfile {
             Id = "provider",
@@ -399,13 +603,23 @@ public sealed class ApplicationProfileServiceTests {
     }
 
     private static Dictionary<string, string> CreateValidSettings(MailProfileKind kind) =>
-        kind == MailProfileKind.Jmap
-            ? new Dictionary<string, string> {
+        kind switch {
+            MailProfileKind.Jmap => new Dictionary<string, string> {
                 [MailProfileSettingsKeys.JmapSessionUrl] = "https://mail.example.com/.well-known/jmap"
-            }
-            : new Dictionary<string, string> {
+            },
+            MailProfileKind.Graph => new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Mailbox] = "user@example.com",
+                [MailProfileSettingsKeys.ClientId] = "graph-client",
+                [MailProfileSettingsKeys.TenantId] = "tenant-a"
+            },
+            MailProfileKind.Gmail => new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Mailbox] = "user@gmail.com",
+                [MailProfileSettingsKeys.ClientId] = "gmail-client"
+            },
+            _ => new Dictionary<string, string> {
                 [MailProfileSettingsKeys.Server] = "mail.example.com"
-            };
+            }
+        };
 
     private static string CreateTemporaryFilePath(string fileName) {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
@@ -479,5 +693,74 @@ public sealed class ApplicationProfileServiceTests {
 
         public Task<bool> RemoveSecretAsync(string profileId, string secretName, CancellationToken cancellationToken = default) =>
             Task.FromResult(_secrets.Remove($"{profileId}::{secretName}"));
+    }
+
+    private sealed class BlockingCoordinatedSecretStore :
+        IMailSecretStore,
+        IMailSecretStoreCredentialContextCoordinator {
+        private readonly SemaphoreSlim _gate = new(1, 1);
+        private readonly TaskCompletionSource<bool> _bindingEntered = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> _bindingAllowed = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly Dictionary<string, string> _secrets = new(StringComparer.OrdinalIgnoreCase);
+
+        public async Task<string?> GetSecretAsync(
+            string profileId,
+            string secretName,
+            CancellationToken cancellationToken = default) {
+            await _gate.WaitAsync(cancellationToken);
+            try {
+                _secrets.TryGetValue($"{profileId}::{secretName}", out string? value);
+                return value;
+            } finally {
+                _gate.Release();
+            }
+        }
+
+        public async Task SetSecretAsync(
+            string profileId,
+            string secretName,
+            string secretValue,
+            CancellationToken cancellationToken = default) {
+            await _gate.WaitAsync(cancellationToken);
+            try {
+                _secrets[$"{profileId}::{secretName}"] = secretValue;
+            } finally {
+                _gate.Release();
+            }
+        }
+
+        public async Task<bool> RemoveSecretAsync(
+            string profileId,
+            string secretName,
+            CancellationToken cancellationToken = default) {
+            await _gate.WaitAsync(cancellationToken);
+            try {
+                return _secrets.Remove($"{profileId}::{secretName}");
+            } finally {
+                _gate.Release();
+            }
+        }
+
+        public Task WaitForContextBindingAsync() => _bindingEntered.Task;
+
+        public void AllowContextBinding() => _bindingAllowed.TrySetResult(true);
+
+        async Task<TResult> IMailSecretStoreCredentialContextCoordinator.ExecuteWithProfileSecretsLockedAsync<TResult>(
+            string profileId,
+            Func<bool, CancellationToken, Task<TResult>> operation,
+            CancellationToken cancellationToken) {
+            await _gate.WaitAsync(cancellationToken);
+            try {
+                _bindingEntered.TrySetResult(true);
+                await _bindingAllowed.Task;
+                bool hasSecrets = _secrets.Keys.Any(key =>
+                    key.StartsWith(profileId + "::", StringComparison.OrdinalIgnoreCase));
+                return await operation(hasSecrets, cancellationToken);
+            } finally {
+                _gate.Release();
+            }
+        }
     }
 }

@@ -242,6 +242,7 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
     private byte[]? _buffer;
     private string? _stagedFilePath;
     private long? _materializedLength;
+    private string? _stagedDirectoryPath;
     private Exception? _materializationFailure;
     private bool _sendAttempted;
     private bool _disposed;
@@ -344,6 +345,7 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
         MemoryStream? memory = new MemoryStream((int)Math.Min(_stagingOptions.MemoryThresholdBytes, 64 * 1024));
         FileStream? staged = null;
         string? stagedPath = null;
+        string? stagedDirectoryPath = null;
         long total = 0;
         var copyBuffer = new byte[64 * 1024];
         try {
@@ -356,7 +358,7 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
                         $"Attachment stream exceeded the {_stagingOptions.MaxBytes} byte staging limit.");
                 }
                 if (staged == null && total > _stagingOptions.MemoryThresholdBytes) {
-                    staged = CreateStagingFile(out stagedPath);
+                    staged = CreateStagingFile(out stagedPath, out stagedDirectoryPath);
                     memory!.Position = 0;
                     memory.CopyTo(staged);
                     memory.Dispose();
@@ -370,13 +372,14 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
                 staged.Dispose();
                 staged = null;
                 _stagedFilePath = stagedPath;
+                _stagedDirectoryPath = stagedDirectoryPath;
             } else {
                 _buffer = memory!.ToArray();
             }
             _materializedLength = total;
         } catch (Exception ex) {
             staged?.Dispose();
-            if (stagedPath != null) TryDeleteStagedFile(stagedPath);
+            if (stagedPath != null) TryDeleteStagedFile(stagedPath, stagedDirectoryPath);
             if (!sourceCanSeek || !_leaveStreamOpen) _materializationFailure = ex;
             throw;
         } finally {
@@ -392,7 +395,7 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
         }
     }
 
-    private FileStream CreateStagingFile(out string path) {
+    private FileStream CreateStagingFile(out string path, out string? cleanupDirectoryPath) {
         bool usesOwnedDirectory = string.IsNullOrWhiteSpace(_stagingOptions.TempDirectory);
         string directory = usesOwnedDirectory
             ? GetDefaultStagingDirectory()
@@ -401,7 +404,7 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
         Directory.CreateDirectory(directory);
         if (usesOwnedDirectory || !directoryExisted) UnixFilePermissions.RestrictDirectory(directory);
         using var directoryLease = AttachmentDirectoryLease.Acquire(directory);
-        return directoryLease.CreateTemporaryFile(useAsync: false, out path);
+        return directoryLease.CreateTemporaryFile(useAsync: false, out path, out cleanupDirectoryPath);
     }
 
     private static string GetDefaultStagingDirectory() {
@@ -422,8 +425,9 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
             if (_disposed) return;
             _disposed = true;
             if (disposing && !_leaveStreamOpen) _stream.Dispose();
-            if (_stagedFilePath != null) TryDeleteStagedFile(_stagedFilePath);
+            if (_stagedFilePath != null) TryDeleteStagedFile(_stagedFilePath, _stagedDirectoryPath);
             _stagedFilePath = null;
+            _stagedDirectoryPath = null;
             _buffer = null;
         }
     }
@@ -432,9 +436,10 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
         if (_disposed) throw new ObjectDisposedException(nameof(StreamAttachmentDescriptor));
     }
 
-    private static void TryDeleteStagedFile(string path) {
+    private static void TryDeleteStagedFile(string path, string? cleanupDirectoryPath) {
         try {
             File.Delete(path);
+            if (cleanupDirectoryPath != null) Directory.Delete(cleanupDirectoryPath, recursive: false);
         } catch (IOException) {
             // Best effort during disposal/finalization; active reader streams may still own the file.
         } catch (UnauthorizedAccessException) {

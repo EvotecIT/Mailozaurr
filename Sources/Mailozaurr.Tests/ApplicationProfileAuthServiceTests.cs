@@ -166,18 +166,17 @@ public sealed class ApplicationProfileAuthServiceTests {
 
     [Fact]
     public async Task LoginGraphAsyncPersistsAccessTokenAndProfileSettings() {
-        var profileStore = new InMemoryProfileStore(new[] {
-            new MailProfile {
-                Id = "graph-work",
-                DisplayName = "Work Graph",
-                Kind = MailProfileKind.Graph,
-                Settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
-                    [MailProfileSettingsKeys.ClientId] = "client-id",
-                    [MailProfileSettingsKeys.TenantId] = "tenant-id"
-                }
+        var profileStore = new InMemoryMailProfileStore();
+        await profileStore.SaveAsync(new MailProfile {
+            Id = "graph-work",
+            DisplayName = "Work Graph",
+            Kind = MailProfileKind.Graph,
+            Settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+                [MailProfileSettingsKeys.ClientId] = "client-id",
+                [MailProfileSettingsKeys.TenantId] = "tenant-id"
             }
         });
-        var secretStore = new InMemorySecretStore();
+        var secretStore = new InMemoryMailSecretStore();
         var service = new MailProfileAuthService(
             new MailProfileService(profileStore, secretStore),
             new MailProfileSecretService(profileStore, secretStore),
@@ -209,18 +208,17 @@ public sealed class ApplicationProfileAuthServiceTests {
 
     [Fact]
     public async Task RefreshGraphAsyncReusesPersistedFeatureScopes() {
-        var profileStore = new InMemoryProfileStore(new[] {
-            new MailProfile {
-                Id = "graph-work",
-                DisplayName = "Work Graph",
-                Kind = MailProfileKind.Graph,
-                Settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
-                    [MailProfileSettingsKeys.ClientId] = "client-id",
-                    [MailProfileSettingsKeys.TenantId] = "tenant-id"
-                }
+        var profileStore = new InMemoryMailProfileStore();
+        await profileStore.SaveAsync(new MailProfile {
+            Id = "graph-work",
+            DisplayName = "Work Graph",
+            Kind = MailProfileKind.Graph,
+            Settings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
+                [MailProfileSettingsKeys.ClientId] = "client-id",
+                [MailProfileSettingsKeys.TenantId] = "tenant-id"
             }
         });
-        var secretStore = new InMemorySecretStore();
+        var secretStore = new InMemoryMailSecretStore();
         var capturedScopes = new List<IReadOnlyList<string>>();
         var service = new MailProfileAuthService(
             new MailProfileService(profileStore, secretStore),

@@ -75,7 +75,22 @@ public sealed class MailProfileService : IMailProfileService {
         if (existing != null) {
             string? changedSetting = MailProfileCredentialContextGuard.GetChangedSetting(existing, profile);
             if (changedSetting != null) {
-                return CredentialContextChangeFailure(existing.Kind, changedSetting);
+                if (_secretStore == null ||
+                    _profileStore is not IMailProfileStoreCredentialContextCoordinator coordinator) {
+                    return CredentialContextChangeFailure(existing.Kind, changedSetting);
+                }
+                try {
+                    MailProfileCredentialContextSaveOutcome outcome = await coordinator
+                        .SaveCredentialContextChangeAsync(profile, _secretStore, cancellationToken)
+                        .ConfigureAwait(false);
+                    return outcome == MailProfileCredentialContextSaveOutcome.Saved
+                        ? OperationResult.Success("Profile saved.")
+                        : CredentialContextChangeFailure(existing.Kind, changedSetting);
+                } catch (MailProfileKindChangeException ex) {
+                    return KindChangeFailure(ex.ExistingKind, ex.RequestedKind);
+                } catch (MailProfileCredentialContextChangeException ex) {
+                    return CredentialContextChangeFailure(ex.ProfileKind, ex.ChangedSetting);
+                }
             }
         }
         try {

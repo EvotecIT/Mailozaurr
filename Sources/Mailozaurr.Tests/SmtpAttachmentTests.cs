@@ -113,7 +113,7 @@ public class SmtpAttachmentTests {
         Directory.CreateDirectory(directory);
         try {
             var source = new MemoryStream(new byte[] { 1, 2, 3, 4, 5 });
-            var descriptor = new StreamAttachmentDescriptor(
+            using var descriptor = new StreamAttachmentDescriptor(
                 source,
                 "staged.bin",
                 stagingOptions: new AttachmentStreamStagingOptions {
@@ -126,11 +126,11 @@ public class SmtpAttachmentTests {
                 Assert.IsType<FileStream>(stream);
                 Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, ReadAll(stream));
             }
-            Assert.Single(Directory.GetFiles(directory));
+            Assert.Single(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
 
             descriptor.Dispose();
 
-            Assert.Empty(Directory.GetFiles(directory));
+            Assert.Empty(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
         } finally {
             Directory.Delete(directory, recursive: true);
         }
@@ -153,14 +153,14 @@ public class SmtpAttachmentTests {
                 Attachments = new List<AttachmentDescriptor> { descriptor }
             };
             descriptor.GetContentBytes();
-            Assert.Single(Directory.GetFiles(directory));
+            Assert.Single(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
 
             smtp.Dispose();
 
-            Assert.Single(Directory.GetFiles(directory));
+            Assert.Single(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
             Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, descriptor.GetContentBytes());
             descriptor.Dispose();
-            Assert.Empty(Directory.GetFiles(directory));
+            Assert.Empty(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
         } finally {
             Directory.Delete(directory, recursive: true);
         }
@@ -188,13 +188,13 @@ public class SmtpAttachmentTests {
 
                 smtp.Send();
 
-                Assert.Single(Directory.GetFiles(directory));
+                Assert.Single(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
                 Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, descriptor.GetContentBytes());
             } finally {
                 smtp.Dispose();
                 descriptor.Dispose();
             }
-            Assert.Empty(Directory.GetFiles(directory));
+            Assert.Empty(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
         } finally {
             Directory.Delete(directory, recursive: true);
         }
@@ -218,7 +218,7 @@ public class SmtpAttachmentTests {
             AttachmentDescriptorLifetime.MarkSendAttempted(new[] { descriptor });
             AttachmentDescriptorLifetime.ReleaseStaging(new[] { descriptor });
 
-            Assert.Single(Directory.GetFiles(directory));
+            Assert.Single(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
             Assert.Equal(new byte[] { 1, 2, 3, 4, 5 }, descriptor.GetContentBytes());
         } finally {
             descriptor.Dispose();
@@ -244,7 +244,7 @@ public class SmtpAttachmentTests {
             AttachmentDescriptorLifetime.MarkSendAttempted(new[] { descriptor });
             AttachmentDescriptorLifetime.ReleaseStaging(new[] { descriptor });
 
-            Assert.Empty(Directory.GetFiles(directory));
+            Assert.Empty(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
             Assert.Throws<ObjectDisposedException>(() => descriptor.OpenContentStream());
         } finally {
             Directory.Delete(directory, recursive: true);
@@ -266,7 +266,7 @@ public class SmtpAttachmentTests {
                 });
 
             Assert.Throws<InvalidDataException>(() => descriptor.OpenContentStream());
-            Assert.Empty(Directory.GetFiles(directory));
+            Assert.Empty(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
         } finally {
             Directory.Delete(directory, recursive: true);
         }
@@ -311,10 +311,19 @@ public class SmtpAttachmentTests {
             stagedPath = Assert.IsType<string>(stagedPathField.GetValue(descriptor));
 
             Assert.True(File.Exists(stagedPath));
-            Assert.Equal("attachments", Path.GetFileName(Path.GetDirectoryName(stagedPath)));
+            string stagingDirectory = Path.GetDirectoryName(stagedPath)!;
+            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                    System.Runtime.InteropServices.OSPlatform.OSX)) {
+                Assert.StartsWith(".mailozaurr-staging-", Path.GetFileName(stagingDirectory), StringComparison.Ordinal);
+                Assert.Equal(
+                    UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute,
+                    File.GetUnixFileMode(stagingDirectory));
+                stagingDirectory = Path.GetDirectoryName(stagingDirectory)!;
+            }
+            Assert.Equal("attachments", Path.GetFileName(stagingDirectory));
             Assert.Equal(
                 "Mailozaurr-" + geteuid().ToString(System.Globalization.CultureInfo.InvariantCulture),
-                Directory.GetParent(Path.GetDirectoryName(stagedPath)!)!.Name);
+                Directory.GetParent(stagingDirectory)!.Name);
         } finally {
             descriptor.Dispose();
         }
@@ -345,10 +354,19 @@ public class SmtpAttachmentTests {
             descriptor.GetContentBytes();
 
             Assert.Equal(originalMode, File.GetUnixFileMode(directory));
-            string stagedPath = Assert.Single(Directory.GetFiles(directory));
+            string stagedPath = Assert.Single(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
             Assert.Equal(
                 UnixFileMode.UserRead | UnixFileMode.UserWrite,
                 File.GetUnixFileMode(stagedPath));
+            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                    System.Runtime.InteropServices.OSPlatform.OSX)) {
+                Assert.Equal(
+                    UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute,
+                    File.GetUnixFileMode(Path.GetDirectoryName(stagedPath)!));
+            }
+
+            descriptor.Dispose();
+            Assert.Empty(Directory.GetFileSystemEntries(directory));
         } finally {
             Directory.Delete(directory, recursive: true);
         }

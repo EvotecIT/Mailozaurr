@@ -406,7 +406,7 @@ public class GraphDraftTests {
             Assert.Equal(3_100_000, uploaded);
             Assert.True(chunks > 1);
             Assert.True(source.ReadCount > 0);
-            Assert.Single(Directory.GetFiles(directory));
+            Assert.Single(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
         } finally {
             descriptor.Dispose();
             Directory.Delete(directory, recursive: true);

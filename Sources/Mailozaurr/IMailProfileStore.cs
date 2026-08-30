@@ -20,6 +20,19 @@ public interface IMailProfileStore {
     Task<bool> RemoveAsync(string profileId, CancellationToken cancellationToken = default);
 }
 
+internal enum MailProfileCredentialContextSaveOutcome {
+    Saved,
+    HasSecrets,
+    Unsupported
+}
+
+internal interface IMailProfileStoreCredentialContextCoordinator {
+    Task<MailProfileCredentialContextSaveOutcome> SaveCredentialContextChangeAsync(
+        MailProfile profile,
+        IMailSecretStore secretStore,
+        CancellationToken cancellationToken = default);
+}
+
 /// <summary>
 /// Coordinates maintenance that must observe a profile inventory which cannot change during the operation.
 /// </summary>

@@ -148,7 +148,7 @@ public class GraphBatchAndRetryTests {
             GraphSmtpResult result = await graph.SendMessageBatchAsync();
 
             Assert.Equal(expectedSuccess, result.Status);
-            Assert.Empty(Directory.GetFiles(directory));
+            Assert.Empty(Directory.GetFiles(directory, "*", SearchOption.AllDirectories));
             Assert.Throws<ObjectDisposedException>(() => descriptor.OpenContentStream());
         } finally {
             handlerField.SetValue(client, original);

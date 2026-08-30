@@ -616,7 +616,10 @@ public class GmailApiClientTests {
                 Attachments = new List<Mailozaurr.Definitions.AttachmentDescriptor> { descriptor }
             };
             smtp.CreateMessage();
-            Assert.Single(System.IO.Directory.GetFiles(directory));
+            Assert.Single(System.IO.Directory.GetFiles(
+                directory,
+                "*",
+                System.IO.SearchOption.AllDirectories));
             var handler = new RecordingHandler(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) {
                 Content = new System.Net.Http.StringContent("{\"id\":\"sent\"}")
             });
@@ -628,7 +631,10 @@ public class GmailApiClientTests {
             await client.SendAsync("me", smtp.Message, smtp.MarkTransportAttempted);
             smtp.Dispose();
 
-            Assert.Empty(System.IO.Directory.GetFiles(directory));
+            Assert.Empty(System.IO.Directory.GetFiles(
+                directory,
+                "*",
+                System.IO.SearchOption.AllDirectories));
             Assert.Throws<ObjectDisposedException>(() => descriptor.OpenContentStream());
         } finally {
             System.IO.Directory.Delete(directory, recursive: true);

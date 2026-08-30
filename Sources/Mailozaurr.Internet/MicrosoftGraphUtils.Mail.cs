@@ -170,11 +170,13 @@ public static partial class MicrosoftGraphUtils {
         foreach (var att in attachments) {
             if (!string.IsNullOrWhiteSpace(att.ContentBytes) && !string.IsNullOrWhiteSpace(att.Name)) {
                 try {
-                    var bytes = Convert.FromBase64String(att.ContentBytes);
-                    results.Add(AttachmentFileStore.SaveBytesToDirectory(
+                    results.Add(AttachmentFileStore.SaveToDirectory(
                         path,
                         att.Name,
-                        bytes,
+                        stream => {
+                            byte[] bytes = Convert.FromBase64String(att.ContentBytes);
+                            stream.Write(bytes, 0, bytes.Length);
+                        },
                         conflictPolicy,
                         index.ToString(System.Globalization.CultureInfo.InvariantCulture)));
                 } catch (FormatException fex) {

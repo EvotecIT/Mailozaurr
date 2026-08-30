@@ -14,17 +14,19 @@ internal readonly struct BoundedMimeMessage {
 
 internal sealed class DmarcMimeDownloadBudget {
     private readonly object _reservationGate = new();
-    private readonly SemaphoreSlim _reservationChanged = new(0, int.MaxValue);
+    private readonly LinkedList<ReservationWaiter> _reservationWaiters = new();
     private readonly long _maxBytesPerMessage;
     private long _remainingBytes;
     private int _activeReservations;
-    private int _waitingReservations;
 
     internal DmarcMimeDownloadBudget(long maxBytesPerMessage, long maxTotalBytes) {
         _maxBytesPerMessage = maxBytesPerMessage;
         _remainingBytes = maxTotalBytes;
     }
 
+    // MailKit exposes actual byte progress rather than a provider download callback that
+    // accepts an allowance. Consume those bytes atomically; Graph and Gmail use DownloadAsync
+    // so their independently started provider requests reserve and refund explicit allowances.
     internal ITransferProgress CreateTransferProgress() =>
         new BoundedTransferProgress(this, _maxBytesPerMessage);
 
@@ -50,44 +52,59 @@ internal sealed class DmarcMimeDownloadBudget {
     }
 
     private async Task<long> ReserveAllowanceAsync(CancellationToken cancellationToken) {
-        bool registeredWaiter = false;
-        while (true) {
-            lock (_reservationGate) {
-                if (registeredWaiter) {
-                    _waitingReservations--;
-                    registeredWaiter = false;
-                }
-                long limit = Math.Min(_maxBytesPerMessage, _remainingBytes);
-                if (limit > 0) {
-                    _remainingBytes -= limit;
-                    _activeReservations++;
-                    return limit;
-                }
-                if (_activeReservations == 0) {
-                    throw new InvalidDataException("DMARC MIME downloads exceeded the configured total byte limit.");
-                }
-                _waitingReservations++;
-                registeredWaiter = true;
-            }
-            try {
-                await _reservationChanged.WaitAsync(cancellationToken).ConfigureAwait(false);
-            } catch {
-                lock (_reservationGate) {
-                    if (registeredWaiter) _waitingReservations--;
-                }
-                throw;
-            }
+        cancellationToken.ThrowIfCancellationRequested();
+        var waiter = new ReservationWaiter();
+        lock (_reservationGate) {
+            waiter.Node = _reservationWaiters.AddLast(waiter);
+            GrantWaitingReservationsLocked();
         }
+        using CancellationTokenRegistration registration = cancellationToken.Register(
+            () => CancelReservation(waiter));
+        return await waiter.Completion.Task.ConfigureAwait(false);
     }
 
     private void CompleteReservation(long refund) {
-        int waiting;
         lock (_reservationGate) {
             _remainingBytes += refund;
             _activeReservations--;
-            waiting = _waitingReservations;
+            GrantWaitingReservationsLocked();
         }
-        if (waiting > 0) _reservationChanged.Release(waiting);
+    }
+
+    private void CancelReservation(ReservationWaiter waiter) {
+        lock (_reservationGate) {
+            if (waiter.Node?.List == null) return;
+            _reservationWaiters.Remove(waiter.Node);
+            waiter.Node = null;
+            waiter.Completion.TrySetCanceled();
+            GrantWaitingReservationsLocked();
+        }
+    }
+
+    private void GrantWaitingReservationsLocked() {
+        while (_reservationWaiters.First != null) {
+            bool canReserveFullAllowance = _remainingBytes >= _maxBytesPerMessage;
+            bool canReserveFinalPartialAllowance = _remainingBytes > 0 && _activeReservations == 0;
+            if (!canReserveFullAllowance && !canReserveFinalPartialAllowance) {
+                if (_activeReservations != 0) return;
+                while (_reservationWaiters.First != null) {
+                    ReservationWaiter rejected = _reservationWaiters.First.Value;
+                    _reservationWaiters.RemoveFirst();
+                    rejected.Node = null;
+                    rejected.Completion.TrySetException(new InvalidDataException(
+                        "DMARC MIME downloads exceeded the configured total byte limit."));
+                }
+                return;
+            }
+
+            ReservationWaiter granted = _reservationWaiters.First.Value;
+            _reservationWaiters.RemoveFirst();
+            granted.Node = null;
+            long limit = Math.Min(_maxBytesPerMessage, _remainingBytes);
+            _remainingBytes -= limit;
+            _activeReservations++;
+            granted.Completion.TrySetResult(limit);
+        }
     }
 
     private void Consume(long count) {
@@ -122,5 +139,11 @@ internal sealed class DmarcMimeDownloadBudget {
             _owner.Consume(delta);
             _reportedBytes = bytesTransferred;
         }
+    }
+
+    private sealed class ReservationWaiter {
+        internal TaskCompletionSource<long> Completion { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        internal LinkedListNode<ReservationWaiter>? Node { get; set; }
     }
 }

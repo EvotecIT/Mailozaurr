@@ -324,6 +324,74 @@ public class SearchDmarcReportsTests {
     }
 
     [Fact]
+    public async Task DmarcMimeDownloadBudget_WaitsForFullAllowanceWhileRefundsRemainPossible() {
+        var budget = new DmarcMimeDownloadBudget(maxBytesPerMessage: 5, maxTotalBytes: 7);
+        var firstStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        long secondLimit = 0;
+
+        Task<MimeMessage> first = budget.DownloadAsync(
+            async (limit, _) => {
+                firstStarted.TrySetResult(null);
+                await releaseFirst.Task;
+                return new BoundedMimeMessage(new MimeMessage(), 1);
+            },
+            CancellationToken.None);
+        await firstStarted.Task;
+        Task<MimeMessage> second = budget.DownloadAsync(
+            (limit, _) => {
+                secondLimit = limit;
+                return Task.FromResult(new BoundedMimeMessage(new MimeMessage(), limit));
+            },
+            CancellationToken.None);
+
+        Assert.False(second.IsCompleted);
+        releaseFirst.TrySetResult(null);
+        await Task.WhenAll(first, second);
+
+        Assert.Equal(5, secondLimit);
+    }
+
+    [Fact]
+    public async Task DmarcMimeDownloadBudget_GrantsWaitingReservationsInArrivalOrder() {
+        var budget = new DmarcMimeDownloadBudget(maxBytesPerMessage: 5, maxTotalBytes: 5);
+        var firstStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thirdStarted = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirst = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSecond = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        Task<MimeMessage> first = budget.DownloadAsync(
+            async (_, _) => {
+                firstStarted.TrySetResult(null);
+                await releaseFirst.Task;
+                return new BoundedMimeMessage(new MimeMessage(), 0);
+            },
+            CancellationToken.None);
+        await firstStarted.Task;
+        Task<MimeMessage> second = budget.DownloadAsync(
+            async (_, _) => {
+                secondStarted.TrySetResult(null);
+                await releaseSecond.Task;
+                return new BoundedMimeMessage(new MimeMessage(), 0);
+            },
+            CancellationToken.None);
+        Task<MimeMessage> third = budget.DownloadAsync(
+            (limit, _) => {
+                thirdStarted.TrySetResult(null);
+                return Task.FromResult(new BoundedMimeMessage(new MimeMessage(), limit));
+            },
+            CancellationToken.None);
+
+        releaseFirst.TrySetResult(null);
+        await secondStarted.Task;
+        Assert.False(thirdStarted.Task.IsCompleted);
+        releaseSecond.TrySetResult(null);
+        await Task.WhenAll(first, second, third);
+        Assert.True(thirdStarted.Task.IsCompleted);
+    }
+
+    [Fact]
     public void FilterDmarcReports_ExtractsAttachments() {
         var now = DateTimeOffset.UtcNow;
         var msg = CreateDmarc("example.com", now);

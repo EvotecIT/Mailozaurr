@@ -17,6 +17,15 @@ internal static class MailProfileCredentialContextGuard {
         MailProfileSettingsKeys.JmapAllowCrossOriginApiUrl
     };
 
+    private static readonly string[] GraphCredentialContextKeys = {
+        MailProfileSettingsKeys.ClientId,
+        MailProfileSettingsKeys.TenantId
+    };
+
+    private static readonly string[] GmailCredentialContextKeys = {
+        MailProfileSettingsKeys.ClientId
+    };
+
     private static readonly string[] SesCredentialContextKeys = {
         MailProfileSettingsKeys.Region
     };
@@ -24,6 +33,8 @@ internal static class MailProfileCredentialContextGuard {
     internal static string? GetChangedSetting(MailProfile existing, MailProfile candidate) {
         string[] keys = existing.Kind switch {
             MailProfileKind.Smtp or MailProfileKind.Imap or MailProfileKind.Pop3 => ServerCredentialContextKeys,
+            MailProfileKind.Graph => GraphCredentialContextKeys,
+            MailProfileKind.Gmail => GmailCredentialContextKeys,
             MailProfileKind.Jmap => JmapCredentialContextKeys,
             MailProfileKind.Ses => SesCredentialContextKeys,
             _ => Array.Empty<string>()
@@ -59,6 +70,13 @@ internal static class MailProfileCredentialContextGuard {
                 return profile.DefaultSender!.Trim();
             }
             return null;
+        }
+
+        if (profile.Kind is MailProfileKind.Graph or MailProfileKind.Gmail) {
+            if (profile.Settings.TryGetValue(MailProfileSettingsKeys.Mailbox, out string? mailbox) &&
+                !string.IsNullOrWhiteSpace(mailbox)) return mailbox.Trim();
+            if (!string.IsNullOrWhiteSpace(profile.DefaultMailbox)) return profile.DefaultMailbox!.Trim();
+            return "me";
         }
 
         return null;

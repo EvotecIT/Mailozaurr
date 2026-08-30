@@ -361,6 +361,31 @@ public sealed class AttachmentFileStoreTests {
     }
 
     [Fact]
+    public void Graph_skip_preflight_retains_existing_file_without_decoding_content() {
+        string directory = CreateTestDirectory();
+        string destination = AttachmentFileStore.ResolvePathInDirectory(directory, "report.xml", "0");
+        try {
+            File.WriteAllText(destination, "existing");
+            var graph = new Attachment {
+                Name = "report.xml",
+                ContentBytes = "not valid base64"
+            };
+
+            IReadOnlyList<AttachmentFileSaveResult> results = MicrosoftGraphUtils.SaveAttachments(
+                new[] { graph },
+                directory,
+                AttachmentFileConflictPolicy.Skip);
+
+            AttachmentFileSaveResult result = Assert.Single(results);
+            Assert.Equal(AttachmentFileSaveAction.Skipped, result.Action);
+            Assert.Equal(destination, result.Path);
+            Assert.Equal("existing", File.ReadAllText(destination));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Mime_async_helper_uses_the_shared_safe_store() {
         string directory = CreateTestDirectory();
         try {

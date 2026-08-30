@@ -12,11 +12,14 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
     private const uint FileFlagOpenReparsePoint = 0x00200000;
     private const int LinuxAtSymlinkNoFollow = 0x100;
     private const int DarwinAtSymlinkNoFollow = 0x0020;
+    private const int DarwinAtRemoveDirectory = 0x0080;
     private const uint RenameExchange = 0x00000002;
     private const uint UnixFileTypeMask = 0xF000;
     private const uint UnixRegularFile = 0x8000;
     private readonly List<SafeFileHandle> _windowsHandles = new();
     private SafeFileHandle? _unixDirectory;
+    private SafeFileHandle? _darwinTemporaryDirectory;
+    private string? _darwinTemporaryDirectoryName;
 
     private AttachmentDirectoryLease(string directoryPath) => DirectoryPath = directoryPath;
 
@@ -36,9 +39,16 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
         }
     }
 
-    internal FileStream CreateTemporaryFile(bool useAsync, out string path) {
+    internal FileStream CreateTemporaryFile(bool useAsync, out string path) =>
+        CreateTemporaryFile(useAsync, out path, out _);
+
+    internal FileStream CreateTemporaryFile(
+        bool useAsync,
+        out string path,
+        out string? cleanupDirectoryPath) {
         using var random = RandomNumberGenerator.Create();
         var bytes = new byte[16];
+        cleanupDirectoryPath = null;
         for (int attempt = 0; attempt < 128; attempt++) {
             random.GetBytes(bytes);
             string name = ".mailozaurr-attachment-" +
@@ -58,13 +68,23 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
                 }
             }
 
+            int temporaryDirectoryFd = GetTemporaryDirectoryFileDescriptor(out cleanupDirectoryPath);
             int fd = openat(
-                _unixDirectory!.DangerousGetHandle().ToInt32(),
+                temporaryDirectoryFd,
                 name,
                 UnixOpenWriteFlags(),
                 Convert.ToUInt32("600", 8));
             if (fd >= 0) {
                 var handle = new SafeFileHandle(new IntPtr(fd), ownsHandle: true);
+                if (fchmod(fd, Convert.ToUInt32("600", 8)) != 0) {
+                    int error = Marshal.GetLastWin32Error();
+                    handle.Dispose();
+                    unlinkat(temporaryDirectoryFd, name, 0);
+                    throw new IOException($"Unable to restrict a temporary attachment file (errno {error}).");
+                }
+                path = cleanupDirectoryPath == null
+                    ? Path.Combine(DirectoryPath, name)
+                    : Path.Combine(cleanupDirectoryPath, name);
                 // POSIX descriptors do not use Windows overlapped-I/O metadata. FileStream still
                 // provides its asynchronous API over this synchronous, directory-bound handle.
                 return new FileStream(handle, FileAccess.Write, 64 * 1024, isAsync: false);
@@ -83,13 +103,14 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
         string temporaryName = Path.GetFileName(temporaryPath);
         string destinationName = Path.GetFileName(destinationPath);
         int directoryFd = _unixDirectory!.DangerousGetHandle().ToInt32();
+        int temporaryDirectoryFd = GetTemporaryDirectoryFileDescriptor(out _);
 
         switch (conflictPolicy) {
             case AttachmentFileConflictPolicy.Fail:
-                LinkTemporary(directoryFd, temporaryName, destinationName);
+                LinkTemporary(temporaryDirectoryFd, temporaryName, directoryFd, destinationName);
                 return new AttachmentFileSaveResult(destinationPath, AttachmentFileSaveAction.Created);
             case AttachmentFileConflictPolicy.Skip:
-                if (TryLinkTemporary(directoryFd, temporaryName, destinationName)) {
+                if (TryLinkTemporary(temporaryDirectoryFd, temporaryName, directoryFd, destinationName)) {
                     return new AttachmentFileSaveResult(destinationPath, AttachmentFileSaveAction.Created);
                 }
                 RejectUnixSymbolicLink(directoryFd, destinationName);
@@ -101,7 +122,7 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
                     string candidate = suffix == 0
                         ? destinationName
                         : stem + " (" + suffix.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")" + extension;
-                    if (!TryLinkTemporary(directoryFd, temporaryName, candidate)) {
+                    if (!TryLinkTemporary(temporaryDirectoryFd, temporaryName, directoryFd, candidate)) {
                         RejectUnixSymbolicLink(directoryFd, candidate);
                         continue;
                     }
@@ -111,18 +132,18 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
                 }
                 throw new IOException("No collision-free attachment filename was available.");
             case AttachmentFileConflictPolicy.Replace:
-                if (TryLinkTemporary(directoryFd, temporaryName, destinationName)) {
+                if (TryLinkTemporary(temporaryDirectoryFd, temporaryName, directoryFd, destinationName)) {
                     return new AttachmentFileSaveResult(destinationPath, AttachmentFileSaveAction.Created);
                 }
                 // Reject a stable non-regular entry before mutating either name. The
                 // exchange and second validation below close a concurrent final-entry swap.
                 RequireUnixRegularFile(directoryFd, destinationName);
-                ExchangeUnixEntries(directoryFd, temporaryName, destinationName);
+                ExchangeUnixEntries(temporaryDirectoryFd, temporaryName, directoryFd, destinationName);
                 try {
-                    RequireUnixRegularFile(directoryFd, temporaryName);
+                    RequireUnixRegularFile(temporaryDirectoryFd, temporaryName);
                 } catch (Exception validationFailure) {
                     try {
-                        ExchangeUnixEntries(directoryFd, temporaryName, destinationName);
+                        ExchangeUnixEntries(temporaryDirectoryFd, temporaryName, directoryFd, destinationName);
                     } catch (Exception rollbackFailure) {
                         throw new IOException(
                             "The attachment replacement target changed type and the atomic exchange could not be rolled back.",
@@ -144,7 +165,7 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
             return;
         }
         if (string.IsNullOrWhiteSpace(path)) return;
-        int directoryFd = _unixDirectory!.DangerousGetHandle().ToInt32();
+        int directoryFd = GetTemporaryDirectoryFileDescriptor(out _);
         string name = Path.GetFileName(path);
         try {
             if (!TryGetUnixFileMode(directoryFd, name, out uint mode) ||
@@ -238,6 +259,51 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
         }
     }
 
+    private int GetTemporaryDirectoryFileDescriptor(out string? cleanupDirectoryPath) {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
+            cleanupDirectoryPath = null;
+            return _unixDirectory!.DangerousGetHandle().ToInt32();
+        }
+
+        EnsureDarwinTemporaryDirectory();
+        cleanupDirectoryPath = Path.Combine(DirectoryPath, _darwinTemporaryDirectoryName!);
+        return _darwinTemporaryDirectory!.DangerousGetHandle().ToInt32();
+    }
+
+    private void EnsureDarwinTemporaryDirectory() {
+        if (_darwinTemporaryDirectory != null) return;
+        int parentDirectoryFd = _unixDirectory!.DangerousGetHandle().ToInt32();
+        using var random = RandomNumberGenerator.Create();
+        var bytes = new byte[16];
+        for (int attempt = 0; attempt < 128; attempt++) {
+            random.GetBytes(bytes);
+            string name = ".mailozaurr-staging-" +
+                BitConverter.ToString(bytes).Replace("-", string.Empty).ToLowerInvariant();
+            if (mkdirat(parentDirectoryFd, name, Convert.ToUInt32("700", 8)) != 0) {
+                if (Marshal.GetLastWin32Error() == 17) continue;
+                ThrowUnixIOException("create a private attachment staging directory");
+            }
+
+            int fd = openat(parentDirectoryFd, name, UnixOpenDirectoryFlags(), 0);
+            if (fd < 0) {
+                int error = Marshal.GetLastWin32Error();
+                unlinkat(parentDirectoryFd, name, DarwinAtRemoveDirectory);
+                throw new IOException($"Unable to bind a private attachment staging directory (errno {error}).");
+            }
+            if (fchmod(fd, Convert.ToUInt32("700", 8)) != 0) {
+                int error = Marshal.GetLastWin32Error();
+                new SafeFileHandle(new IntPtr(fd), ownsHandle: true).Dispose();
+                unlinkat(parentDirectoryFd, name, DarwinAtRemoveDirectory);
+                throw new IOException($"Unable to restrict a private attachment staging directory (errno {error}).");
+            }
+
+            _darwinTemporaryDirectory = new SafeFileHandle(new IntPtr(fd), ownsHandle: true);
+            _darwinTemporaryDirectoryName = name;
+            return;
+        }
+        throw new IOException("Unable to allocate a private attachment staging directory.");
+    }
+
     /// <summary>
     /// Resolves only macOS's fixed root aliases before the no-follow walk. Darwin exposes
     /// <c>/etc</c>, <c>/tmp</c>, and <c>/var</c> as links into <c>/private</c>; in particular,
@@ -256,9 +322,13 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
         return path;
     }
 
-    private static bool TryLinkTemporary(int directoryFd, string temporaryName, string destinationName) {
-        if (linkat(directoryFd, temporaryName, directoryFd, destinationName, 0) == 0) {
-            if (unlinkat(directoryFd, temporaryName, 0) != 0) ThrowUnixIOException("remove a committed temporary attachment link");
+    private static bool TryLinkTemporary(
+        int temporaryDirectoryFd,
+        string temporaryName,
+        int destinationDirectoryFd,
+        string destinationName) {
+        if (linkat(temporaryDirectoryFd, temporaryName, destinationDirectoryFd, destinationName, 0) == 0) {
+            if (unlinkat(temporaryDirectoryFd, temporaryName, 0) != 0) ThrowUnixIOException("remove a committed temporary attachment link");
             return true;
         }
         int error = Marshal.GetLastWin32Error();
@@ -267,18 +337,26 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
         return false;
     }
 
-    private static void LinkTemporary(int directoryFd, string temporaryName, string destinationName) {
-        if (!TryLinkTemporary(directoryFd, temporaryName, destinationName)) {
+    private static void LinkTemporary(
+        int temporaryDirectoryFd,
+        string temporaryName,
+        int destinationDirectoryFd,
+        string destinationName) {
+        if (!TryLinkTemporary(temporaryDirectoryFd, temporaryName, destinationDirectoryFd, destinationName)) {
             throw new IOException("The attachment destination already exists.");
         }
     }
 
-    private static void ExchangeUnixEntries(int directoryFd, string temporaryName, string destinationName) {
+    private static void ExchangeUnixEntries(
+        int temporaryDirectoryFd,
+        string temporaryName,
+        int destinationDirectoryFd,
+        string destinationName) {
         int result;
         try {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
                 try {
-                    result = renameat2(directoryFd, temporaryName, directoryFd, destinationName, RenameExchange);
+                    result = renameat2(temporaryDirectoryFd, temporaryName, destinationDirectoryFd, destinationName, RenameExchange);
                 } catch (EntryPointNotFoundException) {
                     long syscallNumber = RuntimeInformation.ProcessArchitecture switch {
                         Architecture.X64 => 316,
@@ -288,14 +366,14 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
                     };
                     result = checked((int)syscallRenameAt2(
                         syscallNumber,
-                        directoryFd,
+                        temporaryDirectoryFd,
                         temporaryName,
-                        directoryFd,
+                        destinationDirectoryFd,
                         destinationName,
                         RenameExchange));
                 }
             } else {
-                result = renameatx_np(directoryFd, temporaryName, directoryFd, destinationName, RenameExchange);
+                result = renameatx_np(temporaryDirectoryFd, temporaryName, destinationDirectoryFd, destinationName, RenameExchange);
             }
         } catch (EntryPointNotFoundException exception) {
             throw new PlatformNotSupportedException(
@@ -375,6 +453,15 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
         throw new IOException($"Unable to {operation} (errno {Marshal.GetLastWin32Error()}).");
 
     public void Dispose() {
+        _darwinTemporaryDirectory?.Dispose();
+        _darwinTemporaryDirectory = null;
+        if (_darwinTemporaryDirectoryName != null && _unixDirectory != null && !_unixDirectory.IsInvalid) {
+            unlinkat(
+                _unixDirectory.DangerousGetHandle().ToInt32(),
+                _darwinTemporaryDirectoryName,
+                DarwinAtRemoveDirectory);
+        }
+        _darwinTemporaryDirectoryName = null;
         _unixDirectory?.Dispose();
         _unixDirectory = null;
         foreach (SafeFileHandle handle in _windowsHandles) handle.Dispose();
@@ -400,6 +487,7 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
     [DllImport("libc", SetLastError = true)] private static extern int open(string path, int flags);
     [DllImport("libc", SetLastError = true)] private static extern int openat(int directoryFd, string path, int flags, uint mode);
     [DllImport("libc", SetLastError = true)] private static extern int mkdirat(int directoryFd, string path, uint mode);
+    [DllImport("libc", SetLastError = true)] private static extern int fchmod(int fileDescriptor, uint mode);
     [DllImport("libc", SetLastError = true)] private static extern int linkat(int oldDirectoryFd, string oldPath, int newDirectoryFd, string newPath, int flags);
     [DllImport("libc", SetLastError = true)] private static extern int unlinkat(int directoryFd, string path, int flags);
     [DllImport("libc", SetLastError = true)] private static extern int renameat2(int oldDirectoryFd, string oldPath, int newDirectoryFd, string newPath, uint flags);
