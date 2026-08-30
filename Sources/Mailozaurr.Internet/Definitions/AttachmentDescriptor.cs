@@ -400,18 +400,8 @@ public sealed class StreamAttachmentDescriptor : AttachmentDescriptor, IDisposab
         bool directoryExisted = Directory.Exists(directory);
         Directory.CreateDirectory(directory);
         if (usesOwnedDirectory || !directoryExisted) UnixFilePermissions.RestrictDirectory(directory);
-        for (int attempt = 0; attempt < 32; attempt++) {
-            path = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp");
-            try {
-                var stream = new FileStream(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.Read | FileShare.Delete,
-                    bufferSize: 64 * 1024, useAsync: false);
-                UnixFilePermissions.RestrictFile(path);
-                return stream;
-            } catch (IOException) when (attempt < 31) {
-                // Extremely unlikely random-name collision; retry with a fresh name.
-            }
-        }
-        throw new IOException("Unable to create a unique attachment staging file.");
+        using var directoryLease = AttachmentDirectoryLease.Acquire(directory);
+        return directoryLease.CreateTemporaryFile(useAsync: false, out path);
     }
 
     private static string GetDefaultStagingDirectory() {

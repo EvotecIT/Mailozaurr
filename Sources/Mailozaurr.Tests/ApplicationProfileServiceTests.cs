@@ -199,6 +199,9 @@ public sealed class ApplicationProfileServiceTests {
     [InlineData(MailProfileKind.Smtp, MailProfileSettingsKeys.Server, "smtp.example.com", "smtp.attacker.example")]
     [InlineData(MailProfileKind.Imap, MailProfileSettingsKeys.Port, "993", "143")]
     [InlineData(MailProfileKind.Pop3, MailProfileSettingsKeys.SecureSocketOptions, "SslOnConnect", "None")]
+    [InlineData(MailProfileKind.Smtp, MailProfileSettingsKeys.UserName, "sender@example.com", "other@example.com")]
+    [InlineData(MailProfileKind.Imap, MailProfileSettingsKeys.UserName, "reader@example.com", "other@example.com")]
+    [InlineData(MailProfileKind.Pop3, MailProfileSettingsKeys.UserName, "reader@example.com", "other@example.com")]
     [InlineData(MailProfileKind.Smtp, MailProfileSettingsKeys.UseSsl, "true", "false")]
     [InlineData(MailProfileKind.Pop3, MailProfileSettingsKeys.SkipCertificateRevocation, "false", "true")]
     [InlineData(MailProfileKind.Imap, MailProfileSettingsKeys.SkipCertificateValidation, "false", "true")]
@@ -292,6 +295,49 @@ public sealed class ApplicationProfileServiceTests {
         Assert.True(result.Succeeded);
         Assert.Equal("us-east-1", (await service.GetProfileAsync("ses"))!.Settings[MailProfileSettingsKeys.Region]);
         Assert.Equal("retained-secret", await secretStore.GetSecretAsync("ses", MailSecretNames.Password));
+    }
+
+    [Fact]
+    public async Task SaveAsyncComparesEffectiveProtocolIdentityAcrossFallbackSettings() {
+        var store = new InMemoryMailProfileStore();
+        var secretStore = new BasicSecretStore();
+        var service = new MailProfileService(store, secretStore);
+        await service.SaveAsync(new MailProfile {
+            Id = "imap",
+            DisplayName = "IMAP",
+            Kind = MailProfileKind.Imap,
+            DefaultMailbox = "reader@example.com",
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Server] = "imap.example.com"
+            }
+        });
+        await secretStore.SetSecretAsync("imap", MailSecretNames.Password, "retained-secret");
+
+        OperationResult equivalent = await service.SaveAsync(new MailProfile {
+            Id = "imap",
+            DisplayName = "IMAP explicit user",
+            Kind = MailProfileKind.Imap,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Server] = "imap.example.com",
+                [MailProfileSettingsKeys.UserName] = "reader@example.com"
+            }
+        });
+        Assert.True(equivalent.Succeeded);
+
+        OperationResult changed = await service.SaveAsync(new MailProfile {
+            Id = "imap",
+            DisplayName = "IMAP changed user",
+            Kind = MailProfileKind.Imap,
+            DefaultMailbox = "other@example.com",
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Server] = "imap.example.com"
+            }
+        });
+
+        Assert.False(changed.Succeeded);
+        Assert.Equal("profile_credential_context_change_not_allowed", changed.Code);
+        Assert.Equal("reader@example.com", (await service.GetProfileAsync("imap"))!.Settings[MailProfileSettingsKeys.UserName]);
+        Assert.Equal("retained-secret", await secretStore.GetSecretAsync("imap", MailSecretNames.Password));
     }
 
     [Fact]

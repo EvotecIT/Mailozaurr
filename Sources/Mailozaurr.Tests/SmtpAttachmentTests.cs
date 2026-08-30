@@ -345,6 +345,10 @@ public class SmtpAttachmentTests {
             descriptor.GetContentBytes();
 
             Assert.Equal(originalMode, File.GetUnixFileMode(directory));
+            string stagedPath = Assert.Single(Directory.GetFiles(directory));
+            Assert.Equal(
+                UnixFileMode.UserRead | UnixFileMode.UserWrite,
+                File.GetUnixFileMode(stagedPath));
         } finally {
             Directory.Delete(directory, recursive: true);
         }

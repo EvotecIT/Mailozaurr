@@ -6,6 +6,8 @@ internal static class MailProfileCredentialContextGuard {
         MailProfileSettingsKeys.Port,
         MailProfileSettingsKeys.SecureSocketOptions,
         MailProfileSettingsKeys.UseSsl,
+        MailProfileSettingsKeys.AuthMode,
+        MailProfileSettingsKeys.AuthenticationEnabled,
         MailProfileSettingsKeys.SkipCertificateRevocation,
         MailProfileSettingsKeys.SkipCertificateValidation
     };
@@ -27,12 +29,36 @@ internal static class MailProfileCredentialContextGuard {
             _ => Array.Empty<string>()
         };
 
+        string? existingIdentity = ResolveCredentialIdentity(existing);
+        string? candidateIdentity = ResolveCredentialIdentity(candidate);
+        if (!string.Equals(existingIdentity, candidateIdentity, StringComparison.OrdinalIgnoreCase)) {
+            return existing.Kind is MailProfileKind.Smtp or MailProfileKind.Imap or MailProfileKind.Pop3
+                ? MailProfileSettingsKeys.UserName
+                : MailProfileSettingsKeys.Mailbox;
+        }
+
         foreach (string key in keys) {
             existing.Settings.TryGetValue(key, out string? existingValue);
             candidate.Settings.TryGetValue(key, out string? candidateValue);
             if (!AreEquivalent(key, existingValue, candidateValue)) {
                 return key;
             }
+        }
+
+        return null;
+    }
+
+    private static string? ResolveCredentialIdentity(MailProfile profile) {
+        if (profile.Kind is MailProfileKind.Smtp or MailProfileKind.Imap or MailProfileKind.Pop3) {
+            if (profile.Settings.TryGetValue(MailProfileSettingsKeys.UserName, out string? userName) &&
+                !string.IsNullOrWhiteSpace(userName)) return userName.Trim();
+            if (profile.Settings.TryGetValue(MailProfileSettingsKeys.Mailbox, out string? mailbox) &&
+                !string.IsNullOrWhiteSpace(mailbox)) return mailbox.Trim();
+            if (!string.IsNullOrWhiteSpace(profile.DefaultMailbox)) return profile.DefaultMailbox!.Trim();
+            if (profile.Kind == MailProfileKind.Smtp && !string.IsNullOrWhiteSpace(profile.DefaultSender)) {
+                return profile.DefaultSender!.Trim();
+            }
+            return null;
         }
 
         return null;

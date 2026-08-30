@@ -22,6 +22,8 @@ public sealed class DmarcReportInspectionOptions {
     /// <summary>Default maximum downloaded MIME bytes for one candidate message.</summary>
     public const long DefaultMaxMimeBytesPerMessage = 25L * 1024 * 1024;
 
+    private const long MaxSupportedMimeBytesPerMessage = int.MaxValue;
+
     /// <summary>Default maximum downloaded MIME bytes across one search.</summary>
     public const long DefaultMaxTotalMimeBytes = 100L * 1024 * 1024;
 
@@ -65,7 +67,11 @@ public sealed class DmarcReportInspectionOptions {
             throw new ArgumentOutOfRangeException(nameof(MaxArchiveEntriesPerAttachment));
         }
         if (MaxMessagesScanned <= 0) throw new ArgumentOutOfRangeException(nameof(MaxMessagesScanned));
-        if (MaxMimeBytesPerMessage <= 0) throw new ArgumentOutOfRangeException(nameof(MaxMimeBytesPerMessage));
+        if (MaxMimeBytesPerMessage <= 0 || MaxMimeBytesPerMessage > MaxSupportedMimeBytesPerMessage) {
+            throw new ArgumentOutOfRangeException(
+                nameof(MaxMimeBytesPerMessage),
+                $"{nameof(MaxMimeBytesPerMessage)} must be between 1 and {MaxSupportedMimeBytesPerMessage} bytes.");
+        }
         if (MaxTotalMimeBytes < MaxMimeBytesPerMessage) {
             throw new ArgumentException(
                 $"{nameof(MaxTotalMimeBytes)} must be greater than or equal to {nameof(MaxMimeBytesPerMessage)}.",

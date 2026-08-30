@@ -652,6 +652,19 @@ public class SearchDmarcReportsTests {
     }
 
     [Fact]
+    public void InspectionPolicyRejectsMimeLimitThatGraphAndGmailCannotRepresent() {
+        var options = new DmarcReportInspectionOptions {
+            MaxMimeBytesPerMessage = (long)int.MaxValue + 1,
+            MaxTotalMimeBytes = (long)int.MaxValue + 1
+        };
+
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            options.CreatePolicy());
+
+        Assert.Equal(nameof(DmarcReportInspectionOptions.MaxMimeBytesPerMessage), exception.ParamName);
+    }
+
+    [Fact]
     public void FilterDmarcReports_RejectsGzipExpansionBeyondAttachmentLimit() {
         var now = DateTimeOffset.UtcNow;
         var message = new MimeMessage {
