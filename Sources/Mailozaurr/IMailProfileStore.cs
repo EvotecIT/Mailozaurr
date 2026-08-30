@@ -26,6 +26,17 @@ internal enum MailProfileCredentialContextSaveOutcome {
     Unsupported
 }
 
+internal enum MailProfileCreateOutcome {
+    Created,
+    AlreadyExists
+}
+
+internal interface IMailProfileStoreCreateCoordinator {
+    Task<MailProfileCreateOutcome> TryCreateAsync(
+        MailProfile profile,
+        CancellationToken cancellationToken = default);
+}
+
 internal interface IMailProfileStoreCredentialContextCoordinator {
     Task<MailProfileCredentialContextSaveOutcome> SaveCredentialContextChangeAsync(
         MailProfile profile,

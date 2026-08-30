@@ -6,6 +6,7 @@ namespace Mailozaurr;
 public sealed class FileMailProfileStore :
     IMailProfileStore,
     IMailProfileMaintenanceCoordinator,
+    IMailProfileStoreCreateCoordinator,
     IMailProfileStoreCredentialContextCoordinator {
     private readonly JsonFileDocumentStore<MailProfileStoreDocument> _store;
     /// <summary>
@@ -50,6 +51,19 @@ public sealed class FileMailProfileStore :
         await _store.UpdateAsync(
             document => SaveDocument(document, profile, allowCredentialContextChange: false),
             cancellationToken).ConfigureAwait(false);
+    }
+
+    Task<MailProfileCreateOutcome> IMailProfileStoreCreateCoordinator.TryCreateAsync(
+        MailProfile profile,
+        CancellationToken cancellationToken) {
+        MailProfileCloner.Validate(profile);
+        return _store.UpdateUnderWriterLockAsync(document => {
+            bool exists = document.Profiles.Any(candidate =>
+                string.Equals(candidate.Id, profile.Id, StringComparison.OrdinalIgnoreCase));
+            if (exists) return Task.FromResult(MailProfileCreateOutcome.AlreadyExists);
+            SaveDocument(document, profile, allowCredentialContextChange: false);
+            return Task.FromResult(MailProfileCreateOutcome.Created);
+        }, cancellationToken);
     }
 
     Task<MailProfileCredentialContextSaveOutcome>

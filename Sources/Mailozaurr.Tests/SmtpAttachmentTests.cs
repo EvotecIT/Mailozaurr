@@ -312,14 +312,11 @@ public class SmtpAttachmentTests {
 
             Assert.True(File.Exists(stagedPath));
             string stagingDirectory = Path.GetDirectoryName(stagedPath)!;
-            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                    System.Runtime.InteropServices.OSPlatform.OSX)) {
-                Assert.StartsWith(".mailozaurr-staging-", Path.GetFileName(stagingDirectory), StringComparison.Ordinal);
-                Assert.Equal(
-                    UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute,
-                    File.GetUnixFileMode(stagingDirectory));
-                stagingDirectory = Path.GetDirectoryName(stagingDirectory)!;
-            }
+            Assert.StartsWith(".mailozaurr-staging-", Path.GetFileName(stagingDirectory), StringComparison.Ordinal);
+            Assert.Equal(
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute,
+                File.GetUnixFileMode(stagingDirectory));
+            stagingDirectory = Path.GetDirectoryName(stagingDirectory)!;
             Assert.Equal("attachments", Path.GetFileName(stagingDirectory));
             Assert.Equal(
                 "Mailozaurr-" + geteuid().ToString(System.Globalization.CultureInfo.InvariantCulture),
@@ -358,12 +355,13 @@ public class SmtpAttachmentTests {
             Assert.Equal(
                 UnixFileMode.UserRead | UnixFileMode.UserWrite,
                 File.GetUnixFileMode(stagedPath));
-            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                    System.Runtime.InteropServices.OSPlatform.OSX)) {
-                Assert.Equal(
-                    UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute,
-                    File.GetUnixFileMode(Path.GetDirectoryName(stagedPath)!));
-            }
+            Assert.StartsWith(
+                ".mailozaurr-staging-",
+                Path.GetFileName(Path.GetDirectoryName(stagedPath)!),
+                StringComparison.Ordinal);
+            Assert.Equal(
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute,
+                File.GetUnixFileMode(Path.GetDirectoryName(stagedPath)!));
 
             descriptor.Dispose();
             Assert.Empty(Directory.GetFileSystemEntries(directory));

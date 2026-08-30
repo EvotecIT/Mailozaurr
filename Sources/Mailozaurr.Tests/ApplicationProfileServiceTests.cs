@@ -4,6 +4,38 @@ namespace Mailozaurr.Tests;
 
 public sealed class ApplicationProfileServiceTests {
     [Fact]
+    public async Task CreateAsyncAllowsOnlyOneConcurrentInMemoryCreator() {
+        var service = new MailProfileService(new InMemoryMailProfileStore());
+
+        OperationResult[] results = await Task.WhenAll(
+            service.CreateAsync(CreateImapProfile("shared", "First")),
+            service.CreateAsync(CreateImapProfile("shared", "Second")));
+
+        Assert.Single(results, result => result.Succeeded);
+        OperationResult rejected = Assert.Single(results, result => !result.Succeeded);
+        Assert.Equal("profile_already_exists", rejected.Code);
+        MailProfile stored = Assert.IsType<MailProfile>(await service.GetProfileAsync("shared"));
+        Assert.Contains(stored.DisplayName, new[] { "First", "Second" });
+    }
+
+    [Fact]
+    public async Task CreateAsyncAllowsOnlyOneConcurrentFileStoreCreator() {
+        string path = CreateTemporaryFilePath("profiles.json");
+        var firstService = new MailProfileService(new FileMailProfileStore(path));
+        var secondService = new MailProfileService(new FileMailProfileStore(path));
+
+        OperationResult[] results = await Task.WhenAll(
+            firstService.CreateAsync(CreateImapProfile("shared", "First")),
+            secondService.CreateAsync(CreateImapProfile("shared", "Second")));
+
+        Assert.Single(results, result => result.Succeeded);
+        OperationResult rejected = Assert.Single(results, result => !result.Succeeded);
+        Assert.Equal("profile_already_exists", rejected.Code);
+        MailProfile stored = Assert.IsType<MailProfile>(await firstService.GetProfileAsync("shared"));
+        Assert.Contains(stored.DisplayName, new[] { "First", "Second" });
+    }
+
+    [Fact]
     public async Task SaveAsyncReturnsValidationErrorForInvalidProfile() {
         var store = new FileMailProfileStore(CreateTemporaryFilePath("profiles.json"));
         var service = new MailProfileService(store);
@@ -13,6 +45,15 @@ public sealed class ApplicationProfileServiceTests {
         Assert.False(result.Succeeded);
         Assert.Equal("profile_invalid", result.Code);
     }
+
+    private static MailProfile CreateImapProfile(string id, string displayName) => new() {
+        Id = id,
+        DisplayName = displayName,
+        Kind = MailProfileKind.Imap,
+        Settings = new Dictionary<string, string> {
+            [MailProfileSettingsKeys.Server] = "imap.example.com"
+        }
+    };
 
     [Fact]
     public async Task SetDefaultAsyncMarksRequestedProfileAsDefault() {

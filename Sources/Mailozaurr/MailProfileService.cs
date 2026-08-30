@@ -3,7 +3,7 @@ namespace Mailozaurr;
 /// <summary>
 /// Default implementation of profile lifecycle operations.
 /// </summary>
-public sealed class MailProfileService : IMailProfileService {
+public sealed class MailProfileService : IMailProfileService, IMailProfileCreationService {
     private static readonly string[] KnownSecretNames = {
         MailSecretNames.Password,
         MailSecretNames.ClientSecret,
@@ -101,6 +101,27 @@ public sealed class MailProfileService : IMailProfileService {
             return CredentialContextChangeFailure(ex.ProfileKind, ex.ChangedSetting);
         }
         return OperationResult.Success("Profile saved.");
+    }
+
+    /// <inheritdoc />
+    public async Task<OperationResult> CreateAsync(
+        MailProfile profile,
+        CancellationToken cancellationToken = default) {
+        MailProfileValidationResult validation = MailProfileValidator.Validate(profile);
+        if (!validation.Succeeded) return validation;
+        if (_profileStore is not IMailProfileStoreCreateCoordinator coordinator) {
+            return OperationResult.Failure(
+                "profile_create_not_supported",
+                "The configured profile store does not support atomic create-only operations.");
+        }
+
+        MailProfileCreateOutcome outcome = await coordinator.TryCreateAsync(profile, cancellationToken)
+            .ConfigureAwait(false);
+        return outcome == MailProfileCreateOutcome.Created
+            ? OperationResult.Success("Profile created.")
+            : OperationResult.Failure(
+                "profile_already_exists",
+                $"Mail profile '{profile.Id.Trim()}' already exists. Use replacement explicitly to update it.");
     }
 
     /// <inheritdoc />

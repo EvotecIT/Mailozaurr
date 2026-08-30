@@ -10,7 +10,10 @@ public sealed class AttachmentStreamStagingOptions {
     /// <summary>Maximum bytes accepted from the source stream.</summary>
     public long MaxBytes { get; set; } = DefaultMaxBytes;
 
-    /// <summary>Optional directory for staged files. A private Mailozaurr temp directory is used by default.</summary>
+    /// <summary>
+    /// Optional parent directory for staged files. Unix staging uses an owner-only private child directory;
+    /// a private per-user Mailozaurr temp parent is used by default.
+    /// </summary>
     public string? TempDirectory { get; set; }
 
     /// <summary>

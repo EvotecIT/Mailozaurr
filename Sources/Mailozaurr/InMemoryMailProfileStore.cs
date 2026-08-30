@@ -6,6 +6,7 @@ namespace Mailozaurr;
 public sealed class InMemoryMailProfileStore :
     IMailProfileStore,
     IMailProfileMaintenanceCoordinator,
+    IMailProfileStoreCreateCoordinator,
     IMailProfileStoreCredentialContextCoordinator {
     private readonly Dictionary<string, MailProfile> _profiles = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -42,6 +43,20 @@ public sealed class InMemoryMailProfileStore :
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             SaveLocked(profile, allowCredentialContextChange: false);
+        } finally {
+            _gate.Release();
+        }
+    }
+
+    async Task<MailProfileCreateOutcome> IMailProfileStoreCreateCoordinator.TryCreateAsync(
+        MailProfile profile,
+        CancellationToken cancellationToken) {
+        MailProfileCloner.Validate(profile);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try {
+            if (_profiles.ContainsKey(profile.Id.Trim())) return MailProfileCreateOutcome.AlreadyExists;
+            SaveLocked(profile, allowCredentialContextChange: false);
+            return MailProfileCreateOutcome.Created;
         } finally {
             _gate.Release();
         }

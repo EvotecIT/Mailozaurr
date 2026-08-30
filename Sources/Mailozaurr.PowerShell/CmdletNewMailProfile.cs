@@ -66,7 +66,16 @@ public sealed class CmdletNewMailProfile : MailApplicationCmdletBase {
             IsDefault = IsDefault
         };
         MailProfileCmdletSettings.Merge(profile, Settings);
-        OperationResult result = await Application.Profiles.SaveAsync(profile, CancelToken).ConfigureAwait(false);
+        OperationResult result;
+        if (Force) {
+            result = await Application.Profiles.SaveAsync(profile, CancelToken).ConfigureAwait(false);
+        } else if (Application.Profiles is IMailProfileCreationService creationService) {
+            result = await creationService.CreateAsync(profile, CancelToken).ConfigureAwait(false);
+        } else {
+            result = OperationResult.Failure(
+                "profile_create_not_supported",
+                "The configured profile service does not support atomic create-only operations. Use -Force only when replacement is intended.");
+        }
         if (result.Succeeded && IsDefault) {
             result = await Application.Profiles.SetDefaultAsync(profileId, CancelToken).ConfigureAwait(false);
         }

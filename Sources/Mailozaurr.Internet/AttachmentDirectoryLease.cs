@@ -13,13 +13,14 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
     private const int LinuxAtSymlinkNoFollow = 0x100;
     private const int DarwinAtSymlinkNoFollow = 0x0020;
     private const int DarwinAtRemoveDirectory = 0x0080;
+    private const int LinuxAtRemoveDirectory = 0x0200;
     private const uint RenameExchange = 0x00000002;
     private const uint UnixFileTypeMask = 0xF000;
     private const uint UnixRegularFile = 0x8000;
     private readonly List<SafeFileHandle> _windowsHandles = new();
     private SafeFileHandle? _unixDirectory;
-    private SafeFileHandle? _darwinTemporaryDirectory;
-    private string? _darwinTemporaryDirectoryName;
+    private SafeFileHandle? _unixTemporaryDirectory;
+    private string? _unixTemporaryDirectoryName;
 
     private AttachmentDirectoryLease(string directoryPath) => DirectoryPath = directoryPath;
 
@@ -260,18 +261,13 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
     }
 
     private int GetTemporaryDirectoryFileDescriptor(out string? cleanupDirectoryPath) {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
-            cleanupDirectoryPath = null;
-            return _unixDirectory!.DangerousGetHandle().ToInt32();
-        }
-
-        EnsureDarwinTemporaryDirectory();
-        cleanupDirectoryPath = Path.Combine(DirectoryPath, _darwinTemporaryDirectoryName!);
-        return _darwinTemporaryDirectory!.DangerousGetHandle().ToInt32();
+        EnsureUnixTemporaryDirectory();
+        cleanupDirectoryPath = Path.Combine(DirectoryPath, _unixTemporaryDirectoryName!);
+        return _unixTemporaryDirectory!.DangerousGetHandle().ToInt32();
     }
 
-    private void EnsureDarwinTemporaryDirectory() {
-        if (_darwinTemporaryDirectory != null) return;
+    private void EnsureUnixTemporaryDirectory() {
+        if (_unixTemporaryDirectory != null) return;
         int parentDirectoryFd = _unixDirectory!.DangerousGetHandle().ToInt32();
         using var random = RandomNumberGenerator.Create();
         var bytes = new byte[16];
@@ -287,18 +283,18 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
             int fd = openat(parentDirectoryFd, name, UnixOpenDirectoryFlags(), 0);
             if (fd < 0) {
                 int error = Marshal.GetLastWin32Error();
-                unlinkat(parentDirectoryFd, name, DarwinAtRemoveDirectory);
+                unlinkat(parentDirectoryFd, name, UnixAtRemoveDirectoryFlag());
                 throw new IOException($"Unable to bind a private attachment staging directory (errno {error}).");
             }
             if (fchmod(fd, Convert.ToUInt32("700", 8)) != 0) {
                 int error = Marshal.GetLastWin32Error();
                 new SafeFileHandle(new IntPtr(fd), ownsHandle: true).Dispose();
-                unlinkat(parentDirectoryFd, name, DarwinAtRemoveDirectory);
+                unlinkat(parentDirectoryFd, name, UnixAtRemoveDirectoryFlag());
                 throw new IOException($"Unable to restrict a private attachment staging directory (errno {error}).");
             }
 
-            _darwinTemporaryDirectory = new SafeFileHandle(new IntPtr(fd), ownsHandle: true);
-            _darwinTemporaryDirectoryName = name;
+            _unixTemporaryDirectory = new SafeFileHandle(new IntPtr(fd), ownsHandle: true);
+            _unixTemporaryDirectoryName = name;
             return;
         }
         throw new IOException("Unable to allocate a private attachment staging directory.");
@@ -414,7 +410,9 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
         try {
             int noFollowFlag = RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
                 ? DarwinAtSymlinkNoFollow
-                : LinuxAtSymlinkNoFollow;
+                : RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+                    ? LinuxAtSymlinkNoFollow
+                    : throw UnsupportedUnixPlatform();
             if (fstatat(directoryFd, name, statBuffer, noFollowFlag) != 0) {
                 if (Marshal.GetLastWin32Error() == 2) {
                     mode = 0;
@@ -443,25 +441,38 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
 
     private static int UnixOpenDirectoryFlags() => RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
         ? 0x100000 | 0x100 | 0x1000000
-        : 0x10000 | 0x20000 | 0x80000;
+        : RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+            ? 0x10000 | 0x20000 | 0x80000
+            : throw UnsupportedUnixPlatform();
 
     private static int UnixOpenWriteFlags() => RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
         ? 0x0001 | 0x0200 | 0x0800 | 0x0100 | 0x1000000
-        : 0x0001 | 0x0040 | 0x0080 | 0x20000 | 0x80000;
+        : RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+            ? 0x0001 | 0x0040 | 0x0080 | 0x20000 | 0x80000
+            : throw UnsupportedUnixPlatform();
+
+    private static int UnixAtRemoveDirectoryFlag() => RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+        ? DarwinAtRemoveDirectory
+        : RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+            ? LinuxAtRemoveDirectory
+            : throw UnsupportedUnixPlatform();
+
+    private static PlatformNotSupportedException UnsupportedUnixPlatform() => new(
+        $"Secure attachment filesystem operations are supported only on Windows, Linux, and macOS; '{RuntimeInformation.OSDescription}' is not supported.");
 
     private static void ThrowUnixIOException(string operation) =>
         throw new IOException($"Unable to {operation} (errno {Marshal.GetLastWin32Error()}).");
 
     public void Dispose() {
-        _darwinTemporaryDirectory?.Dispose();
-        _darwinTemporaryDirectory = null;
-        if (_darwinTemporaryDirectoryName != null && _unixDirectory != null && !_unixDirectory.IsInvalid) {
+        _unixTemporaryDirectory?.Dispose();
+        _unixTemporaryDirectory = null;
+        if (_unixTemporaryDirectoryName != null && _unixDirectory != null && !_unixDirectory.IsInvalid) {
             unlinkat(
                 _unixDirectory.DangerousGetHandle().ToInt32(),
-                _darwinTemporaryDirectoryName,
-                DarwinAtRemoveDirectory);
+                _unixTemporaryDirectoryName,
+                UnixAtRemoveDirectoryFlag());
         }
-        _darwinTemporaryDirectoryName = null;
+        _unixTemporaryDirectoryName = null;
         _unixDirectory?.Dispose();
         _unixDirectory = null;
         foreach (SafeFileHandle handle in _windowsHandles) handle.Dispose();
