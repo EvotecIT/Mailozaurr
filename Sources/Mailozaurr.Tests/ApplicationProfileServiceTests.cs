@@ -252,6 +252,7 @@ public sealed class ApplicationProfileServiceTests {
     [InlineData(MailProfileKind.Gmail, MailProfileSettingsKeys.Mailbox, "user@gmail.com", "other@gmail.com")]
     [InlineData(MailProfileKind.Gmail, MailProfileSettingsKeys.ClientId, "gmail-client", "other-client")]
     [InlineData(MailProfileKind.Jmap, MailProfileSettingsKeys.JmapSessionUrl, "https://mail.example.com/.well-known/jmap", "https://mail.attacker.example/.well-known/jmap")]
+    [InlineData(MailProfileKind.Jmap, MailProfileSettingsKeys.JmapAccountId, "account-a", "account-b")]
     [InlineData(MailProfileKind.Jmap, MailProfileSettingsKeys.JmapAllowCrossOriginApiUrl, "false", "true")]
     [InlineData(MailProfileKind.Ses, MailProfileSettingsKeys.Region, "us-east-1", "eu-central-1")]
     public async Task SaveAsyncRejectsCredentialContextChangesWithoutRedirectingSecrets(

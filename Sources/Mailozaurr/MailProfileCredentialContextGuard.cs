@@ -14,6 +14,7 @@ internal static class MailProfileCredentialContextGuard {
 
     private static readonly string[] JmapCredentialContextKeys = {
         MailProfileSettingsKeys.JmapSessionUrl,
+        MailProfileSettingsKeys.JmapAccountId,
         MailProfileSettingsKeys.JmapAllowCrossOriginApiUrl
     };
 
