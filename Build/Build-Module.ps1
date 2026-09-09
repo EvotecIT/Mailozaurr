@@ -158,8 +158,8 @@ Build-Module -ModuleName 'Mailozaurr' {
     New-ConfigurationProjectBuild -Name 'Mailozaurr' -ConfigPath $ProjectBuildConfigPath -Enabled -BuildBeforeModule -UseAsReleaseVersionSource -ProvideLocalNuGetFeed -PublishNuget -PublishGitHub
     New-ConfigurationRelease -StageRoot 'Artefacts\UploadReady' -VersionSource ProjectBuild -PrimaryProject 'Mailozaurr' -BuildOrder 'Packages', 'Module' -PublishOrder 'NuGet', 'PowerShellGallery', 'GitHub'
 
-    New-ConfigurationArtefact -Type Unpacked -Enable -Path 'Artefacts\Unpacked' -ModulesPath 'Artefacts\Unpacked\Modules'
-    New-ConfigurationArtefact -Type Packed -Enable -Path 'Artefacts\Packed' -ModulesPath 'Artefacts\Packed\Modules' -IncludeTagName
+    New-ConfigurationArtefact -Type Unpacked -Enable -Path 'Artefacts\Unpacked' -ModulesPath 'Modules'
+    New-ConfigurationArtefact -Type Packed -Enable -Path 'Artefacts\Packed' -IncludeTagName
 
     #New-ConfigurationTest -TestsPath "$PSScriptRoot\..\Tests" -Enable
 
