@@ -40,6 +40,41 @@ public class SmtpSessionServiceTests {
     }
 
     [Fact]
+    public async Task ConnectAndAuthenticateAsync_OwnedSecurityModeTakesPrecedence() {
+        var request = new SmtpSessionRequest {
+            Server = "smtp.test",
+            Port = 587,
+            SecureSocketOptions = SecureSocketOptions.None,
+            SecurityMode = SmtpSecurityMode.StartTls,
+            Authenticate = false,
+            DryRun = true
+        };
+
+        var result = await SmtpSessionService.ConnectAndAuthenticateAsync(new Smtp(), request);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SmtpSecurityMode.StartTls, result.SecurityMode);
+        Assert.Equal(SecureSocketOptions.StartTls, result.SecureSocketOptions);
+    }
+
+    [Fact]
+    public async Task ConnectAndAuthenticateAsync_ReportsEffectiveStartTlsForAutoWithUseSsl() {
+        var request = new SmtpSessionRequest {
+            Server = "smtp.test",
+            SecurityMode = SmtpSecurityMode.Auto,
+            UseSsl = true,
+            Authenticate = false,
+            DryRun = true
+        };
+
+        var result = await SmtpSessionService.ConnectAndAuthenticateAsync(new Smtp(), request);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SmtpSecurityMode.StartTls, result.SecurityMode);
+        Assert.Equal(SecureSocketOptions.StartTls, result.SecureSocketOptions);
+    }
+
+    [Fact]
     public async Task ConnectAndAuthenticateAsync_AnonymousRelaySkipsAuthentication() {
         bool authenticateCalled = false;
         var request = new SmtpSessionRequest {

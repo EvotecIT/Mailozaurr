@@ -62,9 +62,7 @@ public sealed class SmtpPendingMessageSender : IPendingMessageSender {
         var message = await LoadMessageAsync(record, ct).ConfigureAwait(false);
         var secureSocketOptions = ResolveSecureSocketOptions(record.ProviderData);
         var useSsl = ResolveBool(record.ProviderData, UseSslKey, defaultUseSsl);
-        if (useSsl && secureSocketOptions == SecureSocketOptions.Auto) {
-            secureSocketOptions = SecureSocketOptions.StartTls;
-        }
+        secureSocketOptions = secureSocketOptions.ResolveEffective(useSsl);
         var skipValidation = ResolveBool(record.ProviderData, SkipCertificateValidationKey, defaultSkipCertificateValidation);
         var checkRevocation = ResolveBool(record.ProviderData, CheckCertificateRevocationKey, defaultCheckCertificateRevocation);
         var timeout = ResolveInt(record.ProviderData, TimeoutKey, defaultTimeout);

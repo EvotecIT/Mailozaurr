@@ -66,10 +66,7 @@ public partial class Smtp {
             }
 
             Stream stream = tcpClient.GetStream();
-            var effectiveOptions = secureSocketOptions;
-            if (useSsl && effectiveOptions == SecureSocketOptions.Auto) {
-                effectiveOptions = SecureSocketOptions.StartTls;
-            }
+            var effectiveOptions = secureSocketOptions.ResolveEffective(useSsl);
 
             if (effectiveOptions == SecureSocketOptions.SslOnConnect
                 || (effectiveOptions == SecureSocketOptions.Auto && port == 465)) {
