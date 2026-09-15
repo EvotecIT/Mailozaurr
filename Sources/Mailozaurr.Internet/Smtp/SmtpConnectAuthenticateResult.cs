@@ -17,6 +17,11 @@ public sealed class SmtpConnectAuthenticateResult {
     public SecureSocketOptions SecureSocketOptions { get; init; } = SecureSocketOptions.Auto;
 
     /// <summary>
+    /// Effective provider-neutral security mode used for the connection.
+    /// </summary>
+    public SmtpSecurityMode SecurityMode => SecureSocketOptions.ToSmtpSecurityMode();
+
+    /// <summary>
     /// Stable error code for connect/auth failures.
     /// </summary>
     public string ErrorCode { get; init; } = string.Empty;

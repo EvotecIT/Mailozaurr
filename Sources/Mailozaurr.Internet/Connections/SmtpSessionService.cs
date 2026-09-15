@@ -21,6 +21,11 @@ public sealed class SmtpConnectResult {
     public SecureSocketOptions SecureSocketOptions { get; }
 
     /// <summary>
+    /// Gets the provider-neutral security mode used during the connection.
+    /// </summary>
+    public SmtpSecurityMode SecurityMode => SecureSocketOptions.ToSmtpSecurityMode();
+
+    /// <summary>
     /// Gets the error code when the flow failed.
     /// </summary>
     public string? ErrorCode { get; }
@@ -57,6 +62,11 @@ public sealed class SmtpSessionRequest {
     public int Port { get; init; } = 587;
     /// <summary>Secure socket options.</summary>
     public SecureSocketOptions SecureSocketOptions { get; init; } = SecureSocketOptions.Auto;
+    /// <summary>
+    /// Optional provider-neutral security mode. When supplied, this value takes precedence over
+    /// <see cref="SecureSocketOptions"/>.
+    /// </summary>
+    public SmtpSecurityMode? SecurityMode { get; init; }
     /// <summary>Force SSL flag.</summary>
     public bool UseSsl { get; init; }
     /// <summary>Connection timeout in milliseconds.</summary>
@@ -123,7 +133,8 @@ public static class SmtpSessionService {
         smtp.CheckCertificateRevocation = !request.SkipCertificateRevocation;
         smtp.DryRun = request.DryRun;
 
-        var secureOptions = request.SecureSocketOptions;
+        var secureOptions = (request.SecurityMode?.ToMailKit() ?? request.SecureSocketOptions)
+            .ResolveEffective(request.UseSsl);
         var connectFunc = request.ConnectWithCancellationAsync ??
             (request.ConnectAsync is { } legacyConnect
                 ? new Func<Smtp, CancellationToken, Task<SmtpResult>>((client, _) => legacyConnect(client))

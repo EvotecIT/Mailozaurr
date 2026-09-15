@@ -84,6 +84,45 @@ public class SmtpAsyncWrappersTests {
         Assert.Equal(typeof(Task<SmtpResult>), method!.ReturnType);
     }
 
+    [Theory]
+    [InlineData(SecureSocketOptions.Auto, SmtpSecurityMode.Auto)]
+    [InlineData(SecureSocketOptions.None, SmtpSecurityMode.None)]
+    [InlineData(SecureSocketOptions.SslOnConnect, SmtpSecurityMode.SslOnConnect)]
+    [InlineData(SecureSocketOptions.StartTls, SmtpSecurityMode.StartTls)]
+    [InlineData(SecureSocketOptions.StartTlsWhenAvailable, SmtpSecurityMode.StartTlsWhenAvailable)]
+    public async Task ConnectAsync_ReportsProviderNeutralActiveSecurityMode(
+        SecureSocketOptions secureSocketOptions,
+        SmtpSecurityMode expected) {
+        var smtp = new Smtp();
+        var fake = new FakeConnectClient();
+        SetClient(smtp, fake);
+
+        var result = await smtp.ConnectAsync("host", 25, secureSocketOptions);
+
+        Assert.True(result.Status);
+        Assert.Equal(secureSocketOptions, fake.LastSecureSocketOptions);
+        Assert.Equal(expected, smtp.ActiveSecurityMode);
+    }
+
+    [Fact]
+    public void SmtpSecurityMode_PreservesLegacyNumericConfigurationValues() {
+        Assert.Equal(0, (int)SmtpSecurityMode.None);
+        Assert.Equal(1, (int)SmtpSecurityMode.Auto);
+        Assert.Equal(2, (int)SmtpSecurityMode.SslOnConnect);
+        Assert.Equal(3, (int)SmtpSecurityMode.StartTls);
+        Assert.Equal(4, (int)SmtpSecurityMode.StartTlsWhenAvailable);
+    }
+
+    [Fact]
+    public void Connect_PreservesDefaultAndZeroLiteralSourceCompatibility() {
+        var smtp = new Smtp();
+        Func<SmtpResult> defaultLiteralCall = () => smtp.Connect("host", 25, default);
+        Func<SmtpResult> zeroLiteralCall = () => smtp.Connect("host", 25, 0);
+
+        Assert.NotNull(defaultLiteralCall);
+        Assert.NotNull(zeroLiteralCall);
+    }
+
     [Fact]
     public async Task ConnectAndAuthenticateAsync_ReturnsSuccessForOAuthAuthentication() {
         var smtp = new Smtp();

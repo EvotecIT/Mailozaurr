@@ -563,13 +563,7 @@ public partial class Smtp {
             }
             return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, server ?? string.Empty, port, Stopwatch.Elapsed, "", message);
         }
-        var effectiveOptions = secureSocketOptions;
-        if (useSsl && effectiveOptions == SecureSocketOptions.Auto) {
-            // Maintain backwards compatibility with Send-MailMessage by
-            // defaulting to StartTls when the UseSsl flag is supplied and
-            // no explicit option was provided.
-            effectiveOptions = SecureSocketOptions.StartTls;
-        }
+        var effectiveOptions = secureSocketOptions.ResolveEffective(useSsl);
         _activeUseSsl = useSsl;
         _activeSecureSocketOptions = effectiveOptions;
         if (DryRun) {
@@ -660,13 +654,7 @@ public partial class Smtp {
             }
             return new SmtpResult(false, EmailAction.Connect, SentTo, SentFrom, server ?? string.Empty, port, Stopwatch.Elapsed, "", message);
         }
-        var effectiveOptions = secureSocketOptions;
-        if (useSsl && effectiveOptions == SecureSocketOptions.Auto) {
-            // Maintain backwards compatibility with Send-MailMessage by
-            // defaulting to StartTls when the UseSsl flag is supplied and
-            // no explicit option was provided.
-            effectiveOptions = SecureSocketOptions.StartTls;
-        }
+        var effectiveOptions = secureSocketOptions.ResolveEffective(useSsl);
         _activeUseSsl = useSsl;
         _activeSecureSocketOptions = effectiveOptions;
         if (DryRun) {
