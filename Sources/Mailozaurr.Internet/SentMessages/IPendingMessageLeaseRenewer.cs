@@ -12,3 +12,14 @@ public interface IPendingMessageLeaseRenewer {
     Task<bool> TryRenewLeaseAsync(string messageId, string leaseId, DateTimeOffset expectedLeaseUntil,
         DateTimeOffset newLeaseUntil, CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// Optional renewal contract that returns the committed expiry when storage
+/// contention extends the requested lease timestamp.
+/// </summary>
+public interface IPendingMessageLeaseExpirationRenewer : IPendingMessageLeaseRenewer {
+    /// <summary>Renews an owned lease and returns its committed expiry, or null when ownership was lost.</summary>
+    Task<DateTimeOffset?> TryRenewLeaseAndGetExpirationAsync(string messageId, string leaseId,
+        DateTimeOffset expectedLeaseUntil, DateTimeOffset newLeaseUntil,
+        CancellationToken cancellationToken = default);
+}

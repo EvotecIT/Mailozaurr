@@ -30,6 +30,79 @@ public sealed class FilePendingMessageCoordinationTests {
     }
 
     [Fact]
+    public async Task LeaseAcquisitionRetainsItsDurationAfterWaitingForStorageLock() {
+        var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var path = Path.Combine(directory, "pending.log");
+            var repository = new FilePendingMessageRepository(path);
+            var now = DateTimeOffset.UtcNow;
+            await repository.SaveAsync(new PendingMessageRecord {
+                MessageId = "contended-lease", Timestamp = now, NextAttemptAt = now
+            });
+
+            PendingMessageRecord? lease;
+            var lockFile = new FileStream(path + ".lock", FileMode.OpenOrCreate,
+                FileAccess.ReadWrite, FileShare.None);
+            try {
+                var acquisition = repository.TryAcquireLeaseAsync(
+                    "contended-lease", now, now.AddMilliseconds(300));
+                await Task.Delay(450);
+                lockFile.Dispose();
+                lease = await acquisition;
+            } finally {
+                lockFile.Dispose();
+            }
+
+            Assert.NotNull(lease);
+            Assert.True(lease!.ProcessingLeaseUntil >= now.AddMilliseconds(600));
+            Assert.Equal(lease.ProcessingLeaseUntil, lease.NextAttemptAt);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task LeaseRenewalReturnsTheExpiryCommittedAfterStorageContention() {
+        var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var path = Path.Combine(directory, "pending.log");
+            var repository = new FilePendingMessageRepository(path);
+            var now = DateTimeOffset.UtcNow;
+            await repository.SaveAsync(new PendingMessageRecord {
+                MessageId = "contended-renewal", Timestamp = now, NextAttemptAt = now
+            });
+            var lease = await repository.TryAcquireLeaseAsync(
+                "contended-renewal", now, now.AddMilliseconds(300));
+            Assert.NotNull(lease);
+            var expected = lease!.ProcessingLeaseUntil!.Value;
+            var filtered = new Mailozaurr.PowerShell.CmdletSendEmailPendingMessage.FilteredPendingMessageRepository(
+                repository, null, null, false, () => DateTimeOffset.UtcNow);
+
+            DateTimeOffset? committed;
+            var lockFile = new FileStream(path + ".lock", FileMode.OpenOrCreate,
+                FileAccess.ReadWrite, FileShare.None);
+            try {
+                var renewal = filtered.TryRenewLeaseAndGetExpirationAsync(
+                    lease.MessageId, lease.ProcessingLeaseId!, expected, expected.AddMilliseconds(300));
+                await Task.Delay(450);
+                lockFile.Dispose();
+                committed = await renewal;
+            } finally {
+                lockFile.Dispose();
+            }
+
+            Assert.True(committed >= expected.AddMilliseconds(600));
+            Assert.Equal(committed, (await repository.GetByMessageIdAsync(lease.MessageId))!.ProcessingLeaseUntil);
+            Assert.True(await repository.TryRenewLeaseAsync(lease.MessageId,
+                lease.ProcessingLeaseId!, committed!.Value, committed.Value.AddMilliseconds(300)));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ForcedRetryRespectsAnExistingLeaseAndRenewalUsesCompareAndSwap() {
         var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

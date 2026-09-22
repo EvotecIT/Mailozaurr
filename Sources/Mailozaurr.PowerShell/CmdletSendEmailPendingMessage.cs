@@ -153,8 +153,8 @@ public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
         }
     }
 
-    private sealed class FilteredPendingMessageRepository : IPendingMessageRepository, IPendingMessageLeaseRenewer,
-        IPendingMessageLeaseCommitter {
+    internal sealed class FilteredPendingMessageRepository : IPendingMessageRepository,
+        IPendingMessageLeaseExpirationRenewer, IPendingMessageLeaseCommitter {
         private readonly IPendingMessageRepository _inner;
         private readonly HashSet<string>? _messageIds;
         private readonly EmailProvider? _provider;
@@ -214,6 +214,21 @@ public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
             _inner is IPendingMessageLeaseRenewer renewer
                 ? renewer.TryRenewLeaseAsync(messageId, leaseId, expectedLeaseUntil, newLeaseUntil, cancellationToken)
                 : Task.FromResult(false);
+
+        public async Task<DateTimeOffset?> TryRenewLeaseAndGetExpirationAsync(string messageId, string leaseId,
+            DateTimeOffset expectedLeaseUntil, DateTimeOffset newLeaseUntil,
+            CancellationToken cancellationToken = default) {
+            if (_inner is IPendingMessageLeaseExpirationRenewer expirationRenewer) {
+                return await expirationRenewer.TryRenewLeaseAndGetExpirationAsync(
+                    messageId, leaseId, expectedLeaseUntil, newLeaseUntil, cancellationToken).ConfigureAwait(false);
+            }
+            if (_inner is IPendingMessageLeaseRenewer renewer &&
+                await renewer.TryRenewLeaseAsync(messageId, leaseId, expectedLeaseUntil,
+                    newLeaseUntil, cancellationToken).ConfigureAwait(false)) {
+                return newLeaseUntil;
+            }
+            return null;
+        }
 
         public Task<bool> TrySaveWithLeaseAsync(PendingMessageRecord record, string leaseId,
             CancellationToken cancellationToken = default) =>

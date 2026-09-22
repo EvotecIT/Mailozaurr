@@ -275,12 +275,21 @@ public sealed class PendingMessageProcessor {
                 await Task.Delay(interval, renewalCancellation).ConfigureAwait(false);
                 var next = ApplyDelay(clock(), duration);
                 if (next <= expected) next = ApplyDelay(expected, duration);
-                if (next <= expected || !await renewer.TryRenewLeaseAsync(
-                        messageId, leaseId, expected, next, CancellationToken.None).ConfigureAwait(false)) {
+                DateTimeOffset? committed = null;
+                if (next > expected) {
+                    if (renewer is IPendingMessageLeaseExpirationRenewer expirationRenewer) {
+                        committed = await expirationRenewer.TryRenewLeaseAndGetExpirationAsync(
+                            messageId, leaseId, expected, next, CancellationToken.None).ConfigureAwait(false);
+                    } else if (await renewer.TryRenewLeaseAsync(
+                                   messageId, leaseId, expected, next, CancellationToken.None).ConfigureAwait(false)) {
+                        committed = next;
+                    }
+                }
+                if (committed == null) {
                     deliveryCancellation.Cancel();
                     return new InvalidOperationException("The processing lease could not be extended.");
                 }
-                expected = next;
+                expected = committed.Value;
             }
         } catch (OperationCanceledException) when (renewalCancellation.IsCancellationRequested) {
             return null;

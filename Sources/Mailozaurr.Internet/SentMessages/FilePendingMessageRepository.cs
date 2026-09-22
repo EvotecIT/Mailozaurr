@@ -8,7 +8,7 @@ namespace Mailozaurr;
 /// Stores pending message records in a single newline-delimited JSON file.
 /// </summary>
 public sealed class FilePendingMessageRepository : IPendingMessageRepository, IPendingMessageLeaseRenewer,
-    IPendingMessageLeaseCommitter,
+    IPendingMessageLeaseExpirationRenewer, IPendingMessageLeaseCommitter,
     IPendingMessageForcedLeaseRepository {
     private const string UpsertEntryType = "upsert";
     private const string TombstoneEntryType = "tombstone";
@@ -645,6 +645,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
     private async Task<PendingMessageRecord?> TryAcquireLeaseCoreAsync(string messageId,
         DateTimeOffset now, DateTimeOffset leaseUntil, bool ignoreSchedule,
         CancellationToken cancellationToken) {
+        var acquisitionWait = Stopwatch.StartNew();
         bool changed = false;
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
@@ -658,6 +659,16 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             if (current.ProcessingLeaseUntil > now || legacyLeaseMayBeActive ||
                 !ignoreSchedule && current.NextAttemptAt > now) {
                 return null;
+            }
+
+            // The caller computes the expiry before waiting for the local gate,
+            // cross-process lock, and index refresh. Give the owner its intended
+            // lease time when that wait consumed the renewal safety margin.
+            var duration = leaseUntil - now;
+            var elapsed = acquisitionWait.Elapsed;
+            if (duration > TimeSpan.Zero && elapsed.Ticks > duration.Ticks / 3) {
+                var available = DateTimeOffset.MaxValue - leaseUntil;
+                leaseUntil += elapsed < available ? elapsed : available;
             }
 
             _ = current.ProviderData;
@@ -683,21 +694,35 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
 
     /// <inheritdoc />
     public async Task<bool> TryRenewLeaseAsync(string messageId, string leaseId, DateTimeOffset expectedLeaseUntil,
-        DateTimeOffset newLeaseUntil, CancellationToken cancellationToken = default) {
+        DateTimeOffset newLeaseUntil, CancellationToken cancellationToken = default) =>
+        await TryRenewLeaseAndGetExpirationAsync(messageId, leaseId, expectedLeaseUntil,
+            newLeaseUntil, cancellationToken).ConfigureAwait(false) != null;
+
+    /// <inheritdoc />
+    public async Task<DateTimeOffset?> TryRenewLeaseAndGetExpirationAsync(string messageId, string leaseId,
+        DateTimeOffset expectedLeaseUntil, DateTimeOffset newLeaseUntil,
+        CancellationToken cancellationToken = default) {
         if (newLeaseUntil <= expectedLeaseUntil) {
             throw new ArgumentOutOfRangeException(nameof(newLeaseUntil));
         }
+        var renewalWait = Stopwatch.StartNew();
         bool changed = false;
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             ThrowIfDefaultQueueConflictAppeared();
-            if (!File.Exists(filePath)) return false;
+            if (!File.Exists(filePath)) return null;
             using var storageLock = await AcquireIndexedStorageLockAsync(cancellationToken).ConfigureAwait(false);
             var current = await GetByMessageIdCoreAsync(messageId, cancellationToken).ConfigureAwait(false);
             if (current == null || current.NextAttemptAt != expectedLeaseUntil ||
                 current.ProcessingLeaseUntil != expectedLeaseUntil ||
                 current.ProcessingLeaseId != leaseId) {
-                return false;
+                return null;
+            }
+            var duration = newLeaseUntil - expectedLeaseUntil;
+            var elapsed = renewalWait.Elapsed;
+            if (elapsed.Ticks > duration.Ticks / 3) {
+                var available = DateTimeOffset.MaxValue - newLeaseUntil;
+                newLeaseUntil += elapsed < available ? elapsed : available;
             }
             current.NextAttemptAt = newLeaseUntil;
             current.ProcessingLeaseUntil = newLeaseUntil;
@@ -706,7 +731,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             index[current.MessageId] = offset;
             CaptureFileStamp();
             changed = true;
-            return true;
+            return newLeaseUntil;
         } finally {
             gate.Release();
             if (changed) await CompactAfterCommittedMutationAsync().ConfigureAwait(false);
