@@ -55,10 +55,12 @@ public sealed class MailEmlArchiveService {
         var scopePath = Path.Combine(metadataDirectory, "scope.json");
         var expectedScope = new MailEmlArchiveScopeDocument {
             ProfileId = profile.Id,
-            ProfileFingerprint = HashProfile(profile),
+            ProfileFingerprint = HashProfileIdentity(profile),
             ProviderScope = providerScope,
-            MailboxId = request.MailboxId?.Trim(),
-            FolderId = request.FolderId?.Trim(),
+            // ProviderScope already contains the resolved mailbox and folder namespace.
+            // Raw caller aliases must not make equivalent resume requests incompatible.
+            MailboxId = null,
+            FolderId = null,
             InventorySha256 = HashInventory(ids),
             InventoryCount = ids.Count
         };
@@ -251,16 +253,10 @@ public sealed class MailEmlArchiveService {
             .Replace("-", string.Empty).ToLowerInvariant();
     }
 
-    private static string HashProfile(MailProfile profile) {
+    private static string HashProfileIdentity(MailProfile profile) {
         var builder = new StringBuilder();
         Append(profile.Id);
         Append(profile.Kind.ToString());
-        Append(profile.DefaultMailbox);
-        Append(profile.DefaultSender);
-        foreach (var setting in profile.Settings.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)) {
-            Append(setting.Key);
-            Append(setting.Value);
-        }
         return HashText(builder.ToString());
 
         void Append(string? value) {

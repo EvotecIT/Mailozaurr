@@ -35,20 +35,16 @@ public sealed class ProviderEmlArtifactWriter {
         if (string.IsNullOrWhiteSpace(destinationPath)) throw new ArgumentException("Destination path is required.", nameof(destinationPath));
         if (maxBytes <= 0) throw new ArgumentOutOfRangeException(nameof(maxBytes));
         string? stagedPath = null;
+        Stream? stagedStream = null;
         Stream source = content;
         try {
             if (!content.CanSeek) {
                 stagedPath = Path.Combine(Path.GetTempPath(), "mailozaurr-eml-" + Guid.NewGuid().ToString("N") + ".tmp");
-                var staged = UnixFilePermissions.OpenRestrictedFile(stagedPath, FileMode.CreateNew,
+                stagedStream = UnixFilePermissions.OpenRestrictedFile(stagedPath, FileMode.CreateNew,
                     FileAccess.ReadWrite, FileShare.None);
-                try {
-                    await CopyBoundedAsync(content, staged, maxBytes, null, cancellationToken).ConfigureAwait(false);
-                    staged.Position = 0;
-                    source = staged;
-                } catch {
-                    staged.Dispose();
-                    throw;
-                }
+                await CopyBoundedAsync(content, stagedStream, maxBytes, null, cancellationToken).ConfigureAwait(false);
+                stagedStream.Position = 0;
+                source = stagedStream;
             }
             if (source.Length > maxBytes) {
                 throw new InvalidOperationException($"Provider message exceeds the configured {maxBytes} byte export limit.");
@@ -83,7 +79,7 @@ public sealed class ProviderEmlArtifactWriter {
             };
         } finally {
             if (stagedPath != null) {
-                source.Dispose();
+                stagedStream?.Dispose();
                 File.Delete(stagedPath);
             }
         }

@@ -3,7 +3,7 @@ using MailKit;
 namespace Mailozaurr;
 
 /// <summary>Retrieves unmodified RFC 822 content from an IMAP mailbox.</summary>
-public sealed class ImapRawMailMessageSource : IRawMailMessageSource {
+public sealed class ImapRawMailMessageSource : IRawMailMessageSource, IArchiveRawMailMessageSource {
     private readonly IImapSessionFactory _sessionFactory;
 
     /// <summary>Creates an IMAP raw-message source.</summary>
@@ -21,13 +21,26 @@ public sealed class ImapRawMailMessageSource : IRawMailMessageSource {
         return new Session(profile, client);
     }
 
+    async Task<IRawMailMessageSession> IArchiveRawMailMessageSource.OpenArchiveSessionAsync(
+        MailProfile profile, CancellationToken cancellationToken) {
+        if (_sessionFactory is ImapSessionFactory credentialFactory) {
+            var authenticated = await credentialFactory.ConnectForArchiveAsync(profile, cancellationToken)
+                .ConfigureAwait(false);
+            return new Session(profile, authenticated.Client, authenticated.Scope);
+        }
+        throw new NotSupportedException(
+            "IMAP archive resume requires a session factory that binds the authenticated credential.");
+    }
+
     private sealed class Session : IRawMailMessageSession, IStreamingRawMailMessageSession, IRawMailMessageScopeSession {
         private readonly MailProfile _profile;
         private readonly MailKit.Net.Imap.ImapClient _client;
+        private readonly string? _archiveScope;
 
-        internal Session(MailProfile profile, MailKit.Net.Imap.ImapClient client) {
+        internal Session(MailProfile profile, MailKit.Net.Imap.ImapClient client, string? archiveScope = null) {
             _profile = profile;
             _client = client;
+            _archiveScope = archiveScope;
         }
 
         public Task<string> GetScopeAsync(string? mailboxId, string? folderId,
@@ -35,7 +48,10 @@ public sealed class ImapRawMailMessageSource : IRawMailMessageSource {
             cancellationToken.ThrowIfCancellationRequested();
             var folder = ImapMailReadHandler.ResolveFolder(folderId, _profile);
             var mailFolder = _client.GetCachedFolder(folder, FolderAccess.ReadOnly);
-            return Task.FromResult(ImapMailReadHandler.CanonicalizeFolderForStorage(mailFolder.FullName) +
+            var accountScope = _archiveScope ?? throw new NotSupportedException(
+                "IMAP archive resume requires a session factory that binds the authenticated credential.");
+            return Task.FromResult(accountScope + ":" +
+                ImapMailReadHandler.CanonicalizeFolderForStorage(mailFolder.FullName) +
                 ":uidvalidity:" + mailFolder.UidValidity.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 

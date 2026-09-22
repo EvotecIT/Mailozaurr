@@ -70,7 +70,7 @@ public sealed class MailEmlExportService : IMailEmlExportService, IMailEmlArchiv
 
     private async Task<MailEmlExportResult> ExportWithSessionAsync(
         MailEmlExportRequest request, MailProfile profile, IRawMailMessageSession sourceSession,
-        CancellationToken cancellationToken) {
+        CancellationToken cancellationToken, bool validateInitialProviderScope = true) {
         if (request == null) throw new ArgumentNullException(nameof(request));
         if (!string.Equals(request.ProfileId.Trim(), profile.Id, StringComparison.Ordinal))
             throw new InvalidOperationException("An archive export session cannot switch profiles.");
@@ -87,7 +87,7 @@ public sealed class MailEmlExportService : IMailEmlExportService, IMailEmlArchiv
         if (messageIds.Count == 0) throw new ArgumentException("At least one message id is required.", nameof(request));
         var destinationDirectory = Path.GetFullPath(request.DestinationDirectory);
         Directory.CreateDirectory(destinationDirectory);
-        if (request.ExpectedProviderScope != null) {
+        if (request.ExpectedProviderScope != null && validateInitialProviderScope) {
             if (sourceSession is not IRawMailMessageScopeSession scopedSession)
                 throw new NotSupportedException("Archive export requires a provider scope aware source.");
             var actualScope = await scopedSession.GetScopeAsync(request.MailboxId, request.FolderId, cancellationToken).ConfigureAwait(false);
@@ -164,7 +164,7 @@ public sealed class MailEmlExportService : IMailEmlExportService, IMailEmlArchiv
                 item.Sha256 = write.Sha256;
                 item.UsedPreservedSource = write.UsedPreservedSource;
                 item.DiagnosticCodes = write.DiagnosticCodes;
-                if (request.ExpectedProviderScope != null) {
+                if (request.ExpectedProviderScope != null && profile.Kind == MailProfileKind.Imap) {
                     var currentScope = await ((IRawMailMessageScopeSession)sourceSession)
                         .GetScopeAsync(request.MailboxId, request.FolderId, cancellationToken).ConfigureAwait(false);
                     if (!string.Equals(currentScope, request.ExpectedProviderScope, StringComparison.Ordinal))
@@ -194,6 +194,7 @@ public sealed class MailEmlExportService : IMailEmlExportService, IMailEmlArchiv
         private readonly MailEmlExportService _owner;
         private readonly MailProfile _profile;
         private readonly IRawMailMessageSession _sourceSession;
+        private string? _validatedRemoteProviderScope;
 
         internal ArchiveBatchSession(MailEmlExportService owner, MailProfile profile,
             IRawMailMessageSession sourceSession) {
@@ -202,9 +203,19 @@ public sealed class MailEmlExportService : IMailEmlExportService, IMailEmlArchiv
             _sourceSession = sourceSession;
         }
 
-        public Task<MailEmlExportResult> ExportAsync(MailEmlExportRequest request,
-            CancellationToken cancellationToken) =>
-            _owner.ExportWithSessionAsync(request, _profile, _sourceSession, cancellationToken);
+        public async Task<MailEmlExportResult> ExportAsync(MailEmlExportRequest request,
+            CancellationToken cancellationToken) {
+            var isRemoteIdentityProvider = _profile.Kind == MailProfileKind.Graph ||
+                _profile.Kind == MailProfileKind.Gmail;
+            var validateInitialScope = !isRemoteIdentityProvider ||
+                !string.Equals(_validatedRemoteProviderScope, request.ExpectedProviderScope,
+                    StringComparison.Ordinal);
+            var result = await _owner.ExportWithSessionAsync(request, _profile, _sourceSession,
+                cancellationToken, validateInitialScope).ConfigureAwait(false);
+            if (isRemoteIdentityProvider && request.ExpectedProviderScope != null)
+                _validatedRemoteProviderScope = request.ExpectedProviderScope;
+            return result;
+        }
 
         public void Dispose() => _sourceSession.Dispose();
     }
