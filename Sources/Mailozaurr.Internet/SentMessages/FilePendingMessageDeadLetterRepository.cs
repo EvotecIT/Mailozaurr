@@ -125,12 +125,29 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
                 FileAccess.ReadWrite,
                 FileShare.Read);
             RepairIncompleteTail(write);
+            if (ContainsMessageId(record.Message.MessageId)) return;
             write.Position = write.Length;
             await write.WriteAsync(line, 0, line.Length, CancellationToken.None).ConfigureAwait(false);
             await write.FlushAsync(CancellationToken.None).ConfigureAwait(false);
         } finally {
             gate.Release();
         }
+    }
+
+    private bool ContainsMessageId(string messageId) {
+        if (!File.Exists(filePath)) return false;
+        foreach (var line in LogFileLineReader.ReadLinesWithOffsets(filePath)) {
+            if (string.IsNullOrWhiteSpace(line.Line)) continue;
+            try {
+                var record = JsonSerializer.Deserialize(line.Line,
+                    MailozaurrJsonContext.Default.PendingMessageDeadLetterRecord);
+                if (record?.Message != null && string.Equals(record.Message.MessageId,
+                        messageId, StringComparison.OrdinalIgnoreCase)) return true;
+            } catch (JsonException) {
+                // Ignore malformed historical entries while looking for this id.
+            }
+        }
+        return false;
     }
 
     /// <inheritdoc />

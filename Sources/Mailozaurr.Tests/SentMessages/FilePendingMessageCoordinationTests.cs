@@ -59,6 +59,65 @@ public sealed class FilePendingMessageCoordinationTests {
     }
 
     [Fact]
+    public async Task ForcedRetryConservativelyHonorsLegacyFutureLeaseAfterCompaction() {
+        var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var path = Path.Combine(directory, "pending.log");
+            var now = DateTimeOffset.UtcNow;
+            var legacy = new PendingMessageLogEnvelope {
+                EntryType = "upsert",
+                MessageId = "legacy-in-flight",
+                Record = new PendingMessageRecord {
+                    MessageId = "legacy-in-flight",
+                    Timestamp = now,
+                    NextAttemptAt = now.AddMinutes(5)
+                }
+            };
+            File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(legacy) + Environment.NewLine);
+            var repository = new FilePendingMessageRepository(path);
+
+            for (var index = 0; index < 40; index++) {
+                var id = "churn-" + index;
+                await repository.SaveAsync(new PendingMessageRecord {
+                    MessageId = id, Timestamp = now, NextAttemptAt = now
+                });
+                var lease = await repository.TryAcquireLeaseAsync(id, now, now.AddMinutes(1));
+                Assert.NotNull(lease);
+                Assert.True(await repository.TryRemoveWithLeaseAsync(id, lease!.ProcessingLeaseId!));
+            }
+
+            Assert.Null(await repository.TryAcquireForcedLeaseAsync(
+                "legacy-in-flight", now, now.AddMinutes(2)));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task CompactionFailureDoesNotChangeCommittedMutationResult() {
+        var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var path = Path.Combine(directory, "pending.log");
+            var repository = new FilePendingMessageRepository(path,
+                _ => Task.FromException(new IOException("Simulated compaction failure.")));
+            var now = DateTimeOffset.UtcNow;
+
+            await repository.SaveAsync(new PendingMessageRecord {
+                MessageId = "committed", Timestamp = now, NextAttemptAt = now
+            });
+            var lease = await repository.TryAcquireLeaseAsync("committed", now, now.AddMinutes(1));
+
+            Assert.NotNull(lease);
+            Assert.Equal(lease!.ProcessingLeaseId,
+                (await repository.GetByMessageIdAsync("committed"))!.ProcessingLeaseId);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task AcceptanceRetainsRenewedLeaseUntilCleanup() {
         var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -82,6 +141,7 @@ public sealed class FilePendingMessageCoordinationTests {
 
             var persisted = await repository.GetByMessageIdAsync("renewed-send");
             Assert.Equal(renewed, persisted!.ProcessingLeaseUntil);
+            Assert.Equal(renewed, persisted.NextAttemptAt);
             Assert.Null(await repository.TryAcquireLeaseAsync("renewed-send",
                 now.AddSeconds(3), now.AddMinutes(3)));
             Assert.True(await repository.TryRemoveWithLeaseAsync("renewed-send", lease.ProcessingLeaseId!));

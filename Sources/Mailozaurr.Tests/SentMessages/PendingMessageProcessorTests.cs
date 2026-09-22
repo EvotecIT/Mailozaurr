@@ -65,9 +65,15 @@ public sealed class PendingMessageProcessorTests {
 
         public int SaveCount => saveCount;
 
+        public bool ThrowAfterFirstSave { get; set; }
+
         public Task SaveAsync(PendingMessageDeadLetterRecord record, CancellationToken cancellationToken = default) {
             Interlocked.Increment(ref saveCount);
             records[record.Message.MessageId] = record;
+            if (ThrowAfterFirstSave) {
+                ThrowAfterFirstSave = false;
+                throw new IOException("Simulated interruption after durable dead-letter save.");
+            }
             return Task.CompletedTask;
         }
 
@@ -390,6 +396,36 @@ public sealed class PendingMessageProcessorTests {
         Assert.Null(failure.RetryDelay);
         var drop = Assert.Single(observer.Dropped);
         Assert.Equal(PendingMessageDropReason.PermanentFailure, drop.Reason);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_ResumesTerminalMarkerWithoutSendingAgainAfterDeadLetterInterruption() {
+        var currentTime = DateTimeOffset.Parse("2024-06-05T10:00:00Z");
+        var repository = new InMemoryPendingMessageRepository();
+        var record = CreateRecord(currentTime.AddMinutes(-1));
+        repository.Add(record);
+        var sender = new RecordingPendingMessageSender {
+            ShouldThrow = true,
+            ExceptionToThrow = new InvalidOperationException("Permanent failure")
+        };
+        var deadLetters = new InMemoryDeadLetterRepository { ThrowAfterFirstSave = true };
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            { EmailProvider.None, sender }
+        });
+        var processor = new PendingMessageProcessor(repository, factory, clock: () => currentTime,
+            deadLetterRepository: deadLetters);
+
+        await Assert.ThrowsAsync<IOException>(() => processor.ProcessAsync());
+        var terminal = await repository.GetByMessageIdAsync(record.MessageId);
+        Assert.NotNull(terminal?.DeadLetteredAt);
+        Assert.Equal(PendingMessageDropReason.PermanentFailure, terminal!.DeadLetterReason);
+
+        currentTime = currentTime.AddMinutes(2);
+        await processor.ProcessAsync();
+
+        Assert.False(repository.Contains(record.MessageId));
+        Assert.Single(sender.SentRecords);
+        Assert.NotNull(await deadLetters.GetByMessageIdAsync(record.MessageId));
     }
 
     [Fact]

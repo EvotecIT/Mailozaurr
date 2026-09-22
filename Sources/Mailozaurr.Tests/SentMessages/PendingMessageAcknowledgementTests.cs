@@ -49,6 +49,25 @@ public sealed class PendingMessageAcknowledgementTests {
     }
 
     [Fact]
+    public async Task LeaseRenewalContinuesUntilAcceptanceIsPersisted() {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new SlowAcceptanceRepository(new PendingMessageRecord {
+            MessageId = "slow-acceptance",
+            Timestamp = now,
+            NextAttemptAt = now
+        });
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            [EmailProvider.None] = new CountingSender()
+        });
+
+        await new PendingMessageProcessor(repository, factory,
+            processingLeaseDuration: TimeSpan.FromMilliseconds(90)).ProcessAsync();
+
+        Assert.True(repository.RenewCount > 0);
+        Assert.Null(repository.Record);
+    }
+
+    [Fact]
     public async Task CleanupOfPreviouslyAcceptedRecordDoesNotCountAsAnotherAttempt() {
         var now = DateTimeOffset.Parse("2026-01-01T12:00:00Z");
         var repository = new FailingRemovalRepository(new PendingMessageRecord {
@@ -161,6 +180,75 @@ public sealed class PendingMessageAcknowledgementTests {
                 throw new IOException("Simulated queue acknowledgement failure.");
             }
             Record = null;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class SlowAcceptanceRepository : IPendingMessageRepository,
+        IPendingMessageLeaseRenewer, IPendingMessageLeaseCommitter {
+        internal SlowAcceptanceRepository(PendingMessageRecord record) => Record = record;
+
+        internal PendingMessageRecord? Record { get; private set; }
+        internal int RenewCount { get; private set; }
+
+        public Task SaveAsync(PendingMessageRecord record, CancellationToken cancellationToken = default) {
+            Record = record.Clone();
+            return Task.CompletedTask;
+        }
+
+        public Task<PendingMessageRecord?> TryAcquireLeaseAsync(string messageId,
+            DateTimeOffset dueBeforeOrAt, DateTimeOffset leaseUntil,
+            CancellationToken cancellationToken = default) {
+            if (Record == null || Record.MessageId != messageId || Record.NextAttemptAt > dueBeforeOrAt)
+                return Task.FromResult<PendingMessageRecord?>(null);
+            Record.ProcessingLeaseId = Guid.NewGuid().ToString("N");
+            Record.ProcessingLeaseUntil = leaseUntil;
+            Record.NextAttemptAt = leaseUntil;
+            return Task.FromResult<PendingMessageRecord?>(Record.Clone());
+        }
+
+        public Task<bool> TryRenewLeaseAsync(string messageId, string leaseId,
+            DateTimeOffset expectedLeaseUntil, DateTimeOffset newLeaseUntil,
+            CancellationToken cancellationToken = default) {
+            if (Record?.MessageId != messageId || Record.ProcessingLeaseId != leaseId ||
+                Record.ProcessingLeaseUntil != expectedLeaseUntil) return Task.FromResult(false);
+            RenewCount++;
+            Record.ProcessingLeaseUntil = newLeaseUntil;
+            Record.NextAttemptAt = newLeaseUntil;
+            return Task.FromResult(true);
+        }
+
+        public async Task<bool> TrySaveWithLeaseAsync(PendingMessageRecord record, string leaseId,
+            CancellationToken cancellationToken = default) {
+            if (record.DeliveryAcceptedAt.HasValue) await Task.Delay(300, cancellationToken);
+            if (Record?.ProcessingLeaseId != leaseId) return false;
+            record.ProcessingLeaseUntil = Record.ProcessingLeaseUntil;
+            record.NextAttemptAt = Record.ProcessingLeaseUntil!.Value;
+            Record = record.Clone();
+            return true;
+        }
+
+        public async Task<bool> TryRemoveWithLeaseAsync(string messageId, string leaseId,
+            CancellationToken cancellationToken = default) {
+            await Task.Delay(150, cancellationToken);
+            if (Record?.MessageId != messageId || Record.ProcessingLeaseId != leaseId)
+                return false;
+            Record = null;
+            return true;
+        }
+
+        public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(Record?.MessageId == messageId ? Record.Clone() : null);
+
+        public async IAsyncEnumerable<PendingMessageRecord> GetAllAsync(
+            [EnumeratorCancellation] CancellationToken cancellationToken = default) {
+            if (Record != null) yield return Record.Clone();
+            await Task.CompletedTask;
+        }
+
+        public Task RemoveAsync(string messageId, CancellationToken cancellationToken = default) {
+            if (Record?.MessageId == messageId) Record = null;
             return Task.CompletedTask;
         }
     }

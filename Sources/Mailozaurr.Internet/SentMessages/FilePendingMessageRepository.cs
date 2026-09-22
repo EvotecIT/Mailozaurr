@@ -13,11 +13,13 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
     private const string UpsertEntryType = "upsert";
     private const string TombstoneEntryType = "tombstone";
     private const string GenerationPrefix = "mailozaurr-generation:";
+    private const int LeaseAwareFormatVersion = 2;
     private const int DefaultCompactionThreshold = 64;
 
     private readonly string filePath;
     private readonly string lockFilePath;
     private readonly string conflictPath = string.Empty;
+    private readonly Func<CancellationToken, Task>? compactionOverride;
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly Dictionary<string, long> index = new(StringComparer.OrdinalIgnoreCase);
     private long indexedLength = -1;
@@ -47,6 +49,10 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
 
     internal FilePendingMessageRepository(string filePath, string conflictPath)
         : this(filePath) => this.conflictPath = Path.GetFullPath(conflictPath);
+
+    internal FilePendingMessageRepository(string filePath,
+        Func<CancellationToken, Task> compactionOverride)
+        : this(filePath) => this.compactionOverride = compactionOverride;
 
     private static (string Path, string ConflictPath) GetStorageFiles(PendingMessageRepositoryOptions? options) {
         options ??= new PendingMessageRepositoryOptions();
@@ -277,13 +283,22 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
         public PendingMessageRecord? Record { get; }
     }
 
-    private static PendingMessageLogEnvelope CreateUpsertEnvelope(PendingMessageRecord record) => new() {
-        EntryType = UpsertEntryType,
-        MessageId = record.MessageId,
-        Record = record
-    };
+    private static PendingMessageLogEnvelope CreateUpsertEnvelope(
+        PendingMessageRecord record, bool preserveFormat = false) {
+        var formatVersion = preserveFormat && !record.IsLeaseAwareEnvelope
+            ? 0
+            : LeaseAwareFormatVersion;
+        record.IsLeaseAwareEnvelope = formatVersion >= LeaseAwareFormatVersion;
+        return new PendingMessageLogEnvelope {
+            FormatVersion = formatVersion,
+            EntryType = UpsertEntryType,
+            MessageId = record.MessageId,
+            Record = record
+        };
+    }
 
     private static PendingMessageLogEnvelope CreateTombstoneEnvelope(string messageId) => new() {
+        FormatVersion = LeaseAwareFormatVersion,
         EntryType = TombstoneEntryType,
         MessageId = messageId
     };
@@ -333,6 +348,17 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             gate.Release();
         }
         if (needed && File.Exists(filePath)) await CompactAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task CompactAfterCommittedMutationAsync() {
+        try {
+            if (compactionOverride != null)
+                await compactionOverride(CancellationToken.None).ConfigureAwait(false);
+            else
+                await CompactIfNeededAsync(CancellationToken.None).ConfigureAwait(false);
+        } catch (Exception ex) {
+            Trace.TraceWarning("Pending-message compaction failed after a committed mutation: {0}", ex.Message);
+        }
     }
 
     private async Task CompactAsync(CancellationToken cancellationToken) {
@@ -392,7 +418,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
                         continue;
                     }
 
-                    var envelope = CreateUpsertEnvelope(record);
+                    var envelope = CreateUpsertEnvelope(record, preserveFormat: true);
                     var payload = SerializeEnvelope(envelope);
 
                     await write.WriteAsync(payload, 0, payload.Length, cancellationToken).ConfigureAwait(false);
@@ -496,6 +522,11 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
                         record = recordElement.Deserialize(MailozaurrJsonContext.Default.PendingMessageRecord);
                         if (record != null) {
                             _ = record.ProviderData;
+                            record.IsLeaseAwareEnvelope =
+                                TryGetPropertyCaseInsensitive(root, "formatVersion", out var versionElement) &&
+                                versionElement.ValueKind == JsonValueKind.Number &&
+                                versionElement.TryGetInt32(out var version) &&
+                                version >= LeaseAwareFormatVersion;
                         }
                     }
 
@@ -522,6 +553,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             var legacyRecord = JsonSerializer.Deserialize(json, MailozaurrJsonContext.Default.PendingMessageRecord);
             if (legacyRecord != null && !string.IsNullOrWhiteSpace(legacyRecord.MessageId)) {
                 _ = legacyRecord.ProviderData;
+                legacyRecord.IsLeaseAwareEnvelope = false;
                 entry = new LogEntry(LogEntryKind.Upsert, legacyRecord.MessageId, legacyRecord);
                 return true;
             }
@@ -585,7 +617,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
         } finally {
             gate.Release();
         }
-        await CompactIfNeededAsync(cancellationToken).ConfigureAwait(false);
+        await CompactAfterCommittedMutationAsync().ConfigureAwait(false);
     }
 
     /// <summary>Attempts to lease a due pending message for processing.</summary>
@@ -612,7 +644,10 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             if (!File.Exists(filePath)) return null;
             using var storageLock = await AcquireIndexedStorageLockAsync(cancellationToken).ConfigureAwait(false);
             var current = await GetByMessageIdCoreAsync(messageId, cancellationToken).ConfigureAwait(false);
-            if (current == null || current.ProcessingLeaseUntil > now ||
+            if (current == null) return null;
+            var legacyLeaseMayBeActive = ignoreSchedule && !current.IsLeaseAwareEnvelope &&
+                !current.ProcessingLeaseUntil.HasValue && current.NextAttemptAt > now;
+            if (current.ProcessingLeaseUntil > now || legacyLeaseMayBeActive ||
                 !ignoreSchedule && current.NextAttemptAt > now) {
                 return null;
             }
@@ -634,7 +669,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             return null;
         } finally {
             gate.Release();
-            if (changed) await CompactIfNeededAsync(cancellationToken).ConfigureAwait(false);
+            if (changed) await CompactAfterCommittedMutationAsync().ConfigureAwait(false);
         }
     }
 
@@ -653,8 +688,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             var current = await GetByMessageIdCoreAsync(messageId, cancellationToken).ConfigureAwait(false);
             if (current == null || current.NextAttemptAt != expectedLeaseUntil ||
                 current.ProcessingLeaseUntil != expectedLeaseUntil ||
-                current.ProcessingLeaseId != leaseId ||
-                current.DeliveryAcceptedAt.HasValue) {
+                current.ProcessingLeaseId != leaseId) {
                 return false;
             }
             current.NextAttemptAt = newLeaseUntil;
@@ -667,7 +701,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             return true;
         } finally {
             gate.Release();
-            if (changed) await CompactIfNeededAsync(cancellationToken).ConfigureAwait(false);
+            if (changed) await CompactAfterCommittedMutationAsync().ConfigureAwait(false);
         }
     }
 
@@ -686,6 +720,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
                 // Acceptance can follow one or more renewals while the sender
                 // still holds the original record. Keep the persisted expiry.
                 record.ProcessingLeaseUntil = current.ProcessingLeaseUntil;
+                record.NextAttemptAt = current.ProcessingLeaseUntil.Value;
             }
             var offset = await AppendEnvelopeAsync(CreateUpsertEnvelope(record), cancellationToken).ConfigureAwait(false);
             dirtyEntryCount++;
@@ -695,7 +730,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             return true;
         } finally {
             gate.Release();
-            if (changed) await CompactIfNeededAsync(cancellationToken).ConfigureAwait(false);
+            if (changed) await CompactAfterCommittedMutationAsync().ConfigureAwait(false);
         }
     }
 
@@ -718,7 +753,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             return true;
         } finally {
             gate.Release();
-            if (changed) await CompactIfNeededAsync(cancellationToken).ConfigureAwait(false);
+            if (changed) await CompactAfterCommittedMutationAsync().ConfigureAwait(false);
         }
     }
 
@@ -852,6 +887,6 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
         } finally {
             gate.Release();
         }
-        if (removed) await CompactIfNeededAsync(cancellationToken).ConfigureAwait(false);
+        if (removed) await CompactAfterCommittedMutationAsync().ConfigureAwait(false);
     }
 }

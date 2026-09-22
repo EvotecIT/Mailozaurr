@@ -102,101 +102,114 @@ public sealed class PendingMessageProcessor {
             }
             var leaseId = leasedRecord.ProcessingLeaseId;
 
+            if (leasedRecord.DeadLetteredAt.HasValue) {
+                await ExecuteWithLeaseRenewalAsync(leasedRecord, cancellationToken,
+                    deliveryToken => CompleteDeadLetterAndRemoveAsync(leasedRecord, leaseId, deliveryToken))
+                    .ConfigureAwait(false);
+                continue;
+            }
+
             if (leasedRecord.DeliveryAcceptedAt.HasValue) {
                 // The enumeration can be stale. Always choose cleanup from the
                 // record returned by the atomic lease operation.
-                await RemoveOwnedAsync(leasedRecord.MessageId, leaseId, CancellationToken.None).ConfigureAwait(false);
+                await ExecuteWithLeaseRenewalAsync(leasedRecord, cancellationToken,
+                    _ => RemoveOwnedAsync(leasedRecord.MessageId, leaseId, CancellationToken.None))
+                    .ConfigureAwait(false);
                 continue;
             }
 
             if (leasedRecord.AttemptCount >= maxRetryAttempts) {
                 logger?.WriteWarning($"Removing message {leasedRecord.MessageId} after reaching the retry limit ({leasedRecord.AttemptCount}).");
                 observer.MessageDropped(leasedRecord, leasedRecord.AttemptCount, PendingMessageDropReason.RetryLimitReached, null);
-                await DeadLetterAndRemoveAsync(leasedRecord, leasedRecord.AttemptCount,
-                    PendingMessageDropReason.RetryLimitReached, null, leaseId, cancellationToken).ConfigureAwait(false);
+                await ExecuteWithLeaseRenewalAsync(leasedRecord, cancellationToken,
+                    deliveryToken => DeadLetterAndRemoveAsync(leasedRecord, leasedRecord.AttemptCount,
+                        PendingMessageDropReason.RetryLimitReached, null, leaseId, deliveryToken))
+                    .ConfigureAwait(false);
                 continue;
             }
 
             var originalAttemptCount = leasedRecord.AttemptCount;
             var attempt = leasedRecord.IncrementAttemptCount();
             observer.MessageAttemptStarted(leasedRecord, attempt);
-            var stopwatch = Stopwatch.StartNew();
+            await ExecuteWithLeaseRenewalAsync(leasedRecord, cancellationToken, async deliveryToken => {
+                var stopwatch = Stopwatch.StartNew();
 
-            try {
-                var sender = senderFactory.GetSender(leasedRecord);
-                await SendWithLeaseRenewalAsync(sender, leasedRecord, cancellationToken).ConfigureAwait(false);
-                stopwatch.Stop();
-            } catch (ProcessingLeaseLostException) {
-                stopwatch.Stop();
-                // A different worker may now own this record. The outcome of a
-                // provider request that ignored cancellation is indeterminate.
-                throw;
-            } catch (OperationCanceledException ex) {
-                stopwatch.Stop();
-                leasedRecord.ExchangeAttemptCount(originalAttemptCount);
-                leasedRecord.NextAttemptAt = ApplyDelay(clock(), TimeSpan.Zero);
-                leasedRecord.ProcessingLeaseUntil = null;
-                leasedRecord.ProcessingLeaseId = null;
-                observer.MessageFailed(leasedRecord, attempt, ex, stopwatch.Elapsed, willRetry: false, retryDelay: null);
                 try {
-                    await SaveOwnedAsync(leasedRecord, leaseId, CancellationToken.None).ConfigureAwait(false);
-                } catch (Exception saveEx) {
-                    logger?.WriteWarning($"Failed to release processing lease for message {leasedRecord.MessageId} after cancellation: {saveEx.Message}");
-                }
-                throw;
-            } catch (Exception ex) {
-                stopwatch.Stop();
-                var permanentFailure = permanentFailureDetector(ex);
-                var willRetry = !permanentFailure && attempt < maxRetryAttempts;
-                TimeSpan? delay = null;
-                if (willRetry) {
-                    delay = NormalizeDelay(retryDelaySelector(attempt));
-                    var failureTime = clock();
-                    leasedRecord.NextAttemptAt = ApplyDelay(failureTime, delay.Value);
+                    var sender = senderFactory.GetSender(leasedRecord);
+                    await sender.SendAsync(leasedRecord, deliveryToken).ConfigureAwait(false);
+                    stopwatch.Stop();
+                } catch (ProcessingLeaseLostException) {
+                    stopwatch.Stop();
+                    // A different worker may now own this record. The outcome of a
+                    // provider request that ignored cancellation is indeterminate.
+                    throw;
+                } catch (OperationCanceledException ex) {
+                    stopwatch.Stop();
+                    leasedRecord.ExchangeAttemptCount(originalAttemptCount);
+                    leasedRecord.NextAttemptAt = ApplyDelay(clock(), TimeSpan.Zero);
                     leasedRecord.ProcessingLeaseUntil = null;
                     leasedRecord.ProcessingLeaseId = null;
+                    observer.MessageFailed(leasedRecord, attempt, ex, stopwatch.Elapsed, willRetry: false, retryDelay: null);
+                    try {
+                        await SaveOwnedAsync(leasedRecord, leaseId, CancellationToken.None).ConfigureAwait(false);
+                    } catch (Exception saveEx) {
+                        logger?.WriteWarning($"Failed to release processing lease for message {leasedRecord.MessageId} after cancellation: {saveEx.Message}");
+                    }
+                    throw;
+                } catch (Exception ex) {
+                    stopwatch.Stop();
+                    var permanentFailure = permanentFailureDetector(ex);
+                    var willRetry = !permanentFailure && attempt < maxRetryAttempts;
+                    TimeSpan? delay = null;
+                    if (willRetry) {
+                        delay = NormalizeDelay(retryDelaySelector(attempt));
+                        var failureTime = clock();
+                        leasedRecord.NextAttemptAt = ApplyDelay(failureTime, delay.Value);
+                        leasedRecord.ProcessingLeaseUntil = null;
+                        leasedRecord.ProcessingLeaseId = null;
+                    }
+
+                    observer.MessageFailed(leasedRecord, attempt, ex, stopwatch.Elapsed, willRetry, delay);
+
+                    if (!willRetry) {
+                        logger?.WriteWarning($"Dropping message {leasedRecord.MessageId} due to {(permanentFailure ? "permanent failure" : "exceeding retry attempts")}: {ex.Message}");
+                        observer.MessageDropped(leasedRecord, attempt, permanentFailure ? PendingMessageDropReason.PermanentFailure : PendingMessageDropReason.RetryLimitReached, ex);
+                        await DeadLetterAndRemoveAsync(leasedRecord, attempt, permanentFailure ? PendingMessageDropReason.PermanentFailure : PendingMessageDropReason.RetryLimitReached, ex, leaseId, deliveryToken).ConfigureAwait(false);
+                        return;
+                    }
+
+                    logger?.WriteWarning($"Failed to send message {leasedRecord.MessageId}. Scheduling retry #{attempt + 1} at {leasedRecord.NextAttemptAt:O}. Error: {ex.Message}");
+                    await SaveOwnedAsync(leasedRecord, leaseId, deliveryToken).ConfigureAwait(false);
+                    return;
                 }
 
-                observer.MessageFailed(leasedRecord, attempt, ex, stopwatch.Elapsed, willRetry, delay);
-
-                if (!willRetry) {
-                    logger?.WriteWarning($"Dropping message {leasedRecord.MessageId} due to {(permanentFailure ? "permanent failure" : "exceeding retry attempts")}: {ex.Message}");
-                    observer.MessageDropped(leasedRecord, attempt, permanentFailure ? PendingMessageDropReason.PermanentFailure : PendingMessageDropReason.RetryLimitReached, ex);
-                    await DeadLetterAndRemoveAsync(leasedRecord, attempt, permanentFailure ? PendingMessageDropReason.PermanentFailure : PendingMessageDropReason.RetryLimitReached, ex, leaseId, cancellationToken).ConfigureAwait(false);
-                    continue;
-                }
-
-                logger?.WriteWarning($"Failed to send message {leasedRecord.MessageId}. Scheduling retry #{attempt + 1} at {leasedRecord.NextAttemptAt:O}. Error: {ex.Message}");
-                await SaveOwnedAsync(leasedRecord, leaseId, cancellationToken).ConfigureAwait(false);
-                continue;
-            }
-
-            // Provider acceptance and queue acknowledgement are separate outcomes.
-            // Persist an accepted marker before removing the record so a failed
-            // removal cannot turn a successful send into another delivery attempt.
-            var acceptedRecord = leasedRecord.Clone();
-            acceptedRecord.DeliveryAcceptedAt = clock();
-            acceptedRecord.NextAttemptAt = acceptedRecord.DeliveryAcceptedAt.Value;
-            try {
-                await SaveOwnedAsync(acceptedRecord, leaseId, CancellationToken.None).ConfigureAwait(false);
-            } catch (ProcessingLeaseLostException) {
-                throw;
-            } catch (Exception markerFailure) {
-                // Removal may still succeed even when persisting the marker did not.
-                // If both fail, surface the indeterminate acknowledgement explicitly.
+                // Provider acceptance and queue acknowledgement are separate outcomes.
+                // Persist an accepted marker before removing the record so a failed
+                // removal cannot turn a successful send into another delivery attempt.
+                var acceptedRecord = leasedRecord.Clone();
+                acceptedRecord.DeliveryAcceptedAt = clock();
+                acceptedRecord.NextAttemptAt = acceptedRecord.DeliveryAcceptedAt.Value;
                 try {
-                    await RemoveOwnedAsync(leasedRecord.MessageId, leaseId, CancellationToken.None).ConfigureAwait(false);
-                } catch (Exception removalFailure) {
-                    throw new AggregateException(
-                        $"Delivery of '{leasedRecord.MessageId}' was accepted, but queue acknowledgement failed.",
-                        markerFailure, removalFailure);
+                    await SaveOwnedAsync(acceptedRecord, leaseId, CancellationToken.None).ConfigureAwait(false);
+                } catch (ProcessingLeaseLostException) {
+                    throw;
+                } catch (Exception markerFailure) {
+                    // Removal may still succeed even when persisting the marker did not.
+                    // If both fail, surface the indeterminate acknowledgement explicitly.
+                    try {
+                        await RemoveOwnedAsync(leasedRecord.MessageId, leaseId, CancellationToken.None).ConfigureAwait(false);
+                    } catch (Exception removalFailure) {
+                        throw new AggregateException(
+                            $"Delivery of '{leasedRecord.MessageId}' was accepted, but queue acknowledgement failed.",
+                            markerFailure, removalFailure);
+                    }
+                    observer.MessageSent(leasedRecord, attempt, stopwatch.Elapsed);
+                    return;
                 }
-                observer.MessageSent(leasedRecord, attempt, stopwatch.Elapsed);
-                continue;
-            }
 
-            observer.MessageSent(leasedRecord, attempt, stopwatch.Elapsed);
-            await RemoveOwnedAsync(leasedRecord.MessageId, leaseId, CancellationToken.None).ConfigureAwait(false);
+                observer.MessageSent(leasedRecord, attempt, stopwatch.Elapsed);
+                await RemoveOwnedAsync(leasedRecord.MessageId, leaseId, CancellationToken.None).ConfigureAwait(false);
+            }).ConfigureAwait(false);
         }
     }
 
@@ -209,33 +222,39 @@ public sealed class PendingMessageProcessor {
         return await repository.TryAcquireLeaseAsync(record.MessageId, now, leaseUntil, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task SendWithLeaseRenewalAsync(IPendingMessageSender sender,
-        PendingMessageRecord record, CancellationToken cancellationToken) {
+    private async Task ExecuteWithLeaseRenewalAsync(PendingMessageRecord record,
+        CancellationToken cancellationToken, Func<CancellationToken, Task> action) {
         if (repository is not IPendingMessageLeaseRenewer renewer ||
+            repository is not IPendingMessageLeaseCommitter ||
             string.IsNullOrEmpty(record.ProcessingLeaseId)) {
-            await sender.SendAsync(record, cancellationToken).ConfigureAwait(false);
+            await action(cancellationToken).ConfigureAwait(false);
             return;
         }
 
         using var deliveryCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        using var renewalCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        // Caller cancellation stops provider work, but renewal continues until the
+        // callback has durably committed or released the lease-owned outcome.
+        using var renewalCancellation = new CancellationTokenSource();
         Task<Exception?> renewal = RenewLeaseWhileSendingAsync(
             renewer, record.MessageId, record.ProcessingLeaseId!, record.ProcessingLeaseUntil!.Value,
             deliveryCancellation, renewalCancellation.Token);
-        Exception? sendFailure = null;
+        Exception? actionFailure = null;
         Exception? renewalFailure;
         try {
-            await sender.SendAsync(record, deliveryCancellation.Token).ConfigureAwait(false);
+            await action(deliveryCancellation.Token).ConfigureAwait(false);
         } catch (Exception exception) {
-            sendFailure = exception;
+            actionFailure = exception;
         } finally {
             renewalCancellation.Cancel();
         }
         renewalFailure = await renewal.ConfigureAwait(false);
-        if (renewalFailure != null) {
+        // A successfully completed callback has already committed its lease-owned
+        // terminal outcome. A renewal racing with the final removal may then
+        // observe that the record is gone, which is no longer a lease loss.
+        if (renewalFailure != null && actionFailure != null) {
             throw new ProcessingLeaseLostException(record.MessageId, renewalFailure);
         }
-        if (sendFailure != null) ExceptionDispatchInfo.Capture(sendFailure).Throw();
+        if (actionFailure != null) ExceptionDispatchInfo.Capture(actionFailure).Throw();
     }
 
     private async Task<Exception?> RenewLeaseWhileSendingAsync(
@@ -272,18 +291,34 @@ public sealed class PendingMessageProcessor {
         Exception? exception,
         string? leaseId,
         CancellationToken cancellationToken) {
+        record.DeadLetteredAt ??= clock();
+        record.DeadLetterReason = reason;
+        record.DeadLetterAttempt = attempt;
+        record.DeadLetterExceptionType = exception?.GetType().FullName;
+        record.DeadLetterErrorMessage = exception?.Message;
+        await SaveOwnedAsync(record, leaseId, cancellationToken).ConfigureAwait(false);
+        await CompleteDeadLetterAndRemoveAsync(record, leaseId, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task CompleteDeadLetterAndRemoveAsync(
+        PendingMessageRecord record,
+        string? leaseId,
+        CancellationToken cancellationToken) {
         if (deadLetterRepository != null) {
             await deadLetterRepository.SaveAsync(new PendingMessageDeadLetterRecord {
                 Message = record.Clone(),
-                Reason = reason,
-                Attempt = attempt,
-                DeadLetteredAt = clock(),
-                ExceptionType = exception?.GetType().FullName,
-                ErrorMessage = exception?.Message
+                Reason = record.DeadLetterReason ?? PendingMessageDropReason.RetryLimitReached,
+                Attempt = record.DeadLetterAttempt ?? record.AttemptCount,
+                DeadLetteredAt = record.DeadLetteredAt ?? clock(),
+                ExceptionType = record.DeadLetterExceptionType,
+                ErrorMessage = record.DeadLetterErrorMessage
             }, cancellationToken).ConfigureAwait(false);
         }
 
-        await RemoveOwnedAsync(record.MessageId, leaseId, cancellationToken).ConfigureAwait(false);
+        // Once the terminal marker is committed, cleanup is safe to attempt even
+        // if renewal concurrently cancels provider work. The fenced remove still
+        // prevents deleting a record acquired by another worker.
+        await RemoveOwnedAsync(record.MessageId, leaseId, CancellationToken.None).ConfigureAwait(false);
     }
 
     private async Task SaveOwnedAsync(PendingMessageRecord record, string? leaseId,

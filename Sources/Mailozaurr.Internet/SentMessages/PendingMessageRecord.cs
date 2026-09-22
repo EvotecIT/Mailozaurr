@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using System.Threading;
 
 namespace Mailozaurr;
@@ -8,6 +9,9 @@ namespace Mailozaurr;
 /// </summary>
 public sealed class PendingMessageRecord {
     private int attemptCount;
+
+    [JsonIgnore]
+    internal bool IsLeaseAwareEnvelope { get; set; }
 
     /// <summary>Identifier of the message.</summary>
     public string MessageId { get; set; } = string.Empty;
@@ -23,6 +27,24 @@ public sealed class PendingMessageRecord {
     /// queue cleanup and must not be submitted to the provider again.
     /// </summary>
     public DateTimeOffset? DeliveryAcceptedAt { get; set; }
+
+    /// <summary>
+    /// Time when a terminal failure was durably recorded on the active queue.
+    /// A marked record must only be copied to dead-letter storage and removed.
+    /// </summary>
+    public DateTimeOffset? DeadLetteredAt { get; set; }
+
+    /// <summary>Terminal reason awaiting or already copied to dead-letter storage.</summary>
+    public PendingMessageDropReason? DeadLetterReason { get; set; }
+
+    /// <summary>Attempt number associated with the terminal failure.</summary>
+    public int? DeadLetterAttempt { get; set; }
+
+    /// <summary>Exception type captured for a terminal failure.</summary>
+    public string? DeadLetterExceptionType { get; set; }
+
+    /// <summary>Error text captured for a terminal failure.</summary>
+    public string? DeadLetterErrorMessage { get; set; }
 
     /// <summary>Expiry of an active processing lease, when one is held.</summary>
     public DateTimeOffset? ProcessingLeaseUntil { get; set; }
@@ -88,6 +110,11 @@ public sealed class PendingMessageRecord {
         Timestamp = Timestamp,
         NextAttemptAt = NextAttemptAt,
         DeliveryAcceptedAt = DeliveryAcceptedAt,
+        DeadLetteredAt = DeadLetteredAt,
+        DeadLetterReason = DeadLetterReason,
+        DeadLetterAttempt = DeadLetterAttempt,
+        DeadLetterExceptionType = DeadLetterExceptionType,
+        DeadLetterErrorMessage = DeadLetterErrorMessage,
         ProcessingLeaseUntil = ProcessingLeaseUntil,
         ProcessingLeaseId = ProcessingLeaseId,
         AttemptCount = AttemptCount,
@@ -97,6 +124,7 @@ public sealed class PendingMessageRecord {
         UserName = UserName,
         Password = Password,
         Provider = Provider,
+        IsLeaseAwareEnvelope = IsLeaseAwareEnvelope,
         ProviderData = new Dictionary<string, string>(ProviderData)
     };
 }
