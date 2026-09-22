@@ -28,18 +28,18 @@ foreach ($AssemblyFolder in @($AssemblyFolders.Name)) {
 }
 
 $Framework = if ($Standard) {
-    'Standard' 
+    'Standard'
 } elseif ($Core) {
-    'Core' 
+    'Core'
 } else {
-    '' 
+    ''
 }
 $FrameworkNet = if ($Default) {
-    'Default' 
+    'Default'
 } elseif ($Standard) {
-    'Standard' 
+    'Standard'
 } else {
-    '' 
+    ''
 }
 if ($PSEdition -eq 'Core') {
     $PowerForgeRuntimeVersion = [Environment]::Version
@@ -53,7 +53,7 @@ if ($PSEdition -eq 'Core') {
                     $PowerForgeCoreBaselineVersion = [Version]$Matches[1]
                 }
             } catch {
-                $PowerForgeCoreBaselineVersion = $null 
+                $PowerForgeCoreBaselineVersion = $null
             }
         }
     }
@@ -65,12 +65,12 @@ if ($PSEdition -eq 'Core') {
     }
     foreach ($PowerForgeRuntimeFolder in @($AssemblyFolders.Name)) {
         if ($PowerForgeRuntimeFolder -notmatch '^Core-(?:net|netcoreapp)(\d+\.\d+)$') {
-            continue 
+            continue
         }
         try {
-            $PowerForgeCandidateRuntimeVersion = [Version]$Matches[1] 
+            $PowerForgeCandidateRuntimeVersion = [Version]$Matches[1]
         } catch {
-            continue 
+            continue
         }
         if ($PowerForgeCandidateRuntimeVersion -le $PowerForgeRuntimeVersion -and $PowerForgeCandidateRuntimeVersion -gt $PowerForgeSelectedRuntimeVersion -and (Test-Path -LiteralPath ([IO.Path]::Combine($LibRoot, $PowerForgeRuntimeFolder)))) {
             $PowerForgeSelectedRuntimeVersion = $PowerForgeCandidateRuntimeVersion
