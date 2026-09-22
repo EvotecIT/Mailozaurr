@@ -59,6 +59,72 @@ public sealed class FilePendingMessageCoordinationTests {
     }
 
     [Fact]
+    public async Task AcceptanceRetainsRenewedLeaseUntilCleanup() {
+        var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var repository = new FilePendingMessageRepository(Path.Combine(directory, "pending.log"));
+            var now = DateTimeOffset.UtcNow;
+            await repository.SaveAsync(new PendingMessageRecord {
+                MessageId = "renewed-send", Timestamp = now, NextAttemptAt = now
+            });
+            var initial = now.AddSeconds(1);
+            var lease = await repository.TryAcquireLeaseAsync("renewed-send", now, initial);
+            Assert.NotNull(lease);
+            var renewed = now.AddMinutes(2);
+            Assert.True(await repository.TryRenewLeaseAsync("renewed-send",
+                lease!.ProcessingLeaseId!, initial, renewed));
+
+            var accepted = lease.Clone();
+            accepted.DeliveryAcceptedAt = now.AddSeconds(2);
+            accepted.NextAttemptAt = accepted.DeliveryAcceptedAt.Value;
+            Assert.True(await repository.TrySaveWithLeaseAsync(accepted, lease.ProcessingLeaseId!));
+
+            var persisted = await repository.GetByMessageIdAsync("renewed-send");
+            Assert.Equal(renewed, persisted!.ProcessingLeaseUntil);
+            Assert.Null(await repository.TryAcquireLeaseAsync("renewed-send",
+                now.AddSeconds(3), now.AddMinutes(3)));
+            Assert.True(await repository.TryRemoveWithLeaseAsync("renewed-send", lease.ProcessingLeaseId!));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task LeaseOnlyDrainCompactsAndRemovesOldAbandonedCompactionFiles() {
+        var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var path = Path.Combine(directory, "pending.log");
+            var oldTemp = path + ".compact." + Guid.NewGuid().ToString("N");
+            var recentTemp = path + ".compact." + Guid.NewGuid().ToString("N");
+            File.WriteAllText(oldTemp, "abandoned MIME");
+            File.SetLastWriteTimeUtc(oldTemp, DateTime.UtcNow.AddDays(-2));
+            File.WriteAllText(recentTemp, "active candidate");
+            var repository = new FilePendingMessageRepository(path);
+            var now = DateTimeOffset.UtcNow;
+            for (var index = 0; index < 40; index++) {
+                var id = "delivery-" + index;
+                await repository.SaveAsync(new PendingMessageRecord {
+                    MessageId = id, Timestamp = now, NextAttemptAt = now
+                });
+                var lease = await repository.TryAcquireLeaseAsync(id, now, now.AddMinutes(1));
+                Assert.NotNull(lease);
+                Assert.True(await repository.TryRemoveWithLeaseAsync(id, lease!.ProcessingLeaseId!));
+            }
+
+            Assert.False(File.Exists(oldTemp));
+            Assert.True(File.Exists(recentTemp));
+            Assert.True(File.ReadAllLines(path).Length < 40);
+            var remaining = new List<PendingMessageRecord>();
+            await foreach (var record in repository.GetAllAsync()) remaining.Add(record);
+            Assert.Empty(remaining);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task OtherInstanceRebuildsItsIndexAfterCompactionReplacesTheLog() {
         var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

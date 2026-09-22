@@ -26,6 +26,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
     private string? indexedGeneration;
     private static readonly byte[] NewlineBytes = Encoding.UTF8.GetBytes(Environment.NewLine);
     private int dirtyEntryCount;
+    private DateTime lastStaleCompactionCleanupUtc;
 
     /// <summary>Creates a new repository using the specified options.</summary>
     /// <param name="options">Configuration for directory and file naming.</param>
@@ -192,6 +193,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
                     FileAccess.ReadWrite, FileShare.None);
                 try {
                     UnixFilePermissions.RestrictFile(lockFilePath);
+                    CleanupStaleCompactionFiles();
                     return stream;
                 } catch {
                     stream.Dispose();
@@ -199,6 +201,37 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
                 }
             } catch (IOException) when (elapsed.Elapsed < TimeSpan.FromSeconds(30)) {
                 await Task.Delay(25, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private void CleanupStaleCompactionFiles() {
+        var now = DateTime.UtcNow;
+        if (now - lastStaleCompactionCleanupUtc < TimeSpan.FromHours(1)) return;
+        lastStaleCompactionCleanupUtc = now;
+        var directory = Path.GetDirectoryName(filePath)!;
+        var prefix = Path.GetFileName(filePath) + ".compact.";
+        string[] candidates;
+        try {
+            candidates = Directory.GetFiles(directory, prefix + "*", SearchOption.TopDirectoryOnly);
+        } catch (IOException) {
+            return;
+        } catch (UnauthorizedAccessException) {
+            return;
+        }
+        foreach (var path in candidates) {
+            var suffix = Path.GetFileName(path).Substring(prefix.Length);
+            if (!Guid.TryParseExact(suffix, "N", out _)) continue;
+            try {
+                // An active compaction writes with FileShare.None. Recent files
+                // may also be awaiting their short commit lock.
+                if (File.GetLastWriteTimeUtc(path) > now - TimeSpan.FromHours(24)) continue;
+                using (new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
+                File.Delete(path);
+            } catch (IOException) {
+                // An active worker may still own the candidate.
+            } catch (UnauthorizedAccessException) {
+                // Cleanup must not stop queue processing.
             }
         }
     }
@@ -613,6 +646,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
     /// <inheritdoc />
     public async Task<bool> TrySaveWithLeaseAsync(PendingMessageRecord record, string leaseId,
         CancellationToken cancellationToken = default) {
+        bool changed = false;
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             ThrowIfDefaultQueueConflictAppeared();
@@ -620,19 +654,27 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             using var storageLock = await AcquireIndexedStorageLockAsync(cancellationToken).ConfigureAwait(false);
             var current = await GetByMessageIdCoreAsync(record.MessageId, cancellationToken).ConfigureAwait(false);
             if (current?.ProcessingLeaseId != leaseId || !current.ProcessingLeaseUntil.HasValue) return false;
+            if (record.ProcessingLeaseId == leaseId) {
+                // Acceptance can follow one or more renewals while the sender
+                // still holds the original record. Keep the persisted expiry.
+                record.ProcessingLeaseUntil = current.ProcessingLeaseUntil;
+            }
             var offset = await AppendEnvelopeAsync(CreateUpsertEnvelope(record), cancellationToken).ConfigureAwait(false);
             dirtyEntryCount++;
             index[record.MessageId] = offset;
             CaptureFileStamp();
+            changed = true;
             return true;
         } finally {
             gate.Release();
+            if (changed) await CompactIfNeededAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
     /// <inheritdoc />
     public async Task<bool> TryRemoveWithLeaseAsync(string messageId, string leaseId,
         CancellationToken cancellationToken = default) {
+        bool changed = false;
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             ThrowIfDefaultQueueConflictAppeared();
@@ -644,9 +686,11 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             index.Remove(messageId);
             dirtyEntryCount++;
             CaptureFileStamp();
+            changed = true;
             return true;
         } finally {
             gate.Release();
+            if (changed) await CompactIfNeededAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
