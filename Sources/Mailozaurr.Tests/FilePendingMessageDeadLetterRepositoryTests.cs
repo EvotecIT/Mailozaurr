@@ -4,6 +4,17 @@ namespace Mailozaurr.Tests;
 
 public sealed class FilePendingMessageDeadLetterRepositoryTests {
     [Fact]
+    public async Task RemovingMissingRecordFromUncreatedDirectoryIsAnImmediateNoOp() {
+        var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        var repository = new FilePendingMessageDeadLetterRepository(
+            Path.Combine(directory, "dead-letter.log"));
+
+        await repository.RemoveAsync("missing");
+
+        Assert.False(Directory.Exists(directory));
+    }
+
+    [Fact]
     public async Task SaveGetListAndRemoveRoundTripsDeadLetterRecord() {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         var filePath = Path.Combine(directory, "dead-letter.log");

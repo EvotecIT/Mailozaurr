@@ -118,6 +118,46 @@ public sealed class FilePendingMessageCoordinationTests {
     }
 
     [Fact]
+    public async Task ConcurrentMutationsDoNotRunOverlappingCompactions() {
+        var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var active = 0;
+            var maxActive = 0;
+            var firstStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseFirst = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var repository = new FilePendingMessageRepository(Path.Combine(directory, "pending.log"), async _ => {
+                var current = Interlocked.Increment(ref active);
+                var observed = Volatile.Read(ref maxActive);
+                while (current > observed && Interlocked.CompareExchange(ref maxActive, current, observed) != observed)
+                    observed = Volatile.Read(ref maxActive);
+                if (!firstStarted.Task.IsCompleted) {
+                    firstStarted.TrySetResult(true);
+                    await releaseFirst.Task;
+                }
+                Interlocked.Decrement(ref active);
+            });
+            var now = DateTimeOffset.UtcNow;
+            var first = repository.SaveAsync(new PendingMessageRecord {
+                MessageId = "first", Timestamp = now, NextAttemptAt = now
+            });
+            await firstStarted.Task;
+            var second = repository.SaveAsync(new PendingMessageRecord {
+                MessageId = "second", Timestamp = now, NextAttemptAt = now
+            });
+            await Task.Delay(100);
+            releaseFirst.TrySetResult(true);
+            await Task.WhenAll(first, second);
+
+            Assert.Equal(1, maxActive);
+            Assert.NotNull(await repository.GetByMessageIdAsync("first"));
+            Assert.NotNull(await repository.GetByMessageIdAsync("second"));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task AcceptanceRetainsRenewedLeaseUntilCleanup() {
         var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

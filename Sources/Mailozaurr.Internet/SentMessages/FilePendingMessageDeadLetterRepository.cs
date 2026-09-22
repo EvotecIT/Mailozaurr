@@ -129,6 +129,7 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
             write.Position = write.Length;
             await write.WriteAsync(line, 0, line.Length, CancellationToken.None).ConfigureAwait(false);
             await write.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+            write.Flush(flushToDisk: true);
         } finally {
             gate.Release();
         }
@@ -217,6 +218,8 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
         if (string.IsNullOrWhiteSpace(messageId)) {
             throw new ArgumentException("Message id is required.", nameof(messageId));
         }
+        ThrowIfDefaultQueueConflictAppeared();
+        if (!File.Exists(filePath)) return;
 
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
@@ -276,6 +279,7 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
                 }
 
                 await write.FlushAsync(cancellationToken).ConfigureAwait(false);
+                write.Flush(flushToDisk: true);
             }
 
             if (File.Exists(filePath)) {

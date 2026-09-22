@@ -21,6 +21,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
     private readonly string conflictPath = string.Empty;
     private readonly Func<CancellationToken, Task>? compactionOverride;
     private readonly SemaphoreSlim gate = new(1, 1);
+    private readonly SemaphoreSlim compactionGate = new(1, 1);
     private readonly Dictionary<string, long> index = new(StringComparer.OrdinalIgnoreCase);
     private long indexedLength = -1;
     private DateTime indexedWriteTimeUtc;
@@ -333,6 +334,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
         // can be concatenated with a later acceptance marker.
         await write.WriteAsync(line, 0, line.Length, CancellationToken.None).ConfigureAwait(false);
         await write.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+        write.Flush(flushToDisk: true);
 
         return offset;
     }
@@ -352,10 +354,15 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
 
     private async Task CompactAfterCommittedMutationAsync() {
         try {
-            if (compactionOverride != null)
-                await compactionOverride(CancellationToken.None).ConfigureAwait(false);
-            else
-                await CompactIfNeededAsync(CancellationToken.None).ConfigureAwait(false);
+            await compactionGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+            try {
+                if (compactionOverride != null)
+                    await compactionOverride(CancellationToken.None).ConfigureAwait(false);
+                else
+                    await CompactIfNeededAsync(CancellationToken.None).ConfigureAwait(false);
+            } finally {
+                compactionGate.Release();
+            }
         } catch (Exception ex) {
             Trace.TraceWarning("Pending-message compaction failed after a committed mutation: {0}", ex.Message);
         }
@@ -429,6 +436,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
                 }
 
                 await write.FlushAsync(cancellationToken).ConfigureAwait(false);
+                write.Flush(flushToDisk: true);
             }
 
             await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
