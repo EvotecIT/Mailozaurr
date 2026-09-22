@@ -1,3 +1,5 @@
+using OfficeIMO.Email;
+using OfficeIMO.Email.AddressBook;
 using OfficeIMO.Email.Data;
 using OfficeIMO.Email.Store;
 
@@ -16,6 +18,34 @@ public abstract class MailStoreCmdletBase : AsyncPSCmdlet {
             null => throw new PSArgumentNullException(nameof(inputObject)),
             _ => throw new PSArgumentException(
                 "InputObject must be an EmailDataOpenResult containing a store or an EmailStoreSession.")
+        };
+    }
+
+    /// <summary>Resolves an imported email or its native document.</summary>
+    protected static EmailDocument GetEmailDocument(object? inputObject) {
+        object? value = inputObject is PSObject psObject ? psObject.BaseObject : inputObject;
+        return value switch {
+            EmailDocument document => document,
+            EmailDataOpenResult { EmailDocument: not null } result => result.EmailDocument!,
+            EmailDataOpenResult result => throw new PSArgumentException(
+                $"The imported artifact is '{result.Kind}', not an email document."),
+            null => throw new PSArgumentNullException(nameof(inputObject)),
+            _ => throw new PSArgumentException(
+                "InputObject must be an EmailDocument or an Import-MailData result containing one.")
+        };
+    }
+
+    /// <summary>Resolves an imported Offline Address Book or its native session.</summary>
+    protected static OfflineAddressBookSession GetAddressBookSession(object? inputObject) {
+        object? value = inputObject is PSObject psObject ? psObject.BaseObject : inputObject;
+        return value switch {
+            OfflineAddressBookSession session => session,
+            EmailDataOpenResult { AddressBook: not null } result => result.AddressBook!,
+            EmailDataOpenResult result => throw new PSArgumentException(
+                $"The imported artifact is '{result.Kind}', not an Offline Address Book."),
+            null => throw new PSArgumentNullException(nameof(inputObject)),
+            _ => throw new PSArgumentException(
+                "InputObject must be an OfflineAddressBookSession or an Import-MailData result containing one.")
         };
     }
 
