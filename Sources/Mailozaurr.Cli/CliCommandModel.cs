@@ -183,6 +183,7 @@ internal static partial class CliCommandModel {
         "header" => "Message header in key=value form; repeat for multiple headers.",
         "html" => "HTML message body.",
         "include-raw" => "Include raw provider content when available.",
+        "ids-file" => "Text file containing one selected provider message ID per line.",
         "index" => "Zero-based action-plan index; repeat when supported.",
         "is-default" => "Make the profile the default.",
         "kind" => "Mail provider kind.",

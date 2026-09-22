@@ -22,6 +22,9 @@ public sealed class MailEmlExportRequest {
 
     /// <summary>Maximum provider payload size per message.</summary>
     public long MaxMessageBytes { get; set; } = 64L * 1024L * 1024L;
+
+    /// <summary>Required provider namespace when an archive spans multiple export sessions.</summary>
+    public string? ExpectedProviderScope { get; set; }
 }
 
 /// <summary>Result for one requested EML artifact.</summary>

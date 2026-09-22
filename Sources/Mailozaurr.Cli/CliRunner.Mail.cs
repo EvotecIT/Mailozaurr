@@ -394,6 +394,29 @@ public static partial class CliRunner {
                 await WriteItemAsync(output, emlResult, json, value =>
                     value.Message ?? $"Exported {value.ExportedCount} EML message(s).").ConfigureAwait(false);
                 return emlResult.Succeeded ? 0 : 1;
+            case "archive-eml":
+                var archiveIds = parseResult.GetOptionValues("message-id")
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Select(value => value!.Trim())
+                    .ToList();
+                var idsFile = parseResult.GetOption("ids-file");
+                if (!string.IsNullOrWhiteSpace(idsFile)) {
+                    archiveIds.AddRange(File.ReadAllLines(idsFile)
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Select(value => value.Trim()));
+                }
+                var emlArchiveResult = await new MailEmlArchiveService(application.ProfileStore, application.EmlExport)
+                    .ArchiveAsync(new MailEmlArchiveRequest {
+                        ProfileId = RequireOption(parseResult, "profile"),
+                        MailboxId = parseResult.GetOption("mailbox"),
+                        FolderId = parseResult.GetOption("folder"),
+                        MessageIds = archiveIds,
+                        DestinationDirectory = RequireOption(parseResult, "path"),
+                        MaxMessageBytes = parseResult.GetIntOption("max-bytes") ?? 64 * 1024 * 1024
+                    }).ConfigureAwait(false);
+                await WriteItemAsync(output, emlArchiveResult, json, value => value.Message ??
+                    $"Archived {value.ExportedCount} EML message(s).").ConfigureAwait(false);
+                return emlArchiveResult.Succeeded ? 0 : 1;
             case "changes":
                 var changeResult = await application.ChangeFeeds.GetChangesAsync(new MailChangeFeedRequest {
                     ProfileId = RequireOption(parseResult, "profile"),

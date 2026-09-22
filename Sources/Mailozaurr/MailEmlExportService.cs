@@ -1,7 +1,7 @@
 namespace Mailozaurr;
 
 /// <summary>Default provider-neutral EML export orchestration.</summary>
-public sealed class MailEmlExportService : IMailEmlExportService {
+public sealed class MailEmlExportService : IMailEmlExportService, IMailEmlArchiveScopeProvider {
     /// <summary>Maximum number of distinct messages accepted by one export request.</summary>
     public const int MaximumBatchMessageCount = 1000;
 
@@ -21,28 +21,73 @@ public sealed class MailEmlExportService : IMailEmlExportService {
     }
 
     /// <inheritdoc />
+    public async Task<string> GetArchiveScopeAsync(MailProfile profile, string? folderId,
+        CancellationToken cancellationToken = default) {
+        if (!_sources.TryGetValue(profile.Kind, out var source))
+            throw new NotSupportedException($"Raw EML export is not configured for profile kind '{profile.Kind}'.");
+        if (profile.Kind != MailProfileKind.Imap) return profile.Kind.ToString();
+        using var session = await source.OpenSessionAsync(profile, cancellationToken).ConfigureAwait(false);
+        if (session is not IRawMailMessageScopeSession scopeSession)
+            throw new NotSupportedException("IMAP archive requires a source that exposes UIDVALIDITY.");
+        return await scopeSession.GetScopeAsync(folderId, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<MailEmlExportResult> ExportAsync(
         MailEmlExportRequest request,
         CancellationToken cancellationToken = default) {
         if (request == null) throw new ArgumentNullException(nameof(request));
         if (string.IsNullOrWhiteSpace(request.ProfileId)) throw new ArgumentException("Profile id is required.", nameof(request));
         if (string.IsNullOrWhiteSpace(request.DestinationDirectory)) throw new ArgumentException("Destination directory is required.", nameof(request));
+        if (request.MaxMessageBytes <= 0 || request.MaxMessageBytes > int.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(request.MaxMessageBytes));
+        if (request.MessageIds == null) throw new ArgumentException("At least one message id is required.", nameof(request));
+        var profile = await _profileStore.GetByIdAsync(request.ProfileId.Trim(), cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidOperationException($"Profile '{request.ProfileId}' was not found.");
+        if (profile.Kind == MailProfileKind.Imap && request.MaxMessageBytes == int.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(request.MaxMessageBytes));
+        _ = CanonicalizeMessageIds(profile, request.MessageIds);
+        using var sourceSession = await GetSource(profile).OpenSessionAsync(profile, cancellationToken).ConfigureAwait(false);
+        return await ExportWithSessionAsync(request, profile, sourceSession, cancellationToken).ConfigureAwait(false);
+    }
+
+    internal async Task<IMailEmlArchiveBatchSession> OpenArchiveSessionAsync(
+        MailProfile profile, CancellationToken cancellationToken) {
+        var sourceSession = await GetSource(profile).OpenSessionAsync(profile, cancellationToken).ConfigureAwait(false);
+        return new ArchiveBatchSession(this, profile, sourceSession);
+    }
+
+    private IRawMailMessageSource GetSource(MailProfile profile) =>
+        _sources.TryGetValue(profile.Kind, out var source)
+            ? source
+            : throw new NotSupportedException($"Raw EML export is not configured for profile kind '{profile.Kind}'.");
+
+    private async Task<MailEmlExportResult> ExportWithSessionAsync(
+        MailEmlExportRequest request, MailProfile profile, IRawMailMessageSession sourceSession,
+        CancellationToken cancellationToken) {
+        if (request == null) throw new ArgumentNullException(nameof(request));
+        if (!string.Equals(request.ProfileId.Trim(), profile.Id, StringComparison.Ordinal))
+            throw new InvalidOperationException("An archive export session cannot switch profiles.");
+        if (string.IsNullOrWhiteSpace(request.DestinationDirectory)) throw new ArgumentException("Destination directory is required.", nameof(request));
         if (request.MaxMessageBytes <= 0 || request.MaxMessageBytes > int.MaxValue) {
             throw new ArgumentOutOfRangeException(nameof(request.MaxMessageBytes));
         }
 
-        var profile = await _profileStore.GetByIdAsync(request.ProfileId.Trim(), cancellationToken).ConfigureAwait(false)
-            ?? throw new InvalidOperationException($"Profile '{request.ProfileId}' was not found.");
+        if (profile.Kind == MailProfileKind.Imap && request.MaxMessageBytes == int.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(request.MaxMessageBytes),
+                "IMAP export limit must be below Int32.MaxValue so an extra byte can detect oversized content.");
         if (request.MessageIds == null) throw new ArgumentException("At least one message id is required.", nameof(request));
         var messageIds = CanonicalizeMessageIds(profile, request.MessageIds);
         if (messageIds.Count == 0) throw new ArgumentException("At least one message id is required.", nameof(request));
-        if (!_sources.TryGetValue(profile.Kind, out var source)) {
-            throw new NotSupportedException($"Raw EML export is not configured for profile kind '{profile.Kind}'.");
-        }
-
         var destinationDirectory = Path.GetFullPath(request.DestinationDirectory);
         Directory.CreateDirectory(destinationDirectory);
-        using var sourceSession = await source.OpenSessionAsync(profile, cancellationToken).ConfigureAwait(false);
+        if (request.ExpectedProviderScope != null) {
+            if (sourceSession is not IRawMailMessageScopeSession scopedSession)
+                throw new NotSupportedException("Archive export requires a provider scope aware source.");
+            var actualScope = await scopedSession.GetScopeAsync(request.FolderId, cancellationToken).ConfigureAwait(false);
+            if (!string.Equals(actualScope, request.ExpectedProviderScope, StringComparison.Ordinal))
+                throw new InvalidOperationException("The provider mailbox identity changed during this archive run.");
+        }
         var result = new MailEmlExportResult {
             ProfileId = profile.Id,
             DestinationDirectory = destinationDirectory,
@@ -57,12 +102,21 @@ public sealed class MailEmlExportService : IMailEmlExportService {
             result.Results.Add(item);
 
             try {
-                var raw = await sourceSession.GetRawMessageAsync(new RawMailMessageRequest {
+                if (request.ExpectedProviderScope != null) {
+                    var currentScope = await ((IRawMailMessageScopeSession)sourceSession)
+                        .GetScopeAsync(request.FolderId, cancellationToken).ConfigureAwait(false);
+                    if (!string.Equals(currentScope, request.ExpectedProviderScope, StringComparison.Ordinal))
+                        throw new InvalidOperationException("The provider mailbox identity changed during this archive run.");
+                }
+                var rawRequest = new RawMailMessageRequest {
                     MailboxId = request.MailboxId,
                     FolderId = request.FolderId,
                     MessageId = messageId,
                     MaxBytes = request.MaxMessageBytes
-                }, cancellationToken).ConfigureAwait(false);
+                };
+                using var raw = sourceSession is IStreamingRawMailMessageSession streamingSession
+                    ? await streamingSession.GetRawMessageStreamAsync(rawRequest, cancellationToken).ConfigureAwait(false)
+                    : await sourceSession.GetRawMessageAsync(rawRequest, cancellationToken).ConfigureAwait(false);
                 if (raw == null) {
                     item.Code = "message_not_found";
                     item.Message = $"Message '{messageId}' was not found.";
@@ -85,8 +139,11 @@ public sealed class MailEmlExportService : IMailEmlExportService {
 
                 ProviderEmlArtifactWriteResult write;
                 try {
+                    using var buffered = raw.ContentStream == null
+                        ? new MemoryStream(raw.Content, writable: false)
+                        : null;
                     write = await _writer.WriteAsync(
-                        raw.Content,
+                        raw.ContentStream ?? buffered!,
                         destinationPath,
                         request.MaxMessageBytes,
                         request.Overwrite,
@@ -97,12 +154,18 @@ public sealed class MailEmlExportService : IMailEmlExportService {
                     result.FailedCount++;
                     continue;
                 }
-                item.Succeeded = true;
-                item.Message = $"Exported message '{messageId}'.";
                 item.BytesWritten = write.BytesWritten;
                 item.Sha256 = write.Sha256;
                 item.UsedPreservedSource = write.UsedPreservedSource;
                 item.DiagnosticCodes = write.DiagnosticCodes;
+                if (request.ExpectedProviderScope != null) {
+                    var currentScope = await ((IRawMailMessageScopeSession)sourceSession)
+                        .GetScopeAsync(request.FolderId, cancellationToken).ConfigureAwait(false);
+                    if (!string.Equals(currentScope, request.ExpectedProviderScope, StringComparison.Ordinal))
+                        throw new InvalidOperationException("The provider mailbox identity changed during this archive run.");
+                }
+                item.Succeeded = true;
+                item.Message = $"Exported message '{messageId}'.";
                 result.ExportedCount++;
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 throw;
@@ -119,6 +182,25 @@ public sealed class MailEmlExportService : IMailEmlExportService {
             ? $"Exported {result.ExportedCount} EML message(s)."
             : $"Exported {result.ExportedCount} EML message(s); {result.FailedCount} failed.";
         return result;
+    }
+
+    private sealed class ArchiveBatchSession : IMailEmlArchiveBatchSession {
+        private readonly MailEmlExportService _owner;
+        private readonly MailProfile _profile;
+        private readonly IRawMailMessageSession _sourceSession;
+
+        internal ArchiveBatchSession(MailEmlExportService owner, MailProfile profile,
+            IRawMailMessageSession sourceSession) {
+            _owner = owner;
+            _profile = profile;
+            _sourceSession = sourceSession;
+        }
+
+        public Task<MailEmlExportResult> ExportAsync(MailEmlExportRequest request,
+            CancellationToken cancellationToken) =>
+            _owner.ExportWithSessionAsync(request, _profile, _sourceSession, cancellationToken);
+
+        public void Dispose() => _sourceSession.Dispose();
     }
 
     private static string CreateStorageIdentity(
@@ -160,14 +242,14 @@ public sealed class MailEmlExportService : IMailEmlExportService {
             providerIdentityComponent);
     }
 
-    private static string CanonicalizeMessageIdForStorage(MailProfile profile, string messageId) =>
+    internal static string CanonicalizeMessageIdForStorage(MailProfile profile, string messageId) =>
         profile.Kind switch {
             MailProfileKind.Imap => ImapMailReadHandler.CanonicalizeUidForStorage(messageId),
             MailProfileKind.Pop3 => Pop3MailReadHandler.CanonicalizeMessageIdForStorage(messageId),
             _ => messageId
         };
 
-    private static IReadOnlyList<string> CanonicalizeMessageIds(
+    internal static IReadOnlyList<string> CanonicalizeMessageIds(
         MailProfile profile,
         IEnumerable<string> requestedMessageIds) {
         var messageIds = new List<string>();

@@ -262,6 +262,16 @@ mailozaurr mail save-attachments --profile work-imap --folder Inbox --message-id
 
 When `--path` names a directory, saved files keep a readable prefix and add a deterministic SHA-256 identity suffix from the exact provider filename plus the profile, mailbox, folder, message, and provider/per-part identity. This prevents distinct remote names, repeated same-name parts, and cross-message batch saves from overwriting one another after path removal, character replacement, or case folding. An explicit file path is used unchanged.
 
+Archive a selected inventory of provider messages as exact EML bytes:
+
+```powershell
+# One provider message ID per line; retain this file to resume the same snapshot.
+mailozaurr mail archive-eml --profile work-imap --folder Inbox `
+  --ids-file ./inbox-ids.txt --path ./inbox-archive --json
+```
+
+The archive records the selected IDs, effective profile settings, and provider mailbox scope, writes EML files in `eml/`, and keeps per-message SHA-256 records in `.mailozaurr-archive/`. Repeating the command with the same inventory verifies each retained file before skipping it, retries missing or altered files, and reports failed IDs. IMAP resumes also require the same folder UIDVALIDITY; a changed UIDVALIDITY or profile requires a new archive directory. The command accepts more than 1,000 IDs by processing bounded export batches. The ID file is the caller's selected inventory; this command does not discover every message in a mailbox. IMAP retrieves messages in bounded partial fetches. MailKit buffers each POP3 message before returning its stream, with transfer progress enforcing the configured size limit. Graph and Gmail provider APIs currently return buffered MIME payloads.
+
 Draft, send, and queue mail:
 
 ```powershell

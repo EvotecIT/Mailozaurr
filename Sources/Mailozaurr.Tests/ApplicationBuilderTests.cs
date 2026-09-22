@@ -143,7 +143,7 @@ public sealed class ApplicationBuilderTests {
                 DestinationDirectory = Path.Combine(directory, "export")
             });
 
-            Assert.True(result.Succeeded);
+            Assert.True(result.Succeeded, result.Message + " " + string.Join("; ", result.Results.Select(item => item.Message)));
             Assert.Contains(app.ReadHandlers, handler => handler.Kind == MailProfileKind.Pop3);
         } finally {
             Directory.Delete(directory, recursive: true);
