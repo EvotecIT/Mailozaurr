@@ -755,6 +755,7 @@ public sealed class PendingMessageProcessorTests {
 
         repository.ReleaseEnumerations();
         await sender.WaitForFirstSendAsync();
+        await repository.WaitForBothLeaseAttemptsAsync();
         sender.Release();
         await Task.WhenAll(firstTask, secondTask);
 
@@ -770,6 +771,8 @@ public sealed class PendingMessageProcessorTests {
         private readonly TaskCompletionSource<bool> firstSnapshotCaptured = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<bool> secondSnapshotCaptured = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<bool> releaseEnumerators = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> bothLeaseAttempts = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int leaseAttempts;
 
         internal CoordinatedPendingMessageRepository(DateTimeOffset nextAttemptAt, int attemptCount = 0) {
             record = CreateRecord(nextAttemptAt, "coordinated-message");
@@ -799,6 +802,7 @@ public sealed class PendingMessageProcessorTests {
             DateTimeOffset leaseUntil,
             CancellationToken cancellationToken = default) {
             lock (syncRoot) {
+                if (++leaseAttempts == 2) bothLeaseAttempts.TrySetResult(true);
                 if (!string.Equals(record.MessageId, messageId, StringComparison.OrdinalIgnoreCase) || record.NextAttemptAt > dueBeforeOrAt) {
                     return Task.FromResult<PendingMessageRecord?>(null);
                 }
@@ -839,6 +843,8 @@ public sealed class PendingMessageProcessorTests {
         public Task RemoveAsync(string messageId, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         internal void ReleaseEnumerations() => releaseEnumerators.TrySetResult(true);
+
+        internal Task WaitForBothLeaseAttemptsAsync() => bothLeaseAttempts.Task;
     }
 
     private sealed class BlockingPendingMessageSender : IPendingMessageSender {

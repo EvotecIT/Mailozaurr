@@ -277,7 +277,7 @@ Send commands attempt immediate delivery by default. Add `--queue-on-failure` wh
 
 Queue processing records provider acceptance before removing the pending item. If removal fails, the next run retries local cleanup without sending the message again. `Send-EmailPendingMessage -ProcessAll` and a selected `-MessageId` can bypass the retry schedule, but they respect an active processing lease. If the provider accepts a message and both recording that acceptance and removing the item fail, delivery is indeterminate; inspect the provider before retrying it manually.
 
-When upgrading workers that share a pending-message log, stop every queue processor, including scheduled and forced PowerShell runs, before updating them. Restart processing after all workers use the new version; existing queued records remain readable. Do not run an older worker against a log written by the new version: older compaction can discard acceptance and lease markers, and older forced retries can ignore active leases.
+When upgrading workers that share a pending-message log, let in-flight sends finish, then stop every queue processor, including scheduled and forced PowerShell runs, before updating them. Restart processing after all workers use the new version; existing queued records remain readable. Forced retries can process pre-upgrade scheduled records immediately after restart. Do not run an older worker against a log written by the new version: older compaction can discard acceptance and lease markers, and older forced retries can ignore active leases.
 
 Preview and execute mailbox actions:
 

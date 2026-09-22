@@ -43,6 +43,13 @@ public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
 
     /// <inheritdoc />
     protected override async Task ProcessRecordAsync() {
+        var filteredIds = NormalizeMessageIds(MessageId);
+        if (MyInvocation.BoundParameters.ContainsKey(nameof(MessageId)) && filteredIds == null) {
+            ThrowTerminatingError(new ErrorRecord(
+                new PSArgumentException("MessageId must contain at least one non-empty identifier."),
+                "EmptyPendingMessageIdSelection", ErrorCategory.InvalidArgument, MessageId));
+            return;
+        }
         if (!ShouldProcess(PendingMessagesPath!, "Sending pending email messages")) {
             return;
         }
@@ -58,7 +65,6 @@ public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
             writeProgressAction: WriteProgress,
             writeInformationAction: WriteInformation);
 
-        var filteredIds = NormalizeMessageIds(MessageId);
         if (filteredIds != null) {
             foreach (var id in filteredIds) {
                 var record = await repository.GetByMessageIdAsync(id, CancelToken).ConfigureAwait(false);

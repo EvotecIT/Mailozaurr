@@ -678,9 +678,9 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             var current = await GetByMessageIdCoreAsync(messageId, cancellationToken).ConfigureAwait(false);
             if (current == null) return null;
             var currentTime = DateTimeOffset.UtcNow;
-            var legacyLeaseMayBeActive = ignoreSchedule && !current.IsLeaseAwareEnvelope &&
-                !current.ProcessingLeaseUntil.HasValue && current.NextAttemptAt > currentTime;
-            if (current.ProcessingLeaseUntil > currentTime || legacyLeaseMayBeActive ||
+            // Legacy NextAttemptAt may be a retry schedule or an abandoned lease.
+            // The required stop-upgrade-restart leaves no active legacy worker.
+            if (current.ProcessingLeaseUntil > currentTime ||
                 !ignoreSchedule && current.NextAttemptAt > dueBeforeOrAt) {
                 return null;
             }

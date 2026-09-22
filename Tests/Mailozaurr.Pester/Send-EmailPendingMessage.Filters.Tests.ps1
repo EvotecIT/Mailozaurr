@@ -48,8 +48,13 @@ Describe 'Send-EmailPendingMessage provider and message filters' {
     BeforeAll {
         $moduleRoot = Join-Path (Join-Path $PSScriptRoot '..') '..'
         $modulePath = Join-Path $moduleRoot 'Mailozaurr.psd1'
-        if (-not (Get-Module -Name Mailozaurr)) {
+        if (-not (Get-Command Send-EmailPendingMessage -ErrorAction SilentlyContinue)) {
             Import-Module $modulePath -Force
+        }
+
+        if (-not ('MimeKit.MimeMessage' -as [type])) {
+            $binaryDirectory = Split-Path (Get-Command Send-EmailPendingMessage).ImplementingType.Assembly.Location
+            Add-Type -Path (Join-Path $binaryDirectory 'MimeKit.dll')
         }
 
         if (-not ('FilterRecordingPendingMessageSender' -as [type])) {
@@ -170,5 +175,21 @@ public static class FilterPendingMessageSenderFactory {
         $pending.Count | Should -Be 2
         $pending.MessageId | Should -Contain $other.MessageId
         $pending.MessageId | Should -Contain $mailgun.MessageId
+    }
+
+    It 'Rejects an explicitly empty message id selection without sending due messages' {
+        $path = Join-Path $TestDrive 'filters-empty-message-id'
+        $options = [Mailozaurr.PendingMessageRepositoryOptions]::new()
+        $options.DirectoryPath = $path
+        $repo = [Mailozaurr.FilePendingMessageRepository]::new($options)
+        $record = New-PendingRecord -Provider ([Mailozaurr.EmailProvider]::None)
+        $repo.SaveAsync($record).GetAwaiter().GetResult()
+
+        { Send-EmailPendingMessage -PendingMessagesPath $path -MessageId @('') -ErrorAction Stop } | Should -Throw
+        { Send-EmailPendingMessage -PendingMessagesPath $path -MessageId @(' ', '') -ErrorAction Stop } | Should -Throw
+        { Send-EmailPendingMessage -PendingMessagesPath $path -MessageId @() -ErrorAction Stop } | Should -Throw
+
+        [FilterRecordingPendingMessageSender]::GetProcessedMessageIds([Mailozaurr.EmailProvider]::None).Count | Should -Be 0
+        (Get-EmailPendingMessage -PendingMessagesPath $path | Measure-Object).Count | Should -Be 1
     }
 }

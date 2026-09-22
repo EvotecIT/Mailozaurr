@@ -182,7 +182,7 @@ public sealed class FilePendingMessageCoordinationTests {
     }
 
     [Fact]
-    public async Task ForcedRetryConservativelyHonorsLegacyFutureLeaseAfterCompaction() {
+    public async Task ForcedRetryProcessesMigratedScheduledRecordAfterCompaction() {
         var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try {
@@ -210,8 +210,47 @@ public sealed class FilePendingMessageCoordinationTests {
                 Assert.True(await repository.TryRemoveWithLeaseAsync(id, lease!.ProcessingLeaseId!));
             }
 
-            Assert.Null(await repository.TryAcquireForcedLeaseAsync(
-                "legacy-in-flight", now, now.AddMinutes(2)));
+            var forced = await repository.TryAcquireForcedLeaseAsync(
+                "legacy-in-flight", now, now.AddMinutes(2));
+            Assert.NotNull(forced);
+            Assert.Equal("legacy-in-flight", forced!.MessageId);
+            Assert.NotNull(forced.ProcessingLeaseId);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ForcedPowerShellProcessingHandlesMigratedFutureSchedule(bool selectMessage) {
+        var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var path = Path.Combine(directory, "pending.log");
+            var now = DateTimeOffset.UtcNow;
+            var legacy = new PendingMessageLogEnvelope {
+                EntryType = "upsert",
+                MessageId = "migrated-scheduled",
+                Record = new PendingMessageRecord {
+                    MessageId = "migrated-scheduled", Timestamp = now,
+                    NextAttemptAt = now.AddHours(1)
+                }
+            };
+            File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(legacy) + Environment.NewLine);
+            var repository = new FilePendingMessageRepository(path);
+            var filtered = new Mailozaurr.PowerShell.CmdletSendEmailPendingMessage.FilteredPendingMessageRepository(
+                repository, selectMessage ? new[] { "migrated-scheduled" } : null,
+                null, true, () => now);
+            var sender = new CountingSender();
+            var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+                [EmailProvider.None] = sender
+            });
+
+            await new PendingMessageProcessor(filtered, factory, clock: () => now).ProcessAsync();
+
+            Assert.Equal(1, sender.SendCount);
+            Assert.Null(await repository.GetByMessageIdAsync("migrated-scheduled"));
         } finally {
             Directory.Delete(directory, recursive: true);
         }
@@ -598,5 +637,14 @@ public sealed class FilePendingMessageCoordinationTests {
         }
 
         public void Release() => release.TrySetResult(true);
+    }
+
+    private sealed class CountingSender : IPendingMessageSender {
+        public int SendCount { get; private set; }
+
+        public Task SendAsync(PendingMessageRecord record, CancellationToken cancellationToken) {
+            SendCount++;
+            return Task.CompletedTask;
+        }
     }
 }
