@@ -186,12 +186,13 @@ public sealed class PendingMessageProcessor {
                 // If both fail, surface the indeterminate acknowledgement explicitly.
                 try {
                     await RemoveOwnedAsync(leasedRecord.MessageId, leaseId, CancellationToken.None).ConfigureAwait(false);
-                    continue;
                 } catch (Exception removalFailure) {
                     throw new AggregateException(
                         $"Delivery of '{leasedRecord.MessageId}' was accepted, but queue acknowledgement failed.",
                         markerFailure, removalFailure);
                 }
+                observer.MessageSent(leasedRecord, attempt, stopwatch.Elapsed);
+                continue;
             }
 
             observer.MessageSent(leasedRecord, attempt, stopwatch.Elapsed);

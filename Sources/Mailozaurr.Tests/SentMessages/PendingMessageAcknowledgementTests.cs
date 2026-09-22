@@ -28,6 +28,27 @@ public sealed class PendingMessageAcknowledgementTests {
     }
 
     [Fact]
+    public async Task SuccessfulFallbackRemovalReportsAcceptedDelivery() {
+        var now = DateTimeOffset.Parse("2026-01-01T12:00:00Z");
+        var repository = new FailingRemovalRepository(new PendingMessageRecord {
+            MessageId = "fallback-acknowledged",
+            Timestamp = now,
+            NextAttemptAt = now
+        }) { FailFirstRemoval = false, FailAcceptedMarker = true };
+        var sender = new CountingSender();
+        var observer = new CountingObserver();
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            [EmailProvider.None] = sender
+        });
+
+        await new PendingMessageProcessor(repository, factory, observer: observer, clock: () => now).ProcessAsync();
+
+        Assert.Equal(1, sender.SendCount);
+        Assert.Equal(1, observer.SentCount);
+        Assert.Null(repository.Record);
+    }
+
+    [Fact]
     public async Task CleanupOfPreviouslyAcceptedRecordDoesNotCountAsAnotherAttempt() {
         var now = DateTimeOffset.Parse("2026-01-01T12:00:00Z");
         var repository = new FailingRemovalRepository(new PendingMessageRecord {
@@ -87,14 +108,28 @@ public sealed class PendingMessageAcknowledgementTests {
         }
     }
 
+    private sealed class CountingObserver : IPendingMessageProcessorObserver {
+        public int SentCount { get; private set; }
+        public void MessageSkipped(PendingMessageRecord record, PendingMessageSkipReason reason) { }
+        public void MessageAttemptStarted(PendingMessageRecord record, int attempt) { }
+        public void MessageSent(PendingMessageRecord record, int attempt, TimeSpan duration) => SentCount++;
+        public void MessageFailed(PendingMessageRecord record, int attempt, Exception exception,
+            TimeSpan duration, bool willRetry, TimeSpan? retryDelay) { }
+        public void MessageDropped(PendingMessageRecord record, int attempt,
+            PendingMessageDropReason reason, Exception? exception) { }
+    }
+
     private sealed class FailingRemovalRepository : IPendingMessageRepository {
         public FailingRemovalRepository(PendingMessageRecord record) => Record = record;
 
         public PendingMessageRecord? Record { get; private set; }
         public bool FailFirstRemoval { get; set; } = true;
+        public bool FailAcceptedMarker { get; set; }
         public PendingMessageRecord? EnumerationRecord { get; set; }
 
         public Task SaveAsync(PendingMessageRecord record, CancellationToken cancellationToken = default) {
+            if (FailAcceptedMarker && record.DeliveryAcceptedAt != null)
+                throw new IOException("Simulated acceptance marker failure.");
             Record = record.Clone();
             return Task.CompletedTask;
         }
