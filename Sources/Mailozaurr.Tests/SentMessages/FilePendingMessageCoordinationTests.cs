@@ -9,7 +9,7 @@ public sealed class FilePendingMessageCoordinationTests {
         try {
             var first = new FilePendingMessageRepository(path);
             var second = new FilePendingMessageRepository(path);
-            var now = DateTimeOffset.Parse("2026-01-01T12:00:00Z");
+            var now = DateTimeOffset.UtcNow;
             await first.SaveAsync(new PendingMessageRecord {
                 MessageId = "shared-message",
                 Timestamp = now,
@@ -24,6 +24,28 @@ public sealed class FilePendingMessageCoordinationTests {
 
             await second.RemoveAsync("shared-message");
             Assert.Null(await first.GetByMessageIdAsync("shared-message"));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task FutureDueCutoffDoesNotStealAnActiveLease() {
+        var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var path = Path.Combine(directory, "pending.log");
+            var first = new FilePendingMessageRepository(path);
+            var second = new FilePendingMessageRepository(path);
+            var now = DateTimeOffset.UtcNow;
+            await first.SaveAsync(new PendingMessageRecord {
+                MessageId = "future-due", Timestamp = now, NextAttemptAt = now.AddSeconds(30)
+            });
+
+            Assert.NotNull(await first.TryAcquireLeaseAsync(
+                "future-due", now.AddMinutes(1), now.AddMinutes(2)));
+            Assert.Null(await second.TryAcquireLeaseAsync(
+                "future-due", now.AddMinutes(3), now.AddMinutes(4)));
         } finally {
             Directory.Delete(directory, recursive: true);
         }
@@ -443,6 +465,50 @@ public sealed class FilePendingMessageCoordinationTests {
                 await firstRun;
             }
             Assert.Null(await second.GetByMessageIdAsync("long-send"));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData("2024-06-01T12:00:00Z")]
+    [InlineData("2030-06-01T12:00:00Z")]
+    public async Task SchedulingClockOffsetDoesNotChangeSharedLeaseTime(string schedulingTime) {
+        var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var path = Path.Combine(directory, "pending.log");
+            var first = new FilePendingMessageRepository(path);
+            var second = new FilePendingMessageRepository(path);
+            var dueTime = DateTimeOffset.Parse(schedulingTime);
+            await first.SaveAsync(new PendingMessageRecord {
+                MessageId = "offset-clock", Timestamp = dueTime, NextAttemptAt = dueTime
+            });
+            var sender = new BlockingSender();
+            var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+                [EmailProvider.None] = sender
+            });
+            var duration = TimeSpan.FromSeconds(10);
+            var firstProcessor = new PendingMessageProcessor(first, factory,
+                clock: () => dueTime, processingLeaseDuration: duration);
+            var wallStart = DateTimeOffset.UtcNow;
+            var firstRun = firstProcessor.ProcessAsync();
+            await sender.Started;
+            try {
+                var wallEnd = DateTimeOffset.UtcNow;
+                var lease = (await second.GetByMessageIdAsync("offset-clock"))!.ProcessingLeaseUntil!.Value;
+                Assert.InRange(lease, wallStart + duration, wallEnd + duration);
+
+                var secondProcessor = new PendingMessageProcessor(second, factory,
+                    clock: () => DateTimeOffset.Parse("2040-01-01T00:00:00Z"),
+                    processingLeaseDuration: duration);
+                await secondProcessor.ProcessAsync();
+                Assert.Equal(1, sender.SendCount);
+            } finally {
+                sender.Release();
+                await firstRun;
+            }
+            Assert.Null(await second.GetByMessageIdAsync("offset-clock"));
         } finally {
             Directory.Delete(directory, recursive: true);
         }

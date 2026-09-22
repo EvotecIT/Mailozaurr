@@ -28,7 +28,7 @@ public sealed class PendingMessageProcessor {
     /// <param name="repository">Repository used to load and persist pending messages.</param>
     /// <param name="senderFactory">Factory used to resolve the correct sender for each record.</param>
     /// <param name="retryDelaySelector">Provides the delay applied before the next retry attempt.</param>
-    /// <param name="clock">Supplies the current time used for scheduling retries.</param>
+    /// <param name="clock">Supplies time for due-message selection, retry scheduling, and outcome timestamps. Processing leases use UTC wall time.</param>
     /// <param name="maxRetryAttempts">Maximum number of delivery attempts performed before giving up on a message.</param>
     /// <param name="logger">Optional logger used to record processing diagnostics.</param>
     /// <param name="observer">Optional observer used to emit telemetry about processing outcomes.</param>
@@ -220,7 +220,9 @@ public sealed class PendingMessageProcessor {
         DateTimeOffset now,
         CancellationToken cancellationToken) {
         var leaseDuration = processingLeaseDuration > TimeSpan.Zero ? processingLeaseDuration : MinimumLeaseDuration;
-        var leaseUntil = ApplyDelay(now, leaseDuration);
+        // Scheduling may use a caller-supplied clock, but repository leases
+        // must use the same wall clock as other workers sharing the queue.
+        var leaseUntil = ApplyDelay(DateTimeOffset.UtcNow, leaseDuration);
         return await repository.TryAcquireLeaseAsync(record.MessageId, now, leaseUntil, cancellationToken).ConfigureAwait(false);
     }
 
@@ -273,7 +275,7 @@ public sealed class PendingMessageProcessor {
         try {
             while (true) {
                 await Task.Delay(interval, renewalCancellation).ConfigureAwait(false);
-                var next = ApplyDelay(clock(), duration);
+                var next = ApplyDelay(DateTimeOffset.UtcNow, duration);
                 if (next <= expected) next = ApplyDelay(expected, duration);
                 DateTimeOffset? committed = null;
                 if (next > expected) {

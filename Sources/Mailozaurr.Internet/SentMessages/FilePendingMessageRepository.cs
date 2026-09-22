@@ -665,9 +665,10 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
         TryAcquireLeaseCoreAsync(messageId, now, leaseUntil, true, cancellationToken);
 
     private async Task<PendingMessageRecord?> TryAcquireLeaseCoreAsync(string messageId,
-        DateTimeOffset now, DateTimeOffset leaseUntil, bool ignoreSchedule,
+        DateTimeOffset dueBeforeOrAt, DateTimeOffset leaseUntil, bool ignoreSchedule,
         CancellationToken cancellationToken) {
         var acquisitionWait = Stopwatch.StartNew();
+        var startedAt = DateTimeOffset.UtcNow;
         bool scheduleCompaction = false;
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
@@ -676,17 +677,18 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             using var storageLock = await AcquireIndexedStorageLockAsync(cancellationToken).ConfigureAwait(false);
             var current = await GetByMessageIdCoreAsync(messageId, cancellationToken).ConfigureAwait(false);
             if (current == null) return null;
+            var currentTime = DateTimeOffset.UtcNow;
             var legacyLeaseMayBeActive = ignoreSchedule && !current.IsLeaseAwareEnvelope &&
-                !current.ProcessingLeaseUntil.HasValue && current.NextAttemptAt > now;
-            if (current.ProcessingLeaseUntil > now || legacyLeaseMayBeActive ||
-                !ignoreSchedule && current.NextAttemptAt > now) {
+                !current.ProcessingLeaseUntil.HasValue && current.NextAttemptAt > currentTime;
+            if (current.ProcessingLeaseUntil > currentTime || legacyLeaseMayBeActive ||
+                !ignoreSchedule && current.NextAttemptAt > dueBeforeOrAt) {
                 return null;
             }
 
             // The caller computes the expiry before waiting for the local gate,
             // cross-process lock, and index refresh. Give the owner its intended
             // lease time when that wait consumed the renewal safety margin.
-            var duration = leaseUntil - now;
+            var duration = leaseUntil - startedAt;
             var elapsed = acquisitionWait.Elapsed;
             if (duration > TimeSpan.Zero && elapsed.Ticks > duration.Ticks / 3) {
                 var available = DateTimeOffset.MaxValue - leaseUntil;

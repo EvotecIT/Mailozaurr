@@ -242,12 +242,15 @@ public sealed class PendingMessageProcessorTests {
             observer: observer,
             processingLeaseDuration: lease);
 
+        var leaseClockStart = DateTimeOffset.UtcNow;
         await processor.ProcessAsync();
+        var leaseClockEnd = DateTimeOffset.UtcNow;
 
         Assert.False(repository.Contains(record.MessageId));
         Assert.Single(sender.SentRecords);
         Assert.Equal(1, sender.SentRecords[0].AttemptCount);
-        Assert.Equal(currentTime + lease, sender.SentRecords[0].NextAttemptAt);
+        Assert.InRange(sender.SentRecords[0].NextAttemptAt,
+            leaseClockStart + lease, leaseClockEnd + lease);
         Assert.Single(observer.Started);
         Assert.Single(observer.Sent);
         Assert.Empty(observer.Failed);
@@ -420,7 +423,7 @@ public sealed class PendingMessageProcessorTests {
         Assert.NotNull(terminal?.DeadLetteredAt);
         Assert.Equal(PendingMessageDropReason.PermanentFailure, terminal!.DeadLetterReason);
 
-        currentTime = currentTime.AddMinutes(2);
+        currentTime = terminal.NextAttemptAt.AddMinutes(1);
         await processor.ProcessAsync();
 
         Assert.False(repository.Contains(record.MessageId));
@@ -662,10 +665,13 @@ public sealed class PendingMessageProcessorTests {
             clock: () => currentTime,
             processingLeaseDuration: TimeSpan.Zero);
 
+        var leaseClockStart = DateTimeOffset.UtcNow;
         await processor.ProcessAsync();
+        var leaseClockEnd = DateTimeOffset.UtcNow;
 
         var sent = Assert.Single(sender.SentRecords);
-        Assert.Equal(currentTime + TimeSpan.FromSeconds(30), sent.NextAttemptAt);
+        Assert.InRange(sent.NextAttemptAt,
+            leaseClockStart + TimeSpan.FromSeconds(30), leaseClockEnd + TimeSpan.FromSeconds(30));
     }
 
     [Fact]

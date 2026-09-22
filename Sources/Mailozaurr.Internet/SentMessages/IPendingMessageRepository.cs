@@ -14,7 +14,7 @@ public interface IPendingMessageRepository {
     /// </summary>
     /// <param name="messageId">The message id to lease.</param>
     /// <param name="dueBeforeOrAt">Latest due time that still qualifies the message for processing.</param>
-    /// <param name="leaseUntil">Timestamp written to <see cref="PendingMessageRecord.NextAttemptAt"/> when the lease is acquired.</param>
+    /// <param name="leaseUntil">Wall-clock expiration written to <see cref="PendingMessageRecord.NextAttemptAt"/> when the lease is acquired.</param>
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     /// <returns>
     /// The current leased record when acquisition succeeds; otherwise <c>null</c>.
