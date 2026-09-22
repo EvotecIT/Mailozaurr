@@ -153,7 +153,8 @@ public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
         }
     }
 
-    private sealed class FilteredPendingMessageRepository : IPendingMessageRepository, IPendingMessageLeaseRenewer {
+    private sealed class FilteredPendingMessageRepository : IPendingMessageRepository, IPendingMessageLeaseRenewer,
+        IPendingMessageLeaseCommitter {
         private readonly IPendingMessageRepository _inner;
         private readonly HashSet<string>? _messageIds;
         private readonly EmailProvider? _provider;
@@ -208,10 +209,22 @@ public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
                 .ConfigureAwait(false);
         }
 
-        public Task<bool> TryRenewLeaseAsync(string messageId, DateTimeOffset expectedLeaseUntil,
+        public Task<bool> TryRenewLeaseAsync(string messageId, string leaseId, DateTimeOffset expectedLeaseUntil,
             DateTimeOffset newLeaseUntil, CancellationToken cancellationToken = default) =>
             _inner is IPendingMessageLeaseRenewer renewer
-                ? renewer.TryRenewLeaseAsync(messageId, expectedLeaseUntil, newLeaseUntil, cancellationToken)
+                ? renewer.TryRenewLeaseAsync(messageId, leaseId, expectedLeaseUntil, newLeaseUntil, cancellationToken)
+                : Task.FromResult(false);
+
+        public Task<bool> TrySaveWithLeaseAsync(PendingMessageRecord record, string leaseId,
+            CancellationToken cancellationToken = default) =>
+            _inner is IPendingMessageLeaseCommitter committer
+                ? committer.TrySaveWithLeaseAsync(record, leaseId, cancellationToken)
+                : Task.FromResult(false);
+
+        public Task<bool> TryRemoveWithLeaseAsync(string messageId, string leaseId,
+            CancellationToken cancellationToken = default) =>
+            _inner is IPendingMessageLeaseCommitter committer
+                ? committer.TryRemoveWithLeaseAsync(messageId, leaseId, cancellationToken)
                 : Task.FromResult(false);
 
         public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) =>

@@ -45,12 +45,13 @@ public sealed class FilePendingMessageCoordinationTests {
             });
 
             var initialLease = now.AddMinutes(1);
-            Assert.NotNull(await first.TryAcquireForcedLeaseAsync("scheduled-retry", now, initialLease));
+            var lease = await first.TryAcquireForcedLeaseAsync("scheduled-retry", now, initialLease);
+            Assert.NotNull(lease);
             Assert.Null(await second.TryAcquireForcedLeaseAsync("scheduled-retry", now, now.AddMinutes(2)));
 
             var renewedLease = now.AddMinutes(3);
-            Assert.True(await second.TryRenewLeaseAsync("scheduled-retry", initialLease, renewedLease));
-            Assert.False(await first.TryRenewLeaseAsync("scheduled-retry", initialLease, now.AddMinutes(4)));
+            Assert.True(await second.TryRenewLeaseAsync("scheduled-retry", lease!.ProcessingLeaseId!, initialLease, renewedLease));
+            Assert.False(await first.TryRenewLeaseAsync("scheduled-retry", lease.ProcessingLeaseId!, initialLease, now.AddMinutes(4)));
             Assert.Null(await first.TryAcquireLeaseAsync("scheduled-retry", now.AddMinutes(2), now.AddMinutes(4)));
         } finally {
             Directory.Delete(directory, recursive: true);
@@ -98,6 +99,48 @@ public sealed class FilePendingMessageCoordinationTests {
                 await firstRun;
             }
             Assert.Null(await second.GetByMessageIdAsync("long-send"));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task WorkerThatLosesLeaseCannotAcknowledgeAnUncancelableSend() {
+        var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var path = Path.Combine(directory, "pending.log");
+            var first = new FilePendingMessageRepository(path);
+            var second = new FilePendingMessageRepository(path);
+            var now = DateTimeOffset.UtcNow;
+            await first.SaveAsync(new PendingMessageRecord {
+                MessageId = "lease-lost",
+                Timestamp = now,
+                NextAttemptAt = now
+            });
+            var sender = new BlockingSender();
+            var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+                [EmailProvider.None] = sender
+            });
+            var run = new PendingMessageProcessor(first, factory,
+                processingLeaseDuration: TimeSpan.FromMilliseconds(300)).ProcessAsync();
+            await sender.Started;
+            try {
+                var replacement = (await second.GetByMessageIdAsync("lease-lost"))!;
+                replacement.ProcessingLeaseId = Guid.NewGuid().ToString("N");
+                replacement.ProcessingLeaseUntil = now.AddMinutes(5);
+                replacement.NextAttemptAt = replacement.ProcessingLeaseUntil.Value;
+                await second.SaveAsync(replacement);
+                await Task.Delay(450);
+            } finally {
+                sender.Release();
+            }
+
+            await Assert.ThrowsAnyAsync<InvalidOperationException>(() => run);
+            var remaining = await second.GetByMessageIdAsync("lease-lost");
+            Assert.NotNull(remaining);
+            Assert.Null(remaining!.DeliveryAcceptedAt);
+            Assert.Equal(1, sender.SendCount);
         } finally {
             Directory.Delete(directory, recursive: true);
         }

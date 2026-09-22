@@ -27,6 +27,9 @@ public sealed class PendingMessageRecord {
     /// <summary>Expiry of an active processing lease, when one is held.</summary>
     public DateTimeOffset? ProcessingLeaseUntil { get; set; }
 
+    /// <summary>Identity of the worker that owns the current processing lease.</summary>
+    public string? ProcessingLeaseId { get; set; }
+
     /// <summary>Number of times delivery has been attempted.</summary>
     public int AttemptCount {
         get => Volatile.Read(ref attemptCount);
@@ -86,6 +89,7 @@ public sealed class PendingMessageRecord {
         NextAttemptAt = NextAttemptAt,
         DeliveryAcceptedAt = DeliveryAcceptedAt,
         ProcessingLeaseUntil = ProcessingLeaseUntil,
+        ProcessingLeaseId = ProcessingLeaseId,
         AttemptCount = AttemptCount,
         MimeMessage = MimeMessage,
         Server = Server,

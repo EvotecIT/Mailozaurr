@@ -50,6 +50,34 @@ public sealed class PendingMessageAcknowledgementTests {
         Assert.Null(repository.Record);
     }
 
+    [Fact]
+    public async Task AcceptedStateFromLeaseWinsOverStaleEnumeration() {
+        var now = DateTimeOffset.Parse("2026-01-01T12:00:00Z");
+        var current = new PendingMessageRecord {
+            MessageId = "accepted-after-snapshot",
+            Timestamp = now,
+            NextAttemptAt = now,
+            DeliveryAcceptedAt = now
+        };
+        var repository = new FailingRemovalRepository(current) {
+            FailFirstRemoval = false,
+            EnumerationRecord = new PendingMessageRecord {
+                MessageId = current.MessageId,
+                Timestamp = now,
+                NextAttemptAt = now
+            }
+        };
+        var sender = new CountingSender();
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            [EmailProvider.None] = sender
+        });
+
+        await new PendingMessageProcessor(repository, factory, clock: () => now).ProcessAsync();
+
+        Assert.Equal(0, sender.SendCount);
+        Assert.Null(repository.Record);
+    }
+
     private sealed class CountingSender : IPendingMessageSender {
         public int SendCount { get; private set; }
 
@@ -64,6 +92,7 @@ public sealed class PendingMessageAcknowledgementTests {
 
         public PendingMessageRecord? Record { get; private set; }
         public bool FailFirstRemoval { get; set; } = true;
+        public PendingMessageRecord? EnumerationRecord { get; set; }
 
         public Task SaveAsync(PendingMessageRecord record, CancellationToken cancellationToken = default) {
             Record = record.Clone();
@@ -86,7 +115,8 @@ public sealed class PendingMessageAcknowledgementTests {
 
         public async IAsyncEnumerable<PendingMessageRecord> GetAllAsync(
             [EnumeratorCancellation] CancellationToken cancellationToken = default) {
-            if (Record != null) yield return Record.Clone();
+            if (EnumerationRecord != null) yield return EnumerationRecord.Clone();
+            else if (Record != null) yield return Record.Clone();
             await Task.CompletedTask;
         }
 
