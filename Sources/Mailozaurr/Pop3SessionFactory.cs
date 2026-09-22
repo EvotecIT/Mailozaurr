@@ -1,5 +1,7 @@
 using MailKit.Net.Pop3;
 using MailKit.Security;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Mailozaurr;
 
@@ -29,6 +31,23 @@ public sealed class Pop3SessionFactory : IPop3SessionFactory {
 
         var request = await CreateRequestAsync(profile, cancellationToken).ConfigureAwait(false);
         return await _connectAsync(request, cancellationToken).ConfigureAwait(false);
+    }
+
+    internal async Task<(Pop3Client Client, string Scope)> ConnectForArchiveAsync(
+        MailProfile profile, CancellationToken cancellationToken) {
+        if (profile == null) throw new ArgumentNullException(nameof(profile));
+        if (profile.Kind != MailProfileKind.Pop3)
+            throw new InvalidOperationException($"Profile '{profile.Id}' is not a POP3 profile.");
+        var request = await CreateRequestAsync(profile, cancellationToken).ConfigureAwait(false);
+        // POP3 exposes no stable authenticated account identifier. Bind a resume to the
+        // exact credential accepted by the server, and fail closed after credential rotation.
+        // A slow KDF avoids storing a directly reusable password or a fast password hash.
+        using var fingerprint = new Rfc2898DeriveBytes(request.Secret,
+            Encoding.UTF8.GetBytes("Mailozaurr:POP3:archive:" + profile.Id),
+            210000, HashAlgorithmName.SHA256);
+        var scope = "Pop3:credential:" + Convert.ToBase64String(fingerprint.GetBytes(32));
+        var client = await _connectAsync(request, cancellationToken).ConfigureAwait(false);
+        return (client, scope);
     }
 
     private async Task<Pop3SessionRequest> CreateRequestAsync(MailProfile profile, CancellationToken cancellationToken) {

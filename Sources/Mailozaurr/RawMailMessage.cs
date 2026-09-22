@@ -58,7 +58,8 @@ public interface IStreamingRawMailMessageSession {
 /// <summary>Exposes the provider's current identity namespace for a folder.</summary>
 public interface IRawMailMessageScopeSession {
     /// <summary>Returns a stable scope token, such as the IMAP folder's UIDVALIDITY.</summary>
-    Task<string> GetScopeAsync(string? folderId, CancellationToken cancellationToken = default);
+    Task<string> GetScopeAsync(string? mailboxId, string? folderId,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>Provider-specific source of batch-scoped raw RFC 822 sessions.</summary>
@@ -70,4 +71,9 @@ public interface IRawMailMessageSource {
     Task<IRawMailMessageSession> OpenSessionAsync(
         MailProfile profile,
         CancellationToken cancellationToken = default);
+}
+
+internal interface IArchiveRawMailMessageSource {
+    Task<IRawMailMessageSession> OpenArchiveSessionAsync(
+        MailProfile profile, CancellationToken cancellationToken);
 }

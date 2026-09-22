@@ -458,7 +458,7 @@ public sealed partial class CliRunnerTests {
     }
 
     private sealed class FakeEmlExportService : IMailEmlExportService, IMailEmlArchiveScopeProvider {
-        public Task<string> GetArchiveScopeAsync(MailProfile profile, string? folderId,
+        public Task<string> GetArchiveScopeAsync(MailProfile profile, string? mailboxId, string? folderId,
             CancellationToken cancellationToken = default) => Task.FromResult("INBOX:uidvalidity:1");
         public MailEmlExportRequest? LastRequest { get; private set; }
 

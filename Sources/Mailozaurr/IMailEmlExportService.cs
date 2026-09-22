@@ -3,7 +3,7 @@ namespace Mailozaurr;
 /// <summary>Resolves provider identity before an archive trusts stored records.</summary>
 public interface IMailEmlArchiveScopeProvider {
     /// <summary>Gets the current identity namespace for the selected folder.</summary>
-    Task<string> GetArchiveScopeAsync(MailProfile profile, string? folderId,
+    Task<string> GetArchiveScopeAsync(MailProfile profile, string? mailboxId, string? folderId,
         CancellationToken cancellationToken = default);
 }
 

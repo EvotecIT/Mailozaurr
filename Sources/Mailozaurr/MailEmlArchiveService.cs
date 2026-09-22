@@ -48,7 +48,7 @@ public sealed class MailEmlArchiveService {
             FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         if (_export is not IMailEmlArchiveScopeProvider scopeProvider)
             throw new NotSupportedException("Archive export requires a provider scope aware export service.");
-        var providerScope = await scopeProvider.GetArchiveScopeAsync(profile, request.FolderId,
+        var providerScope = await scopeProvider.GetArchiveScopeAsync(profile, request.MailboxId, request.FolderId,
             cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(providerScope))
             throw new InvalidOperationException("The provider did not return a mailbox identity scope.");
@@ -106,7 +106,7 @@ public sealed class MailEmlArchiveService {
                 if (pending.Count == MailEmlExportService.MaximumBatchMessageCount) {
                     if (batchSession == null && _export is MailEmlExportService defaultExport)
                         batchSession = await defaultExport.OpenArchiveSessionAsync(profile, cancellationToken).ConfigureAwait(false);
-                    await ExportBatchAsync(request, profile.Id, profile.Kind == MailProfileKind.Imap ? providerScope : null,
+                    await ExportBatchAsync(request, profile.Id, providerScope,
                         emlDirectory, recordsDirectory, pending, batchSession,
                         result, cancellationToken).ConfigureAwait(false);
                     pending.Clear();
@@ -115,7 +115,7 @@ public sealed class MailEmlArchiveService {
             if (pending.Count > 0) {
                 if (batchSession == null && _export is MailEmlExportService defaultExport)
                     batchSession = await defaultExport.OpenArchiveSessionAsync(profile, cancellationToken).ConfigureAwait(false);
-                await ExportBatchAsync(request, profile.Id, profile.Kind == MailProfileKind.Imap ? providerScope : null,
+                await ExportBatchAsync(request, profile.Id, providerScope,
                     emlDirectory, recordsDirectory, pending, batchSession,
                     result, cancellationToken).ConfigureAwait(false);
             }

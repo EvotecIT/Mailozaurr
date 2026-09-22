@@ -21,15 +21,14 @@ public sealed class MailEmlExportService : IMailEmlExportService, IMailEmlArchiv
     }
 
     /// <inheritdoc />
-    public async Task<string> GetArchiveScopeAsync(MailProfile profile, string? folderId,
+    public async Task<string> GetArchiveScopeAsync(MailProfile profile, string? mailboxId, string? folderId,
         CancellationToken cancellationToken = default) {
         if (!_sources.TryGetValue(profile.Kind, out var source))
             throw new NotSupportedException($"Raw EML export is not configured for profile kind '{profile.Kind}'.");
-        if (profile.Kind != MailProfileKind.Imap) return profile.Kind.ToString();
-        using var session = await source.OpenSessionAsync(profile, cancellationToken).ConfigureAwait(false);
+        using var session = await OpenScopedSessionAsync(source, profile, cancellationToken).ConfigureAwait(false);
         if (session is not IRawMailMessageScopeSession scopeSession)
-            throw new NotSupportedException("IMAP archive requires a source that exposes UIDVALIDITY.");
-        return await scopeSession.GetScopeAsync(folderId, cancellationToken).ConfigureAwait(false);
+            throw new NotSupportedException("Archive requires a source that exposes a verified mailbox scope.");
+        return await scopeSession.GetScopeAsync(mailboxId, folderId, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -53,9 +52,16 @@ public sealed class MailEmlExportService : IMailEmlExportService, IMailEmlArchiv
 
     internal async Task<IMailEmlArchiveBatchSession> OpenArchiveSessionAsync(
         MailProfile profile, CancellationToken cancellationToken) {
-        var sourceSession = await GetSource(profile).OpenSessionAsync(profile, cancellationToken).ConfigureAwait(false);
+        var source = GetSource(profile);
+        var sourceSession = await OpenScopedSessionAsync(source, profile, cancellationToken).ConfigureAwait(false);
         return new ArchiveBatchSession(this, profile, sourceSession);
     }
+
+    private static Task<IRawMailMessageSession> OpenScopedSessionAsync(IRawMailMessageSource source,
+        MailProfile profile, CancellationToken cancellationToken) =>
+        source is IArchiveRawMailMessageSource archiveSource
+            ? archiveSource.OpenArchiveSessionAsync(profile, cancellationToken)
+            : source.OpenSessionAsync(profile, cancellationToken);
 
     private IRawMailMessageSource GetSource(MailProfile profile) =>
         _sources.TryGetValue(profile.Kind, out var source)
@@ -84,7 +90,7 @@ public sealed class MailEmlExportService : IMailEmlExportService, IMailEmlArchiv
         if (request.ExpectedProviderScope != null) {
             if (sourceSession is not IRawMailMessageScopeSession scopedSession)
                 throw new NotSupportedException("Archive export requires a provider scope aware source.");
-            var actualScope = await scopedSession.GetScopeAsync(request.FolderId, cancellationToken).ConfigureAwait(false);
+            var actualScope = await scopedSession.GetScopeAsync(request.MailboxId, request.FolderId, cancellationToken).ConfigureAwait(false);
             if (!string.Equals(actualScope, request.ExpectedProviderScope, StringComparison.Ordinal))
                 throw new InvalidOperationException("The provider mailbox identity changed during this archive run.");
         }
@@ -102,9 +108,9 @@ public sealed class MailEmlExportService : IMailEmlExportService, IMailEmlArchiv
             result.Results.Add(item);
 
             try {
-                if (request.ExpectedProviderScope != null) {
+                if (request.ExpectedProviderScope != null && profile.Kind == MailProfileKind.Imap) {
                     var currentScope = await ((IRawMailMessageScopeSession)sourceSession)
-                        .GetScopeAsync(request.FolderId, cancellationToken).ConfigureAwait(false);
+                        .GetScopeAsync(request.MailboxId, request.FolderId, cancellationToken).ConfigureAwait(false);
                     if (!string.Equals(currentScope, request.ExpectedProviderScope, StringComparison.Ordinal))
                         throw new InvalidOperationException("The provider mailbox identity changed during this archive run.");
                 }
@@ -160,7 +166,7 @@ public sealed class MailEmlExportService : IMailEmlExportService, IMailEmlArchiv
                 item.DiagnosticCodes = write.DiagnosticCodes;
                 if (request.ExpectedProviderScope != null) {
                     var currentScope = await ((IRawMailMessageScopeSession)sourceSession)
-                        .GetScopeAsync(request.FolderId, cancellationToken).ConfigureAwait(false);
+                        .GetScopeAsync(request.MailboxId, request.FolderId, cancellationToken).ConfigureAwait(false);
                     if (!string.Equals(currentScope, request.ExpectedProviderScope, StringComparison.Ordinal))
                         throw new InvalidOperationException("The provider mailbox identity changed during this archive run.");
                 }

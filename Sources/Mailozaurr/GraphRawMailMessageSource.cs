@@ -19,13 +19,22 @@ public sealed class GraphRawMailMessageSource : IRawMailMessageSource {
         return new Session(profile, session);
     }
 
-    private sealed class Session : IRawMailMessageSession {
+    private sealed class Session : IRawMailMessageSession, IRawMailMessageScopeSession {
         private readonly MailProfile _profile;
         private readonly GraphSession _session;
 
         internal Session(MailProfile profile, GraphSession session) {
             _profile = profile;
             _session = session;
+        }
+
+        /// <inheritdoc />
+        public async Task<string> GetScopeAsync(string? mailboxId, string? folderId,
+            CancellationToken cancellationToken = default) {
+            var userId = GraphMailReadHandler.ResolveUserId(_profile, mailboxId);
+            var identity = await _session.Client.GetMailboxIdentityAsync(userId, cancellationToken)
+                .ConfigureAwait(false);
+            return "Graph:user:" + identity.Id.Trim().ToLowerInvariant();
         }
 
         public async Task<RawMailMessage?> GetRawMessageAsync(

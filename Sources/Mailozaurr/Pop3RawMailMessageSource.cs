@@ -3,7 +3,7 @@ using MailKit;
 namespace Mailozaurr;
 
 /// <summary>Retrieves unmodified RFC 822 content from a POP3 mailbox.</summary>
-public sealed class Pop3RawMailMessageSource : IRawMailMessageSource {
+public sealed class Pop3RawMailMessageSource : IRawMailMessageSource, IArchiveRawMailMessageSource {
     private readonly IPop3SessionFactory _sessionFactory;
 
     /// <summary>Creates a POP3 raw-message source.</summary>
@@ -21,14 +21,37 @@ public sealed class Pop3RawMailMessageSource : IRawMailMessageSource {
         return new Session(client);
     }
 
-    private sealed class Session : IRawMailMessageSession, IStreamingRawMailMessageSession {
+    async Task<IRawMailMessageSession> IArchiveRawMailMessageSource.OpenArchiveSessionAsync(
+        MailProfile profile, CancellationToken cancellationToken) {
+        if (_sessionFactory is Pop3SessionFactory credentialFactory) {
+            var authenticated = await credentialFactory.ConnectForArchiveAsync(profile, cancellationToken)
+                .ConfigureAwait(false);
+            return new Session(authenticated.Client, authenticated.Scope);
+        }
+        throw new NotSupportedException(
+            "POP3 archive resume requires a session factory that binds the authenticated credential.");
+    }
+
+    private sealed class Session : IRawMailMessageSession, IStreamingRawMailMessageSession, IRawMailMessageScopeSession {
         private readonly MailKit.Net.Pop3.Pop3Client _client;
+        private readonly string? _archiveScope;
         private readonly Dictionary<long, Dictionary<string, List<int>>> _fingerprintIndexes = new();
         private readonly Dictionary<long, bool> _fingerprintIndexesSkippedOversized = new();
         private IList<string>? _uids;
         private Dictionary<string, int>? _uidIndexes;
 
-        internal Session(MailKit.Net.Pop3.Pop3Client client) => _client = client;
+        internal Session(MailKit.Net.Pop3.Pop3Client client, string? archiveScope = null) {
+            _client = client;
+            _archiveScope = archiveScope;
+        }
+
+        public Task<string> GetScopeAsync(string? mailboxId, string? folderId,
+            CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
+            _ = Pop3MailReadHandler.NormalizeFolderId(folderId);
+            return Task.FromResult(_archiveScope ?? throw new NotSupportedException(
+                "POP3 archive resume requires a session factory that binds the authenticated credential."));
+        }
 
         public async Task<RawMailMessage?> GetRawMessageAsync(
             RawMailMessageRequest request,

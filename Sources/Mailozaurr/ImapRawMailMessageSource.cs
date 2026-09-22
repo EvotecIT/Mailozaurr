@@ -30,7 +30,8 @@ public sealed class ImapRawMailMessageSource : IRawMailMessageSource {
             _client = client;
         }
 
-        public Task<string> GetScopeAsync(string? folderId, CancellationToken cancellationToken = default) {
+        public Task<string> GetScopeAsync(string? mailboxId, string? folderId,
+            CancellationToken cancellationToken = default) {
             cancellationToken.ThrowIfCancellationRequested();
             var folder = ImapMailReadHandler.ResolveFolder(folderId, _profile);
             var mailFolder = _client.GetCachedFolder(folder, FolderAccess.ReadOnly);
