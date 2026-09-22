@@ -68,6 +68,28 @@ public sealed class PendingMessageAcknowledgementTests {
     }
 
     [Fact]
+    public async Task CancellationAfterFencedLeaseReleaseRemainsCancellation() {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new SlowAcceptanceRepository(new PendingMessageRecord {
+            MessageId = "cancel-after-release",
+            Timestamp = now,
+            NextAttemptAt = now
+        }) { DelayAfterRelease = TimeSpan.FromMilliseconds(150) };
+        using var cancellation = new CancellationTokenSource();
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            [EmailProvider.None] = new CancelingSender(cancellation)
+        });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            new PendingMessageProcessor(repository, factory,
+                processingLeaseDuration: TimeSpan.FromMilliseconds(90)).ProcessAsync(cancellation.Token));
+
+        Assert.True(repository.RenewRejectedCount > 0);
+        Assert.Null(repository.Record?.ProcessingLeaseId);
+        Assert.Equal(0, repository.Record?.AttemptCount);
+    }
+
+    [Fact]
     public async Task CleanupOfPreviouslyAcceptedRecordDoesNotCountAsAnotherAttempt() {
         var now = DateTimeOffset.Parse("2026-01-01T12:00:00Z");
         var repository = new FailingRemovalRepository(new PendingMessageRecord {
@@ -123,6 +145,18 @@ public sealed class PendingMessageAcknowledgementTests {
 
         public Task SendAsync(PendingMessageRecord record, CancellationToken cancellationToken) {
             SendCount++;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class CancelingSender : IPendingMessageSender {
+        private readonly CancellationTokenSource cancellation;
+
+        internal CancelingSender(CancellationTokenSource cancellation) => this.cancellation = cancellation;
+
+        public Task SendAsync(PendingMessageRecord record, CancellationToken cancellationToken) {
+            cancellation.Cancel();
+            cancellationToken.ThrowIfCancellationRequested();
             return Task.CompletedTask;
         }
     }
@@ -190,6 +224,8 @@ public sealed class PendingMessageAcknowledgementTests {
 
         internal PendingMessageRecord? Record { get; private set; }
         internal int RenewCount { get; private set; }
+        internal int RenewRejectedCount { get; private set; }
+        internal TimeSpan DelayAfterRelease { get; set; }
 
         public Task SaveAsync(PendingMessageRecord record, CancellationToken cancellationToken = default) {
             Record = record.Clone();
@@ -211,7 +247,10 @@ public sealed class PendingMessageAcknowledgementTests {
             DateTimeOffset expectedLeaseUntil, DateTimeOffset newLeaseUntil,
             CancellationToken cancellationToken = default) {
             if (Record?.MessageId != messageId || Record.ProcessingLeaseId != leaseId ||
-                Record.ProcessingLeaseUntil != expectedLeaseUntil) return Task.FromResult(false);
+                Record.ProcessingLeaseUntil != expectedLeaseUntil) {
+                RenewRejectedCount++;
+                return Task.FromResult(false);
+            }
             RenewCount++;
             Record.ProcessingLeaseUntil = newLeaseUntil;
             Record.NextAttemptAt = newLeaseUntil;
@@ -222,6 +261,11 @@ public sealed class PendingMessageAcknowledgementTests {
             CancellationToken cancellationToken = default) {
             if (record.DeliveryAcceptedAt.HasValue) await Task.Delay(300, cancellationToken);
             if (Record?.ProcessingLeaseId != leaseId) return false;
+            if (record.ProcessingLeaseId == null) {
+                Record = record.Clone();
+                if (DelayAfterRelease > TimeSpan.Zero) await Task.Delay(DelayAfterRelease, cancellationToken);
+                return true;
+            }
             record.ProcessingLeaseUntil = Record.ProcessingLeaseUntil;
             record.NextAttemptAt = Record.ProcessingLeaseUntil!.Value;
             Record = record.Clone();

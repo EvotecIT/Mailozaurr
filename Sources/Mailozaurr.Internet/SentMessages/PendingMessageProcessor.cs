@@ -131,6 +131,7 @@ public sealed class PendingMessageProcessor {
             var originalAttemptCount = leasedRecord.AttemptCount;
             var attempt = leasedRecord.IncrementAttemptCount();
             observer.MessageAttemptStarted(leasedRecord, attempt);
+            var cancellationLeaseReleased = false;
             await ExecuteWithLeaseRenewalAsync(leasedRecord, cancellationToken, async deliveryToken => {
                 var stopwatch = Stopwatch.StartNew();
 
@@ -152,6 +153,7 @@ public sealed class PendingMessageProcessor {
                     observer.MessageFailed(leasedRecord, attempt, ex, stopwatch.Elapsed, willRetry: false, retryDelay: null);
                     try {
                         await SaveOwnedAsync(leasedRecord, leaseId, CancellationToken.None).ConfigureAwait(false);
+                        cancellationLeaseReleased = true;
                     } catch (Exception saveEx) {
                         logger?.WriteWarning($"Failed to release processing lease for message {leasedRecord.MessageId} after cancellation: {saveEx.Message}");
                     }
@@ -209,7 +211,7 @@ public sealed class PendingMessageProcessor {
 
                 observer.MessageSent(leasedRecord, attempt, stopwatch.Elapsed);
                 await RemoveOwnedAsync(leasedRecord.MessageId, leaseId, CancellationToken.None).ConfigureAwait(false);
-            }).ConfigureAwait(false);
+            }, () => cancellationLeaseReleased).ConfigureAwait(false);
         }
     }
 
@@ -223,7 +225,8 @@ public sealed class PendingMessageProcessor {
     }
 
     private async Task ExecuteWithLeaseRenewalAsync(PendingMessageRecord record,
-        CancellationToken cancellationToken, Func<CancellationToken, Task> action) {
+        CancellationToken cancellationToken, Func<CancellationToken, Task> action,
+        Func<bool>? cancellationOutcomeCommitted = null) {
         if (repository is not IPendingMessageLeaseRenewer renewer ||
             repository is not IPendingMessageLeaseCommitter ||
             string.IsNullOrEmpty(record.ProcessingLeaseId)) {
@@ -251,7 +254,10 @@ public sealed class PendingMessageProcessor {
         // A successfully completed callback has already committed its lease-owned
         // terminal outcome. A renewal racing with the final removal may then
         // observe that the record is gone, which is no longer a lease loss.
-        if (renewalFailure != null && actionFailure != null) {
+        // A cancellation handler may have already released the lease through a
+        // fenced save. Renewal can then observe that release as a failed renew.
+        if (renewalFailure != null && actionFailure != null &&
+            !(actionFailure is OperationCanceledException && cancellationOutcomeCommitted?.Invoke() == true)) {
             throw new ProcessingLeaseLostException(record.MessageId, renewalFailure);
         }
         if (actionFailure != null) ExceptionDispatchInfo.Capture(actionFailure).Throw();
