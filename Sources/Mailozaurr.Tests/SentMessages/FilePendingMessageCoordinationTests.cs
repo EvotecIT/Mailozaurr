@@ -97,9 +97,12 @@ public sealed class FilePendingMessageCoordinationTests {
         try {
             var path = Path.Combine(directory, "pending.log");
             var oldTemp = path + ".compact." + Guid.NewGuid().ToString("N");
+            var legacyTemp = path + ".compact";
             var recentTemp = path + ".compact." + Guid.NewGuid().ToString("N");
             File.WriteAllText(oldTemp, "abandoned MIME");
             File.SetLastWriteTimeUtc(oldTemp, DateTime.UtcNow.AddDays(-2));
+            File.WriteAllText(legacyTemp, "abandoned legacy MIME");
+            File.SetLastWriteTimeUtc(legacyTemp, DateTime.UtcNow.AddDays(-2));
             File.WriteAllText(recentTemp, "active candidate");
             var repository = new FilePendingMessageRepository(path);
             var now = DateTimeOffset.UtcNow;
@@ -114,11 +117,38 @@ public sealed class FilePendingMessageCoordinationTests {
             }
 
             Assert.False(File.Exists(oldTemp));
+            Assert.False(File.Exists(legacyTemp));
             Assert.True(File.Exists(recentTemp));
             Assert.True(File.ReadAllLines(path).Length < 40);
             var remaining = new List<PendingMessageRecord>();
             await foreach (var record in repository.GetAllAsync()) remaining.Add(record);
             Assert.Empty(remaining);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task NextAppendRepairsInterruptedLogTailBeforeWritingAnotherRecord() {
+        var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var path = Path.Combine(directory, "pending.log");
+            var now = DateTimeOffset.UtcNow;
+            await new FilePendingMessageRepository(path).SaveAsync(new PendingMessageRecord {
+                MessageId = "first", Timestamp = now, NextAttemptAt = now
+            });
+            File.AppendAllText(path, "{\"EntryType\":\"upsert\",\"Record\":");
+
+            var recovered = new FilePendingMessageRepository(path);
+            await recovered.SaveAsync(new PendingMessageRecord {
+                MessageId = "second", Timestamp = now, NextAttemptAt = now
+            });
+
+            var reopened = new FilePendingMessageRepository(path);
+            Assert.NotNull(await reopened.GetByMessageIdAsync("first"));
+            Assert.NotNull(await reopened.GetByMessageIdAsync("second"));
+            Assert.DoesNotContain("{\"EntryType\":\"upsert\",\"Record\":", File.ReadAllText(path));
         } finally {
             Directory.Delete(directory, recursive: true);
         }

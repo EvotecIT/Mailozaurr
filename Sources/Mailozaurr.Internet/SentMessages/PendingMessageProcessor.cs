@@ -250,7 +250,7 @@ public sealed class PendingMessageProcessor {
                 var next = ApplyDelay(clock(), duration);
                 if (next <= expected) next = ApplyDelay(expected, duration);
                 if (next <= expected || !await renewer.TryRenewLeaseAsync(
-                        messageId, leaseId, expected, next, renewalCancellation).ConfigureAwait(false)) {
+                        messageId, leaseId, expected, next, CancellationToken.None).ConfigureAwait(false)) {
                     deliveryCancellation.Cancel();
                     return new InvalidOperationException("The processing lease could not be extended.");
                 }

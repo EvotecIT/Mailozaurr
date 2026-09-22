@@ -213,15 +213,20 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
         var prefix = Path.GetFileName(filePath) + ".compact.";
         string[] candidates;
         try {
-            candidates = Directory.GetFiles(directory, prefix + "*", SearchOption.TopDirectoryOnly);
+            candidates = Directory.GetFiles(directory, prefix + "*", SearchOption.TopDirectoryOnly)
+                .Concat(new[] { filePath + ".compact" })
+                .Where(File.Exists)
+                .ToArray();
         } catch (IOException) {
             return;
         } catch (UnauthorizedAccessException) {
             return;
         }
         foreach (var path in candidates) {
-            var suffix = Path.GetFileName(path).Substring(prefix.Length);
-            if (!Guid.TryParseExact(suffix, "N", out _)) continue;
+            if (!string.Equals(path, filePath + ".compact", StringComparison.Ordinal)) {
+                var suffix = Path.GetFileName(path).Substring(prefix.Length);
+                if (!Guid.TryParseExact(suffix, "N", out _)) continue;
+            }
             try {
                 // An active compaction writes with FileShare.None. Recent files
                 // may also be awaiting their short commit lock.
@@ -286,18 +291,33 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
     private static byte[] SerializeEnvelope(PendingMessageLogEnvelope envelope) => JsonSerializer.SerializeToUtf8Bytes(envelope, MailozaurrJsonContext.Default.PendingMessageLogEnvelope);
 
     private async Task<long> AppendEnvelopeAsync(PendingMessageLogEnvelope envelope, CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
         var payload = SerializeEnvelope(envelope);
-
+        var line = new byte[payload.Length + NewlineBytes.Length];
+        Buffer.BlockCopy(payload, 0, line, 0, payload.Length);
+        Buffer.BlockCopy(NewlineBytes, 0, line, payload.Length, NewlineBytes.Length);
         using var write = UnixFilePermissions.OpenRestrictedFile(
             filePath,
-            FileMode.Append,
-            FileAccess.Write,
+            FileMode.OpenOrCreate,
+            FileAccess.ReadWrite,
             FileShare.Read);
+        // The storage lock is held by every caller. Drop an incomplete tail left
+        // by a prior interrupted write before appending the next envelope.
+        if (indexedLength >= 0 && indexedLength < write.Length) write.SetLength(indexedLength);
+        if (write.Length > 0) {
+            write.Position = write.Length - 1;
+            if (write.ReadByte() != '\n') {
+                write.Position = write.Length;
+                await write.WriteAsync(NewlineBytes, 0, NewlineBytes.Length, CancellationToken.None).ConfigureAwait(false);
+            }
+        }
+        write.Position = write.Length;
         var offset = write.Position;
 
-        await write.WriteAsync(payload, 0, payload.Length, cancellationToken).ConfigureAwait(false);
-        await write.WriteAsync(NewlineBytes, 0, NewlineBytes.Length, cancellationToken).ConfigureAwait(false);
-        await write.FlushAsync(cancellationToken).ConfigureAwait(false);
+        // Once an append starts, cancellation must not leave a fragment that
+        // can be concatenated with a later acceptance marker.
+        await write.WriteAsync(line, 0, line.Length, CancellationToken.None).ConfigureAwait(false);
+        await write.FlushAsync(CancellationToken.None).ConfigureAwait(false);
 
         return offset;
     }
@@ -318,6 +338,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
     private async Task CompactAsync(CancellationToken cancellationToken) {
         var originalStamp = GetFileStamp();
         if (originalStamp == null) return;
+        var originalGeneration = ReadCurrentGeneration();
         var temp = filePath + ".compact." + Guid.NewGuid().ToString("N");
 
         var records = new Dictionary<string, PendingMessageRecord>(StringComparer.OrdinalIgnoreCase);
@@ -387,7 +408,8 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try {
                 using var storageLock = await AcquireStorageLockAsync(cancellationToken).ConfigureAwait(false);
-                if (GetFileStamp() != originalStamp) return;
+                if (GetFileStamp() != originalStamp ||
+                    !StringComparer.Ordinal.Equals(ReadCurrentGeneration(), originalGeneration)) return;
                 var backup = filePath + ".bak";
                 File.Replace(temp, filePath, backup);
                 if (File.Exists(backup)) {
@@ -583,6 +605,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
     private async Task<PendingMessageRecord?> TryAcquireLeaseCoreAsync(string messageId,
         DateTimeOffset now, DateTimeOffset leaseUntil, bool ignoreSchedule,
         CancellationToken cancellationToken) {
+        bool changed = false;
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             ThrowIfDefaultQueueConflictAppeared();
@@ -603,6 +626,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             index[current.MessageId] = offset;
 
             CaptureFileStamp();
+            changed = true;
             return current;
         } catch (FileNotFoundException) {
             return null;
@@ -610,6 +634,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             return null;
         } finally {
             gate.Release();
+            if (changed) await CompactIfNeededAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -619,6 +644,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
         if (newLeaseUntil <= expectedLeaseUntil) {
             throw new ArgumentOutOfRangeException(nameof(newLeaseUntil));
         }
+        bool changed = false;
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             ThrowIfDefaultQueueConflictAppeared();
@@ -637,9 +663,11 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             dirtyEntryCount++;
             index[current.MessageId] = offset;
             CaptureFileStamp();
+            changed = true;
             return true;
         } finally {
             gate.Release();
+            if (changed) await CompactIfNeededAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 

@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -16,8 +18,10 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
     private const string DefaultDeadLetterFileName = "dead-letter.log";
 
     private readonly string filePath;
+    private readonly string lockFilePath;
     private readonly string conflictPath = string.Empty;
     private readonly SemaphoreSlim gate = new(1, 1);
+    private DateTime lastStaleRewriteCleanupUtc;
     private static readonly byte[] NewlineBytes = Encoding.UTF8.GetBytes(Environment.NewLine);
 
     /// <summary>Creates a repository using pending-message options and a dead-letter file name.</summary>
@@ -31,6 +35,7 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
     /// <summary>Creates a repository using an explicit file path.</summary>
     public FilePendingMessageDeadLetterRepository(string filePath) {
         this.filePath = Path.GetFullPath(filePath ?? throw new ArgumentNullException(nameof(filePath)));
+        lockFilePath = this.filePath + ".lock";
     }
 
     internal FilePendingMessageDeadLetterRepository(string filePath, string conflictPath)
@@ -108,15 +113,21 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
                 if (!directoryExisted) UnixFilePermissions.RestrictDirectory(directory);
             }
 
+            using var storageLock = await AcquireStorageLockAsync(cancellationToken).ConfigureAwait(false);
+
             var payload = JsonSerializer.SerializeToUtf8Bytes(record, MailozaurrJsonContext.Default.PendingMessageDeadLetterRecord);
+            var line = new byte[payload.Length + NewlineBytes.Length];
+            Buffer.BlockCopy(payload, 0, line, 0, payload.Length);
+            Buffer.BlockCopy(NewlineBytes, 0, line, payload.Length, NewlineBytes.Length);
             using var write = UnixFilePermissions.OpenRestrictedFile(
                 filePath,
-                FileMode.Append,
-                FileAccess.Write,
+                FileMode.OpenOrCreate,
+                FileAccess.ReadWrite,
                 FileShare.Read);
-            await write.WriteAsync(payload, 0, payload.Length, cancellationToken).ConfigureAwait(false);
-            await write.WriteAsync(NewlineBytes, 0, NewlineBytes.Length, cancellationToken).ConfigureAwait(false);
-            await write.FlushAsync(cancellationToken).ConfigureAwait(false);
+            RepairIncompleteTail(write);
+            write.Position = write.Length;
+            await write.WriteAsync(line, 0, line.Length, CancellationToken.None).ConfigureAwait(false);
+            await write.FlushAsync(CancellationToken.None).ConfigureAwait(false);
         } finally {
             gate.Release();
         }
@@ -149,7 +160,10 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             ThrowIfDefaultQueueConflictAppeared();
-            using var read = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var storageLock = await AcquireStorageLockAsync(cancellationToken).ConfigureAwait(false);
+            if (!File.Exists(filePath)) yield break;
+            using var read = new FileStream(filePath, FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
             using var reader = new StreamReader(read, Encoding.UTF8, false, 1024, leaveOpen: true);
             string? line;
             while ((line = await reader.ReadLineAsync().ConfigureAwait(false)) != null) {
@@ -160,7 +174,7 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
 
                 try {
                     var record = JsonSerializer.Deserialize(line, MailozaurrJsonContext.Default.PendingMessageDeadLetterRecord);
-                    if (record != null && !string.IsNullOrWhiteSpace(record.Message.MessageId)) {
+                    if (record?.Message != null && !string.IsNullOrWhiteSpace(record.Message.MessageId)) {
                         snapshot.Add(record);
                     }
                 } catch (JsonException) {
@@ -190,6 +204,7 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             ThrowIfDefaultQueueConflictAppeared();
+            using var storageLock = await AcquireStorageLockAsync(cancellationToken).ConfigureAwait(false);
             if (!File.Exists(filePath)) {
                 return;
             }
@@ -211,7 +226,7 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
                         continue;
                     }
 
-                    if (record != null && !string.Equals(record.Message.MessageId, messageId, StringComparison.OrdinalIgnoreCase)) {
+                    if (record?.Message != null && !string.Equals(record.Message.MessageId, messageId, StringComparison.OrdinalIgnoreCase)) {
                         retained.Add(record);
                     }
                 }
@@ -229,7 +244,7 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
             Directory.CreateDirectory(directory);
         }
 
-        var tempPath = filePath + ".tmp";
+        var tempPath = filePath + ".tmp." + Guid.NewGuid().ToString("N");
         var backupPath = filePath + ".bak";
         try {
             using (var write = UnixFilePermissions.OpenRestrictedFile(
@@ -267,5 +282,80 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
                 File.Delete(backupPath);
             }
         }
+    }
+
+    private async Task<FileStream> AcquireStorageLockAsync(CancellationToken cancellationToken) {
+        var elapsed = Stopwatch.StartNew();
+        while (true) {
+            cancellationToken.ThrowIfCancellationRequested();
+            try {
+                var storageLock = UnixFilePermissions.OpenRestrictedFile(lockFilePath, FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite, FileShare.None);
+                try {
+                    CleanupStaleRewriteFiles();
+                    return storageLock;
+                } catch {
+                    storageLock.Dispose();
+                    throw;
+                }
+            } catch (IOException) when (elapsed.Elapsed < TimeSpan.FromSeconds(30)) {
+                await Task.Delay(25, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private void CleanupStaleRewriteFiles() {
+        var now = DateTime.UtcNow;
+        if (now - lastStaleRewriteCleanupUtc < TimeSpan.FromHours(1)) return;
+        lastStaleRewriteCleanupUtc = now;
+        var directory = Path.GetDirectoryName(filePath)!;
+        var prefix = Path.GetFileName(filePath) + ".tmp.";
+        string[] candidates;
+        try {
+            candidates = Directory.GetFiles(directory, prefix + "*", SearchOption.TopDirectoryOnly)
+                .Concat(new[] { filePath + ".tmp" }).Where(File.Exists).ToArray();
+        } catch (IOException) {
+            return;
+        } catch (UnauthorizedAccessException) {
+            return;
+        }
+        foreach (var path in candidates) {
+            if (!string.Equals(path, filePath + ".tmp", StringComparison.Ordinal)) {
+                var suffix = Path.GetFileName(path).Substring(prefix.Length);
+                if (!Guid.TryParseExact(suffix, "N", out _)) continue;
+            }
+            try {
+                if (File.GetLastWriteTimeUtc(path) > now - TimeSpan.FromHours(24)) continue;
+                using (new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
+                File.Delete(path);
+            } catch (IOException) {
+            } catch (UnauthorizedAccessException) {
+            }
+        }
+    }
+
+    private void RepairIncompleteTail(FileStream write) {
+        if (write.Length == 0) return;
+        write.Position = write.Length - 1;
+        if (write.ReadByte() == '\n') return;
+        long lastOffset = 0;
+        string? lastLine = null;
+        foreach (var line in LogFileLineReader.ReadLinesWithOffsets(filePath)) {
+            lastOffset = line.Offset;
+            lastLine = line.Line;
+        }
+        if (lastLine == null) return;
+        try {
+            var record = JsonSerializer.Deserialize(lastLine,
+                MailozaurrJsonContext.Default.PendingMessageDeadLetterRecord);
+            if (record?.Message != null && !string.IsNullOrWhiteSpace(record.Message.MessageId)) {
+                write.Position = write.Length;
+                write.Write(NewlineBytes, 0, NewlineBytes.Length);
+                return;
+            }
+        } catch (JsonException) {
+            // A partial record cannot be treated as a successful dead letter.
+        }
+        write.SetLength(lastOffset);
     }
 }
