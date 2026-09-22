@@ -90,6 +90,25 @@ public sealed class PendingMessageAcknowledgementTests {
     }
 
     [Fact]
+    public async Task FailedRenewalDoesNotMasqueradeAsCallerCancellation() {
+        var now = DateTimeOffset.UtcNow;
+        var repository = new SlowAcceptanceRepository(new PendingMessageRecord {
+            MessageId = "renewal-failed", Timestamp = now, NextAttemptAt = now
+        }) { RejectRenewal = true };
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            [EmailProvider.None] = new WaitForCancellationSender()
+        });
+
+        var failure = await Assert.ThrowsAnyAsync<InvalidOperationException>(() =>
+            new PendingMessageProcessor(repository, factory,
+                processingLeaseDuration: TimeSpan.FromMilliseconds(90)).ProcessAsync());
+
+        Assert.Contains("processing lease", failure.Message);
+        Assert.True(repository.RenewRejectedCount > 0);
+        Assert.NotNull(repository.Record?.ProcessingLeaseId);
+    }
+
+    [Fact]
     public async Task CleanupOfPreviouslyAcceptedRecordDoesNotCountAsAnotherAttempt() {
         var now = DateTimeOffset.Parse("2026-01-01T12:00:00Z");
         var repository = new FailingRemovalRepository(new PendingMessageRecord {
@@ -161,6 +180,11 @@ public sealed class PendingMessageAcknowledgementTests {
         }
     }
 
+    private sealed class WaitForCancellationSender : IPendingMessageSender {
+        public async Task SendAsync(PendingMessageRecord record, CancellationToken cancellationToken) =>
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+    }
+
     private sealed class CountingObserver : IPendingMessageProcessorObserver {
         public int SentCount { get; private set; }
         public void MessageSkipped(PendingMessageRecord record, PendingMessageSkipReason reason) { }
@@ -226,6 +250,7 @@ public sealed class PendingMessageAcknowledgementTests {
         internal int RenewCount { get; private set; }
         internal int RenewRejectedCount { get; private set; }
         internal TimeSpan DelayAfterRelease { get; set; }
+        internal bool RejectRenewal { get; set; }
 
         public Task SaveAsync(PendingMessageRecord record, CancellationToken cancellationToken = default) {
             Record = record.Clone();
@@ -246,6 +271,10 @@ public sealed class PendingMessageAcknowledgementTests {
         public Task<bool> TryRenewLeaseAsync(string messageId, string leaseId,
             DateTimeOffset expectedLeaseUntil, DateTimeOffset newLeaseUntil,
             CancellationToken cancellationToken = default) {
+            if (RejectRenewal) {
+                RenewRejectedCount++;
+                return Task.FromResult(false);
+            }
             if (Record?.MessageId != messageId || Record.ProcessingLeaseId != leaseId ||
                 Record.ProcessingLeaseUntil != expectedLeaseUntil) {
                 RenewRejectedCount++;

@@ -144,7 +144,7 @@ public sealed class PendingMessageProcessor {
                     // A different worker may now own this record. The outcome of a
                     // provider request that ignored cancellation is indeterminate.
                     throw;
-                } catch (OperationCanceledException ex) {
+                } catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested) {
                     stopwatch.Stop();
                     leasedRecord.ExchangeAttemptCount(originalAttemptCount);
                     leasedRecord.NextAttemptAt = ApplyDelay(clock(), TimeSpan.Zero);
@@ -157,6 +157,11 @@ public sealed class PendingMessageProcessor {
                     } catch (Exception saveEx) {
                         logger?.WriteWarning($"Failed to release processing lease for message {leasedRecord.MessageId} after cancellation: {saveEx.Message}");
                     }
+                    throw;
+                } catch (OperationCanceledException) when (deliveryToken.IsCancellationRequested) {
+                    stopwatch.Stop();
+                    // Renewal cancellation is reported by ExecuteWithLeaseRenewalAsync.
+                    // Keep the fenced record intact until its lease expires.
                     throw;
                 } catch (Exception ex) {
                     stopwatch.Stop();
@@ -259,7 +264,8 @@ public sealed class PendingMessageProcessor {
         // A cancellation handler may have already released the lease through a
         // fenced save. Renewal can then observe that release as a failed renew.
         if (renewalFailure != null && actionFailure != null &&
-            !(actionFailure is OperationCanceledException && cancellationOutcomeCommitted?.Invoke() == true)) {
+            !(cancellationToken.IsCancellationRequested && actionFailure is OperationCanceledException &&
+              cancellationOutcomeCommitted?.Invoke() == true)) {
             throw new ProcessingLeaseLostException(record.MessageId, renewalFailure);
         }
         if (actionFailure != null) ExceptionDispatchInfo.Capture(actionFailure).Throw();

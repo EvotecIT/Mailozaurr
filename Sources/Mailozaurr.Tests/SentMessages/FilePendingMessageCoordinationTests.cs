@@ -96,7 +96,7 @@ public sealed class FilePendingMessageCoordinationTests {
                 MessageId = "contended-renewal", Timestamp = now, NextAttemptAt = now
             });
             var lease = await repository.TryAcquireLeaseAsync(
-                "contended-renewal", now, now.AddMilliseconds(300));
+                "contended-renewal", now, now.AddSeconds(2));
             Assert.NotNull(lease);
             var expected = lease!.ProcessingLeaseUntil!.Value;
             var filtered = new Mailozaurr.PowerShell.CmdletSendEmailPendingMessage.FilteredPendingMessageRepository(
@@ -119,6 +119,34 @@ public sealed class FilePendingMessageCoordinationTests {
             Assert.Equal(committed, (await repository.GetByMessageIdAsync(lease.MessageId))!.ProcessingLeaseUntil);
             Assert.True(await repository.TryRenewLeaseAsync(lease.MessageId,
                 lease.ProcessingLeaseId!, committed!.Value, committed.Value.AddMilliseconds(300)));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RenewalStopsWaitingWhenItsLeaseExpiresUnderStorageContention() {
+        var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var path = Path.Combine(directory, "pending.log");
+            var repository = new FilePendingMessageRepository(path);
+            var now = DateTimeOffset.UtcNow;
+            await repository.SaveAsync(new PendingMessageRecord {
+                MessageId = "expired-renewal", Timestamp = now, NextAttemptAt = now
+            });
+            var lease = await repository.TryAcquireLeaseAsync(
+                "expired-renewal", now, now.AddSeconds(1));
+            Assert.NotNull(lease);
+            var expected = lease!.ProcessingLeaseUntil!.Value;
+
+            using var lockFile = new FileStream(path + ".lock", FileMode.OpenOrCreate,
+                FileAccess.ReadWrite, FileShare.None);
+            Assert.True(expected > DateTimeOffset.UtcNow);
+            var renewal = repository.TryRenewLeaseAndGetExpirationAsync(
+                lease.MessageId, lease.ProcessingLeaseId!, expected, expected.AddSeconds(1));
+            Assert.Same(renewal, await Task.WhenAny(renewal, Task.Delay(TimeSpan.FromSeconds(3))));
+            Assert.Null(await renewal);
         } finally {
             Directory.Delete(directory, recursive: true);
         }

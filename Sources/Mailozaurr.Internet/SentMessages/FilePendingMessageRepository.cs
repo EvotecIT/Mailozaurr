@@ -729,14 +729,23 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
         if (newLeaseUntil <= expectedLeaseUntil) {
             throw new ArgumentOutOfRangeException(nameof(newLeaseUntil));
         }
+        var remaining = expectedLeaseUntil - DateTimeOffset.UtcNow;
+        if (remaining <= TimeSpan.Zero) return null;
+        using var leaseDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (remaining <= TimeSpan.FromMilliseconds(int.MaxValue)) leaseDeadline.CancelAfter(remaining);
         var renewalWait = Stopwatch.StartNew();
         bool scheduleCompaction = false;
-        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try {
+            await gate.WaitAsync(leaseDeadline.Token).ConfigureAwait(false);
+        } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && leaseDeadline.IsCancellationRequested) {
+            return null;
+        }
         try {
             ThrowIfDefaultQueueConflictAppeared();
             if (!File.Exists(filePath)) return null;
-            using var storageLock = await AcquireIndexedStorageLockAsync(cancellationToken).ConfigureAwait(false);
-            var current = await GetByMessageIdCoreAsync(messageId, cancellationToken).ConfigureAwait(false);
+            using var storageLock = await AcquireIndexedStorageLockAsync(leaseDeadline.Token).ConfigureAwait(false);
+            var current = await GetByMessageIdCoreAsync(messageId, leaseDeadline.Token).ConfigureAwait(false);
+            if (DateTimeOffset.UtcNow >= expectedLeaseUntil) return null;
             if (current == null || current.NextAttemptAt != expectedLeaseUntil ||
                 current.ProcessingLeaseUntil != expectedLeaseUntil ||
                 current.ProcessingLeaseId != leaseId) {
@@ -756,6 +765,8 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             CaptureFileStamp();
             scheduleCompaction = compactionOverride != null || IsCompactionNeeded();
             return newLeaseUntil;
+        } catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && leaseDeadline.IsCancellationRequested) {
+            return null;
         } finally {
             gate.Release();
             if (scheduleCompaction) ScheduleBackgroundCompaction();
