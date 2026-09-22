@@ -36,7 +36,7 @@ public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
     public string[]? MessageId { get; set; }
 
     /// <summary>
-    /// Processes all messages regardless of their scheduled retry time.
+    /// Processes messages regardless of their scheduled retry time while respecting active leases.
     /// </summary>
     [Parameter]
     public SwitchParameter ProcessAll { get; set; }
@@ -153,7 +153,7 @@ public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
         }
     }
 
-    private sealed class FilteredPendingMessageRepository : IPendingMessageRepository {
+    private sealed class FilteredPendingMessageRepository : IPendingMessageRepository, IPendingMessageLeaseRenewer {
         private readonly IPendingMessageRepository _inner;
         private readonly HashSet<string>? _messageIds;
         private readonly EmailProvider? _provider;
@@ -196,9 +196,23 @@ public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
                 return null;
             }
 
-            var effectiveDueTime = _forceProcessing ? DateTimeOffset.MaxValue : dueBeforeOrAt;
-            return await _inner.TryAcquireLeaseAsync(messageId, effectiveDueTime, leaseUntil, cancellationToken).ConfigureAwait(false);
+            if (_forceProcessing && record.ProcessingLeaseUntil > _clock()) {
+                return null;
+            }
+
+            if (_forceProcessing && _inner is IPendingMessageForcedLeaseRepository forcedRepository) {
+                return await forcedRepository.TryAcquireForcedLeaseAsync(
+                    messageId, _clock(), leaseUntil, cancellationToken).ConfigureAwait(false);
+            }
+            return await _inner.TryAcquireLeaseAsync(messageId, dueBeforeOrAt, leaseUntil, cancellationToken)
+                .ConfigureAwait(false);
         }
+
+        public Task<bool> TryRenewLeaseAsync(string messageId, DateTimeOffset expectedLeaseUntil,
+            DateTimeOffset newLeaseUntil, CancellationToken cancellationToken = default) =>
+            _inner is IPendingMessageLeaseRenewer renewer
+                ? renewer.TryRenewLeaseAsync(messageId, expectedLeaseUntil, newLeaseUntil, cancellationToken)
+                : Task.FromResult(false);
 
         public Task<PendingMessageRecord?> GetByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) =>
             _inner.GetByMessageIdAsync(messageId, cancellationToken);

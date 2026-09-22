@@ -275,6 +275,8 @@ mailozaurr queue process --json
 
 Send commands attempt immediate delivery by default. Add `--queue-on-failure` when a failed immediate attempt should be persisted for later processing.
 
+Queue processing records provider acceptance before removing the pending item. If removal fails, the next run retries local cleanup without sending the message again. `Send-EmailPendingMessage -ProcessAll` and a selected `-MessageId` can bypass the retry schedule, but they respect an active processing lease. If the provider accepts a message and both recording that acceptance and removing the item fail, delivery is indeterminate; inspect the provider before retrying it manually.
+
 Preview and execute mailbox actions:
 
 ```powershell

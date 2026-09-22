@@ -93,6 +93,19 @@ public sealed class PendingMessageProcessor {
                 continue;
             }
 
+            if (record.DeliveryAcceptedAt.HasValue) {
+                var cleanupLease = await AcquireProcessingLeaseAsync(record, now, cancellationToken).ConfigureAwait(false);
+                if (cleanupLease == null) {
+                    observer.MessageSkipped(record, PendingMessageSkipReason.LeaseNotAcquired);
+                    continue;
+                }
+
+                // The provider already accepted this message. A prior acknowledgement
+                // failed, so only retry the local cleanup.
+                await repository.RemoveAsync(cleanupLease.MessageId, CancellationToken.None).ConfigureAwait(false);
+                continue;
+            }
+
             if (record.AttemptCount >= maxRetryAttempts) {
                 var exhaustedLease = await AcquireProcessingLeaseAsync(record, now, cancellationToken).ConfigureAwait(false);
                 if (exhaustedLease == null) {
@@ -121,14 +134,13 @@ public sealed class PendingMessageProcessor {
 
             try {
                 var sender = senderFactory.GetSender(leasedRecord);
-                await sender.SendAsync(leasedRecord, cancellationToken).ConfigureAwait(false);
+                await SendWithLeaseRenewalAsync(sender, leasedRecord, cancellationToken).ConfigureAwait(false);
                 stopwatch.Stop();
-                observer.MessageSent(leasedRecord, attempt, stopwatch.Elapsed);
-                await repository.RemoveAsync(leasedRecord.MessageId, cancellationToken).ConfigureAwait(false);
             } catch (OperationCanceledException ex) {
                 stopwatch.Stop();
                 leasedRecord.ExchangeAttemptCount(originalAttemptCount);
                 leasedRecord.NextAttemptAt = ApplyDelay(clock(), TimeSpan.Zero);
+                leasedRecord.ProcessingLeaseUntil = null;
                 observer.MessageFailed(leasedRecord, attempt, ex, stopwatch.Elapsed, willRetry: false, retryDelay: null);
                 try {
                     await repository.SaveAsync(leasedRecord, CancellationToken.None).ConfigureAwait(false);
@@ -145,6 +157,7 @@ public sealed class PendingMessageProcessor {
                     delay = NormalizeDelay(retryDelaySelector(attempt));
                     var failureTime = clock();
                     leasedRecord.NextAttemptAt = ApplyDelay(failureTime, delay.Value);
+                    leasedRecord.ProcessingLeaseUntil = null;
                 }
 
                 observer.MessageFailed(leasedRecord, attempt, ex, stopwatch.Elapsed, willRetry, delay);
@@ -158,7 +171,33 @@ public sealed class PendingMessageProcessor {
 
                 logger?.WriteWarning($"Failed to send message {leasedRecord.MessageId}. Scheduling retry #{attempt + 1} at {leasedRecord.NextAttemptAt:O}. Error: {ex.Message}");
                 await repository.SaveAsync(leasedRecord, cancellationToken).ConfigureAwait(false);
+                continue;
             }
+
+            // Provider acceptance and queue acknowledgement are separate outcomes.
+            // Persist an accepted marker before removing the record so a failed
+            // removal cannot turn a successful send into another delivery attempt.
+            var acceptedRecord = leasedRecord.Clone();
+            acceptedRecord.DeliveryAcceptedAt = clock();
+            acceptedRecord.NextAttemptAt = acceptedRecord.DeliveryAcceptedAt.Value;
+            acceptedRecord.ProcessingLeaseUntil = null;
+            try {
+                await repository.SaveAsync(acceptedRecord, CancellationToken.None).ConfigureAwait(false);
+            } catch (Exception markerFailure) {
+                // Removal may still succeed even when persisting the marker did not.
+                // If both fail, surface the indeterminate acknowledgement explicitly.
+                try {
+                    await repository.RemoveAsync(leasedRecord.MessageId, CancellationToken.None).ConfigureAwait(false);
+                    continue;
+                } catch (Exception removalFailure) {
+                    throw new AggregateException(
+                        $"Delivery of '{leasedRecord.MessageId}' was accepted, but queue acknowledgement failed.",
+                        markerFailure, removalFailure);
+                }
+            }
+
+            observer.MessageSent(leasedRecord, attempt, stopwatch.Elapsed);
+            await repository.RemoveAsync(leasedRecord.MessageId, CancellationToken.None).ConfigureAwait(false);
         }
     }
 
@@ -169,6 +208,56 @@ public sealed class PendingMessageProcessor {
         var leaseDuration = processingLeaseDuration > TimeSpan.Zero ? processingLeaseDuration : MinimumLeaseDuration;
         var leaseUntil = ApplyDelay(now, leaseDuration);
         return await repository.TryAcquireLeaseAsync(record.MessageId, now, leaseUntil, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task SendWithLeaseRenewalAsync(IPendingMessageSender sender,
+        PendingMessageRecord record, CancellationToken cancellationToken) {
+        if (repository is not IPendingMessageLeaseRenewer renewer) {
+            await sender.SendAsync(record, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        using var deliveryCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var renewalCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        Task<Exception?> renewal = RenewLeaseWhileSendingAsync(
+            renewer, record.MessageId, record.NextAttemptAt,
+            deliveryCancellation, renewalCancellation.Token);
+        try {
+            await sender.SendAsync(record, deliveryCancellation.Token).ConfigureAwait(false);
+        } finally {
+            renewalCancellation.Cancel();
+            var renewalFailure = await renewal.ConfigureAwait(false);
+            if (renewalFailure != null) {
+                logger?.WriteWarning($"Could not renew the delivery lease for message {record.MessageId}: {renewalFailure.Message}");
+            }
+        }
+    }
+
+    private async Task<Exception?> RenewLeaseWhileSendingAsync(
+        IPendingMessageLeaseRenewer renewer, string messageId, DateTimeOffset initialLeaseUntil,
+        CancellationTokenSource deliveryCancellation, CancellationToken renewalCancellation) {
+        var duration = processingLeaseDuration > TimeSpan.Zero ? processingLeaseDuration : MinimumLeaseDuration;
+        var interval = TimeSpan.FromTicks(Math.Min(duration.Ticks / 3, TimeSpan.FromSeconds(30).Ticks));
+        if (interval <= TimeSpan.Zero) interval = TimeSpan.FromTicks(1);
+        var expected = initialLeaseUntil;
+        try {
+            while (true) {
+                await Task.Delay(interval, renewalCancellation).ConfigureAwait(false);
+                var next = ApplyDelay(clock(), duration);
+                if (next <= expected) next = ApplyDelay(expected, duration);
+                if (next <= expected || !await renewer.TryRenewLeaseAsync(
+                        messageId, expected, next, renewalCancellation).ConfigureAwait(false)) {
+                    deliveryCancellation.Cancel();
+                    return new InvalidOperationException("The processing lease could not be extended.");
+                }
+                expected = next;
+            }
+        } catch (OperationCanceledException) when (renewalCancellation.IsCancellationRequested) {
+            return null;
+        } catch (Exception exception) {
+            deliveryCancellation.Cancel();
+            return exception;
+        }
     }
 
     private async Task DeadLetterAndRemoveAsync(

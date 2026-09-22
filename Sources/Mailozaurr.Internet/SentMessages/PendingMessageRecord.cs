@@ -18,6 +18,15 @@ public sealed class PendingMessageRecord {
     /// <summary>Time when the next send attempt should occur.</summary>
     public DateTimeOffset NextAttemptAt { get; set; }
 
+    /// <summary>
+    /// Time at which the sender reported acceptance. An accepted record only needs
+    /// queue cleanup and must not be submitted to the provider again.
+    /// </summary>
+    public DateTimeOffset? DeliveryAcceptedAt { get; set; }
+
+    /// <summary>Expiry of an active processing lease, when one is held.</summary>
+    public DateTimeOffset? ProcessingLeaseUntil { get; set; }
+
     /// <summary>Number of times delivery has been attempted.</summary>
     public int AttemptCount {
         get => Volatile.Read(ref attemptCount);
@@ -75,6 +84,8 @@ public sealed class PendingMessageRecord {
         MessageId = MessageId,
         Timestamp = Timestamp,
         NextAttemptAt = NextAttemptAt,
+        DeliveryAcceptedAt = DeliveryAcceptedAt,
+        ProcessingLeaseUntil = ProcessingLeaseUntil,
         AttemptCount = AttemptCount,
         MimeMessage = MimeMessage,
         Server = Server,
