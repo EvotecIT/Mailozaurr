@@ -175,9 +175,52 @@ Both write commands accept `-StoreReaderOptions` for custom safety bounds and pa
 
 Use `-Flatten` for directory exports when preserving a deep archive hierarchy would exceed the host's path limit, especially under Windows PowerShell 5.1.
 
-OST input is read-only: Mailozaurr does not pretend to reconstruct server-only content or write an OST. OfficeIMO.Email also provides existing Unicode PST mutation, recovery export, compaction, splitting, associated Outlook data, reminder queues, and category/view/rule inspection. Mailozaurr does not mirror those specialized APIs; .NET callers use them directly, while PowerShell workflows can continue from the native `$data.Store` session for session-backed operations.
+OST input is read-only: Mailozaurr does not pretend to reconstruct server-only content or write an OST. OfficeIMO.Email also provides Unicode PST mutation, recovery export, compaction, splitting, associated Outlook data, reminder queues, and category/view/rule inspection. PowerShell callers can use those specialized APIs through the native `$data.Store` session; Mailozaurr does not duplicate their implementation.
 
 `Import-MailData` is also the discovery entry point for standalone ICS and VCF files and Outlook Offline Address Book data. It returns the native OfficeIMO owner through `Calendar`, `Contact`, or `AddressBook`, preserving the complete API instead of projecting a smaller Mailozaurr copy.
+
+The PowerShell module also offers direct read-only entry points for OfficeIMO.Email analysis:
+
+| Command | Result |
+| --- | --- |
+| `Get-MailSemanticFingerprint` | Versioned semantic digest for grouping likely duplicates |
+| `Compare-MailDataSemantic` | Native difference report for two imported emails |
+| `Get-MailStoreConversation` | Bounded conversation graph with link confidence |
+| `Get-MailStoreMaintenancePlan` | Source-bound validation and recovery recommendations |
+| `Search-MailAddressBook` | Bounded OAB search report with a resume checkpoint |
+
+```powershell
+$source = Import-MailData './source.eml' -UseStreamingEmailReader
+$copy = Import-MailData './copy.eml' -UseStreamingEmailReader
+try {
+    $source | Get-MailSemanticFingerprint
+    $source | Compare-MailDataSemantic -ReferenceObject $copy
+} finally {
+    $source, $copy | Close-MailData
+}
+```
+
+For duplicate grouping, compare fingerprints produced with the same schema version, algorithm, profile, and options. Use keyed `EmailSemanticComparisonOptions` before persisting fingerprints of private mail. Keep imported results open until comparison completes.
+
+```powershell
+$store = Import-MailData './archive.pst'
+try {
+    $store | Get-MailStoreConversation
+    $store | Get-MailStoreMaintenancePlan -MaxItems 50000
+} finally {
+    $store | Close-MailData
+}
+
+$directory = Import-MailData './directory.oab'
+try {
+    $batch = $directory | Search-MailAddressBook -Term 'Ada' -MaxEntriesScanned 1000
+    if ($batch.NextCheckpoint) {
+        $directory | Search-MailAddressBook -Term 'Ada' -MaxEntriesScanned 1000 -ResumeFrom $batch.NextCheckpoint
+    }
+} finally {
+    $directory | Close-MailData
+}
+```
 
 ## Architecture notes
 

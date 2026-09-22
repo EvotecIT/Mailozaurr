@@ -100,18 +100,30 @@ foreach (`$dependencyName in `$isolatedDependencyNames) {
     'Mailozaurr.Smtp'
     'Mailozaurr.SmtpConnectionPool'
     'OfficeIMO.Email.AddressBook.OfflineAddressBookReaderOptions'
+    'OfficeIMO.Email.AddressBook.OfflineAddressBookObjectType'
+    'OfficeIMO.Email.AddressBook.OfflineAddressBookSearchCheckpoint'
+    'OfficeIMO.Email.AddressBook.OfflineAddressBookSearchFields'
+    'OfficeIMO.Email.AddressBook.OfflineAddressBookSearchMatchMode'
+    'OfficeIMO.Email.AddressBook.OfflineAddressBookSearchReport'
+    'OfficeIMO.Email.AddressBook.OfflineAddressBookSearchResult'
     'OfficeIMO.Email.ContentLineReaderOptions'
     'OfficeIMO.Email.Data.EmailDataArtifactKind'
     'OfficeIMO.Email.Data.EmailDataOpenOptions'
     'OfficeIMO.Email.Data.EmailDataOpenResult'
     'OfficeIMO.Email.EmailReaderOptions'
+    'OfficeIMO.Email.EmailSemanticComparisonOptions'
+    'OfficeIMO.Email.EmailSemanticComparisonReport'
+    'OfficeIMO.Email.EmailSemanticFingerprint'
     'OfficeIMO.Email.OutlookItemKind'
     'OfficeIMO.Email.Store.EmailStoreContentMatchMode'
+    'OfficeIMO.Email.Store.EmailConversationGraph'
+    'OfficeIMO.Email.Store.EmailConversationGraphOptions'
     'OfficeIMO.Email.Store.EmailStoreContentSearchCheckpoint'
     'OfficeIMO.Email.Store.EmailStoreContentSearchFields'
     'OfficeIMO.Email.Store.EmailStoreFormat'
     'OfficeIMO.Email.Store.EmailStoreItemReadParts'
     'OfficeIMO.Email.Store.EmailStoreMergeFolderMode'
+    'OfficeIMO.Email.Store.EmailStoreMaintenancePlan'
     'OfficeIMO.Email.Store.EmailStoreReaderOptions'
     'OfficeIMO.Email.Store.EmailStoreSession'
     'OfficeIMO.Email.Store.EmailStoreSpecialFolderKind'
@@ -227,8 +239,8 @@ try {
             $dependency.ALC | Should -Be 'Mailozaurr'
             $dependency.ALCIsDefault | Should -BeFalse
         }
-        $result.AllowedTypeCount | Should -Be 41
-        $result.ActualAllowedTypeCount | Should -Be 41
+        $result.AllowedTypeCount | Should -Be 53
+        $result.ActualAllowedTypeCount | Should -Be 53
         @($result.MissingAllowedTypes).Count | Should -Be 0
         @($result.UnexpectedAllowedTypes).Count | Should -Be 0
         @($result.WrongAllowedTypeContexts).Count | Should -Be 0

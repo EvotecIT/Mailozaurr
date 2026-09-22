@@ -17,5 +17,17 @@ Describe 'Import-Module' {
         (Get-Command Export-MailFile -ErrorAction Stop).ModuleName | Should -Be 'Mailozaurr'
         (Get-Command Import-MailFile -ErrorAction Stop).ModuleName | Should -Be 'Mailozaurr'
         (Get-Command Send-EmailMessage -ErrorAction Stop).ModuleName | Should -Be 'Mailozaurr'
+        foreach ($name in @(
+            'Compare-MailDataSemantic'
+            'Get-MailSemanticFingerprint'
+            'Get-MailStoreConversation'
+            'Get-MailStoreMaintenancePlan'
+            'Search-MailAddressBook'
+        )) {
+            $manifest.CmdletsToExport | Should -Contain $name
+            (Get-Command $name -ErrorAction Stop).ModuleName | Should -Be 'Mailozaurr'
+        }
+        [OfficeIMO.Email.EmailSemanticComparisonOptions]::new() | Should -Not -BeNullOrEmpty
+        [OfficeIMO.Email.Store.EmailConversationGraphOptions]::new() | Should -Not -BeNullOrEmpty
     }
 }
