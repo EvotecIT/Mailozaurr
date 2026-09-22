@@ -1,12 +1,15 @@
 namespace Mailozaurr;
 
 /// <summary>Bounded provider-supplied RFC 822 content for one mailbox message.</summary>
-public sealed class RawMailMessage {
+public sealed class RawMailMessage : IDisposable {
     /// <summary>Provider-specific message identifier.</summary>
     public string MessageId { get; set; } = string.Empty;
 
     /// <summary>Unmodified RFC 822 bytes returned by the provider.</summary>
     public byte[] Content { get; set; } = Array.Empty<byte>();
+
+    /// <summary>Optional provider stream used by bounded export without materializing another byte array.</summary>
+    public Stream? ContentStream { get; set; }
 
     /// <summary>
     /// Optional provider epoch or namespace component required to keep persisted identities stable.
@@ -16,6 +19,9 @@ public sealed class RawMailMessage {
     /// epoch changes. Other providers normally leave it unset.
     /// </remarks>
     public string? StorageIdentityComponent { get; set; }
+
+    /// <summary>Closes provider content when this result owns a stream.</summary>
+    public void Dispose() => ContentStream?.Dispose();
 }
 
 /// <summary>Request for provider-native RFC 822 message content.</summary>
@@ -41,6 +47,21 @@ public interface IRawMailMessageSession : IDisposable {
         CancellationToken cancellationToken = default);
 }
 
+/// <summary>Optional raw-message session that can transfer a provider stream to the exporter.</summary>
+public interface IStreamingRawMailMessageSession {
+    /// <summary>Opens one bounded provider message. The caller disposes the returned result.</summary>
+    Task<RawMailMessage?> GetRawMessageStreamAsync(
+        RawMailMessageRequest request,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>Exposes the provider's current identity namespace for a folder.</summary>
+public interface IRawMailMessageScopeSession {
+    /// <summary>Returns a stable scope token, such as the IMAP folder's UIDVALIDITY.</summary>
+    Task<string> GetScopeAsync(string? mailboxId, string? folderId,
+        CancellationToken cancellationToken = default);
+}
+
 /// <summary>Provider-specific source of batch-scoped raw RFC 822 sessions.</summary>
 public interface IRawMailMessageSource {
     /// <summary>Profile kind handled by this source.</summary>
@@ -50,4 +71,9 @@ public interface IRawMailMessageSource {
     Task<IRawMailMessageSession> OpenSessionAsync(
         MailProfile profile,
         CancellationToken cancellationToken = default);
+}
+
+internal interface IArchiveRawMailMessageSource {
+    Task<IRawMailMessageSession> OpenArchiveSessionAsync(
+        MailProfile profile, CancellationToken cancellationToken);
 }

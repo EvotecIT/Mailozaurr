@@ -20,13 +20,25 @@ public sealed class GmailRawMailMessageSource : IRawMailMessageSource {
         return new Session(profile, session);
     }
 
-    private sealed class Session : IRawMailMessageSession {
+    private sealed class Session : IRawMailMessageSession, IRawMailMessageScopeSession {
         private readonly MailProfile _profile;
         private readonly GmailSession _session;
 
         internal Session(MailProfile profile, GmailSession session) {
             _profile = profile;
             _session = session;
+        }
+
+        /// <inheritdoc />
+        public async Task<string> GetScopeAsync(string? mailboxId, string? folderId,
+            CancellationToken cancellationToken = default) {
+            var userId = GmailMailReadHandler.ResolveUserId(_profile, mailboxId);
+            var identity = await _session.Client.GetProfileAsync(userId, cancellationToken)
+                .ConfigureAwait(false);
+            var address = identity.EmailAddress;
+            if (string.IsNullOrWhiteSpace(address))
+                throw new InvalidDataException("Gmail returned a profile without a mailbox address.");
+            return "Gmail:mailbox:" + address!.Trim().ToLowerInvariant();
         }
 
         public async Task<RawMailMessage?> GetRawMessageAsync(

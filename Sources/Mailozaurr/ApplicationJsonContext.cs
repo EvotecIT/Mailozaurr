@@ -10,6 +10,8 @@ namespace Mailozaurr;
 [JsonSerializable(typeof(MailMessageActionPlanBatchStoreDocument))]
 [JsonSerializable(typeof(MailProfileStoreDocument))]
 [JsonSerializable(typeof(MailSecretStoreDocument))]
+[JsonSerializable(typeof(MailEmlArchiveScopeDocument))]
+[JsonSerializable(typeof(MailEmlArchiveRecordDocument))]
 internal partial class ApplicationJsonContext : JsonSerializerContext;
 
 internal sealed class MailDraftStoreDocument {

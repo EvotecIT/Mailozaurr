@@ -29,6 +29,44 @@ public sealed class MailEmlExportServiceTests {
     }
 
     [Fact]
+    public async Task ProviderWriterStagesNonSeekableContentWithoutChangingBytes() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var content = CreateMessage("stream-one", "X-Spacing:   keep\t");
+            var path = Path.Combine(directory, "stream.eml");
+            using var stream = new NonSeekableReadStream(content);
+
+            var result = await new ProviderEmlArtifactWriter().WriteAsync(stream, path, content.Length);
+
+            Assert.Equal(content, File.ReadAllBytes(path));
+            Assert.Equal(content.Length, result.BytesWritten);
+            Assert.True(result.UsedPreservedSource);
+            Assert.Equal(64, result.Sha256.Length);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ProviderWriterRejectsOversizedStreamBeforeReplacingDestination() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var path = Path.Combine(directory, "stream.eml");
+            var original = CreateMessage("original", "X-Test: original");
+            File.WriteAllBytes(path, original);
+            using var stream = new NonSeekableReadStream(CreateMessage("large", "X-Test: too-large"));
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                new ProviderEmlArtifactWriter().WriteAsync(stream, path, 8, overwrite: true));
+
+            Assert.Equal(original, File.ReadAllBytes(path));
+            Assert.False(stream.Disposed);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ProviderWriterRejectsLimitBeforeReplacingDestination() {
         var directory = CreateTemporaryDirectory();
         try {
@@ -123,6 +161,27 @@ public sealed class MailEmlExportServiceTests {
     }
 
     [Fact]
+    public async Task Pop3UidExportIndexesOnceAndRejectsUnderreportedContent() {
+        var first = new MimeMessage { Subject = "First", Body = new TextPart("plain") { Text = "one" } };
+        var second = new MimeMessage { Subject = "Second", Body = new TextPart("plain") { Text = new string('x', 4096) } };
+        var client = new BoundedPop3Client(new[] { first, second }, oversizedIndex: -1) {
+            AnnouncedSizeOverride = 1
+        };
+        var source = new Pop3RawMailMessageSource(new FixedPop3SessionFactory(client));
+        using var session = await source.OpenSessionAsync(new MailProfile { Id = "pop", Kind = MailProfileKind.Pop3 });
+        var streaming = Assert.IsAssignableFrom<IStreamingRawMailMessageSession>(session);
+
+        using var retrieved = await streaming.GetRawMessageStreamAsync(new RawMailMessageRequest {
+            MessageId = "uid:uid-0", MaxBytes = 2048
+        });
+        Assert.NotNull(retrieved);
+        await Assert.ThrowsAsync<InvalidDataException>(() => streaming.GetRawMessageStreamAsync(
+            new RawMailMessageRequest { MessageId = "uid:uid-1", MaxBytes = 2048 }));
+        Assert.Equal(1, client.UidFetches);
+        Assert.Equal(new[] { 0, 1 }, client.Downloads);
+    }
+
+    [Fact]
     public async Task ProviderWriterClaimsOrReplacesDestinationAtomically() {
         var directory = CreateTemporaryDirectory();
         try {
@@ -175,6 +234,32 @@ public sealed class MailEmlExportServiceTests {
             Assert.Single(outcomes, succeeded => !succeeded);
             var saved = File.ReadAllBytes(path);
             Assert.True(saved.SequenceEqual(first) || saved.SequenceEqual(second));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task BatchExportPrefersProviderStreamAndClosesIt() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profileStore = new InMemoryMailProfileStore();
+            await profileStore.SaveAsync(new MailProfile {
+                Id = "stream-mailbox", DisplayName = "Stream mailbox", Kind = MailProfileKind.Imap
+            });
+            var content = CreateMessage("streamed", "X-Test: stream");
+            var source = new FakeStreamingRawMailMessageSource(content);
+            var result = await new MailEmlExportService(profileStore, new[] { source })
+                .ExportAsync(new MailEmlExportRequest {
+                    ProfileId = "stream-mailbox",
+                    MessageIds = new List<string> { "42" },
+                    DestinationDirectory = directory
+                });
+
+            Assert.True(result.Succeeded);
+            Assert.Equal(content, File.ReadAllBytes(result.Results[0].DestinationPath!));
+            Assert.True(source.Stream!.Disposed);
+            Assert.Equal(1, source.StreamRequestCount);
         } finally {
             Directory.Delete(directory, recursive: true);
         }
@@ -391,6 +476,38 @@ public sealed class MailEmlExportServiceTests {
             new RawMailMessageRequest { MessageId = "missing", MaxBytes = 1024 });
 
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GraphArchiveScopeUsesProviderVerifiedMailboxIdForOverride() {
+        var profile = new MailProfile { Id = "graph", Kind = MailProfileKind.Graph };
+        var factory = new StatusGraphSessionFactory(
+            System.Net.HttpStatusCode.OK, "{\"id\":\"graph-object-41\"}");
+        var source = new GraphRawMailMessageSource(factory);
+        using var session = await source.OpenSessionAsync(profile);
+
+        var scope = await ((IRawMailMessageScopeSession)session)
+            .GetScopeAsync("shared@example.test", null);
+
+        Assert.Equal("Graph:user:graph-object-41", scope);
+        Assert.Contains("users/shared%40example.test", factory.LastHandler!.LastRequestUri!.AbsoluteUri,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GmailArchiveScopeUsesProviderVerifiedEmailAndRejectsMissingIdentity() {
+        var profile = new MailProfile { Id = "gmail", Kind = MailProfileKind.Gmail };
+        var source = new GmailRawMailMessageSource(new StatusGmailSessionFactory(
+            System.Net.HttpStatusCode.OK, "{\"emailAddress\":\"Owner@Example.Test\"}"));
+        using var session = await source.OpenSessionAsync(profile);
+        Assert.Equal("Gmail:mailbox:owner@example.test",
+            await ((IRawMailMessageScopeSession)session).GetScopeAsync("me", null));
+
+        var missingIdentity = new GmailRawMailMessageSource(new StatusGmailSessionFactory(
+            System.Net.HttpStatusCode.OK));
+        using var missingSession = await missingIdentity.OpenSessionAsync(profile);
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            ((IRawMailMessageScopeSession)missingSession).GetScopeAsync(null, null));
     }
 
     [Fact]
@@ -660,6 +777,367 @@ public sealed class MailEmlExportServiceTests {
         }
     }
 
+    [Fact]
+    public async Task ArchiveResumesOnlyAfterVerifyingExistingBytesAndScope() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profiles = new InMemoryMailProfileStore();
+            await profiles.SaveAsync(new MailProfile {
+                Id = "archive-mailbox", DisplayName = "Archive mailbox", Kind = MailProfileKind.Imap
+            });
+            var source = new FakeRawMailMessageSource(new Dictionary<string, byte[]> {
+                ["41"] = CreateMessage("first", "X-Test: one"),
+                ["42"] = CreateMessage("second", "X-Test: two")
+            });
+            var archive = new MailEmlArchiveService(profiles,
+                new MailEmlExportService(profiles, new[] { source }));
+            var request = new MailEmlArchiveRequest {
+                ProfileId = "archive-mailbox",
+                FolderId = "INBOX",
+                MessageIds = new List<string> { "42", "41", "41" },
+                DestinationDirectory = Path.Combine(directory, "archive")
+            };
+
+            var first = await archive.ArchiveAsync(request);
+            var resumed = await archive.ArchiveAsync(request);
+
+            Assert.True(first.Succeeded, first.Message);
+            Assert.Equal(2, first.ExportedCount);
+            Assert.True(resumed.Succeeded, resumed.Message);
+            Assert.Equal(2, resumed.VerifiedExistingCount);
+            Assert.Equal(0, resumed.ExportedCount);
+            Assert.Equal(2, source.RequestCount);
+            Assert.Equal(3, source.SessionCount);
+
+            var emlPath = Directory.GetFiles(Path.Combine(request.DestinationDirectory, "eml"), "*.eml").First();
+            File.AppendAllText(emlPath, "corrupted");
+            var repaired = await archive.ArchiveAsync(request);
+            Assert.True(repaired.Succeeded, repaired.Message);
+            Assert.Equal(1, repaired.ExportedCount);
+            Assert.Equal(1, repaired.VerifiedExistingCount);
+            Assert.Equal(3, source.RequestCount);
+
+            source.ProviderScope = "INBOX:uidvalidity:2";
+            await Assert.ThrowsAsync<InvalidOperationException>(() => archive.ArchiveAsync(request));
+            source.ProviderScope = "INBOX:uidvalidity:1";
+
+            var changedProfile = await profiles.GetByIdAsync("archive-mailbox");
+            changedProfile!.Settings[MailProfileSettingsKeys.Folder] = "Other";
+            await profiles.SaveAsync(changedProfile);
+            var resumedAfterIrrelevantProfileChange = await archive.ArchiveAsync(request);
+            Assert.True(resumedAfterIrrelevantProfileChange.Succeeded,
+                resumedAfterIrrelevantProfileChange.Message);
+            Assert.Equal(2, resumedAfterIrrelevantProfileChange.VerifiedExistingCount);
+            changedProfile.Settings.Clear();
+            await profiles.SaveAsync(changedProfile);
+
+            request.MessageIds = new List<string> { "41" };
+            await Assert.ThrowsAsync<InvalidOperationException>(() => archive.ArchiveAsync(request));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(MailProfileKind.Imap, "41")]
+    [InlineData(MailProfileKind.Graph, "message-41")]
+    [InlineData(MailProfileKind.Gmail, "message-41")]
+    [InlineData(MailProfileKind.Pop3, "uid:message-41")]
+    public async Task ArchiveDoesNotSkipVerifiedFilesAfterProviderIdentityChanges(
+        MailProfileKind kind, string messageId) {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profiles = new InMemoryMailProfileStore();
+            await profiles.SaveAsync(new MailProfile {
+                Id = "switching-mailbox", DisplayName = "Switching mailbox", Kind = kind
+            });
+            var source = new FakeRawMailMessageSource(new Dictionary<string, byte[]> {
+                [messageId] = CreateMessage("first", "X-Test: one")
+            }, kind) { ProviderScope = "authenticated-mailbox-one" };
+            var archive = new MailEmlArchiveService(profiles,
+                new MailEmlExportService(profiles, new[] { source }));
+            var request = new MailEmlArchiveRequest {
+                ProfileId = "switching-mailbox",
+                MessageIds = new List<string> { messageId },
+                DestinationDirectory = Path.Combine(directory, "archive")
+            };
+
+            Assert.True((await archive.ArchiveAsync(request)).Succeeded);
+            source.ProviderScope = "authenticated-mailbox-two";
+            await Assert.ThrowsAsync<InvalidOperationException>(() => archive.ArchiveAsync(request));
+            Assert.Equal(1, source.RequestCount);
+            source.ProviderScope = "authenticated-mailbox-one";
+            var resumed = await archive.ArchiveAsync(request);
+            Assert.True(resumed.Succeeded, resumed.Message);
+            Assert.Equal(1, resumed.VerifiedExistingCount);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Pop3ArchiveScopeUsesStableAuthenticatedAccountIdentity() {
+        var secrets = new InMemoryMailSecretStore();
+        var profile = new MailProfile { Id = "pop-account", Kind = MailProfileKind.Pop3 };
+        profile.Settings[MailProfileSettingsKeys.Server] = "pop.example.test";
+        profile.Settings[MailProfileSettingsKeys.UserName] = "account@example.test";
+        await secrets.SetSecretAsync(profile.Id, MailSecretNames.Password, "first-secret");
+        var source = new Pop3RawMailMessageSource(new Pop3SessionFactory(secrets,
+            (request, token) => Task.FromResult(new Pop3Client())));
+        string first;
+        using (var session = await ((IArchiveRawMailMessageSource)source)
+            .OpenArchiveSessionAsync(profile, CancellationToken.None)) {
+            first = await ((IRawMailMessageScopeSession)session).GetScopeAsync(null, null);
+        }
+        await secrets.SetSecretAsync(profile.Id, MailSecretNames.Password, "second-secret");
+        using var replaced = await ((IArchiveRawMailMessageSource)source)
+            .OpenArchiveSessionAsync(profile, CancellationToken.None);
+        var second = await ((IRawMailMessageScopeSession)replaced).GetScopeAsync(null, null);
+        Assert.Equal(first, second);
+        Assert.DoesNotContain("first-secret", first, StringComparison.Ordinal);
+        Assert.DoesNotContain("second-secret", second, StringComparison.Ordinal);
+
+        profile.Settings[MailProfileSettingsKeys.UserName] = "Account@example.test";
+        using var otherAccount = await ((IArchiveRawMailMessageSource)source)
+            .OpenArchiveSessionAsync(profile, CancellationToken.None);
+        var other = await ((IRawMailMessageScopeSession)otherAccount).GetScopeAsync(null, null);
+        Assert.NotEqual(first, other);
+    }
+
+    [Fact]
+    public async Task ImapArchiveScopeUsesStableAuthenticatedAccountIdentity() {
+        var secrets = new InMemoryMailSecretStore();
+        var profile = new MailProfile { Id = "imap-account", Kind = MailProfileKind.Imap };
+        profile.Settings[MailProfileSettingsKeys.Server] = "imap.example.test";
+        profile.Settings[MailProfileSettingsKeys.UserName] = "account@example.test";
+        await secrets.SetSecretAsync(profile.Id, MailSecretNames.Password, "first-secret");
+        var factory = new ImapSessionFactory(secrets,
+            (request, token) => Task.FromResult(new MailKit.Net.Imap.ImapClient()));
+        var first = await factory.ConnectForArchiveAsync(profile, CancellationToken.None);
+        first.Client.Dispose();
+        await secrets.SetSecretAsync(profile.Id, MailSecretNames.Password, "second-secret");
+        var second = await factory.ConnectForArchiveAsync(profile, CancellationToken.None);
+        second.Client.Dispose();
+
+        Assert.Equal(first.Scope, second.Scope);
+        Assert.DoesNotContain("first-secret", first.Scope, StringComparison.Ordinal);
+        Assert.DoesNotContain("second-secret", second.Scope, StringComparison.Ordinal);
+
+        profile.Settings[MailProfileSettingsKeys.UserName] = "Account@example.test";
+        var other = await factory.ConnectForArchiveAsync(profile, CancellationToken.None);
+        other.Client.Dispose();
+        Assert.NotEqual(first.Scope, other.Scope);
+    }
+
+    [Theory]
+    [InlineData(MailProfileKind.Graph, "message-41", "mailbox", "ME", "me")]
+    [InlineData(MailProfileKind.Gmail, "message-41", "mailbox", "Owner@Example.test", "owner@example.test")]
+    [InlineData(MailProfileKind.Imap, "41", "folder", "INBOX", "inbox")]
+    public async Task EquivalentProfileAliasesDoNotInvalidateArchive(
+        MailProfileKind kind, string messageId, string settingKey, string initialValue, string replacementValue) {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profiles = new InMemoryMailProfileStore();
+            var profile = new MailProfile {
+                Id = "alias-mailbox", DisplayName = "Alias mailbox", Kind = kind
+            };
+            profile.Settings[settingKey] = initialValue;
+            await profiles.SaveAsync(profile);
+            var source = new FakeRawMailMessageSource(new Dictionary<string, byte[]> {
+                [messageId] = CreateMessage("first", "X-Test: one")
+            }, kind) { ProviderScope = kind + ":account:object-41" };
+            var archive = new MailEmlArchiveService(profiles,
+                new MailEmlExportService(profiles, new[] { source }));
+            var request = new MailEmlArchiveRequest {
+                ProfileId = "alias-mailbox",
+                MessageIds = new List<string> { messageId },
+                DestinationDirectory = Path.Combine(directory, "archive")
+            };
+
+            Assert.True((await archive.ArchiveAsync(request)).Succeeded);
+            profile.Settings[settingKey] = replacementValue;
+            await profiles.SaveAsync(profile);
+            var resumed = await archive.ArchiveAsync(request);
+
+            Assert.True(resumed.Succeeded, resumed.Message);
+            Assert.Equal(1, resumed.VerifiedExistingCount);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(MailProfileKind.Graph)]
+    [InlineData(MailProfileKind.Gmail)]
+    public async Task RemoteArchiveIdentityIsNotProbedPerMessage(MailProfileKind kind) {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profiles = new InMemoryMailProfileStore();
+            await profiles.SaveAsync(new MailProfile {
+                Id = "remote", DisplayName = "Remote mailbox", Kind = kind
+            });
+            var source = new FakeRawMailMessageSource(new Dictionary<string, byte[]> {
+                ["one"] = CreateMessage("one", "X-Test: one"),
+                ["two"] = CreateMessage("two", "X-Test: two")
+            }, kind) { ProviderScope = kind + ":mailbox:owner" };
+            var archive = new MailEmlArchiveService(profiles,
+                new MailEmlExportService(profiles, new[] { source }));
+
+            var result = await archive.ArchiveAsync(new MailEmlArchiveRequest {
+                ProfileId = "remote",
+                MessageIds = new List<string> { "one", "two" },
+                DestinationDirectory = Path.Combine(directory, "archive")
+            });
+
+            Assert.True(result.Succeeded, result.Message);
+            Assert.Equal(2, source.ScopeRequestCount);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(MailProfileKind.Graph)]
+    [InlineData(MailProfileKind.Gmail)]
+    public async Task RetainedRemoteArchiveSessionCachesVerifiedIdentityAcrossBatches(MailProfileKind kind) {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profiles = new InMemoryMailProfileStore();
+            var profile = new MailProfile { Id = "remote-batches", DisplayName = "Remote batches", Kind = kind };
+            await profiles.SaveAsync(profile);
+            var source = new FakeRawMailMessageSource(new Dictionary<string, byte[]> {
+                ["one"] = CreateMessage("one", "X-Test: one"),
+                ["two"] = CreateMessage("two", "X-Test: two")
+            }, kind) { ProviderScope = kind + ":mailbox:owner" };
+            var export = new MailEmlExportService(profiles, new[] { source });
+            using var session = await export.OpenArchiveSessionAsync(profile, CancellationToken.None);
+
+            foreach (var messageId in new[] { "one", "two" }) {
+                var result = await session.ExportAsync(new MailEmlExportRequest {
+                    ProfileId = profile.Id,
+                    MessageIds = new List<string> { messageId },
+                    DestinationDirectory = directory,
+                    ExpectedProviderScope = source.ProviderScope
+                }, CancellationToken.None);
+                Assert.True(result.Succeeded, result.Message);
+            }
+
+            Assert.Equal(1, source.ScopeRequestCount);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ArchivePersistsSuccessfulItemsAndRetriesFailuresOnRestart() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profiles = new InMemoryMailProfileStore();
+            await profiles.SaveAsync(new MailProfile {
+                Id = "archive-mailbox", DisplayName = "Archive mailbox", Kind = MailProfileKind.Imap
+            });
+            var messages = new Dictionary<string, byte[]> {
+                ["41"] = CreateMessage("first", "X-Test: one")
+            };
+            var source = new FakeRawMailMessageSource(messages);
+            var archive = new MailEmlArchiveService(profiles,
+                new MailEmlExportService(profiles, new[] { source }));
+            var request = new MailEmlArchiveRequest {
+                ProfileId = "archive-mailbox",
+                MessageIds = new List<string> { "41", "42" },
+                DestinationDirectory = Path.Combine(directory, "archive")
+            };
+
+            var partial = await archive.ArchiveAsync(request);
+            Assert.False(partial.Succeeded);
+            Assert.Equal(1, partial.ExportedCount);
+            Assert.Equal(1, partial.FailedCount);
+
+            messages["42"] = CreateMessage("second", "X-Test: two");
+            var resumed = await archive.ArchiveAsync(request);
+            Assert.True(resumed.Succeeded, resumed.Message);
+            Assert.Equal(1, resumed.VerifiedExistingCount);
+            Assert.Equal(1, resumed.ExportedCount);
+            Assert.Equal(3, source.RequestCount);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ArchiveRejectsImapEpochChangeDuringAnExportBatch() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profiles = new InMemoryMailProfileStore();
+            await profiles.SaveAsync(new MailProfile {
+                Id = "changing-mailbox", DisplayName = "Changing mailbox", Kind = MailProfileKind.Imap
+            });
+            var source = new FakeRawMailMessageSource(new Dictionary<string, byte[]> {
+                ["41"] = CreateMessage("first", "X-Test: one"),
+                ["42"] = CreateMessage("second", "X-Test: two")
+            }) { ProviderScopeAfterFirstRequest = "INBOX:uidvalidity:2" };
+            var archive = new MailEmlArchiveService(profiles,
+                new MailEmlExportService(profiles, new[] { source }));
+            var request = new MailEmlArchiveRequest {
+                ProfileId = "changing-mailbox", MessageIds = new List<string> { "41", "42" },
+                DestinationDirectory = Path.Combine(directory, "archive")
+            };
+
+            var result = await archive.ArchiveAsync(request);
+            Assert.False(result.Succeeded);
+            Assert.Equal(0, result.ExportedCount);
+            Assert.Equal(2, result.FailedCount);
+            Assert.Empty(Directory.GetFiles(Path.Combine(request.DestinationDirectory, ".mailozaurr-archive", "records")));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => archive.ArchiveAsync(request));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ImapExportRejectsLimitWithoutOversizeSentinel() {
+        var profiles = new InMemoryMailProfileStore();
+        await profiles.SaveAsync(new MailProfile { Id = "imap", DisplayName = "IMAP", Kind = MailProfileKind.Imap });
+        var source = new FakeRawMailMessageSource(new Dictionary<string, byte[]>());
+        var export = new MailEmlExportService(profiles, new[] { source });
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => export.ExportAsync(new MailEmlExportRequest {
+            ProfileId = "imap", MessageIds = new List<string> { "1" },
+            DestinationDirectory = Path.GetTempPath(), MaxMessageBytes = int.MaxValue
+        }));
+        Assert.Equal(0, source.SessionCount);
+    }
+
+    [Fact]
+    public async Task Pop3ArchiveReusesOneProviderSessionAcrossExportBatches() {
+        var directory = CreateTemporaryDirectory();
+        try {
+            var profiles = new InMemoryMailProfileStore();
+            await profiles.SaveAsync(new MailProfile {
+                Id = "archive-mailbox", DisplayName = "Archive mailbox", Kind = MailProfileKind.Pop3
+            });
+            var ids = Enumerable.Range(1, MailEmlExportService.MaximumBatchMessageCount + 1)
+                .Select(value => "uid:" + value.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                .ToList();
+            var content = CreateMessage("shared", "X-Test: bulk");
+            var source = new FakeRawMailMessageSource(ids.ToDictionary(
+                id => id, _ => content, StringComparer.Ordinal), MailProfileKind.Pop3);
+            var archive = new MailEmlArchiveService(profiles,
+                new MailEmlExportService(profiles, new[] { source }));
+
+            var result = await archive.ArchiveAsync(new MailEmlArchiveRequest {
+                ProfileId = "archive-mailbox",
+                MessageIds = ids,
+                DestinationDirectory = Path.Combine(directory, "archive")
+            });
+
+            Assert.True(result.Succeeded, result.Message);
+            Assert.Equal(ids.Count, result.ExportedCount);
+            Assert.Equal(2, source.SessionCount); // one identity probe, one reused export session
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static byte[] CreateMessage(string subject, string extraHeader) => Encoding.ASCII.GetBytes(
         "From: sender@example.com\r\n" +
         "To: recipient@example.com\r\n" +
@@ -677,7 +1155,70 @@ public sealed class MailEmlExportServiceTests {
         return directory;
     }
 
-    private sealed class FakeRawMailMessageSource : IRawMailMessageSource, IRawMailMessageSession {
+    private sealed class NonSeekableReadStream : Stream {
+        private readonly MemoryStream _inner;
+
+        internal NonSeekableReadStream(byte[] content) => _inner = new MemoryStream(content, writable: false);
+
+        internal bool Disposed { get; private set; }
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+        public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count,
+            CancellationToken cancellationToken) => _inner.ReadAsync(buffer, offset, count, cancellationToken);
+        public override void Flush() => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        protected override void Dispose(bool disposing) {
+            if (disposing) {
+                _inner.Dispose();
+                Disposed = true;
+            }
+            base.Dispose(disposing);
+        }
+    }
+
+    private sealed class FakeStreamingRawMailMessageSource : IRawMailMessageSource,
+        IRawMailMessageSession, IStreamingRawMailMessageSession {
+        private readonly byte[] _content;
+
+        internal FakeStreamingRawMailMessageSource(byte[] content) => _content = content;
+
+        public MailProfileKind Kind => MailProfileKind.Imap;
+
+        internal NonSeekableReadStream? Stream { get; private set; }
+
+        internal int StreamRequestCount { get; private set; }
+
+        public Task<IRawMailMessageSession> OpenSessionAsync(MailProfile profile,
+            CancellationToken cancellationToken = default) => Task.FromResult<IRawMailMessageSession>(this);
+
+        public Task<RawMailMessage?> GetRawMessageAsync(RawMailMessageRequest request,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Buffered retrieval must not be used for a streaming source.");
+
+        public Task<RawMailMessage?> GetRawMessageStreamAsync(RawMailMessageRequest request,
+            CancellationToken cancellationToken = default) {
+            StreamRequestCount++;
+            Stream = new NonSeekableReadStream(_content);
+            return Task.FromResult<RawMailMessage?>(new RawMailMessage {
+                MessageId = request.MessageId,
+                ContentStream = Stream
+            });
+        }
+
+        public void Dispose() { }
+    }
+
+    private sealed class FakeRawMailMessageSource : IRawMailMessageSource, IRawMailMessageSession, IRawMailMessageScopeSession {
         private readonly IReadOnlyDictionary<string, byte[]> _messages;
 
         internal FakeRawMailMessageSource(
@@ -697,6 +1238,18 @@ public sealed class MailEmlExportServiceTests {
 
         public string? StorageIdentityComponent { get; set; }
 
+        public string ProviderScope { get; set; } = "INBOX:uidvalidity:1";
+
+        public string? ProviderScopeAfterFirstRequest { get; set; }
+
+        public int ScopeRequestCount { get; private set; }
+
+        public Task<string> GetScopeAsync(string? mailboxId, string? folderId,
+            CancellationToken cancellationToken = default) {
+            ScopeRequestCount++;
+            return Task.FromResult(ProviderScope);
+        }
+
         public string? ThrowOperationCanceledForMessageId { get; set; }
 
         public CancellationTokenSource? CancelOnOperationCanceled { get; set; }
@@ -712,6 +1265,8 @@ public sealed class MailEmlExportServiceTests {
             RawMailMessageRequest request,
             CancellationToken cancellationToken = default) {
             RequestCount++;
+            if (RequestCount == 1 && ProviderScopeAfterFirstRequest != null)
+                ProviderScope = ProviderScopeAfterFirstRequest;
             if (string.Equals(request.MessageId, ThrowOperationCanceledForMessageId, StringComparison.Ordinal)) {
                 CancelOnOperationCanceled?.Cancel();
                 throw new OperationCanceledException("Provider operation timed out.", cancellationToken);
@@ -739,8 +1294,14 @@ public sealed class MailEmlExportServiceTests {
 
     private sealed class StatusGraphSessionFactory : IGraphSessionFactory {
         private readonly System.Net.HttpStatusCode _statusCode;
+        private readonly string _body;
 
-        internal StatusGraphSessionFactory(System.Net.HttpStatusCode statusCode) => _statusCode = statusCode;
+        internal StatusGraphSessionFactory(System.Net.HttpStatusCode statusCode, string body = "{}") {
+            _statusCode = statusCode;
+            _body = body;
+        }
+
+        internal StatusResponseHandler? LastHandler { get; private set; }
 
         public Task<GraphSession> ConnectAsync(
             MailProfile profile,
@@ -750,15 +1311,20 @@ public sealed class MailEmlExportServiceTests {
                 AccessToken = "token",
                 ExpiresOn = DateTimeOffset.MaxValue
             });
-            SetHttpClient(client, new StatusResponseHandler(_statusCode), "https://graph.microsoft.com/v1.0/");
+            LastHandler = new StatusResponseHandler(_statusCode, _body);
+            SetHttpClient(client, LastHandler, "https://graph.microsoft.com/v1.0/");
             return Task.FromResult(new GraphSession(client, "me"));
         }
     }
 
     private sealed class StatusGmailSessionFactory : IGmailSessionFactory {
         private readonly System.Net.HttpStatusCode _statusCode;
+        private readonly string _body;
 
-        internal StatusGmailSessionFactory(System.Net.HttpStatusCode statusCode) => _statusCode = statusCode;
+        internal StatusGmailSessionFactory(System.Net.HttpStatusCode statusCode, string body = "{}") {
+            _statusCode = statusCode;
+            _body = body;
+        }
 
         public Task<GmailSession> ConnectAsync(
             MailProfile profile,
@@ -768,21 +1334,30 @@ public sealed class MailEmlExportServiceTests {
                 AccessToken = "token",
                 ExpiresOn = DateTimeOffset.MaxValue
             });
-            SetHttpClient(client, new StatusResponseHandler(_statusCode), "https://gmail.googleapis.com/gmail/v1/");
+            SetHttpClient(client, new StatusResponseHandler(_statusCode, _body), "https://gmail.googleapis.com/gmail/v1/");
             return Task.FromResult(new GmailSession(client, "me"));
         }
     }
 
     private sealed class StatusResponseHandler : System.Net.Http.HttpMessageHandler {
         private readonly System.Net.HttpStatusCode _statusCode;
+        private readonly string _body;
 
-        internal StatusResponseHandler(System.Net.HttpStatusCode statusCode) => _statusCode = statusCode;
+        internal StatusResponseHandler(System.Net.HttpStatusCode statusCode, string body = "{}") {
+            _statusCode = statusCode;
+            _body = body;
+        }
+
+        internal Uri? LastRequestUri { get; private set; }
 
         protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(
             System.Net.Http.HttpRequestMessage request,
-            CancellationToken cancellationToken) => Task.FromResult(new System.Net.Http.HttpResponseMessage(_statusCode) {
-                Content = new System.Net.Http.StringContent("{}")
+            CancellationToken cancellationToken) {
+            LastRequestUri = request.RequestUri;
+            return Task.FromResult(new System.Net.Http.HttpResponseMessage(_statusCode) {
+                Content = new System.Net.Http.StringContent(_body)
             });
+        }
     }
 
     private static void SetHttpClient(object client, System.Net.Http.HttpMessageHandler handler, string baseAddress) {
@@ -801,6 +1376,10 @@ public sealed class MailEmlExportServiceTests {
 
         public List<int> Downloads { get; } = new();
 
+        public int UidFetches { get; private set; }
+
+        public int? AnnouncedSizeOverride { get; set; }
+
         public override bool IsConnected => true;
 
         public override bool IsAuthenticated => true;
@@ -808,7 +1387,13 @@ public sealed class MailEmlExportServiceTests {
         public override int Count => _messages.Count;
 
         public override int GetMessageSize(int index, CancellationToken cancellationToken = default) =>
-            index == _oversizedIndex ? 4096 : GetBytes(_messages[index]).Length;
+            index == _oversizedIndex ? 4096 : AnnouncedSizeOverride ?? GetBytes(_messages[index]).Length;
+
+        public override Task<IList<string>> GetMessageUidsAsync(CancellationToken cancellationToken = default) {
+            UidFetches++;
+            return Task.FromResult<IList<string>>(Enumerable.Range(0, _messages.Count)
+                .Select(index => "uid-" + index).ToList());
+        }
 
         public override Task<HeaderList> GetMessageHeadersAsync(
             int index,
@@ -820,7 +1405,9 @@ public sealed class MailEmlExportServiceTests {
             CancellationToken cancellationToken = default,
             ITransferProgress? progress = null) {
             Downloads.Add(index);
-            return Task.FromResult<Stream>(new MemoryStream(GetBytes(_messages[index]), writable: false));
+            var bytes = GetBytes(_messages[index]);
+            progress?.Report(bytes.Length);
+            return Task.FromResult<Stream>(new MemoryStream(bytes, writable: false));
         }
 
         private static byte[] GetBytes(MimeMessage message) {

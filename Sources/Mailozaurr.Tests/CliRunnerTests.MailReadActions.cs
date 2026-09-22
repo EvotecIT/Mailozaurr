@@ -312,6 +312,39 @@ public sealed partial class CliRunnerTests {
     }
 
     [Fact]
+    public async Task MailArchiveEmlReadsInventoryFileAndSkipsVerifiedFilesOnResume() {
+        var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var idsFile = Path.Combine(directory, "ids.txt");
+            File.WriteAllLines(idsFile, new[] { "42", "84" });
+            var archivePath = Path.Combine(directory, "archive");
+            var fixture = CreateFixture();
+            fixture.EmlExportService.WriteArtifacts = true;
+            using var stdout = new StringWriter();
+            using var stderr = new StringWriter();
+            var arguments = new[] {
+                "mail", "archive-eml", "--profile", "work-imap",
+                "--folder", "Inbox", "--ids-file", idsFile,
+                "--path", archivePath, "--json"
+            };
+
+            var firstExit = await CliRunner.RunAsync(arguments, stdout, stderr,
+                _ => fixture.CreateBuilder());
+            var resumedExit = await CliRunner.RunAsync(arguments, stdout, stderr,
+                _ => fixture.CreateBuilder());
+
+            Assert.True(firstExit == 0, stdout + " " + stderr);
+            Assert.True(resumedExit == 0, stdout + " " + stderr);
+            Assert.Equal(1, fixture.EmlExportService.ExportCalls);
+            Assert.Equal(new[] { "42", "84" }, fixture.EmlExportService.LastRequest!.MessageIds);
+            Assert.Equal(2, Directory.GetFiles(Path.Combine(archivePath, "eml"), "*.eml").Length);
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task MailMarkReadUsesApplicationMessageActionService() {
         using var stdout = new StringWriter();
         using var stderr = new StringWriter();

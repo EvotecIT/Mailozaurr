@@ -1,7 +1,9 @@
+using MailKit;
+
 namespace Mailozaurr;
 
 /// <summary>Retrieves unmodified RFC 822 content from a POP3 mailbox.</summary>
-public sealed class Pop3RawMailMessageSource : IRawMailMessageSource {
+public sealed class Pop3RawMailMessageSource : IRawMailMessageSource, IArchiveRawMailMessageSource {
     private readonly IPop3SessionFactory _sessionFactory;
 
     /// <summary>Creates a POP3 raw-message source.</summary>
@@ -19,13 +21,37 @@ public sealed class Pop3RawMailMessageSource : IRawMailMessageSource {
         return new Session(client);
     }
 
-    private sealed class Session : IRawMailMessageSession {
+    async Task<IRawMailMessageSession> IArchiveRawMailMessageSource.OpenArchiveSessionAsync(
+        MailProfile profile, CancellationToken cancellationToken) {
+        if (_sessionFactory is Pop3SessionFactory credentialFactory) {
+            var authenticated = await credentialFactory.ConnectForArchiveAsync(profile, cancellationToken)
+                .ConfigureAwait(false);
+            return new Session(authenticated.Client, authenticated.Scope);
+        }
+        throw new NotSupportedException(
+            "POP3 archive resume requires a session factory that binds the authenticated credential.");
+    }
+
+    private sealed class Session : IRawMailMessageSession, IStreamingRawMailMessageSession, IRawMailMessageScopeSession {
         private readonly MailKit.Net.Pop3.Pop3Client _client;
+        private readonly string? _archiveScope;
         private readonly Dictionary<long, Dictionary<string, List<int>>> _fingerprintIndexes = new();
         private readonly Dictionary<long, bool> _fingerprintIndexesSkippedOversized = new();
         private IList<string>? _uids;
+        private Dictionary<string, int>? _uidIndexes;
 
-        internal Session(MailKit.Net.Pop3.Pop3Client client) => _client = client;
+        internal Session(MailKit.Net.Pop3.Pop3Client client, string? archiveScope = null) {
+            _client = client;
+            _archiveScope = archiveScope;
+        }
+
+        public Task<string> GetScopeAsync(string? mailboxId, string? folderId,
+            CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
+            _ = Pop3MailReadHandler.NormalizeFolderId(folderId);
+            return Task.FromResult(_archiveScope ?? throw new NotSupportedException(
+                "POP3 archive resume requires a session factory that binds the authenticated credential."));
+        }
 
         public async Task<RawMailMessage?> GetRawMessageAsync(
             RawMailMessageRequest request,
@@ -33,15 +59,8 @@ public sealed class Pop3RawMailMessageSource : IRawMailMessageSource {
             _ = Pop3MailReadHandler.NormalizeFolderId(request.FolderId);
             var identifier = Pop3MailReadHandler.ParseMessageId(request.MessageId);
             if (!string.IsNullOrWhiteSpace(identifier.Uid)) {
-                var uids = _uids ??= await _client.GetMessageUidsAsync(cancellationToken).ConfigureAwait(false);
-                var index = -1;
-                for (var candidate = 0; candidate < uids.Count; candidate++) {
-                    if (string.Equals(uids[candidate], identifier.Uid, StringComparison.Ordinal)) {
-                        index = candidate;
-                        break;
-                    }
-                }
-                return index < 0
+                var indexes = await GetUidIndexesAsync(cancellationToken).ConfigureAwait(false);
+                return !indexes.TryGetValue(identifier.Uid!, out var index)
                     ? null
                     : await ReadAtIndexAsync(_client, request, index, cancellationToken).ConfigureAwait(false);
             }
@@ -74,6 +93,47 @@ public sealed class Pop3RawMailMessageSource : IRawMailMessageSource {
                     matchingIndexes[identifier.Occurrence],
                     cancellationToken)
                 .ConfigureAwait(false);
+        }
+
+        public async Task<RawMailMessage?> GetRawMessageStreamAsync(
+            RawMailMessageRequest request,
+            CancellationToken cancellationToken = default) {
+            _ = Pop3MailReadHandler.NormalizeFolderId(request.FolderId);
+            var identifier = Pop3MailReadHandler.ParseMessageId(request.MessageId);
+            if (string.IsNullOrWhiteSpace(identifier.Uid)) {
+                // Hash identities require mailbox-wide fingerprint resolution.
+                // Retain that existing bounded path and stream its selected result.
+                var buffered = await GetRawMessageAsync(request, cancellationToken).ConfigureAwait(false);
+                if (buffered == null) return null;
+                return new RawMailMessage {
+                    MessageId = buffered.MessageId,
+                    StorageIdentityComponent = buffered.StorageIdentityComponent,
+                    ContentStream = new MemoryStream(buffered.Content, writable: false)
+                };
+            }
+
+            var indexes = await GetUidIndexesAsync(cancellationToken).ConfigureAwait(false);
+            if (indexes.TryGetValue(identifier.Uid!, out var index)) {
+                var announcedSize = _client.GetMessageSize(index, cancellationToken);
+                if (announcedSize > request.MaxBytes) {
+                    throw new InvalidDataException($"POP3 MIME content exceeds {request.MaxBytes} bytes.");
+                }
+                var stream = await _client.GetStreamAsync(index, headersOnly: false,
+                    cancellationToken: cancellationToken,
+                    progress: new BoundedTransferProgress(request.MaxBytes)).ConfigureAwait(false);
+                return new RawMailMessage { MessageId = request.MessageId, ContentStream = stream };
+            }
+            return null;
+        }
+
+        private async Task<Dictionary<string, int>> GetUidIndexesAsync(CancellationToken cancellationToken) {
+            if (_uidIndexes != null) return _uidIndexes;
+            var uids = _uids ??= await _client.GetMessageUidsAsync(cancellationToken).ConfigureAwait(false);
+            var indexes = new Dictionary<string, int>(uids.Count, StringComparer.Ordinal);
+            for (var index = 0; index < uids.Count; index++) {
+                if (!indexes.ContainsKey(uids[index])) indexes.Add(uids[index], index);
+            }
+            return _uidIndexes = indexes;
         }
 
         public void Dispose() => _client.Dispose();
@@ -132,12 +192,26 @@ public sealed class Pop3RawMailMessageSource : IRawMailMessageSource {
             using var stream = await client.GetStreamAsync(
                 index,
                 headersOnly: false,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+                cancellationToken: cancellationToken,
+                progress: new BoundedTransferProgress(request.MaxBytes)).ConfigureAwait(false);
             return new RawMailMessage {
                 MessageId = request.MessageId,
                 Content = await RawMailMessageSourceUtilities.ReadBoundedAsync(stream, request.MaxBytes, cancellationToken)
                     .ConfigureAwait(false)
             };
         }
+    }
+
+    private sealed class BoundedTransferProgress : ITransferProgress {
+        private readonly long _maxBytes;
+
+        internal BoundedTransferProgress(long maxBytes) => _maxBytes = maxBytes;
+
+        public void Report(long bytesTransferred) {
+            if (bytesTransferred > _maxBytes)
+                throw new InvalidDataException($"POP3 MIME content exceeds {_maxBytes} bytes.");
+        }
+
+        public void Report(long bytesTransferred, long totalSize) => Report(bytesTransferred);
     }
 }

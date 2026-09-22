@@ -1,5 +1,7 @@
 #if NET8_0_OR_GREATER
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
 using Mailozaurr;
 using Mailozaurr.Cli;
 
@@ -455,13 +457,44 @@ public sealed partial class CliRunnerTests {
         }
     }
 
-    private sealed class FakeEmlExportService : IMailEmlExportService {
+    private sealed class FakeEmlExportService : IMailEmlExportService, IMailEmlArchiveScopeProvider {
+        public Task<string> GetArchiveScopeAsync(MailProfile profile, string? mailboxId, string? folderId,
+            CancellationToken cancellationToken = default) => Task.FromResult("INBOX:uidvalidity:1");
         public MailEmlExportRequest? LastRequest { get; private set; }
+
+        public bool WriteArtifacts { get; set; }
+
+        public int ExportCalls { get; private set; }
 
         public Task<MailEmlExportResult> ExportAsync(
             MailEmlExportRequest request,
             CancellationToken cancellationToken = default) {
             LastRequest = request;
+            ExportCalls++;
+            if (WriteArtifacts) {
+                Directory.CreateDirectory(request.DestinationDirectory);
+                var items = new List<MailEmlExportItemResult>();
+                foreach (var id in request.MessageIds) {
+                    var path = Path.Combine(request.DestinationDirectory, id + ".eml");
+                    var bytes = Encoding.ASCII.GetBytes("Subject: Test\r\n\r\n" + id);
+                    File.WriteAllBytes(path, bytes);
+                    items.Add(new MailEmlExportItemResult {
+                        Succeeded = true,
+                        MessageId = id,
+                        DestinationPath = path,
+                        BytesWritten = bytes.Length,
+                        Sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant()
+                    });
+                }
+                return Task.FromResult(new MailEmlExportResult {
+                    Succeeded = true,
+                    ProfileId = request.ProfileId,
+                    DestinationDirectory = request.DestinationDirectory,
+                    RequestedCount = items.Count,
+                    ExportedCount = items.Count,
+                    Results = items
+                });
+            }
             return Task.FromResult(new MailEmlExportResult {
                 Succeeded = true,
                 ProfileId = request.ProfileId,

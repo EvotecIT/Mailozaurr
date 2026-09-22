@@ -50,6 +50,8 @@ namespace Mailozaurr.Cli;
 [JsonSerializable(typeof(SaveAttachmentsManyResult))]
 [JsonSerializable(typeof(MailEmlExportItemResult))]
 [JsonSerializable(typeof(MailEmlExportResult))]
+[JsonSerializable(typeof(MailEmlArchiveResult))]
+[JsonSerializable(typeof(MailEmlArchiveFailure))]
 [JsonSerializable(typeof(MailChangeItem))]
 [JsonSerializable(typeof(MailChangeFeedResult))]
 [JsonSerializable(typeof(MailChangeSubscriptionResult))]

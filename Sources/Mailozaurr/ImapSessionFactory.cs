@@ -33,6 +33,18 @@ public sealed class ImapSessionFactory : IImapSessionFactory {
         return await _connectAsync(request, cancellationToken).ConfigureAwait(false);
     }
 
+    internal async Task<(ImapClient Client, string Scope)> ConnectForArchiveAsync(
+        MailProfile profile, CancellationToken cancellationToken) {
+        if (profile == null) throw new ArgumentNullException(nameof(profile));
+        if (profile.Kind != MailProfileKind.Imap)
+            throw new InvalidOperationException($"Profile '{profile.Id}' is not an IMAP profile.");
+        var request = await CreateRequestAsync(profile, cancellationToken).ConfigureAwait(false);
+        var client = await _connectAsync(request, cancellationToken).ConfigureAwait(false);
+        var scope = ArchiveAccountScope.Create("Imap", request.Connection.Server,
+            request.Connection.Port, request.UserName);
+        return (client, scope);
+    }
+
     private async Task<ImapSessionRequest> CreateRequestAsync(MailProfile profile, CancellationToken cancellationToken) {
         var server = RequireSetting(profile, MailProfileSettingsKeys.Server);
         var port = GetIntSetting(profile, MailProfileSettingsKeys.Port) ?? 993;

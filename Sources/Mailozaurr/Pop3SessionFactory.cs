@@ -31,6 +31,18 @@ public sealed class Pop3SessionFactory : IPop3SessionFactory {
         return await _connectAsync(request, cancellationToken).ConfigureAwait(false);
     }
 
+    internal async Task<(Pop3Client Client, string Scope)> ConnectForArchiveAsync(
+        MailProfile profile, CancellationToken cancellationToken) {
+        if (profile == null) throw new ArgumentNullException(nameof(profile));
+        if (profile.Kind != MailProfileKind.Pop3)
+            throw new InvalidOperationException($"Profile '{profile.Id}' is not a POP3 profile.");
+        var request = await CreateRequestAsync(profile, cancellationToken).ConfigureAwait(false);
+        var client = await _connectAsync(request, cancellationToken).ConfigureAwait(false);
+        var scope = ArchiveAccountScope.Create("Pop3", request.Connection.Server,
+            request.Connection.Port, request.UserName);
+        return (client, scope);
+    }
+
     private async Task<Pop3SessionRequest> CreateRequestAsync(MailProfile profile, CancellationToken cancellationToken) {
         var authMode = GetAuthMode(profile);
         var userName = ResolveUserName(profile);

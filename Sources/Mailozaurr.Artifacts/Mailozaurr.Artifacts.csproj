@@ -32,6 +32,7 @@
 
   <ItemGroup>
     <Compile Include="..\Mailozaurr.Internet\MailFiles\**\*.cs" Link="MailFiles\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Mailozaurr.Internet\Cryptography\UnixFilePermissions.cs" Link="Cryptography\UnixFilePermissions.cs" />
   </ItemGroup>
 
   <ItemGroup>
