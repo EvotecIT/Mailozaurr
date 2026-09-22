@@ -59,6 +59,34 @@ public sealed class FilePendingMessageCoordinationTests {
     }
 
     [Fact]
+    public async Task OtherInstanceRebuildsItsIndexAfterCompactionReplacesTheLog() {
+        var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var path = Path.Combine(directory, "pending.log");
+            var first = new FilePendingMessageRepository(path);
+            var second = new FilePendingMessageRepository(path);
+            var now = DateTimeOffset.UtcNow;
+            var record = new PendingMessageRecord { MessageId = "kept", Timestamp = now, NextAttemptAt = now };
+            await first.SaveAsync(record);
+            Assert.NotNull(await second.GetByMessageIdAsync(record.MessageId));
+
+            for (var attempt = 0; attempt < 65; attempt++) {
+                record.AttemptCount = attempt;
+                await first.SaveAsync(record);
+            }
+
+            var loaded = await second.GetByMessageIdAsync(record.MessageId);
+            Assert.NotNull(loaded);
+            Assert.Equal(64, loaded!.AttemptCount);
+            Assert.NotNull(await second.TryAcquireLeaseAsync(record.MessageId, now, now.AddMinutes(1)));
+            Assert.NotNull(await first.GetByMessageIdAsync(record.MessageId));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task LongProviderSendKeepsTheLeasePastItsInitialExpiry() {
         var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);

@@ -12,6 +12,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
     IPendingMessageForcedLeaseRepository {
     private const string UpsertEntryType = "upsert";
     private const string TombstoneEntryType = "tombstone";
+    private const string GenerationPrefix = "mailozaurr-generation:";
     private const int DefaultCompactionThreshold = 64;
 
     private readonly string filePath;
@@ -22,6 +23,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
     private long indexedLength = -1;
     private DateTime indexedWriteTimeUtc;
     private DateTime indexedCreationTimeUtc;
+    private string? indexedGeneration;
     private static readonly byte[] NewlineBytes = Encoding.UTF8.GetBytes(Environment.NewLine);
     private int dirtyEntryCount;
 
@@ -80,14 +82,23 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
     private void BuildIndex() {
         index.Clear();
         dirtyEntryCount = 0;
+        indexedGeneration = null;
+        var stampBefore = GetFileStamp();
 
         if (!File.Exists(filePath)) {
             indexedLength = -1;
             return;
         }
 
+        long completeLength = 0;
         try {
             foreach (var line in LogFileLineReader.ReadLinesWithOffsets(filePath)) {
+                if (!line.IsComplete && !TryParseLogEntry(line.Line, out _)) break;
+                completeLength = line.EndOffset;
+                if (line.Offset == 0 && line.Line.StartsWith(GenerationPrefix, StringComparison.Ordinal)) {
+                    indexedGeneration = line.Line.Substring(GenerationPrefix.Length);
+                    continue;
+                }
                 if (!TryParseLogEntry(line.Line, out var entry)) {
                     continue;
                 }
@@ -112,7 +123,29 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             index.Clear();
             dirtyEntryCount = 0;
         }
+        var stampAfter = GetFileStamp();
         CaptureFileStamp();
+        indexedLength = stampAfter != null && stampBefore == stampAfter ? completeLength : -1;
+    }
+
+    private long ApplyAppendedEntries(long startOffset) {
+        long completeLength = startOffset;
+        foreach (var line in LogFileLineReader.ReadLinesWithOffsets(filePath, startOffset)) {
+            if (!line.IsComplete && !TryParseLogEntry(line.Line, out _)) break;
+            completeLength = line.EndOffset;
+            if (!TryParseLogEntry(line.Line, out var entry)) continue;
+            switch (entry.Kind) {
+                case LogEntryKind.Upsert:
+                    if (index.ContainsKey(entry.MessageId)) dirtyEntryCount++;
+                    index[entry.MessageId] = line.Offset;
+                    break;
+                case LogEntryKind.Tombstone:
+                    index.Remove(entry.MessageId);
+                    dirtyEntryCount++;
+                    break;
+            }
+        }
+        return completeLength;
     }
 
     private void RefreshIndexIfChanged() {
@@ -121,8 +154,18 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             if (indexedLength != -1) BuildIndex();
             return;
         }
-        if (file.Length != indexedLength || file.LastWriteTimeUtc != indexedWriteTimeUtc ||
-            file.CreationTimeUtc != indexedCreationTimeUtc) {
+        if (indexedLength >= 0 &&
+            !StringComparer.Ordinal.Equals(indexedGeneration, ReadCurrentGeneration())) {
+            BuildIndex();
+        } else if (indexedLength >= 0 && file.CreationTimeUtc == indexedCreationTimeUtc &&
+            file.Length > indexedLength) {
+            var stampBefore = GetFileStamp();
+            long completeLength = ApplyAppendedEntries(indexedLength);
+            var stampAfter = GetFileStamp();
+            CaptureFileStamp();
+            indexedLength = stampBefore == stampAfter ? completeLength : -1;
+        } else if (file.Length != indexedLength || file.LastWriteTimeUtc != indexedWriteTimeUtc ||
+                   file.CreationTimeUtc != indexedCreationTimeUtc) {
             BuildIndex();
         }
     }
@@ -157,6 +200,23 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             } catch (IOException) when (elapsed.Elapsed < TimeSpan.FromSeconds(30)) {
                 await Task.Delay(25, cancellationToken).ConfigureAwait(false);
             }
+        }
+    }
+
+    private async Task<FileStream> AcquireIndexedStorageLockAsync(CancellationToken cancellationToken) {
+        // Full index construction happens before the cross-process lock. Once
+        // acquired, only a concurrent append's suffix normally remains.
+        for (var attempt = 0; attempt < 3; attempt++) {
+            RefreshIndexIfChanged();
+            if (indexedLength >= 0 || !File.Exists(filePath)) break;
+        }
+        var storageLock = await AcquireStorageLockAsync(cancellationToken).ConfigureAwait(false);
+        try {
+            RefreshIndexIfChanged();
+            return storageLock;
+        } catch {
+            storageLock.Dispose();
+            throw;
         }
     }
 
@@ -210,25 +270,22 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
     }
 
     private async Task CompactIfNeededAsync(CancellationToken cancellationToken) {
-        // Keep churn proportional to the live queue size. A fixed threshold
-        // rewrites a large queue after every small batch of removals.
-        if (dirtyEntryCount < Math.Max(DefaultCompactionThreshold, index.Count / 2)) {
-            return;
+        bool needed;
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try {
+            // Keep churn proportional to the live queue size. A fixed
+            // threshold rewrites a large queue after every small batch.
+            needed = dirtyEntryCount >= Math.Max(DefaultCompactionThreshold, index.Count / 2);
+        } finally {
+            gate.Release();
         }
-
-        if (!File.Exists(filePath)) {
-            return;
-        }
-
-        await CompactAsync(cancellationToken).ConfigureAwait(false);
+        if (needed && File.Exists(filePath)) await CompactAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private async Task CompactAsync(CancellationToken cancellationToken) {
-        var temp = filePath + ".compact";
-
-        if (File.Exists(temp)) {
-            File.Delete(temp);
-        }
+        var originalStamp = GetFileStamp();
+        if (originalStamp == null) return;
+        var temp = filePath + ".compact." + Guid.NewGuid().ToString("N");
 
         var records = new Dictionary<string, PendingMessageRecord>(StringComparer.OrdinalIgnoreCase);
         var orderedIds = new LinkedList<string>();
@@ -264,6 +321,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
         }
 
         var newIndex = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        var generation = Guid.NewGuid().ToString("N");
 
         try {
             using (var write = UnixFilePermissions.OpenRestrictedFile(
@@ -271,7 +329,9 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
                 FileMode.Create,
                 FileAccess.Write,
                 FileShare.None)) {
-                long position = 0;
+                var header = Encoding.ASCII.GetBytes(GenerationPrefix + generation + Environment.NewLine);
+                await write.WriteAsync(header, 0, header.Length, cancellationToken).ConfigureAwait(false);
+                long position = header.Length;
 
                 foreach (var id in orderedIds) {
                     if (!records.TryGetValue(id, out var record)) {
@@ -291,26 +351,64 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
                 await write.FlushAsync(cancellationToken).ConfigureAwait(false);
             }
 
-            var backup = filePath + ".bak";
-            if (File.Exists(filePath)) {
+            await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try {
+                using var storageLock = await AcquireStorageLockAsync(cancellationToken).ConfigureAwait(false);
+                if (GetFileStamp() != originalStamp) return;
+                var backup = filePath + ".bak";
                 File.Replace(temp, filePath, backup);
                 if (File.Exists(backup)) {
                     File.Delete(backup);
                 }
-            } else {
-                File.Move(temp, filePath);
-            }
 
-            index.Clear();
-            foreach (var pair in newIndex) {
-                index[pair.Key] = pair.Value;
-            }
+                index.Clear();
+                foreach (var pair in newIndex) {
+                    index[pair.Key] = pair.Value;
+                }
 
-            dirtyEntryCount = 0;
+                dirtyEntryCount = 0;
+                indexedGeneration = generation;
+                CaptureFileStamp();
+            } finally {
+                gate.Release();
+            }
         } finally {
             if (File.Exists(temp)) {
                 File.Delete(temp);
             }
+        }
+    }
+
+    private (long Length, DateTime WriteTimeUtc, DateTime CreationTimeUtc)? GetFileStamp() {
+        try {
+            var file = new FileInfo(filePath);
+            return file.Exists ? (file.Length, file.LastWriteTimeUtc, file.CreationTimeUtc) : null;
+        } catch (FileNotFoundException) {
+            return null;
+        } catch (DirectoryNotFoundException) {
+            return null;
+        }
+    }
+
+    private string? ReadCurrentGeneration() {
+        try {
+            using var read = new FileStream(filePath, FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            var header = new byte[GenerationPrefix.Length + 32];
+            var count = 0;
+            while (count < header.Length) {
+                var received = read.Read(header, count, header.Length - count);
+                if (received == 0) return null;
+                count += received;
+            }
+            var value = Encoding.ASCII.GetString(header);
+            return value.StartsWith(GenerationPrefix, StringComparison.Ordinal)
+                ? value.Substring(GenerationPrefix.Length)
+                : null;
+        } catch (FileNotFoundException) {
+            return null;
+        } catch (DirectoryNotFoundException) {
+            return null;
         }
     }
 
@@ -411,8 +509,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
                 Directory.CreateDirectory(directory);
                 UnixFilePermissions.RestrictDirectory(directory);
             }
-            using var storageLock = await AcquireStorageLockAsync(cancellationToken).ConfigureAwait(false);
-            RefreshIndexIfChanged();
+            using var storageLock = await AcquireIndexedStorageLockAsync(cancellationToken).ConfigureAwait(false);
 
             if (record.NextAttemptAt == default) {
                 record.NextAttemptAt = DateTimeOffset.UtcNow;
@@ -429,11 +526,11 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
 
             index[record.MessageId] = offset;
 
-            await CompactIfNeededAsync(cancellationToken).ConfigureAwait(false);
             CaptureFileStamp();
         } finally {
             gate.Release();
         }
+        await CompactIfNeededAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Attempts to lease a due pending message for processing.</summary>
@@ -457,8 +554,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
         try {
             ThrowIfDefaultQueueConflictAppeared();
             if (!File.Exists(filePath)) return null;
-            using var storageLock = await AcquireStorageLockAsync(cancellationToken).ConfigureAwait(false);
-            RefreshIndexIfChanged();
+            using var storageLock = await AcquireIndexedStorageLockAsync(cancellationToken).ConfigureAwait(false);
             var current = await GetByMessageIdCoreAsync(messageId, cancellationToken).ConfigureAwait(false);
             if (current == null || current.ProcessingLeaseUntil > now ||
                 !ignoreSchedule && current.NextAttemptAt > now) {
@@ -494,8 +590,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
         try {
             ThrowIfDefaultQueueConflictAppeared();
             if (!File.Exists(filePath)) return false;
-            using var storageLock = await AcquireStorageLockAsync(cancellationToken).ConfigureAwait(false);
-            RefreshIndexIfChanged();
+            using var storageLock = await AcquireIndexedStorageLockAsync(cancellationToken).ConfigureAwait(false);
             var current = await GetByMessageIdCoreAsync(messageId, cancellationToken).ConfigureAwait(false);
             if (current == null || current.NextAttemptAt != expectedLeaseUntil ||
                 current.ProcessingLeaseUntil != expectedLeaseUntil ||
@@ -522,8 +617,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
         try {
             ThrowIfDefaultQueueConflictAppeared();
             if (!File.Exists(filePath)) return false;
-            using var storageLock = await AcquireStorageLockAsync(cancellationToken).ConfigureAwait(false);
-            RefreshIndexIfChanged();
+            using var storageLock = await AcquireIndexedStorageLockAsync(cancellationToken).ConfigureAwait(false);
             var current = await GetByMessageIdCoreAsync(record.MessageId, cancellationToken).ConfigureAwait(false);
             if (current?.ProcessingLeaseId != leaseId || !current.ProcessingLeaseUntil.HasValue) return false;
             var offset = await AppendEnvelopeAsync(CreateUpsertEnvelope(record), cancellationToken).ConfigureAwait(false);
@@ -543,8 +637,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
         try {
             ThrowIfDefaultQueueConflictAppeared();
             if (!File.Exists(filePath)) return false;
-            using var storageLock = await AcquireStorageLockAsync(cancellationToken).ConfigureAwait(false);
-            RefreshIndexIfChanged();
+            using var storageLock = await AcquireIndexedStorageLockAsync(cancellationToken).ConfigureAwait(false);
             var current = await GetByMessageIdCoreAsync(messageId, cancellationToken).ConfigureAwait(false);
             if (current?.ProcessingLeaseId != leaseId || !current.ProcessingLeaseUntil.HasValue) return false;
             await AppendEnvelopeAsync(CreateTombstoneEnvelope(messageId), cancellationToken).ConfigureAwait(false);
@@ -566,8 +659,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             ThrowIfDefaultQueueConflictAppeared();
-            using var storageLock = await AcquireStorageLockAsync(cancellationToken).ConfigureAwait(false);
-            RefreshIndexIfChanged();
+            using var storageLock = await AcquireIndexedStorageLockAsync(cancellationToken).ConfigureAwait(false);
             return await GetByMessageIdCoreAsync(messageId, cancellationToken).ConfigureAwait(false);
         } catch (FileNotFoundException) {
             return null;
@@ -663,12 +755,12 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
 
     /// <summary>Removes a pending message by its ID.</summary>
     public async Task RemoveAsync(string messageId, CancellationToken cancellationToken = default) {
+        bool removed = false;
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             ThrowIfDefaultQueueConflictAppeared();
             if (!File.Exists(filePath)) return;
-            using var storageLock = await AcquireStorageLockAsync(cancellationToken).ConfigureAwait(false);
-            RefreshIndexIfChanged();
+            using var storageLock = await AcquireIndexedStorageLockAsync(cancellationToken).ConfigureAwait(false);
             if (!index.ContainsKey(messageId)) {
                 return;
             }
@@ -683,10 +775,11 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             index.Remove(messageId);
             dirtyEntryCount++;
 
-            await CompactIfNeededAsync(cancellationToken).ConfigureAwait(false);
+            removed = true;
             CaptureFileStamp();
         } finally {
             gate.Release();
         }
+        if (removed) await CompactIfNeededAsync(cancellationToken).ConfigureAwait(false);
     }
 }
