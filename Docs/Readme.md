@@ -2,7 +2,7 @@
 Module Name: Mailozaurr
 Module Guid: 2b0ea9f1-3ff1-4300-b939-106d5da608fa
 Download Help Link: https://github.com/EvotecIT/MailoZaurr
-Help Version: 3.0.1
+Help Version: 3.0.2
 Locale: en-US
 ---
 # Mailozaurr Module
@@ -31,6 +31,11 @@ or server settings.
 Closes an imported email-data artifact and its owned resources.
 
 Disposes the result returned by Import-MailData, closing PST/OST/OLM/Mbox/mailbox-directory or OAB sessions and releasing file-backed email attachment content.
+
+### [Compare-MailDataSemantic](Compare-MailDataSemantic.md)
+Compares two email documents by their semantic content.
+
+Returns the native OfficeIMO.Email difference report. Import both artifacts first and keep their results open until comparison finishes.
 
 ### [Connect-EmailGraph](Connect-EmailGraph.md)
 Connects to Microsoft Graph using application credentials, certificates, device code, or on-behalf-of authentication.
@@ -234,6 +239,16 @@ Gets JMAP threads by id.
 ### [Get-MailProfile](Get-MailProfile.md)
 Gets one or more saved Mailozaurr profiles without exposing secret values.
 
+### [Get-MailSemanticFingerprint](Get-MailSemanticFingerprint.md)
+Computes a semantic fingerprint of an email document.
+
+Uses OfficeIMO.Email to fingerprint normalized content and attachments. Supply keyed digest options before persisting fingerprints of private mail.
+
+### [Get-MailStoreConversation](Get-MailStoreConversation.md)
+Builds a bounded conversation graph from an imported mail store.
+
+Returns OfficeIMO.Email's native graph, including edge confidence and diagnostics.
+
 ### [Get-MailStoreFolder](Get-MailStoreFolder.md)
 Lists folders from an imported PST, OST, OLM, Mbox, EMLX, or mailbox directory.
 
@@ -243,6 +258,11 @@ Returns OfficeIMO.Email folder metadata without decoding message bodies or attac
 Enumerates or reads items from an imported mail store.
 
 Returns lightweight OfficeIMO.Email item references by default. Use Read to project selected message parts while the owning store remains open.
+
+### [Get-MailStoreMaintenancePlan](Get-MailStoreMaintenancePlan.md)
+Plans read-only maintenance for an imported mail store.
+
+Returns OfficeIMO.Email's source-bound validation, recovery evidence, and recommendations. The plan does not modify the store.
 
 ### [Get-MimeMessageContent](Get-MimeMessageContent.md)
 Retrieves text and HTML bodies from a MIME message.
@@ -420,6 +440,11 @@ Searches an IMAP mailbox and returns matching messages.
 
 ### [Search-JMAPEmail](Search-JMAPEmail.md)
 Queries a bounded page of JMAP email identifiers.
+
+### [Search-MailAddressBook](Search-MailAddressBook.md)
+Searches a bounded, resumable Outlook Offline Address Book.
+
+Returns OfficeIMO.Email's native report with matches, diagnostics, and a checkpoint for the next batch.
 
 ### [Search-MailStore](Search-MailStore.md)
 Searches mail-store metadata or selected message content.
