@@ -29,6 +29,8 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
     private string? indexedGeneration;
     private static readonly byte[] NewlineBytes = Encoding.UTF8.GetBytes(Environment.NewLine);
     private int dirtyEntryCount;
+    private int backgroundCompactionPending;
+    private int backgroundCompactionRunning;
     private DateTime lastStaleCompactionCleanupUtc;
 
     /// <summary>Creates a new repository using the specified options.</summary>
@@ -345,12 +347,15 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
         try {
             // Keep churn proportional to the live queue size. A fixed
             // threshold rewrites a large queue after every small batch.
-            needed = dirtyEntryCount >= Math.Max(DefaultCompactionThreshold, index.Count / 2);
+            needed = IsCompactionNeeded();
         } finally {
             gate.Release();
         }
         if (needed && File.Exists(filePath)) await CompactAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    private bool IsCompactionNeeded() =>
+        dirtyEntryCount >= Math.Max(DefaultCompactionThreshold, index.Count / 2);
 
     private async Task CompactAfterCommittedMutationAsync() {
         try {
@@ -365,6 +370,23 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             }
         } catch (Exception ex) {
             Trace.TraceWarning("Pending-message compaction failed after a committed mutation: {0}", ex.Message);
+        }
+    }
+
+    private void ScheduleBackgroundCompaction() {
+        Interlocked.Exchange(ref backgroundCompactionPending, 1);
+        if (Interlocked.CompareExchange(ref backgroundCompactionRunning, 1, 0) == 0)
+            _ = Task.Run(RunBackgroundCompactionAsync);
+    }
+
+    private async Task RunBackgroundCompactionAsync() {
+        try {
+            while (Interlocked.Exchange(ref backgroundCompactionPending, 0) == 1)
+                await CompactAfterCommittedMutationAsync().ConfigureAwait(false);
+        } finally {
+            Volatile.Write(ref backgroundCompactionRunning, 0);
+            if (Volatile.Read(ref backgroundCompactionPending) == 1)
+                ScheduleBackgroundCompaction();
         }
     }
 
@@ -646,7 +668,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
         DateTimeOffset now, DateTimeOffset leaseUntil, bool ignoreSchedule,
         CancellationToken cancellationToken) {
         var acquisitionWait = Stopwatch.StartNew();
-        bool changed = false;
+        bool scheduleCompaction = false;
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             ThrowIfDefaultQueueConflictAppeared();
@@ -680,7 +702,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             index[current.MessageId] = offset;
 
             CaptureFileStamp();
-            changed = true;
+            scheduleCompaction = compactionOverride != null || IsCompactionNeeded();
             return current;
         } catch (FileNotFoundException) {
             return null;
@@ -688,7 +710,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             return null;
         } finally {
             gate.Release();
-            if (changed) await CompactAfterCommittedMutationAsync().ConfigureAwait(false);
+            if (scheduleCompaction) ScheduleBackgroundCompaction();
         }
     }
 
@@ -706,7 +728,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             throw new ArgumentOutOfRangeException(nameof(newLeaseUntil));
         }
         var renewalWait = Stopwatch.StartNew();
-        bool changed = false;
+        bool scheduleCompaction = false;
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             ThrowIfDefaultQueueConflictAppeared();
@@ -730,18 +752,18 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             dirtyEntryCount++;
             index[current.MessageId] = offset;
             CaptureFileStamp();
-            changed = true;
+            scheduleCompaction = compactionOverride != null || IsCompactionNeeded();
             return newLeaseUntil;
         } finally {
             gate.Release();
-            if (changed) await CompactAfterCommittedMutationAsync().ConfigureAwait(false);
+            if (scheduleCompaction) ScheduleBackgroundCompaction();
         }
     }
 
     /// <inheritdoc />
     public async Task<bool> TrySaveWithLeaseAsync(PendingMessageRecord record, string leaseId,
         CancellationToken cancellationToken = default) {
-        bool changed = false;
+        bool scheduleCompaction = false;
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             ThrowIfDefaultQueueConflictAppeared();
@@ -759,18 +781,18 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             dirtyEntryCount++;
             index[record.MessageId] = offset;
             CaptureFileStamp();
-            changed = true;
+            scheduleCompaction = compactionOverride != null || IsCompactionNeeded();
             return true;
         } finally {
             gate.Release();
-            if (changed) await CompactAfterCommittedMutationAsync().ConfigureAwait(false);
+            if (scheduleCompaction) ScheduleBackgroundCompaction();
         }
     }
 
     /// <inheritdoc />
     public async Task<bool> TryRemoveWithLeaseAsync(string messageId, string leaseId,
         CancellationToken cancellationToken = default) {
-        bool changed = false;
+        bool scheduleCompaction = false;
         await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try {
             ThrowIfDefaultQueueConflictAppeared();
@@ -782,11 +804,11 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
             index.Remove(messageId);
             dirtyEntryCount++;
             CaptureFileStamp();
-            changed = true;
+            scheduleCompaction = compactionOverride != null || IsCompactionNeeded();
             return true;
         } finally {
             gate.Release();
-            if (changed) await CompactAfterCommittedMutationAsync().ConfigureAwait(false);
+            if (scheduleCompaction) ScheduleBackgroundCompaction();
         }
     }
 

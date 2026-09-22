@@ -191,6 +191,53 @@ public sealed class FilePendingMessageCoordinationTests {
     }
 
     [Fact]
+    public async Task LeaseAcquisitionAndRenewalReturnWhileCompactionIsRunning() {
+        var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try {
+            var path = Path.Combine(directory, "pending.log");
+            var now = DateTimeOffset.UtcNow;
+            await new FilePendingMessageRepository(path).SaveAsync(new PendingMessageRecord {
+                MessageId = "compaction-in-flight", Timestamp = now, NextAttemptAt = now
+            });
+            var started = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var secondCompleted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var compactionCount = 0;
+            var repository = new FilePendingMessageRepository(path, async _ => {
+                var count = Interlocked.Increment(ref compactionCount);
+                if (count == 1) {
+                    started.TrySetResult(true);
+                    await release.Task;
+                } else if (count == 2) {
+                    secondCompleted.TrySetResult(true);
+                }
+            });
+
+            try {
+                var acquisition = repository.TryAcquireLeaseAsync(
+                    "compaction-in-flight", now, now.AddSeconds(5));
+                Assert.Same(acquisition, await Task.WhenAny(acquisition, Task.Delay(TimeSpan.FromSeconds(5))));
+                var lease = await acquisition;
+                Assert.NotNull(lease);
+                Assert.Same(started.Task, await Task.WhenAny(started.Task, Task.Delay(TimeSpan.FromSeconds(5))));
+
+                var renewal = repository.TryRenewLeaseAndGetExpirationAsync(lease!.MessageId,
+                    lease.ProcessingLeaseId!, lease.ProcessingLeaseUntil!.Value,
+                    lease.ProcessingLeaseUntil.Value.AddSeconds(5));
+                Assert.Same(renewal, await Task.WhenAny(renewal, Task.Delay(TimeSpan.FromSeconds(5))));
+                Assert.NotNull(await renewal);
+            } finally {
+                release.TrySetResult(true);
+            }
+            Assert.Same(secondCompleted.Task,
+                await Task.WhenAny(secondCompleted.Task, Task.Delay(TimeSpan.FromSeconds(5))));
+        } finally {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ConcurrentMutationsDoNotRunOverlappingCompactions() {
         var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
