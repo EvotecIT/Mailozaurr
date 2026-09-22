@@ -124,6 +124,31 @@ public sealed class FilePendingMessageDeadLetterRepositoryTests {
     }
 
     [Fact]
+    public async Task IdempotencyIndexTracksOtherInstancesAndRewrites() {
+        var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(directory, "dead-letter.log");
+        try {
+            var first = new FilePendingMessageDeadLetterRepository(path);
+            var second = new FilePendingMessageDeadLetterRepository(path);
+            await first.SaveAsync(CreateRecord("first"));
+            await second.SaveAsync(CreateRecord("second"));
+            await first.SaveAsync(CreateRecord("second"));
+            Assert.Equal(2, (await ReadAllAsync(first)).Count);
+
+            await second.RemoveAsync("first");
+            await first.SaveAsync(CreateRecord("first"));
+            await second.SaveAsync(CreateRecord("first"));
+
+            var records = await ReadAllAsync(new FilePendingMessageDeadLetterRepository(path));
+            Assert.Equal(2, records.Count);
+            Assert.Equal(1, records.Count(record => record.Message.MessageId == "first"));
+            Assert.Equal(1, records.Count(record => record.Message.MessageId == "second"));
+        } finally {
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task SeparateInstancesSerializeRemovalAndNewTerminalSave() {
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr.Tests", Guid.NewGuid().ToString("N"));
         var path = Path.Combine(directory, "dead-letter.log");

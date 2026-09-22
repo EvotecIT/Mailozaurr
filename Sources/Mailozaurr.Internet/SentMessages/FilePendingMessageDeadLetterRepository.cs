@@ -16,11 +16,17 @@ namespace Mailozaurr;
 public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDeadLetterRepository {
     private const string DefaultPendingFileName = "pending.log";
     private const string DefaultDeadLetterFileName = "dead-letter.log";
+    private const string GenerationPrefix = "mailozaurr-dead-letter-generation:";
 
     private readonly string filePath;
     private readonly string lockFilePath;
     private readonly string conflictPath = string.Empty;
     private readonly SemaphoreSlim gate = new(1, 1);
+    private readonly HashSet<string> messageIds = new(StringComparer.OrdinalIgnoreCase);
+    private long indexedLength = -1;
+    private DateTime indexedWriteTimeUtc;
+    private DateTime indexedCreationTimeUtc;
+    private string? indexedGeneration;
     private DateTime lastStaleRewriteCleanupUtc;
     private static readonly byte[] NewlineBytes = Encoding.UTF8.GetBytes(Environment.NewLine);
 
@@ -125,30 +131,81 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
                 FileAccess.ReadWrite,
                 FileShare.Read);
             RepairIncompleteTail(write);
-            if (ContainsMessageId(record.Message.MessageId)) return;
+            RefreshMessageIdIndex();
+            if (messageIds.Contains(record.Message.MessageId)) return;
             write.Position = write.Length;
             await write.WriteAsync(line, 0, line.Length, CancellationToken.None).ConfigureAwait(false);
             await write.FlushAsync(CancellationToken.None).ConfigureAwait(false);
             write.Flush(flushToDisk: true);
+            messageIds.Add(record.Message.MessageId);
+            CaptureIndexStamp();
         } finally {
             gate.Release();
         }
     }
 
-    private bool ContainsMessageId(string messageId) {
-        if (!File.Exists(filePath)) return false;
-        foreach (var line in LogFileLineReader.ReadLinesWithOffsets(filePath)) {
-            if (string.IsNullOrWhiteSpace(line.Line)) continue;
+    private void RefreshMessageIdIndex() {
+        var file = new FileInfo(filePath);
+        if (!file.Exists) {
+            messageIds.Clear();
+            indexedLength = -1;
+            indexedGeneration = null;
+            return;
+        }
+
+        // The storage lock allows appends from other instances and atomic
+        // rewrites. A new generation detects rewrites even when file metadata
+        // has coarse timestamp resolution or the replacement has equal length.
+        var generation = ReadCurrentGeneration();
+        if (indexedLength >= 0 && file.CreationTimeUtc == indexedCreationTimeUtc &&
+            StringComparer.Ordinal.Equals(generation, indexedGeneration) &&
+            file.Length >= indexedLength) {
+            if (file.Length > indexedLength) ScanMessageIds(indexedLength);
+            else if (file.LastWriteTimeUtc != indexedWriteTimeUtc) ScanMessageIds(fromStart: true);
+        } else {
+            ScanMessageIds(fromStart: true);
+        }
+        indexedGeneration = generation;
+        CaptureIndexStamp();
+    }
+
+    private void ScanMessageIds(long startOffset = 0, bool fromStart = false) {
+        if (fromStart) messageIds.Clear();
+        foreach (var line in LogFileLineReader.ReadLinesWithOffsets(filePath, startOffset)) {
+            if (string.IsNullOrWhiteSpace(line.Line) ||
+                line.Offset == 0 && line.Line.StartsWith(GenerationPrefix, StringComparison.Ordinal)) continue;
             try {
                 var record = JsonSerializer.Deserialize(line.Line,
                     MailozaurrJsonContext.Default.PendingMessageDeadLetterRecord);
-                if (record?.Message != null && string.Equals(record.Message.MessageId,
-                        messageId, StringComparison.OrdinalIgnoreCase)) return true;
+                if (record?.Message != null && !string.IsNullOrWhiteSpace(record.Message.MessageId))
+                    messageIds.Add(record.Message.MessageId);
             } catch (JsonException) {
-                // Ignore malformed historical entries while looking for this id.
+                // Ignore malformed historical entries while rebuilding the index.
             }
         }
-        return false;
+    }
+
+    private void CaptureIndexStamp() {
+        var file = new FileInfo(filePath);
+        indexedLength = file.Exists ? file.Length : -1;
+        indexedWriteTimeUtc = file.Exists ? file.LastWriteTimeUtc : default;
+        indexedCreationTimeUtc = file.Exists ? file.CreationTimeUtc : default;
+    }
+
+    private string? ReadCurrentGeneration() {
+        using var read = new FileStream(filePath, FileMode.Open, FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete);
+        var header = new byte[GenerationPrefix.Length + 32];
+        var count = 0;
+        while (count < header.Length) {
+            var received = read.Read(header, count, header.Length - count);
+            if (received == 0) return null;
+            count += received;
+        }
+        var value = Encoding.ASCII.GetString(header);
+        return value.StartsWith(GenerationPrefix, StringComparison.Ordinal)
+            ? value.Substring(GenerationPrefix.Length)
+            : null;
     }
 
     /// <inheritdoc />
@@ -252,13 +309,16 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
                 }
             }
 
-            await RewriteAsync(retained, cancellationToken).ConfigureAwait(false);
+            indexedGeneration = await RewriteAsync(retained, cancellationToken).ConfigureAwait(false);
+            messageIds.Clear();
+            foreach (var record in retained) messageIds.Add(record.Message.MessageId);
+            CaptureIndexStamp();
         } finally {
             gate.Release();
         }
     }
 
-    private async Task RewriteAsync(IReadOnlyList<PendingMessageDeadLetterRecord> records, CancellationToken cancellationToken) {
+    private async Task<string> RewriteAsync(IReadOnlyList<PendingMessageDeadLetterRecord> records, CancellationToken cancellationToken) {
         var directory = Path.GetDirectoryName(filePath);
         if (!string.IsNullOrWhiteSpace(directory)) {
             Directory.CreateDirectory(directory);
@@ -266,12 +326,15 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
 
         var tempPath = filePath + ".tmp." + Guid.NewGuid().ToString("N");
         var backupPath = filePath + ".bak";
+        var generation = Guid.NewGuid().ToString("N");
         try {
             using (var write = UnixFilePermissions.OpenRestrictedFile(
                 tempPath,
                 FileMode.Create,
                 FileAccess.Write,
                 FileShare.None)) {
+                var header = Encoding.ASCII.GetBytes(GenerationPrefix + generation + Environment.NewLine);
+                await write.WriteAsync(header, 0, header.Length, cancellationToken).ConfigureAwait(false);
                 foreach (var record in records) {
                     var payload = JsonSerializer.SerializeToUtf8Bytes(record, MailozaurrJsonContext.Default.PendingMessageDeadLetterRecord);
                     await write.WriteAsync(payload, 0, payload.Length, cancellationToken).ConfigureAwait(false);
@@ -289,11 +352,12 @@ public sealed class FilePendingMessageDeadLetterRepository : IPendingMessageDead
                     File.Delete(backupPath);
                 }
                 backupPath = string.Empty;
-                return;
+                return generation;
             }
 
             File.Move(tempPath, filePath);
             tempPath = string.Empty;
+            return generation;
         } finally {
             if (!string.IsNullOrEmpty(tempPath) && File.Exists(tempPath)) {
                 File.Delete(tempPath);
