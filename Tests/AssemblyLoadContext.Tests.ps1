@@ -105,6 +105,7 @@ foreach (`$dependencyName in `$isolatedDependencyNames) {
     'OfficeIMO.Email.AddressBook.OfflineAddressBookSearchFields'
     'OfficeIMO.Email.AddressBook.OfflineAddressBookSearchMatchMode'
     'OfficeIMO.Email.AddressBook.OfflineAddressBookSearchReport'
+    'OfficeIMO.Email.AddressBook.OfflineAddressBookSearchResult'
     'OfficeIMO.Email.ContentLineReaderOptions'
     'OfficeIMO.Email.Data.EmailDataArtifactKind'
     'OfficeIMO.Email.Data.EmailDataOpenOptions'
@@ -238,8 +239,8 @@ try {
             $dependency.ALC | Should -Be 'Mailozaurr'
             $dependency.ALCIsDefault | Should -BeFalse
         }
-        $result.AllowedTypeCount | Should -Be 52
-        $result.ActualAllowedTypeCount | Should -Be 52
+        $result.AllowedTypeCount | Should -Be 53
+        $result.ActualAllowedTypeCount | Should -Be 53
         @($result.MissingAllowedTypes).Count | Should -Be 0
         @($result.UnexpectedAllowedTypes).Count | Should -Be 0
         @($result.WrongAllowedTypeContexts).Count | Should -Be 0

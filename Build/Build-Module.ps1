@@ -134,6 +134,7 @@ Build-Module -ModuleName 'Mailozaurr' {
             'OfficeIMO.Email.AddressBook.OfflineAddressBookSearchFields'
             'OfficeIMO.Email.AddressBook.OfflineAddressBookSearchMatchMode'
             'OfficeIMO.Email.AddressBook.OfflineAddressBookSearchReport'
+            'OfficeIMO.Email.AddressBook.OfflineAddressBookSearchResult'
             'OfficeIMO.Email.ContentLineReaderOptions'
             'OfficeIMO.Email.Data.EmailDataArtifactKind'
             'OfficeIMO.Email.Data.EmailDataOpenOptions'
