@@ -4,18 +4,26 @@ namespace Mailozaurr;
 
 internal static class LogFileLineReader {
     internal readonly struct LineRecord {
-        public LineRecord(long offset, string line) {
+        public LineRecord(long offset, long endOffset, bool isComplete, string line) {
             Offset = offset;
+            EndOffset = endOffset;
+            IsComplete = isComplete;
             Line = line;
         }
 
         public long Offset { get; }
 
+        public long EndOffset { get; }
+
+        public bool IsComplete { get; }
+
         public string Line { get; }
     }
 
-    public static IEnumerable<LineRecord> ReadLinesWithOffsets(string filePath) {
-        using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+    public static IEnumerable<LineRecord> ReadLinesWithOffsets(string filePath, long startOffset = 0) {
+        using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete);
+        if (startOffset > 0) stream.Seek(startOffset, SeekOrigin.Begin);
         foreach (var line in ReadLinesWithOffsets(stream)) {
             yield return line;
         }
@@ -50,7 +58,8 @@ internal static class LogFileLineReader {
                 yield break;
             }
 
-            yield return new LineRecord(offset, buffer.Count == 0 ? string.Empty : Encoding.UTF8.GetString(buffer.ToArray()));
+            yield return new LineRecord(offset, stream.Position, !endOfFile,
+                buffer.Count == 0 ? string.Empty : Encoding.UTF8.GetString(buffer.ToArray()));
             buffer.Clear();
 
             if (endOfFile) {

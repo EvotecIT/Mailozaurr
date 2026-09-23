@@ -7,7 +7,10 @@ namespace Mailozaurr;
 /// Persists pending messages that reached a terminal, inspectable failure state.
 /// </summary>
 public interface IPendingMessageDeadLetterRepository {
-    /// <summary>Saves a terminal pending-message outcome.</summary>
+    /// <summary>
+    /// Saves a terminal pending-message outcome. Repeating the same original
+    /// message id must be idempotent so an interrupted queue transition can resume.
+    /// </summary>
     Task SaveAsync(PendingMessageDeadLetterRecord record, CancellationToken cancellationToken = default);
 
     /// <summary>Gets a dead-lettered message by original message id.</summary>

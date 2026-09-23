@@ -65,9 +65,15 @@ public sealed class PendingMessageProcessorTests {
 
         public int SaveCount => saveCount;
 
+        public bool ThrowAfterFirstSave { get; set; }
+
         public Task SaveAsync(PendingMessageDeadLetterRecord record, CancellationToken cancellationToken = default) {
             Interlocked.Increment(ref saveCount);
             records[record.Message.MessageId] = record;
+            if (ThrowAfterFirstSave) {
+                ThrowAfterFirstSave = false;
+                throw new IOException("Simulated interruption after durable dead-letter save.");
+            }
             return Task.CompletedTask;
         }
 
@@ -236,12 +242,15 @@ public sealed class PendingMessageProcessorTests {
             observer: observer,
             processingLeaseDuration: lease);
 
+        var leaseClockStart = DateTimeOffset.UtcNow;
         await processor.ProcessAsync();
+        var leaseClockEnd = DateTimeOffset.UtcNow;
 
         Assert.False(repository.Contains(record.MessageId));
         Assert.Single(sender.SentRecords);
         Assert.Equal(1, sender.SentRecords[0].AttemptCount);
-        Assert.Equal(currentTime + lease, sender.SentRecords[0].NextAttemptAt);
+        Assert.InRange(sender.SentRecords[0].NextAttemptAt,
+            leaseClockStart + lease, leaseClockEnd + lease);
         Assert.Single(observer.Started);
         Assert.Single(observer.Sent);
         Assert.Empty(observer.Failed);
@@ -390,6 +399,36 @@ public sealed class PendingMessageProcessorTests {
         Assert.Null(failure.RetryDelay);
         var drop = Assert.Single(observer.Dropped);
         Assert.Equal(PendingMessageDropReason.PermanentFailure, drop.Reason);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_ResumesTerminalMarkerWithoutSendingAgainAfterDeadLetterInterruption() {
+        var currentTime = DateTimeOffset.Parse("2024-06-05T10:00:00Z");
+        var repository = new InMemoryPendingMessageRepository();
+        var record = CreateRecord(currentTime.AddMinutes(-1));
+        repository.Add(record);
+        var sender = new RecordingPendingMessageSender {
+            ShouldThrow = true,
+            ExceptionToThrow = new InvalidOperationException("Permanent failure")
+        };
+        var deadLetters = new InMemoryDeadLetterRepository { ThrowAfterFirstSave = true };
+        var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+            { EmailProvider.None, sender }
+        });
+        var processor = new PendingMessageProcessor(repository, factory, clock: () => currentTime,
+            deadLetterRepository: deadLetters);
+
+        await Assert.ThrowsAsync<IOException>(() => processor.ProcessAsync());
+        var terminal = await repository.GetByMessageIdAsync(record.MessageId);
+        Assert.NotNull(terminal?.DeadLetteredAt);
+        Assert.Equal(PendingMessageDropReason.PermanentFailure, terminal!.DeadLetterReason);
+
+        currentTime = terminal.NextAttemptAt.AddMinutes(1);
+        await processor.ProcessAsync();
+
+        Assert.False(repository.Contains(record.MessageId));
+        Assert.Single(sender.SentRecords);
+        Assert.NotNull(await deadLetters.GetByMessageIdAsync(record.MessageId));
     }
 
     [Fact]
@@ -626,10 +665,13 @@ public sealed class PendingMessageProcessorTests {
             clock: () => currentTime,
             processingLeaseDuration: TimeSpan.Zero);
 
+        var leaseClockStart = DateTimeOffset.UtcNow;
         await processor.ProcessAsync();
+        var leaseClockEnd = DateTimeOffset.UtcNow;
 
         var sent = Assert.Single(sender.SentRecords);
-        Assert.Equal(currentTime + TimeSpan.FromSeconds(30), sent.NextAttemptAt);
+        Assert.InRange(sent.NextAttemptAt,
+            leaseClockStart + TimeSpan.FromSeconds(30), leaseClockEnd + TimeSpan.FromSeconds(30));
     }
 
     [Fact]
@@ -713,6 +755,7 @@ public sealed class PendingMessageProcessorTests {
 
         repository.ReleaseEnumerations();
         await sender.WaitForFirstSendAsync();
+        await repository.WaitForBothLeaseAttemptsAsync();
         sender.Release();
         await Task.WhenAll(firstTask, secondTask);
 
@@ -728,6 +771,8 @@ public sealed class PendingMessageProcessorTests {
         private readonly TaskCompletionSource<bool> firstSnapshotCaptured = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<bool> secondSnapshotCaptured = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<bool> releaseEnumerators = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> bothLeaseAttempts = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int leaseAttempts;
 
         internal CoordinatedPendingMessageRepository(DateTimeOffset nextAttemptAt, int attemptCount = 0) {
             record = CreateRecord(nextAttemptAt, "coordinated-message");
@@ -757,6 +802,7 @@ public sealed class PendingMessageProcessorTests {
             DateTimeOffset leaseUntil,
             CancellationToken cancellationToken = default) {
             lock (syncRoot) {
+                if (++leaseAttempts == 2) bothLeaseAttempts.TrySetResult(true);
                 if (!string.Equals(record.MessageId, messageId, StringComparison.OrdinalIgnoreCase) || record.NextAttemptAt > dueBeforeOrAt) {
                     return Task.FromResult<PendingMessageRecord?>(null);
                 }
@@ -797,6 +843,8 @@ public sealed class PendingMessageProcessorTests {
         public Task RemoveAsync(string messageId, CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         internal void ReleaseEnumerations() => releaseEnumerators.TrySetResult(true);
+
+        internal Task WaitForBothLeaseAttemptsAsync() => bothLeaseAttempts.Task;
     }
 
     private sealed class BlockingPendingMessageSender : IPendingMessageSender {
