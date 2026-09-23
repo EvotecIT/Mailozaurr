@@ -326,6 +326,55 @@ public sealed class FilePendingMessageCoordinationTests {
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProcessingWaitsForScheduledCompactionBeforeReturning(bool filtered) {
+        var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        try {
+            var path = Path.Combine(directory, "pending.log");
+            var now = DateTimeOffset.UtcNow;
+            await new FilePendingMessageRepository(path).SaveAsync(new PendingMessageRecord {
+                MessageId = "drain-before-exit", Timestamp = now, NextAttemptAt = now
+            });
+            var started = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var completed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var repository = new FilePendingMessageRepository(path, async _ => {
+                started.TrySetResult(true);
+                await release.Task;
+                completed.TrySetResult(true);
+            });
+            IPendingMessageRepository view = filtered
+                ? new Mailozaurr.PowerShell.CmdletSendEmailPendingMessage.FilteredPendingMessageRepository(
+                    repository, null, null, false, () => DateTimeOffset.UtcNow)
+                : repository;
+            var sender = new CountingSender();
+            var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
+                [EmailProvider.None] = sender
+            });
+            var processing = new PendingMessageProcessor(view, factory).ProcessAsync();
+
+            Assert.Same(started.Task, await Task.WhenAny(started.Task, Task.Delay(TimeSpan.FromSeconds(5))));
+            var deadline = DateTimeOffset.UtcNow.AddSeconds(5);
+            while (await repository.GetByMessageIdAsync("drain-before-exit") != null &&
+                   DateTimeOffset.UtcNow < deadline) {
+                await Task.Delay(10);
+            }
+            Assert.Null(await repository.GetByMessageIdAsync("drain-before-exit"));
+            Assert.False(processing.IsCompleted);
+
+            release.TrySetResult(true);
+            await processing;
+            Assert.True(completed.Task.IsCompleted);
+            Assert.Equal(1, sender.SendCount);
+        } finally {
+            release.TrySetResult(true);
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task ConcurrentMutationsDoNotRunOverlappingCompactions() {
         var directory = Path.Combine(Path.GetTempPath(), "mailozaurr-queue-" + Guid.NewGuid().ToString("N"));

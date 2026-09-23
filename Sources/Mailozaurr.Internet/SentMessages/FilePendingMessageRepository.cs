@@ -9,7 +9,7 @@ namespace Mailozaurr;
 /// </summary>
 public sealed class FilePendingMessageRepository : IPendingMessageRepository, IPendingMessageLeaseRenewer,
     IPendingMessageLeaseExpirationRenewer, IPendingMessageLeaseCommitter,
-    IPendingMessageForcedLeaseRepository {
+    IPendingMessageForcedLeaseRepository, IPendingMessageRepositoryMaintenance {
     private const string UpsertEntryType = "upsert";
     private const string TombstoneEntryType = "tombstone";
     private const string GenerationPrefix = "mailozaurr-generation:";
@@ -22,6 +22,7 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
     private readonly Func<CancellationToken, Task>? compactionOverride;
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly SemaphoreSlim compactionGate = new(1, 1);
+    private readonly object backgroundCompactionSync = new();
     private readonly Dictionary<string, long> index = new(StringComparer.OrdinalIgnoreCase);
     private long indexedLength = -1;
     private DateTime indexedWriteTimeUtc;
@@ -29,8 +30,8 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
     private string? indexedGeneration;
     private static readonly byte[] NewlineBytes = Encoding.UTF8.GetBytes(Environment.NewLine);
     private int dirtyEntryCount;
-    private int backgroundCompactionPending;
-    private int backgroundCompactionRunning;
+    private bool backgroundCompactionPending;
+    private Task? backgroundCompactionTask;
     private DateTime lastStaleCompactionCleanupUtc;
 
     /// <summary>Creates a new repository using the specified options.</summary>
@@ -374,20 +375,30 @@ public sealed class FilePendingMessageRepository : IPendingMessageRepository, IP
     }
 
     private void ScheduleBackgroundCompaction() {
-        Interlocked.Exchange(ref backgroundCompactionPending, 1);
-        if (Interlocked.CompareExchange(ref backgroundCompactionRunning, 1, 0) == 0)
-            _ = Task.Run(RunBackgroundCompactionAsync);
+        lock (backgroundCompactionSync) {
+            backgroundCompactionPending = true;
+            backgroundCompactionTask ??= Task.Run(RunBackgroundCompactionAsync);
+        }
     }
 
     private async Task RunBackgroundCompactionAsync() {
-        try {
-            while (Interlocked.Exchange(ref backgroundCompactionPending, 0) == 1)
-                await CompactAfterCommittedMutationAsync().ConfigureAwait(false);
-        } finally {
-            Volatile.Write(ref backgroundCompactionRunning, 0);
-            if (Volatile.Read(ref backgroundCompactionPending) == 1)
-                ScheduleBackgroundCompaction();
+        while (true) {
+            lock (backgroundCompactionSync) {
+                if (!backgroundCompactionPending) {
+                    backgroundCompactionTask = null;
+                    return;
+                }
+                backgroundCompactionPending = false;
+            }
+            await CompactAfterCommittedMutationAsync().ConfigureAwait(false);
         }
+    }
+
+    /// <inheritdoc />
+    public async Task WaitForPendingMaintenanceAsync() {
+        Task? task;
+        lock (backgroundCompactionSync) task = backgroundCompactionTask;
+        if (task != null) await task.ConfigureAwait(false);
     }
 
     private async Task CompactAsync(CancellationToken cancellationToken) {

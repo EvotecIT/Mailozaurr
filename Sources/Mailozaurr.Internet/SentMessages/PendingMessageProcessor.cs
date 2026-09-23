@@ -75,6 +75,15 @@ public sealed class PendingMessageProcessor {
     /// </summary>
     /// <param name="cancellationToken">Token used to observe cancellation requests.</param>
     public async Task ProcessAsync(CancellationToken cancellationToken = default) {
+        try {
+            await ProcessCoreAsync(cancellationToken).ConfigureAwait(false);
+        } finally {
+            if (repository is IPendingMessageRepositoryMaintenance maintenance)
+                await maintenance.WaitForPendingMaintenanceAsync().ConfigureAwait(false);
+        }
+    }
+
+    private async Task ProcessCoreAsync(CancellationToken cancellationToken) {
         await using var enumerator = repository.GetAllAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
         while (await enumerator.MoveNextAsync().ConfigureAwait(false)) {
             cancellationToken.ThrowIfCancellationRequested();

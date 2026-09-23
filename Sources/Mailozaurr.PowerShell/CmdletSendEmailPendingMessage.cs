@@ -160,7 +160,8 @@ public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
     }
 
     internal sealed class FilteredPendingMessageRepository : IPendingMessageRepository,
-        IPendingMessageLeaseExpirationRenewer, IPendingMessageLeaseCommitter {
+        IPendingMessageLeaseExpirationRenewer, IPendingMessageLeaseCommitter,
+        IPendingMessageRepositoryMaintenance {
         private readonly IPendingMessageRepository _inner;
         private readonly HashSet<string>? _messageIds;
         private readonly EmailProvider? _provider;
@@ -281,6 +282,11 @@ public sealed class CmdletSendEmailPendingMessage : AsyncPSCmdlet {
 
         public Task RemoveAsync(string messageId, CancellationToken cancellationToken = default) =>
             _inner.RemoveAsync(messageId, cancellationToken);
+
+        public Task WaitForPendingMaintenanceAsync() =>
+            _inner is IPendingMessageRepositoryMaintenance maintenance
+                ? maintenance.WaitForPendingMaintenanceAsync()
+                : Task.CompletedTask;
 
         private bool ContainsMessageId(string? id) {
             if (string.IsNullOrEmpty(id) || _messageIds == null) {
