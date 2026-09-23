@@ -71,10 +71,7 @@ public partial class Graph {
                         await PostGraphWebhookAsync(okResult, cancellationToken);
                         return okResult;
                     }
-                    var error = JsonSerializer.Deserialize(content, GraphJsonContext.Default.GraphApiError);
-                    var errorMessage = (error == null || error.Error == null || error.Error.InnerError == null)
-                        ? $"Unknown error: {content}"
-                        : $"Error code: {error.Error.Code}, message: {error.Error.Message}, request ID: {error.Error.InnerError.RequestId}, date: {error.Error.InnerError.Date}";
+                    var errorMessage = FormatGraphSendError(response.StatusCode, content);
                     var retryAfter = ParseRetryAfter(response);
                     throw new GraphApiException(response.StatusCode, errorMessage, content, retryAfter);
                 } finally {
@@ -241,10 +238,7 @@ public partial class Graph {
 
             // If the status code indicates an error, throw an exception with the content
             var sendContent = await sendResponse.Content.ReadAsStringAsync();
-            var sendError = JsonSerializer.Deserialize(sendContent, GraphJsonContext.Default.GraphApiError);
-            var sendErrorMessage = (sendError == null || sendError.Error == null || sendError.Error.InnerError == null)
-                ? $"Unknown error: {sendContent}"
-                : $"Error code: {sendError.Error.Code}, message: {sendError.Error.Message}, request ID: {sendError.Error.InnerError.RequestId}, date: {sendError.Error.InnerError.Date}";
+            var sendErrorMessage = FormatGraphSendError(sendResponse.StatusCode, sendContent);
             var retryAfter = ParseRetryAfter(sendResponse);
             throw new GraphApiException(sendResponse.StatusCode, sendErrorMessage, sendContent, retryAfter);
         } catch (GraphApiException ex) {
@@ -338,6 +332,22 @@ public partial class Graph {
         return CreateGraphFailureResult(operationStopwatch, exception?.Message,
             structuredError: graphException?.ResponseContent,
             statusCode: graphException?.StatusCode);
+    }
+
+    private static string FormatGraphSendError(HttpStatusCode statusCode, string responseContent) {
+        var error = GraphApiErrorParser.Parse(responseContent, statusCode)?.Error;
+        var detail = error == null
+            ? responseContent
+            : string.Join(": ", new[] { error.Code, error.Message }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        var requestId = error?.InnerError?.RequestId;
+        var message = $"Graph send failed (HTTP {(int)statusCode} {statusCode})";
+        if (!string.IsNullOrWhiteSpace(detail)) {
+            message += $": {detail}";
+        }
+        if (!string.IsNullOrWhiteSpace(requestId)) {
+            message += $" (request ID: {requestId})";
+        }
+        return message;
     }
 
     private GraphBatchRequest CreateBatchSendRequest() {
