@@ -250,6 +250,9 @@ namespace Mailozaurr.Tests {
 
             Assert.False(result.Status);
             Assert.Equal(EmailAction.Send, result.EmailAction);
+            Assert.Contains("HTTP 400", result.Error);
+            Assert.Contains("ErrorInvalidUser", result.Error);
+            Assert.Contains("Invalid mailbox", result.Error);
             Assert.NotNull(result.GraphError);
             Assert.Equal(HttpStatusCode.BadRequest, result.GraphError!.StatusCode);
             Assert.Equal("ErrorInvalidUser", result.GraphError.Error?.Code);

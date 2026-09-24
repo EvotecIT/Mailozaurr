@@ -347,23 +347,39 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         try {
             var status = graph.ConnectO365GraphAsync().GetAwaiter().GetResult();
             if (!status.Status) {
-                if (!Suppress) {
-                    WriteObject(status);
-                }
+                WriteGraphFailure(status);
                 LogEmitter.EmitLogs(graph.LogCollector, this);
                 return;
             }
             status = graph.IsLargerAttachment
                 ? graph.SendMessageDraftAsync().GetAwaiter().GetResult()
                 : graph.SendMessageAsync().GetAwaiter().GetResult();
-            if (!Suppress) {
-                WriteObject(status);
+            if (status.Status) {
+                if (!Suppress) WriteObject(status);
+            } else {
+                WriteGraphFailure(status);
             }
         } catch (GraphApiException ex) {
             WriteError(new ErrorRecord(ex, "GraphApiError", ErrorCategory.InvalidOperation, null));
         }
 
         LogEmitter.EmitLogs(graph.LogCollector, this);
+    }
+
+    private void WriteGraphFailure(SmtpResult result, Exception? exception = null) {
+        if (!Suppress) WriteObject(result);
+
+        string message = string.IsNullOrWhiteSpace(result.Error)
+            ? $"Graph {result.EmailAction} failed."
+            : result.Error!;
+        var graphError = (result as GraphSmtpResult)?.GraphError;
+        exception ??= graphError != null && graphError.StatusCode != 0
+            ? new GraphApiException(graphError.StatusCode, message, graphError.Raw)
+            : new InvalidOperationException(message);
+        var record = new ErrorRecord(exception, "GraphSendFailed", ErrorCategory.InvalidOperation, result.SentFrom) {
+            ErrorDetails = new ErrorDetails(message)
+        };
+        WriteError(record);
     }
 
     private async Task ProcessMgGraphRequest(string fromEmail, string fromName) {
@@ -622,22 +638,16 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         using (var powerShell = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace)) {
             powerShell.AddCommand("Invoke-MgGraphRequest");
             powerShell.AddParameters(parameters);
+            powerShell.AddParameter("ErrorAction", ActionPreference.Stop);
             try {
-                powerShell.Invoke();
+                InvokeMgGraphRequestChecked(powerShell);
                 if (!Suppress) {
                     WriteObject(new SmtpResult(true, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ""));
                 }
             } catch (RuntimeException ex) {
-                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending using Graph Api (MgGraphRequest): {ex.Message}");
-                if (errorAction == ActionPreference.Stop) {
-                    throw;
-                }
-                if (!Suppress) {
-                    var result = new GraphSmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
-                        GraphError = GraphApiErrorParser.Parse(ex.Message)
-                    };
-                    WriteObject(result);
-                }
+                WriteGraphFailure(new GraphSmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
+                    GraphError = GraphApiErrorParser.Parse(ex.Message)
+                }, ex);
             }
         }
     }
@@ -659,20 +669,13 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
             using (var powerShell = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace)) {
                 powerShell.AddCommand("Invoke-MgGraphRequest");
                 powerShell.AddParameters(parameters);
+                powerShell.AddParameter("ErrorAction", ActionPreference.Stop);
                 try {
-                    powerShell.Invoke();
+                    InvokeMgGraphRequestChecked(powerShell);
                 } catch (RuntimeException ex) {
-                    LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending using Graph Api (MgGraphRequest): {ex.Message}");
-                    if (errorAction == ActionPreference.Stop) {
-                        throw;
-                    }
-
-                    if (!Suppress) {
-                        var result = new GraphSmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
-                            GraphError = GraphApiErrorParser.Parse(ex.Message)
-                        };
-                        WriteObject(result);
-                    }
+                    WriteGraphFailure(new GraphSmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
+                        GraphError = GraphApiErrorParser.Parse(ex.Message)
+                    }, ex);
                     return false;
                 }
             }
@@ -698,8 +701,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         using (var powerShell = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace)) {
             powerShell.AddCommand("Invoke-MgGraphRequest");
             powerShell.AddParameters(parameters);
+            powerShell.AddParameter("ErrorAction", ActionPreference.Stop);
             try {
-                var results = powerShell.Invoke();
+                var results = InvokeMgGraphRequestChecked(powerShell);
                 if (results.Count > 0) {
                     if (TryGetPowerShellResultValue(results[0], "uploadUrl", out var uploadUrl)) {
                         return uploadUrl;
@@ -710,16 +714,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
                     throw new InvalidOperationException("No results were returned from the Invoke-MgGraphRequest command.");
                 }
             } catch (RuntimeException ex) {
-                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending using Graph Api (MgGraphRequest): {ex.Message}");
-                if (errorAction == ActionPreference.Stop) {
-                    throw;
-                }
-                if (!Suppress) {
-                    var result = new GraphSmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
-                        GraphError = GraphApiErrorParser.Parse(ex.Message)
-                    };
-                    WriteObject(result);
-                }
+                WriteGraphFailure(new GraphSmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
+                    GraphError = GraphApiErrorParser.Parse(ex.Message)
+                }, ex);
             }
         }
 
@@ -736,8 +733,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         using (var powerShell = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace)) {
             powerShell.AddCommand("Invoke-MgGraphRequest");
             powerShell.AddParameters(parameters);
+            powerShell.AddParameter("ErrorAction", ActionPreference.Stop);
             try {
-                var results = powerShell.Invoke();
+                var results = InvokeMgGraphRequestChecked(powerShell);
                 if (results.Count > 0) {
                     if (TryGetPowerShellResultValue(results[0], "id", out var id)) {
                         return id;
@@ -748,16 +746,9 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
                     throw new InvalidOperationException("No results were returned from the Invoke-MgGraphRequest command.");
                 }
             } catch (RuntimeException ex) {
-                LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error during sending using Graph Api (MgGraphRequest): {ex.Message}");
-                if (errorAction == ActionPreference.Stop) {
-                    throw;
-                }
-                if (!Suppress) {
-                    var result = new GraphSmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
-                        GraphError = GraphApiErrorParser.Parse(ex.Message)
-                    };
-                    WriteObject(result);
-                }
+                WriteGraphFailure(new GraphSmtpResult(false, action, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
+                    GraphError = GraphApiErrorParser.Parse(ex.Message)
+                }, ex);
             }
         }
 
@@ -774,21 +765,40 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         using var powerShell = System.Management.Automation.PowerShell.Create(RunspaceMode.CurrentRunspace);
         powerShell.AddCommand("Invoke-MgGraphRequest");
         powerShell.AddParameters(parameters);
+        powerShell.AddParameter("ErrorAction", ActionPreference.Stop);
         try {
-            powerShell.Invoke();
+            InvokeMgGraphRequestChecked(powerShell);
             return true;
         } catch (RuntimeException ex) {
-            LoggingMessages.Logger.WriteWarning($"Send-EmailMessage - Error while adding a Graph draft attachment (MgGraphRequest): {ex.Message}");
-            if (errorAction == ActionPreference.Stop) {
-                throw;
-            }
-            if (!Suppress) {
-                WriteObject(new GraphSmtpResult(false, EmailAction.SendAttachment, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
-                    GraphError = GraphApiErrorParser.Parse(ex.Message)
-                });
-            }
+            WriteGraphFailure(new GraphSmtpResult(false, EmailAction.SendAttachment, sentTo, sentFrom, "GraphAPI", 0, elapsed, "", ex.Message) {
+                GraphError = GraphApiErrorParser.Parse(ex.Message)
+            }, ex);
             return false;
         }
+    }
+
+    private System.Collections.ObjectModel.Collection<PSObject> InvokeMgGraphRequestChecked(System.Management.Automation.PowerShell powerShell) {
+        var previousError = GetLatestPowerShellError();
+        var results = powerShell.Invoke();
+        ThrowIfMgGraphRequestFailed(powerShell, previousError);
+        return results;
+    }
+
+    private ErrorRecord? GetLatestPowerShellError() {
+        var errors = SessionState.PSVariable.GetValue("Error") as System.Collections.IList;
+        return errors != null && errors.Count > 0 ? errors[0] as ErrorRecord : null;
+    }
+
+    private void ThrowIfMgGraphRequestFailed(System.Management.Automation.PowerShell powerShell, ErrorRecord? previousError) {
+        if (!powerShell.HadErrors && powerShell.Streams.Error.Count == 0) return;
+
+        var failure = powerShell.Streams.Error.FirstOrDefault();
+        var latestError = GetLatestPowerShellError();
+        if (failure == null && !ReferenceEquals(previousError, latestError)) failure = latestError;
+        var message = failure?.ErrorDetails?.Message ?? failure?.Exception?.Message
+            ?? powerShell.InvocationStateInfo.Reason?.Message
+            ?? "Invoke-MgGraphRequest reported an error.";
+        throw new RuntimeException(message, failure?.Exception ?? new InvalidOperationException(message));
     }
 
     private static bool TryGetPowerShellResultValue(PSObject result, string propertyName, out string value) {
