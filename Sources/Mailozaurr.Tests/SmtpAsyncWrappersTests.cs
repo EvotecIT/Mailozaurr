@@ -299,7 +299,7 @@ public class SmtpAsyncWrappersTests {
 
         Assert.True(result.IsSuccess);
         Assert.NotNull(poolIdentity);
-        Assert.StartsWith("new.user@example.com|", poolIdentity!, StringComparison.Ordinal);
+        Assert.StartsWith("authenticated:new.user@example.com|", poolIdentity!, StringComparison.Ordinal);
         Assert.Null(smtp.ConnectionPoolIdentity);
     }
 

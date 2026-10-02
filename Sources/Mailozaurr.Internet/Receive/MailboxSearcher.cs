@@ -53,7 +53,7 @@ public static partial class MailboxSearcher {
         int maxResults = 0,
         CancellationToken cancellationToken = default,
         string? queryString = null) {
-        var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadOnly);
+        var mailFolder = await client.GetCachedFolderAsync(folder, FolderAccess.ReadOnly, cancellationToken).ConfigureAwait(false);
         SearchQuery search = SearchQuery.All;
         var sinceUtc = NormalizeToUtc(since);
         var beforeUtc = NormalizeToUtc(before);

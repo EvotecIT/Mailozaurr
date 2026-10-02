@@ -17,11 +17,11 @@ public static class ImapDeleteOperations {
         /// <summary>Folder full name.</summary>
         string FullName { get; }
 
-        /// <summary>Expunges messages flagged as deleted.</summary>
+        /// <summary>Expunges the entire folder. Targeted deletion uses <see cref="IImapUidExpungeFolder"/> instead.</summary>
         Task ExpungeAsync(CancellationToken cancellationToken = default);
     }
 
-    private sealed class MailKitDeleteFolderAdapter : IImapDeleteFolder {
+    private sealed class MailKitDeleteFolderAdapter : IImapDeleteFolder, IImapUidExpungeFolder {
         private readonly IMailFolder _folder;
 
         internal MailKitDeleteFolderAdapter(IMailFolder folder) {
@@ -42,8 +42,10 @@ public static class ImapDeleteOperations {
         public Task RemoveFlagsAsync(UniqueId uid, MessageFlags flags, bool silent, CancellationToken cancellationToken = default) =>
             _folder.RemoveFlagsAsync(uid, flags, silent, cancellationToken);
 
-        public Task ExpungeAsync(CancellationToken cancellationToken = default) =>
-            _folder.ExpungeAsync(cancellationToken);
+        public Task<bool> ExpungeAsync(IReadOnlyCollection<UniqueId> uids, CancellationToken cancellationToken = default) =>
+            ImapExpunge.SelectedAsync(_folder, new List<UniqueId>(uids), cancellationToken);
+
+        public Task ExpungeAsync(CancellationToken cancellationToken = default) => _folder.ExpungeAsync(cancellationToken);
     }
 
     /// <summary>
@@ -84,7 +86,7 @@ public static class ImapDeleteOperations {
     }
 
     /// <summary>
-    /// Marks messages deleted and optionally expunges the folder.
+    /// Marks messages deleted and optionally expunges only the selected UIDs where supported.
     /// </summary>
     public static Task<ImapDeleteResult> DeleteAsync(
         IMailFolder folder,
@@ -100,7 +102,7 @@ public static class ImapDeleteOperations {
     }
 
     /// <summary>
-    /// Marks messages deleted and optionally expunges the folder.
+    /// Marks messages deleted and optionally expunges only the selected UIDs where supported.
     /// </summary>
     public static async Task<ImapDeleteResult> DeleteAsync(
         IImapDeleteFolder folder,
@@ -142,8 +144,7 @@ public static class ImapDeleteOperations {
         result.DeletedUids.AddRange(operation.SuccessfulUids);
 
         if (expunge && result.Deleted > 0) {
-            await folder.ExpungeAsync(cancellationToken).ConfigureAwait(false);
-            result.Expunged = true;
+            result.Expunged = await ImapExpunge.SelectedAsync(folder, result.DeletedUids, cancellationToken).ConfigureAwait(false);
         }
 
         return result;

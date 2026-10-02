@@ -66,7 +66,7 @@ public sealed class ImapDeleteOperationsTests {
         Assert.Equal(0, folder.ExpungeCalls);
     }
 
-    private sealed class FakeDeleteFolder : ImapDeleteOperations.IImapDeleteFolder {
+    private sealed class FakeDeleteFolder : ImapDeleteOperations.IImapDeleteFolder, IImapUidExpungeFolder {
         internal bool ThrowOnBulkAdd { get; set; }
         internal HashSet<uint> FailSingleAddFor { get; set; } = new();
         internal int ExpungeCalls { get; private set; }
@@ -111,9 +111,12 @@ public sealed class ImapDeleteOperationsTests {
         }
 
         public Task ExpungeAsync(CancellationToken cancellationToken = default) {
-            _ = cancellationToken;
+            throw new InvalidOperationException("Folder-wide expunge must not be called.");
+        }
+        public Task<bool> ExpungeAsync(IReadOnlyCollection<UniqueId> uids, CancellationToken cancellationToken = default) {
+            Assert.NotEmpty(uids);
             ExpungeCalls++;
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
     }
 }

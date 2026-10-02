@@ -226,6 +226,7 @@ try {
 
 - [Platform Architecture](Docs/Platform-Architecture.md) - layering and reuse rules for future library, PowerShell, CLI, MCP, and GUI work
 - [Configuration and Usage](Docs/Configuration-and-Usage.md) - profile model, PowerShell setup, provider guidance, CLI recipes, and MCP usage
+- [Library roadmap](ROADMAP.md) - prioritized improvements and the evidence required before adding them
 
 ## Additional surfaces
 
@@ -330,6 +331,8 @@ Send commands attempt immediate delivery by default. Add `--queue-on-failure` wh
 
 Queue processing records provider acceptance before removing the pending item. If removal fails, the next run retries local cleanup without sending the message again. `Send-EmailPendingMessage -ProcessAll` and a selected `-MessageId` can bypass the retry schedule, but they respect an active processing lease. If the provider accepts a message and both recording that acceptance and removing the item fail, delivery is indeterminate; inspect the provider before retrying it manually.
 
+The .NET `Smtp.SendAsync` result reports SMTP acceptance through `Status` and `DeliveryAccepted`. A failed sent-log write, queue acknowledgement, or webhook notification appears in `PostSendErrors` and does not trigger another SMTP send. Acceptance confirms that the SMTP server accepted the message; it does not confirm arrival in the recipient's inbox. Caller cancellation during transport propagates as cancellation. `Smtp.ProcessPendingMessagesAsync` uses the shared queue processor's leases and acceptance markers and processes SMTP records only.
+
 When upgrading workers that share a pending-message log, let in-flight sends finish, then stop every queue processor, including scheduled and forced PowerShell runs, before updating them. Restart processing after all workers use the new version; existing queued records remain readable. Forced retries can process pre-upgrade scheduled records immediately after restart. Do not run an older worker against a log written by the new version: older compaction can discard acceptance and lease markers, and older forced retries can ignore active leases.
 
 Preview and execute mailbox actions:
@@ -427,6 +430,7 @@ This will make sure the project has required libraries.
   - [x] PGP/MIME encryption and signature verification
   - Optional retry logic for `Send-EmailMessage` via `-RetryCount`, `-RetryDelayMilliseconds`, `-RetryDelayBackoff` and `-RetryAlways`.  Retries are only attempted for transient errors by default, but `-RetryAlways` forces retries on all errors.
   - Optional SMTP connection pooling via `-UseConnectionPool` and `-ConnectionPoolSize` for faster repeated sends. Use `Clear-SmtpConnectionPool` to reset the pool and `Test-SmtpConnection` to check if your server keeps connections open.
+  - Pooled connections are partitioned by account, TLS mode, certificate callback, revocation policy, and local domain. Message content belongs to the current caller. Connections with a caller-owned protocol logger are kept outside the pool.
 - POP3
   - [x] Connect to POP3
   - [x] Get POP3 Emails
@@ -443,6 +447,7 @@ This will make sure the project has required libraries.
   - [x] Listen for new IMAP messages via `ImapIdleListener`
   - [x] Wait for new IMAP messages with the `Wait-IMAPMessage` cmdlet supporting `-Until`, `-StopOnMatch` and `-TimeoutSeconds`
   - [x] Search IMAP mailboxes with `Search-IMAPMailbox` returning messages (use `-Count` to limit results)
+  - Targeted delete and fallback move operations expunge only the selected UIDs. Servers without UID-scoped expunge leave those messages marked `Deleted`; unrelated deleted messages are preserved. Custom .NET folder adapters can implement `IImapUidExpungeFolder` to support scoped expunge. `ImapDeleteResult.Expunged` reports whether expunge completed.
 - Office 365 Graph API
   - [x] Get Mail Folders via `Get-EmailGraphFolder` with `-Connection` or `-MgGraphRequest`
   - [x] Get Mail Messages

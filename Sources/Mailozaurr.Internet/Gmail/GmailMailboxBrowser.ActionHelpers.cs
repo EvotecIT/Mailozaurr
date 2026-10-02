@@ -199,7 +199,7 @@ public sealed partial class GmailMailboxBrowser {
     private async Task<GmailMailboxMessageSummary?> TryGetMessageSummaryAsync(string messageId, CancellationToken cancellationToken) {
         try {
             return await GetMessageSummaryAsync(messageId, cancellationToken).ConfigureAwait(false);
-        } catch {
+        } catch (GmailApiException exception) when (exception.StatusCode == HttpStatusCode.NotFound) {
             return null;
         }
     }

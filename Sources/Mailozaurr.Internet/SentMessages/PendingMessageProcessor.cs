@@ -22,6 +22,9 @@ public sealed class PendingMessageProcessor {
     private readonly Func<Exception, bool> permanentFailureDetector;
     private readonly TimeSpan processingLeaseDuration;
 
+    /// <summary>Optional provider selection for a provider-specific queue worker. Other providers are left untouched.</summary>
+    public EmailProvider? ProviderFilter { get; set; }
+
     /// <summary>
     /// Initializes a new instance of the <see cref="PendingMessageProcessor"/> class.
     /// </summary>
@@ -91,6 +94,7 @@ public sealed class PendingMessageProcessor {
             if (record == null) {
                 continue;
             }
+            if (ProviderFilter.HasValue && record.Provider != ProviderFilter.Value) continue;
 
             if (string.IsNullOrWhiteSpace(record.MessageId)) {
                 observer.MessageSkipped(record, PendingMessageSkipReason.MissingMessageId);

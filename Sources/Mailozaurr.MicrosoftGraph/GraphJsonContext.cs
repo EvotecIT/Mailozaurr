@@ -22,6 +22,7 @@ namespace Mailozaurr;
 [JsonSerializable(typeof(GraphAttachment))]
 [JsonSerializable(typeof(GraphAttachmentItem))]
 [JsonSerializable(typeof(GraphAttachmentItemWrapper))]
+[JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(GraphInboxRule))]
 [JsonSerializable(typeof(GraphInboxRuleActions))]
 [JsonSerializable(typeof(GraphInboxRulePredicates))]

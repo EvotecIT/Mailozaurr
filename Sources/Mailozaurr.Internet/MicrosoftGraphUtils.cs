@@ -25,31 +25,27 @@ namespace Mailozaurr {
         internal static Func<string, string, string, string, IEnumerable<string>?, Task<GraphAuthorization>> AcquireGraphCertificateTokenAsyncFunc { get; set; } = AcquireGraphCertificateTokenAsyncDefault;
         internal static Func<string, string, byte[], string, IEnumerable<string>?, Task<GraphAuthorization>> AcquireGraphCertificateBytesTokenAsyncFunc { get; set; } = AcquireGraphCertificateBytesTokenAsyncDefault;
         internal static Func<string, string, string, IEnumerable<string>?, Task<GraphAuthorization>> AcquireGraphCertificatePemTokenAsyncFunc { get; set; } = AcquireGraphCertificatePemTokenAsyncDefault;
-        private static SemaphoreSlim _concurrencySemaphore = new(5, 5);
-        private static int _maxConcurrentRequests = 5;
+        private static readonly GraphRequestLimiter RequestLimiter = new(5);
 
         /// <summary>
         /// Gets or sets the maximum number of concurrent HTTP requests allowed.
         /// </summary>
         /// <remarks>
         /// This is a process-wide limit. Setting this property affects all Graph operations in the
-        /// current AppDomain. The underlying semaphore is swapped using a thread-safe exchange to
-        /// ensure safe updates under concurrency.
+        /// current AppDomain. Existing requests retain admission when the limit is reduced;
+        /// subsequent requests wait until capacity is available.
         /// </remarks>
         public static int MaxConcurrentRequests {
-            get => _maxConcurrentRequests;
+            get => RequestLimiter.Limit;
             set {
                 if (value <= 0) {
                     throw new ArgumentOutOfRangeException(nameof(MaxConcurrentRequests));
                 }
-                var newSem = new SemaphoreSlim(value, value);
-                var old = Interlocked.Exchange(ref _concurrencySemaphore, newSem);
-                old.Dispose();
-                _maxConcurrentRequests = value;
+                RequestLimiter.Limit = value;
             }
         }
 
-        internal static SemaphoreSlim ConcurrencySemaphore => _concurrencySemaphore;
+        internal static GraphRequestLimiter ConcurrencySemaphore => RequestLimiter;
 
         internal static string GetEndpointBase(GraphEndpoint endpoint) =>
             endpoint switch {
@@ -380,31 +376,29 @@ namespace Mailozaurr {
             IDictionary<string, string>? headers = null,
             string? body = null,
             CancellationToken cancellationToken = default) {
-            var request = new HttpRequestMessage(new HttpMethod(method), uri);
-            if (headers != null) {
-                foreach (var kvp in headers) {
-                    request.Headers.TryAddWithoutValidation(kvp.Key, kvp.Value);
-                }
-            }
-            if (!string.IsNullOrWhiteSpace(body) && (method == "POST" || method == "PUT" || method == "PATCH")) {
-                request.Content = new StringContent(body, Encoding.UTF8, "application/json");
-            }
             await ConcurrencySemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
             HttpResponseMessage? response = null;
             try {
-                response = await HttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-                if ((int)response.StatusCode == 429) {
-                    var delay = GetRetryAfterDelay(response);
-                    response.Dispose();
-                    if (delay > TimeSpan.Zero) {
-                        await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                for (var attempt = 0; attempt < 2; attempt++) {
+                    using var request = new HttpRequestMessage(new HttpMethod(method), uri);
+                    if (headers != null) {
+                        foreach (var kvp in headers) request.Headers.TryAddWithoutValidation(kvp.Key, kvp.Value);
+                    }
+                    if (!string.IsNullOrWhiteSpace(body) &&
+                        (request.Method == HttpMethod.Post || request.Method == HttpMethod.Put || request.Method.Method.Equals("PATCH", StringComparison.OrdinalIgnoreCase))) {
+                        request.Content = new StringContent(body, Encoding.UTF8, "application/json");
                     }
                     response = await HttpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+                    if ((int)response.StatusCode != 429 || attempt == 1) break;
+                    var delay = GetRetryAfterDelay(response);
+                    response.Dispose();
+                    response = null;
+                    if (delay > TimeSpan.Zero) await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
                 }
 #if NET5_0_OR_GREATER
-                var responseContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                var responseContent = await response!.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 #else
-                var responseContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                var responseContent = await response!.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
                 if (!response.IsSuccessStatusCode) {
                     throw new GraphApiException(

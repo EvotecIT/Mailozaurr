@@ -80,7 +80,7 @@ public static class JunkCleaner {
         if (dryRun) {
             return;
         }
-        var junk = client.GetCachedFolder(folder ?? "Junk", FolderAccess.ReadWrite);
+        var junk = await client.GetCachedFolderAsync(folder ?? "Junk", FolderAccess.ReadWrite, cancellationToken).ConfigureAwait(false);
         var uids = await junk.SearchAsync(SearchQuery.All, cancellationToken).ConfigureAwait(false);
         if (uids.Count == 0) {
             return;
@@ -100,7 +100,7 @@ public static class JunkCleaner {
         if (toDelete.Count == 0) return;
 
         await junk.AddFlagsAsync(toDelete, MessageFlags.Deleted, true, cancellationToken).ConfigureAwait(false);
-        await junk.ExpungeAsync(cancellationToken).ConfigureAwait(false);
+        await ImapExpunge.SelectedAsync(junk, toDelete, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -127,7 +127,7 @@ public static class JunkCleaner {
         bool skipHasAttachment = false,
         IEnumerable<string>? skipAttachmentExtension = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default) {
-        var junk = client.GetCachedFolder(folder ?? "Junk", FolderAccess.ReadOnly);
+        var junk = await client.GetCachedFolderAsync(folder ?? "Junk", FolderAccess.ReadOnly, cancellationToken).ConfigureAwait(false);
         var uids = await junk.SearchAsync(SearchQuery.All, cancellationToken).ConfigureAwait(false);
         var criteria = CreateSkipCriteria(skipFrom, skipTo, skipSubjectContains, skipMessageId, skipUid, skipAttachmentExtension);
         foreach (var uid in uids) {

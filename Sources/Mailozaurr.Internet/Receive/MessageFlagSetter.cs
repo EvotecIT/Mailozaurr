@@ -49,12 +49,12 @@ public static class MessageFlagSetter {
     /// <summary>
     /// Sets or clears message flags in an IMAP folder, optionally simulating the change.
     /// </summary>
-    public static Task SetFlagsAsync(ImapClient client, UniqueId uid, MessageFlags flags, bool add, bool dryRun, string? folder = null, CancellationToken cancellationToken = default) {
+    public static async Task SetFlagsAsync(ImapClient client, UniqueId uid, MessageFlags flags, bool add, bool dryRun, string? folder = null, CancellationToken cancellationToken = default) {
         if (dryRun) {
-            return Task.CompletedTask;
+            return;
         }
-        var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadWrite);
-        return SetFlagsAsync(new FolderWrapper(mailFolder), uid, flags, add, cancellationToken);
+        var mailFolder = await client.GetCachedFolderAsync(folder, FolderAccess.ReadWrite, cancellationToken).ConfigureAwait(false);
+        await SetFlagsAsync(new FolderWrapper(mailFolder), uid, flags, add, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

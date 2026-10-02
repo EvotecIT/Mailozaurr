@@ -116,6 +116,7 @@ public static class MessageFetcher {
         }
 
         var uids = await mailFolder.SearchAsync(query, cancellationToken).ConfigureAwait(false);
+        var deletedUids = new List<UniqueId>();
         foreach (var uid in uids) {
             MimeMessage msg;
             try {
@@ -134,10 +135,11 @@ public static class MessageFetcher {
             yield return new ImapEmailMessage(uid, msg, reports);
             if (performDelete) {
                 await mailFolder.AddFlagsAsync(uid, MessageFlags.Deleted, true, cancellationToken).ConfigureAwait(false);
+                deletedUids.Add(uid);
             }
         }
-        if (performDelete && uids.Count > 0) {
-            await mailFolder.ExpungeAsync(cancellationToken).ConfigureAwait(false);
+        if (deletedUids.Count > 0) {
+            await ImapExpunge.SelectedAsync(mailFolder, deletedUids, cancellationToken).ConfigureAwait(false);
         }
     }
 

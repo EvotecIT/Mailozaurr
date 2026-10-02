@@ -14,8 +14,6 @@ namespace Mailozaurr;
 /// </summary>
 public sealed partial class GraphMailboxBrowser {
     private const string SummarySelect = "id,subject,receivedDateTime,from,toRecipients,internetMessageId,hasAttachments,isRead,flag,conversationId";
-    // Must be a multiple of 320 KiB (except last chunk).
-    private const int LargeAttachmentChunkSize = 327_680 * 32; // 10 MiB
     private readonly GraphApiClient _graph;
 
     /// <summary>
