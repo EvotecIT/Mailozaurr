@@ -212,7 +212,7 @@ public static class Helpers {
     }
 
     internal static async Task PostWebhookAsync<T>(string? url, T result, JsonTypeInfo<T> jsonTypeInfo,
-        CancellationToken cancellationToken = default, HttpClient? client = null) {
+        CancellationToken cancellationToken = default, HttpClient? client = null, bool throwOnFailure = false) {
         if (string.IsNullOrWhiteSpace(url)) {
             return;
         }
@@ -224,10 +224,11 @@ public static class Helpers {
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
             using var response = await client.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode) {
+                if (throwOnFailure) response.EnsureSuccessStatusCode();
                 LoggingMessages.Logger.WriteWarning(
                     $"Failed to post webhook: {(int)response.StatusCode} {response.ReasonPhrase}");
             }
-        } catch (HttpRequestException ex) {
+        } catch (HttpRequestException ex) when (!throwOnFailure) {
             LoggingMessages.Logger.WriteWarning($"Failed to post webhook: {ex.Message}");
         }
     }

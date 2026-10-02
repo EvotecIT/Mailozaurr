@@ -254,14 +254,15 @@ public partial class Smtp {
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private string? _poolIdentity;
 
-    private bool IsConnectionPoolingEnabled => UseConnectionPool ?? SmtpConnectionPool.PoolingEnabled;
+    // Protocol loggers belong to the caller and cannot be replaced on a MailKit transport.
+    private bool IsConnectionPoolingEnabled => Logging?.ProtocolLogger == null && (UseConnectionPool ?? SmtpConnectionPool.PoolingEnabled);
     /// <summary>Skip server certificate validation.</summary>
     public bool SkipCertificateValidation {
         get => _skipCertificateValidation;
         set {
             _skipCertificateValidation = value;
             if (value) {
-                Client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+                Client.ServerCertificateValidationCallback = AcceptAnyCertificate;
             } else {
                 Client.ServerCertificateValidationCallback = null;
             }
@@ -572,23 +573,24 @@ public partial class Smtp {
         }
         if (Client.IsConnected) {
             if (IsConnectionPoolingEnabled) {
-                SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client, oldPoolIdentity, IsConnectionPoolingEnabled);
+                ReturnConnectionToPool(oldServer, oldPort, oldPoolIdentity);
             } else {
                 Client.Disconnect(true);
             }
-            Client = ClientFactory(Logging?.ProtocolLogger);
         }
 
         var poolIdentity = GetConnectionPoolIdentity();
         var pooled = SmtpConnectionPool.TryRentClient(server, port, poolIdentity, IsConnectionPoolingEnabled);
         if (pooled != null) {
-            Client = pooled;
+            AdoptPooledClient(pooled);
         }
         try {
             if (!Client.IsConnected) {
                 Client.Connect(server, port, effectiveOptions);
             }
             _poolIdentity = poolIdentity;
+            connectedPoolPolicy = GetPoolTransportPolicy();
+            reusableAuthentication = true;
             LogVerbose($"Connected to {server} on {port} port using SSL: {effectiveOptions}");
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "");
         } catch (Exception ex) {
@@ -663,23 +665,24 @@ public partial class Smtp {
         }
         if (Client.IsConnected) {
             if (IsConnectionPoolingEnabled) {
-                SmtpConnectionPool.ReturnClient(oldServer, oldPort, Client, oldPoolIdentity, IsConnectionPoolingEnabled);
+                ReturnConnectionToPool(oldServer, oldPort, oldPoolIdentity);
             } else {
                 Client.Disconnect(true);
             }
-            Client = ClientFactory(Logging?.ProtocolLogger);
         }
 
         var poolIdentity = GetConnectionPoolIdentity();
         var pooled = SmtpConnectionPool.TryRentClient(server, port, poolIdentity, IsConnectionPoolingEnabled);
         if (pooled != null) {
-            Client = pooled;
+            AdoptPooledClient(pooled);
         }
         try {
             if (!Client.IsConnected) {
                 await Client.ConnectAsync(server, port, effectiveOptions, cancellationToken).ConfigureAwait(false);
             }
             _poolIdentity = poolIdentity;
+            connectedPoolPolicy = GetPoolTransportPolicy();
+            reusableAuthentication = true;
             LogVerbose($"Connected to {server} on {port} port using SSL: {effectiveOptions}");
             return new SmtpResult(true, EmailAction.Connect, SentTo, SentFrom, server, port, Stopwatch.Elapsed, "");
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
@@ -718,6 +721,8 @@ public partial class Smtp {
         cancellationToken.ThrowIfCancellationRequested();
 
         var normalizedUserName = userName?.Trim() ?? string.Empty;
+        Credential = new NetworkCredential(normalizedUserName, secret ?? string.Empty);
+        credentialAuthMode = authMode;
         var previousConnectionPoolIdentity = ConnectionPoolIdentity;
         var shouldOverrideConnectionPoolIdentity =
             string.IsNullOrWhiteSpace(previousConnectionPoolIdentity) &&
@@ -756,8 +761,12 @@ public partial class Smtp {
         }
 
         try {
-            await ProtocolAuth.AuthenticateSmtpAsync(Client, normalizedUserName, secret, authMode, cancellationToken).ConfigureAwait(false);
-            Credential = new NetworkCredential(normalizedUserName, secret ?? string.Empty);
+            var credential = new NetworkCredential(normalizedUserName, secret ?? string.Empty);
+            if (!ReuseAuthentication(credential)) {
+                await ProtocolAuth.AuthenticateSmtpAsync(Client, normalizedUserName, secret ?? string.Empty, authMode, cancellationToken).ConfigureAwait(false);
+                Credential = credential;
+                RecordAuthenticationIdentity();
+            }
             return new SmtpConnectAuthenticateResult {
                 IsSuccess = true,
                 SecureSocketOptions = ActiveSecureSocketOptions
@@ -785,6 +794,7 @@ public partial class Smtp {
     /// <param name="isOAuth"></param>
     /// <returns></returns>
     public SmtpResult Authenticate(ICredentials Credentials, bool isOAuth = false) {
+        credentialAuthMode = isOAuth ? ProtocolAuthMode.OAuth2 : ProtocolAuthMode.Basic;
         if (DryRun) {
             LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "Authentication skipped (WhatIf)");
@@ -800,6 +810,12 @@ public partial class Smtp {
             }
         }
         try {
+            if (isOAuth && Credentials is not NetworkCredential) {
+                throw new ArgumentException("OAuth2 authentication requires a NetworkCredential containing a user name and token.", nameof(Credentials));
+            }
+            if (ReuseAuthentication(Credentials as NetworkCredential)) {
+                return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+            }
             if (isOAuth) {
                 var oauthCredential = Credentials as NetworkCredential;
                 if (oauthCredential != null) {
@@ -813,6 +829,7 @@ public partial class Smtp {
                 Credential = Credentials as NetworkCredential;
                 Client.Authenticate(Credentials);
             }
+            RecordAuthenticationIdentity();
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (Exception ex) {
             LogWarning($"Send-EmailMessage - Error during authentication (oAuth): {ex.Message}");
@@ -844,12 +861,19 @@ public partial class Smtp {
         ICredentials Credentials,
         bool isOAuth,
         CancellationToken cancellationToken) {
+        credentialAuthMode = isOAuth ? ProtocolAuthMode.OAuth2 : ProtocolAuthMode.Basic;
         cancellationToken.ThrowIfCancellationRequested();
         if (DryRun) {
             LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "Authentication skipped (WhatIf)");
         }
         try {
+            if (isOAuth && Credentials is not NetworkCredential) {
+                throw new ArgumentException("OAuth2 authentication requires a NetworkCredential containing a user name and token.", nameof(Credentials));
+            }
+            if (ReuseAuthentication(Credentials as NetworkCredential)) {
+                return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
+            }
             if (isOAuth) {
                 var networkCredential = Credentials as NetworkCredential;
                 if (networkCredential != null) {
@@ -863,6 +887,7 @@ public partial class Smtp {
                 Credential = Credentials as NetworkCredential;
                 await Client.AuthenticateAsync(Credentials, cancellationToken);
             }
+            RecordAuthenticationIdentity();
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
@@ -888,6 +913,7 @@ public partial class Smtp {
         try {
             var mechanism = new SaslMechanismNtlmIntegrated();
             Client.Authenticate(mechanism);
+            reusableAuthentication = false;
             LogVerbose($"Send-EmailMessage - Authenticated using default credentials");
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (Exception ex) {
@@ -938,6 +964,7 @@ public partial class Smtp {
     /// <param name="mechanism">Authentication mechanism to use.</param>
     /// <returns>An <see cref="SmtpResult"/> representing the outcome.</returns>
     public SmtpResult Authenticate(string username, string password, bool isSecureString, AuthenticationMechanism mechanism = AuthenticationMechanism.Auto) {
+        credentialAuthMode = ProtocolAuthMode.Basic;
         if (DryRun) {
             LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "Authentication skipped (WhatIf)");
@@ -952,6 +979,9 @@ public partial class Smtp {
                     throw new InvalidOperationException(message);
                 }
                 return new SmtpResult(false, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", message);
+            }
+            if (ReuseAuthentication(Credential)) {
+                return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
             }
             switch (mechanism) {
                 case AuthenticationMechanism.CramMd5:
@@ -970,6 +1000,7 @@ public partial class Smtp {
                     throw new ArgumentOutOfRangeException(nameof(mechanism), mechanism, "Unsupported SMTP authentication mechanism.");
             }
             LogVerbose($"Send-EmailMessage - Authenticated as {username}");
+            RecordAuthenticationIdentity();
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
         } catch (Exception ex) {
             LogWarning($"Send-EmailMessage - Error during authentication: {ex.Message}");
@@ -995,8 +1026,7 @@ public partial class Smtp {
         if (Client.IsConnected) {
             if (IsConnectionPoolingEnabled) {
                 var identity = _poolIdentity ?? GetConnectionPoolIdentity();
-                SmtpConnectionPool.ReturnClient(Server, Port, Client, identity, IsConnectionPoolingEnabled);
-                Client = ClientFactory(Logging?.ProtocolLogger);
+                ReturnConnectionToPool(Server, Port, identity);
             } else {
                 Client.Disconnect(true);
             }
@@ -1013,8 +1043,7 @@ public partial class Smtp {
         if (Client.IsConnected) {
             if (IsConnectionPoolingEnabled) {
                 var identity = _poolIdentity ?? GetConnectionPoolIdentity();
-                SmtpConnectionPool.ReturnClient(Server, Port, Client, identity, IsConnectionPoolingEnabled);
-                Client = ClientFactory(Logging?.ProtocolLogger);
+                ReturnConnectionToPool(Server, Port, identity);
                 clientToDispose = Client;
             } else {
                 Client.Disconnect(true);

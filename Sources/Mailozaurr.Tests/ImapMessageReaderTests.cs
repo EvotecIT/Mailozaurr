@@ -40,15 +40,13 @@ public sealed class ImapMessageReaderTests {
             .ReturnsAsync(message);
 
         var personalRoot = new Mock<IMailFolder>();
-        personalRoot.Setup(f => f.GetSubfolder("Sub", It.IsAny<CancellationToken>()))
-            .Returns(folder.Object);
+        personalRoot.Setup(f => f.GetSubfolderAsync("Sub", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(folder.Object);
 
         var client = new Mock<ImapClient> { CallBase = true };
         client.Setup(c => c.Inbox).Returns(Mock.Of<IMailFolder>(f => f.FullName == "Inbox"));
-        client.Setup(c => c.GetFolder("Sub", It.IsAny<CancellationToken>()))
-            .Throws(new FolderNotFoundException("Sub"));
-        client.Setup(c => c.GetFolder(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns((string name, CancellationToken _) => name.Length == 0 ? personalRoot.Object : throw new FolderNotFoundException(name));
+        client.Setup(c => c.GetFolderAsync("Sub", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new FolderNotFoundException("Sub"));
 
         var personalNamespaces = new FolderNamespaceCollection();
         personalNamespaces.Add(new FolderNamespace('.', ""));

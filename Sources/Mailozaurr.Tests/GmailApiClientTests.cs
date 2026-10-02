@@ -116,13 +116,14 @@ public class GmailApiClientTests {
         }
     }
     [Fact]
-    public void Constructor_SetsAuthorizationHeader() {
+    public async Task Credential_IsAppliedToRequest() {
         var cred = new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue };
-        var client = new GmailApiClient(cred);
-        var field = typeof(GmailApiClient).GetField("_client", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var httpClient = (System.Net.Http.HttpClient)field.GetValue(client)!;
-        Assert.Equal("Bearer", httpClient.DefaultRequestHeaders.Authorization?.Scheme);
-        Assert.Equal("t", httpClient.DefaultRequestHeaders.Authorization?.Parameter);
+        var handler = new RecordingHandler(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent("{\"messages\":[]}") });
+        using var httpClient = new HttpClient(handler);
+        using var client = new GmailApiClient(httpClient, credential: cred);
+        await client.ListPageAsync("me");
+        Assert.Equal("Bearer", Assert.Single(handler.Requests).Headers.Authorization?.Scheme);
+        Assert.Equal("t", handler.Requests[0].Headers.Authorization?.Parameter);
     }
 
     [Fact]

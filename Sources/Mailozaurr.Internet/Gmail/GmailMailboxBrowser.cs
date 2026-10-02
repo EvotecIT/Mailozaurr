@@ -21,6 +21,13 @@ public sealed partial class GmailMailboxBrowser {
     private const string RawFields = "id,threadId,internalDate,labelIds,raw";
     private readonly GmailApiClient _gmail;
     private readonly string _userId;
+    private int summaryDownloadConcurrency = 4;
+
+    /// <summary>Maximum simultaneous message-summary requests used by list and search operations. Defaults to four.</summary>
+    public int SummaryDownloadConcurrency {
+        get => summaryDownloadConcurrency;
+        set => summaryDownloadConcurrency = value > 0 ? value : throw new ArgumentOutOfRangeException(nameof(value));
+    }
 
     /// <summary>
     /// Maximum MIME payload size used by <see cref="GetMessageContentAsync"/> when no explicit limit is provided.
@@ -184,13 +191,7 @@ public sealed partial class GmailMailboxBrowser {
             }
         }
 
-        var summaries = new List<GmailMailboxMessageSummary>(selectedIds.Count);
-        foreach (var id in selectedIds) {
-            var summary = await TryGetMessageSummaryAsync(id, cancellationToken).ConfigureAwait(false);
-            if (summary != null) {
-                summaries.Add(summary);
-            }
-        }
+        var summaries = await LoadSummariesAsync(selectedIds, cancellationToken).ConfigureAwait(false);
 
         return new GmailMailboxListResult {
             ResolvedLabelId = resolvedLabelId,
@@ -308,19 +309,23 @@ public sealed partial class GmailMailboxBrowser {
             }
         }
 
-        var summaries = new List<GmailMailboxMessageSummary>(selected.Count);
-        foreach (var id in selected) {
-            var summary = await TryGetMessageSummaryAsync(id, cancellationToken).ConfigureAwait(false);
-            if (summary != null) {
-                summaries.Add(summary);
-            }
-        }
+        var summaries = await LoadSummariesAsync(selected, cancellationToken).ConfigureAwait(false);
 
         summaries.Sort(static (a, b) => b.DateUtc.CompareTo(a.DateUtc));
         return new GmailMailboxSearchResult {
             ResolvedLabelId = resolvedLabelId,
             Messages = summaries
         };
+    }
+
+    private async Task<List<GmailMailboxMessageSummary>> LoadSummariesAsync(IReadOnlyList<string> ids, CancellationToken cancellationToken) {
+        var downloaded = await BoundedMailboxDownloader.DownloadInOrderAsync(ids, SummaryDownloadConcurrency,
+            TryGetMessageSummaryAsync, cancellationToken).ConfigureAwait(false);
+        var summaries = new List<GmailMailboxMessageSummary>(downloaded.Count);
+        foreach (var summary in downloaded) {
+            if (summary != null) summaries.Add(summary);
+        }
+        return summaries;
     }
 
     /// <summary>

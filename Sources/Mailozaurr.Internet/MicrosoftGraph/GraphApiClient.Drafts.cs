@@ -187,13 +187,17 @@ public sealed partial class GraphApiClient {
     /// <summary>
     /// Uploads one attachment chunk to a Graph upload session URL.
     /// </summary>
-    public async Task UploadAttachmentChunkAsync(
+    public Task UploadAttachmentChunkAsync(
         string uploadUrl,
         byte[] chunk,
         long startInclusive,
         long endInclusive,
         long totalLength,
-        CancellationToken cancellationToken = default) {
+        CancellationToken cancellationToken = default) =>
+        UploadAttachmentChunkAsync(uploadUrl, chunk, 0, chunk?.Length ?? 0, startInclusive, endInclusive, totalLength, cancellationToken);
+
+    internal async Task UploadAttachmentChunkAsync(string uploadUrl, byte[] chunk, int offset, int count,
+        long startInclusive, long endInclusive, long totalLength, CancellationToken cancellationToken) {
         ThrowIfDisposed();
         if (string.IsNullOrWhiteSpace(uploadUrl)) {
             throw new ArgumentException("uploadUrl is required.", nameof(uploadUrl));
@@ -201,12 +205,14 @@ public sealed partial class GraphApiClient {
         if (chunk == null) {
             throw new ArgumentNullException(nameof(chunk));
         }
-        if (chunk.Length == 0) {
+        if (count == 0) {
             throw new ArgumentException("chunk must not be empty.", nameof(chunk));
         }
+        if (offset < 0 || count < 0 || offset > chunk.Length - count) throw new ArgumentOutOfRangeException(nameof(count));
+        if (endInclusive - startInclusive + 1 != count) throw new ArgumentException("Content range must match the chunk length.", nameof(endInclusive));
 
         using var req = new HttpRequestMessage(HttpMethod.Put, uploadUrl);
-        req.Content = new ByteArrayContent(chunk);
+        req.Content = new ByteArrayContent(chunk, offset, count);
         req.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         req.Content.Headers.ContentRange = new ContentRangeHeaderValue(startInclusive, endInclusive, totalLength);
 
@@ -224,8 +230,7 @@ public sealed partial class GraphApiClient {
     }
 
     private static string BuildCreateUploadSessionPayload(GraphAttachmentItem attachmentItem) {
-        static string JsonString(string value) =>
-            "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+        static string JsonString(string value) => JsonSerializer.Serialize(value, GraphJsonContext.Default.String);
 
         var sb = new StringBuilder();
         sb.Append("{\"attachmentItem\":{");

@@ -60,7 +60,7 @@ public static class ImapMessageReader {
             throw new ArgumentNullException(nameof(request));
         }
 
-        var mailFolder = client.GetCachedFolder(request.Folder, FolderAccess.ReadOnly);
+        var mailFolder = await client.GetCachedFolderAsync(request.Folder, FolderAccess.ReadOnly, cancellationToken).ConfigureAwait(false);
         var message = await mailFolder.GetMessageAsync(request.Uid, cancellationToken).ConfigureAwait(false);
 
         var attachments = message.Attachments.Select(static attachment => new ImapMessageAttachmentInfo(

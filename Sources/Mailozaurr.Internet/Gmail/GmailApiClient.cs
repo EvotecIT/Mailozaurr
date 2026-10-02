@@ -22,6 +22,7 @@ public sealed partial class GmailApiClient : IDisposable {
     private readonly Func<CancellationToken, Task<string>>? _refreshToken;
     private readonly OAuthCredential? _credential;
     private readonly bool _disposeClient;
+    private string? _refreshedAccessToken;
     private bool _disposed;
 
     private void ThrowIfDisposed() {
@@ -43,7 +44,6 @@ public sealed partial class GmailApiClient : IDisposable {
         _client = new HttpClient {
             BaseAddress = new Uri("https://gmail.googleapis.com/gmail/v1/")
         };
-        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credential.AccessToken);
         _refreshToken = refreshToken;
     }
 
@@ -71,9 +71,6 @@ public sealed partial class GmailApiClient : IDisposable {
         _disposeClient = ownsHttpClient;
         if (_client.BaseAddress == null) {
             _client.BaseAddress = baseAddress ?? new Uri("https://gmail.googleapis.com/gmail/v1/");
-        }
-        if (credential != null && !string.IsNullOrEmpty(credential.AccessToken) && _client.DefaultRequestHeaders.Authorization == null) {
-            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credential.AccessToken);
         }
     }
 
@@ -106,7 +103,7 @@ public sealed partial class GmailApiClient : IDisposable {
             response.StatusCode == HttpStatusCode.Forbidden) {
             if (_refreshToken != null) {
                 string token = await _refreshToken(cancellationToken).ConfigureAwait(false);
-                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                _refreshedAccessToken = token;
                 if (_credential != null) {
                     _credential.AccessToken = token;
                 }
@@ -121,7 +118,7 @@ public sealed partial class GmailApiClient : IDisposable {
     }
 
     private string? ResolveAccessToken() {
-        var token = _credential?.AccessToken;
+        var token = _credential?.AccessToken ?? _refreshedAccessToken;
         if (!string.IsNullOrEmpty(token)) {
             return token;
         }
@@ -132,6 +129,32 @@ public sealed partial class GmailApiClient : IDisposable {
         }
 
         return null;
+    }
+
+    private Task<HttpResponseMessage> SendAuthorizedAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+        SendAuthorizedAsync(request, HttpCompletionOption.ResponseContentRead, cancellationToken);
+
+    private Task<HttpResponseMessage> SendAuthorizedAsync(HttpRequestMessage request, HttpCompletionOption completionOption, CancellationToken cancellationToken) {
+        // Instance credentials must override shared defaults, including after refresh.
+        if (_credential != null || _refreshedAccessToken != null) {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _credential?.AccessToken ?? _refreshedAccessToken);
+        }
+        return _client.SendAsync(request, completionOption, cancellationToken);
+    }
+
+    private async Task<HttpResponseMessage> GetAuthorizedAsync(string uri, CancellationToken cancellationToken) {
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        return await SendAuthorizedAsync(request, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<HttpResponseMessage> PostAuthorizedAsync(string uri, HttpContent? content, CancellationToken cancellationToken) {
+        using var request = new HttpRequestMessage(HttpMethod.Post, uri) { Content = content };
+        return await SendAuthorizedAsync(request, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<HttpResponseMessage> DeleteAuthorizedAsync(string uri, CancellationToken cancellationToken) {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, uri);
+        return await SendAuthorizedAsync(request, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task QueuePendingMessageAsync(string userId, MimeMessage message, CancellationToken cancellationToken) {
@@ -241,7 +264,7 @@ public sealed partial class GmailApiClient : IDisposable {
         var json = JsonSerializer.Serialize(new GmailRawRequest(raw), GmailJsonContext.Default.GmailRawRequest);
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
         onTransportAttempt?.Invoke();
-        using var response = await _client.PostAsync($"users/{userId}/messages/send", content, cancellationToken).ConfigureAwait(false);
+        using var response = await PostAuthorizedAsync($"users/{userId}/messages/send", content, cancellationToken).ConfigureAwait(false);
         var queued = false;
         try {
             await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);

@@ -181,7 +181,7 @@ public sealed partial class GmailApiClient {
         CancellationToken cancellationToken) {
         ThrowIfDisposed();
         using var request = new HttpRequestMessage(method, url) { Content = content };
-        using var response = await _client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        using var response = await SendAuthorizedAsync(request, cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
 #if NET5_0_OR_GREATER
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);

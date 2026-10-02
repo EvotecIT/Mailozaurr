@@ -47,14 +47,14 @@ public static class ImapMoveOperations {
         /// <summary>Adds flags to one UID.</summary>
         Task AddFlagsAsync(UniqueId uid, MessageFlags flags, bool silent, CancellationToken cancellationToken = default);
 
-        /// <summary>Expunges the folder.</summary>
+        /// <summary>Expunges the entire folder. Move fallback uses <see cref="IImapUidExpungeFolder"/> instead.</summary>
         Task ExpungeAsync(CancellationToken cancellationToken = default);
 
         /// <summary>Searches destination for Message-Id matches.</summary>
         Task<IList<UniqueId>> SearchByMessageIdAsync(string messageId, CancellationToken cancellationToken = default);
     }
 
-    private sealed class MailKitMoveFolderAdapter : IImapMoveFolder {
+    private sealed class MailKitMoveFolderAdapter : IImapMoveFolder, IImapUidExpungeFolder {
         private readonly IMailFolder _folder;
 
         internal MailKitMoveFolderAdapter(IMailFolder folder) {
@@ -102,8 +102,10 @@ public static class ImapMoveOperations {
         public Task AddFlagsAsync(UniqueId uid, MessageFlags flags, bool silent, CancellationToken cancellationToken = default) =>
             _folder.AddFlagsAsync(uid, flags, silent, cancellationToken);
 
-        public Task ExpungeAsync(CancellationToken cancellationToken = default) =>
-            _folder.ExpungeAsync(cancellationToken);
+        public Task<bool> ExpungeAsync(IReadOnlyCollection<UniqueId> uids, CancellationToken cancellationToken = default) =>
+            ImapExpunge.SelectedAsync(_folder, new List<UniqueId>(uids), cancellationToken);
+
+        public Task ExpungeAsync(CancellationToken cancellationToken = default) => _folder.ExpungeAsync(cancellationToken);
 
         public Task<IList<UniqueId>> SearchByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) =>
             _folder.SearchAsync(SearchQuery.HeaderContains("Message-Id", messageId), cancellationToken);
@@ -236,7 +238,7 @@ public static class ImapMoveOperations {
         result.SourceFolder = source.FullName;
         result.TargetFolder = destination.FullName;
 
-        var sourceNeedsExpunge = false;
+        var copiedUids = new List<UniqueId>();
         foreach (var uid in unique) {
             string? messageId = null;
             long? targetUid = null;
@@ -266,7 +268,7 @@ public static class ImapMoveOperations {
                     }
 
                     await source.AddFlagsAsync(uid, MessageFlags.Deleted, silent: true, cancellationToken).ConfigureAwait(false);
-                    sourceNeedsExpunge = true;
+                    copiedUids.Add(uid);
                 }
 
                 if (!targetUid.HasValue && !string.IsNullOrWhiteSpace(messageId)) {
@@ -312,9 +314,11 @@ public static class ImapMoveOperations {
             }
         }
 
-        if (sourceNeedsExpunge) {
+        if (copiedUids.Count > 0) {
             try {
-                await source.ExpungeAsync(cancellationToken).ConfigureAwait(false);
+                await ImapExpunge.SelectedAsync(source, copiedUids, cancellationToken).ConfigureAwait(false);
+            } catch (OperationCanceledException) {
+                throw;
             } catch {
                 // best-effort: copies already exist in destination.
             }

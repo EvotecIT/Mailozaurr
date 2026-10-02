@@ -76,30 +76,32 @@ public static class GraphMimeMessageSender {
         }
     }
 
-    private static async Task UploadAttachmentAsync(
+    internal static async Task UploadAttachmentAsync(
         GraphApiClient client,
         GraphUploadSessionResult uploadSession,
         DecodedMimeAttachment attachment,
         CancellationToken cancellationToken) {
-        const int chunkSize = Graph.MaxChunkSize;
+        // Keep Outlook upload requests below 4 MB, including providers using decimal MB.
+        const int chunkSize = 3_932_160;
+        if (string.IsNullOrWhiteSpace(uploadSession.UploadUrl)) throw new InvalidDataException("Graph upload session creation failed (empty uploadUrl).");
         using var stream = attachment.OpenRead();
         var buffer = new byte[chunkSize];
         long position = 0;
 
-        while (true) {
-            var read = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
-            if (read <= 0) {
-                break;
+        while (position < attachment.Length) {
+            var expected = (int)Math.Min(buffer.Length, attachment.Length - position);
+            var read = 0;
+            while (read < expected) {
+                var count = await stream.ReadAsync(buffer, read, expected - read, cancellationToken).ConfigureAwait(false);
+                if (count == 0) throw new EndOfStreamException("Attachment ended before its declared length.");
+                read += count;
             }
-
-            var chunk = new byte[read];
-            Buffer.BlockCopy(buffer, 0, chunk, 0, read);
             var startInclusive = position;
             var endInclusive = position + read - 1L;
 
             await client.UploadAttachmentChunkAsync(
                 uploadSession.UploadUrl!,
-                chunk,
+                buffer, 0, read,
                 startInclusive,
                 endInclusive,
                 attachment.Length,

@@ -20,6 +20,10 @@ public class SmtpResult {
     public string? MessageId { get; set; }
     /// <summary>Whether the failed send was successfully persisted for later delivery.</summary>
     public bool Queued { get; set; }
+    /// <summary>Whether the SMTP server accepted this message for delivery. Acceptance does not prove inbox delivery.</summary>
+    public bool DeliveryAccepted { get; set; }
+    /// <summary>Failures in persistence or notification after the delivery decision. These must not trigger a resend.</summary>
+    public List<string> PostSendErrors { get; set; } = new();
     /// <summary>Optional message returned by the operation.</summary>
     public string? Message { get; set; }
     /// <summary>Time taken to perform the action.</summary>

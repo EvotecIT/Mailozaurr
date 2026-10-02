@@ -140,7 +140,7 @@ public sealed class ImapMoveOperationsTests {
         Assert.Equal(1, source.OpenCalls);
     }
 
-    private sealed class FakeFolder : ImapMoveOperations.IImapMoveFolder {
+    private sealed class FakeFolder : ImapMoveOperations.IImapMoveFolder, IImapUidExpungeFolder {
         internal FakeFolder(string fullName) {
             FullName = fullName;
         }
@@ -252,9 +252,12 @@ public sealed class ImapMoveOperationsTests {
         }
 
         public Task ExpungeAsync(CancellationToken cancellationToken = default) {
-            _ = cancellationToken;
+            throw new InvalidOperationException("Folder-wide expunge must not be called.");
+        }
+        public Task<bool> ExpungeAsync(IReadOnlyCollection<UniqueId> uids, CancellationToken cancellationToken = default) {
+            Assert.NotEmpty(uids);
             ExpungeCalls++;
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
 
         public Task<IList<UniqueId>> SearchByMessageIdAsync(string messageId, CancellationToken cancellationToken = default) {

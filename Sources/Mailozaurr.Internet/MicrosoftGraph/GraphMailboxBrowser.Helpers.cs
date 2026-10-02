@@ -123,62 +123,7 @@ public sealed partial class GraphMailboxBrowser {
             messageId,
             BuildAttachmentItem(attachment),
             cancellationToken: cancellationToken).ConfigureAwait(false);
-        var uploadUrl = NormalizeOptional(uploadSession.UploadUrl);
-        if (uploadUrl == null) {
-            throw new InvalidDataException("Graph upload session creation failed (empty uploadUrl).");
-        }
-
-        using var stream = attachment.OpenRead();
-        long offset = 0;
-        while (offset < attachment.Length) {
-            cancellationToken.ThrowIfCancellationRequested();
-            var remaining = attachment.Length - offset;
-            var chunkLen = (int)Math.Min(LargeAttachmentChunkSize, remaining);
-            var buffer = new byte[chunkLen];
-
-            var read = 0;
-            while (read < chunkLen) {
-#if NET5_0_OR_GREATER
-                var count = await stream.ReadAsync(buffer.AsMemory(read, chunkLen - read), cancellationToken).ConfigureAwait(false);
-#else
-                var count = await stream.ReadAsync(buffer, read, chunkLen - read, cancellationToken).ConfigureAwait(false);
-#endif
-                if (count <= 0) {
-                    break;
-                }
-
-                read += count;
-            }
-
-            if (read <= 0) {
-                throw new InvalidDataException(
-                    $"Graph upload failed: unexpected end of stream for '{attachment.Name}' at {offset.ToString(CultureInfo.InvariantCulture)}.");
-            }
-
-            var start = offset;
-            var end = offset + read - 1;
-            if (read == buffer.Length) {
-                await _graph.UploadAttachmentChunkAsync(
-                    uploadUrl,
-                    buffer,
-                    start,
-                    end,
-                    attachment.Length,
-                    cancellationToken).ConfigureAwait(false);
-            } else {
-                var trimmed = new byte[read];
-                Buffer.BlockCopy(buffer, 0, trimmed, 0, read);
-                await _graph.UploadAttachmentChunkAsync(
-                    uploadUrl,
-                    trimmed,
-                    start,
-                    end,
-                    attachment.Length,
-                    cancellationToken).ConfigureAwait(false);
-            }
-
-            offset += read;
-        }
+        await GraphMimeMessageSender.UploadAttachmentAsync(_graph, uploadSession, attachment, cancellationToken).ConfigureAwait(false);
     }
 
     private static GraphAttachmentItem BuildAttachmentItem(DecodedMimeAttachment attachment) {

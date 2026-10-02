@@ -48,6 +48,37 @@ public static class ImapClientFolderCache {
         return mailFolder;
     }
 
+    /// <summary>Resolves and opens a cached folder asynchronously without blocking on server I/O.</summary>
+    /// <param name="client">Connected IMAP client. Operations on a single client must be serialized.</param>
+    /// <param name="folder">Folder name or null for the inbox.</param>
+    /// <param name="access">Required folder access.</param>
+    /// <param name="cancellationToken">Cancellation token for resolution and opening.</param>
+    /// <returns>The opened folder.</returns>
+    public static async Task<IMailFolder> GetCachedFolderAsync(this ImapClient client, string? folder, FolderAccess access, CancellationToken cancellationToken = default) {
+        if (client == null) throw new ArgumentNullException(nameof(client));
+        cancellationToken.ThrowIfCancellationRequested();
+        var map = Cache.GetOrCreateValue(client);
+        var inbox = client.Inbox ?? throw new InvalidOperationException("The IMAP client does not expose an inbox folder.");
+        var inboxName = inbox.FullName ?? inbox.Name ?? "INBOX";
+        var name = string.IsNullOrWhiteSpace(folder) ? inboxName : folder!;
+        if (!map.TryGetValue(name, out var mailFolder)) {
+            if (name.Equals(inboxName, StringComparison.OrdinalIgnoreCase)) {
+                mailFolder = inbox;
+            } else {
+                try {
+                    mailFolder = await client.GetFolderAsync(name, cancellationToken).ConfigureAwait(false);
+                } catch (FolderNotFoundException) {
+                    if (client.PersonalNamespaces.Count == 0) throw;
+                    mailFolder = await client.GetFolder(client.PersonalNamespaces[0]).GetSubfolderAsync(name, cancellationToken).ConfigureAwait(false);
+                }
+            }
+            map[name] = mailFolder;
+        }
+        if (mailFolder.IsOpen && mailFolder.Access != access) await mailFolder.CloseAsync(false, cancellationToken).ConfigureAwait(false);
+        if (!mailFolder.IsOpen) await mailFolder.OpenAsync(access, cancellationToken).ConfigureAwait(false);
+        return mailFolder;
+    }
+
     /// <summary>
     /// Clears cached folders for the specified client.
     /// </summary>

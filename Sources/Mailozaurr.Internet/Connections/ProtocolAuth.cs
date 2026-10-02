@@ -64,12 +64,11 @@ public static class ProtocolAuth {
         }
 
         var normalizedUser = userName.Trim();
-        var normalizedSecret = secret.Trim();
         if (mode == ProtocolAuthMode.OAuth2) {
-            return client.AuthenticateAsync(new SaslMechanismOAuth2(normalizedUser, normalizedSecret), cancellationToken);
+            return client.AuthenticateAsync(new SaslMechanismOAuth2(normalizedUser, secret.Trim()), cancellationToken);
         }
 
-        return client.AuthenticateAsync(new NetworkCredential(normalizedUser, normalizedSecret), cancellationToken);
+        return client.AuthenticateAsync(new NetworkCredential(normalizedUser, secret), cancellationToken);
     }
 
     /// <summary>

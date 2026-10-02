@@ -34,7 +34,7 @@ public sealed class JunkCleanerTests {
 
         var client = new Mock<ImapClient> { CallBase = true };
         client.Setup(c => c.Inbox).Returns(Mock.Of<IMailFolder>(f => f.FullName == "Inbox"));
-        client.Setup(c => c.GetFolder("Junk", It.IsAny<CancellationToken>())).Returns(folder.Object);
+        client.Setup(c => c.GetFolderAsync("Junk", It.IsAny<CancellationToken>())).ReturnsAsync(folder.Object);
         client.Setup(c => c.PersonalNamespaces).Returns(new FolderNamespaceCollection());
 
         var skipFrom = new SingleUseEnumerable<string>("skip-from@example.com");
@@ -81,7 +81,7 @@ public sealed class JunkCleanerTests {
 
         var client = new Mock<ImapClient> { CallBase = true };
         client.Setup(c => c.Inbox).Returns(Mock.Of<IMailFolder>(f => f.FullName == "Inbox"));
-        client.Setup(c => c.GetFolder("Junk", It.IsAny<CancellationToken>())).Returns(folder.Object);
+        client.Setup(c => c.GetFolderAsync("Junk", It.IsAny<CancellationToken>())).ReturnsAsync(folder.Object);
         client.Setup(c => c.PersonalNamespaces).Returns(new FolderNamespaceCollection());
 
         var results = new List<ImapEmailMessage>();

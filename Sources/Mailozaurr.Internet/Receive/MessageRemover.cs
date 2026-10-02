@@ -50,10 +50,10 @@ public static class MessageRemover {
         if (dryRun) {
             return;
         }
-        var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadWrite);
+        var mailFolder = await client.GetCachedFolderAsync(folder, FolderAccess.ReadWrite, cancellationToken).ConfigureAwait(false);
         await mailFolder.AddFlagsAsync(uid, MessageFlags.Deleted, true, cancellationToken).ConfigureAwait(false);
         if (expunge) {
-            await mailFolder.ExpungeAsync(cancellationToken).ConfigureAwait(false);
+            await ImapExpunge.SelectedAsync(mailFolder, new[] { uid }, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -100,10 +100,10 @@ public static class MessageRemover {
         if (list.Count == 0) {
             return;
         }
-        var mailFolder = client.GetCachedFolder(folder, FolderAccess.ReadWrite);
+        var mailFolder = await client.GetCachedFolderAsync(folder, FolderAccess.ReadWrite, cancellationToken).ConfigureAwait(false);
         await mailFolder.AddFlagsAsync(list, MessageFlags.Deleted, true, cancellationToken).ConfigureAwait(false);
         if (expunge) {
-            await mailFolder.ExpungeAsync(cancellationToken).ConfigureAwait(false);
+            await ImapExpunge.SelectedAsync(mailFolder, list, cancellationToken).ConfigureAwait(false);
         }
     }
 
