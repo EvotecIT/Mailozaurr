@@ -810,6 +810,9 @@ public partial class Smtp {
             }
         }
         try {
+            if (isOAuth && Credentials is not NetworkCredential) {
+                throw new ArgumentException("OAuth2 authentication requires a NetworkCredential containing a user name and token.", nameof(Credentials));
+            }
             if (ReuseAuthentication(Credentials as NetworkCredential)) {
                 return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
             }
@@ -865,6 +868,9 @@ public partial class Smtp {
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "Authentication skipped (WhatIf)");
         }
         try {
+            if (isOAuth && Credentials is not NetworkCredential) {
+                throw new ArgumentException("OAuth2 authentication requires a NetworkCredential containing a user name and token.", nameof(Credentials));
+            }
             if (ReuseAuthentication(Credentials as NetworkCredential)) {
                 return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging);
             }

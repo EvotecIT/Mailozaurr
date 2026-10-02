@@ -7,6 +7,29 @@ namespace Mailozaurr.Tests;
 [Collection("GraphCollection")]
 public sealed class SmtpPoolAuthenticationTests {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OAuthWithUnsupportedCredentialType_DoesNotReportAuthenticationSuccess(bool asynchronous) {
+        var originalFactory = Smtp.ClientFactory;
+        Smtp.ClientFactory = _ => new AuthenticatedClient();
+        var smtp = new Smtp();
+        try {
+            Assert.True((await smtp.ConnectAsync("smtp.example.test", 587)).Status);
+            var credentials = new CredentialCache();
+            var result = asynchronous
+                ? await smtp.AuthenticateAsync(credentials, isOAuth: true)
+                : smtp.Authenticate(credentials, isOAuth: true);
+            Assert.False(result.Status);
+            Assert.False(smtp.Client.IsAuthenticated);
+            Assert.Equal(0, ((AuthenticatedClient)smtp.Client).Authentications);
+            Assert.Contains("NetworkCredential", result.Error);
+        } finally {
+            smtp.Dispose();
+            Smtp.ClientFactory = originalFactory;
+        }
+    }
+
+    [Theory]
     [InlineData("wrong-secret", ProtocolAuthMode.Basic)]
     [InlineData("secret", ProtocolAuthMode.OAuth2)]
     [InlineData("", ProtocolAuthMode.Basic)]
