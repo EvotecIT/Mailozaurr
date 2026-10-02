@@ -430,7 +430,7 @@ This will make sure the project has required libraries.
   - [x] PGP/MIME encryption and signature verification
   - Optional retry logic for `Send-EmailMessage` via `-RetryCount`, `-RetryDelayMilliseconds`, `-RetryDelayBackoff` and `-RetryAlways`.  Retries are only attempted for transient errors by default, but `-RetryAlways` forces retries on all errors.
   - Optional SMTP connection pooling via `-UseConnectionPool` and `-ConnectionPoolSize` for faster repeated sends. Use `Clear-SmtpConnectionPool` to reset the pool and `Test-SmtpConnection` to check if your server keeps connections open.
-  - Pooled connections are partitioned by account, TLS mode, certificate callback, revocation policy, and local domain. Message content belongs to the current caller. Connections with a caller-owned protocol logger are kept outside the pool.
+  - Pooled connections are partitioned by account, credential fingerprint, authentication mode, TLS mode, certificate callback, revocation policy, and local domain. Message content belongs to the current caller. Connections with a caller-owned protocol logger are kept outside the pool. .NET callers use `ConnectAndAuthenticateAsync`, or call `ConfigureAuthentication` before a separate `Connect` and `Authenticate`, to reuse authenticated connections. PowerShell supplies that context automatically.
 - POP3
   - [x] Connect to POP3
   - [x] Get POP3 Emails

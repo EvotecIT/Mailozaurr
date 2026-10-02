@@ -10,7 +10,7 @@ public static class GraphLargeAttachmentUploader {
         if (string.IsNullOrWhiteSpace(accessToken)) throw new ArgumentException("accessToken is required.", nameof(accessToken));
         if (string.IsNullOrWhiteSpace(messageId)) throw new ArgumentException("messageId is required.", nameof(messageId));
         if (attachments == null) throw new ArgumentNullException(nameof(attachments));
-        using var graph = new GraphApiClient(client, credential: new OAuthCredential { AccessToken = accessToken });
+        using var graph = new GraphApiClient(client, new OAuthCredential { AccessToken = accessToken }, new Uri("https://graph.microsoft.com/v1.0/"));
         foreach (var attachment in attachments) {
             if (attachment == null) continue;
             cancellationToken.ThrowIfCancellationRequested();

@@ -10,6 +10,24 @@ namespace Mailozaurr.Tests;
 [Collection("GraphCollection")]
 public sealed class SmtpAcceptedDeliveryTests {
     [Fact]
+    public async Task QueueFailure_UsesFirstRetryDelayAndReportsFailure() {
+        var repository = new RemovalFailureRepository(new PendingMessageRecord {
+            MessageId = "malformed@example.test", MimeMessage = "invalid base64!", NextAttemptAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+        });
+        var smtp = new Smtp {
+            PendingMessageRepository = repository, LogCollector = new LogCollector(),
+            RetryDelayMilliseconds = 1000, RetryDelayBackoff = 2
+        };
+        try {
+            var started = DateTimeOffset.UtcNow;
+            await smtp.ProcessPendingMessagesAsync();
+            var finished = DateTimeOffset.UtcNow;
+            Assert.InRange(repository.Record.NextAttemptAt, started.AddSeconds(1), finished.AddSeconds(1));
+            Assert.Contains(smtp.LogCollector.Logs, entry => entry.Type == LogType.Warning && entry.Message.Contains("malformed@example.test"));
+        } finally { smtp.Dispose(); }
+    }
+
+    [Fact]
     public async Task QueueRemovalFailure_PersistsAcceptanceAndWorkerDoesNotResend() {
         var client = new AcceptedClient();
         var smtp = await CreateAsync(client);

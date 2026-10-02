@@ -722,6 +722,7 @@ public partial class Smtp {
 
         var normalizedUserName = userName?.Trim() ?? string.Empty;
         Credential = new NetworkCredential(normalizedUserName, secret ?? string.Empty);
+        credentialAuthMode = authMode;
         var previousConnectionPoolIdentity = ConnectionPoolIdentity;
         var shouldOverrideConnectionPoolIdentity =
             string.IsNullOrWhiteSpace(previousConnectionPoolIdentity) &&
@@ -793,6 +794,7 @@ public partial class Smtp {
     /// <param name="isOAuth"></param>
     /// <returns></returns>
     public SmtpResult Authenticate(ICredentials Credentials, bool isOAuth = false) {
+        credentialAuthMode = isOAuth ? ProtocolAuthMode.OAuth2 : ProtocolAuthMode.Basic;
         if (DryRun) {
             LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "Authentication skipped (WhatIf)");
@@ -856,6 +858,7 @@ public partial class Smtp {
         ICredentials Credentials,
         bool isOAuth,
         CancellationToken cancellationToken) {
+        credentialAuthMode = isOAuth ? ProtocolAuthMode.OAuth2 : ProtocolAuthMode.Basic;
         cancellationToken.ThrowIfCancellationRequested();
         if (DryRun) {
             LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
@@ -955,6 +958,7 @@ public partial class Smtp {
     /// <param name="mechanism">Authentication mechanism to use.</param>
     /// <returns>An <see cref="SmtpResult"/> representing the outcome.</returns>
     public SmtpResult Authenticate(string username, string password, bool isSecureString, AuthenticationMechanism mechanism = AuthenticationMechanism.Auto) {
+        credentialAuthMode = ProtocolAuthMode.Basic;
         if (DryRun) {
             LogVerbose("Send-EmailMessage - DryRun enabled, skipping authentication.");
             return new SmtpResult(true, EmailAction.Authenticate, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "Authentication skipped (WhatIf)");

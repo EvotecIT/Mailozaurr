@@ -19,6 +19,7 @@ public partial class Smtp {
             var originalUseSsl = smtp._activeUseSsl;
             var originalIdentity = smtp.ConnectionPoolIdentity;
             var originalCredential = smtp.Credential;
+            var originalAuthMode = smtp.credentialAuthMode;
             try {
                 var data = record.ProviderData;
                 var options = originalSecureOptions;
@@ -33,6 +34,7 @@ public partial class Smtp {
                 if (!string.IsNullOrWhiteSpace(record.UserName)) smtp.ConnectionPoolIdentity = record.UserName;
                 smtp.Credential = string.IsNullOrEmpty(record.UserName) ? null :
                     new NetworkCredential(record.UserName, CredentialProtection.UnprotectWithFallback(record.Password));
+                smtp.credentialAuthMode = ProtocolAuthMode.Basic;
                 var server = record.Server ?? smtp.Server;
                 if (!string.IsNullOrWhiteSpace(server)) {
                     var connect = await smtp.ConnectAsync(server, record.Port ?? smtp.Port, options, useSsl, ct).ConfigureAwait(false);
@@ -68,6 +70,7 @@ public partial class Smtp {
                 smtp._activeUseSsl = originalUseSsl;
                 smtp.ConnectionPoolIdentity = originalIdentity;
                 smtp.Credential = originalCredential;
+                smtp.credentialAuthMode = originalAuthMode;
             }
         }
     }

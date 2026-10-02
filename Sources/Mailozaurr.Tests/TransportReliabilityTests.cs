@@ -215,6 +215,7 @@ public sealed class TransportReliabilityTests {
     private sealed class UploadLimitHandler : HttpMessageHandler {
         public readonly List<long> UploadedBytes = new();
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) {
+            if (request.Method == HttpMethod.Get) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"id\":\"draft\"}") });
             if (request.Method == HttpMethod.Post) {
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
                     Content = new StringContent(request.RequestUri!.AbsolutePath.EndsWith("createUploadSession", StringComparison.Ordinal) ?
@@ -241,6 +242,10 @@ public sealed class TransportReliabilityTests {
         using var attachment = DecodedMimeAttachment.DecodeToTempFile(part);
         var handler = new UploadLimitHandler();
         using var http = new HttpClient(handler);
+        if (!mailboxImport) {
+            using var priorRequest = await http.GetAsync("https://graph.microsoft.com/v1.0/me/messages/draft");
+            Assert.Null(http.BaseAddress);
+        }
         if (mailboxImport) {
             using var graph = new GraphApiClient(http, credential: new OAuthCredential { AccessToken = "audit-token" });
             using var message = new MimeMessage();

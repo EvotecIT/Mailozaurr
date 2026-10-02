@@ -73,6 +73,7 @@ public sealed partial class GmailApiClient {
 
         using var response = await GetAuthorizedAsync(url.ToString(), cancellationToken).ConfigureAwait(false);
         await ThrowIfAuthErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
 #if NET5_0_OR_GREATER
         var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 #else

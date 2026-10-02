@@ -57,8 +57,12 @@ public partial class Smtp {
             var factory = new PendingMessageSenderFactory(new[] {
                 new KeyValuePair<EmailProvider, IPendingMessageSender>(EmailProvider.None, new ConfiguredPendingSmtpSender(this))
             });
+            var queueLogger = new InternalLogger();
+            queueLogger.OnWarningMessage += (_, args) => LogWarning(args.Message);
+            queueLogger.OnVerboseMessage += (_, args) => LogVerbose(args.Message);
             var processor = new PendingMessageProcessor(PendingMessageRepository, factory,
-                retryDelaySelector: CalculateRetryDelay, maxRetryAttempts: int.MaxValue,
+                retryDelaySelector: attempt => CalculateRetryDelay(attempt - 1), maxRetryAttempts: int.MaxValue,
+                logger: queueLogger,
                 permanentFailureDetector: _ => false) { ProviderFilter = EmailProvider.None };
             await processor.ProcessAsync(cancellationToken).ConfigureAwait(false);
         } finally {
@@ -114,7 +118,8 @@ public partial class Smtp {
         } else if (!string.IsNullOrWhiteSpace(ConnectionPoolIdentity) && !string.Equals(ConnectionPoolIdentity, userName, StringComparison.Ordinal)) {
             userName = $"{ConnectionPoolIdentity}|{userName}";
         }
-        return (credential == null ? "unauthenticated:" : "authenticated:") + userName;
+        return credential == null ? "unauthenticated:" + userName :
+            $"authenticated:{userName}|{credentialAuthMode}|{GetCredentialFingerprint(credential)}";
     }
 
     private string GetPoolTransportPolicy() {

@@ -534,6 +534,13 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
         }
 
         var useSslFlag = UseSsl.IsPresent && !this.MyInvocation.BoundParameters.ContainsKey(nameof(SecureSocketOptions));
+        if (!UseDefaultCredentials && Credential != null) {
+            smtpClient.ConfigureAuthentication(new NetworkCredential(Credential.UserName, Credential.Password),
+                OAuth2 ? ProtocolAuthMode.OAuth2 : ProtocolAuthMode.Basic);
+        } else if (!UseDefaultCredentials && !string.IsNullOrWhiteSpace(Username)) {
+            smtpClient.ConfigureAuthentication(new NetworkCredential(Username,
+                smtpClient.ConvertSecureStringToPlainString(Password ?? string.Empty, AsSecureString)));
+        }
         var status = smtpClient.Connect(Server ?? string.Empty, Port, SecureSocketOptions, useSslFlag);
 
         // Emit logs after Connect operation

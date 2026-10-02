@@ -25,6 +25,7 @@ public sealed partial class GraphApiClient : IDisposable {
     private readonly Func<CancellationToken, Task<string>>? _refreshToken;
     private readonly OAuthCredential? _credential;
     private readonly bool _disposeClient;
+    private readonly Uri? _requestBaseAddress;
     private bool _disposed;
 
     /// <summary>Configured Microsoft Graph API base address.</summary>
@@ -37,6 +38,8 @@ public sealed partial class GraphApiClient : IDisposable {
     }
 
     private void ApplyAuthHeader(HttpRequestMessage request) {
+        if (_requestBaseAddress != null && request.RequestUri != null && !request.RequestUri.IsAbsoluteUri)
+            request.RequestUri = new Uri(_requestBaseAddress, request.RequestUri);
         request.Headers.TryAddWithoutValidation("Prefer", ImmutableIdPreference);
 
         // Avoid mutating HttpClient.DefaultRequestHeaders.Authorization (thread-safety + token refresh semantics).
@@ -65,6 +68,14 @@ public sealed partial class GraphApiClient : IDisposable {
         _client = new HttpClient {
             BaseAddress = baseAddress ?? new Uri("https://graph.microsoft.com/v1.0/")
         };
+    }
+
+    // Upload adapters must support caller-owned clients whose requests have already
+    // started. Resolve Graph requests locally without changing their BaseAddress.
+    internal GraphApiClient(HttpClient client, OAuthCredential credential, Uri requestBaseAddress) {
+        _client = client ?? throw new ArgumentNullException(nameof(client));
+        _credential = credential ?? throw new ArgumentNullException(nameof(credential));
+        _requestBaseAddress = requestBaseAddress ?? throw new ArgumentNullException(nameof(requestBaseAddress));
     }
 
     /// <summary>

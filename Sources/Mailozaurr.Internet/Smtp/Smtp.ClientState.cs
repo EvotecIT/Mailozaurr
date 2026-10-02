@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Net.Security;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Mailozaurr;
 
@@ -14,8 +16,43 @@ public partial class Smtp {
     private static readonly RemoteCertificateValidationCallback AcceptAnyCertificate = (_, _, _, _) => true;
     private string? connectedPoolPolicy;
     private bool reusableAuthentication = true;
+    private ProtocolAuthMode credentialAuthMode;
+    private static readonly byte[] PoolCredentialKey = CreatePoolCredentialKey();
+
+    /// <summary>Supplies the authentication context used to select a pooled connection before calling Connect.</summary>
+    /// <remarks>This configures credentials; it does not authenticate. Call Authenticate after Connect, or use ConnectAndAuthenticateAsync.</remarks>
+    /// <param name="credential">Account credentials for the connection.</param>
+    /// <param name="mode">Basic or OAuth2 authentication.</param>
+    public void ConfigureAuthentication(NetworkCredential credential, ProtocolAuthMode mode = ProtocolAuthMode.Basic) {
+        if (credential == null) throw new ArgumentNullException(nameof(credential));
+        if (mode != ProtocolAuthMode.Basic && mode != ProtocolAuthMode.OAuth2) throw new ArgumentOutOfRangeException(nameof(mode));
+        Credential = new NetworkCredential(credential.UserName, credential.Password, credential.Domain);
+        credentialAuthMode = mode;
+    }
+
+    private static byte[] CreatePoolCredentialKey() {
+        var key = new byte[32];
+        using var random = RandomNumberGenerator.Create();
+        random.GetBytes(key);
+        return key;
+    }
+
+    private static string GetCredentialFingerprint(NetworkCredential credential) {
+        var user = credential.UserName;
+        var domain = credential.Domain;
+        var secret = credential.Password;
+        var bytes = Encoding.UTF8.GetBytes($"{user.Length}:{user}{domain.Length}:{domain}{secret.Length}:{secret}");
+        try {
+            using var hash = new HMACSHA256(PoolCredentialKey);
+            return Convert.ToBase64String(hash.ComputeHash(bytes));
+        } finally {
+            Array.Clear(bytes, 0, bytes.Length);
+        }
+    }
 
     private bool ReuseAuthentication(NetworkCredential? credential) {
+        if (credential != null && !SmtpValidation.TryValidateCredentials(credential.UserName, credential.Password, out var error))
+            throw new InvalidOperationException(error);
         if (!Client.IsAuthenticated) return false;
         if (credential == null || !string.Equals(_poolIdentity, GetPoolUserIdentity(credential) + "|" + connectedPoolPolicy, StringComparison.Ordinal)) {
             throw new InvalidOperationException("The SMTP connection is already authenticated for a different or unknown identity.");
