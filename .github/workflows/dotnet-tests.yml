@@ -89,11 +89,11 @@ jobs:
         if: always()
         with:
           name: coverage-reports-windows
-          path: '**/coverage.cobertura.xml'
+          path: 'TestResults/*.cobertura.xml'
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
-          files: '**/coverage.cobertura.xml'
+          directory: TestResults
           fail_ci_if_error: false
 
   test-ubuntu:
@@ -163,11 +163,11 @@ jobs:
         if: always()
         with:
           name: coverage-reports-ubuntu
-          path: '**/coverage.cobertura.xml'
+          path: 'TestResults/*.cobertura.xml'
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
-          files: '**/coverage.cobertura.xml'
+          directory: TestResults
           fail_ci_if_error: false
 
   test-macos:
@@ -237,11 +237,11 @@ jobs:
         if: always()
         with:
           name: coverage-reports-macos
-          path: '**/coverage.cobertura.xml'
+          path: 'TestResults/*.cobertura.xml'
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
-          files: '**/coverage.cobertura.xml'
+          directory: TestResults
           fail_ci_if_error: false
 
   test-module-alc:
