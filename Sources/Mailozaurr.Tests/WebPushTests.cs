@@ -9,6 +9,18 @@ namespace Mailozaurr.Tests;
 
 public sealed class WebPushTests {
     [Fact]
+    public async Task CallerOwnedClient_RetainsConfiguredDeadlineAndRemainsUsableAfterSenderDisposal() {
+        using var http = new System.Net.Http.HttpClient(new PushHandler((_,_) => Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.Created)))) {
+            Timeout = TimeSpan.FromMinutes(2)
+        };
+        using (var sender = new WebPushClient(http)) {
+            Assert.Equal(TimeSpan.FromMinutes(2),http.Timeout);
+        }
+        using var response = await http.GetAsync("https://fcm.googleapis.com/test");
+        Assert.Equal(System.Net.HttpStatusCode.Created,response.StatusCode);
+    }
+
+    [Fact]
     public void DiagnosticStrings_DoNotExposeCredentialsOrSubscriptionSecrets() {
         var credentials = new WebPushCredentials("public-key", "private-secret", "mailto:ops@example.com");
         var subscription = new WebPushSubscription(new Uri("https://fcm.googleapis.com/secret-token"), "browser-key", "auth-secret");

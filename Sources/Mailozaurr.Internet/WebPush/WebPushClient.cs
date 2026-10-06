@@ -40,6 +40,7 @@ public sealed record WebPushResult(HttpStatusCode StatusCode, DateTimeOffset? Re
 /// <summary>Sends RFC 8291 encrypted Web Push messages on .NET 8 or later. The default transport never follows redirects.</summary>
 public sealed class WebPushClient : IDisposable {
     private readonly HttpClient client;
+    private readonly bool ownsClient;
 
     /// <summary>Creates a reusable sender with a 30-second timeout and redirects disabled.</summary>
     public WebPushClient() : this(new HttpClientHandler { AllowAutoRedirect = false }) { }
@@ -48,6 +49,13 @@ public sealed class WebPushClient : IDisposable {
     public WebPushClient(HttpMessageHandler handler) {
         ArgumentNullException.ThrowIfNull(handler);
         client = new HttpClient(handler, disposeHandler:true) { Timeout = TimeSpan.FromSeconds(30) };
+        ownsClient = true;
+    }
+
+    /// <summary>Uses a caller-owned client without changing its timeout or headers. Its transport must disable redirects and must not rewrite destination hosts.</summary>
+    public WebPushClient(HttpClient client) {
+        ArgumentNullException.ThrowIfNull(client);
+        this.client = client;
     }
 
     /// <summary>Sends one message and returns the push service status. HTTP 404/410 mean the subscription should be removed; transport errors propagate.</summary>
@@ -79,6 +87,6 @@ public sealed class WebPushClient : IDisposable {
     }
 
     /// <summary>Disposes the owned HTTP client and transport.</summary>
-    public void Dispose() => client.Dispose();
+    public void Dispose() { if (ownsClient) client.Dispose(); }
 }
 #endif
