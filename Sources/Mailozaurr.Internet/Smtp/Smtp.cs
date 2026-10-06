@@ -1045,10 +1045,9 @@ public partial class Smtp {
                 var identity = _poolIdentity ?? GetConnectionPoolIdentity();
                 ReturnConnectionToPool(Server, Port, identity);
                 clientToDispose = Client;
-            } else {
-                Client.Disconnect(true);
             }
         }
+        // ClientSmtp.Dispose owns best-effort QUIT and closes the transport even if QUIT fails.
         clientToDispose.Dispose();
         Stopwatch.Stop();
     }

@@ -10,6 +10,37 @@ namespace Mailozaurr.Tests;
 [Collection("GraphCollection")]
 public sealed class SmtpAcceptedDeliveryTests {
     [Fact]
+    public async Task AcceptedMessage_RemainsAcceptedWhenQuitFails_AndClientIsDisposed() {
+        var client = new FailedQuitClient();
+        var smtp = await CreateAsync(client);
+        var result = await smtp.SendAsync();
+        Assert.True(result.DeliveryAccepted);
+        Assert.True(result.Status);
+        smtp.Dispose();
+        Assert.Equal(1,client.Sends);
+        Assert.Equal(1,client.QuitAttempts);
+        Assert.True(client.Disposed);
+    }
+
+    private sealed class FailedQuitClient : ClientSmtp {
+        internal int Sends;
+        internal int QuitAttempts;
+        internal bool Disposed;
+        public override bool IsConnected => !Disposed;
+        public override Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
+            Sends++;
+            return Task.FromResult("accepted");
+        }
+        public override void Disconnect(bool quit, CancellationToken cancellationToken = default) {
+            QuitAttempts++;
+            throw new IOException("Server closed after accepting DATA.");
+        }
+        protected override void Dispose(bool disposing) {
+            try { base.Dispose(disposing); } finally { Disposed = true; }
+        }
+    }
+
+    [Fact]
     public async Task QueueFailure_UsesFirstRetryDelayAndReportsFailure() {
         var repository = new RemovalFailureRepository(new PendingMessageRecord {
             MessageId = "malformed@example.test", MimeMessage = "invalid base64!", NextAttemptAt = DateTimeOffset.UtcNow.AddMinutes(-1)
