@@ -45,10 +45,12 @@
 
   <ItemGroup Condition=" '$(UseOfficeIMOProjectReferences)' == 'true' ">
     <ProjectReference Include="$(OfficeIMORoot)\OfficeIMO.Email\OfficeIMO.Email.csproj" />
+    <ProjectReference Include="$(OfficeIMORoot)\OfficeIMO.Email.Html\OfficeIMO.Email.Html.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(UseOfficeIMOProjectReferences)' != 'true' ">
     <PackageReference Include="OfficeIMO.Email" Version="$(OfficeIMOVersion)" />
+    <PackageReference Include="OfficeIMO.Email.Html" Version="$(OfficeIMOVersion)" />
   </ItemGroup>
 
   <ItemGroup>

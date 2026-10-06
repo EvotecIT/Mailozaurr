@@ -46,6 +46,7 @@ In V2, some functionality was moved to dedicated projects:
 - [MailKit](https://github.com/jstedfast/MailKit) - licensed MIT
 - [MimeKit](https://github.com/jstedfast/MimeKit) - licensed MIT
 - [OfficeIMO.Email](https://github.com/EvotecIT/OfficeIMO) - licensed MIT
+- [OfficeIMO.Email.Html](https://github.com/EvotecIT/OfficeIMO) - licensed MIT; safe body projection and local HTML copies
 
 For OAuth2 support, Mailozaurr also bundles:
 
@@ -69,14 +70,49 @@ Applications with a narrower job can avoid unrelated provider stacks:
 | SMTP, IMAP, POP3, MIME, SendGrid, Mailgun, or SES | `Mailozaurr.Internet` | Microsoft and Google auth; OfficeIMO |
 | Microsoft Graph mail | `Mailozaurr.MicrosoftGraph` | Google auth; OfficeIMO |
 | Gmail API mail | `Mailozaurr.Gmail` | Microsoft auth; OfficeIMO |
-| `EmailDocument` and `MimeMessage` interoperability, EML/MSG/OFT/TNEF | `Mailozaurr.Artifacts` | Internet protocols and provider auth |
+| Local messages, archives, attachments, HTML copies, and `MimeMessage` interoperability | `Mailozaurr.Artifacts` | Internet protocols and provider auth |
 | Local email and Outlook artifacts without MimeKit | `OfficeIMO.Email` | Every Mailozaurr package |
 
-Graph and Gmail depend on `Mailozaurr.Internet`, so those packages also include the common MIME and protocol foundation. `Mailozaurr.Artifacts` is independent of Internet and depends only on MimeKit and OfficeIMO.Email. Add `OfficeIMO.Security` explicitly in C# when artifact verification or decryption needs its concrete provider.
+Graph and Gmail depend on `Mailozaurr.Internet`, so those packages also include the common MIME and protocol foundation. `Mailozaurr.Artifacts` is independent of Internet and depends on MimeKit, OfficeIMO.Email, and OfficeIMO.Email.Html. The HTML bridge brings OfficeIMO.Html and OfficeIMO.Html.Rtf for body parsing, safe projection, and embedded resource handling. Add `OfficeIMO.Security` explicitly in C# when artifact verification or decryption needs its concrete provider.
 
 The PowerShell module remains one batteries-included installation. It consumes the complete `Mailozaurr` package and includes OfficeIMO.Security; PowerShell users do not select NuGet leaves.
 
-## EML, MSG, OFT, and TNEF files
+## Read messages, save attachments, and export copies
+
+Use the same message flow for local email files and supported offline archives:
+
+```powershell
+$mail = Get-MailMessage './Archive.pst' -SubjectContains 'invoice' -First 1
+$mail.TextBody
+$mail | Get-MailAttachment -FileName '*.pdf', '*.xlsx'
+$mail | Save-MailAttachment './Extracted' -FileName '*.pdf' -PassThru
+$mail | Get-MailAttachment -InlineOnly -ContentType 'image/*' |
+    Save-MailAttachment './Images' -PassThru
+$mail | Export-MailFile './Invoice.html' -IncludeAttachments -PassThru
+$mail | Export-MailFile './Invoice.eml' -AllowLoss
+```
+
+`Get-MailMessage` closes its reader before returning bodies and attachment metadata. Saving or exporting reopens the unchanged source for the operation; the view remains usable afterward. `Path` accepts files and wildcard patterns. `Folder` accepts an exact store folder path or unique name; `Recurse` includes descendants. `Since` is inclusive and `Before` exclusive, using received date with sent-date fallback. `First` defaults to 1,000 and limits matches across all paths in source order. `MaxItemsScanned` bounds summaries examined per source and warns when the search stops at its limit.
+
+Attachment saving creates one folder per message. `Flatten` puts source-specific filenames into one directory. Filenames are portable and existing files are never overwritten; `PassThru` returns the saved path, original filename, SHA-256, byte count, and message provenance. Ordinary and inline attachments are both included unless filtered. Extraction defaults allow 1,000 attachments, 64 MiB per file, and 256 MiB per operation; unavailable content and failures are reported.
+
+HTML export uses the safe OfficeIMO.Email.Html projection, saves embedded resources, and rewrites supported image and CSS references without downloading remote resources. `IncludeAttachments` adds saved regular files and links. Keep the generated `.assets-<id>` directory alongside the HTML; `Force` creates a fresh resource directory when replacing HTML, retaining earlier resources. Native conversions block unrepresentable metadata by default; `AllowLoss` reports permitted losses as warnings without bypassing integrity restrictions.
+
+For batches or several queries over the same archive:
+
+```powershell
+Invoke-MailStore './Archive.pst' {
+    param($store)
+    $invoices = $store | Get-MailMessage -SubjectContains 'invoice' -First 25
+    $contracts = $store | Get-MailMessage -SubjectContains 'contract' -First 25
+    $invoices | Save-MailAttachment './Invoices' -FileName '*.pdf'
+    $contracts | Export-MailFile -OutputDirectory './Contracts' -Format Html
+}
+```
+
+The scope reuses a reader for queries and closes it even when the block throws. Payload operations still reopen the source independently, and returned message views remain usable after the scope closes. An OST is an offline cache: inspect `ContentAvailability`, and expect errors if payloads are missing. The reader supports PST-compatible OST data and cannot fetch uncached content. Work from an offline source copy.
+
+## Lower-level EML, MSG, OFT, and TNEF files
 
 Mailozaurr keeps transport, mailbox access, MimeKit message composition, PGP, DKIM, ARC, and outbound S/MIME workflows. OfficeIMO.Email owns local EML, MSG, OFT, and TNEF artifact reading, writing, and projection, including typed Outlook items, RTF-backed bodies, embedded items, retained MAPI properties, and bounded S/MIME verification through OfficeIMO.Security.
 
