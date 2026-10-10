@@ -7,9 +7,9 @@ using EmailMessage = OfficeIMO.Email.EmailMessage;
 /// <summary>
 /// <para type="synopsis">Reads messages from local email files or offline archives.</para>
 /// <para type="description">Returns bodies, recipient addresses and attachment descriptions without leaving a source open. First limits matching messages across all input paths. MaxItemsScanned limits summaries examined per source and emits a warning when reached. Payload operations require the original source to remain unchanged.</para>
+/// </summary>
 /// <example><summary>Read one matching invoice</summary><code>$mail = Get-MailMessage -Path './Archive.pst' -SubjectContains 'invoice' -First 1</code></example>
 /// <example><summary>Read EML and MSG files</summary><code>Get-MailMessage -Path './Mail/*.eml', './Mail/*.msg'</code></example>
-/// </summary>
 [Cmdlet(VerbsCommon.Get, "MailMessage", DefaultParameterSetName = "Store")]
 [OutputType(typeof(EmailMessage))]
 public sealed class CmdletGetMailMessage : AsyncPSCmdlet {

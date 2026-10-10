@@ -30,13 +30,13 @@ Returns bodies, recipient addresses and attachment descriptions without leaving 
 
 ### EXAMPLE 1
 ```powershell
-Get-MailMessage -InputObject 'Value'
+$mail = Get-MailMessage -Path './Archive.pst' -SubjectContains 'invoice' -First 1
 ```
 
 
 ### EXAMPLE 2
 ```powershell
-Get-MailMessage -Path @('C:\Path')
+Get-MailMessage -Path './Mail/*.eml', './Mail/*.msg'
 ```
 
 

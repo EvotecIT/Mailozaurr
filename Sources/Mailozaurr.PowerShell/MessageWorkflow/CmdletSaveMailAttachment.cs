@@ -7,9 +7,9 @@ using EmailMessage = OfficeIMO.Email.EmailMessage;
 /// <summary>
 /// <para type="synopsis">Saves selected message attachments and inline images.</para>
 /// <para type="description">Uses bounded, atomic attachment extraction. By default each message gets its own folder; Flatten uses message-prefixed filenames in one folder. Original filenames remain in PassThru records. Existing files are never overwritten. Source files must remain unchanged.</para>
-/// <example><summary>Save PDFs from messages</summary><code>$messages | Save-MailAttachment -Path './Extracted' -FileName '*.pdf' -PassThru</code></example>
-/// <example><summary>Save inline images</summary><code>$mail | Get-MailAttachment -InlineOnly -ContentType 'image/*' | Save-MailAttachment './Images' -PassThru</code></example>
 /// </summary>
+/// <example><summary>Save PDFs from messages</summary><code>Get-MailMessage -Path './Mail/*.eml' | Save-MailAttachment -Path './Extracted' -FileName '*.pdf' -PassThru</code></example>
+/// <example><summary>Save inline images</summary><code>Get-MailMessage -Path './Mail/invoice.eml' | Get-MailAttachment -InlineOnly -ContentType 'image/*' | Save-MailAttachment -Path './Images' -PassThru</code></example>
 [Cmdlet(VerbsData.Save, "MailAttachment", SupportsShouldProcess = true)]
 [OutputType(typeof(MailSavedAttachment))]
 public sealed class CmdletSaveMailAttachment : MailAttachmentCmdletBase {

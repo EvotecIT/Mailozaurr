@@ -7990,15 +7990,22 @@ ensure credentials are disposed and not kept in memory.</maml:para>
     </maml:alertSet>
     <command:examples>
       <command:example>
-        <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Export-MailFile -OutputPath 'C:\Path' -InputObject 'Value'</dev:code>
+        <maml:title>Convert an Outlook MSG file to EML</maml:title>
+        <dev:code>Get-MailMessage -Path './message.msg' | Export-MailFile -OutputPath './message.eml' -AllowLoss -PassThru</dev:code>
+        <dev:remarks>
+          <maml:para>AllowLoss accepts the omission of Outlook metadata that EML cannot represent.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Create a readable local copy</maml:title>
+        <dev:code>Get-MailMessage -Path './Mail/invoice.eml' | Export-MailFile -OutputPath './Invoice.html' -IncludeAttachments -PassThru</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
       </command:example>
       <command:example>
-        <maml:title>EXAMPLE 2</maml:title>
-        <dev:code>Export-MailFile -InputObject 'Value' -OutputDirectory 'Value' -Format 'Value'</dev:code>
+        <maml:title>Export several messages</maml:title>
+        <dev:code>Get-MailMessage -Path './Mail/*.eml' | Export-MailFile -OutputDirectory './EmailCopies' -Format Eml -PassThru</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -14289,8 +14296,8 @@ message and folder counts as well as attachment sizes.</maml:para>
     </maml:alertSet>
     <command:examples>
       <command:example>
-        <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Get-MailAttachment -InputObject 'Value'</dev:code>
+        <maml:title>Find inline images</maml:title>
+        <dev:code>Get-MailMessage -Path './Mail/invoice.eml' | Get-MailAttachment -InlineOnly -ContentType 'image/*'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -14679,15 +14686,15 @@ message and folder counts as well as attachment sizes.</maml:para>
     </maml:alertSet>
     <command:examples>
       <command:example>
-        <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Get-MailMessage -InputObject 'Value'</dev:code>
+        <maml:title>Read one matching invoice</maml:title>
+        <dev:code>$mail = Get-MailMessage -Path './Archive.pst' -SubjectContains 'invoice' -First 1</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
       </command:example>
       <command:example>
-        <maml:title>EXAMPLE 2</maml:title>
-        <dev:code>Get-MailMessage -Path @('C:\Path')</dev:code>
+        <maml:title>Read EML and MSG files</maml:title>
+        <dev:code>Get-MailMessage -Path './Mail/*.eml', './Mail/*.msg'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -16764,8 +16771,8 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     </maml:alertSet>
     <command:examples>
       <command:example>
-        <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Invoke-MailStore -Path 'C:\Path' -ScriptBlock { }</dev:code>
+        <maml:title>Read messages from one open store</maml:title>
+        <dev:code>Invoke-MailStore './Archive.pst' { param($store) $store | Get-MailMessage -Folder Inbox -First 10 }</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -26677,8 +26684,15 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     </maml:alertSet>
     <command:examples>
       <command:example>
-        <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Save-MailAttachment -Path 'C:\Path' -InputObject 'Value'</dev:code>
+        <maml:title>Save PDFs from messages</maml:title>
+        <dev:code>Get-MailMessage -Path './Mail/*.eml' | Save-MailAttachment -Path './Extracted' -FileName '*.pdf' -PassThru</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Save inline images</maml:title>
+        <dev:code>Get-MailMessage -Path './Mail/invoice.eml' | Get-MailAttachment -InlineOnly -ContentType 'image/*' | Save-MailAttachment -Path './Images' -PassThru</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>

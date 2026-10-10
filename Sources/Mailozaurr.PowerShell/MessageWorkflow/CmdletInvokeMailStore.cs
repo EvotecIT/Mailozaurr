@@ -5,8 +5,8 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// <para type="synopsis">Runs a script block with an automatically closed local mail-store scope.</para>
 /// <para type="description">Passes one store scope to the script block. Repeated Get-MailMessage calls reuse its reader. The store closes on completion, cancellation or a terminating error. Returned message views remain usable while their source file is unchanged.</para>
-/// <example><summary>Read several groups from one open store</summary><code>Invoke-MailStore './Archive.pst' { param($store) $store | Get-MailMessage -Folder Inbox -First 10 }</code></example>
 /// </summary>
+/// <example><summary>Read messages from one open store</summary><code>Invoke-MailStore './Archive.pst' { param($store) $store | Get-MailMessage -Folder Inbox -First 10 }</code></example>
 [Cmdlet(VerbsLifecycle.Invoke, "MailStore")]
 [OutputType(typeof(object))]
 public sealed class CmdletInvokeMailStore : PSCmdlet {

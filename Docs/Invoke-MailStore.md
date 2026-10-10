@@ -25,7 +25,7 @@ Passes one store scope to the script block. Repeated Get-MailMessage calls reuse
 
 ### EXAMPLE 1
 ```powershell
-Invoke-MailStore -Path 'C:\Path' -ScriptBlock { }
+Invoke-MailStore './Archive.pst' { param($store) $store | Get-MailMessage -Folder Inbox -First 10 }
 ```
 
 

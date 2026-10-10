@@ -7,10 +7,10 @@ using EmailMessage = OfficeIMO.Email.EmailMessage;
 /// <summary>
 /// <para type="synopsis">Exports messages as EML, MSG, OFT, TNEF, or local HTML copies.</para>
 /// <para type="description">Accepts Get-MailMessage views, native documents, or Import-MailFile messages. OutputPath exports one message with format inferred from its extension. OutputDirectory exports message views with portable source-specific names. HTML saves embedded images locally; IncludeAttachments also saves regular files and adds links. Remote resources are blocked. Legacy Import-MailFile input is disposed after an attempted export unless KeepInputOpen is used; Get-MailMessage views remain usable.</para>
-/// <example><summary>Convert an Outlook MSG file to EML</summary><code>Import-MailFile './message.msg' | Export-MailFile './message.eml'</code></example>
-/// <example><summary>Create a readable local copy</summary><code>$mail | Export-MailFile -Path './Invoice.html' -IncludeAttachments -PassThru</code></example>
-/// <example><summary>Export several messages</summary><code>$messages | Export-MailFile -OutputDirectory './EmailCopies' -Format Eml -PassThru</code></example>
 /// </summary>
+/// <example><summary>Convert an Outlook MSG file to EML</summary><code>Get-MailMessage -Path './message.msg' | Export-MailFile -OutputPath './message.eml' -AllowLoss -PassThru</code><para>AllowLoss accepts the omission of Outlook metadata that EML cannot represent.</para></example>
+/// <example><summary>Create a readable local copy</summary><code>Get-MailMessage -Path './Mail/invoice.eml' | Export-MailFile -OutputPath './Invoice.html' -IncludeAttachments -PassThru</code></example>
+/// <example><summary>Export several messages</summary><code>Get-MailMessage -Path './Mail/*.eml' | Export-MailFile -OutputDirectory './EmailCopies' -Format Eml -PassThru</code></example>
 [Cmdlet(VerbsData.Export, "MailFile", SupportsShouldProcess = true, DefaultParameterSetName = "File")]
 [OutputType(typeof(FileInfo))]
 public sealed class CmdletExportMailFile : AsyncPSCmdlet {

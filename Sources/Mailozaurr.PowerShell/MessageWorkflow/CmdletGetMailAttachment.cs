@@ -5,8 +5,8 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// <para type="synopsis">Lists or filters a message's attachment descriptions.</para>
 /// <para type="description">Includes regular files, inline resources and hidden attachments by default. The command reads metadata already present on the message and does not reopen the source or save bytes.</para>
-/// <example><summary>Find inline images</summary><code>$mail | Get-MailAttachment -InlineOnly -ContentType 'image/*'</code></example>
 /// </summary>
+/// <example><summary>Find inline images</summary><code>Get-MailMessage -Path './Mail/invoice.eml' | Get-MailAttachment -InlineOnly -ContentType 'image/*'</code></example>
 [Cmdlet(VerbsCommon.Get, "MailAttachment")]
 [OutputType(typeof(EmailMessageAttachment))]
 public sealed class CmdletGetMailAttachment : MailAttachmentCmdletBase {

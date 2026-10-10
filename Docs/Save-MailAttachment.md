@@ -25,7 +25,13 @@ Uses bounded, atomic attachment extraction. By default each message gets its own
 
 ### EXAMPLE 1
 ```powershell
-Save-MailAttachment -Path 'C:\Path' -InputObject 'Value'
+Get-MailMessage -Path './Mail/*.eml' | Save-MailAttachment -Path './Extracted' -FileName '*.pdf' -PassThru
+```
+
+
+### EXAMPLE 2
+```powershell
+Get-MailMessage -Path './Mail/invoice.eml' | Get-MailAttachment -InlineOnly -ContentType 'image/*' | Save-MailAttachment -Path './Images' -PassThru
 ```
 
 

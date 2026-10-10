@@ -25,7 +25,7 @@ Includes regular files, inline resources and hidden attachments by default. The 
 
 ### EXAMPLE 1
 ```powershell
-Get-MailAttachment -InputObject 'Value'
+Get-MailMessage -Path './Mail/invoice.eml' | Get-MailAttachment -InlineOnly -ContentType 'image/*'
 ```
 
 

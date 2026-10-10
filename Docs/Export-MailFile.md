@@ -30,13 +30,20 @@ Accepts Get-MailMessage views, native documents, or Import-MailFile messages. Ou
 
 ### EXAMPLE 1
 ```powershell
-Export-MailFile -OutputPath 'C:\Path' -InputObject 'Value'
+Get-MailMessage -Path './message.msg' | Export-MailFile -OutputPath './message.eml' -AllowLoss -PassThru
 ```
 
+AllowLoss accepts the omission of Outlook metadata that EML cannot represent.
 
 ### EXAMPLE 2
 ```powershell
-Export-MailFile -InputObject 'Value' -OutputDirectory 'Value' -Format 'Value'
+Get-MailMessage -Path './Mail/invoice.eml' | Export-MailFile -OutputPath './Invoice.html' -IncludeAttachments -PassThru
+```
+
+
+### EXAMPLE 3
+```powershell
+Get-MailMessage -Path './Mail/*.eml' | Export-MailFile -OutputDirectory './EmailCopies' -Format Eml -PassThru
 ```
 
 
