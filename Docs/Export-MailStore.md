@@ -10,10 +10,12 @@ Exports selected items from a PST, OST, OLM, Mbox, EMLX, or mailbox directory.
 
 Delegates to OfficeIMO.Email for EML, MSG, OFT, TNEF, Mbox, Maildir, or EMLX output. The source store remains read-only and the native preservation report is returned.
 
+Unsupported source metadata blocks export unless AllowLoss is specified. The preservation report retains conversion diagnostics.
+
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-Export-MailStore [-OutputPath] <string> [-Format] <string> -InputObject <Object> [-FolderId <string>] [-IncludeDescendants] [-IncludeAssociatedItems] [-IncludeOrphanedItems] [-Flatten] [-NoManifest] [-StopOnError] [-Force] [-MaxItems <int>] [-WhatIf] [-Confirm] [<CommonParameters>]
+Export-MailStore [-OutputPath] <string> [-Format] <string> -InputObject <Object> [-FolderId <string>] [-IncludeDescendants] [-IncludeAssociatedItems] [-IncludeOrphanedItems] [-Flatten] [-NoManifest] [-StopOnError] [-Force] [-AllowLoss] [-MaxItems <int>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -21,15 +23,46 @@ Exports selected items from a PST, OST, OLM, Mbox, EMLX, or mailbox directory.
 
 Delegates to OfficeIMO.Email for EML, MSG, OFT, TNEF, Mbox, Maildir, or EMLX output. The source store remains read-only and the native preservation report is returned.
 
+Unsupported source metadata blocks export unless AllowLoss is specified. The preservation report retains conversion diagnostics.
+
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```powershell
-Export-MailStore -InputObject 'Value'
+Export-MailStore -InputObject $data -OutputPath './export' -Format Eml
+```
+
+
+### EXAMPLE 2
+```powershell
+Export-MailStore -InputObject $data -OutputPath './portable.mbox' -Format Mbox -AllowLoss
+```
+
+The returned preservation report includes warnings for source metadata that the destination cannot represent.
+
+### EXAMPLE 3
+```powershell
+Export-MailStore -InputObject $data -OutputPath './archive.mbox' -Format Mbox -FolderId $folder.Id -IncludeDescendants
 ```
 
 
 ## PARAMETERS
+
+### -AllowLoss
+Allows unsupported source metadata to be omitted from exported messages.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
 
 ### -Flatten
 Flattens folder hierarchy for directory-based output.

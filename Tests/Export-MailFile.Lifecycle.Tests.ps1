@@ -2,7 +2,7 @@ Describe 'Export-MailFile input ownership' {
     BeforeAll {
         $script:previousDevelopmentMode = $env:MAILOZAURR_DEVELOPMENT
         $env:MAILOZAURR_DEVELOPMENT = '1'
-        $modulePath = Resolve-Path "$PSScriptRoot/../Mailozaurr.psd1"
+        $modulePath = if ($env:MAILOZAURR_TEST_MODULE_PATH) { $env:MAILOZAURR_TEST_MODULE_PATH } else { Resolve-Path "$PSScriptRoot/../Mailozaurr.psd1" }
         Remove-Module Mailozaurr -Force -ErrorAction SilentlyContinue
         Import-Module $modulePath -Force -ErrorAction Stop
 

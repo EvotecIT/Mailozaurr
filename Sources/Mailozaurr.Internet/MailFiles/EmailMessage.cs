@@ -1,9 +1,8 @@
-using MimeKit;
 using OfficeIMO.Email;
 
 namespace Mailozaurr;
 
-/// <summary>Converts EML and Outlook MSG artifacts through OfficeIMO.Email and MimeKit.</summary>
+/// <summary>Converts EML and Outlook MSG artifacts through OfficeIMO.Email.</summary>
 public static class EmailMessage {
     /// <summary>Converts one or more EML files to MSG format.</summary>
     public static IEnumerable<EmlConversionResult> ConvertEmlToMsg(string[] emlFile, string outputFolder,
@@ -76,15 +75,32 @@ public static class EmailMessage {
         return ConvertFiles(msgFile, outputFolder, ".eml", ConvertMsgToEml, force);
     }
 
+    /// <summary>Converts MSG files to EML using an explicit OfficeIMO serialization and loss policy.</summary>
+    public static IEnumerable<MsgConversionResult> ConvertMsgToEml(string[] msgFile, string outputFolder,
+        bool force, EmailWriterOptions options) {
+        if (msgFile == null) throw new ArgumentNullException(nameof(msgFile));
+        if (options == null) throw new ArgumentNullException(nameof(options));
+        return ConvertFiles(msgFile, outputFolder, ".eml",
+            (source, target, overwrite) => ConvertMsgToEml(source, target, overwrite, options), force);
+    }
+
     /// <summary>Converts one MSG file to EML format.</summary>
-    public static MsgConversionResult ConvertMsgToEml(FileInfo msgFile, FileInfo emlFile, bool force) {
+    public static MsgConversionResult ConvertMsgToEml(FileInfo msgFile, FileInfo emlFile, bool force) =>
+        ConvertMsgToEml(msgFile, emlFile, force, EmailWriterOptions.Default);
+
+    /// <summary>Converts one MSG file to EML using an explicit OfficeIMO serialization and loss policy.</summary>
+    /// <remarks>The overload without options blocks known metadata loss. Select a nonblocking conversion-loss policy explicitly when that loss is acceptable.</remarks>
+    public static MsgConversionResult ConvertMsgToEml(FileInfo msgFile, FileInfo emlFile, bool force,
+        EmailWriterOptions options) {
+        if (options == null) throw new ArgumentNullException(nameof(options));
         if (!File.Exists(msgFile.FullName)) return MissingMsg(msgFile, emlFile);
         EnsureOutputDirectory(emlFile);
         string tempFile = CreateTempOutputPath(emlFile);
         try {
             using MailFileMessage source = MailFileMessage.Load(msgFile, RichReadOptions());
-            MimeMessage mimeMessage = source.ToMimeMessage();
-            mimeMessage.WriteTo(tempFile);
+            EmailWriteResult writeResult = new EmailDocumentWriter(options)
+                .Write(source.OfficeDocument, tempFile, EmailFileFormat.Eml);
+            MailFileDiagnostics.ThrowIfErrors(writeResult.Diagnostics, "The EML file could not be written");
             return TryFinalizeConvertedFile(tempFile, emlFile.FullName, force, "EML file already exists",
                 out string? error)
                 ? new MsgConversionResult { MsgFile = msgFile.FullName, EmlFile = emlFile.FullName, Status = true }
@@ -101,17 +117,24 @@ public static class EmailMessage {
     }
 
     /// <summary>Asynchronously converts one MSG file to EML format.</summary>
+    public static Task<MsgConversionResult> ConvertMsgToEmlAsync(FileInfo msgFile, FileInfo emlFile,
+        bool force, CancellationToken cancellationToken = default) =>
+        ConvertMsgToEmlAsync(msgFile, emlFile, force, EmailWriterOptions.Default, cancellationToken);
+
+    /// <summary>Asynchronously converts one MSG file to EML using an explicit OfficeIMO serialization and loss policy.</summary>
+    /// <remarks>The overload without options blocks known metadata loss. Cancellation still propagates to the caller.</remarks>
     public static async Task<MsgConversionResult> ConvertMsgToEmlAsync(FileInfo msgFile, FileInfo emlFile,
-        bool force, CancellationToken cancellationToken = default) {
+        bool force, EmailWriterOptions options, CancellationToken cancellationToken) {
+        if (options == null) throw new ArgumentNullException(nameof(options));
         if (!File.Exists(msgFile.FullName)) return MissingMsg(msgFile, emlFile);
         EnsureOutputDirectory(emlFile);
         string tempFile = CreateTempOutputPath(emlFile);
         try {
             using MailFileMessage source = await MailFileMessage.LoadAsync(msgFile, RichReadOptions(), cancellationToken)
                 .ConfigureAwait(false);
-            MimeMessage mimeMessage = await source.OfficeDocument.ToMimeMessageAsync(cancellationToken)
-                .ConfigureAwait(false);
-            await mimeMessage.WriteToAsync(tempFile, cancellationToken).ConfigureAwait(false);
+            EmailWriteResult writeResult = await new EmailDocumentWriter(options).WriteAsync(
+                source.OfficeDocument, tempFile, EmailFileFormat.Eml, cancellationToken).ConfigureAwait(false);
+            MailFileDiagnostics.ThrowIfErrors(writeResult.Diagnostics, "The EML file could not be written");
             return TryFinalizeConvertedFile(tempFile, emlFile.FullName, force, "EML file already exists",
                 out string? error)
                 ? new MsgConversionResult { MsgFile = msgFile.FullName, EmlFile = emlFile.FullName, Status = true }
@@ -214,6 +237,4 @@ public static class EmailMessage {
         }
     }
 
-    private static Task<MimeMessage> ToMimeMessageAsync(this EmailDocument document,
-        CancellationToken cancellationToken) => MailFileMimeAdapter.ToMimeMessageAsync(document, cancellationToken);
 }

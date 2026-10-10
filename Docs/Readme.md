@@ -2,7 +2,7 @@
 Module Name: Mailozaurr
 Module Guid: 2b0ea9f1-3ff1-4300-b939-106d5da608fa
 Download Help Link: https://github.com/EvotecIT/MailoZaurr
-Help Version: 3.0.2
+Help Version: 3.0.3
 Locale: en-US
 ---
 # Mailozaurr Module
@@ -144,9 +144,9 @@ Disconnects an active POP3 connection previously established with Connect-POP3.
 The Disconnect-POP3 cmdlet disconnects an active MailKit POP3 client session. Pass the PopConnectionInfo object returned by Connect-POP3 to this cmdlet to safely close the connection and release resources.
 
 ### [Export-MailFile](Export-MailFile.md)
-Exports an imported mail file as EML, MSG, or TNEF.
+Exports messages as EML, MSG, OFT, TNEF, or local HTML copies.
 
-Writes a MailFileMessage to a file and disposes the input after an attempted export unless -KeepInputOpen is specified. Previewed or rejected operations leave the input open. The destination extension selects EML, MSG, or TNEF, so the same command handles conversion in either direction.
+Accepts Get-MailMessage views, native documents, or Import-MailFile messages. OutputPath exports one message with format inferred from its extension. OutputDirectory exports message views with portable source-specific names. HTML saves embedded images locally; IncludeAttachments also saves regular files and adds links. Remote resources are blocked. Legacy Import-MailFile input is disposed after an attempted export unless KeepInputOpen is used; Get-MailMessage views remain usable.
 
 ### [Export-MailStore](Export-MailStore.md)
 Exports selected items from a PST, OST, OLM, Mbox, EMLX, or mailbox directory.
@@ -236,6 +236,16 @@ Gets the authoritative JMAP Session resource for a saved profile.
 ### [Get-JMAPThread](Get-JMAPThread.md)
 Gets JMAP threads by id.
 
+### [Get-MailAttachment](Get-MailAttachment.md)
+Lists or filters a message's attachment descriptions.
+
+Includes regular files, inline resources and hidden attachments by default. The command reads metadata already present on the message and does not reopen the source or save bytes.
+
+### [Get-MailMessage](Get-MailMessage.md)
+Reads messages from local email files or offline archives.
+
+Returns bodies, recipient addresses and attachment descriptions without leaving a source open. First limits matching messages across all input paths. MaxItemsScanned limits summaries examined per source and emits a warning when reached. Payload operations require the original source to remain unchanged.
+
 ### [Get-MailProfile](Get-MailProfile.md)
 Gets one or more saved Mailozaurr profiles without exposing secret values.
 
@@ -289,6 +299,11 @@ Detects EML, MSG, OFT, TNEF, ICS, VCF, PST, OST, OLM, EMLX, Mbox, Maildir, Apple
 Imports an EML, MSG, OFT, or TNEF mail file and returns its contents as a message object.
 
 The Import-MailFile cmdlet loads a native mail artifact and returns a MailFileMessage for further processing, inspection, or conversion.
+
+### [Invoke-MailStore](Invoke-MailStore.md)
+Runs a script block with an automatically closed local mail-store scope.
+
+Passes one store scope to the script block. Repeated Get-MailMessage calls reuse its reader. The store closes on completion, cancellation or a terminating error. Returned message views remain usable while their source file is unchanged.
 
 ### [Merge-MailStore](Merge-MailStore.md)
 Merges multiple read-only mail stores into a new Unicode PST.
@@ -416,6 +431,11 @@ The Save-IMAPMessage cmdlet saves a message from an IMAP mailbox (using a ImapCo
 Saves attachments from an IMAP message to disk.
 
 The Save-IMAPMessageAttachment cmdlet saves all attachments from an IMAP message identified by its UID to the specified directory.
+
+### [Save-MailAttachment](Save-MailAttachment.md)
+Saves selected message attachments and inline images.
+
+Uses bounded, atomic attachment extraction. By default each message gets its own folder; Flatten uses message-prefixed filenames in one folder. Original filenames remain in PassThru records. Existing files are never overwritten. Source files must remain unchanged.
 
 ### [Save-MimeMessage](Save-MimeMessage.md)
 Saves a MIME message or wrapper object to disk.

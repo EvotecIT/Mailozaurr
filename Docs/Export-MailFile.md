@@ -6,37 +6,103 @@ schema: 2.0.0
 ---
 # Export-MailFile
 ## SYNOPSIS
-Exports an imported mail file as EML, MSG, or TNEF.
+Exports messages as EML, MSG, OFT, TNEF, or local HTML copies.
 
-Writes a MailFileMessage to a file and disposes the input after an attempted export unless -KeepInputOpen is specified. Previewed or rejected operations leave the input open. The destination extension selects EML, MSG, or TNEF, so the same command handles conversion in either direction.
+Accepts Get-MailMessage views, native documents, or Import-MailFile messages. OutputPath exports one message with format inferred from its extension. OutputDirectory exports message views with portable source-specific names. HTML saves embedded images locally; IncludeAttachments also saves regular files and adds links. Remote resources are blocked. Legacy Import-MailFile input is disposed after an attempted export unless KeepInputOpen is used; Get-MailMessage views remain usable.
 
 ## SYNTAX
-### __AllParameterSets
+### File (Default)
 ```powershell
-Export-MailFile [-OutputPath] <string> -InputObject <MailFileMessage> [-Force] [-PassThru] [-KeepInputOpen] [-WhatIf] [-Confirm] [<CommonParameters>]
+Export-MailFile [-OutputPath] <string> -InputObject <Object> [-IncludeAttachments] [-AllowLoss] [-Force] [-PassThru] [-KeepInputOpen] [-WhatIf] [-Confirm] [<CommonParameters>]
+```
+
+### Directory
+```powershell
+Export-MailFile -InputObject <Object> -OutputDirectory <string> -Format <string> [-IncludeAttachments] [-AllowLoss] [-Force] [-PassThru] [-KeepInputOpen] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Exports an imported mail file as EML, MSG, or TNEF.
+Exports messages as EML, MSG, OFT, TNEF, or local HTML copies.
 
-Writes a MailFileMessage to a file and disposes the input after an attempted export unless -KeepInputOpen is specified. Previewed or rejected operations leave the input open. The destination extension selects EML, MSG, or TNEF, so the same command handles conversion in either direction.
+Accepts Get-MailMessage views, native documents, or Import-MailFile messages. OutputPath exports one message with format inferred from its extension. OutputDirectory exports message views with portable source-specific names. HTML saves embedded images locally; IncludeAttachments also saves regular files and adds links. Remote resources are blocked. Legacy Import-MailFile input is disposed after an attempted export unless KeepInputOpen is used; Get-MailMessage views remain usable.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```powershell
-Export-MailFile -InputObject 'Value'
+Get-MailMessage -Path './message.msg' | Export-MailFile -OutputPath './message.eml' -AllowLoss -PassThru
+```
+
+AllowLoss accepts the omission of Outlook metadata that EML cannot represent.
+
+### EXAMPLE 2
+```powershell
+Get-MailMessage -Path './Mail/invoice.eml' | Export-MailFile -OutputPath './Invoice.html' -IncludeAttachments -PassThru
+```
+
+
+### EXAMPLE 3
+```powershell
+Get-MailMessage -Path './Mail/*.eml' | Export-MailFile -OutputDirectory './EmailCopies' -Format Eml -PassThru
 ```
 
 
 ## PARAMETERS
 
-### -Force
-Overwrites an existing destination file.
+### -AllowLoss
+Allows native-format conversion to omit unrepresentable source metadata, reporting losses as warnings.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: __AllParameterSets
+Parameter Sets: File, Directory
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Force
+Atomically replaces an existing destination file.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: File, Directory
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Format
+Batch output format.
+
+```yaml
+Type: String
+Parameter Sets: Directory
+Aliases: None
+Possible values: Eml, Msg, Html, Oft, Tnef
+
+Required: True
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -IncludeAttachments
+Include regular attachments and links in HTML exports, in addition to embedded images.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: File, Directory
 Aliases: None
 Possible values:
 
@@ -48,11 +114,11 @@ Accept wildcard characters: False
 ```
 
 ### -InputObject
-Message returned by Import-MailFile or loaded through the .NET API.
+Get-MailMessage view, native email document, or Import-MailFile message.
 
 ```yaml
-Type: MailFileMessage
-Parameter Sets: __AllParameterSets
+Type: Object
+Parameter Sets: File, Directory
 Aliases: Message
 Possible values:
 
@@ -64,11 +130,11 @@ Accept wildcard characters: False
 ```
 
 ### -KeepInputOpen
-Keeps the input message open after export so the caller can continue using it.
+Keeps legacy Import-MailFile input open after an attempted export.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: __AllParameterSets
+Parameter Sets: File, Directory
 Aliases: None
 Possible values:
 
@@ -79,12 +145,28 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
-### -OutputPath
-Destination file. Use .eml, .msg, .tnef, or winmail.dat.
+### -OutputDirectory
+Destination directory for Get-MailMessage views, using portable message names.
 
 ```yaml
 Type: String
-Parameter Sets: __AllParameterSets
+Parameter Sets: Directory
+Aliases: None
+Possible values:
+
+Required: True
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -OutputPath
+Destination file; extension selects the output format.
+
+```yaml
+Type: String
+Parameter Sets: File
 Aliases: Path
 Possible values:
 
@@ -96,11 +178,11 @@ Accept wildcard characters: False
 ```
 
 ### -PassThru
-Returns a FileInfo for the exported file.
+Returns a FileInfo for each committed message copy.
 
 ```yaml
 Type: SwitchParameter
-Parameter Sets: __AllParameterSets
+Parameter Sets: File, Directory
 Aliases: None
 Possible values:
 
@@ -116,7 +198,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 
 ## INPUTS
 
-- `Mailozaurr.MailFileMessage`
+- `System.Object`
 
 ## OUTPUTS
 

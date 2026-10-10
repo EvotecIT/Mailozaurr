@@ -3,58 +3,93 @@
 
 $LibrariesByFolder = @{
     'Core' = @(
-        'Lib\Core\Mailozaurr.PowerShell.dll'
+        'Lib\Core\AngleSharp.dll'
+        'Lib\Core\AngleSharp.Css.dll'
         'Lib\Core\BouncyCastle.Cryptography.dll'
         'Lib\Core\EmailValidation.dll'
-        'Lib\Core\Google.Apis.Auth.dll'
+        'Lib\Core\Mailozaurr.Jmap.dll'
+        'Lib\Core\Microsoft.IdentityModel.Abstractions.dll'
+        'Lib\Core\Newtonsoft.Json.dll'
         'Lib\Core\Google.Apis.Core.dll'
         'Lib\Core\Google.Apis.dll'
-        'Lib\Core\MailKit.dll'
-        'Lib\Core\Mailozaurr.dll'
-        'Lib\Core\Microsoft.Identity.Client.dll'
-        'Lib\Core\Microsoft.IdentityModel.Abstractions.dll'
-        'Lib\Core\MimeKit.dll'
-        'Lib\Core\Newtonsoft.Json.dll'
+        'Lib\Core\Google.Apis.Auth.dll'
         'Lib\Core\NSspi.dll'
-        'Lib\Core\OfficeIMO.Drawing.dll'
-        'Lib\Core\OfficeIMO.Email.dll'
+        'Lib\Core\OfficeIMO.Core.dll'
+        'Lib\Core\OfficeIMO.Html.Core.dll'
+        'Lib\Core\OfficeIMO.Html.AngleSharp.dll'
+        'Lib\Core\OfficeIMO.Html.dll'
         'Lib\Core\OfficeIMO.Rtf.dll'
+        'Lib\Core\OfficeIMO.Email.dll'
+        'Lib\Core\OfficeIMO.Html.Rtf.dll'
+        'Lib\Core\OfficeIMO.Email.Html.dll'
         'Lib\Core\System.CodeDom.dll'
+        'Lib\Core\System.Formats.Asn1.dll'
+        'Lib\Core\Microsoft.Bcl.Cryptography.dll'
+        'Lib\Core\Microsoft.Identity.Client.dll'
+        'Lib\Core\System.Security.Cryptography.Pkcs.dll'
+        'Lib\Core\MimeKit.dll'
+        'Lib\Core\MailKit.dll'
+        'Lib\Core\Mailozaurr.Artifacts.dll'
+        'Lib\Core\System.Security.Cryptography.ProtectedData.dll'
+        'Lib\Core\Mailozaurr.Internet.dll'
+        'Lib\Core\Mailozaurr.Gmail.dll'
+        'Lib\Core\Mailozaurr.MicrosoftGraph.dll'
+        'Lib\Core\Mailozaurr.dll'
+        'Lib\Core\System.Security.Cryptography.Xml.dll'
+        'Lib\Core\OfficeIMO.Security.dll'
+        'Lib\Core\Mailozaurr.PowerShell.dll'
     )
     'Default' = @(
-        'Lib\Default\Mailozaurr.PowerShell.dll'
         'Lib\Default\BouncyCastle.Cryptography.dll'
         'Lib\Default\EmailValidation.dll'
-        'Lib\Default\Google.Apis.Auth.dll'
+        'Lib\Default\Microsoft.IdentityModel.Abstractions.dll'
+        'Lib\Default\Newtonsoft.Json.dll'
         'Lib\Default\Google.Apis.Core.dll'
         'Lib\Default\Google.Apis.dll'
-        'Lib\Default\MailKit.dll'
-        'Lib\Default\Mailozaurr.dll'
-        'Lib\Default\Microsoft.Bcl.AsyncInterfaces.dll'
-        'Lib\Default\Microsoft.Identity.Client.dll'
-        'Lib\Default\Microsoft.IdentityModel.Abstractions.dll'
-        'Lib\Default\MimeKit.dll'
-        'Lib\Default\Newtonsoft.Json.dll'
+        'Lib\Default\Google.Apis.Auth.dll'
         'Lib\Default\NSspi.dll'
-        'Lib\Default\OfficeIMO.Drawing.dll'
-        'Lib\Default\OfficeIMO.Email.dll'
-        'Lib\Default\OfficeIMO.Rtf.dll'
+        'Lib\Default\OfficeIMO.Core.dll'
+        'Lib\Default\OfficeIMO.Html.Core.dll'
         'Lib\Default\System.Buffers.dll'
-        'Lib\Default\System.Diagnostics.DiagnosticSource.dll'
-        'Lib\Default\System.Formats.Asn1.dll'
-        'Lib\Default\System.IO.Pipelines.dll'
-        'Lib\Default\System.Memory.dll'
         'Lib\Default\System.Numerics.Vectors.dll'
         'Lib\Default\System.Runtime.CompilerServices.Unsafe.dll'
+        'Lib\Default\System.Memory.dll'
+        'Lib\Default\MimeKit.dll'
+        'Lib\Default\OfficeIMO.Security.dll'
+        'Lib\Default\System.Diagnostics.DiagnosticSource.dll'
+        'Lib\Default\System.Formats.Asn1.dll'
+        'Lib\Default\Microsoft.Bcl.Cryptography.dll'
+        'Lib\Default\System.Security.Cryptography.Xml.dll'
         'Lib\Default\System.Text.Encoding.CodePages.dll'
+        'Lib\Default\AngleSharp.dll'
+        'Lib\Default\AngleSharp.Css.dll'
+        'Lib\Default\OfficeIMO.Html.AngleSharp.dll'
+        'Lib\Default\OfficeIMO.Html.dll'
+        'Lib\Default\OfficeIMO.Rtf.dll'
+        'Lib\Default\OfficeIMO.Email.dll'
+        'Lib\Default\Mailozaurr.Artifacts.dll'
+        'Lib\Default\OfficeIMO.Html.Rtf.dll'
+        'Lib\Default\OfficeIMO.Email.Html.dll'
         'Lib\Default\System.Text.Encodings.Web.dll'
-        'Lib\Default\System.Text.Json.dll'
         'Lib\Default\System.Threading.Tasks.Extensions.dll'
+        'Lib\Default\MailKit.dll'
+        'Lib\Default\Microsoft.Bcl.AsyncInterfaces.dll'
+        'Lib\Default\System.IO.Pipelines.dll'
+        'Lib\Default\System.Text.Json.dll'
+        'Lib\Default\Mailozaurr.Internet.dll'
+        'Lib\Default\Mailozaurr.Gmail.dll'
+        'Lib\Default\Mailozaurr.Jmap.dll'
+        'Lib\Default\Microsoft.Identity.Client.dll'
+        'Lib\Default\Mailozaurr.MicrosoftGraph.dll'
+        'Lib\Default\Mailozaurr.dll'
+        'Lib\Default\Mailozaurr.PowerShell.dll'
     )
 }
 
 
-$AssemblyFolders = Get-ChildItem -Path $PSScriptRoot\Lib -Directory -ErrorAction SilentlyContinue
+$LibRoot = [IO.Path]::Combine($PSScriptRoot, 'Lib')
+$AssemblyFolders = Get-ChildItem -LiteralPath $LibRoot -Directory -ErrorAction SilentlyContinue
+$Root = @(Get-ChildItem -LiteralPath $LibRoot -File -ErrorAction SilentlyContinue | Where-Object Extension -IEQ '.dll').Count -gt 0
 
 $Default = $false
 $Core = $false
@@ -89,8 +124,48 @@ if ($Standard -and $Core -and $Default) {
 } elseif ($Default) {
     $Framework = ''
     $FrameworkNet = 'Default'
+} elseif ($Root) {
+    $Framework = ''
+    $FrameworkNet = ''
 } else {
     #Write-Error -Message 'No assemblies found'
+}
+
+if ($PSEdition -eq 'Core') {
+    $PowerForgeRuntimeVersion = [Environment]::Version
+    $PowerForgeCoreBaselineVersion = $null
+    if ($Core) {
+        $PowerForgeCoreMarkerPath = [IO.Path]::Combine($LibRoot, 'Core', 'PowerForge.TargetFramework.txt')
+        if (Test-Path -LiteralPath $PowerForgeCoreMarkerPath -PathType Leaf) {
+            try {
+                $PowerForgeCoreTargetFramework = [IO.File]::ReadAllText($PowerForgeCoreMarkerPath).Trim()
+                if ($PowerForgeCoreTargetFramework -match '^net(?:coreapp)?(\d+\.\d+)$') {
+                    $PowerForgeCoreBaselineVersion = [Version]$Matches[1]
+                }
+            } catch { $PowerForgeCoreBaselineVersion = $null }
+        }
+    }
+    $PowerForgeSelectedRuntimeVersion = [Version]'0.0'
+    $PowerForgeSelectedRuntimeFolder = $null
+    if ($Core -and $null -ne $PowerForgeCoreBaselineVersion -and $PowerForgeCoreBaselineVersion -le $PowerForgeRuntimeVersion) {
+        $PowerForgeSelectedRuntimeVersion = $PowerForgeCoreBaselineVersion
+        $PowerForgeSelectedRuntimeFolder = 'Core'
+    }
+    foreach ($PowerForgeRuntimeFolder in @($AssemblyFolders.Name)) {
+        if ($PowerForgeRuntimeFolder -notmatch '^Core-(?:net|netcoreapp)(\d+\.\d+)$') { continue }
+        try { $PowerForgeCandidateRuntimeVersion = [Version]$Matches[1] } catch { continue }
+        if ($PowerForgeCandidateRuntimeVersion -le $PowerForgeRuntimeVersion -and $PowerForgeCandidateRuntimeVersion -gt $PowerForgeSelectedRuntimeVersion -and (Test-Path -LiteralPath ([IO.Path]::Combine($LibRoot, $PowerForgeRuntimeFolder)))) {
+            $PowerForgeSelectedRuntimeVersion = $PowerForgeCandidateRuntimeVersion
+            $PowerForgeSelectedRuntimeFolder = $PowerForgeRuntimeFolder
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PowerForgeSelectedRuntimeFolder)) {
+        $Framework = $PowerForgeSelectedRuntimeFolder
+    } elseif ($Core -and (-not $Standard -or ($null -ne $PowerForgeCoreBaselineVersion -and $PowerForgeCoreBaselineVersion -le $PowerForgeRuntimeVersion))) {
+        $Framework = 'Core'
+    } elseif ($Standard) {
+        $Framework = 'Standard'
+    }
 }
 
 if ($PSEdition -eq 'Core') {
@@ -99,19 +174,45 @@ if ($PSEdition -eq 'Core') {
     $LibFolder = $FrameworkNet
 }
 
-$LibrariesToLoad = $LibrariesByFolder[$LibFolder]
-if ($null -eq $LibrariesToLoad) { $LibrariesToLoad = @() }
+$LibraryFoldersToLoad = @($LibFolder)
+if ($null -ne $ResolvePowerForgeModuleAssembly) {
+    $PowerForgeLibrariesRoot = [IO.Path]::GetFullPath($LibRoot)
+    $PowerForgeLibrariesRootPrefix = $PowerForgeLibrariesRoot
+    if (-not $PowerForgeLibrariesRootPrefix.EndsWith([IO.Path]::DirectorySeparatorChar.ToString(), [StringComparison]::Ordinal)) {
+        $PowerForgeLibrariesRootPrefix += [IO.Path]::DirectorySeparatorChar
+    }
+    foreach ($PowerForgeLibraryFileName in $LibraryFileNames) {
+        try {
+            $PowerForgeResolvedLibrary = & $ResolvePowerForgeModuleAssembly -LibraryFileName $PowerForgeLibraryFileName
+        } catch {
+            Write-Verbose "Skipping preload-folder discovery for '$PowerForgeLibraryFileName'. $($_.Exception.Message)"
+            continue
+        }
+        $PowerForgeResolvedLibraryDirectory = [IO.Path]::GetFullPath($PowerForgeResolvedLibrary.Directory)
+        $PowerForgeResolvedLibraryFolder = if ($PowerForgeResolvedLibraryDirectory -ieq $PowerForgeLibrariesRoot) {
+            ''
+        } elseif ($PowerForgeResolvedLibraryDirectory.StartsWith($PowerForgeLibrariesRootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            $PowerForgeResolvedLibraryDirectory.Substring($PowerForgeLibrariesRootPrefix.Length).Replace('\\', '/').Trim('/')
+        }
+        if ($null -ne $PowerForgeResolvedLibraryFolder -and
+            $LibrariesByFolder.ContainsKey($PowerForgeResolvedLibraryFolder) -and
+            $PowerForgeResolvedLibraryFolder -notin $LibraryFoldersToLoad) {
+            $LibraryFoldersToLoad += $PowerForgeResolvedLibraryFolder
+        }
+    }
+}
+
+$LibrariesToLoad = @(
+    foreach ($LibraryFolderToLoad in $LibraryFoldersToLoad) {
+        if ($LibrariesByFolder.ContainsKey($LibraryFolderToLoad)) {
+            $LibrariesByFolder[$LibraryFolderToLoad]
+        }
+    }
+) | Select-Object -Unique
 foreach ($L in $LibrariesToLoad) {
     try {
         $LibraryPathParts = @($PSScriptRoot) + @($L -split '[\\/]' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
         $LibraryPath = [IO.Path]::Combine([string[]] $LibraryPathParts)
-        try {
-            $null = [System.Reflection.AssemblyName]::GetAssemblyName($LibraryPath)
-        } catch [System.BadImageFormatException] {
-            Write-Verbose -Message "Skipping non-managed library '$L'."
-            continue
-        }
-
         Add-Type -Path $LibraryPath -ErrorAction Stop
     } catch {
         if ($_.Exception.Message -like '*Assembly with same name is already loaded*') {

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using OfficeIMO.Email;
 using Xunit;
 
 namespace Mailozaurr.Tests;
@@ -58,7 +59,14 @@ public class EmailMessageConversionTests {
         var msgPath = Path.Combine(msgDir, "sample.msg");
 
         var outputDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
-        var results = EmailMessage.ConvertMsgToEml(new[] { msgPath }, outputDir, true).ToList();
+        var strict = EmailMessage.ConvertMsgToEml(new[] { msgPath }, outputDir, true).ToList();
+        Assert.Single(strict);
+        Assert.False(strict[0].Status);
+        Assert.Contains("EMAIL_SOURCE_METADATA_NOT_REPRESENTED_IN_EML", strict[0].Error, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(outputDir, "sample.eml")));
+
+        var results = EmailMessage.ConvertMsgToEml(new[] { msgPath }, outputDir, true,
+            new EmailWriterOptions(EmailConversionLossPolicy.Warn)).ToList();
 
         Assert.Single(results);
         Assert.True(results[0].Status);

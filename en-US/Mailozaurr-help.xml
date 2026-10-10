@@ -5568,15 +5568,27 @@ or server settings.</maml:para>
       <maml:description>
         <maml:para>Converts MSG files to EML format for interoperability with other clients.</maml:para>
         <maml:para>The ConvertFrom-MsgToEml cmdlet converts one or more MSG files to EML format. Provide input MSG file paths and the destination folder. Existing files can be overwritten with the -Force switch.</maml:para>
+        <maml:para>Unsupported source metadata blocks conversion by default. Use AllowLoss to accept its omission when exporting a portable message.</maml:para>
       </maml:description>
     </command:details>
     <maml:description>
-      <maml:para>Converts MSG files to EML format for interoperability with other clients.</maml:para>
-      <maml:para>The ConvertFrom-MsgToEml cmdlet converts one or more MSG files to EML format. Provide input MSG file paths and the destination folder. Existing files can be overwritten with the -Force switch.</maml:para>
+      <maml:para>Use this cmdlet to archive or migrate Outlook messages to the portable EML format. Conversion blocks unsupported metadata loss unless AllowLoss is specified.</maml:para>
     </maml:description>
     <command:syntax>
       <command:syntaxItem parameterSetName="__AllParameterSets">
         <maml:name>ConvertFrom-MsgToEml</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AllowLoss</maml:name>
+          <maml:description>
+            <maml:para>Allows unsupported source metadata to be omitted during conversion.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="2" aliases="None">
           <maml:name>Force</maml:name>
           <maml:description>
@@ -5616,6 +5628,18 @@ or server settings.</maml:para>
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>AllowLoss</maml:name>
+        <maml:description>
+          <maml:para>Allows unsupported source metadata to be omitted during conversion.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="2" aliases="None">
         <maml:name>Force</maml:name>
         <maml:description>
@@ -5668,10 +5692,17 @@ or server settings.</maml:para>
     </maml:alertSet>
     <command:examples>
       <command:example>
-        <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>ConvertFrom-MsgToEml -InputPath @('C:\Path')</dev:code>
+        <maml:title>Convert multiple MSG files</maml:title>
+        <dev:code>ConvertFrom-MsgToEml -InputPath "C:\Mail\mail1.msg","C:\Mail\mail2.msg" -OutputFolder "C:\Converted"</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Convert an Outlook message while accepting metadata loss</maml:title>
+        <dev:code>ConvertFrom-MsgToEml -InputPath './invoice.msg' -OutputFolder './portable' -AllowLoss</dev:code>
+        <dev:remarks>
+          <maml:para>The message content is converted to EML while Outlook metadata that EML cannot represent may be omitted.</maml:para>
         </dev:remarks>
       </command:example>
     </command:examples>
@@ -7618,21 +7649,45 @@ ensure credentials are disposed and not kept in memory.</maml:para>
       <command:verb>Export</command:verb>
       <command:noun>MailFile</command:noun>
       <maml:description>
-        <maml:para>Exports an imported mail file as EML, MSG, or TNEF.</maml:para>
-        <maml:para>Writes a MailFileMessage to a file and disposes the input after an attempted export unless -KeepInputOpen is specified. Previewed or rejected operations leave the input open. The destination extension selects EML, MSG, or TNEF, so the same command handles conversion in either direction.</maml:para>
+        <maml:para>Exports messages as EML, MSG, OFT, TNEF, or local HTML copies.</maml:para>
+        <maml:para>Accepts Get-MailMessage views, native documents, or Import-MailFile messages. OutputPath exports one message with format inferred from its extension. OutputDirectory exports message views with portable source-specific names. HTML saves embedded images locally; IncludeAttachments also saves regular files and adds links. Remote resources are blocked. Legacy Import-MailFile input is disposed after an attempted export unless KeepInputOpen is used; Get-MailMessage views remain usable.</maml:para>
       </maml:description>
     </command:details>
     <maml:description>
-      <maml:para>Exports an imported mail file as EML, MSG, or TNEF.</maml:para>
-      <maml:para>Writes a MailFileMessage to a file and disposes the input after an attempted export unless -KeepInputOpen is specified. Previewed or rejected operations leave the input open. The destination extension selects EML, MSG, or TNEF, so the same command handles conversion in either direction.</maml:para>
+      <maml:para>Exports messages as EML, MSG, OFT, TNEF, or local HTML copies.</maml:para>
+      <maml:para>Accepts Get-MailMessage views, native documents, or Import-MailFile messages. OutputPath exports one message with format inferred from its extension. OutputDirectory exports message views with portable source-specific names. HTML saves embedded images locally; IncludeAttachments also saves regular files and adds links. Remote resources are blocked. Legacy Import-MailFile input is disposed after an attempted export unless KeepInputOpen is used; Get-MailMessage views remain usable.</maml:para>
     </maml:description>
     <command:syntax>
-      <command:syntaxItem parameterSetName="__AllParameterSets">
+      <command:syntaxItem parameterSetName="File">
         <maml:name>Export-MailFile</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AllowLoss</maml:name>
+          <maml:description>
+            <maml:para>Allows native-format conversion to omit unrepresentable source metadata, reporting losses as warnings.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Force</maml:name>
           <maml:description>
-            <maml:para>Overwrites an existing destination file.</maml:para>
+            <maml:para>Atomically replaces an existing destination file.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>IncludeAttachments</maml:name>
+          <maml:description>
+            <maml:para>Include regular attachments and links in HTML exports, in addition to embedded images.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -7644,11 +7699,11 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="Message">
           <maml:name>InputObject</maml:name>
           <maml:description>
-            <maml:para>Message returned by Import-MailFile or loaded through the .NET API.</maml:para>
+            <maml:para>Get-MailMessage view, native email document, or Import-MailFile message.</maml:para>
           </maml:description>
-          <command:parameterValue required="true" variableLength="false">MailFileMessage</command:parameterValue>
+          <command:parameterValue required="true" variableLength="false">Object</command:parameterValue>
           <dev:type>
-            <maml:name>MailFileMessage</maml:name>
+            <maml:name>Object</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -7656,7 +7711,7 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>KeepInputOpen</maml:name>
           <maml:description>
-            <maml:para>Keeps the input message open after export so the caller can continue using it.</maml:para>
+            <maml:para>Keeps legacy Import-MailFile input open after an attempted export.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -7668,7 +7723,7 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="0" aliases="Path">
           <maml:name>OutputPath</maml:name>
           <maml:description>
-            <maml:para>Destination file. Use .eml, .msg, .tnef, or winmail.dat.</maml:para>
+            <maml:para>Destination file; extension selects the output format.</maml:para>
           </maml:description>
           <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
           <dev:type>
@@ -7680,7 +7735,113 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>PassThru</maml:name>
           <maml:description>
-            <maml:para>Returns a FileInfo for the exported file.</maml:para>
+            <maml:para>Returns a FileInfo for each committed message copy.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+      <command:syntaxItem parameterSetName="Directory">
+        <maml:name>Export-MailFile</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AllowLoss</maml:name>
+          <maml:description>
+            <maml:para>Allows native-format conversion to omit unrepresentable source metadata, reporting losses as warnings.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Force</maml:name>
+          <maml:description>
+            <maml:para>Atomically replaces an existing destination file.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Format</maml:name>
+          <maml:description>
+            <maml:para>Batch output format.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Eml</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Msg</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Html</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Oft</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Tnef</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>IncludeAttachments</maml:name>
+          <maml:description>
+            <maml:para>Include regular attachments and links in HTML exports, in addition to embedded images.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="Message">
+          <maml:name>InputObject</maml:name>
+          <maml:description>
+            <maml:para>Get-MailMessage view, native email document, or Import-MailFile message.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>KeepInputOpen</maml:name>
+          <maml:description>
+            <maml:para>Keeps legacy Import-MailFile input open after an attempted export.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>OutputDirectory</maml:name>
+          <maml:description>
+            <maml:para>Destination directory for Get-MailMessage views, using portable message names.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>PassThru</maml:name>
+          <maml:description>
+            <maml:para>Returns a FileInfo for each committed message copy.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -7693,9 +7854,52 @@ ensure credentials are disposed and not kept in memory.</maml:para>
     </command:syntax>
     <command:parameters>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>AllowLoss</maml:name>
+        <maml:description>
+          <maml:para>Allows native-format conversion to omit unrepresentable source metadata, reporting losses as warnings.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>Force</maml:name>
         <maml:description>
-          <maml:para>Overwrites an existing destination file.</maml:para>
+          <maml:para>Atomically replaces an existing destination file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Format</maml:name>
+        <maml:description>
+          <maml:para>Batch output format.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">Eml</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Msg</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Html</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Oft</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Tnef</command:parameterValue>
+        </command:parameterValueGroup>
+        <dev:type>
+          <maml:name>String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>IncludeAttachments</maml:name>
+        <maml:description>
+          <maml:para>Include regular attachments and links in HTML exports, in addition to embedded images.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
         <dev:type>
@@ -7707,11 +7911,11 @@ ensure credentials are disposed and not kept in memory.</maml:para>
       <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="Message">
         <maml:name>InputObject</maml:name>
         <maml:description>
-          <maml:para>Message returned by Import-MailFile or loaded through the .NET API.</maml:para>
+          <maml:para>Get-MailMessage view, native email document, or Import-MailFile message.</maml:para>
         </maml:description>
-        <command:parameterValue required="true" variableLength="false">MailFileMessage</command:parameterValue>
+        <command:parameterValue required="true" variableLength="false">Object</command:parameterValue>
         <dev:type>
-          <maml:name>MailFileMessage</maml:name>
+          <maml:name>Object</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -7719,7 +7923,7 @@ ensure credentials are disposed and not kept in memory.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>KeepInputOpen</maml:name>
         <maml:description>
-          <maml:para>Keeps the input message open after export so the caller can continue using it.</maml:para>
+          <maml:para>Keeps legacy Import-MailFile input open after an attempted export.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
         <dev:type>
@@ -7728,10 +7932,22 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>OutputDirectory</maml:name>
+        <maml:description>
+          <maml:para>Destination directory for Get-MailMessage views, using portable message names.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+        <dev:type>
+          <maml:name>String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="0" aliases="Path">
         <maml:name>OutputPath</maml:name>
         <maml:description>
-          <maml:para>Destination file. Use .eml, .msg, .tnef, or winmail.dat.</maml:para>
+          <maml:para>Destination file; extension selects the output format.</maml:para>
         </maml:description>
         <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
         <dev:type>
@@ -7743,7 +7959,7 @@ ensure credentials are disposed and not kept in memory.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>PassThru</maml:name>
         <maml:description>
-          <maml:para>Returns a FileInfo for the exported file.</maml:para>
+          <maml:para>Returns a FileInfo for each committed message copy.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
         <dev:type>
@@ -7756,7 +7972,7 @@ ensure credentials are disposed and not kept in memory.</maml:para>
     <command:inputTypes>
       <command:inputType>
         <dev:type>
-          <maml:name>Mailozaurr.MailFileMessage</maml:name>
+          <maml:name>System.Object</maml:name>
         </dev:type>
       </command:inputType>
     </command:inputTypes>
@@ -7774,8 +7990,22 @@ ensure credentials are disposed and not kept in memory.</maml:para>
     </maml:alertSet>
     <command:examples>
       <command:example>
-        <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Export-MailFile -InputObject 'Value'</dev:code>
+        <maml:title>Convert an Outlook MSG file to EML</maml:title>
+        <dev:code>Get-MailMessage -Path './message.msg' | Export-MailFile -OutputPath './message.eml' -AllowLoss -PassThru</dev:code>
+        <dev:remarks>
+          <maml:para>AllowLoss accepts the omission of Outlook metadata that EML cannot represent.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Create a readable local copy</maml:title>
+        <dev:code>Get-MailMessage -Path './Mail/invoice.eml' | Export-MailFile -OutputPath './Invoice.html' -IncludeAttachments -PassThru</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Export several messages</maml:title>
+        <dev:code>Get-MailMessage -Path './Mail/*.eml' | Export-MailFile -OutputDirectory './EmailCopies' -Format Eml -PassThru</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -7791,15 +8021,29 @@ ensure credentials are disposed and not kept in memory.</maml:para>
       <maml:description>
         <maml:para>Exports selected items from a PST, OST, OLM, Mbox, EMLX, or mailbox directory.</maml:para>
         <maml:para>Delegates to OfficeIMO.Email for EML, MSG, OFT, TNEF, Mbox, Maildir, or EMLX output. The source store remains read-only and the native preservation report is returned.</maml:para>
+        <maml:para>Unsupported source metadata blocks export unless AllowLoss is specified. The preservation report retains conversion diagnostics.</maml:para>
       </maml:description>
     </command:details>
     <maml:description>
       <maml:para>Exports selected items from a PST, OST, OLM, Mbox, EMLX, or mailbox directory.</maml:para>
       <maml:para>Delegates to OfficeIMO.Email for EML, MSG, OFT, TNEF, Mbox, Maildir, or EMLX output. The source store remains read-only and the native preservation report is returned.</maml:para>
+      <maml:para>Unsupported source metadata blocks export unless AllowLoss is specified. The preservation report retains conversion diagnostics.</maml:para>
     </maml:description>
     <command:syntax>
       <command:syntaxItem parameterSetName="__AllParameterSets">
         <maml:name>Export-MailStore</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AllowLoss</maml:name>
+          <maml:description>
+            <maml:para>Allows unsupported source metadata to be omitted from exported messages.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Flatten</maml:name>
           <maml:description>
@@ -7956,6 +8200,18 @@ ensure credentials are disposed and not kept in memory.</maml:para>
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>AllowLoss</maml:name>
+        <maml:description>
+          <maml:para>Allows unsupported source metadata to be omitted from exported messages.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>Flatten</maml:name>
         <maml:description>
@@ -8136,8 +8392,22 @@ ensure credentials are disposed and not kept in memory.</maml:para>
     </maml:alertSet>
     <command:examples>
       <command:example>
-        <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Export-MailStore -InputObject 'Value'</dev:code>
+        <maml:title>Export an OST to EML files</maml:title>
+        <dev:code>Export-MailStore -InputObject $data -OutputPath './export' -Format Eml</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Export a portable mailbox while accepting metadata loss</maml:title>
+        <dev:code>Export-MailStore -InputObject $data -OutputPath './portable.mbox' -Format Mbox -AllowLoss</dev:code>
+        <dev:remarks>
+          <maml:para>The returned preservation report includes warnings for source metadata that the destination cannot represent.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Export one folder hierarchy to Mbox</maml:title>
+        <dev:code>Export-MailStore -InputObject $data -OutputPath './archive.mbox' -Format Mbox -FolderId $folder.Id -IncludeDescendants</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -13890,6 +14160,550 @@ message and folder counts as well as attachment sizes.</maml:para>
   </command:command>
   <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10" xmlns:MSHelp="http://msdn.microsoft.com/mshelp" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10">
     <command:details>
+      <command:name>Get-MailAttachment</command:name>
+      <command:verb>Get</command:verb>
+      <command:noun>MailAttachment</command:noun>
+      <maml:description>
+        <maml:para>Lists or filters a message's attachment descriptions.</maml:para>
+        <maml:para>Includes regular files, inline resources and hidden attachments by default. The command reads metadata already present on the message and does not reopen the source or save bytes.</maml:para>
+      </maml:description>
+    </command:details>
+    <maml:description>
+      <maml:para>Lists or filters a message's attachment descriptions.</maml:para>
+      <maml:para>Includes regular files, inline resources and hidden attachments by default. The command reads metadata already present on the message and does not reopen the source or save bytes.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem parameterSetName="__AllParameterSets">
+        <maml:name>Get-MailAttachment</maml:name>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>ContentType</maml:name>
+          <maml:description>
+            <maml:para>Media-type wildcard patterns, such as image/*.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+          <dev:type>
+            <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>FileName</maml:name>
+          <maml:description>
+            <maml:para>Filename wildcard patterns; a match against any pattern is sufficient.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+          <dev:type>
+            <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>InlineOnly</maml:name>
+          <maml:description>
+            <maml:para>Returns only attachments marked inline.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="None">
+          <maml:name>InputObject</maml:name>
+          <maml:description>
+            <maml:para>Message or attachment description from Get-MailMessage or Get-MailAttachment.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>ContentType</maml:name>
+        <maml:description>
+          <maml:para>Media-type wildcard patterns, such as image/*.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>String[]</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>FileName</maml:name>
+        <maml:description>
+          <maml:para>Filename wildcard patterns; a match against any pattern is sufficient.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>String[]</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>InlineOnly</maml:name>
+        <maml:description>
+          <maml:para>Returns only attachments marked inline.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="None">
+        <maml:name>InputObject</maml:name>
+        <maml:description>
+          <maml:para>Message or attachment description from Get-MailMessage or Get-MailAttachment.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">Object</command:parameterValue>
+        <dev:type>
+          <maml:name>Object</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes>
+      <command:inputType>
+        <dev:type>
+          <maml:name>System.Object</maml:name>
+        </dev:type>
+      </command:inputType>
+    </command:inputTypes>
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>OfficeIMO.Email.EmailMessageAttachment</maml:name>
+        </dev:type>
+      </command:returnValue>
+    </command:returnValues>
+    <maml:alertSet>
+      <maml:alert>
+        <maml:para></maml:para>
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>Find inline images</maml:title>
+        <dev:code>Get-MailMessage -Path './Mail/invoice.eml' | Get-MailAttachment -InlineOnly -ContentType 'image/*'</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+    <command:relatedLinks />
+  </command:command>
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10" xmlns:MSHelp="http://msdn.microsoft.com/mshelp" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10">
+    <command:details>
+      <command:name>Get-MailMessage</command:name>
+      <command:verb>Get</command:verb>
+      <command:noun>MailMessage</command:noun>
+      <maml:description>
+        <maml:para>Reads messages from local email files or offline archives.</maml:para>
+        <maml:para>Returns bodies, recipient addresses and attachment descriptions without leaving a source open. First limits matching messages across all input paths. MaxItemsScanned limits summaries examined per source and emits a warning when reached. Payload operations require the original source to remain unchanged.</maml:para>
+      </maml:description>
+    </command:details>
+    <maml:description>
+      <maml:para>Reads messages from local email files or offline archives.</maml:para>
+      <maml:para>Returns bodies, recipient addresses and attachment descriptions without leaving a source open. First limits matching messages across all input paths. MaxItemsScanned limits summaries examined per source and emits a warning when reached. Payload operations require the original source to remain unchanged.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem parameterSetName="Store">
+        <maml:name>Get-MailMessage</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Before</maml:name>
+          <maml:description>
+            <maml:para>Exclusive received-date upper bound, falling back to sent date.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">DateTimeOffset</command:parameterValue>
+          <dev:type>
+            <maml:name>DateTimeOffset</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>First</maml:name>
+          <maml:description>
+            <maml:para>Maximum matching messages across all input sources. Default: 1000.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Folder</maml:name>
+          <maml:description>
+            <maml:para>Exact folder path or a unique folder name.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="None">
+          <maml:name>InputObject</maml:name>
+          <maml:description>
+            <maml:para>Store scope supplied by Invoke-MailStore.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaxItemsScanned</maml:name>
+          <maml:description>
+            <maml:para>Maximum summaries examined per source. Default: 1000000.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Recurse</maml:name>
+          <maml:description>
+            <maml:para>Includes descendants of Folder.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SenderContains</maml:name>
+          <maml:description>
+            <maml:para>Case-insensitive sender name or address fragment.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Since</maml:name>
+          <maml:description>
+            <maml:para>Inclusive received-date lower bound, falling back to sent date.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">DateTimeOffset</command:parameterValue>
+          <dev:type>
+            <maml:name>DateTimeOffset</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SubjectContains</maml:name>
+          <maml:description>
+            <maml:para>Case-insensitive subject fragment.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+      <command:syntaxItem parameterSetName="Path">
+        <maml:name>Get-MailMessage</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Before</maml:name>
+          <maml:description>
+            <maml:para>Exclusive received-date upper bound, falling back to sent date.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">DateTimeOffset</command:parameterValue>
+          <dev:type>
+            <maml:name>DateTimeOffset</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>First</maml:name>
+          <maml:description>
+            <maml:para>Maximum matching messages across all input sources. Default: 1000.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Folder</maml:name>
+          <maml:description>
+            <maml:para>Exact folder path or a unique folder name.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>MaxItemsScanned</maml:name>
+          <maml:description>
+            <maml:para>Maximum summaries examined per source. Default: 1000000.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="true" globbing="false" pipelineInput="False" position="0" aliases="FullName">
+          <maml:name>Path</maml:name>
+          <maml:description>
+            <maml:para>Local email or archive paths; wildcard patterns are supported.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">String[]</command:parameterValue>
+          <dev:type>
+            <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Recurse</maml:name>
+          <maml:description>
+            <maml:para>Includes descendants of Folder.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SenderContains</maml:name>
+          <maml:description>
+            <maml:para>Case-insensitive sender name or address fragment.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Since</maml:name>
+          <maml:description>
+            <maml:para>Inclusive received-date lower bound, falling back to sent date.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">DateTimeOffset</command:parameterValue>
+          <dev:type>
+            <maml:name>DateTimeOffset</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>SubjectContains</maml:name>
+          <maml:description>
+            <maml:para>Case-insensitive subject fragment.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Before</maml:name>
+        <maml:description>
+          <maml:para>Exclusive received-date upper bound, falling back to sent date.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">DateTimeOffset</command:parameterValue>
+        <dev:type>
+          <maml:name>DateTimeOffset</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>First</maml:name>
+        <maml:description>
+          <maml:para>Maximum matching messages across all input sources. Default: 1000.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>Int32</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Folder</maml:name>
+        <maml:description>
+          <maml:para>Exact folder path or a unique folder name.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+        <dev:type>
+          <maml:name>String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="None">
+        <maml:name>InputObject</maml:name>
+        <maml:description>
+          <maml:para>Store scope supplied by Invoke-MailStore.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">Object</command:parameterValue>
+        <dev:type>
+          <maml:name>Object</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>MaxItemsScanned</maml:name>
+        <maml:description>
+          <maml:para>Maximum summaries examined per source. Default: 1000000.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>Int32</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="true" variableLength="true" globbing="false" pipelineInput="False" position="0" aliases="FullName">
+        <maml:name>Path</maml:name>
+        <maml:description>
+          <maml:para>Local email or archive paths; wildcard patterns are supported.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>String[]</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Recurse</maml:name>
+        <maml:description>
+          <maml:para>Includes descendants of Folder.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>SenderContains</maml:name>
+        <maml:description>
+          <maml:para>Case-insensitive sender name or address fragment.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+        <dev:type>
+          <maml:name>String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Since</maml:name>
+        <maml:description>
+          <maml:para>Inclusive received-date lower bound, falling back to sent date.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">DateTimeOffset</command:parameterValue>
+        <dev:type>
+          <maml:name>DateTimeOffset</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>SubjectContains</maml:name>
+        <maml:description>
+          <maml:para>Case-insensitive subject fragment.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
+        <dev:type>
+          <maml:name>String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes>
+      <command:inputType>
+        <dev:type>
+          <maml:name>System.Object</maml:name>
+        </dev:type>
+      </command:inputType>
+    </command:inputTypes>
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>OfficeIMO.Email.EmailMessage</maml:name>
+        </dev:type>
+      </command:returnValue>
+    </command:returnValues>
+    <maml:alertSet>
+      <maml:alert>
+        <maml:para></maml:para>
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>Read one matching invoice</maml:title>
+        <dev:code>$mail = Get-MailMessage -Path './Archive.pst' -SubjectContains 'invoice' -First 1</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Read EML and MSG files</maml:title>
+        <dev:code>Get-MailMessage -Path './Mail/*.eml', './Mail/*.msg'</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+    <command:relatedLinks />
+  </command:command>
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10" xmlns:MSHelp="http://msdn.microsoft.com/mshelp" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10">
+    <command:details>
       <command:name>Get-MailProfile</command:name>
       <command:verb>Get</command:verb>
       <command:noun>MailProfile</command:noun>
@@ -15866,6 +16680,105 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
         <maml:uri>https://github.com/EvotecIT/Mailozaurr</maml:uri>
       </maml:navigationLink>
     </command:relatedLinks>
+  </command:command>
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10" xmlns:MSHelp="http://msdn.microsoft.com/mshelp" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10">
+    <command:details>
+      <command:name>Invoke-MailStore</command:name>
+      <command:verb>Invoke</command:verb>
+      <command:noun>MailStore</command:noun>
+      <maml:description>
+        <maml:para>Runs a script block with an automatically closed local mail-store scope.</maml:para>
+        <maml:para>Passes one store scope to the script block. Repeated Get-MailMessage calls reuse its reader. The store closes on completion, cancellation or a terminating error. Returned message views remain usable while their source file is unchanged.</maml:para>
+      </maml:description>
+    </command:details>
+    <maml:description>
+      <maml:para>Runs a script block with an automatically closed local mail-store scope.</maml:para>
+      <maml:para>Passes one store scope to the script block. Repeated Get-MailMessage calls reuse its reader. The store closes on completion, cancellation or a terminating error. Returned message views remain usable while their source file is unchanged.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem parameterSetName="__AllParameterSets">
+        <maml:name>Invoke-MailStore</maml:name>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="0" aliases="None">
+          <maml:name>Path</maml:name>
+          <maml:description>
+            <maml:para>Local archive file.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="1" aliases="None">
+          <maml:name>ScriptBlock</maml:name>
+          <maml:description>
+            <maml:para>Script block accepting the store as its first argument.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">ScriptBlock</command:parameterValue>
+          <dev:type>
+            <maml:name>ScriptBlock</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="0" aliases="None">
+        <maml:name>Path</maml:name>
+        <maml:description>
+          <maml:para>Local archive file.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+        <dev:type>
+          <maml:name>String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="1" aliases="None">
+        <maml:name>ScriptBlock</maml:name>
+        <maml:description>
+          <maml:para>Script block accepting the store as its first argument.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">ScriptBlock</command:parameterValue>
+        <dev:type>
+          <maml:name>ScriptBlock</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes>
+      <command:inputType>
+        <dev:type>
+          <maml:name>None</maml:name>
+        </dev:type>
+      </command:inputType>
+    </command:inputTypes>
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>System.Object</maml:name>
+        </dev:type>
+      </command:returnValue>
+    </command:returnValues>
+    <maml:alertSet>
+      <maml:alert>
+        <maml:para></maml:para>
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>Read messages from one open store</maml:title>
+        <dev:code>Invoke-MailStore './Archive.pst' { param($store) $store | Get-MailMessage -Folder Inbox -First 10 }</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+    <command:relatedLinks />
   </command:command>
   <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10" xmlns:MSHelp="http://msdn.microsoft.com/mshelp" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10">
     <command:details>
@@ -25554,6 +26467,232 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
         <dev:code>Save-IMAPMessageAttachment -Path 'C:\Path'</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+    </command:examples>
+    <command:relatedLinks />
+  </command:command>
+  <command:command xmlns:maml="http://schemas.microsoft.com/maml/2004/10" xmlns:dev="http://schemas.microsoft.com/maml/dev/2004/10" xmlns:MSHelp="http://msdn.microsoft.com/mshelp" xmlns:command="http://schemas.microsoft.com/maml/dev/command/2004/10">
+    <command:details>
+      <command:name>Save-MailAttachment</command:name>
+      <command:verb>Save</command:verb>
+      <command:noun>MailAttachment</command:noun>
+      <maml:description>
+        <maml:para>Saves selected message attachments and inline images.</maml:para>
+        <maml:para>Uses bounded, atomic attachment extraction. By default each message gets its own folder; Flatten uses message-prefixed filenames in one folder. Original filenames remain in PassThru records. Existing files are never overwritten. Source files must remain unchanged.</maml:para>
+      </maml:description>
+    </command:details>
+    <maml:description>
+      <maml:para>Saves selected message attachments and inline images.</maml:para>
+      <maml:para>Uses bounded, atomic attachment extraction. By default each message gets its own folder; Flatten uses message-prefixed filenames in one folder. Original filenames remain in PassThru records. Existing files are never overwritten. Source files must remain unchanged.</maml:para>
+    </maml:description>
+    <command:syntax>
+      <command:syntaxItem parameterSetName="__AllParameterSets">
+        <maml:name>Save-MailAttachment</maml:name>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>ContentType</maml:name>
+          <maml:description>
+            <maml:para>Media-type wildcard patterns, such as image/*.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+          <dev:type>
+            <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>FileName</maml:name>
+          <maml:description>
+            <maml:para>Filename wildcard patterns; a match against any pattern is sufficient.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+          <dev:type>
+            <maml:name>String[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Flatten</maml:name>
+          <maml:description>
+            <maml:para>Saves all messages into one directory with source-specific filename prefixes.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>InlineOnly</maml:name>
+          <maml:description>
+            <maml:para>Returns only attachments marked inline.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="None">
+          <maml:name>InputObject</maml:name>
+          <maml:description>
+            <maml:para>Message or attachment description from Get-MailMessage or Get-MailAttachment.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">Object</command:parameterValue>
+          <dev:type>
+            <maml:name>Object</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>PassThru</maml:name>
+          <maml:description>
+            <maml:para>Returns saved paths, attachment metadata and source provenance.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="0" aliases="None">
+          <maml:name>Path</maml:name>
+          <maml:description>
+            <maml:para>Destination directory.</maml:para>
+          </maml:description>
+          <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+          <dev:type>
+            <maml:name>String</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+      </command:syntaxItem>
+    </command:syntax>
+    <command:parameters>
+      <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>ContentType</maml:name>
+        <maml:description>
+          <maml:para>Media-type wildcard patterns, such as image/*.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>String[]</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>FileName</maml:name>
+        <maml:description>
+          <maml:para>Filename wildcard patterns; a match against any pattern is sufficient.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
+        <dev:type>
+          <maml:name>String[]</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Flatten</maml:name>
+        <maml:description>
+          <maml:para>Saves all messages into one directory with source-specific filename prefixes.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>InlineOnly</maml:name>
+        <maml:description>
+          <maml:para>Returns only attachments marked inline.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="True (ByValue)" position="named" aliases="None">
+        <maml:name>InputObject</maml:name>
+        <maml:description>
+          <maml:para>Message or attachment description from Get-MailMessage or Get-MailAttachment.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">Object</command:parameterValue>
+        <dev:type>
+          <maml:name>Object</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>PassThru</maml:name>
+        <maml:description>
+          <maml:para>Returns saved paths, attachment metadata and source provenance.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="0" aliases="None">
+        <maml:name>Path</maml:name>
+        <maml:description>
+          <maml:para>Destination directory.</maml:para>
+        </maml:description>
+        <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+        <dev:type>
+          <maml:name>String</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+    </command:parameters>
+    <command:inputTypes>
+      <command:inputType>
+        <dev:type>
+          <maml:name>System.Object</maml:name>
+        </dev:type>
+      </command:inputType>
+    </command:inputTypes>
+    <command:returnValues>
+      <command:returnValue>
+        <dev:type>
+          <maml:name>Mailozaurr.MailSavedAttachment</maml:name>
+        </dev:type>
+      </command:returnValue>
+    </command:returnValues>
+    <maml:alertSet>
+      <maml:alert>
+        <maml:para></maml:para>
+      </maml:alert>
+    </maml:alertSet>
+    <command:examples>
+      <command:example>
+        <maml:title>Save PDFs from messages</maml:title>
+        <dev:code>Get-MailMessage -Path './Mail/*.eml' | Save-MailAttachment -Path './Extracted' -FileName '*.pdf' -PassThru</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Save inline images</maml:title>
+        <dev:code>Get-MailMessage -Path './Mail/invoice.eml' | Get-MailAttachment -InlineOnly -ContentType 'image/*' | Save-MailAttachment -Path './Images' -PassThru</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
