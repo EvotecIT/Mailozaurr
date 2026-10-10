@@ -10,26 +10,49 @@ Converts MSG files to EML format for interoperability with other clients.
 
 The ConvertFrom-MsgToEml cmdlet converts one or more MSG files to EML format. Provide input MSG file paths and the destination folder. Existing files can be overwritten with the -Force switch.
 
+Unsupported source metadata blocks conversion by default. Use AllowLoss to accept its omission when exporting a portable message.
+
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-ConvertFrom-MsgToEml [-InputPath] <string[]> [-OutputFolder] <string> [-Force] [<CommonParameters>]
+ConvertFrom-MsgToEml [-InputPath] <string[]> [-OutputFolder] <string> [-Force] [-AllowLoss] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
-Converts MSG files to EML format for interoperability with other clients.
-
-The ConvertFrom-MsgToEml cmdlet converts one or more MSG files to EML format. Provide input MSG file paths and the destination folder. Existing files can be overwritten with the -Force switch.
+Use this cmdlet to archive or migrate Outlook messages to the portable EML format. Conversion blocks unsupported metadata loss unless AllowLoss is specified.
 
 ## EXAMPLES
 
 ### EXAMPLE 1
 ```powershell
-ConvertFrom-MsgToEml -InputPath @('C:\Path')
+ConvertFrom-MsgToEml -InputPath "C:\Mail\mail1.msg","C:\Mail\mail2.msg" -OutputFolder "C:\Converted"
 ```
 
 
+### EXAMPLE 2
+```powershell
+ConvertFrom-MsgToEml -InputPath './invoice.msg' -OutputFolder './portable' -AllowLoss
+```
+
+The message content is converted to EML while Outlook metadata that EML cannot represent may be omitted.
+
 ## PARAMETERS
+
+### -AllowLoss
+Allows unsupported source metadata to be omitted during conversion.
+
+```yaml
+Type: SwitchParameter
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
 
 ### -Force
 Overwrite existing files.

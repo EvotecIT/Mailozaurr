@@ -6,15 +6,21 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// <para type="synopsis">Exports selected items from a PST, OST, OLM, Mbox, EMLX, or mailbox directory.</para>
 /// <para type="description">Delegates to OfficeIMO.Email for EML, MSG, OFT, TNEF, Mbox, Maildir, or EMLX output. The source store remains read-only and the native preservation report is returned.</para>
+/// <para type="description">Unsupported source metadata blocks export unless AllowLoss is specified. The preservation report retains conversion diagnostics.</para>
+/// </summary>
 /// <example>
 ///   <summary>Export an OST to EML files</summary>
 ///   <code>Export-MailStore -InputObject $data -OutputPath './export' -Format Eml</code>
 /// </example>
 /// <example>
+///   <summary>Export a portable mailbox while accepting metadata loss</summary>
+///   <code>Export-MailStore -InputObject $data -OutputPath './portable.mbox' -Format Mbox -AllowLoss</code>
+///   <para>The returned preservation report includes warnings for source metadata that the destination cannot represent.</para>
+/// </example>
+/// <example>
 ///   <summary>Export one folder hierarchy to Mbox</summary>
 ///   <code>Export-MailStore -InputObject $data -OutputPath './archive.mbox' -Format Mbox -FolderId $folder.Id -IncludeDescendants</code>
 /// </example>
-/// </summary>
 [Cmdlet(VerbsData.Export, "MailStore", SupportsShouldProcess = true)]
 [OutputType(typeof(EmailStoreExportReport), typeof(EmailStoreMboxExportReport))]
 public sealed class CmdletExportMailStore : MailStoreCmdletBase {
@@ -67,6 +73,10 @@ public sealed class CmdletExportMailStore : MailStoreCmdletBase {
     [Parameter]
     public SwitchParameter Force { get; set; }
 
+    /// <summary>Allows unsupported source metadata to be omitted from exported messages.</summary>
+    [Parameter]
+    public SwitchParameter AllowLoss { get; set; }
+
     /// <summary>Maximum source items attempted.</summary>
     [Parameter]
     [ValidateRange(1, int.MaxValue)]
@@ -81,6 +91,7 @@ public sealed class CmdletExportMailStore : MailStoreCmdletBase {
             string destination = GetUnresolvedProviderPathFromPSPath(outputPath);
             if (!ShouldProcess(destination, $"Export mail store as {Format}")) return Task.CompletedTask;
 
+            var writerOptions = new EmailWriterOptions(AllowLoss.IsPresent ? EmailConversionLossPolicy.Warn : EmailConversionLossPolicy.Block);
             object report;
             IReadOnlyList<EmailStoreDiagnostic> diagnostics;
             if (Format.Equals("Mbox", StringComparison.OrdinalIgnoreCase)) {
@@ -91,7 +102,8 @@ public sealed class CmdletExportMailStore : MailStoreCmdletBase {
                     IncludeOrphanedItems.IsPresent,
                     Force.IsPresent,
                     !StopOnError.IsPresent,
-                    MaxItems);
+                    MaxItems,
+                    writerOptions: new EmailMailboxWriterOptions(writerOptions));
                 EmailStoreMboxExportReport result = session.ExportToMbox(destination, options, CancelToken);
                 report = result;
                 diagnostics = result.Diagnostics;
@@ -110,7 +122,8 @@ public sealed class CmdletExportMailStore : MailStoreCmdletBase {
                     Force.IsPresent,
                     !StopOnError.IsPresent,
                     !NoManifest.IsPresent,
-                    MaxItems);
+                    MaxItems,
+                    messageOptions: writerOptions);
                 EmailStoreExportReport result = session.ExportToNativeDirectory(destination, options, CancelToken);
                 report = result;
                 diagnostics = result.Diagnostics;
@@ -132,7 +145,8 @@ public sealed class CmdletExportMailStore : MailStoreCmdletBase {
                     Force.IsPresent,
                     !StopOnError.IsPresent,
                     !NoManifest.IsPresent,
-                    MaxItems);
+                    MaxItems,
+                    writerOptions: writerOptions);
                 EmailStoreExportReport result = session.ExportToDirectory(destination, options, CancelToken);
                 report = result;
                 diagnostics = result.Diagnostics;

@@ -5568,15 +5568,27 @@ or server settings.</maml:para>
       <maml:description>
         <maml:para>Converts MSG files to EML format for interoperability with other clients.</maml:para>
         <maml:para>The ConvertFrom-MsgToEml cmdlet converts one or more MSG files to EML format. Provide input MSG file paths and the destination folder. Existing files can be overwritten with the -Force switch.</maml:para>
+        <maml:para>Unsupported source metadata blocks conversion by default. Use AllowLoss to accept its omission when exporting a portable message.</maml:para>
       </maml:description>
     </command:details>
     <maml:description>
-      <maml:para>Converts MSG files to EML format for interoperability with other clients.</maml:para>
-      <maml:para>The ConvertFrom-MsgToEml cmdlet converts one or more MSG files to EML format. Provide input MSG file paths and the destination folder. Existing files can be overwritten with the -Force switch.</maml:para>
+      <maml:para>Use this cmdlet to archive or migrate Outlook messages to the portable EML format. Conversion blocks unsupported metadata loss unless AllowLoss is specified.</maml:para>
     </maml:description>
     <command:syntax>
       <command:syntaxItem parameterSetName="__AllParameterSets">
         <maml:name>ConvertFrom-MsgToEml</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AllowLoss</maml:name>
+          <maml:description>
+            <maml:para>Allows unsupported source metadata to be omitted during conversion.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="2" aliases="None">
           <maml:name>Force</maml:name>
           <maml:description>
@@ -5616,6 +5628,18 @@ or server settings.</maml:para>
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>AllowLoss</maml:name>
+        <maml:description>
+          <maml:para>Allows unsupported source metadata to be omitted during conversion.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="2" aliases="None">
         <maml:name>Force</maml:name>
         <maml:description>
@@ -5668,10 +5692,17 @@ or server settings.</maml:para>
     </maml:alertSet>
     <command:examples>
       <command:example>
-        <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>ConvertFrom-MsgToEml -InputPath @('C:\Path')</dev:code>
+        <maml:title>Convert multiple MSG files</maml:title>
+        <dev:code>ConvertFrom-MsgToEml -InputPath "C:\Mail\mail1.msg","C:\Mail\mail2.msg" -OutputFolder "C:\Converted"</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Convert an Outlook message while accepting metadata loss</maml:title>
+        <dev:code>ConvertFrom-MsgToEml -InputPath './invoice.msg' -OutputFolder './portable' -AllowLoss</dev:code>
+        <dev:remarks>
+          <maml:para>The message content is converted to EML while Outlook metadata that EML cannot represent may be omitted.</maml:para>
         </dev:remarks>
       </command:example>
     </command:examples>
@@ -7983,15 +8014,29 @@ ensure credentials are disposed and not kept in memory.</maml:para>
       <maml:description>
         <maml:para>Exports selected items from a PST, OST, OLM, Mbox, EMLX, or mailbox directory.</maml:para>
         <maml:para>Delegates to OfficeIMO.Email for EML, MSG, OFT, TNEF, Mbox, Maildir, or EMLX output. The source store remains read-only and the native preservation report is returned.</maml:para>
+        <maml:para>Unsupported source metadata blocks export unless AllowLoss is specified. The preservation report retains conversion diagnostics.</maml:para>
       </maml:description>
     </command:details>
     <maml:description>
       <maml:para>Exports selected items from a PST, OST, OLM, Mbox, EMLX, or mailbox directory.</maml:para>
       <maml:para>Delegates to OfficeIMO.Email for EML, MSG, OFT, TNEF, Mbox, Maildir, or EMLX output. The source store remains read-only and the native preservation report is returned.</maml:para>
+      <maml:para>Unsupported source metadata blocks export unless AllowLoss is specified. The preservation report retains conversion diagnostics.</maml:para>
     </maml:description>
     <command:syntax>
       <command:syntaxItem parameterSetName="__AllParameterSets">
         <maml:name>Export-MailStore</maml:name>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>AllowLoss</maml:name>
+          <maml:description>
+            <maml:para>Allows unsupported source metadata to be omitted from exported messages.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+          <dev:type>
+            <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>Flatten</maml:name>
           <maml:description>
@@ -8148,6 +8193,18 @@ ensure credentials are disposed and not kept in memory.</maml:para>
       </command:syntaxItem>
     </command:syntax>
     <command:parameters>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>AllowLoss</maml:name>
+        <maml:description>
+          <maml:para>Allows unsupported source metadata to be omitted from exported messages.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
+        <dev:type>
+          <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>Flatten</maml:name>
         <maml:description>
@@ -8328,8 +8385,22 @@ ensure credentials are disposed and not kept in memory.</maml:para>
     </maml:alertSet>
     <command:examples>
       <command:example>
-        <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Export-MailStore -InputObject 'Value'</dev:code>
+        <maml:title>Export an OST to EML files</maml:title>
+        <dev:code>Export-MailStore -InputObject $data -OutputPath './export' -Format Eml</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Export a portable mailbox while accepting metadata loss</maml:title>
+        <dev:code>Export-MailStore -InputObject $data -OutputPath './portable.mbox' -Format Mbox -AllowLoss</dev:code>
+        <dev:remarks>
+          <maml:para>The returned preservation report includes warnings for source metadata that the destination cannot represent.</maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>Export one folder hierarchy to Mbox</maml:title>
+        <dev:code>Export-MailStore -InputObject $data -OutputPath './archive.mbox' -Format Mbox -FolderId $folder.Id -IncludeDescendants</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>

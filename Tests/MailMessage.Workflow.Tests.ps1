@@ -129,6 +129,25 @@ Describe 'Message-centric local email workflows' {
         Test-Path -LiteralPath $destination | Should -BeFalse
     }
 
+    It 'requires explicit metadata-loss acknowledgment for MSG conversion' {
+        $mail = Get-MailMessage $script:eml -ErrorAction Stop
+        $msg = Join-Path $TestDrive 'portable.msg'
+        $mail | Export-MailFile $msg -ErrorAction Stop
+        $destination = Join-Path $TestDrive 'converted-msg'
+
+        $strict = ConvertFrom-MsgToEml -InputPath $msg -OutputFolder $destination -ErrorAction Stop
+        $strict.Status | Should -BeFalse
+        $strict.Error | Should -Match 'EMAIL_SOURCE_METADATA_NOT_REPRESENTED_IN_EML'
+        Test-Path -LiteralPath (Join-Path $destination 'portable.eml') | Should -BeFalse
+
+        $converted = ConvertFrom-MsgToEml -InputPath $msg -OutputFolder $destination -AllowLoss -ErrorAction Stop
+        $converted.Status | Should -BeTrue
+        $readBack = Get-MailMessage (Join-Path $destination 'portable.eml') -ErrorAction Stop
+        $readBack.Subject | Should -Be $mail.Subject
+        $readBack.TextBody.Trim() | Should -Be 'Invoice body'
+        @($readBack.Attachments).Count | Should -Be 2
+    }
+
     It 'applies First across wildcard inputs and gives batch exports distinct names' {
         $second = Join-Path $script:source 'invoice-two.eml'
         [IO.File]::WriteAllText($second, $script:body)

@@ -166,10 +166,13 @@ Describe 'OfficeIMO.Email mail-store workflows' {
         $maildirPath = Join-Path $TestDrive 'maildir-export'
         $emlxPath = Join-Path $TestDrive 'emlx-export'
 
-        $eml = Export-MailStore -InputObject $script:data -OutputPath $emlDirectory -Format Eml -Flatten -ErrorAction Stop
-        $mbox = Export-MailStore -InputObject $script:data -OutputPath $mboxPath -Format Mbox -ErrorAction Stop
-        $maildir = Export-MailStore -InputObject $script:data -OutputPath $maildirPath -Format Maildir -Flatten -ErrorAction Stop
-        $emlx = Export-MailStore -InputObject $script:data -OutputPath $emlxPath -Format Emlx -Flatten -ErrorAction Stop
+        { Export-MailStore -InputObject $script:data -OutputPath $mboxPath -Format Mbox -ErrorAction Stop } | Should -Throw '*EMAIL_STORE_EXPORT_NO_ITEMS_WRITTEN*'
+        Test-Path -LiteralPath $mboxPath | Should -BeFalse
+
+        $eml = Export-MailStore -InputObject $script:data -OutputPath $emlDirectory -Format Eml -Flatten -AllowLoss -ErrorAction Stop
+        $mbox = Export-MailStore -InputObject $script:data -OutputPath $mboxPath -Format Mbox -AllowLoss -ErrorAction Stop
+        $maildir = Export-MailStore -InputObject $script:data -OutputPath $maildirPath -Format Maildir -Flatten -AllowLoss -ErrorAction Stop
+        $emlx = Export-MailStore -InputObject $script:data -OutputPath $emlxPath -Format Emlx -Flatten -AllowLoss -ErrorAction Stop
 
         $eml.SucceededCount | Should -Be 2
         $mbox.SucceededCount | Should -Be 2

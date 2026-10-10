@@ -95,7 +95,15 @@ public sealed class MailFileOfficeImoContractsTests {
             Assert.Equal("IPM.Contact", result.MessageClass);
             Assert.Equal("Ada", result.OfficeDocument.Contact!.GivenName);
             Assert.Equal("ada@example.com", result.OfficeDocument.Contact.Email1.Address);
-            using MimeMessage projected = result.ToMimeMessage();
+            InvalidDataException blocked = Assert.Throws<InvalidDataException>(() => result.ToMimeMessage());
+            Assert.Contains("EMAIL_SOURCE_METADATA_NOT_REPRESENTED_IN_EML", blocked.Message, StringComparison.Ordinal);
+            MailFileMimeMessageConversionResult conversion = result.ConvertToMimeMessage(
+                new EmailWriterOptions(EmailConversionLossPolicy.Warn));
+            Assert.False(conversion.HasErrors);
+            Assert.Contains(conversion.Diagnostics, diagnostic =>
+                diagnostic.Code == "EMAIL_SOURCE_METADATA_NOT_REPRESENTED_IN_EML" &&
+                diagnostic.Severity == EmailDiagnosticSeverity.Warning);
+            using MimeMessage projected = conversion.Message!;
             Assert.Equal("Ada Lovelace", projected.Subject);
         } finally {
             Directory.Delete(directory, true);
@@ -113,8 +121,14 @@ public sealed class MailFileOfficeImoContractsTests {
             EmlConversionResult toMsg = await EmailMessage.ConvertEmlToMsgAsync(
                 new FileInfo(emlPath), new FileInfo(msgPath), true);
             MailFileMessage imported = await MailFileReader.ReadAsync(msgPath);
+            MsgConversionResult blocked = await EmailMessage.ConvertMsgToEmlAsync(
+                new FileInfo(msgPath), new FileInfo(roundTripPath), true, default);
+            Assert.False(blocked.Status);
+            Assert.Contains("EMAIL_SOURCE_METADATA_NOT_REPRESENTED_IN_EML", blocked.Error!, StringComparison.Ordinal);
+            Assert.False(File.Exists(roundTripPath));
             MsgConversionResult toEml = await EmailMessage.ConvertMsgToEmlAsync(
-                new FileInfo(msgPath), new FileInfo(roundTripPath), true);
+                new FileInfo(msgPath), new FileInfo(roundTripPath), true,
+                new EmailWriterOptions(EmailConversionLossPolicy.Warn), default);
 
             Assert.True(toMsg.Status, toMsg.Error);
             Assert.Equal("Async owner", imported.Subject);
@@ -137,7 +151,10 @@ public sealed class MailFileOfficeImoContractsTests {
             MailFileMessage message = MailFileMessage.Load(emlPath);
             await message.SaveAsync(msgPath);
             MailFileMessage converted = await MailFileMessage.LoadAsync(msgPath);
-            converted.Save(roundTripPath);
+            InvalidDataException blocked = Assert.Throws<InvalidDataException>(() => converted.Save(roundTripPath));
+            Assert.Contains("EMAIL_SOURCE_METADATA_NOT_REPRESENTED_IN_EML", blocked.Message, StringComparison.Ordinal);
+            Assert.False(File.Exists(roundTripPath));
+            converted.Save(roundTripPath, new EmailWriterOptions(EmailConversionLossPolicy.Warn));
 
             Assert.Equal("Simple Mailozaurr API", message.Subject);
             Assert.False(message.HasErrors);
@@ -218,11 +235,20 @@ public sealed class MailFileOfficeImoContractsTests {
             WriteEml(directory, "stale.eml", "Fresh metadata", "Fresh body");
 
             EmlConversionResult toMsg = await EmailMessage.ConvertEmlToMsgAsync(emlFile, msgFile, true);
-            MsgConversionResult toEml = await EmailMessage.ConvertMsgToEmlAsync(msgFile, roundTripFile, true);
+            MsgConversionResult blocked = EmailMessage.ConvertMsgToEml(msgFile, roundTripFile, true);
+            Assert.False(blocked.Status);
+            Assert.Contains("EMAIL_SOURCE_METADATA_NOT_REPRESENTED_IN_EML", blocked.Error!, StringComparison.Ordinal);
+            Assert.False(File.Exists(roundTripPath));
+            var writerOptions = new EmailWriterOptions(EmailConversionLossPolicy.Warn);
+            MsgConversionResult toEml = EmailMessage.ConvertMsgToEml(msgFile, roundTripFile, true, writerOptions);
+            MsgConversionResult bulk = Assert.Single(EmailMessage.ConvertMsgToEml(
+                new[] { msgFile.FullName }, Path.Combine(directory, "bulk"), true, writerOptions));
 
             Assert.True(toMsg.Status, toMsg.Error);
             Assert.True(toEml.Status, toEml.Error);
             Assert.Equal("Fresh metadata", MimeMessage.Load(roundTripPath).Subject);
+            Assert.True(bulk.Status, bulk.Error);
+            Assert.Equal("Fresh metadata", MimeMessage.Load(bulk.EmlFile).Subject);
         } finally {
             Directory.Delete(directory, true);
         }
