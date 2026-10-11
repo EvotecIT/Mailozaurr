@@ -18,14 +18,14 @@ $message | Save-MimeMessage -Path ./Output/IncidentReview.eml
 
 This workflow performs local file operations and needs no SMTP server, OAuth session or mail credentials. It uses Mailozaurr 3.0.2 or later. Create the output directory and attachments before running the snippet.
 
-The [PSWriteOffice report-package recipe](https://github.com/EvotecIT/PSWriteOffice/blob/3bad89a2230d4bdb970251e5e1c73065e044ac00/Examples/Integrations/Recipe-Mailozaurr-PdfDelivery.ps1) handles the full sequence: create a sample service PDF or accept existing attachments, save an EML, and optionally send only when `-Send` and SMTP settings are supplied. The accompanying [HTML and Windows event recipes](https://github.com/EvotecIT/PSWriteOffice/tree/3bad89a2230d4bdb970251e5e1c73065e044ac00/Examples/Integrations) create Word/PDF briefs and numeric Excel registers that can be attached unchanged.
+The [PSWriteOffice report-package recipe](https://github.com/EvotecIT/PSWriteOffice/blob/c7a93f8ed393a97a0235b5db66078216ba73a98a/Examples/Integrations/Recipe-Mailozaurr-PdfDelivery.ps1) handles the full sequence: create a sample service PDF or accept existing attachments, save an EML, and optionally send only when `-Send` and SMTP settings are supplied. The accompanying [HTML and Windows event recipes](https://github.com/EvotecIT/PSWriteOffice/tree/c7a93f8ed393a97a0235b5db66078216ba73a98a/Examples/Integrations) create Word/PDF briefs and numeric Excel registers that can be attached unchanged.
 
 To run the complete offline example from an exact source revision:
 
 ```powershell
 Install-Module Mailozaurr, PSWriteOffice -Scope CurrentUser
 git clone https://github.com/EvotecIT/PSWriteOffice.git PSWriteOffice-reports
-git -C PSWriteOffice-reports checkout 3bad89a2230d4bdb970251e5e1c73065e044ac00
+git -C PSWriteOffice-reports checkout c7a93f8ed393a97a0235b5db66078216ba73a98a
 Set-Location ./PSWriteOffice-reports
 
 ./Examples/Integrations/Recipe-Mailozaurr-PdfDelivery.ps1 -OutputDirectory ./Output/MailReview
