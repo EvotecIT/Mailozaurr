@@ -5,7 +5,7 @@ Use Mailozaurr to compose a message with existing report files and save it as EM
 ```powershell
 Import-Module Mailozaurr
 
-$attachments = @('./Output/EventIncidentBrief.pdf', './Output/EventRegister.xlsx')
+$attachments = @('./Output/EventBrief/EventIncidentBrief.pdf', './Output/EventBrief/EventRegister.xlsx')
 $message = New-MimeMessage `
     -From 'Reporting <reporting@example.invalid>' `
     -To 'Review team <review@example.invalid>' `
@@ -16,7 +16,7 @@ $message = New-MimeMessage `
 $message | Save-MimeMessage -Path ./Output/IncidentReview.eml
 ```
 
-This workflow performs local file operations and needs no SMTP server, OAuth session or mail credentials. It uses Mailozaurr 3.0.2 or later. Create the output directory and attachments before running the snippet.
+This workflow performs local file operations and needs no SMTP server, OAuth session or mail credentials. It uses Mailozaurr 3.0.2 or later. The attachment paths match an event-report recipe run with `-OutputDirectory ./Output/EventBrief` from the PSWriteOffice checkout. Create `./Output` and both attachments before running the snippet.
 
 The [PSWriteOffice report-package recipe](https://github.com/EvotecIT/PSWriteOffice/blob/c7a93f8ed393a97a0235b5db66078216ba73a98a/Examples/Integrations/Recipe-Mailozaurr-PdfDelivery.ps1) handles the full sequence: create a sample service PDF or accept existing attachments, save an EML, and optionally send only when `-Send` and SMTP settings are supplied. The accompanying [HTML and Windows event recipes](https://github.com/EvotecIT/PSWriteOffice/tree/c7a93f8ed393a97a0235b5db66078216ba73a98a/Examples/Integrations) create Word/PDF briefs and numeric Excel registers that can be attached unchanged.
 
