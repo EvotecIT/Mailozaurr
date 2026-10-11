@@ -29,6 +29,8 @@ Author and Social
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-pklys-0077B5.svg?logo=LinkedIn)](https://www.linkedin.com/in/pklys)
 [![Discord](https://img.shields.io/discord/508328927853281280?style=flat-square&label=discord%20chat)](https://evo.yt/discord)
 
+See [local report email packages](Docs/Report-Packages.md) for composing attachments with PSWriteOffice and reviewing an EML before delivery.
+
 ## What it's all about
 
 Mailozaurr provides SMTP, POP3, IMAP, Microsoft Graph mail support, and mail-format tooling for PowerShell and .NET. Underneath it uses MimeKit and MailKit libraries written by Jeffrey Stedfast.
