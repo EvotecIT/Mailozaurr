@@ -57,13 +57,13 @@ public sealed class CmdletSaveIMAPMessage : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
+            var fullPath = string.IsNullOrEmpty(Path) ? null : GetUnresolvedProviderPathFromPSPath(Path);
             var uid = new UniqueId(Uid);
             var mailFolder = conn.Data.GetCachedFolder(Folder ?? conn.Folder?.FullName, FolderAccess.ReadOnly);
             conn.Folders[mailFolder.FullName] = (ImapFolder)mailFolder;
             var message = await mailFolder.GetMessageAsync(uid, CancelToken).ConfigureAwait(false);
 
-            if (!string.IsNullOrEmpty(Path)) {
-                var fullPath = System.IO.Path.GetFullPath(Path);
+            if (fullPath != null) {
                 var directory = System.IO.Path.GetDirectoryName(fullPath);
                 if (!string.IsNullOrEmpty(directory) && !System.IO.Directory.Exists(directory)) {
                     System.IO.Directory.CreateDirectory(directory);
