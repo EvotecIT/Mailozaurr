@@ -57,7 +57,7 @@ public sealed class CmdletSaveIMAPMessage : AsyncPSCmdlet {
     protected override async Task ProcessRecordAsync() {
         var conn = Client ?? DefaultSessions.ImapSession;
         if (conn != null && conn.Data != null) {
-            var fullPath = string.IsNullOrEmpty(Path) ? null : GetUnresolvedProviderPathFromPSPath(Path);
+            var fullPath = string.IsNullOrEmpty(Path) ? null : PowerShellFileSystemPath.Resolve(SessionState, Path!);
             var uid = new UniqueId(Uid);
             var mailFolder = conn.Data.GetCachedFolder(Folder ?? conn.Folder?.FullName, FolderAccess.ReadOnly);
             conn.Folders[mailFolder.FullName] = (ImapFolder)mailFolder;

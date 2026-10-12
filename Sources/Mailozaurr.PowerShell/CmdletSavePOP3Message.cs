@@ -50,7 +50,7 @@ public sealed class CmdletSavePOP3Message : AsyncPSCmdlet {
         var conn = Client ?? DefaultSessions.Pop3Session;
         if (conn != null && conn.Data != null) {
             if (Index < conn.Data.Count) {
-                var resolved = Path == null ? null : GetUnresolvedProviderPathFromPSPath(Path);
+                var resolved = Path == null ? null : PowerShellFileSystemPath.Resolve(SessionState, Path);
                 var message = await conn.Data.GetMessageAsync(Index, CancelToken).ConfigureAwait(false);
                 if (resolved != null) {
                     var directory = System.IO.Path.GetDirectoryName(resolved);

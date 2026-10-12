@@ -34,4 +34,30 @@ Describe 'Save-MimeMessage' {
             Test-Path -LiteralPath (Join-Path $TestDrive 'message.eml') | Should -BeTrue
         } finally { Remove-PSDrive -Name MessageOutput }
     }
+
+    It 'Rejects <Path> without writing a provider path as a filesystem file' -TestCases @(
+        @{ Path = 'Env:message.eml'; FileName = 'message.eml'; Existing = $true }
+        @{ Path = 'Variable:message.eml'; FileName = 'message.eml'; Existing = $true }
+        @{ Path = 'Microsoft.PowerShell.Core\Environment::message.eml'; FileName = 'message.eml'; Existing = $true }
+        @{ Path = 'Env:unexpected.eml'; FileName = 'unexpected.eml'; Existing = $false }
+    ) {
+        param($Path, $FileName, $Existing)
+        $message = New-MimeMessage -From 'sender@example.invalid' -To 'reader@example.invalid' -Subject 'Save test' -TextBody 'Local fixture'
+        $victim = Join-Path $TestDrive $FileName
+        if ($Existing) { [IO.File]::WriteAllText($victim, 'Preserve this file') }
+        $processDirectory = [Environment]::CurrentDirectory
+        Push-Location $TestDrive
+        try {
+            [Environment]::CurrentDirectory = $TestDrive
+            { Save-MimeMessage -InputObject $message -Path $Path -ErrorAction Stop } | Should -Throw '*FileSystem*'
+            if ($Existing) {
+                [IO.File]::ReadAllText($victim) | Should -Be 'Preserve this file'
+            } else {
+                Test-Path -LiteralPath $victim | Should -BeFalse
+            }
+        } finally {
+            [Environment]::CurrentDirectory = $processDirectory
+            Pop-Location
+        }
+    }
 }
