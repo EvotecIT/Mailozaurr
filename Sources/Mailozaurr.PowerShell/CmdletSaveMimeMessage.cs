@@ -23,7 +23,7 @@ public sealed class CmdletSaveMimeMessage : PSCmdlet {
         var message = PowerShellMimeMessageResolver.Resolve(InputObject);
         if (message == null) return;
 
-        var resolved = System.IO.Path.GetFullPath(Path);
+        var resolved = PowerShellFileSystemPath.Resolve(SessionState, Path!);
         var directory = System.IO.Path.GetDirectoryName(resolved);
         if (!string.IsNullOrEmpty(directory) && !System.IO.Directory.Exists(directory))
             System.IO.Directory.CreateDirectory(directory);
