@@ -7,7 +7,6 @@ $Body = EmailBody {
 }
 
 # Save the rendered HtmlForgeX.Email HTML beside this example before running it.
-# Email source and examples live in EvotecIT/HtmlForgeX under HtmlForgeX.Email.Examples.
 $Path = Join-Path $PSScriptRoot 'EmailProductLaunchAnnouncement.html'
 $Body = Get-Content -Path $Path -Raw
 # authorize via Connect-MgGraph with delegated rights or any other supported method
