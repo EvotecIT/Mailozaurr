@@ -6,8 +6,8 @@ $Body = EmailBody {
     New-HTMLText -Text "This is test of Connect-MGGraph functionality"
 }
 
-$Path = "C:\Support\GitHub\HtmlForgeX.Emails\HtmlForgeX.Email.Examples\EmailTableAdvancedStyling.html"
-$Path = "C:/Support/GitHub/HtmlForgeX.Emails/HtmlForgeX.Email.Examples/bin/Debug/net8.0/EmailProductLaunchAnnouncement.html"
+# Save the rendered HtmlForgeX.Email HTML beside this example before running it.
+$Path = Join-Path $PSScriptRoot 'EmailProductLaunchAnnouncement.html'
 $Body = Get-Content -Path $Path -Raw
 # authorize via Connect-MgGraph with delegated rights or any other supported method
 Connect-MgGraph -Scopes Mail.Send -NoWelcome
