@@ -24,7 +24,7 @@
     <PackageTags>Windows;MacOS;Linux;Mail;Email;SMTP;IMAP;POP3;MIME;SendGrid;Mailgun;AmazonSES;DMARC;DKIM</PackageTags>
     <DefaultItemExcludes>$(DefaultItemExcludes);**/artifacts/**;**/Artifacts/**</DefaultItemExcludes>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <OfficeIMOVersion>3.4.5</OfficeIMOVersion>
+    <OfficeIMOVersion>3.5.1</OfficeIMOVersion>
     <OfficeIMORoot Condition=" '$(OfficeIMORoot)' == '' ">..\..\..\OfficeIMO</OfficeIMORoot>
     <UseOfficeIMOProjectReferences Condition=" '$(UseOfficeIMOProjectReferences)' == '' ">false</UseOfficeIMOProjectReferences>
   </PropertyGroup>
@@ -79,11 +79,13 @@
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'netstandard2.0' ">
-    <PackageReference Include="System.Text.Json" Version="10.0.12" />
+    <PackageReference Include="System.Text.Json" Version="10.0.13" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'net8.0' ">
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.13" />
+    <!-- MimeKit's minimum CMS dependency predates the serviced security fixes. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'net472' ">
