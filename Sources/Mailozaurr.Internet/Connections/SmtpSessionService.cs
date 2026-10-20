@@ -111,6 +111,37 @@ public sealed class SmtpSessionRequest {
 /// Helpers for establishing SMTP sessions.
 /// </summary>
 public static class SmtpSessionService {
+    /// <summary>Gets or sets the factory used to create owned SMTP connection-test sessions.</summary>
+    public static Func<Smtp> SmtpFactory { get; set; } = () => new Smtp();
+
+    /// <summary>Connects and optionally authenticates, then releases the session without sending a message.</summary>
+    /// <param name="request">Connection and authentication settings.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    /// <returns>A task that completes when the connection test succeeds.</returns>
+    /// <exception cref="InvalidOperationException">The connection test failed. Details are deliberately omitted.</exception>
+    public static async Task TestConnectionAsync(SmtpSessionRequest request, CancellationToken cancellationToken = default) {
+        if (request is null) {
+            throw new ArgumentNullException(nameof(request));
+        }
+
+        Smtp? smtp = null;
+        try {
+            cancellationToken.ThrowIfCancellationRequested();
+            smtp = SmtpFactory();
+            using var diagnostics = new SmtpDiagnosticScope(smtp);
+            var result = await ConnectAndAuthenticateAsync(smtp, request, cancellationToken).ConfigureAwait(false);
+            if (!result.IsSuccess) {
+                throw new InvalidOperationException("SMTP connection test failed.");
+            }
+        } catch (OperationCanceledException exception) {
+            throw new OperationCanceledException("SMTP operation canceled.", exception.CancellationToken);
+        } catch {
+            throw new InvalidOperationException("SMTP connection test failed.");
+        } finally {
+            DisposeQuietly(smtp);
+        }
+    }
+
     /// <summary>
     /// Attempts to connect and authenticate using the provided SMTP client/configuration.
     /// </summary>
@@ -179,13 +210,21 @@ public static class SmtpSessionService {
         try {
             smtp.Disconnect();
         } catch {
-            // best-effort
+            TraceDisconnectFailureQuietly();
         }
 
         try {
             smtp.Dispose();
         } catch {
             // best-effort
+        }
+    }
+
+    internal static void TraceDisconnectFailureQuietly() {
+        try {
+            System.Diagnostics.Trace.TraceWarning("SMTP disconnect failed.");
+        } catch {
+            // A diagnostic listener must not prevent disposal.
         }
     }
 }

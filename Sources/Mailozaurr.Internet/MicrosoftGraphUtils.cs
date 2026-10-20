@@ -22,6 +22,7 @@ namespace Mailozaurr {
     public static partial class MicrosoftGraphUtils {
         private static readonly HttpClient HttpClient;
         private static readonly ConcurrentDictionary<string, GraphAuthorization> TokenCache = new();
+        internal static readonly GraphTokenMemoryCache MemoryTokenCache = new(TokenCache);
         internal static Func<string, string, string, string, IEnumerable<string>?, Task<GraphAuthorization>> AcquireGraphCertificateTokenAsyncFunc { get; set; } = AcquireGraphCertificateTokenAsyncDefault;
         internal static Func<string, string, byte[], string, IEnumerable<string>?, Task<GraphAuthorization>> AcquireGraphCertificateBytesTokenAsyncFunc { get; set; } = AcquireGraphCertificateBytesTokenAsyncDefault;
         internal static Func<string, string, string, IEnumerable<string>?, Task<GraphAuthorization>> AcquireGraphCertificatePemTokenAsyncFunc { get; set; } = AcquireGraphCertificatePemTokenAsyncDefault;
@@ -226,70 +227,11 @@ namespace Mailozaurr {
                 return $"{auth.TokenType} {auth.AccessToken}";
             }
 
-            var body = new Dictionary<string, string>
-            {
-                { "grant_type", "client_credentials" },
-                { "resource", resource },
-                { "client_id", credential.ClientId }
-            };
-            if (!string.IsNullOrEmpty(credential.ClientSecret)) {
-                body.Add("client_secret", credential.ClientSecret!);
-            }
-            var content = new FormUrlEncodedContent(body);
-            var url = $"https://login.microsoftonline.com/{tenantDomain}/oauth2/token";
-            await ConcurrencySemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-            HttpResponseMessage? response = null;
-            try {
-                response = await HttpClient.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
-                if ((int)response.StatusCode == 429) {
-                    var delay = GetRetryAfterDelay(response);
-                    response.Dispose();
-                    if (delay > TimeSpan.Zero) {
-                        await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-                    }
-                    response = await HttpClient.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
-                }
-#if NET5_0_OR_GREATER
-                var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-#else
-                var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-#endif
-                if (!response.IsSuccessStatusCode) {
-                    throw new GraphApiException(
-                        response.StatusCode,
-                        $"ConnectO365GraphAsync - Error: {json}",
-                        json);
-                }
-                var token = System.Text.Json.JsonDocument.Parse(json);
-                var accessToken = token.RootElement.GetProperty("access_token").GetString();
-                var tokenType = token.RootElement.GetProperty("token_type").GetString();
-                var expiresOn = DateTimeOffset.UtcNow.AddHours(1);
-                if (token.RootElement.TryGetProperty("expires_in", out var expIn)) {
-                    if (expIn.ValueKind == System.Text.Json.JsonValueKind.Number && expIn.TryGetInt32(out var expiresInSeconds)) {
-                        expiresOn = DateTimeOffset.UtcNow.AddSeconds(expiresInSeconds);
-                    } else if (expIn.ValueKind == System.Text.Json.JsonValueKind.String &&
-                               int.TryParse(expIn.GetString(), out var expiresInStringSeconds)) {
-                        expiresOn = DateTimeOffset.UtcNow.AddSeconds(expiresInStringSeconds);
-                    }
-                }
-                if (token.RootElement.TryGetProperty("expires_on", out var expOn)) {
-                    if (long.TryParse(expOn.GetString(), out var expSeconds)) {
-                        expiresOn = DateTimeOffset.FromUnixTimeSeconds(expSeconds);
-                    }
-                }
-                TokenCache[key] = new GraphAuthorization { AccessToken = accessToken ?? string.Empty, TokenType = tokenType ?? string.Empty, ExpiresOn = expiresOn };
-                await OAuthTokenCache.SetAsync($"graph:{key}", new OAuthCredential {
-                    UserName = credential.ClientId,
-                    AccessToken = accessToken ?? string.Empty,
-                    ExpiresOn = expiresOn
-                }).ConfigureAwait(false);
-                return $"{tokenType} {accessToken}";
-            } finally {
-                response?.Dispose();
-                ConcurrencySemaphore.Release();
-            }
+            GraphAuthorization authorization = await AcquireClientCredentialsAuthorizationAsync(
+                credential, tenantDomain, resource, HttpClient, cancellationToken).ConfigureAwait(false);
+            await CacheGraphAuthorizationAsync(key, credential.ClientId, authorization).ConfigureAwait(false);
+            return $"{authorization.TokenType} {authorization.AccessToken}";
         }
-
         /// <summary>
         /// Connects to O365 Graph with retry logic and returns the Authorization header value.
         /// </summary>

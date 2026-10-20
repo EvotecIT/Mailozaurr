@@ -514,7 +514,7 @@ public partial class Graph {
         try {
             using var uploadChunkResponse = await _client.SendAsync(requestMessage, cancellationToken);
             if (!uploadChunkResponse.IsSuccessStatusCode) {
-                LogCollector.LogWarning(uploadChunkResponse.ToString());
+                LogCollector.LogWarning(SuppressSensitiveDiagnostics ? "Microsoft Graph attachment upload failed." : uploadChunkResponse.ToString());
             }
         } finally {
             MicrosoftGraphUtils.ConcurrencySemaphore.Release();

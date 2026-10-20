@@ -118,7 +118,7 @@ public partial class Graph {
             rawAttachmentBytes += source.Length;
             _streamableAttachmentCount++;
         } catch (Exception ex) {
-            LogCollector.LogError($"Send-EmailMessage - Failed to read attachment '{path}': {ex.Message}");
+            LogCollector.LogError(SuppressSensitiveDiagnostics ? "Send-EmailMessage - Failed to read attachment." : $"Send-EmailMessage - Failed to read attachment '{path}': {ex.Message}");
         }
     }
 
