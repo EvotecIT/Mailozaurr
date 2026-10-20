@@ -126,6 +126,10 @@ namespace Mailozaurr {
                 credential.CertificatePath ?? string.Empty,
                 credential.CertificatePemPath ?? string.Empty,
                 certificateBytesHash,
+                credential.Certificate?.GetCertHashString() ?? string.Empty,
+                credential.CertificateThumbprint ?? string.Empty,
+                credential.CertificateStoreLocation.ToString(),
+                credential.CertificateStoreName.ToString(),
                 credential.ClientSecret ?? string.Empty);
 
             return $"v2:{ComputeSha256Hex(Encoding.UTF8.GetBytes(identity))}";
@@ -177,6 +181,10 @@ namespace Mailozaurr {
         /// Connects to O365 Graph and returns the Authorization header value ("Bearer ...").
         /// </summary>
         public static async Task<string> ConnectO365GraphAsync(GraphCredential credential, string tenantDomain, string resource = "https://manage.office.com", CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (credential.Certificate != null && !credential.Certificate.HasPrivateKey) {
+                throw new InvalidOperationException(AuthenticationFailure);
+            }
             var delegatedAccessToken = credential.AccessToken;
             if (delegatedAccessToken != null && delegatedAccessToken.Trim().Length > 0) {
                 var accessToken = delegatedAccessToken.Trim();
@@ -193,6 +201,16 @@ namespace Mailozaurr {
             if (cachedFile != null && cachedFile.ExpiresOn > DateTimeOffset.UtcNow.AddMinutes(5)) {
                 TokenCache[key] = new GraphAuthorization { AccessToken = cachedFile.AccessToken, TokenType = "Bearer", ExpiresOn = cachedFile.ExpiresOn };
                 return $"Bearer {cachedFile.AccessToken}";
+            }
+            if (credential.Certificate != null || !string.IsNullOrWhiteSpace(credential.CertificateThumbprint)) {
+                using var authentication = new GraphAuthenticationClient(new GraphCredential {
+                    ClientId = credential.ClientId, DirectoryId = tenantDomain, Certificate = credential.Certificate,
+                    CertificateThumbprint = credential.CertificateThumbprint,
+                    CertificateStoreLocation = credential.CertificateStoreLocation, CertificateStoreName = credential.CertificateStoreName
+                }, scopes: new[] { $"{resource}/.default" });
+                GraphAuthorization certificateAuthorization = await authentication.GetAuthorizationAsync(cancellationToken).ConfigureAwait(false);
+                await CacheGraphAuthorizationAsync(key, credential.ClientId, certificateAuthorization).ConfigureAwait(false);
+                return $"{certificateAuthorization.TokenType} {certificateAuthorization.AccessToken}";
             }
             if (!string.IsNullOrWhiteSpace(credential.CertificatePath)) {
                 var scopes = new[] { $"{resource}/.default" };

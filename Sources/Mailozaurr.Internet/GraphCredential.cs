@@ -8,6 +8,19 @@ namespace Mailozaurr;
 /// and passed to the <c>Graph</c> helper class.
 /// </remarks>
 public class GraphCredential {
+    /// <summary>Gets or sets a caller-owned certificate with its private key. The key need not be exportable.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public System.Security.Cryptography.X509Certificates.X509Certificate2? Certificate { get; set; }
+
+    /// <summary>Gets or sets a certificate thumbprint to resolve from the specified Windows certificate store.</summary>
+    public string? CertificateThumbprint { get; set; }
+
+    /// <summary>Gets or sets the certificate store location. Defaults to the current user.</summary>
+    public System.Security.Cryptography.X509Certificates.StoreLocation CertificateStoreLocation { get; set; } = System.Security.Cryptography.X509Certificates.StoreLocation.CurrentUser;
+
+    /// <summary>Gets or sets the certificate store name. Defaults to the personal store.</summary>
+    public System.Security.Cryptography.X509Certificates.StoreName CertificateStoreName { get; set; } = System.Security.Cryptography.X509Certificates.StoreName.My;
+
     /// <summary>
     /// Gets or sets the application (client) identifier.
     /// </summary>
