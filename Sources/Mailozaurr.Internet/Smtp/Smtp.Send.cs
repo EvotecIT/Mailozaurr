@@ -73,6 +73,9 @@ public partial class Smtp {
     /// Logs a verbose message using LogCollector if available, otherwise uses LoggingMessages.Logger.
     /// </summary>
     private void LogVerbose(string message) {
+        if (SuppressDiagnostics) {
+            return;
+        }
         if (LogCollector != null) {
             LogCollector.LogVerbose(message);
         } else {
@@ -84,6 +87,9 @@ public partial class Smtp {
     /// Logs a warning message using LogCollector if available, otherwise uses LoggingMessages.Logger.
     /// </summary>
     private void LogWarning(string message) {
+        if (SuppressDiagnostics) {
+            return;
+        }
         if (LogCollector != null) {
             LogCollector.LogWarning(message);
         } else {

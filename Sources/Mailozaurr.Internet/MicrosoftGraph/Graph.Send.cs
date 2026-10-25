@@ -15,6 +15,8 @@ public partial class Graph {
     public async Task<GraphSmtpResult> SendMessageAsync(CancellationToken cancellationToken = default) {
         try {
             return await SendMessageCoreAsync(cancellationToken).ConfigureAwait(false);
+        } catch (Exception ex) when (SuppressSensitiveDiagnostics) {
+            throw SafeSendException(ex);
         } finally {
             AttachmentDescriptorLifetime.ReleaseStaging(Attachments?.OfType<Mailozaurr.Definitions.AttachmentDescriptor>());
         }
@@ -81,7 +83,7 @@ public partial class Graph {
                 throw;
             } catch (TaskCanceledException ex) {
                 lastException = ex;
-                LogCollector.LogWarning($"Send-EmailMessage - Sending via Graph API cancelled: {ex.Message}");
+                LogGraphFailure("Send-EmailMessage - Sending via Graph API cancelled", ex);
                 var maxRetries = policy?.MaxRetries ?? RetryCount;
                 var shouldRetry = (policy?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
                 if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
@@ -92,7 +94,7 @@ public partial class Graph {
                 await DelayWithBackoffAsync(policy, attempts, null, ex, cancellationToken);
             } catch (Exception ex) {
                 lastException = ex;
-                LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
+                LogGraphFailure("Send-EmailMessage - Error during sending using Graph API", ex);
                 var maxRetries = policy?.MaxRetries ?? RetryCount;
                 var shouldRetry = (policy?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
                 if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
@@ -121,6 +123,8 @@ public partial class Graph {
     public async Task<GraphSmtpResult> SendMessageDraftAsync(CancellationToken cancellationToken = default) {
         try {
             return await SendMessageDraftAsync(messagePrepared: false, cancellationToken).ConfigureAwait(false);
+        } catch (Exception ex) when (SuppressSensitiveDiagnostics) {
+            throw SafeSendException(ex);
         } finally {
             AttachmentDescriptorLifetime.ReleaseStaging(Attachments?.OfType<Mailozaurr.Definitions.AttachmentDescriptor>());
         }
@@ -147,7 +151,7 @@ public partial class Graph {
         } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
             throw;
         } catch (Exception ex) {
-            LogCollector.LogWarning($"Send-EmailMessage - Error while creating the Graph draft or adding attachments: {ex.Message}");
+            LogGraphFailure("Send-EmailMessage - Error while creating the Graph draft or adding attachments", ex);
             if (ErrorAction == ActionPreference.Stop) {
                 throw;
             }
@@ -160,12 +164,12 @@ public partial class Graph {
         Exception? lastException = null;
         do {
             try {
-                return await SendDraftMessage(draftMessage, cancellationToken);
+                return await SendDraftMessageCoreAsync(draftMessage, cancellationToken);
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 throw;
             } catch (TaskCanceledException ex) {
                 lastException = ex;
-                LogCollector.LogWarning($"Send-EmailMessage - Sending draft via Graph API cancelled: {ex.Message}");
+                LogGraphFailure("Send-EmailMessage - Sending draft via Graph API cancelled", ex);
                 var maxRetries = policyDraft?.MaxRetries ?? RetryCount;
                 var shouldRetry = (policyDraft?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
                 if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
@@ -176,7 +180,7 @@ public partial class Graph {
                 await DelayWithBackoffAsync(policyDraft, attempts, null, ex, cancellationToken);
             } catch (Exception ex) {
                 lastException = ex;
-                LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
+                LogGraphFailure("Send-EmailMessage - Error during sending using Graph API", ex);
                 var maxRetries = policyDraft?.MaxRetries ?? RetryCount;
                 var shouldRetry = (policyDraft?.RetryOnTransient ?? true) ? GraphRetryHelper.IsTransient(ex) : RetryAlways;
                 if ((!shouldRetry && !RetryAlways) || attempts >= maxRetries) {
@@ -205,6 +209,14 @@ public partial class Graph {
     /// <param name="cancellationToken">Token used to cancel the operation.</param>
     /// <returns>The result of the send operation.</returns>
     public async Task<GraphSmtpResult> SendDraftMessage(GraphMessage draftMessage, CancellationToken cancellationToken = default) {
+        try {
+            return await SendDraftMessageCoreAsync(draftMessage, cancellationToken).ConfigureAwait(false);
+        } catch (Exception ex) when (SuppressSensitiveDiagnostics) {
+            throw SafeSendException(ex);
+        }
+    }
+
+    private async Task<GraphSmtpResult> SendDraftMessageCoreAsync(GraphMessage draftMessage, CancellationToken cancellationToken) {
         var operationStopwatch = StartOperationTimer();
         if (DryRun) {
             LogCollector.LogVerbose("Send-EmailMessage - DryRun enabled, skipping Graph draft send.");
@@ -242,7 +254,7 @@ public partial class Graph {
             var retryAfter = ParseRetryAfter(sendResponse);
             throw new GraphApiException(sendResponse.StatusCode, sendErrorMessage, sendContent, retryAfter);
         } catch (GraphApiException ex) {
-            LogCollector.LogWarning($"Send-EmailMessage - Error during sending using Graph API: {ex.Message}");
+            LogGraphFailure("Send-EmailMessage - Error during sending using Graph API", ex);
             var failResult = CreateGraphFailureResult(operationStopwatch, ex.Message,
                 ex.ResponseContent, ex.ResponseContent, ex.StatusCode);
             await PostGraphWebhookAsync(failResult, cancellationToken);
@@ -258,6 +270,8 @@ public partial class Graph {
     public async Task<GraphSmtpResult> SendMessageBatchAsync(CancellationToken cancellationToken = default) {
         try {
             return await SendMessageBatchCoreAsync(cancellationToken).ConfigureAwait(false);
+        } catch (Exception ex) when (SuppressSensitiveDiagnostics) {
+            throw SafeSendException(ex);
         } finally {
             AttachmentDescriptorLifetime.ReleaseStaging(
                 Attachments?.OfType<Mailozaurr.Definitions.AttachmentDescriptor>());
@@ -320,11 +334,17 @@ public partial class Graph {
 
     private GraphSmtpResult CreateGraphFailureResult(Stopwatch operationStopwatch,
         string? error, string? outputMessage = null, string? structuredError = null,
-        HttpStatusCode? statusCode = null, EmailAction emailAction = EmailAction.Send) => new(false, emailAction,
-        SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed,
-        outputMessage ?? string.Empty, error) {
-        GraphError = GraphApiErrorParser.Parse(structuredError ?? error, statusCode)
-    };
+        HttpStatusCode? statusCode = null, EmailAction emailAction = EmailAction.Send) {
+        if (SuppressSensitiveDiagnostics) {
+            error = SafeSendFailure;
+            outputMessage = string.Empty;
+            structuredError = SafeSendFailure;
+        }
+        return new GraphSmtpResult(false, emailAction, SentTo, SentFrom, "GraphAPI", 0, operationStopwatch.Elapsed,
+            outputMessage ?? string.Empty, error) {
+            GraphError = GraphApiErrorParser.Parse(structuredError ?? error, statusCode)
+        };
+    }
 
     private GraphSmtpResult CreateGraphFailureResult(Stopwatch operationStopwatch,
         Exception? exception) {
@@ -334,7 +354,8 @@ public partial class Graph {
             statusCode: graphException?.StatusCode);
     }
 
-    private static string FormatGraphSendError(HttpStatusCode statusCode, string responseContent) {
+    private string FormatGraphSendError(HttpStatusCode statusCode, string responseContent) {
+        if (SuppressSensitiveDiagnostics) return $"{SafeSendFailure} HTTP {(int)statusCode}.";
         var error = GraphApiErrorParser.Parse(responseContent, statusCode)?.Error;
         var detail = error == null
             ? responseContent

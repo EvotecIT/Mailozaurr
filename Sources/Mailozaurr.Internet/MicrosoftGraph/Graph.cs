@@ -294,6 +294,15 @@ public partial class Graph : IDisposable {
         if (LogCollector == null) LogCollector = new();
     }
 
+    /// <summary>Initializes a Graph session using the supplied HTTP handler and an isolated in-memory token cache.</summary>
+    /// <param name="handler">Handler used for authentication and Graph requests. It is disposed with this session.</param>
+    public Graph(HttpMessageHandler handler) {
+        if (handler == null) throw new ArgumentNullException(nameof(handler));
+        Stopwatch = Stopwatch.StartNew();
+        _client = new HttpClient(handler);
+        _tokenCache = new GraphTokenMemoryCache();
+    }
+
     /// <summary>
     /// Apply a send policy to this instance. Also updates the global Graph concurrency limit.
     /// </summary>
@@ -319,6 +328,10 @@ public partial class Graph : IDisposable {
     }
 
     private void LogMissingAttachmentWarning(string attachmentPath) {
+        if (SuppressSensitiveDiagnostics) {
+            LogCollector.LogWarning("Send-EmailMessage - Attachment file not found.");
+            return;
+        }
         var pathForMessage = string.IsNullOrWhiteSpace(attachmentPath)
             ? "(empty path)"
             : attachmentPath;
@@ -349,7 +362,7 @@ public partial class Graph : IDisposable {
 
 
     private async Task<GraphSmtpResult> TrySmtpFallbackAsync(GraphSendPolicy? policy, GraphSmtpResult current, Exception? lastException, CancellationToken cancellationToken) {
-        if (current.GraphError == null && lastException != null) {
+        if (!SuppressSensitiveDiagnostics && current.GraphError == null && lastException != null) {
             var graphException = lastException as GraphApiException;
             current.GraphError = GraphApiErrorParser.Parse(
                 graphException?.ResponseContent ?? lastException.Message,
@@ -386,7 +399,7 @@ public partial class Graph : IDisposable {
                         var d = CreateSmtpFallbackAttachment(a);
                         if (a.IsInline) inline.Add(d); else attachments.Add(d);
                     } catch (FormatException fex) {
-                        LogCollector.LogWarning($"Send-EmailMessage - SMTP fallback skipped invalid base64 attachment '{(a?.Name ?? "(unnamed)")}' : {fex.Message}");
+                        LogGraphFailure("Send-EmailMessage - SMTP fallback skipped invalid base64 attachment", fex);
                     }
                 }
                 if (attachments.Count > 0) smtp.Attachments = attachments;
@@ -396,16 +409,23 @@ public partial class Graph : IDisposable {
                 AddFileAttachmentSourcesToSmtpFallback(smtp);
             }
 
-            await smtp.CreateMessageAsync(cancellationToken).ConfigureAwait(false);
             LogCollector.LogVerbose("Send-EmailMessage - Sending via SMTP fallback after Graph failure.");
-            SmtpResult fallbackResult = await smtp.SendAsync(cancellationToken).ConfigureAwait(false);
-            return new GraphSmtpResult(fallbackResult, fallbackResult.Error) {
+            SmtpResult fallbackResult;
+            if (SuppressSensitiveDiagnostics) {
+                fallbackResult = await smtp.CreateAndSendSafelyAsync(cancellationToken).ConfigureAwait(false);
+            } else {
+                await smtp.CreateMessageAsync(cancellationToken).ConfigureAwait(false);
+                fallbackResult = await smtp.SendAsync(cancellationToken).ConfigureAwait(false);
+            }
+            return new GraphSmtpResult(fallbackResult, SuppressSensitiveDiagnostics ? (fallbackResult.Status ? string.Empty : SafeSendFailure) : fallbackResult.Error) {
+                Message = SuppressSensitiveDiagnostics ? string.Empty : fallbackResult.Message,
+                PostSendErrors = SuppressSensitiveDiagnostics ? new List<string>() : fallbackResult.PostSendErrors,
                 GraphError = current.GraphError
             };
         } catch (Exception ex) {
-            LogCollector.LogWarning($"Send-EmailMessage - SMTP fallback failed: {ex.Message}");
+            LogGraphFailure("Send-EmailMessage - SMTP fallback failed", ex);
             // Preserve original Graph failure, but add fallback context to Error for diagnostics
-            var fallbackError = ex.ToString();
+            var fallbackError = SuppressSensitiveDiagnostics ? "SMTP fallback failed." : ex.ToString();
             var mergedError = string.IsNullOrWhiteSpace(current.Error)
                 ? $"Graph failed; SMTP fallback error: {fallbackError}"
                 : $"{current.Error} | SMTP fallback error: {fallbackError}";

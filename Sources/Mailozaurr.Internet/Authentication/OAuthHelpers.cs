@@ -10,7 +10,7 @@ namespace Mailozaurr;
 /// Helper methods for acquiring OAuth tokens for various services.
 /// </summary>
 public static class OAuthHelpers {
-    private static string[] NormalizeScopes(IEnumerable<string> scopes) =>
+    internal static string[] NormalizeScopes(IEnumerable<string> scopes) =>
         scopes?
             .Where(scope => !string.IsNullOrWhiteSpace(scope))
             .Select(scope => scope.Trim())
@@ -289,8 +289,8 @@ public static class OAuthHelpers {
         string certificatePath,
         string certificatePassword,
         IEnumerable<string>? scopes = null) {
-        var certificate = new X509Certificate2(certificatePath, certificatePassword);
-        return await AcquireGraphCertificateTokenInternal(clientId, tenantId, certificate, scopes);
+        using var certificate = new X509Certificate2(certificatePath, certificatePassword, GraphCertificateStore.ImportKeyStorageFlags);
+        return await AcquireGraphCertificateTokenAsync(clientId, tenantId, certificate, scopes).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -308,8 +308,8 @@ public static class OAuthHelpers {
         byte[] certificateBytes,
         string certificatePassword,
         IEnumerable<string>? scopes = null) {
-        var certificate = new X509Certificate2(certificateBytes, certificatePassword);
-        return await AcquireGraphCertificateTokenInternal(clientId, tenantId, certificate, scopes);
+        using var certificate = new X509Certificate2(certificateBytes, certificatePassword, GraphCertificateStore.ImportKeyStorageFlags);
+        return await AcquireGraphCertificateTokenAsync(clientId, tenantId, certificate, scopes).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -320,35 +320,38 @@ public static class OAuthHelpers {
     /// <param name="pemPath">Path to the PEM certificate file.</param>
     /// <param name="scopes">Optional scopes to request.</param>
     /// <returns>The authorization information including access token.</returns>
-    public static Task<GraphAuthorization> AcquireGraphCertificatePemTokenAsync(
+    public static async Task<GraphAuthorization> AcquireGraphCertificatePemTokenAsync(
         string clientId,
         string tenantId,
         string pemPath,
         IEnumerable<string>? scopes = null) {
 #if NET5_0_OR_GREATER
-        var certificate = X509Certificate2.CreateFromPemFile(pemPath);
-        return AcquireGraphCertificateTokenInternal(clientId, tenantId, certificate, scopes);
+        using var certificate = X509Certificate2.CreateFromPemFile(pemPath);
+        return await AcquireGraphCertificateTokenAsync(clientId, tenantId, certificate, scopes).ConfigureAwait(false);
 #else
-        return Task.FromException<GraphAuthorization>(new NotSupportedException("PEM certificates are not supported on this framework."));
+        await Task.CompletedTask.ConfigureAwait(false);
+        throw new NotSupportedException("PEM certificates are not supported on this framework.");
 #endif
     }
 
-    private static async Task<GraphAuthorization> AcquireGraphCertificateTokenInternal(
+    /// <summary>Acquires a Graph token using a caller-owned certificate without exporting its private key.</summary>
+    /// <param name="clientId">The application identifier.</param>
+    /// <param name="tenantId">The tenant identifier.</param>
+    /// <param name="certificate">The certificate with a private key, including a non-exportable store key.</param>
+    /// <param name="scopes">Optional application scopes.</param>
+    /// <param name="cancellationToken">Cancels authentication.</param>
+    /// <returns>The authorization including its expiry.</returns>
+    public static async Task<GraphAuthorization> AcquireGraphCertificateTokenAsync(
         string clientId,
         string tenantId,
         X509Certificate2 certificate,
-        IEnumerable<string>? scopes) {
-        var app = ConfidentialClientApplicationBuilder
-            .Create(clientId)
-            .WithTenantId(tenantId)
-            .WithCertificate(certificate)
-            .Build();
-        scopes ??= new[] { "https://graph.microsoft.com/.default" };
-        var result = await app.AcquireTokenForClient(scopes).ExecuteAsync();
-        return new GraphAuthorization {
-            AccessToken = result.AccessToken,
-            TokenType = "Bearer",
-            ExpiresOn = result.ExpiresOn
-        };
+        IEnumerable<string>? scopes = null,
+        System.Threading.CancellationToken cancellationToken = default) {
+        if (certificate == null) throw new ArgumentNullException(nameof(certificate));
+        using var client = new GraphAuthenticationClient(new GraphCredential {
+            ClientId = clientId, DirectoryId = tenantId, Certificate = certificate
+        }, scopes: scopes);
+        return await client.GetAuthorizationAsync(cancellationToken).ConfigureAwait(false);
     }
+
 }

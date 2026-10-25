@@ -61,7 +61,13 @@ public partial class Smtp {
                     }
                 }).ConfigureAwait(false);
             } finally {
-                try { smtp.Disconnect(); } catch (Exception exception) { smtp.LogWarning($"ProcessPendingMessages - Disconnect failed: {exception.Message}"); }
+                try { smtp.Disconnect(); } catch (Exception exception) {
+                    if (smtp.SuppressDiagnostics) {
+                        SmtpSessionService.TraceDisconnectFailureQuietly();
+                    } else {
+                        smtp.LogWarning($"ProcessPendingMessages - Disconnect failed: {exception.Message}");
+                    }
+                }
                 smtp.SkipCertificateValidation = originalSkip;
                 smtp.ServerCertificateValidationCallback = originalCallback;
                 smtp.CheckCertificateRevocation = originalRevocation;

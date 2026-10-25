@@ -272,8 +272,8 @@ namespace Mailozaurr.Tests {
         }
 
         [Fact]
-        public async Task ConnectO365GraphAsync_HttpError_ReturnsStructuredGraphError() {
-            const string responseBody = "{\"error\":{\"code\":\"invalid_client\",\"message\":\"Bad credentials\"}}";
+        public async Task ConnectO365GraphAsync_HttpError_ReturnsStatusWithoutProviderDiagnostics() {
+            const string responseBody = "{\"error\":{\"code\":\"invalid_client\",\"message\":\"Private provider credentials\"}}";
             var handler = new RecordingHandler(new HttpResponseMessage(HttpStatusCode.Unauthorized) {
                 Content = new StringContent(responseBody)
             });
@@ -288,8 +288,10 @@ namespace Mailozaurr.Tests {
             Assert.Equal(EmailAction.Connect, result.EmailAction);
             Assert.NotNull(result.GraphError);
             Assert.Equal(HttpStatusCode.Unauthorized, result.GraphError!.StatusCode);
-            Assert.Equal("invalid_client", result.GraphError.Error?.Code);
-            Assert.Equal(responseBody, result.GraphError.Raw);
+            Assert.Equal("Microsoft Graph authentication failed.", result.Error);
+            Assert.Equal(result.Error, result.GraphError.Raw);
+            Assert.Null(result.GraphError.Error);
+            Assert.DoesNotContain("Private provider credentials", System.Text.Json.JsonSerializer.Serialize(result));
             Assert.Single(handler.Requests);
         }
 
