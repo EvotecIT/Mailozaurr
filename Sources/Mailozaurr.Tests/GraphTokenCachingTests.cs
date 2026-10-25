@@ -7,6 +7,30 @@ namespace Mailozaurr.Tests;
 
 public class GraphTokenCachingTests {
     [Fact]
+    public async Task Connect_ThrottledTokenRequest_RecreatesContentForRetry() {
+        HttpContent? previous = null;
+        int requests = 0;
+        using var handler = new TokenHandler(async (request, _) => {
+            Assert.NotSame(previous, request.Content);
+            Assert.Contains("client_secret=secret", await request.Content!.ReadAsStringAsync());
+            previous = request.Content;
+            if (++requests == 1) {
+                // .NET Framework disposes sent content. Model that lifetime on every target.
+                request.Content.Dispose();
+                var throttled = new HttpResponseMessage((HttpStatusCode)429);
+                throttled.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.Zero);
+                return throttled;
+            }
+            return Token("retried-token");
+        });
+        using var graph = Session(handler);
+
+        Assert.True((await graph.ConnectO365GraphAsync()).Status);
+        Assert.Equal("retried-token", graph.AccessToken);
+        Assert.Equal(2, requests);
+    }
+
+    [Fact]
     public async Task Connect_ValidCachedToken_ReusesTokenWithoutHttp() {
         using var handler = new TokenHandler((_, _) => Task.FromResult(Token("first")));
         using var graph = Session(handler);

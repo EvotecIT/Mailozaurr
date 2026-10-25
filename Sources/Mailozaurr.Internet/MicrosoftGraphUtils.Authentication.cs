@@ -10,23 +10,26 @@ public static partial class MicrosoftGraphUtils {
     internal static async Task<GraphAuthorization> AcquireClientCredentialsAuthorizationAsync(
         GraphCredential credential, string tenant, string resource, HttpClient client, CancellationToken cancellationToken) {
         try {
-            using var content = new FormUrlEncodedContent(new Dictionary<string, string> {
+            var form = new Dictionary<string, string> {
                 ["grant_type"] = "client_credentials",
                 ["resource"] = resource,
                 ["client_id"] = credential.ClientId,
                 ["client_secret"] = credential.ClientSecret ?? string.Empty
-            });
+            };
             string url = $"https://login.microsoftonline.com/{Uri.EscapeDataString(tenant)}/oauth2/token";
             await ConcurrencySemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
             HttpResponseMessage? response = null;
             try {
-                response = await client.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
+                using (var content = new FormUrlEncodedContent(form)) {
+                    response = await client.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
+                }
                 if ((int)response.StatusCode == 429) {
                     TimeSpan delay = GetRetryAfterDelay(response);
                     response.Dispose();
                     response = null;
                     if (delay > TimeSpan.Zero) await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-                    response = await client.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
+                    using var retryContent = new FormUrlEncodedContent(form);
+                    response = await client.PostAsync(url, retryContent, cancellationToken).ConfigureAwait(false);
                 }
                 if (!response.IsSuccessStatusCode) {
                     throw new GraphApiException(response.StatusCode, AuthenticationFailure, string.Empty);

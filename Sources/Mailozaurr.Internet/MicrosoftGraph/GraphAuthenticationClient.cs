@@ -29,7 +29,8 @@ public sealed class GraphAuthenticationClient : IDisposable {
             !string.IsNullOrEmpty(authorityHost.Query) || !string.IsNullOrEmpty(authorityHost.Fragment)) {
             throw new ArgumentException("An HTTPS authority without credentials, query or fragment is required.", nameof(authorityHost));
         }
-        _scopes = scopes?.ToArray() ?? new[] { "https://graph.microsoft.com/.default" };
+        string[] normalizedScopes = OAuthHelpers.NormalizeScopes(scopes ?? Array.Empty<string>());
+        _scopes = normalizedScopes.Length == 0 ? new[] { "https://graph.microsoft.com/.default" } : normalizedScopes;
         try {
             var builder = ConfidentialClientApplicationBuilder.Create(credential.ClientId)
                 .WithAuthority(new Uri(authorityHost, Uri.EscapeDataString(credential.DirectoryId)).AbsoluteUri)

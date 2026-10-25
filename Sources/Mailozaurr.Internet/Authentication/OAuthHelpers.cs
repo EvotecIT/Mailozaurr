@@ -10,7 +10,7 @@ namespace Mailozaurr;
 /// Helper methods for acquiring OAuth tokens for various services.
 /// </summary>
 public static class OAuthHelpers {
-    private static string[] NormalizeScopes(IEnumerable<string> scopes) =>
+    internal static string[] NormalizeScopes(IEnumerable<string> scopes) =>
         scopes?
             .Where(scope => !string.IsNullOrWhiteSpace(scope))
             .Select(scope => scope.Trim())

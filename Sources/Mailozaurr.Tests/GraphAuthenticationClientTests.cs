@@ -42,6 +42,17 @@ public class GraphAuthenticationClientTests {
     }
 
     [Fact]
+    public async Task GetAuthorizationAsync_EmptyOrBlankScopes_UsesDefaultAndTrimsExplicitScopes() {
+        foreach (string[] scopes in new[] { Array.Empty<string>(), new[] { "", "  ", null! }, new[] { " https://graph.microsoft.com/.default " } }) {
+            var transport = new TokenTransport();
+            using var client = new GraphAuthenticationClient(CreateCredential(), send: transport.SendAsync, scopes: scopes);
+
+            Assert.Equal("token-1", (await client.GetAuthorizationAsync()).AccessToken);
+            Assert.Contains("https://graph.microsoft.com/.default", Assert.Single(transport.Forms)["scope"].Split(' '));
+        }
+    }
+
+    [Fact]
     public async Task GetAuthorizationAsync_ValidToken_ReusesMsalCacheAndPreservesExpiry() {
         var transport = new TokenTransport();
         using var client = new GraphAuthenticationClient(CreateCredential(), send: transport.SendAsync);
