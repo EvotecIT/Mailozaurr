@@ -323,7 +323,7 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
         string temporaryName,
         int destinationDirectoryFd,
         string destinationName) {
-        if (linkat(temporaryDirectoryFd, temporaryName, destinationDirectoryFd, destinationName, 0) == 0) {
+        if (UnixFileLinks.Create(temporaryDirectoryFd, temporaryName, destinationDirectoryFd, destinationName) == 0) {
             if (unlinkat(temporaryDirectoryFd, temporaryName, 0) != 0) ThrowUnixIOException("remove a committed temporary attachment link");
             return true;
         }
@@ -499,7 +499,6 @@ internal sealed class AttachmentDirectoryLease : IDisposable {
     [DllImport("libc", SetLastError = true)] private static extern int openat(int directoryFd, string path, int flags, uint mode);
     [DllImport("libc", SetLastError = true)] private static extern int mkdirat(int directoryFd, string path, uint mode);
     [DllImport("libc", SetLastError = true)] private static extern int fchmod(int fileDescriptor, uint mode);
-    [DllImport("libc", SetLastError = true)] private static extern int linkat(int oldDirectoryFd, string oldPath, int newDirectoryFd, string newPath, int flags);
     [DllImport("libc", SetLastError = true)] private static extern int unlinkat(int directoryFd, string path, int flags);
     [DllImport("libc", SetLastError = true)] private static extern int renameat2(int oldDirectoryFd, string oldPath, int newDirectoryFd, string newPath, uint flags);
     [DllImport("libc", SetLastError = true)] private static extern int renameatx_np(int oldDirectoryFd, string oldPath, int newDirectoryFd, string newPath, uint flags);

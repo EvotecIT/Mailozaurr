@@ -25,13 +25,13 @@ internal static class AtomicEmlFileCopy {
             }
             cancellationToken.ThrowIfCancellationRequested();
             if (!overwrite) {
-                File.Move(temporaryPath, fullPath);
+                MoveNew(temporaryPath, fullPath);
                 return;
             }
             while (true) {
                 if (!File.Exists(fullPath)) {
                     try {
-                        File.Move(temporaryPath, fullPath);
+                        MoveNew(temporaryPath, fullPath);
                         return;
                     } catch (IOException) when (File.Exists(fullPath)) {
                         // A concurrent writer created the target after the check.
@@ -47,6 +47,19 @@ internal static class AtomicEmlFileCopy {
             }
         } finally {
             if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+        }
+    }
+
+    private static void MoveNew(string source, string destination) {
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)) {
+            File.Move(source, destination);
+            return;
+        }
+        // A hard link claims the final name atomically without replacing an existing entry.
+        // The temporary file remains owned by WriteAsync and is removed in its finally block.
+        if (UnixFileLinks.Create(source, destination) != 0) {
+            throw new IOException("The EML destination could not be claimed.",
+                new System.ComponentModel.Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error()));
         }
     }
 
