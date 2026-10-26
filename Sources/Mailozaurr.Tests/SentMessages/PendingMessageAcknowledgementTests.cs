@@ -74,7 +74,7 @@ public sealed class PendingMessageAcknowledgementTests {
             MessageId = "cancel-after-release",
             Timestamp = now,
             NextAttemptAt = now
-        }) { DelayAfterRelease = TimeSpan.FromMilliseconds(150) };
+        }) { WaitForRenewalAfterRelease = true };
         using var cancellation = new CancellationTokenSource();
         var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
             [EmailProvider.None] = new CancelingSender(cancellation)
@@ -249,8 +249,10 @@ public sealed class PendingMessageAcknowledgementTests {
         internal PendingMessageRecord? Record { get; private set; }
         internal int RenewCount { get; private set; }
         internal int RenewRejectedCount { get; private set; }
-        internal TimeSpan DelayAfterRelease { get; set; }
+        internal bool WaitForRenewalAfterRelease { get; set; }
         internal bool RejectRenewal { get; set; }
+        private readonly TaskCompletionSource<bool> renewalAfterRelease =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Task SaveAsync(PendingMessageRecord record, CancellationToken cancellationToken = default) {
             Record = record.Clone();
@@ -278,6 +280,7 @@ public sealed class PendingMessageAcknowledgementTests {
             if (Record?.MessageId != messageId || Record.ProcessingLeaseId != leaseId ||
                 Record.ProcessingLeaseUntil != expectedLeaseUntil) {
                 RenewRejectedCount++;
+                if (Record?.ProcessingLeaseId == null) renewalAfterRelease.TrySetResult(true);
                 return Task.FromResult(false);
             }
             RenewCount++;
@@ -292,7 +295,13 @@ public sealed class PendingMessageAcknowledgementTests {
             if (Record?.ProcessingLeaseId != leaseId) return false;
             if (record.ProcessingLeaseId == null) {
                 Record = record.Clone();
-                if (DelayAfterRelease > TimeSpan.Zero) await Task.Delay(DelayAfterRelease, cancellationToken);
+                if (WaitForRenewalAfterRelease) {
+                    // Keep the fenced save in flight until renewal observes the released lease.
+                    Task completed = await Task.WhenAny(renewalAfterRelease.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+                    if (completed != renewalAfterRelease.Task)
+                        throw new TimeoutException("Lease renewal did not observe the fenced release.");
+                    await renewalAfterRelease.Task;
+                }
                 return true;
             }
             record.ProcessingLeaseUntil = Record.ProcessingLeaseUntil;
