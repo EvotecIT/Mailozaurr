@@ -46,7 +46,7 @@
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'net8.0' ">
     <!-- Keep this independently shipped MimeKit adapter on the serviced CMS package. -->
-    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(UseOfficeIMOProjectReferences)' == 'true' ">
