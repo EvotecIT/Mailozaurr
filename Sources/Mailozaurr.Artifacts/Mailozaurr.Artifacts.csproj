@@ -3,7 +3,7 @@
     <Company>Evotec</Company>
     <Authors>Przemyslaw Klys</Authors>
     <VersionPrefix>3.0.5</VersionPrefix>
-    <OfficeIMOVersion>3.5.1</OfficeIMOVersion>
+    <OfficeIMOVersion>3.5.2</OfficeIMOVersion>
     <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
     <AssemblyName>Mailozaurr.Artifacts</AssemblyName>
     <PackageId>Mailozaurr.Artifacts</PackageId>
@@ -41,7 +41,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="MimeKit" Version="4.18.1" />
+    <PackageReference Include="MimeKit" Version="4.18.2" />
   </ItemGroup>
 
   <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'net8.0' ">
