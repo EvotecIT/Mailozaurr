@@ -21,7 +21,7 @@ Deletes a Gmail message.
 
 ### EXAMPLE 1
 ```powershell
-Remove-GmailMessage -GmailAccount 'Value' -Credential Get-Credential -Id 'Value'
+Remove-GmailMessage -GmailAccount 'Value' -Credential (Get-Credential) -Id 'Value'
 ```
 
 

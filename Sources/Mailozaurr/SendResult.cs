@@ -18,4 +18,19 @@ public sealed class SendResult : OperationResult {
 
     /// <summary>Provider-native message identifier when available.</summary>
     public string? ProviderMessageId { get; set; }
+
+    /// <summary>SMTP host that accepted the message, or the last attempted host on failure.</summary>
+    public string? Server { get; set; }
+
+    /// <summary>SMTP port of the final attempt.</summary>
+    public int? Port { get; set; }
+
+    /// <summary>Ordered SMTP delivery attempts, including transient failures before acceptance.</summary>
+    public IReadOnlyList<SmtpDeliveryAttempt> Attempts { get; set; } = Array.Empty<SmtpDeliveryAttempt>();
+
+    /// <summary>Whether the final failure is eligible for a later retry.</summary>
+    public bool IsTransient { get; set; }
+
+    /// <summary>Whether any attempt may have delivered without a confirmed acknowledgement.</summary>
+    public bool DeliveryUnknown { get; set; }
 }

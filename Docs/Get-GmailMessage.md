@@ -26,13 +26,13 @@ Retrieves messages using the Gmail API.
 
 ### EXAMPLE 1
 ```powershell
-Get-GmailMessage -GmailAccount 'Value' -Credential Get-Credential -Id 'Value'
+Get-GmailMessage -GmailAccount 'Value' -Credential (Get-Credential) -Id 'Value'
 ```
 
 
 ### EXAMPLE 2
 ```powershell
-Get-GmailMessage -GmailAccount 'Value' -Credential Get-Credential
+Get-GmailMessage -GmailAccount 'Value' -Credential (Get-Credential)
 ```
 
 

@@ -25,7 +25,7 @@ The Save-POP3Message cmdlet saves a message from a POP3 mailbox (using a PopConn
 
 ### EXAMPLE 1
 ```powershell
-Save-POP3Message -Path 'C:\Path'
+Save-POP3Message -Index 1 -Path 'C:\Path'
 ```
 
 

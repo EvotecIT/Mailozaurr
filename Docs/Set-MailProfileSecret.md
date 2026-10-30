@@ -26,13 +26,13 @@ Stores or copies a protected secret for a saved mail profile.
 
 ### EXAMPLE 1
 ```powershell
-Set-MailProfileSecret -Value (Read-Host -AsSecureString)
+Set-MailProfileSecret -ProfileId 'Value' -Name 'Name' -Value (Read-Host -AsSecureString)
 ```
 
 
 ### EXAMPLE 2
 ```powershell
-Set-MailProfileSecret -Reference 'Value'
+Set-MailProfileSecret -ProfileId 'Value' -Name 'Name' -Reference 'Value'
 ```
 
 

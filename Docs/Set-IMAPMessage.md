@@ -21,7 +21,7 @@ Updates flags on an IMAP message.
 
 ### EXAMPLE 1
 ```powershell
-Set-IMAPMessage -Client 'Value'
+Set-IMAPMessage -Uid 1
 ```
 
 

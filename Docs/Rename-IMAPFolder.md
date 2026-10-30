@@ -21,7 +21,7 @@ Renames an IMAP folder.
 
 ### EXAMPLE 1
 ```powershell
-Rename-IMAPFolder -Client 'Value'
+Rename-IMAPFolder -Folder 'Value' -NewName 'Name'
 ```
 
 

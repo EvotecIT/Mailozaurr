@@ -171,7 +171,7 @@ public static class TemporarySmimeCertificate {
 
         foreach (var flags in flagCombinations) {
             try {
-                return new X509Certificate2(pfxData, password, flags);
+                return CertificateDataLoader.LoadPkcs12(pfxData, password, flags);
             } catch (CryptographicException ex) {
                 exceptions.Add(ex);
             }
@@ -181,7 +181,7 @@ public static class TemporarySmimeCertificate {
         if (!string.IsNullOrEmpty(password)) {
             foreach (var flags in flagCombinations) {
                 try {
-                    return new X509Certificate2(pfxData, string.Empty, flags);
+                    return CertificateDataLoader.LoadPkcs12(pfxData, string.Empty, flags);
                 } catch (CryptographicException ex) {
                     exceptions.Add(ex);
                 }
@@ -191,7 +191,7 @@ public static class TemporarySmimeCertificate {
         // Strategy 3: Try with null password
         foreach (var flags in flagCombinations) {
             try {
-                return new X509Certificate2(pfxData, (string?)null, flags);
+                return CertificateDataLoader.LoadPkcs12(pfxData, (string?)null, flags);
             } catch (CryptographicException ex) {
                 exceptions.Add(ex);
             }
@@ -199,13 +199,13 @@ public static class TemporarySmimeCertificate {
 
         // Strategy 4: Try the simple constructor without flags
         try {
-            return new X509Certificate2(pfxData, password);
+            return CertificateDataLoader.LoadPkcs12(pfxData, password);
         } catch (CryptographicException ex) {
             exceptions.Add(ex);
         }
 
         try {
-            return new X509Certificate2(pfxData);
+            return CertificateDataLoader.LoadPkcs12(pfxData, null);
         } catch (CryptographicException ex) {
             exceptions.Add(ex);
         }

@@ -6,7 +6,7 @@ on:
 # To enable, replace above with push/pull_request triggers
 
 env:
-  DOTNET_VERSION: '10.0.300'
+  DOTNET_VERSION: '10.0.x'
   BUILD_CONFIGURATION: 'Debug'
 
 jobs:

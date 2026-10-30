@@ -25,7 +25,7 @@ The Get-EmailDeliveryStatus cmdlet queries IMAP, POP3, Microsoft Graph, or Gmail
 
 ### EXAMPLE 1
 ```powershell
-Get-EmailDeliveryStatus -Protocol 'Value' -GmailAccount 'Value' -Credential Get-Credential
+Get-EmailDeliveryStatus -Protocol 'Value' -GmailAccount 'Value' -Credential (Get-Credential)
 ```
 
 

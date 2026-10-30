@@ -26,7 +26,13 @@ Moves an IMAP folder to a new location.
 
 ### EXAMPLE 1
 ```powershell
-Move-IMAPFolder -Client 'Value'
+Move-IMAPFolder -Folder 'Value' -DestinationFolder 'Value'
+```
+
+
+### EXAMPLE 2
+```powershell
+Move-IMAPFolder -Folder 'Value'
 ```
 
 

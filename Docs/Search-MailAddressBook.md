@@ -25,7 +25,7 @@ Returns OfficeIMO.Email's native report with matches, diagnostics, and a checkpo
 
 ### EXAMPLE 1
 ```powershell
-Search-MailAddressBook -Term @('Value')
+Search-MailAddressBook -InputObject 'Value' -Term @('Value')
 ```
 
 

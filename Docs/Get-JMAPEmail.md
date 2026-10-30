@@ -21,7 +21,7 @@ Gets a bounded set of JMAP email objects by id.
 
 ### EXAMPLE 1
 ```powershell
-Get-JMAPEmail -EmailId @('Value')
+Get-JMAPEmail -ProfileId 'Value' -EmailId @('Value')
 ```
 
 

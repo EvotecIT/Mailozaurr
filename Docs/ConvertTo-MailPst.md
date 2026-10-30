@@ -25,7 +25,7 @@ Converts PST, supported PST-compatible OST, OLM, Mbox, EMLX, EML, Maildir, Apple
 
 ### EXAMPLE 1
 ```powershell
-ConvertTo-MailPst -InputPath 'C:\Path'
+ConvertTo-MailPst -InputPath 'C:\Path' -OutputPath 'C:\Path'
 ```
 
 

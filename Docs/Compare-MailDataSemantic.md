@@ -25,7 +25,7 @@ Returns the native OfficeIMO.Email difference report. Import both artifacts firs
 
 ### EXAMPLE 1
 ```powershell
-Compare-MailDataSemantic -InputObject 'Value'
+Compare-MailDataSemantic -InputObject 'Value' -ReferenceObject 'Value'
 ```
 
 

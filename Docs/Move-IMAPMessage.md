@@ -25,7 +25,7 @@ The Move-IMAPMessage cmdlet moves a message identified by its UID from the curre
 
 ### EXAMPLE 1
 ```powershell
-Move-IMAPMessage -Client 'Value'
+Move-IMAPMessage -Uid 1 -DestinationFolder 'Value'
 ```
 
 

@@ -292,6 +292,38 @@ public sealed class ApplicationProfileServiceTests {
     }
 
     [Fact]
+    public async Task SaveAsyncRejectsSecondarySmtpEndpointChangeWithoutRedirectingSecrets() {
+        var store = new InMemoryMailProfileStore();
+        var secrets = new BasicSecretStore();
+        var service = new MailProfileService(store, secrets);
+        var profile = new MailProfile {
+            Id = "smtp-policy", DisplayName = "SMTP policy", Kind = MailProfileKind.Smtp,
+            Settings = CreateValidSettings(MailProfileKind.Smtp),
+            SmtpDelivery = new SmtpDeliveryOptions {
+                Servers = new List<SmtpEndpoint> {
+                    new() { Server = "primary.example.invalid", Port = 587 },
+                    new() { Server = "secondary.example.invalid", Port = 587 }
+                }
+            }
+        };
+        Assert.True((await service.SaveAsync(profile)).Succeeded);
+        await secrets.SetSecretAsync(profile.Id, MailSecretNames.Password, "retained-secret");
+        var candidate = await service.GetProfileAsync(profile.Id);
+        Assert.NotNull(candidate);
+        candidate.SmtpDelivery!.Servers[1].Server = "redirected.example.invalid";
+
+        var result = await service.SaveAsync(candidate);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("profile_credential_context_change_not_allowed", result.Code);
+        var unchanged = await service.GetProfileAsync(profile.Id);
+        Assert.NotNull(unchanged);
+        Assert.Equal("primary.example.invalid", unchanged.SmtpDelivery!.Servers[0].Server);
+        Assert.Equal("secondary.example.invalid", unchanged.SmtpDelivery.Servers[1].Server);
+        Assert.Equal("retained-secret", await secrets.GetSecretAsync(profile.Id, MailSecretNames.Password));
+    }
+
+    [Fact]
     public async Task SaveAsyncAllowsGraphContextBindingWhenNoSecretsExist() {
         var store = new InMemoryMailProfileStore();
         var secretStore = new InMemoryMailSecretStore();

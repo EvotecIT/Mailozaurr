@@ -21,7 +21,7 @@ Creates a provider profile over the reusable Mailozaurr profile service.
 
 ### EXAMPLE 1
 ```powershell
-New-MailProfile -DisplayName 'Name' -Kind 'Value'
+New-MailProfile -ProfileId 'Value' -DisplayName 'Name' -Kind 'Value'
 ```
 
 

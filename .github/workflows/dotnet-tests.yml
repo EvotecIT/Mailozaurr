@@ -14,8 +14,19 @@ on:
       - v2-speedygonzales
   workflow_dispatch:  # Manual trigger only
 
+permissions:
+  contents: read
+
+concurrency:
+  group: dotnet-tests-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
-  DOTNET_VERSION: '10.0.300'
+  MSBUILDDISABLENODEREUSE: '1'
+  DOTNET_CLI_USE_MSBUILD_SERVER: '0'
+  DOTNET_VERSION: |
+    8.0.x
+    10.0.x
   BUILD_CONFIGURATION: 'Debug'
   TEST_VERBOSITY: minimal # set to 'detailed' to restore full test output
   SUMMARIZE_FAILURES: true # set to 'false' to disable summarizing failing tests
@@ -41,7 +52,7 @@ jobs:
         run: dotnet build Sources/Mailozaurr.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Run tests
-        run: dotnet test Sources/Mailozaurr.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity ${{ env.TEST_VERBOSITY }} --results-directory TestResults -- --report-xunit-trx --coverage --coverage-output-format cobertura
+        run: dotnet test --solution Sources/Mailozaurr.sln --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity ${{ env.TEST_VERBOSITY }} --results-directory TestResults --report-xunit-trx
 
       - name: Summarize failing tests
         if: failure() && env.SUMMARIZE_FAILURES == 'true'
@@ -84,18 +95,6 @@ jobs:
           name: test-results-windows
           path: '**/*.trx'
 
-      - name: Upload coverage reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-reports-windows
-          path: 'TestResults/*.cobertura.xml'
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v7
-        with:
-          directory: TestResults
-          fail_ci_if_error: false
-
   test-ubuntu:
     name: 'Ubuntu'
     runs-on: ubuntu-latest
@@ -116,7 +115,10 @@ jobs:
         run: dotnet build Sources/Mailozaurr.Tests/Mailozaurr.Tests.csproj --framework net8.0 --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Run tests
-        run: dotnet test Sources/Mailozaurr.Tests/Mailozaurr.Tests.csproj --framework net8.0 --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity ${{ env.TEST_VERBOSITY }} --results-directory TestResults -- --report-xunit-trx --coverage --coverage-output-format cobertura
+        run: dotnet test --project Sources/Mailozaurr.Tests/Mailozaurr.Tests.csproj --framework net8.0 --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity ${{ env.TEST_VERBOSITY }} --results-directory TestResults --report-xunit-trx
+
+      - name: Run .NET 10 tests
+        run: dotnet test --project Sources/Mailozaurr.Tests/Mailozaurr.Tests.csproj --framework net10.0 --configuration ${{ env.BUILD_CONFIGURATION }} --verbosity ${{ env.TEST_VERBOSITY }} --results-directory TestResults/net10 --report-xunit-trx
 
       - name: Summarize failing tests
         if: failure() && env.SUMMARIZE_FAILURES == 'true'
@@ -158,18 +160,6 @@ jobs:
         with:
           name: test-results-ubuntu
           path: '**/*.trx'
-      - name: Upload coverage reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-reports-ubuntu
-          path: 'TestResults/*.cobertura.xml'
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v7
-        with:
-          directory: TestResults
-          fail_ci_if_error: false
-
   test-macos:
     name: 'macOS'
     runs-on: macos-latest
@@ -190,7 +180,10 @@ jobs:
         run: dotnet build Sources/Mailozaurr.Tests/Mailozaurr.Tests.csproj --framework net8.0 --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
 
       - name: Run tests
-        run: dotnet test Sources/Mailozaurr.Tests/Mailozaurr.Tests.csproj --framework net8.0 --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity ${{ env.TEST_VERBOSITY }} --results-directory TestResults -- --report-xunit-trx --coverage --coverage-output-format cobertura
+        run: dotnet test --project Sources/Mailozaurr.Tests/Mailozaurr.Tests.csproj --framework net8.0 --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity ${{ env.TEST_VERBOSITY }} --results-directory TestResults --report-xunit-trx
+
+      - name: Run .NET 10 tests
+        run: dotnet test --project Sources/Mailozaurr.Tests/Mailozaurr.Tests.csproj --framework net10.0 --configuration ${{ env.BUILD_CONFIGURATION }} --verbosity ${{ env.TEST_VERBOSITY }} --results-directory TestResults/net10 --report-xunit-trx
 
       - name: Summarize failing tests
         if: failure() && env.SUMMARIZE_FAILURES == 'true'
@@ -232,18 +225,6 @@ jobs:
         with:
           name: test-results-macos
           path: '**/*.trx'
-      - name: Upload coverage reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-reports-macos
-          path: 'TestResults/*.cobertura.xml'
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v7
-        with:
-          directory: TestResults
-          fail_ci_if_error: false
-
   test-module-alc:
     name: 'PowerShell ALC packaging'
     runs-on: windows-latest

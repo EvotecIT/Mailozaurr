@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net472;net8.0</TargetFrameworks>
+        <TargetFrameworks>net472;net8.0;net10.0</TargetFrameworks>
         <OutputType>Exe</OutputType>
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
@@ -16,7 +16,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
         <PackageReference Include="Moq" Version="4.21.0" />
         <PackageReference Include="PowerShellStandard.Library" Version="5.1.1" PrivateAssets="all" />
@@ -33,10 +32,10 @@
     </ItemGroup>
 
   <ItemGroup>
-        <ProjectReference Include="..\Mailozaurr.Cli\Mailozaurr.Cli.csproj" Condition=" '$(TargetFramework)' == 'net8.0' " />
+        <ProjectReference Include="..\Mailozaurr.Cli\Mailozaurr.Cli.csproj" Condition=" '$(TargetFramework)' != 'net472' " />
         <ProjectReference Include="..\Mailozaurr\Mailozaurr.csproj" />
         <ProjectReference Include="..\Mailozaurr.PowerShell\Mailozaurr.PowerShell.csproj" />
-        <ProjectReference Include="..\Mailozaurr.Examples\Mailozaurr.Examples.csproj" Condition=" '$(TargetFramework)' == 'net8.0' " />
+        <ProjectReference Include="..\Mailozaurr.Examples\Mailozaurr.Examples.csproj" Condition=" '$(TargetFramework)' != 'net472' " />
   </ItemGroup>
 
 </Project>

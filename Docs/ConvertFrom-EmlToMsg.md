@@ -25,7 +25,7 @@ The ConvertFrom-EmlToMsg cmdlet converts one or more EML files to MSG format. Sp
 
 ### EXAMPLE 1
 ```powershell
-ConvertFrom-EmlToMsg -InputPath @('C:\Path')
+ConvertFrom-EmlToMsg -InputPath @('C:\Path') -OutputFolder 'Value'
 ```
 
 

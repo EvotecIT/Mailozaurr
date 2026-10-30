@@ -45,7 +45,7 @@ Connect-IMAP -UserName 'Name' -Password 'Value'
 
 ### EXAMPLE 2
 ```powershell
-Connect-IMAP -Credential Get-Credential
+Connect-IMAP -Credential (Get-Credential)
 ```
 
 
@@ -188,7 +188,7 @@ Parameter Sets: OAuth2, Credential, ClearText
 Aliases: None
 Possible values:
 
-Required: True
+Required: False
 Position: named
 Default value: None
 Accept pipeline input: False

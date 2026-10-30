@@ -21,7 +21,7 @@ Lists JMAP sending identities when submission is available.
 
 ### EXAMPLE 1
 ```powershell
-Get-JMAPIdentity -ProfileDirectory 'Value'
+Get-JMAPIdentity -ProfileId 'Value'
 ```
 
 

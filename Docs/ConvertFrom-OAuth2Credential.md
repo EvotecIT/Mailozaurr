@@ -25,7 +25,7 @@ The ConvertFrom-OAuth2Credential cmdlet converts a PSCredential containing an OA
 
 ### EXAMPLE 1
 ```powershell
-ConvertFrom-OAuth2Credential -Credential Get-Credential
+ConvertFrom-OAuth2Credential -Credential (Get-Credential)
 ```
 
 

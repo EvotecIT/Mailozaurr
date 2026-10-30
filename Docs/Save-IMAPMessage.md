@@ -25,7 +25,7 @@ The Save-IMAPMessage cmdlet saves a message from an IMAP mailbox (using a ImapCo
 
 ### EXAMPLE 1
 ```powershell
-Save-IMAPMessage -Path 'C:\Path'
+Save-IMAPMessage -Uid 1 -Path 'C:\Path'
 ```
 
 

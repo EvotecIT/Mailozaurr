@@ -37,7 +37,7 @@ public class TemporarySmimeCertificateTests {
             using X509Certificate2 certificate = TemporarySmimeCertificate.CreateSelfSigned(
                 outputPath: path,
                 outputPassword: password);
-            using var loaded = new X509Certificate2(path, password);
+            using var loaded = CertificateDataLoader.LoadPkcs12File(path, password, X509KeyStorageFlags.EphemeralKeySet);
 
             Assert.True(loaded.HasPrivateKey);
             Assert.Throws<IOException>(() => TemporarySmimeCertificate.CreateSelfSigned(

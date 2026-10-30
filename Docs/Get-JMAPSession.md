@@ -21,7 +21,7 @@ Gets the authoritative JMAP Session resource for a saved profile.
 
 ### EXAMPLE 1
 ```powershell
-Get-JMAPSession -ProfileDirectory 'Value'
+Get-JMAPSession -ProfileId 'Value'
 ```
 
 

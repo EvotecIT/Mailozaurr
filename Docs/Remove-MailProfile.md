@@ -21,7 +21,7 @@ Removes a profile and its owned protected secrets.
 
 ### EXAMPLE 1
 ```powershell
-Remove-MailProfile -ProfileDirectory 'Value'
+Remove-MailProfile -ProfileId 'Value'
 ```
 
 

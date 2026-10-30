@@ -9,7 +9,7 @@ public class GraphCertificateStoreTests {
     public void Select_NormalizedThumbprint_PreservesNonExportableKeyAfterOriginalIsDisposed() {
         using X509Certificate2 original = GraphAuthenticationClientTests.CreateNonExportableCertificate();
         GraphAuthenticationClientTests.AssertNonExportable(original);
-        using var publicOnly = new X509Certificate2(original.RawData);
+        using var publicOnly = CertificateDataLoader.LoadCertificate(original.RawData);
         // The same certificate without a key must not shadow the usable entry.
         var certificates = new X509Certificate2Collection { publicOnly, original };
         string decoratedThumbprint = "\u200e " + string.Join(" \t", Enumerable.Range(0, original.Thumbprint.Length / 2)
@@ -30,7 +30,7 @@ public class GraphCertificateStoreTests {
     public void Select_MatchingPublicCertificateWithoutPrivateKey_RejectsWithoutLeakingThumbprint() {
         // Public DER only: constructing this certificate never acquires a private key.
         using X509Certificate2 source = GraphAuthenticationClientTests.CreateNonExportableCertificate();
-        using var publicOnly = new X509Certificate2(source.RawData);
+        using var publicOnly = CertificateDataLoader.LoadCertificate(source.RawData);
         var certificates = new X509Certificate2Collection { publicOnly };
 
         InvalidOperationException error = Assert.Throws<InvalidOperationException>(

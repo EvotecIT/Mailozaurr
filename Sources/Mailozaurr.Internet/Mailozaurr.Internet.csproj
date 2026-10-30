@@ -3,7 +3,7 @@
     <Company>Evotec</Company>
     <Authors>Przemyslaw Klys</Authors>
     <VersionPrefix>3.0.5</VersionPrefix>
-    <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
+    <TargetFrameworks>net472;net8.0;net10.0</TargetFrameworks>
     <AssemblyName>Mailozaurr.Internet</AssemblyName>
     <RootNamespace>Mailozaurr</RootNamespace>
     <PackageId>Mailozaurr.Internet</PackageId>
@@ -82,7 +82,7 @@
     <PackageReference Include="System.Text.Json" Version="10.0.14" />
   </ItemGroup>
 
-  <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'net8.0' ">
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net10.0' ">
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.14" />
     <!-- MimeKit's minimum CMS dependency predates the serviced security fixes. -->
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />

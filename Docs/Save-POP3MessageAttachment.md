@@ -25,7 +25,7 @@ The Save-POP3MessageAttachment cmdlet saves all attachments from a POP3 message 
 
 ### EXAMPLE 1
 ```powershell
-Save-POP3MessageAttachment -Path 'C:\Path'
+Save-POP3MessageAttachment -Index 1 -Path 'C:\Path'
 ```
 
 

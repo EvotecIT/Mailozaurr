@@ -33,8 +33,11 @@ public sealed class SmtpSessionFactory : ISmtpSessionFactory {
         return await _connectAsync(request, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<SmtpSessionRequest> CreateRequestAsync(MailProfile profile, CancellationToken cancellationToken) {
-        var server = RequireSetting(profile, MailProfileSettingsKeys.Server);
+    /// <summary>Resolves the SMTP transport settings and stored secret for a delivery session.</summary>
+    public async Task<SmtpSessionRequest> CreateRequestAsync(MailProfile profile, CancellationToken cancellationToken = default) {
+        if (profile == null) throw new ArgumentNullException(nameof(profile));
+        if (profile.Kind != MailProfileKind.Smtp) throw new InvalidOperationException("An SMTP profile is required.");
+        var server = profile.SmtpDelivery?.Servers.FirstOrDefault()?.Server ?? RequireSetting(profile, MailProfileSettingsKeys.Server);
         var port = GetIntSetting(profile, MailProfileSettingsKeys.Port) ?? 587;
         var authenticationEnabled = GetBoolSetting(profile, MailProfileSettingsKeys.AuthenticationEnabled) ?? true;
         var authMode = GetAuthMode(profile);

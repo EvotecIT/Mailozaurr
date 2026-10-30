@@ -16,7 +16,7 @@ public partial class Smtp {
     public SmtpResult Encrypt(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         try {
-            using var certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
+            using var certificate = CertificateDataLoader.LoadPkcs12File(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
             return Encrypt(certificate);
         } finally {
             if (isSecureString) {
@@ -135,7 +135,7 @@ public partial class Smtp {
     public SmtpResult Sign(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         try {
-            using var certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
+            using var certificate = CertificateDataLoader.LoadPkcs12File(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
             return Sign(certificate);
         } finally {
             if (isSecureString) {
@@ -185,7 +185,7 @@ public partial class Smtp {
     public SmtpResult Pkcs7Sign(string pfxFilePath, string password, bool isSecureString) {
         password = ConvertSecureStringToPlainString(password, isSecureString);
         try {
-            using var certificate = new X509Certificate2(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
+            using var certificate = CertificateDataLoader.LoadPkcs12File(pfxFilePath, password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
             return Pkcs7Sign(certificate);
         } finally {
             if (isSecureString) {

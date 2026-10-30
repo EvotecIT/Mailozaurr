@@ -21,7 +21,7 @@ Saves attachments from a Gmail message to disk.
 
 ### EXAMPLE 1
 ```powershell
-Save-GmailMessageAttachment -GmailAccount 'Value' -Credential Get-Credential -Id 'Value' -Path 'C:\Path'
+Save-GmailMessageAttachment -GmailAccount 'Value' -Credential (Get-Credential) -Id 'Value' -Path 'C:\Path'
 ```
 
 

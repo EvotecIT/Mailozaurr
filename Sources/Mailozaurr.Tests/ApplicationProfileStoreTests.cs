@@ -4,6 +4,67 @@ namespace Mailozaurr.Tests;
 
 public sealed class ApplicationProfileStoreTests {
     [Fact]
+    public async Task FileProfileStoreRoundTripsSmtpDeliveryPolicyWithIndependentSnapshots() {
+        var filePath = CreateTemporaryFilePath();
+        var store = new FileMailProfileStore(filePath);
+        var profile = new MailProfile {
+            Id = "smtp-policy", DisplayName = "SMTP policy", Kind = MailProfileKind.Smtp,
+            SmtpDelivery = new SmtpDeliveryOptions {
+                Strategy = SmtpServerStrategy.RoundRobin, MaxAttempts = 7, CircuitBreakMinutes = 5,
+                Servers = new List<SmtpEndpoint> {
+                    new() { Server = "primary.example.invalid", Port = 587, SecureSocketOptions = MailKit.Security.SecureSocketOptions.StartTls },
+                    new() { Server = "secondary.example.invalid", Port = 465, SecureSocketOptions = MailKit.Security.SecureSocketOptions.SslOnConnect },
+                    new() { Server = "inherited.example.invalid", Port = 2525 }
+                }
+            }
+        };
+        await store.SaveAsync(profile);
+        var loaded = await new FileMailProfileStore(filePath).GetByIdAsync(profile.Id);
+        Assert.NotNull(loaded);
+        var policy = Assert.IsType<SmtpDeliveryOptions>(loaded.SmtpDelivery);
+        Assert.Equal(SmtpServerStrategy.RoundRobin, policy.Strategy);
+        Assert.Equal(7, policy.MaxAttempts);
+        Assert.Equal(5, policy.CircuitBreakMinutes);
+        Assert.Collection(policy.Servers,
+            endpoint => {
+                Assert.Equal("primary.example.invalid", endpoint.Server);
+                Assert.Equal(587, endpoint.Port);
+                Assert.Equal(MailKit.Security.SecureSocketOptions.StartTls, endpoint.SecureSocketOptions);
+            },
+            endpoint => {
+                Assert.Equal("secondary.example.invalid", endpoint.Server);
+                Assert.Equal(465, endpoint.Port);
+                Assert.Equal(MailKit.Security.SecureSocketOptions.SslOnConnect, endpoint.SecureSocketOptions);
+            },
+            endpoint => {
+                Assert.Equal("inherited.example.invalid", endpoint.Server);
+                Assert.Equal(2525, endpoint.Port);
+                Assert.Null(endpoint.SecureSocketOptions);
+            });
+        var independent = Assert.Single(await store.GetAllAsync());
+        policy.Servers[0].Server = "edited.example.invalid";
+        policy.Servers[0].Port = 25;
+        policy.Servers[0].SecureSocketOptions = MailKit.Security.SecureSocketOptions.None;
+        policy.Servers.RemoveAt(1);
+        policy.Strategy = SmtpServerStrategy.Random;
+        policy.MaxAttempts = 1;
+        policy.CircuitBreakMinutes = 0;
+        var persisted = await new FileMailProfileStore(filePath).GetByIdAsync(profile.Id);
+        Assert.NotNull(persisted);
+        foreach (var snapshot in new[] { profile, independent, persisted }) {
+            var unchanged = Assert.IsType<SmtpDeliveryOptions>(snapshot.SmtpDelivery);
+            Assert.Equal(3, unchanged.Servers.Count);
+            Assert.Equal("primary.example.invalid", unchanged.Servers[0].Server);
+            Assert.Equal(587, unchanged.Servers[0].Port);
+            Assert.Equal(MailKit.Security.SecureSocketOptions.StartTls, unchanged.Servers[0].SecureSocketOptions);
+            Assert.Equal("secondary.example.invalid", unchanged.Servers[1].Server);
+            Assert.Equal(SmtpServerStrategy.RoundRobin, unchanged.Strategy);
+            Assert.Equal(7, unchanged.MaxAttempts);
+            Assert.Equal(5, unchanged.CircuitBreakMinutes);
+        }
+    }
+
+    [Fact]
     public async Task FileProfileStoreRoundTripsProfiles() {
         var filePath = CreateTemporaryFilePath();
         var store = new FileMailProfileStore(filePath);

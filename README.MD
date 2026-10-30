@@ -17,7 +17,6 @@ PowerShell Module
 Project Information
 
 [![build status](https://dev.azure.com/evotecpl/Mailozaurr/_apis/build/status/EvotecIT.Mailozaurr)](https://dev.azure.com/evotecpl/Mailozaurr/_build/results?buildId=latest)
-[![codecov](https://codecov.io/gh/EvotecIT/Mailozaurr/branch/v2-speedygonzales/graph/badge.svg)](https://codecov.io/gh/EvotecIT/Mailozaurr)
 [![top language](https://img.shields.io/github/languages/top/evotecit/Mailozaurr.svg)](https://github.com/EvotecIT/Mailozaurr)
 [![license](https://img.shields.io/github/license/EvotecIT/Mailozaurr.svg)](https://github.com/EvotecIT/Mailozaurr)
 [![code size](https://img.shields.io/github/languages/code-size/evotecit/Mailozaurr.svg)](https://github.com/EvotecIT/Mailozaurr)
@@ -40,6 +39,93 @@ This repository has two branches:
 In V2, some functionality was moved to dedicated projects:
 - DNS features moved to [DnsClientX](https://github.com/EvotecIT/DnsClientX).
 - SPF, DKIM, DMARC, and MX validation (except download-focused functionality) moved to [DomainDetective](https://github.com/EvotecIT/DomainDetective).
+
+## SMTP failover and batch delivery
+
+`Send-EmailMessage` accepts several SMTP hosts. `Failover` tries them in order;
+`RoundRobin` advances the starting host for each message and `Random` chooses a
+starting host at random. Transient connection, TLS, timeout and SMTP 4xx failures
+can advance to another eligible host. Permanent SMTP rejections stop the message.
+
+Reuse a delivery session across a batch to retain healthy connections and host
+cooldowns, and dispose it when the batch finishes:
+
+```powershell
+$delivery = [Mailozaurr.SmtpDeliverySession]::new()
+try {
+    $mail = @{
+        From = 'notifications@example.com'
+        Server = 'relay-a.example.com', 'relay-b.example.com'
+        Port = 587
+        SecureSocketOptions = 'StartTls'
+        Strategy = 'Failover'
+        DeliverySession = $delivery
+        RetryCount = 3
+        CircuitBreakMinutes = 2
+    }
+    foreach ($recipient in 'first@example.com', 'second@example.com') {
+        Send-EmailMessage @mail -To $recipient -Subject 'Notification' -Body 'Your notification'
+    }
+} finally {
+    $delivery.Dispose()
+}
+```
+
+Bare hosts inherit `Port` and `SecureSocketOptions`. Use endpoint URIs to override
+them: `smtp+starttls://relay-a.example.com:587`, `smtps://relay-b.example.com:465`,
+or `smtp://relay-c.example.com:25` for an explicitly unencrypted connection.
+Existing single-host calls retain their behavior.
+
+PowerShell's total attempt budget is the greater of the server count and
+`RetryCount + 1`. The existing retry delay, exponential backoff, delay cap and
+jitter settings apply across hosts. The default cooldown is two minutes;
+`CircuitBreakMinutes = 0` disables it. When all hosts are cooling down, delivery
+returns an explicit failure. Permanent rejections are never retried by this route,
+including when `RetryAlways` is set. Invocation-specific protocol logging retains
+host cooldowns but closes that invocation's logged connections after sending.
+
+.NET callers use the same policy through `MailProfile.SmtpDelivery` and a
+caller-owned session:
+
+```csharp
+using var delivery = new SmtpDeliverySession();
+var handler = new SmtpMailSendHandler(new SmtpSessionFactory(), delivery);
+var profile = new MailProfile {
+    Id = "notifications",
+    DisplayName = "Notifications",
+    Kind = MailProfileKind.Smtp,
+    DefaultSender = "notifications@example.com",
+    Settings = new() { [MailProfileSettingsKeys.AuthenticationEnabled] = "false" },
+    SmtpDelivery = new SmtpDeliveryOptions {
+        Strategy = SmtpServerStrategy.Failover,
+        MaxAttempts = 4,
+        Servers = {
+            new SmtpEndpoint { Server = "relay-a.example.com", Port = 587,
+                SecureSocketOptions = MailKit.Security.SecureSocketOptions.StartTls },
+            new SmtpEndpoint { Server = "relay-b.example.com", Port = 465,
+                SecureSocketOptions = MailKit.Security.SecureSocketOptions.SslOnConnect }
+        }
+    }
+};
+var result = await handler.SendAsync(profile, new SendMessageRequest {
+    Message = new DraftMessage {
+        Subject = "Notification", TextBody = "Your notification",
+        To = { new MessageRecipient { Address = "recipient@example.com" } }
+    }
+});
+```
+
+For authenticated profiles, use the existing username settings and protected
+profile secret store with `SmtpSessionFactory(secretStore)`. Changing transport
+or authentication settings closes previously cached connections before reuse.
+The profile policy persists through the normal profile store. Multi-server
+delivery returns failed attempts directly; it does not implicitly queue them.
+
+Results include the final `Server` and `Port`, ordered `Attempts`, the final
+failure reason and transient classification. A transport loss while sending can
+leave acceptance unknown. That result has `DeliveryUnknown = true` and stops
+automatic retries to avoid a duplicate; reconcile delivery before manually
+resending. Successful acceptance is separate from arrival in the recipient's inbox.
 
 ## Core dependencies (V2)
 

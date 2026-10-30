@@ -15,22 +15,22 @@ Authentication can be provided via credentials, OAuth2, or provider-specific tok
 ## SYNTAX
 ### Compatibility (Default)
 ```powershell
-Send-EmailMessage -Server <string> -From <Object> [-Content <Object>] [-Port <int>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-Encoding <string>] [-DeliveryNotificationOption <DeliveryNotification[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-SkipCertificateRevocation] [-SkipCertificateValidation] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-Timeout <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-MimeMessagePath <string>] [-LocalDomain <string>] [-SignOrEncrypt <EmailActionEncryption>] [-CertificatePath <string>] [-CertificatePassword <string>] [-CertificatePasswordAsSecureString <bool>] [-CertificateThumbprint <string>] [-Certificate <X509Certificate2>] [-PublicKeyPath <string>] [-PrivateKeyPath <string>] [-PrivateKeyPassword <string>] [-PrivateKeyPasswordAsSecureString <bool>] [-WhatIf] [-Confirm] [<CommonParameters>]
+Send-EmailMessage -Server <string[]> -From <Object> [-Content <Object>] [-Strategy <SmtpServerStrategy>] [-CircuitBreakMinutes <int>] [-DeliverySession <SmtpDeliverySession>] [-Port <int>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-Encoding <string>] [-DeliveryNotificationOption <DeliveryNotification[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-SkipCertificateRevocation] [-SkipCertificateValidation] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-Timeout <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-MimeMessagePath <string>] [-LocalDomain <string>] [-SignOrEncrypt <EmailActionEncryption>] [-CertificatePath <string>] [-CertificatePassword <string>] [-CertificatePasswordAsSecureString <bool>] [-CertificateThumbprint <string>] [-Certificate <X509Certificate2>] [-PublicKeyPath <string>] [-PrivateKeyPath <string>] [-PrivateKeyPassword <string>] [-PrivateKeyPasswordAsSecureString <bool>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ### DefaultCredentials
 ```powershell
-Send-EmailMessage -Server <string> -From <Object> [-Content <Object>] [-Port <int>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-Encoding <string>] [-DeliveryNotificationOption <DeliveryNotification[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-SkipCertificateRevocation] [-SkipCertificateValidation] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-Timeout <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-MimeMessagePath <string>] [-LocalDomain <string>] [-UseDefaultCredentials <bool>] [-SignOrEncrypt <EmailActionEncryption>] [-CertificatePath <string>] [-CertificatePassword <string>] [-CertificatePasswordAsSecureString <bool>] [-CertificateThumbprint <string>] [-Certificate <X509Certificate2>] [-PublicKeyPath <string>] [-PrivateKeyPath <string>] [-PrivateKeyPassword <string>] [-PrivateKeyPasswordAsSecureString <bool>] [-WhatIf] [-Confirm] [<CommonParameters>]
+Send-EmailMessage -Server <string[]> -From <Object> [-Content <Object>] [-Strategy <SmtpServerStrategy>] [-CircuitBreakMinutes <int>] [-DeliverySession <SmtpDeliverySession>] [-Port <int>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-Encoding <string>] [-DeliveryNotificationOption <DeliveryNotification[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-SkipCertificateRevocation] [-SkipCertificateValidation] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-Timeout <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-MimeMessagePath <string>] [-LocalDomain <string>] [-UseDefaultCredentials <bool>] [-SignOrEncrypt <EmailActionEncryption>] [-CertificatePath <string>] [-CertificatePassword <string>] [-CertificatePasswordAsSecureString <bool>] [-CertificateThumbprint <string>] [-Certificate <X509Certificate2>] [-PublicKeyPath <string>] [-PrivateKeyPath <string>] [-PrivateKeyPassword <string>] [-PrivateKeyPasswordAsSecureString <bool>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ### SecureString
 ```powershell
-Send-EmailMessage -Server <string> -From <Object> [-Content <Object>] [-Port <int>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-Encoding <string>] [-DeliveryNotificationOption <DeliveryNotification[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>] [-Username <string>] [-Password <string>] [-AuthenticationMechanism <AuthenticationMechanism>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-SkipCertificateRevocation] [-SkipCertificateValidation] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-Timeout <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-AsSecureString] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-MimeMessagePath <string>] [-LocalDomain <string>] [-SignOrEncrypt <EmailActionEncryption>] [-CertificatePath <string>] [-CertificatePassword <string>] [-CertificatePasswordAsSecureString <bool>] [-CertificateThumbprint <string>] [-Certificate <X509Certificate2>] [-PublicKeyPath <string>] [-PrivateKeyPath <string>] [-PrivateKeyPassword <string>] [-PrivateKeyPasswordAsSecureString <bool>] [-WhatIf] [-Confirm] [<CommonParameters>]
+Send-EmailMessage -Server <string[]> -From <Object> [-Content <Object>] [-Strategy <SmtpServerStrategy>] [-CircuitBreakMinutes <int>] [-DeliverySession <SmtpDeliverySession>] [-Port <int>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-Encoding <string>] [-DeliveryNotificationOption <DeliveryNotification[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>] [-Username <string>] [-Password <string>] [-AuthenticationMechanism <AuthenticationMechanism>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-SkipCertificateRevocation] [-SkipCertificateValidation] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-Timeout <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-AsSecureString] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-MimeMessagePath <string>] [-LocalDomain <string>] [-SignOrEncrypt <EmailActionEncryption>] [-CertificatePath <string>] [-CertificatePassword <string>] [-CertificatePasswordAsSecureString <bool>] [-CertificateThumbprint <string>] [-Certificate <X509Certificate2>] [-PublicKeyPath <string>] [-PrivateKeyPath <string>] [-PrivateKeyPassword <string>] [-PrivateKeyPasswordAsSecureString <bool>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ### oAuth
 ```powershell
-Send-EmailMessage -Server <string> -From <Object> -Credential <pscredential> [-Content <Object>] [-Port <int>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-Encoding <string>] [-DeliveryNotificationOption <DeliveryNotification[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-SkipCertificateRevocation] [-SkipCertificateValidation] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-Timeout <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-OAuth2] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-MimeMessagePath <string>] [-LocalDomain <string>] [-SignOrEncrypt <EmailActionEncryption>] [-CertificatePath <string>] [-CertificatePassword <string>] [-CertificatePasswordAsSecureString <bool>] [-CertificateThumbprint <string>] [-Certificate <X509Certificate2>] [-PublicKeyPath <string>] [-PrivateKeyPath <string>] [-PrivateKeyPassword <string>] [-PrivateKeyPasswordAsSecureString <bool>] [-WhatIf] [-Confirm] [<CommonParameters>]
+Send-EmailMessage -Server <string[]> -From <Object> -Credential <pscredential> [-Content <Object>] [-Strategy <SmtpServerStrategy>] [-CircuitBreakMinutes <int>] [-DeliverySession <SmtpDeliverySession>] [-Port <int>] [-ReplyTo <string>] [-Cc <Object[]>] [-Bcc <Object[]>] [-To <Object[]>] [-Subject <string>] [-Priority <MessagePriority>] [-Encoding <string>] [-DeliveryNotificationOption <DeliveryNotification[]>] [-DeliveryStatusNotificationType <DeliveryStatusNotificationType>] [-SecureSocketOptions <SecureSocketOptions>] [-UseSsl] [-SkipCertificateRevocation] [-SkipCertificateValidation] [-HTML <string[]>] [-Text <string[]>] [-Attachment <Object[]>] [-InlineAttachment <Object[]>] [-Headers <hashtable>] [-Timeout <int>] [-RetryCount <int>] [-RetryDelayMilliseconds <int>] [-RetryDelayBackoff <double>] [-MaxDelayMilliseconds <int>] [-JitterMilliseconds <int>] [-RetryAlways] [-UseConnectionPool] [-ConnectionPoolSize <int>] [-OAuth2] [-Suppress] [-LogPath <string>] [-SentLogPath <string>] [-LogConsole] [-LogObject] [-LogTimestamps] [-LogSecrets] [-LogTimeStampsFormat <string>] [-LogServerPrefix <string>] [-LogClientPrefix <string>] [-LogOverwrite] [-MimeMessagePath <string>] [-LocalDomain <string>] [-SignOrEncrypt <EmailActionEncryption>] [-CertificatePath <string>] [-CertificatePassword <string>] [-CertificatePasswordAsSecureString <bool>] [-CertificateThumbprint <string>] [-Certificate <X509Certificate2>] [-PublicKeyPath <string>] [-PrivateKeyPath <string>] [-PrivateKeyPassword <string>] [-PrivateKeyPasswordAsSecureString <bool>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ### Graph
@@ -266,6 +266,22 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -CircuitBreakMinutes
+Minutes to keep a failing SMTP endpoint circuit open. Explicitly binding this parameter enables the delivery session, including for one server.
+
+```yaml
+Type: Int32
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -ConnectionPoolSize
 Maximum number of connections to keep in the pool.
 
@@ -324,6 +340,22 @@ Type: DeliveryNotification[]
 Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: None
 Possible values: None, Delay, Never, OnFailure, OnSuccess
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -DeliverySession
+Optional caller-owned session preserving rotation and circuit state across invocations. The cmdlet never disposes a supplied session. Protocol logging uses connections owned by the invocation and closes them after sending; rotation and circuit state remain in the session.
+
+```yaml
+Type: SmtpDeliverySession
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
+Aliases: None
+Possible values:
 
 Required: False
 Position: named
@@ -735,7 +767,7 @@ Accept wildcard characters: False
 ```
 
 ### -MimeMessagePath
-Saves the email message to a file for troubleshooting purposes.
+Saves the email message to a file for troubleshooting purposes. For SMTP delivery sessions, a save failure after accepted delivery is reported in PostSendErrors without changing delivery success.
 
 ```yaml
 Type: String
@@ -944,7 +976,7 @@ Accept wildcard characters: False
 
 ### -RetryAlways
 When specified, retries are attempted regardless of the error
-type. Without this switch, only transient errors are retried.
+type. Without this switch, only transient errors are retried. SMTP delivery sessions always stop on permanent rejection or uncertain delivery, even with this switch.
 
 ```yaml
 Type: SwitchParameter
@@ -960,7 +992,7 @@ Accept wildcard characters: False
 ```
 
 ### -RetryCount
-Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries).
+Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries). For SMTP delivery sessions the total attempt budget is the greater of the server count and RetryCount + 1, capped at Int32.MaxValue. Failover visits eligible servers before revisiting them; permanent or uncertain delivery failures may stop earlier.
 
 ```yaml
 Type: Int32
@@ -1072,10 +1104,10 @@ Accept wildcard characters: False
 ```
 
 ### -Server
-Specifies the SMTP server to use for sending the email message. Required for SMTP scenarios.
+Specifies SMTP servers in preference order. Entries may be bare hosts or SMTP URIs with their own port and security mode. A URI automatically enables the delivery session, including for one server. Required for SMTP scenarios.
 
 ```yaml
-Type: String
+Type: String[]
 Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: SmtpServer
 Possible values:
@@ -1127,6 +1159,22 @@ Type: SwitchParameter
 Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
 Aliases: SkipCertificateValidatation
 Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -Strategy
+Selects SMTP server ordering. Explicitly binding this parameter enables the delivery session, including for one server.
+
+```yaml
+Type: SmtpServerStrategy
+Parameter Sets: Compatibility, DefaultCredentials, SecureString, oAuth
+Aliases: None
+Possible values: Failover, RoundRobin, Random
 
 Required: False
 Position: named

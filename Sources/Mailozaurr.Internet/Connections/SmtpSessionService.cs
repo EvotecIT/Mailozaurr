@@ -97,6 +97,11 @@ public sealed class SmtpSessionRequest {
     public string Password { get; init; } = string.Empty;
     /// <summary>Protocol auth mode.</summary>
     public ProtocolAuthMode AuthMode { get; init; } = ProtocolAuthMode.Basic;
+    /// <summary>Value describing custom authentication settings not represented by UserName, Password and AuthMode,
+    /// such as the default-credential account/domain and selected SASL mechanism. Equivalent callbacks must provide
+    /// the same value; change it whenever their authentication identity or policy changes. The delivery session hashes
+    /// this value and credentials for connection isolation and never includes it in results or diagnostics.</summary>
+    public string? AuthenticationContext { get; init; }
     /// <summary>Optional connect delegate retained for source and binary compatibility.</summary>
     public Func<Smtp, Task<SmtpResult>>? ConnectAsync { get; init; }
     /// <summary>Optional authenticate delegate retained for source and binary compatibility.</summary>

@@ -13,9 +13,21 @@ internal static class MailProfileCloner {
         DefaultMailbox = profile.DefaultMailbox,
         IsDefault = profile.IsDefault,
         Settings = new Dictionary<string, string>(profile.Settings, StringComparer.OrdinalIgnoreCase),
+        SmtpDelivery = CloneSmtpDelivery(profile.SmtpDelivery),
         Capabilities = profile.Capabilities == null
             ? null
             : new ProfileCapabilities(profile.Capabilities.Kind, profile.Capabilities.Capabilities)
+    };
+
+    private static SmtpDeliveryOptions? CloneSmtpDelivery(SmtpDeliveryOptions? options) => options == null ? null : new() {
+        Strategy = options.Strategy,
+        MaxAttempts = options.MaxAttempts,
+        CircuitBreakMinutes = options.CircuitBreakMinutes,
+        Servers = options.Servers.Select(server => new SmtpEndpoint {
+            Server = server.Server,
+            Port = server.Port,
+            SecureSocketOptions = server.SecureSocketOptions
+        }).ToList()
     };
 
     public static void Validate(MailProfile? profile) {

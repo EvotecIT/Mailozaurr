@@ -25,7 +25,7 @@ Validates PST, OST, OLM, EMLX, Mbox, or mailbox-directory data at shallow, summa
 
 ### EXAMPLE 1
 ```powershell
-Test-MailStore -ExcludeOrphanedItems
+Test-MailStore -InputObject 'Value'
 ```
 
 

@@ -32,6 +32,9 @@ internal static class MailProfileCredentialContextGuard {
     };
 
     internal static string? GetChangedSetting(MailProfile existing, MailProfile candidate) {
+        if (existing.Kind == MailProfileKind.Smtp && !SameSmtpEndpoints(existing.SmtpDelivery, candidate.SmtpDelivery)) {
+            return nameof(MailProfile.SmtpDelivery);
+        }
         string[] keys = existing.Kind switch {
             MailProfileKind.Smtp or MailProfileKind.Imap or MailProfileKind.Pop3 => ServerCredentialContextKeys,
             MailProfileKind.Graph => GraphCredentialContextKeys,
@@ -58,6 +61,18 @@ internal static class MailProfileCredentialContextGuard {
         }
 
         return null;
+    }
+
+    private static bool SameSmtpEndpoints(SmtpDeliveryOptions? first, SmtpDeliveryOptions? second) {
+        if (first == null || second == null) return first == second;
+        if (first.Servers.Count != second.Servers.Count) return false;
+        for (var index = 0; index < first.Servers.Count; index++) {
+            var left = first.Servers[index];
+            var right = second.Servers[index];
+            if (!string.Equals(left.Server, right.Server, StringComparison.OrdinalIgnoreCase) ||
+                left.Port != right.Port || left.SecureSocketOptions != right.SecureSocketOptions) return false;
+        }
+        return true;
     }
 
     private static string? ResolveCredentialIdentity(MailProfile profile) {
