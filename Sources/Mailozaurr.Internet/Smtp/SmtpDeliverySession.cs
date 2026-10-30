@@ -163,16 +163,9 @@ public sealed class SmtpDeliverySession : IDisposable {
     }
 
     private void Bind(SmtpSessionRequest request, SmtpDeliveryOptions options) {
-        if (options.Servers == null || options.Servers.Count == 0) throw new ArgumentException("At least one SMTP endpoint is required.", nameof(options));
-        if (options.MaxAttempts < 1 || options.CircuitBreakMinutes < 0 ||
-            !Enum.IsDefined(typeof(SmtpServerStrategy), options.Strategy)) throw new ArgumentOutOfRangeException(nameof(options));
         if (request.ConnectAsync != null || request.ConnectWithCancellationAsync != null)
             throw new ArgumentException("Connect callbacks cannot override multi-host selection.", nameof(request));
-        var endpoints = options.Servers.Select(endpoint => {
-            if (endpoint == null) throw new ArgumentException("An SMTP endpoint cannot be null.", nameof(options));
-            return SmtpEndpoint.Parse(endpoint.Server, endpoint.Port, endpoint.SecureSocketOptions ??
-                (request.SecurityMode?.ToMailKit() ?? request.SecureSocketOptions).ResolveEffective(request.UseSsl));
-        }).ToArray();
+        var endpoints = options.ResolveEndpoints((request.SecurityMode?.ToMailKit() ?? request.SecureSocketOptions).ResolveEffective(request.UseSsl));
         var identity = GetTransportIdentity(request, endpoints);
         if (string.Equals(transportIdentity, identity, StringComparison.Ordinal)) return;
         foreach (var host in hosts) DropConnection(host);
@@ -251,7 +244,14 @@ public sealed class SmtpDeliverySession : IDisposable {
             if (current is SmtpCommandException command)
                 return (int)command.StatusCode >= 400 && (int)command.StatusCode < 500;
         }
-        if (exception is MailKit.Security.AuthenticationException) return false;
+        if (exception is MailKit.Security.AuthenticationException authentication) {
+            // Explicit SASL authentication preserves SMTP status only in MailKit's invariant "ddd: " prefix.
+            // Recognize only a complete 4xx prefix; 5xx and unrecognized authentication failures remain permanent.
+            var message = authentication.Message;
+            return message.Length >= 5 && message[0] == '4' &&
+                message[1] >= '0' && message[1] <= '9' &&
+                message[2] >= '0' && message[2] <= '9' && message[3] == ':' && message[4] == ' ';
+        }
         return exception is IOException || exception is SocketException || exception is TimeoutException ||
             exception is SslHandshakeException || exception is System.Security.Authentication.AuthenticationException ||
             exception is SmtpProtocolException || exception is OperationCanceledException;

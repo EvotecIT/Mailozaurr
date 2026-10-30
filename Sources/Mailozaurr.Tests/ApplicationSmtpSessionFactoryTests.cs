@@ -4,6 +4,43 @@ using Mailozaurr;
 namespace Mailozaurr.Tests;
 
 public sealed class ApplicationSmtpSessionFactoryTests {
+    [Theory]
+    [InlineData("relay.example.invalid", 2465, SecureSocketOptions.SslOnConnect, 2465, SecureSocketOptions.SslOnConnect)]
+    [InlineData("smtp+starttls://relay.example.invalid:2525", 587, SecureSocketOptions.None, 2525, SecureSocketOptions.StartTls)]
+    public async Task FactoryConnectionProbeUsesTheTypedEndpointPortAndTls(string server, int port,
+        SecureSocketOptions endpointSecurity, int expectedPort, SecureSocketOptions expectedSecurity) {
+        SmtpSessionRequest? captured = null;
+        var factory = new SmtpSessionFactory(connectAsync: (request, _) => {
+            captured = request;
+            return Task.FromResult(new Smtp());
+        });
+        var profile = new MailProfile {
+            Id = "endpoint-probe", Kind = MailProfileKind.Smtp,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.Server] = "legacy.example.invalid",
+                [MailProfileSettingsKeys.Port] = "25",
+                [MailProfileSettingsKeys.SecureSocketOptions] = SecureSocketOptions.Auto.ToString(),
+                [MailProfileSettingsKeys.UseSsl] = "true",
+                [MailProfileSettingsKeys.AuthenticationEnabled] = "false"
+            },
+            SmtpDelivery = new SmtpDeliveryOptions {
+                Servers = { new SmtpEndpoint { Server = server, Port = port, SecureSocketOptions = endpointSecurity } }
+            }
+        };
+
+        var session = await factory.ConnectAsync(profile);
+        try {
+            Assert.NotNull(captured);
+            Assert.Equal("relay.example.invalid", captured.Server);
+            Assert.Equal(expectedPort, captured.Port);
+            Assert.Equal(expectedSecurity, captured.SecureSocketOptions);
+            Assert.False(captured.UseSsl);
+            Assert.False(captured.Authenticate);
+        } finally {
+            SmtpSessionService.DisposeQuietly(session);
+        }
+    }
+
     [Fact]
     public async Task FactoryBuildsBasicAuthSessionRequestFromProfileAndSecrets() {
         var secretStore = new InMemorySecretStore();

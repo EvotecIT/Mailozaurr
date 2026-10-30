@@ -107,7 +107,7 @@ public sealed class SmtpMailSendHandler : IMailSendHandler {
             throw new NotSupportedException("SMTP delivery policies require SmtpSessionFactory.");
         }
         using var message = await _draftMimeMessageFactory.CreateAsync(profile, request.Message, cancellationToken).ConfigureAwait(false);
-        var transport = await factory.CreateRequestAsync(profile, cancellationToken).ConfigureAwait(false);
+        var transport = await factory.CreateRequestAsync(profile, cancellationToken, forDeliverySession: true).ConfigureAwait(false);
         var session = _deliverySession ?? new SmtpDeliverySession();
         try {
             var result = await session.SendAsync(message, transport, profile.SmtpDelivery!, cancellationToken).ConfigureAwait(false);

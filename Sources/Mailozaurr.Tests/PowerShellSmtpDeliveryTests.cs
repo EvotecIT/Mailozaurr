@@ -94,6 +94,42 @@ public sealed class PowerShellSmtpDeliveryTests {
         }
     }
 
+    [Fact]
+    public async Task Command_ReusedSessionClearsOmittedDeliveryNotifications() {
+        await using var server = new LoopbackSmtpServer(advertiseDsn: true);
+        RunCommand($$"""
+            $session = [Mailozaurr.SmtpDeliverySession]::new()
+            try {
+                $arguments = @{ From = 'from@example.test'; To = 'to@example.test'; Server = 'smtp://127.0.0.1:{{server.Port}}'; DeliverySession = $session; Text = 'body'; ErrorAction = 'Stop' }
+                $cases = @(
+                    @{ Name = 'omitted'; Parameters = @{} }
+                    @{ Name = 'null'; Parameters = @{ DeliveryNotificationOption = $null } }
+                    @{ Name = 'empty'; Parameters = @{ DeliveryNotificationOption = @() } }
+                    @{ Name = 'none'; Parameters = @{ DeliveryNotificationOption = [Mailozaurr.DeliveryNotification]::None } }
+                )
+                foreach ($case in $cases) {
+                    $first = Send-EmailMessage @arguments -DeliveryNotificationOption Never -DeliveryStatusNotificationType Full
+                    $options = $case.Parameters
+                    $second = Send-EmailMessage @arguments @options
+                    if (-not $first.DeliveryAccepted -or -not $second.DeliveryAccepted) { throw "DSN command delivery failed: $($case.Name)" }
+                }
+            } finally { $session.Dispose() }
+            Write-Output 'COMMAND_PROOF_PASSED'
+            """);
+        Assert.Equal(1, server.Connections);
+        Assert.Equal(8, server.Accepted);
+        var mailCommands = server.MailFromCommands.ToArray();
+        var recipientCommands = server.RecipientCommands.ToArray();
+        Assert.Equal(8, mailCommands.Length);
+        Assert.Equal(8, recipientCommands.Length);
+        for (int index = 0; index < mailCommands.Length; index += 2) {
+            Assert.Contains(" RET=FULL", mailCommands[index]);
+            Assert.Contains(" NOTIFY=NEVER", recipientCommands[index]);
+            Assert.DoesNotContain(" RET=", mailCommands[index + 1]);
+            Assert.DoesNotContain(" NOTIFY=", recipientCommands[index + 1]);
+        }
+    }
+
     private static string Quote(string value) => value.Replace("'", "''");
 
     private static void RunCommand(string body) {

@@ -6,6 +6,37 @@ namespace Mailozaurr.Tests;
 [Collection("GraphCollection")]
 public class SmtpDeliverySessionTests {
     [Fact]
+    public async Task ProfileFailoverKeepsCommonTlsDefaultsWhenThePrimaryOverridesThem() {
+        await using var primary = new LoopbackSmtpServer(recipientCode: 450);
+        await using var secondary = new LoopbackSmtpServer();
+        using var session = new SmtpDeliverySession();
+        var policy = Options(primary, secondary);
+        policy.Servers[1].SecureSocketOptions = null;
+        var profile = new MailProfile {
+            Id = "mixed-tls", Kind = MailProfileKind.Smtp, DefaultSender = "sender@example.invalid",
+            SmtpDelivery = policy,
+            Settings = new Dictionary<string, string> {
+                [MailProfileSettingsKeys.AuthenticationEnabled] = "false",
+                [MailProfileSettingsKeys.SecureSocketOptions] = SecureSocketOptions.StartTls.ToString(),
+                [MailProfileSettingsKeys.RetryDelayMilliseconds] = "0",
+                [MailProfileSettingsKeys.JitterMilliseconds] = "0"
+            }
+        };
+        var result = await new SmtpMailSendHandler(new SmtpSessionFactory(), session).SendAsync(profile,
+            new SendMessageRequest { Message = new DraftMessage {
+                Subject = "Synthetic", TextBody = "Synthetic",
+                To = { new MessageRecipient { Address = "recipient@example.invalid" } }
+            } });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(new[] { primary.Port, secondary.Port }, result.Attempts.Select(attempt => attempt.Port));
+        Assert.Equal(1, primary.Recipients);
+        Assert.Equal(1, secondary.Connections);
+        Assert.Equal(0, secondary.Recipients);
+        Assert.Equal(0, primary.Accepted + secondary.Accepted);
+    }
+
+    [Fact]
     public async Task ProfileDeliveryRoute_FailsOverAndReusesConnectionAcrossDrafts() {
         await using var primary = new LoopbackSmtpServer(recipientCode: 450);
         await using var secondary = new LoopbackSmtpServer();
@@ -114,15 +145,21 @@ public class SmtpDeliverySessionTests {
     }
 
     [Theory]
-    [InlineData(454, true)]
-    [InlineData(535, false)]
-    public async Task AuthenticationReply_ControlsFailoverBeforeSending(int authenticationCode, bool shouldFailOver) {
+    [InlineData(454, true, false)]
+    [InlineData(535, false, false)]
+    [InlineData(454, true, true)]
+    [InlineData(535, false, true)]
+    public async Task AuthenticationReply_ControlsFailoverBeforeSending(int authenticationCode, bool shouldFailOver, bool explicitPlain) {
         await using var primary = new LoopbackSmtpServer(authenticationCode: authenticationCode);
         await using var secondary = new LoopbackSmtpServer(authenticationCode: 235);
         using var session = new SmtpDeliverySession();
         using var message = Message();
         var request = new SmtpSessionRequest {
             Authenticate = true, UserName = "loopback-user", Password = "synthetic-test-password",
+            AuthenticateWithCancellationAsync = explicitPlain ? (client, token) => {
+                token.ThrowIfCancellationRequested();
+                return Task.FromResult(client.Authenticate("loopback-user", "synthetic-test-password", false, AuthenticationMechanism.Plain));
+            } : null,
             SecureSocketOptions = SecureSocketOptions.None, TimeoutMs = 2000,
             RetryCount = 0, RetryDelayMilliseconds = 0, MaxDelayMilliseconds = 0, JitterMilliseconds = 0
         };

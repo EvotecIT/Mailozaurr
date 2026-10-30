@@ -4,6 +4,41 @@ namespace Mailozaurr.Tests;
 
 public sealed class ApplicationProfileServiceTests {
     [Fact]
+    public async Task TypedSmtpPolicyCanBeCreatedSavedAndDiagnosedWithoutLegacyServerSettings() {
+        var path = CreateTemporaryFilePath("profiles.json");
+        try {
+            var store = new FileMailProfileStore(path);
+            var service = new MailProfileService(store, new InMemoryMailSecretStore());
+            var profile = new MailProfile {
+                Id = "typed-smtp", DisplayName = "Typed SMTP", Kind = MailProfileKind.Smtp,
+                DefaultSender = "sender@example.invalid",
+                Settings = new Dictionary<string, string> { [MailProfileSettingsKeys.AuthenticationEnabled] = "false" },
+                SmtpDelivery = new SmtpDeliveryOptions {
+                    Servers = { new SmtpEndpoint { Server = "smtp+starttls://relay.example.invalid:2525" } }
+                }
+            };
+            Assert.True((await service.CreateAsync(profile)).Succeeded);
+            var loaded = Assert.IsType<MailProfile>(await service.GetProfileAsync(profile.Id));
+            loaded.DisplayName = "Updated typed SMTP";
+            loaded.SmtpDelivery!.Strategy = SmtpServerStrategy.RoundRobin;
+            Assert.True((await service.SaveAsync(loaded)).Succeeded);
+            Assert.True((await service.DiagnoseAsync(profile.Id)).Succeeded);
+            var persisted = Assert.IsType<MailProfile>(await new FileMailProfileStore(path).GetByIdAsync(profile.Id));
+            Assert.Equal("Updated typed SMTP", persisted.DisplayName);
+            Assert.Equal(SmtpServerStrategy.RoundRobin, persisted.SmtpDelivery!.Strategy);
+            Assert.Equal("smtp+starttls://relay.example.invalid:2525", Assert.Single(persisted.SmtpDelivery.Servers).Server);
+            Assert.False(persisted.Settings.ContainsKey(MailProfileSettingsKeys.Server));
+
+            persisted.SmtpDelivery.Servers.Clear();
+            Assert.False((await service.SaveAsync(persisted)).Succeeded);
+            var retained = Assert.IsType<MailProfile>(await service.GetProfileAsync(profile.Id));
+            Assert.Single(retained.SmtpDelivery!.Servers);
+        } finally {
+            Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task CreateAsyncAllowsOnlyOneConcurrentInMemoryCreator() {
         var service = new MailProfileService(new InMemoryMailProfileStore());
 

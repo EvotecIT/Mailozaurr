@@ -17,8 +17,11 @@ internal sealed class LoopbackSmtpServer : IAsyncDisposable {
     private readonly bool silentGreeting;
     private readonly bool dropAfterData;
     private readonly int? authenticationCode;
+    private readonly bool advertiseDsn;
     private int authentications;
     internal ConcurrentQueue<string> MessageIds { get; } = new();
+    internal ConcurrentQueue<string> MailFromCommands { get; } = new();
+    internal ConcurrentQueue<string> RecipientCommands { get; } = new();
     private readonly TaskCompletionSource<bool> connected = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int connections;
     private int recipients;
@@ -33,12 +36,13 @@ internal sealed class LoopbackSmtpServer : IAsyncDisposable {
     internal Task Connected => connected.Task;
     internal int Authentications => Volatile.Read(ref authentications);
 
-    internal LoopbackSmtpServer(int recipientCode = 250, int contentCode = 250, bool silentGreeting = false, bool dropAfterData = false, int? authenticationCode = null) {
+    internal LoopbackSmtpServer(int recipientCode = 250, int contentCode = 250, bool silentGreeting = false, bool dropAfterData = false, int? authenticationCode = null, bool advertiseDsn = false) {
         this.recipientCode = recipientCode;
         this.contentCode = contentCode;
         this.silentGreeting = silentGreeting;
         this.dropAfterData = dropAfterData;
         this.authenticationCode = authenticationCode;
+        this.advertiseDsn = advertiseDsn;
         listener.Start();
         Port = ((IPEndPoint)listener.LocalEndpoint).Port;
         accepting = AcceptAsync();
@@ -76,9 +80,12 @@ internal sealed class LoopbackSmtpServer : IAsyncDisposable {
                     var verb = line.Split(' ')[0].ToUpperInvariant();
                     switch (verb) {
                         case "EHLO":
-                            if (authenticationCode.HasValue) {
+                            if (authenticationCode.HasValue || advertiseDsn) {
                                 await writer.WriteLineAsync("250-loopback");
-                                await writer.WriteLineAsync("250 AUTH PLAIN");
+                                if (authenticationCode.HasValue) {
+                                    await writer.WriteLineAsync(advertiseDsn ? "250-AUTH PLAIN" : "250 AUTH PLAIN");
+                                }
+                                if (advertiseDsn) await writer.WriteLineAsync("250 DSN");
                             } else {
                                 await writer.WriteLineAsync("250 loopback");
                             }
@@ -87,6 +94,7 @@ internal sealed class LoopbackSmtpServer : IAsyncDisposable {
                             await writer.WriteLineAsync("250 loopback");
                             break;
                         case "MAIL":
+                            MailFromCommands.Enqueue(line);
                             if (authenticationCode.HasValue && !authenticated) {
                                 await writer.WriteLineAsync("530 authentication required");
                             } else {
@@ -109,6 +117,7 @@ internal sealed class LoopbackSmtpServer : IAsyncDisposable {
                             await writer.WriteLineAsync("250 OK");
                             break;
                         case "RCPT":
+                            RecipientCommands.Enqueue(line);
                             Interlocked.Increment(ref recipients);
                             await writer.WriteLineAsync($"{recipientCode} recipient response");
                             break;

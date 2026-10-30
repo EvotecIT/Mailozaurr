@@ -34,8 +34,19 @@ public static class MailProfileValidator {
         switch (profile.Kind) {
             case MailProfileKind.Imap:
             case MailProfileKind.Pop3:
-            case MailProfileKind.Smtp:
                 RequireSetting(profile, MailProfileSettingsKeys.Server, result);
+                ValidateOptionalPort(profile, result);
+                break;
+            case MailProfileKind.Smtp:
+                if (profile.SmtpDelivery == null) {
+                    RequireSetting(profile, MailProfileSettingsKeys.Server, result);
+                } else {
+                    try {
+                        _ = SmtpSessionFactory.ResolveDeliveryEndpoints(profile);
+                    } catch (Exception exception) when (exception is ArgumentException or InvalidOperationException) {
+                        result.Errors.Add(exception.Message);
+                    }
+                }
                 ValidateOptionalPort(profile, result);
                 break;
             case MailProfileKind.Graph:
