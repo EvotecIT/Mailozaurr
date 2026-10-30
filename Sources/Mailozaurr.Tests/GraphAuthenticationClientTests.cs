@@ -288,7 +288,7 @@ public class GraphAuthenticationClientTests {
         const string password = "synthetic-fixture-bootstrap-only";
         byte[] pfx = bootstrap.Export(X509ContentType.Pfx, password);
         try {
-            return new X509Certificate2(pfx, password, X509KeyStorageFlags.EphemeralKeySet);
+            return CertificateDataLoader.LoadPkcs12(pfx, password, X509KeyStorageFlags.EphemeralKeySet);
         } finally {
             Array.Clear(pfx, 0, pfx.Length);
         }

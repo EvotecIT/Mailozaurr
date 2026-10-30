@@ -3,7 +3,7 @@
     <Company>Evotec</Company>
     <Authors>Przemyslaw Klys</Authors>
     <VersionPrefix>3.0.5</VersionPrefix>
-    <TargetFrameworks>net472;netstandard2.0;net8.0</TargetFrameworks>
+    <TargetFrameworks>net472;net8.0;net10.0</TargetFrameworks>
     <AssemblyName>Mailozaurr.Jmap</AssemblyName>
     <PackageId>Mailozaurr.Jmap</PackageId>
     <Description>RFC 8620 and RFC 8621 JMAP mail discovery, synchronization, and mailbox operations for .NET.</Description>

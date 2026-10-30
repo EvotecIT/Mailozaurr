@@ -21,7 +21,7 @@ Removes an IMAP folder.
 
 ### EXAMPLE 1
 ```powershell
-Remove-IMAPFolder -Client 'Value'
+Remove-IMAPFolder -Folder 'Value'
 ```
 
 

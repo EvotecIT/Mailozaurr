@@ -25,7 +25,7 @@ The Get-DmarcReport cmdlet queries IMAP, POP3, Microsoft Graph, or Gmail API to 
 
 ### EXAMPLE 1
 ```powershell
-Get-DmarcReport -Protocol 'Value' -GmailAccount 'Value' -Credential Get-Credential
+Get-DmarcReport -Protocol 'Value' -GmailAccount 'Value' -Credential (Get-Credential)
 ```
 
 

@@ -24,6 +24,12 @@ public class SmtpResult {
     public bool DeliveryAccepted { get; set; }
     /// <summary>Failures in persistence or notification after the delivery decision. These must not trigger a resend.</summary>
     public List<string> PostSendErrors { get; set; } = new();
+    /// <summary>Host attempts made by the multi-host delivery engine.</summary>
+    public IReadOnlyList<SmtpDeliveryAttempt> Attempts { get; set; } = Array.Empty<SmtpDeliveryAttempt>();
+    /// <summary>Whether the final failure is transient.</summary>
+    public bool IsTransient { get; set; }
+    /// <summary>Whether a send lost transport confirmation and acceptance is unknown.</summary>
+    public bool DeliveryUnknown { get; set; }
     /// <summary>Optional message returned by the operation.</summary>
     public string? Message { get; set; }
     /// <summary>Time taken to perform the action.</summary>

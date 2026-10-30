@@ -80,6 +80,8 @@ Converts MSG files to EML format for interoperability with other clients.
 
 The ConvertFrom-MsgToEml cmdlet converts one or more MSG files to EML format. Provide input MSG file paths and the destination folder. Existing files can be overwritten with the -Force switch.
 
+Unsupported source metadata blocks conversion by default. Use AllowLoss to accept its omission when exporting a portable message.
+
 ### [ConvertFrom-OAuth2Credential](ConvertFrom-OAuth2Credential.md)
 Extracts username and token from an OAuth2 PSCredential.
 
@@ -152,6 +154,8 @@ Accepts Get-MailMessage views, native documents, or Import-MailFile messages. Ou
 Exports selected items from a PST, OST, OLM, Mbox, EMLX, or mailbox directory.
 
 Delegates to OfficeIMO.Email for EML, MSG, OFT, TNEF, Mbox, Maildir, or EMLX output. The source store remains read-only and the native preservation report is returned.
+
+Unsupported source metadata blocks export unless AllowLoss is specified. The preservation report retains conversion diagnostics.
 
 ### [Get-DmarcReport](Get-DmarcReport.md)
 Searches for DMARC aggregate reports in a mailbox.

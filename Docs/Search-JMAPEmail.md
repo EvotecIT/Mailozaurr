@@ -21,7 +21,7 @@ Queries a bounded page of JMAP email identifiers.
 
 ### EXAMPLE 1
 ```powershell
-Search-JMAPEmail -After 'Value'
+Search-JMAPEmail -ProfileId 'Value'
 ```
 
 

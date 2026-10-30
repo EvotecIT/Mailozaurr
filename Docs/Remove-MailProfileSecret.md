@@ -21,7 +21,7 @@ Removes a protected secret from a saved mail profile.
 
 ### EXAMPLE 1
 ```powershell
-Remove-MailProfileSecret -Name 'Name'
+Remove-MailProfileSecret -ProfileId 'Value' -Name 'Name'
 ```
 
 

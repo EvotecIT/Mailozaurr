@@ -20,7 +20,7 @@ public sealed class SmtpPoolTlsIsolationTests {
         using var generated = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
         // Schannel requires a non-ephemeral key handle. Importing does not install
         // the certificate in a store; disposal releases its temporary key container.
-        using var certificate = new X509Certificate2(generated.Export(X509ContentType.Pfx));
+        using var certificate = CertificateDataLoader.LoadPkcs12(generated.Export(X509ContentType.Pfx), null);
         using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;

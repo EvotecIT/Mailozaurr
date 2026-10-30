@@ -167,8 +167,8 @@ public class SentMessageRepositoryTests {
     private static async Task<SentMessageRecord?> SequentialSearchAsync(string path, string messageId) {
         using var read = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         using var reader = new StreamReader(read);
-        while (!reader.EndOfStream) {
-            string? line = await reader.ReadLineAsync();
+        string? line;
+        while ((line = await reader.ReadLineAsync()) != null) {
             if (string.IsNullOrWhiteSpace(line)) {
                 continue;
             }

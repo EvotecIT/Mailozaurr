@@ -33,8 +33,15 @@ public sealed class SmtpSessionFactory : ISmtpSessionFactory {
         return await _connectAsync(request, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<SmtpSessionRequest> CreateRequestAsync(MailProfile profile, CancellationToken cancellationToken) {
-        var server = RequireSetting(profile, MailProfileSettingsKeys.Server);
+    /// <summary>Resolves common delivery defaults or the first endpoint for a direct connection probe.</summary>
+    internal async Task<SmtpSessionRequest> CreateRequestAsync(MailProfile profile, CancellationToken cancellationToken = default,
+        bool forDeliverySession = false) {
+        if (profile == null) throw new ArgumentNullException(nameof(profile));
+        if (profile.Kind != MailProfileKind.Smtp) throw new InvalidOperationException("An SMTP profile is required.");
+        var secureOptions = GetSecureSocketOptions(profile);
+        var useSsl = GetBoolSetting(profile, MailProfileSettingsKeys.UseSsl) ?? false;
+        var endpoint = profile.SmtpDelivery?.ResolveEndpoints(secureOptions.ResolveEffective(useSsl)).First();
+        var server = endpoint?.Server ?? RequireSetting(profile, MailProfileSettingsKeys.Server);
         var port = GetIntSetting(profile, MailProfileSettingsKeys.Port) ?? 587;
         var authenticationEnabled = GetBoolSetting(profile, MailProfileSettingsKeys.AuthenticationEnabled) ?? true;
         var authMode = GetAuthMode(profile);
@@ -45,9 +52,9 @@ public sealed class SmtpSessionFactory : ISmtpSessionFactory {
 
         return new SmtpSessionRequest {
             Server = server,
-            Port = port,
-            SecureSocketOptions = GetSecureSocketOptions(profile),
-            UseSsl = GetBoolSetting(profile, MailProfileSettingsKeys.UseSsl) ?? false,
+            Port = forDeliverySession ? port : endpoint?.Port ?? port,
+            SecureSocketOptions = forDeliverySession ? secureOptions : endpoint?.SecureSocketOptions ?? secureOptions,
+            UseSsl = forDeliverySession || endpoint == null ? useSsl : false,
             TimeoutMs = GetIntSetting(profile, MailProfileSettingsKeys.Timeout) ?? 30000,
             RetryCount = GetIntSetting(profile, MailProfileSettingsKeys.RetryCount) ?? 3,
             RetryDelayMilliseconds = GetIntSetting(profile, MailProfileSettingsKeys.RetryDelayMilliseconds) ?? 500,
@@ -63,6 +70,11 @@ public sealed class SmtpSessionFactory : ISmtpSessionFactory {
             AuthMode = authMode
         };
     }
+
+    /// <summary>Validates and resolves the endpoint policy without acquiring credentials or connecting.</summary>
+    internal static SmtpEndpoint[] ResolveDeliveryEndpoints(MailProfile profile) =>
+        profile.SmtpDelivery!.ResolveEndpoints(GetSecureSocketOptions(profile).ResolveEffective(
+            GetBoolSetting(profile, MailProfileSettingsKeys.UseSsl) ?? false));
 
     private async Task<string> ResolveSecretAsync(MailProfile profile, ProtocolAuthMode authMode, CancellationToken cancellationToken) {
         var primarySecretName = authMode == ProtocolAuthMode.OAuth2

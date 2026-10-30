@@ -21,7 +21,7 @@ Decrypts an encrypted MimeMessage using PGP or S/MIME.
 
 ### EXAMPLE 1
 ```powershell
-Unprotect-MimeMessage -PrivateKeyPath 'C:\Path'
+Unprotect-MimeMessage -InputObject 'Value'
 ```
 
 

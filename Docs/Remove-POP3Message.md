@@ -21,7 +21,7 @@ Removes messages from a POP3 mailbox by index.
 
 ### EXAMPLE 1
 ```powershell
-Remove-POP3Message -Client 'Value'
+Remove-POP3Message -Index @(1)
 ```
 
 

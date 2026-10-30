@@ -25,7 +25,7 @@ Returns OfficeIMO.Email folder metadata without decoding message bodies or attac
 
 ### EXAMPLE 1
 ```powershell
-Get-MailStoreFolder -Name 'Name'
+Get-MailStoreFolder -InputObject 'Value'
 ```
 
 

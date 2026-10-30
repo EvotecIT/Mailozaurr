@@ -26,13 +26,13 @@ Retrieves Gmail threads using the Gmail API.
 
 ### EXAMPLE 1
 ```powershell
-Get-GmailThread -GmailAccount 'Value' -Credential Get-Credential -Id 'Value'
+Get-GmailThread -GmailAccount 'Value' -Credential (Get-Credential) -Id 'Value'
 ```
 
 
 ### EXAMPLE 2
 ```powershell
-Get-GmailThread -GmailAccount 'Value' -Credential Get-Credential
+Get-GmailThread -GmailAccount 'Value' -Credential (Get-Credential)
 ```
 
 

@@ -21,7 +21,7 @@ Updates non-secret fields of an existing Mailozaurr profile.
 
 ### EXAMPLE 1
 ```powershell
-Set-MailProfile -ClearSettings
+Set-MailProfile -ProfileId 'Value'
 ```
 
 

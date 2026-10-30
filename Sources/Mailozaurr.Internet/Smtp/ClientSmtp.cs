@@ -94,25 +94,19 @@ public partial class ClientSmtp : SmtpClient {
     /// <param name="mailbox">The recipient mailbox address.</param>
     /// <returns>The delivery status notification flags to use, or <c>null</c>.</returns>
     protected override DeliveryStatusNotification? GetDeliveryStatusNotifications(MimeMessage message, MailboxAddress mailbox) {
-        DeliveryStatusNotification combinedOption = 0;
-        if (DeliveryNotificationOption != null) {
-            foreach (var option in DeliveryNotificationOption) {
-                switch (option) {
-                    case DeliveryNotification.None:
-                        break;
-                    case DeliveryNotification.Delay:
-                        combinedOption |= DeliveryStatusNotification.Delay;
-                        break;
-                    case DeliveryNotification.Never:
-                        combinedOption |= DeliveryStatusNotification.Never;
-                        break;
-                    case DeliveryNotification.OnFailure:
-                        combinedOption |= DeliveryStatusNotification.Failure;
-                        break;
-                    case DeliveryNotification.OnSuccess:
-                        combinedOption |= DeliveryStatusNotification.Success;
-                        break;
-                }
+        // Keep omission distinct from MailKit's zero-valued NOTIFY=NEVER.
+        if (DeliveryNotificationOption == null) return null;
+        DeliveryStatusNotification? combinedOption = null;
+        foreach (var option in DeliveryNotificationOption) {
+            DeliveryStatusNotification? notification = option switch {
+                DeliveryNotification.Delay => DeliveryStatusNotification.Delay,
+                DeliveryNotification.Never => DeliveryStatusNotification.Never,
+                DeliveryNotification.OnFailure => DeliveryStatusNotification.Failure,
+                DeliveryNotification.OnSuccess => DeliveryStatusNotification.Success,
+                _ => null
+            };
+            if (notification.HasValue) {
+                combinedOption = (combinedOption ?? 0) | notification.Value;
             }
         }
         return combinedOption;

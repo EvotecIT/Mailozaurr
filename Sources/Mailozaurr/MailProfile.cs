@@ -29,6 +29,12 @@ public sealed class MailProfile {
     public Dictionary<string, string> Settings { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
+    /// Optional SMTP endpoint selection and retry policy. Null preserves the single-server settings route.
+    /// Connections and host cooldowns can be shared by supplying a delivery session to the SMTP handler.
+    /// </summary>
+    public SmtpDeliveryOptions? SmtpDelivery { get; set; }
+
+    /// <summary>
     /// Explicit capability override when present.
     /// </summary>
     public ProfileCapabilities? Capabilities { get; set; }

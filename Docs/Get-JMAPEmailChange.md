@@ -21,7 +21,7 @@ Gets bounded JMAP email changes since an opaque state token.
 
 ### EXAMPLE 1
 ```powershell
-Get-JMAPEmailChange -MaxChanges 1
+Get-JMAPEmailChange -ProfileId 'Value' -SinceState 'Value'
 ```
 
 

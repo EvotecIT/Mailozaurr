@@ -25,7 +25,7 @@ Returns lightweight OfficeIMO.Email item references by default. Use Read to proj
 
 ### EXAMPLE 1
 ```powershell
-Get-MailStoreItem -FolderId 'Value'
+Get-MailStoreItem -InputObject 'Value'
 ```
 
 

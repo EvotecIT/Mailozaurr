@@ -21,7 +21,7 @@ Updates local flags on a POP3 message.
 
 ### EXAMPLE 1
 ```powershell
-Set-POP3Message -Client 'Value'
+Set-POP3Message -Index 1
 ```
 
 

@@ -1550,7 +1550,7 @@ or server settings.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Compare-MailDataSemantic -InputObject 'Value'</dev:code>
+        <dev:code>Compare-MailDataSemantic -InputObject 'Value' -ReferenceObject 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -4222,7 +4222,7 @@ or server settings.</maml:para>
       </command:example>
       <command:example>
         <maml:title>EXAMPLE 2</maml:title>
-        <dev:code>Connect-IMAP -Credential Get-Credential</dev:code>
+        <dev:code>Connect-IMAP -Credential (Get-Credential)</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -5417,7 +5417,7 @@ or server settings.</maml:para>
       </command:example>
       <command:example>
         <maml:title>EXAMPLE 2</maml:title>
-        <dev:code>Connect-POP3 -Credential Get-Credential</dev:code>
+        <dev:code>Connect-POP3 -Credential (Get-Credential)</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -5547,7 +5547,7 @@ or server settings.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>ConvertFrom-EmlToMsg -InputPath @('C:\Path')</dev:code>
+        <dev:code>ConvertFrom-EmlToMsg -InputPath @('C:\Path') -OutputFolder 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -5780,7 +5780,7 @@ or server settings.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>ConvertFrom-OAuth2Credential -Credential Get-Credential</dev:code>
+        <dev:code>ConvertFrom-OAuth2Credential -Credential (Get-Credential)</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -6994,7 +6994,7 @@ or server settings.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>ConvertTo-MailPst -InputPath 'C:\Path'</dev:code>
+        <dev:code>ConvertTo-MailPst -InputPath 'C:\Path' -OutputPath 'C:\Path'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -8878,7 +8878,7 @@ ensure credentials are disposed and not kept in memory.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Get-DmarcReport -Protocol 'Value' -GmailAccount 'Value' -Credential Get-Credential</dev:code>
+        <dev:code>Get-DmarcReport -Protocol 'Value' -GmailAccount 'Value' -Credential (Get-Credential)</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -9484,7 +9484,7 @@ ensure credentials are disposed and not kept in memory.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Get-EmailDeliveryStatus -Protocol 'Value' -GmailAccount 'Value' -Credential Get-Credential</dev:code>
+        <dev:code>Get-EmailDeliveryStatus -Protocol 'Value' -GmailAccount 'Value' -Credential (Get-Credential)</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -11325,14 +11325,14 @@ ensure credentials are disposed and not kept in memory.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Get-GmailMessage -GmailAccount 'Value' -Credential Get-Credential -Id 'Value'</dev:code>
+        <dev:code>Get-GmailMessage -GmailAccount 'Value' -Credential (Get-Credential) -Id 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
       </command:example>
       <command:example>
         <maml:title>EXAMPLE 2</maml:title>
-        <dev:code>Get-GmailMessage -GmailAccount 'Value' -Credential Get-Credential</dev:code>
+        <dev:code>Get-GmailMessage -GmailAccount 'Value' -Credential (Get-Credential)</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -11533,14 +11533,14 @@ ensure credentials are disposed and not kept in memory.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Get-GmailThread -GmailAccount 'Value' -Credential Get-Credential -Id 'Value'</dev:code>
+        <dev:code>Get-GmailThread -GmailAccount 'Value' -Credential (Get-Credential) -Id 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
       </command:example>
       <command:example>
         <maml:title>EXAMPLE 2</maml:title>
-        <dev:code>Get-GmailThread -GmailAccount 'Value' -Credential Get-Credential</dev:code>
+        <dev:code>Get-GmailThread -GmailAccount 'Value' -Credential (Get-Credential)</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -12676,6 +12676,13 @@ message and folder counts as well as attachment sizes.</maml:para>
           <maml:para></maml:para>
         </dev:remarks>
       </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 2</maml:title>
+        <dev:code>Get-IMAPFolder -Client 'Value'</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
     </command:examples>
     <command:relatedLinks>
       <maml:navigationLink>
@@ -13473,7 +13480,7 @@ message and folder counts as well as attachment sizes.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Get-JMAPEmail -EmailId @('Value')</dev:code>
+        <dev:code>Get-JMAPEmail -ProfileId 'Value' -EmailId @('Value')</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -13642,7 +13649,7 @@ message and folder counts as well as attachment sizes.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Get-JMAPEmailChange -MaxChanges 1</dev:code>
+        <dev:code>Get-JMAPEmailChange -ProfileId 'Value' -SinceState 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -13763,7 +13770,7 @@ message and folder counts as well as attachment sizes.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Get-JMAPIdentity -ProfileDirectory 'Value'</dev:code>
+        <dev:code>Get-JMAPIdentity -ProfileId 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -13884,7 +13891,7 @@ message and folder counts as well as attachment sizes.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Get-JMAPMailbox -ProfileDirectory 'Value'</dev:code>
+        <dev:code>Get-JMAPMailbox -ProfileId 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -14005,7 +14012,7 @@ message and folder counts as well as attachment sizes.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Get-JMAPSession -ProfileDirectory 'Value'</dev:code>
+        <dev:code>Get-JMAPSession -ProfileId 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -14150,7 +14157,7 @@ message and folder counts as well as attachment sizes.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Get-JMAPThread -ProfileDirectory 'Value'</dev:code>
+        <dev:code>Get-JMAPThread -ProfileId 'Value' -ThreadId @('Value')</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -15310,7 +15317,7 @@ message and folder counts as well as attachment sizes.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Get-MailStoreFolder -Name 'Name'</dev:code>
+        <dev:code>Get-MailStoreFolder -InputObject 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -15628,7 +15635,7 @@ message and folder counts as well as attachment sizes.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Get-MailStoreItem -FolderId 'Value'</dev:code>
+        <dev:code>Get-MailStoreItem -InputObject 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -17145,7 +17152,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Merge-MailStore -InputPath @('C:\Path')</dev:code>
+        <dev:code>Merge-MailStore -InputPath @('C:\Path') -OutputPath 'C:\Path'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -18189,7 +18196,14 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Move-IMAPFolder -Client 'Value'</dev:code>
+        <dev:code>Move-IMAPFolder -Folder 'Value' -DestinationFolder 'Value'</dev:code>
+        <dev:remarks>
+          <maml:para></maml:para>
+        </dev:remarks>
+      </command:example>
+      <command:example>
+        <maml:title>EXAMPLE 2</maml:title>
+        <dev:code>Move-IMAPFolder -Folder 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -18333,7 +18347,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Move-IMAPMessage -Client 'Value'</dev:code>
+        <dev:code>Move-IMAPMessage -Uid 1 -DestinationFolder 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -21791,7 +21805,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>New-MailProfile -DisplayName 'Name' -Kind 'Value'</dev:code>
+        <dev:code>New-MailProfile -ProfileId 'Value' -DisplayName 'Name' -Kind 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -22590,7 +22604,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Remove-GmailMessage -GmailAccount 'Value' -Credential Get-Credential -Id 'Value'</dev:code>
+        <dev:code>Remove-GmailMessage -GmailAccount 'Value' -Credential (Get-Credential) -Id 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -24494,7 +24508,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Remove-IMAPFolder -Client 'Value'</dev:code>
+        <dev:code>Remove-IMAPFolder -Folder 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -24612,7 +24626,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Remove-IMAPMessage -Client 'Value'</dev:code>
+        <dev:code>Remove-IMAPMessage -Uid @(1)</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -24806,7 +24820,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Remove-MailProfile -ProfileDirectory 'Value'</dev:code>
+        <dev:code>Remove-MailProfile -ProfileId 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -24951,7 +24965,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Remove-MailProfileSecret -Name 'Name'</dev:code>
+        <dev:code>Remove-MailProfileSecret -ProfileId 'Value' -Name 'Name'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -25045,7 +25059,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Remove-POP3Message -Client 'Value'</dev:code>
+        <dev:code>Remove-POP3Message -Index @(1)</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -25589,7 +25603,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Rename-IMAPFolder -Client 'Value'</dev:code>
+        <dev:code>Rename-IMAPFolder -Folder 'Value' -NewName 'Name'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -25812,7 +25826,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Save-GmailMessageAttachment -GmailAccount 'Value' -Credential Get-Credential -Id 'Value' -Path 'C:\Path'</dev:code>
+        <dev:code>Save-GmailMessageAttachment -GmailAccount 'Value' -Credential (Get-Credential) -Id 'Value' -Path 'C:\Path'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -26229,7 +26243,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Save-IMAPMessage -Path 'C:\Path'</dev:code>
+        <dev:code>Save-IMAPMessage -Uid 1 -Path 'C:\Path'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -26466,7 +26480,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Save-IMAPMessageAttachment -Path 'C:\Path'</dev:code>
+        <dev:code>Save-IMAPMessageAttachment -Uid 1 -Path 'C:\Path'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -26903,7 +26917,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Save-POP3Message -Path 'C:\Path'</dev:code>
+        <dev:code>Save-POP3Message -Index 1 -Path 'C:\Path'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -27116,7 +27130,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Save-POP3MessageAttachment -Path 'C:\Path'</dev:code>
+        <dev:code>Save-POP3MessageAttachment -Index 1 -Path 'C:\Path'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -28121,7 +28135,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Search-JMAPEmail -After 'Value'</dev:code>
+        <dev:code>Search-JMAPEmail -ProfileId 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -28507,7 +28521,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Search-MailAddressBook -Term @('Value')</dev:code>
+        <dev:code>Search-MailAddressBook -InputObject 'Value' -Term @('Value')</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -29281,14 +29295,14 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Search-MailStore -Before 'Value'</dev:code>
+        <dev:code>Search-MailStore -InputObject 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
       </command:example>
       <command:example>
         <maml:title>EXAMPLE 2</maml:title>
-        <dev:code>Search-MailStore -Term @('Value')</dev:code>
+        <dev:code>Search-MailStore -InputObject 'Value' -Term @('Value')</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -29738,6 +29752,18 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CircuitBreakMinutes</maml:name>
+          <maml:description>
+            <maml:para>Minutes to keep a failing SMTP endpoint circuit open. Explicitly binding this parameter enables the delivery session, including for one server.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>ConnectionPoolSize</maml:name>
           <maml:description>
             <maml:para>Maximum number of connections to keep in the pool.</maml:para>
@@ -29777,6 +29803,18 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>DeliveryNotification[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>DeliverySession</maml:name>
+          <maml:description>
+            <maml:para>Optional caller-owned session preserving rotation and circuit state across invocations. The cmdlet never disposes a supplied session. Protocol logging uses connections owned by the invocation and closes them after sending; rotation and circuit state remain in the session.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SmtpDeliverySession</command:parameterValue>
+          <dev:type>
+            <maml:name>SmtpDeliverySession</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -30015,7 +30053,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MimeMessagePath</maml:name>
           <maml:description>
-            <maml:para>Saves the email message to a file for troubleshooting purposes.</maml:para>
+            <maml:para>Saves the email message to a file for troubleshooting purposes. For SMTP delivery sessions, a save failure after accepted delivery is reported in PostSendErrors without changing delivery success.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
           <dev:type>
@@ -30117,7 +30155,7 @@ import. Supported inputs are .eml, .msg, .oft, .tnef, and winmail.dat. Accepts a
           <maml:name>RetryAlways</maml:name>
           <maml:description>
             <maml:para>When specified, retries are attempted regardless of the error&#xD;
-type. Without this switch, only transient errors are retried.</maml:para>
+type. Without this switch, only transient errors are retried. SMTP delivery sessions always stop on permanent rejection or uncertain delivery, even with this switch.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -30129,7 +30167,7 @@ type. Without this switch, only transient errors are retried.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>RetryCount</maml:name>
           <maml:description>
-            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries).</maml:para>
+            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries). For SMTP delivery sessions the total attempt budget is the greater of the server count and RetryCount + 1, capped at Int32.MaxValue. Failover visits eligible servers before revisiting them; permanent or uncertain delivery failures may stop earlier.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
@@ -30193,14 +30231,14 @@ type. Without this switch, only transient errors are retried.</maml:para>
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
-        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="SmtpServer">
+        <command:parameter required="true" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="SmtpServer">
           <maml:name>Server</maml:name>
           <maml:description>
-            <maml:para>Specifies the SMTP server to use for sending the email message. Required for SMTP scenarios.</maml:para>
+            <maml:para>Specifies SMTP servers in preference order. Entries may be bare hosts or SMTP URIs with their own port and security mode. A URI automatically enables the delivery session, including for one server. Required for SMTP scenarios.</maml:para>
           </maml:description>
-          <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+          <command:parameterValue required="true" variableLength="false">String[]</command:parameterValue>
           <dev:type>
-            <maml:name>String</maml:name>
+            <maml:name>String[]</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -30247,6 +30285,23 @@ type. Without this switch, only transient errors are retried.</maml:para>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
             <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Strategy</maml:name>
+          <maml:description>
+            <maml:para>Selects SMTP server ordering. Explicitly binding this parameter enables the delivery session, including for one server.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SmtpServerStrategy</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Failover</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">RoundRobin</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Random</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>SmtpServerStrategy</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -30437,6 +30492,18 @@ StartTls to be used automatically.</maml:para>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CircuitBreakMinutes</maml:name>
+          <maml:description>
+            <maml:para>Minutes to keep a failing SMTP endpoint circuit open. Explicitly binding this parameter enables the delivery session, including for one server.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>ConnectionPoolSize</maml:name>
           <maml:description>
             <maml:para>Maximum number of connections to keep in the pool.</maml:para>
@@ -30476,6 +30543,18 @@ StartTls to be used automatically.</maml:para>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>DeliveryNotification[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>DeliverySession</maml:name>
+          <maml:description>
+            <maml:para>Optional caller-owned session preserving rotation and circuit state across invocations. The cmdlet never disposes a supplied session. Protocol logging uses connections owned by the invocation and closes them after sending; rotation and circuit state remain in the session.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SmtpDeliverySession</command:parameterValue>
+          <dev:type>
+            <maml:name>SmtpDeliverySession</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -30714,7 +30793,7 @@ StartTls to be used automatically.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MimeMessagePath</maml:name>
           <maml:description>
-            <maml:para>Saves the email message to a file for troubleshooting purposes.</maml:para>
+            <maml:para>Saves the email message to a file for troubleshooting purposes. For SMTP delivery sessions, a save failure after accepted delivery is reported in PostSendErrors without changing delivery success.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
           <dev:type>
@@ -30816,7 +30895,7 @@ StartTls to be used automatically.</maml:para>
           <maml:name>RetryAlways</maml:name>
           <maml:description>
             <maml:para>When specified, retries are attempted regardless of the error&#xD;
-type. Without this switch, only transient errors are retried.</maml:para>
+type. Without this switch, only transient errors are retried. SMTP delivery sessions always stop on permanent rejection or uncertain delivery, even with this switch.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -30828,7 +30907,7 @@ type. Without this switch, only transient errors are retried.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>RetryCount</maml:name>
           <maml:description>
-            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries).</maml:para>
+            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries). For SMTP delivery sessions the total attempt budget is the greater of the server count and RetryCount + 1, capped at Int32.MaxValue. Failover visits eligible servers before revisiting them; permanent or uncertain delivery failures may stop earlier.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
@@ -30892,14 +30971,14 @@ type. Without this switch, only transient errors are retried.</maml:para>
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
-        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="SmtpServer">
+        <command:parameter required="true" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="SmtpServer">
           <maml:name>Server</maml:name>
           <maml:description>
-            <maml:para>Specifies the SMTP server to use for sending the email message. Required for SMTP scenarios.</maml:para>
+            <maml:para>Specifies SMTP servers in preference order. Entries may be bare hosts or SMTP URIs with their own port and security mode. A URI automatically enables the delivery session, including for one server. Required for SMTP scenarios.</maml:para>
           </maml:description>
-          <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+          <command:parameterValue required="true" variableLength="false">String[]</command:parameterValue>
           <dev:type>
-            <maml:name>String</maml:name>
+            <maml:name>String[]</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -30946,6 +31025,23 @@ type. Without this switch, only transient errors are retried.</maml:para>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
             <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Strategy</maml:name>
+          <maml:description>
+            <maml:para>Selects SMTP server ordering. Explicitly binding this parameter enables the delivery session, including for one server.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SmtpServerStrategy</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Failover</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">RoundRobin</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Random</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>SmtpServerStrategy</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -31178,6 +31274,18 @@ StartTls to be used automatically.</maml:para>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CircuitBreakMinutes</maml:name>
+          <maml:description>
+            <maml:para>Minutes to keep a failing SMTP endpoint circuit open. Explicitly binding this parameter enables the delivery session, including for one server.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>ConnectionPoolSize</maml:name>
           <maml:description>
             <maml:para>Maximum number of connections to keep in the pool.</maml:para>
@@ -31217,6 +31325,18 @@ StartTls to be used automatically.</maml:para>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>DeliveryNotification[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>DeliverySession</maml:name>
+          <maml:description>
+            <maml:para>Optional caller-owned session preserving rotation and circuit state across invocations. The cmdlet never disposes a supplied session. Protocol logging uses connections owned by the invocation and closes them after sending; rotation and circuit state remain in the session.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SmtpDeliverySession</command:parameterValue>
+          <dev:type>
+            <maml:name>SmtpDeliverySession</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -31455,7 +31575,7 @@ StartTls to be used automatically.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MimeMessagePath</maml:name>
           <maml:description>
-            <maml:para>Saves the email message to a file for troubleshooting purposes.</maml:para>
+            <maml:para>Saves the email message to a file for troubleshooting purposes. For SMTP delivery sessions, a save failure after accepted delivery is reported in PostSendErrors without changing delivery success.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
           <dev:type>
@@ -31569,7 +31689,7 @@ StartTls to be used automatically.</maml:para>
           <maml:name>RetryAlways</maml:name>
           <maml:description>
             <maml:para>When specified, retries are attempted regardless of the error&#xD;
-type. Without this switch, only transient errors are retried.</maml:para>
+type. Without this switch, only transient errors are retried. SMTP delivery sessions always stop on permanent rejection or uncertain delivery, even with this switch.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -31581,7 +31701,7 @@ type. Without this switch, only transient errors are retried.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>RetryCount</maml:name>
           <maml:description>
-            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries).</maml:para>
+            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries). For SMTP delivery sessions the total attempt budget is the greater of the server count and RetryCount + 1, capped at Int32.MaxValue. Failover visits eligible servers before revisiting them; permanent or uncertain delivery failures may stop earlier.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
@@ -31645,14 +31765,14 @@ type. Without this switch, only transient errors are retried.</maml:para>
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
-        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="SmtpServer">
+        <command:parameter required="true" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="SmtpServer">
           <maml:name>Server</maml:name>
           <maml:description>
-            <maml:para>Specifies the SMTP server to use for sending the email message. Required for SMTP scenarios.</maml:para>
+            <maml:para>Specifies SMTP servers in preference order. Entries may be bare hosts or SMTP URIs with their own port and security mode. A URI automatically enables the delivery session, including for one server. Required for SMTP scenarios.</maml:para>
           </maml:description>
-          <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+          <command:parameterValue required="true" variableLength="false">String[]</command:parameterValue>
           <dev:type>
-            <maml:name>String</maml:name>
+            <maml:name>String[]</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -31699,6 +31819,23 @@ type. Without this switch, only transient errors are retried.</maml:para>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
             <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Strategy</maml:name>
+          <maml:description>
+            <maml:para>Selects SMTP server ordering. Explicitly binding this parameter enables the delivery session, including for one server.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SmtpServerStrategy</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Failover</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">RoundRobin</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Random</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>SmtpServerStrategy</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -31901,6 +32038,18 @@ StartTls to be used automatically.</maml:para>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>CircuitBreakMinutes</maml:name>
+          <maml:description>
+            <maml:para>Minutes to keep a failing SMTP endpoint circuit open. Explicitly binding this parameter enables the delivery session, including for one server.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+          <dev:type>
+            <maml:name>Int32</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>ConnectionPoolSize</maml:name>
           <maml:description>
             <maml:para>Maximum number of connections to keep in the pool.</maml:para>
@@ -31952,6 +32101,18 @@ StartTls to be used automatically.</maml:para>
           </command:parameterValueGroup>
           <dev:type>
             <maml:name>DeliveryNotification[]</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>DeliverySession</maml:name>
+          <maml:description>
+            <maml:para>Optional caller-owned session preserving rotation and circuit state across invocations. The cmdlet never disposes a supplied session. Protocol logging uses connections owned by the invocation and closes them after sending; rotation and circuit state remain in the session.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SmtpDeliverySession</command:parameterValue>
+          <dev:type>
+            <maml:name>SmtpDeliverySession</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -32190,7 +32351,7 @@ StartTls to be used automatically.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>MimeMessagePath</maml:name>
           <maml:description>
-            <maml:para>Saves the email message to a file for troubleshooting purposes.</maml:para>
+            <maml:para>Saves the email message to a file for troubleshooting purposes. For SMTP delivery sessions, a save failure after accepted delivery is reported in PostSendErrors without changing delivery success.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
           <dev:type>
@@ -32304,7 +32465,7 @@ StartTls to be used automatically.</maml:para>
           <maml:name>RetryAlways</maml:name>
           <maml:description>
             <maml:para>When specified, retries are attempted regardless of the error&#xD;
-type. Without this switch, only transient errors are retried.</maml:para>
+type. Without this switch, only transient errors are retried. SMTP delivery sessions always stop on permanent rejection or uncertain delivery, even with this switch.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -32316,7 +32477,7 @@ type. Without this switch, only transient errors are retried.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>RetryCount</maml:name>
           <maml:description>
-            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries).</maml:para>
+            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries). For SMTP delivery sessions the total attempt budget is the greater of the server count and RetryCount + 1, capped at Int32.MaxValue. Failover visits eligible servers before revisiting them; permanent or uncertain delivery failures may stop earlier.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
@@ -32380,14 +32541,14 @@ type. Without this switch, only transient errors are retried.</maml:para>
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
         </command:parameter>
-        <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="SmtpServer">
+        <command:parameter required="true" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="SmtpServer">
           <maml:name>Server</maml:name>
           <maml:description>
-            <maml:para>Specifies the SMTP server to use for sending the email message. Required for SMTP scenarios.</maml:para>
+            <maml:para>Specifies SMTP servers in preference order. Entries may be bare hosts or SMTP URIs with their own port and security mode. A URI automatically enables the delivery session, including for one server. Required for SMTP scenarios.</maml:para>
           </maml:description>
-          <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+          <command:parameterValue required="true" variableLength="false">String[]</command:parameterValue>
           <dev:type>
-            <maml:name>String</maml:name>
+            <maml:name>String[]</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -32434,6 +32595,23 @@ type. Without this switch, only transient errors are retried.</maml:para>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
             <maml:name>SwitchParameter</maml:name>
+            <maml:uri />
+          </dev:type>
+          <dev:defaultValue>None</dev:defaultValue>
+        </command:parameter>
+        <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+          <maml:name>Strategy</maml:name>
+          <maml:description>
+            <maml:para>Selects SMTP server ordering. Explicitly binding this parameter enables the delivery session, including for one server.</maml:para>
+          </maml:description>
+          <command:parameterValue required="false" variableLength="false">SmtpServerStrategy</command:parameterValue>
+          <command:parameterValueGroup>
+            <command:parameterValue required="false" variableLength="false">Failover</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">RoundRobin</command:parameterValue>
+            <command:parameterValue required="false" variableLength="false">Random</command:parameterValue>
+          </command:parameterValueGroup>
+          <dev:type>
+            <maml:name>SmtpServerStrategy</maml:name>
             <maml:uri />
           </dev:type>
           <dev:defaultValue>None</dev:defaultValue>
@@ -32897,7 +33075,7 @@ StartTls to be used automatically.</maml:para>
           <maml:name>RetryAlways</maml:name>
           <maml:description>
             <maml:para>When specified, retries are attempted regardless of the error&#xD;
-type. Without this switch, only transient errors are retried.</maml:para>
+type. Without this switch, only transient errors are retried. SMTP delivery sessions always stop on permanent rejection or uncertain delivery, even with this switch.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -32909,7 +33087,7 @@ type. Without this switch, only transient errors are retried.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>RetryCount</maml:name>
           <maml:description>
-            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries).</maml:para>
+            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries). For SMTP delivery sessions the total attempt budget is the greater of the server count and RetryCount + 1, capped at Int32.MaxValue. Failover visits eligible servers before revisiting them; permanent or uncertain delivery failures may stop earlier.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
@@ -33375,7 +33553,7 @@ type. Without this switch, only transient errors are retried.</maml:para>
           <maml:name>RetryAlways</maml:name>
           <maml:description>
             <maml:para>When specified, retries are attempted regardless of the error&#xD;
-type. Without this switch, only transient errors are retried.</maml:para>
+type. Without this switch, only transient errors are retried. SMTP delivery sessions always stop on permanent rejection or uncertain delivery, even with this switch.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -33387,7 +33565,7 @@ type. Without this switch, only transient errors are retried.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>RetryCount</maml:name>
           <maml:description>
-            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries).</maml:para>
+            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries). For SMTP delivery sessions the total attempt budget is the greater of the server count and RetryCount + 1, capped at Int32.MaxValue. Failover visits eligible servers before revisiting them; permanent or uncertain delivery failures may stop earlier.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
@@ -33781,7 +33959,7 @@ type. Without this switch, only transient errors are retried.</maml:para>
           <maml:name>RetryAlways</maml:name>
           <maml:description>
             <maml:para>When specified, retries are attempted regardless of the error&#xD;
-type. Without this switch, only transient errors are retried.</maml:para>
+type. Without this switch, only transient errors are retried. SMTP delivery sessions always stop on permanent rejection or uncertain delivery, even with this switch.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -33793,7 +33971,7 @@ type. Without this switch, only transient errors are retried.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>RetryCount</maml:name>
           <maml:description>
-            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries).</maml:para>
+            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries). For SMTP delivery sessions the total attempt budget is the greater of the server count and RetryCount + 1, capped at Int32.MaxValue. Failover visits eligible servers before revisiting them; permanent or uncertain delivery failures may stop earlier.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
@@ -34255,7 +34433,7 @@ type. Without this switch, only transient errors are retried.</maml:para>
           <maml:name>RetryAlways</maml:name>
           <maml:description>
             <maml:para>When specified, retries are attempted regardless of the error&#xD;
-type. Without this switch, only transient errors are retried.</maml:para>
+type. Without this switch, only transient errors are retried. SMTP delivery sessions always stop on permanent rejection or uncertain delivery, even with this switch.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -34267,7 +34445,7 @@ type. Without this switch, only transient errors are retried.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>RetryCount</maml:name>
           <maml:description>
-            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries).</maml:para>
+            <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries). For SMTP delivery sessions the total attempt budget is the greater of the server count and RetryCount + 1, capped at Int32.MaxValue. Failover visits eligible servers before revisiting them; permanent or uncertain delivery failures may stop earlier.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
@@ -34502,6 +34680,18 @@ type. Without this switch, only transient errors are retried.</maml:para>
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>CircuitBreakMinutes</maml:name>
+        <maml:description>
+          <maml:para>Minutes to keep a failing SMTP endpoint circuit open. Explicitly binding this parameter enables the delivery session, including for one server.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
+        <dev:type>
+          <maml:name>Int32</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>ConnectionPoolSize</maml:name>
         <maml:description>
           <maml:para>Maximum number of connections to keep in the pool.</maml:para>
@@ -34553,6 +34743,18 @@ type. Without this switch, only transient errors are retried.</maml:para>
         </command:parameterValueGroup>
         <dev:type>
           <maml:name>DeliveryNotification[]</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>DeliverySession</maml:name>
+        <maml:description>
+          <maml:para>Optional caller-owned session preserving rotation and circuit state across invocations. The cmdlet never disposes a supplied session. Protocol logging uses connections owned by the invocation and closes them after sending; rotation and circuit state remain in the session.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SmtpDeliverySession</command:parameterValue>
+        <dev:type>
+          <maml:name>SmtpDeliverySession</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -34883,7 +35085,7 @@ type. Without this switch, only transient errors are retried.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>MimeMessagePath</maml:name>
         <maml:description>
-          <maml:para>Saves the email message to a file for troubleshooting purposes.</maml:para>
+          <maml:para>Saves the email message to a file for troubleshooting purposes. For SMTP delivery sessions, a save failure after accepted delivery is reported in PostSendErrors without changing delivery success.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">String</command:parameterValue>
         <dev:type>
@@ -35045,7 +35247,7 @@ type. Without this switch, only transient errors are retried.</maml:para>
         <maml:name>RetryAlways</maml:name>
         <maml:description>
           <maml:para>When specified, retries are attempted regardless of the error&#xD;
-type. Without this switch, only transient errors are retried.</maml:para>
+type. Without this switch, only transient errors are retried. SMTP delivery sessions always stop on permanent rejection or uncertain delivery, even with this switch.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
         <dev:type>
@@ -35057,7 +35259,7 @@ type. Without this switch, only transient errors are retried.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>RetryCount</maml:name>
         <maml:description>
-          <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries).</maml:para>
+          <maml:para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries). For SMTP delivery sessions the total attempt budget is the greater of the server count and RetryCount + 1, capped at Int32.MaxValue. Failover visits eligible servers before revisiting them; permanent or uncertain delivery failures may stop earlier.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
         <dev:type>
@@ -35145,14 +35347,14 @@ type. Without this switch, only transient errors are retried.</maml:para>
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
       </command:parameter>
-      <command:parameter required="true" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="SmtpServer">
+      <command:parameter required="true" variableLength="true" globbing="false" pipelineInput="False" position="named" aliases="SmtpServer">
         <maml:name>Server</maml:name>
         <maml:description>
-          <maml:para>Specifies the SMTP server to use for sending the email message. Required for SMTP scenarios.</maml:para>
+          <maml:para>Specifies SMTP servers in preference order. Entries may be bare hosts or SMTP URIs with their own port and security mode. A URI automatically enables the delivery session, including for one server. Required for SMTP scenarios.</maml:para>
         </maml:description>
-        <command:parameterValue required="true" variableLength="false">String</command:parameterValue>
+        <command:parameterValue required="true" variableLength="false">String[]</command:parameterValue>
         <dev:type>
-          <maml:name>String</maml:name>
+          <maml:name>String[]</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -35199,6 +35401,23 @@ type. Without this switch, only transient errors are retried.</maml:para>
         <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
         <dev:type>
           <maml:name>SwitchParameter</maml:name>
+          <maml:uri />
+        </dev:type>
+        <dev:defaultValue>None</dev:defaultValue>
+      </command:parameter>
+      <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
+        <maml:name>Strategy</maml:name>
+        <maml:description>
+          <maml:para>Selects SMTP server ordering. Explicitly binding this parameter enables the delivery session, including for one server.</maml:para>
+        </maml:description>
+        <command:parameterValue required="false" variableLength="false">SmtpServerStrategy</command:parameterValue>
+        <command:parameterValueGroup>
+          <command:parameterValue required="false" variableLength="false">Failover</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">RoundRobin</command:parameterValue>
+          <command:parameterValue required="false" variableLength="false">Random</command:parameterValue>
+        </command:parameterValueGroup>
+        <dev:type>
+          <maml:name>SmtpServerStrategy</maml:name>
           <maml:uri />
         </dev:type>
         <dev:defaultValue>None</dev:defaultValue>
@@ -35420,7 +35639,7 @@ StartTls to be used automatically.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
           <maml:name>ProcessAll</maml:name>
           <maml:description>
-            <maml:para>Processes all messages regardless of their scheduled retry time.</maml:para>
+            <maml:para>Processes messages regardless of their scheduled retry time while respecting active leases.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
           <dev:type>
@@ -35479,7 +35698,7 @@ StartTls to be used automatically.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="None">
         <maml:name>ProcessAll</maml:name>
         <maml:description>
-          <maml:para>Processes all messages regardless of their scheduled retry time.</maml:para>
+          <maml:para>Processes messages regardless of their scheduled retry time while respecting active leases.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">SwitchParameter</command:parameterValue>
         <dev:type>
@@ -35790,7 +36009,7 @@ StartTls to be used automatically.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Send-GmailMessage -GmailAccount 'Value' -Credential Get-Credential -From 'Value' -To @('Value')</dev:code>
+        <dev:code>Send-GmailMessage -GmailAccount 'Value' -Credential (Get-Credential) -From 'Value' -To @('Value')</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -36995,7 +37214,7 @@ StartTls to be used automatically.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Set-IMAPMessage -Client 'Value'</dev:code>
+        <dev:code>Set-IMAPMessage -Uid 1</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -37356,7 +37575,7 @@ StartTls to be used automatically.</maml:para>
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Set-MailProfile -ClearSettings</dev:code>
+        <dev:code>Set-MailProfile -ProfileId 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -37626,14 +37845,14 @@ Mailozaurr can enforce typed provider, tenant, client, origin, and purpose metad
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Set-MailProfileSecret -Value (Read-Host -AsSecureString)</dev:code>
+        <dev:code>Set-MailProfileSecret -ProfileId 'Value' -Name 'Name' -Value (Read-Host -AsSecureString)</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
       </command:example>
       <command:example>
         <maml:title>EXAMPLE 2</maml:title>
-        <dev:code>Set-MailProfileSecret -Reference 'Value'</dev:code>
+        <dev:code>Set-MailProfileSecret -ProfileId 'Value' -Name 'Name' -Reference 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -37775,7 +37994,7 @@ Mailozaurr can enforce typed provider, tenant, client, origin, and purpose metad
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Set-POP3Message -Client 'Value'</dev:code>
+        <dev:code>Set-POP3Message -Index 1</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -37892,7 +38111,7 @@ Mailozaurr can enforce typed provider, tenant, client, origin, and purpose metad
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Test-EmailAddress -AllowInternational</dev:code>
+        <dev:code>Test-EmailAddress -EmailAddress @('Value')</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -38083,7 +38302,7 @@ Mailozaurr can enforce typed provider, tenant, client, origin, and purpose metad
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Test-MailProfile -Connection</dev:code>
+        <dev:code>Test-MailProfile -ProfileId 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -38336,7 +38555,7 @@ Mailozaurr can enforce typed provider, tenant, client, origin, and purpose metad
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Test-MailStore -ExcludeOrphanedItems</dev:code>
+        <dev:code>Test-MailStore -InputObject 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>
@@ -39197,7 +39416,7 @@ probe or send an explicit validation message for authorized mail-flow testing.</
     <command:examples>
       <command:example>
         <maml:title>EXAMPLE 1</maml:title>
-        <dev:code>Unprotect-MimeMessage -PrivateKeyPath 'C:\Path'</dev:code>
+        <dev:code>Unprotect-MimeMessage -InputObject 'Value'</dev:code>
         <dev:remarks>
           <maml:para></maml:para>
         </dev:remarks>

@@ -8,7 +8,7 @@ namespace Mailozaurr.PowerShell;
 
 public sealed partial class CmdletSendEmailMessage : PSCmdlet {
     /// <summary>
-    /// <para>Specifies the SMTP server to use for sending the email message. Required for SMTP scenarios.</para>
+    /// <para>Specifies SMTP servers in preference order. Entries may be bare hosts or SMTP URIs with their own port and security mode. A URI automatically enables the delivery session, including for one server. Required for SMTP scenarios.</para>
     /// </summary>
     [Parameter(Mandatory = true, ParameterSetName = "SecureString")]
     [Parameter(Mandatory = true, ParameterSetName = "oAuth")]
@@ -16,7 +16,35 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = true, ParameterSetName = "DefaultCredentials")]
     [Alias("SmtpServer")]
     [ValidateNotNullOrEmpty]
-    public string? Server { get; set; }
+    public string[]? Server { get; set; }
+
+    /// <summary>
+    /// <para>Selects SMTP server ordering. Explicitly binding this parameter enables the delivery session, including for one server.</para>
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
+    [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
+    [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
+    [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
+    public SmtpServerStrategy Strategy { get; set; } = SmtpServerStrategy.Failover;
+
+    /// <summary>
+    /// <para>Minutes to keep a failing SMTP endpoint circuit open. Explicitly binding this parameter enables the delivery session, including for one server.</para>
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
+    [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
+    [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
+    [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
+    [ValidateRange(0, int.MaxValue)]
+    public int CircuitBreakMinutes { get; set; } = 2;
+
+    /// <summary>
+    /// <para>Optional caller-owned session preserving rotation and circuit state across invocations. The cmdlet never disposes a supplied session. Protocol logging uses connections owned by the invocation and closes them after sending; rotation and circuit state remain in the session.</para>
+    /// </summary>
+    [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
+    [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
+    [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
+    [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
+    public SmtpDeliverySession? DeliverySession { get; set; }
 
     /// <summary>
     /// <para>Specifies the port to use on the SMTP server. The default is 587.</para>
@@ -293,7 +321,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
     public int Timeout { get; set; } = 12000;
 
     /// <summary>
-    /// <para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries).</para>
+    /// <para>Specifies how many times the cmdlet should retry sending the message when an error occurs. Default is 0 (no retries). For SMTP delivery sessions the total attempt budget is the greater of the server count and RetryCount + 1, capped at Int32.MaxValue. Failover visits eligible servers before revisiting them; permanent or uncertain delivery failures may stop earlier.</para>
     /// </summary>
     [Parameter(Mandatory = false)]
     public int RetryCount { get; set; } = 0;
@@ -324,7 +352,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
 
     /// <summary>
     /// <para>When specified, retries are attempted regardless of the error
-    /// type. Without this switch, only transient errors are retried.</para>
+    /// type. Without this switch, only transient errors are retried. SMTP delivery sessions always stop on permanent rejection or uncertain delivery, even with this switch.</para>
     /// </summary>
     [Parameter(Mandatory = false)]
     public SwitchParameter RetryAlways { get; set; }
@@ -508,7 +536,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
     public SwitchParameter LogOverwrite { get; set; }
 
     /// <summary>
-    /// <para>Saves the email message to a file for troubleshooting purposes.</para>
+    /// <para>Saves the email message to a file for troubleshooting purposes. For SMTP delivery sessions, a save failure after accepted delivery is reported in PostSendErrors without changing delivery success.</para>
     /// </summary>
     [Parameter(Mandatory = false, ParameterSetName = "DefaultCredentials")]
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]

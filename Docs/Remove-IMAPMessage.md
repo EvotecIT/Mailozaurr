@@ -21,7 +21,7 @@ Removes messages from an IMAP folder by UID.
 
 ### EXAMPLE 1
 ```powershell
-Remove-IMAPMessage -Client 'Value'
+Remove-IMAPMessage -Uid @(1)
 ```
 
 

@@ -21,7 +21,7 @@ Lists JMAP mailboxes and effective rights for a saved profile.
 
 ### EXAMPLE 1
 ```powershell
-Get-JMAPMailbox -ProfileDirectory 'Value'
+Get-JMAPMailbox -ProfileId 'Value'
 ```
 
 

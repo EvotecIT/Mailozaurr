@@ -30,13 +30,13 @@ Uses OfficeIMO.Email bounded summary search by default. Supplying Term enables r
 
 ### EXAMPLE 1
 ```powershell
-Search-MailStore -Before 'Value'
+Search-MailStore -InputObject 'Value'
 ```
 
 
 ### EXAMPLE 2
 ```powershell
-Search-MailStore -Term @('Value')
+Search-MailStore -InputObject 'Value' -Term @('Value')
 ```
 
 

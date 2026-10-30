@@ -21,7 +21,7 @@ Sends an email using the Gmail API.
 
 ### EXAMPLE 1
 ```powershell
-Send-GmailMessage -GmailAccount 'Value' -Credential Get-Credential -From 'Value' -To @('Value')
+Send-GmailMessage -GmailAccount 'Value' -Credential (Get-Credential) -From 'Value' -To @('Value')
 ```
 
 

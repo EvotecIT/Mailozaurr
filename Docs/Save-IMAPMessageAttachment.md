@@ -25,7 +25,7 @@ The Save-IMAPMessageAttachment cmdlet saves all attachments from an IMAP message
 
 ### EXAMPLE 1
 ```powershell
-Save-IMAPMessageAttachment -Path 'C:\Path'
+Save-IMAPMessageAttachment -Uid 1 -Path 'C:\Path'
 ```
 
 

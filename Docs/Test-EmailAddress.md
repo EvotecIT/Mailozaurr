@@ -25,7 +25,7 @@ The Test-EmailAddress cmdlet checks if one or more email addresses are valid acc
 
 ### EXAMPLE 1
 ```powershell
-Test-EmailAddress -AllowInternational
+Test-EmailAddress -EmailAddress @('Value')
 ```
 
 

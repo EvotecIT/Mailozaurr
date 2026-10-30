@@ -25,7 +25,7 @@ Delegates folder mapping, bounded retries, semantic deduplication, and PST writi
 
 ### EXAMPLE 1
 ```powershell
-Merge-MailStore -InputPath @('C:\Path')
+Merge-MailStore -InputPath @('C:\Path') -OutputPath 'C:\Path'
 ```
 
 

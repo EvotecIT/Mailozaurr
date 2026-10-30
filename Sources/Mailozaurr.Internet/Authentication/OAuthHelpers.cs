@@ -289,7 +289,7 @@ public static class OAuthHelpers {
         string certificatePath,
         string certificatePassword,
         IEnumerable<string>? scopes = null) {
-        using var certificate = new X509Certificate2(certificatePath, certificatePassword, GraphCertificateStore.ImportKeyStorageFlags);
+        using var certificate = CertificateDataLoader.LoadPkcs12File(certificatePath, certificatePassword, GraphCertificateStore.ImportKeyStorageFlags);
         return await AcquireGraphCertificateTokenAsync(clientId, tenantId, certificate, scopes).ConfigureAwait(false);
     }
 
@@ -308,7 +308,7 @@ public static class OAuthHelpers {
         byte[] certificateBytes,
         string certificatePassword,
         IEnumerable<string>? scopes = null) {
-        using var certificate = new X509Certificate2(certificateBytes, certificatePassword, GraphCertificateStore.ImportKeyStorageFlags);
+        using var certificate = CertificateDataLoader.LoadPkcs12(certificateBytes, certificatePassword, GraphCertificateStore.ImportKeyStorageFlags);
         return await AcquireGraphCertificateTokenAsync(clientId, tenantId, certificate, scopes).ConfigureAwait(false);
     }
 

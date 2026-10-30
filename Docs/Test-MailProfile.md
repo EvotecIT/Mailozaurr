@@ -21,7 +21,7 @@ Diagnoses stored profile readiness or performs a live connection probe.
 
 ### EXAMPLE 1
 ```powershell
-Test-MailProfile -Connection
+Test-MailProfile -ProfileId 'Value'
 ```
 
 

@@ -21,7 +21,7 @@ Gets JMAP threads by id.
 
 ### EXAMPLE 1
 ```powershell
-Get-JMAPThread -ProfileDirectory 'Value'
+Get-JMAPThread -ProfileId 'Value' -ThreadId @('Value')
 ```
 
 

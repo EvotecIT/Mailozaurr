@@ -60,7 +60,7 @@ Accept wildcard characters: False
 ```
 
 ### -ProcessAll
-Processes all messages regardless of their scheduled retry time.
+Processes messages regardless of their scheduled retry time while respecting active leases.
 
 ```yaml
 Type: SwitchParameter

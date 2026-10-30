@@ -34,6 +34,12 @@ Get-IMAPFolder -Path 'C:\Path'
 ```
 
 
+### EXAMPLE 2
+```powershell
+Get-IMAPFolder -Client 'Value'
+```
+
+
 ## PARAMETERS
 
 ### -Client

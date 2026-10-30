@@ -86,8 +86,8 @@ public sealed class GraphAuthenticationClient : IDisposable {
         if (!string.IsNullOrWhiteSpace(credential.CertificateThumbprint)) {
             return GraphCertificateStore.Load(credential.CertificateThumbprint!, credential.CertificateStoreLocation, credential.CertificateStoreName);
         }
-        if (!string.IsNullOrWhiteSpace(credential.CertificatePath)) return new X509Certificate2(credential.CertificatePath, credential.CertificatePassword, GraphCertificateStore.ImportKeyStorageFlags);
-        if (credential.CertificateBytes != null) return new X509Certificate2(credential.CertificateBytes, credential.CertificatePassword, GraphCertificateStore.ImportKeyStorageFlags);
+        if (!string.IsNullOrWhiteSpace(credential.CertificatePath)) return CertificateDataLoader.LoadPkcs12File(credential.CertificatePath!, credential.CertificatePassword, GraphCertificateStore.ImportKeyStorageFlags);
+        if (credential.CertificateBytes != null) return CertificateDataLoader.LoadPkcs12(credential.CertificateBytes, credential.CertificatePassword, GraphCertificateStore.ImportKeyStorageFlags);
         if (!string.IsNullOrWhiteSpace(credential.CertificatePemPath)) {
 #if NET5_0_OR_GREATER
             return X509Certificate2.CreateFromPemFile(credential.CertificatePemPath!);
