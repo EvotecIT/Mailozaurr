@@ -100,7 +100,7 @@ public sealed class CmdletConvertToMailPst : MailStoreCmdletBase {
                 conversionOptions: options,
                 cancellationToken: CancelToken);
             WriteObject(report);
-            WriteStoreDiagnostics(report.Diagnostics, destination);
+            WriteStoreDiagnostics(report.NativeDiagnostics, destination);
         } catch (OperationCanceledException) when (CancelToken.IsCancellationRequested) {
             throw;
         } catch (Exception exception) {

@@ -55,7 +55,7 @@ public sealed class ProviderEmlArtifactWriter {
                 maxInputBytes: maxBytes,
                 includeAttachmentContent: false);
             using EmailReadResult readResult = await new EmailDocumentReader(readerOptions)
-                .ReadStreamingAsync(source, "message.eml", cancellationToken).ConfigureAwait(false);
+                .ReadDocumentAsync(source, EmailReadContentStorage.TemporaryFiles, "message.eml", cancellationToken).ConfigureAwait(false);
             if (readResult.HasErrors) {
                 throw CreateDiagnosticException("OfficeIMO.Email rejected the provider MIME content", readResult.Diagnostics);
             }

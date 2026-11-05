@@ -106,7 +106,7 @@ public sealed class CmdletExportMailStore : MailStoreCmdletBase {
                     writerOptions: new EmailMailboxWriterOptions(writerOptions));
                 EmailStoreMboxExportReport result = session.ExportToMbox(destination, options, CancelToken);
                 report = result;
-                diagnostics = result.Diagnostics;
+                diagnostics = result.NativeDiagnostics;
             } else if (Format.Equals("Maildir", StringComparison.OrdinalIgnoreCase) ||
                        Format.Equals("Emlx", StringComparison.OrdinalIgnoreCase)) {
                 EmailStoreNativeDirectoryFormat nativeFormat = Format.Equals("Maildir", StringComparison.OrdinalIgnoreCase)
@@ -126,7 +126,7 @@ public sealed class CmdletExportMailStore : MailStoreCmdletBase {
                     messageOptions: writerOptions);
                 EmailStoreExportReport result = session.ExportToNativeDirectory(destination, options, CancelToken);
                 report = result;
-                diagnostics = result.Diagnostics;
+                diagnostics = result.NativeDiagnostics;
             } else {
                 EmailFileFormat emailFormat = Format.ToUpperInvariant() switch {
                     "EML" => EmailFileFormat.Eml,
@@ -149,7 +149,7 @@ public sealed class CmdletExportMailStore : MailStoreCmdletBase {
                     writerOptions: writerOptions);
                 EmailStoreExportReport result = session.ExportToDirectory(destination, options, CancelToken);
                 report = result;
-                diagnostics = result.Diagnostics;
+                diagnostics = result.NativeDiagnostics;
             }
             WriteObject(report);
             WriteStoreDiagnostics(diagnostics, destination);
