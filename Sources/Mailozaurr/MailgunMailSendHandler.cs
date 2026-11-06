@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http;
 using MimeKit;
 
 namespace Mailozaurr;
@@ -6,6 +7,9 @@ namespace Mailozaurr;
 /// <summary>Normalized Mailgun delivery handler backed by Mailozaurr.</summary>
 public sealed class MailgunMailSendHandler : IMailSendHandler {
     private readonly IMailSecretStore _secretStore;
+    private readonly bool _singleAttempt;
+
+    internal MailgunMailSendHandler(IMailSecretStore secrets, bool singleAttempt) : this(secrets) => _singleAttempt = singleAttempt;
     private readonly IPendingMessageRepository? _pendingMessageRepository;
     private readonly Func<MailgunClient, CancellationToken, Task<SmtpResult>> _sendAsync;
 
@@ -29,28 +33,29 @@ public sealed class MailgunMailSendHandler : IMailSendHandler {
             _secretStore, profile, MailSecretNames.ApiKey, cancellationToken).ConfigureAwait(false);
         var attachments = ProviderMailSendHandlerSupport.Attachments(request.Message);
 
-        using var client = new MailgunClient {
-            Credentials = new NetworkCredential("api", apiKey),
-            Domain = ProviderMailSendHandlerSupport.GetSetting(profile, MailProfileSettingsKeys.Domain),
-            From = ProviderMailSendHandlerSupport.ToMailboxAddress(
-                ProviderMailSendHandlerSupport.ResolveSender(profile, request.Message)),
-            To = ProviderMailSendHandlerSupport.Recipients(request.Message.To),
-            Cc = ProviderMailSendHandlerSupport.Recipients(request.Message.Cc),
-            Bcc = ProviderMailSendHandlerSupport.Recipients(request.Message.Bcc),
-            ReplyTo = ProviderMailSendHandlerSupport.ResolveReplyTo(request.Message) is { } replyTo
+        using var client = CreateClient();
+
+        client.Credentials = new NetworkCredential("api", apiKey);
+        client.Domain = ProviderMailSendHandlerSupport.GetSetting(profile, MailProfileSettingsKeys.Domain);
+        client.From = ProviderMailSendHandlerSupport.ToMailboxAddress(
+                ProviderMailSendHandlerSupport.ResolveSender(profile, request.Message));
+        client.To = ProviderMailSendHandlerSupport.Recipients(request.Message.To);
+        client.Cc = ProviderMailSendHandlerSupport.Recipients(request.Message.Cc);
+        client.Bcc = ProviderMailSendHandlerSupport.Recipients(request.Message.Bcc);
+        client.ReplyTo = ProviderMailSendHandlerSupport.ResolveReplyTo(request.Message) is { } replyTo
                 ? ProviderMailSendHandlerSupport.ToMailboxAddress(replyTo)
-                : null,
-            Subject = request.Message.Subject,
-            Text = request.Message.TextBody ?? string.Empty,
-            Html = request.Message.HtmlBody ?? string.Empty,
-            Priority = request.Message.Priority,
-            Headers = request.Message.Headers,
-            Attachments = attachments.Where(attachment =>
-                !string.Equals(attachment.ContentDisposition?.Disposition, ContentDisposition.Inline, StringComparison.OrdinalIgnoreCase)).ToList(),
-            InlineAttachments = attachments.Where(attachment =>
-                string.Equals(attachment.ContentDisposition?.Disposition, ContentDisposition.Inline, StringComparison.OrdinalIgnoreCase)).ToList(),
-            PendingMessageRepository = request.QueueOnFailure ? _pendingMessageRepository : null
-        };
+                : null;
+        client.Subject = request.Message.Subject;
+        client.Text = request.Message.TextBody ?? string.Empty;
+        client.Html = request.Message.HtmlBody ?? string.Empty;
+        client.Priority = request.Message.Priority;
+        client.Headers = request.Message.Headers;
+        client.Attachments = attachments.Where(attachment =>
+                !string.Equals(attachment.ContentDisposition?.Disposition, ContentDisposition.Inline, StringComparison.OrdinalIgnoreCase)).ToList();
+        client.InlineAttachments = attachments.Where(attachment =>
+                string.Equals(attachment.ContentDisposition?.Disposition, ContentDisposition.Inline, StringComparison.OrdinalIgnoreCase)).ToList();
+        client.PendingMessageRepository = request.QueueOnFailure ? _pendingMessageRepository : null;
+
         ProviderMailSendHandlerSupport.ApplyRetrySettings(profile, (count, delay, backoff, max, jitter, always) => {
             client.RetryCount = count;
             client.RetryDelayMilliseconds = delay;
@@ -63,6 +68,10 @@ public sealed class MailgunMailSendHandler : IMailSendHandler {
         var result = await _sendAsync(client, cancellationToken).ConfigureAwait(false);
         return ProviderMailSendHandlerSupport.ToResult(profile, result);
     }
+
+    private MailgunClient CreateClient() => _singleAttempt
+        ? new MailgunClient(new HttpClientHandler { AllowAutoRedirect = false })
+        : new MailgunClient();
 
     private static Task<SmtpResult> DefaultSendAsync(MailgunClient client, CancellationToken cancellationToken) =>
         client.SendEmailAsync(cancellationToken);

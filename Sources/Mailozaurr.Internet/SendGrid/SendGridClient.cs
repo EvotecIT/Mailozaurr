@@ -1,4 +1,4 @@
-﻿using Mailozaurr.Definitions;
+using Mailozaurr.Definitions;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 
@@ -464,6 +464,7 @@ public sealed class SendGridClient : IDisposable {
                         MessageId = queuedMessageId,
                         Queued = queuedMessageId != null
                     };
+                    HttpRetryPolicy.RecordFailure(failResult, ex);
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
                     return failResult;
                 }
@@ -498,6 +499,7 @@ public sealed class SendGridClient : IDisposable {
                         MessageId = queuedMessageId,
                         Queued = queuedMessageId != null
                     };
+                    HttpRetryPolicy.RecordFailure(failResult, ex);
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
                     return failResult;
                 }

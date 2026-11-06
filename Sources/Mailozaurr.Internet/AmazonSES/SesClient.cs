@@ -285,6 +285,7 @@ public class SesClient : IDisposable {
                     MessageId = queuedMessageId,
                     Queued = queuedMessageId != null
                 };
+                HttpRetryPolicy.RecordFailure(fail, lastException);
                 await Helpers.PostWebhookAsync(WebhookUrl, fail, cancellationToken, _client);
                 return fail;
             }

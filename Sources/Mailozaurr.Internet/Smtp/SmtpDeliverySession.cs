@@ -70,6 +70,7 @@ public sealed class SmtpDeliverySession : IDisposable {
                 if (index < 0) {
                     if (last == null) {
                         last = Failure(message, string.Empty, 0, "All SMTP hosts are in cooldown.", true, false);
+                        last.DeliveryRejected = true;
                     } else {
                         last.Error = string.IsNullOrEmpty(last.Error) ? "All SMTP hosts are in cooldown." :
                             last.Error + " All SMTP hosts are in cooldown.";

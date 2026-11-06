@@ -436,6 +436,7 @@ public class MailgunClient : IDisposable {
                         MessageId = queuedMessageId,
                         Queued = queuedMessageId != null
                     };
+                    HttpRetryPolicy.RecordFailure(failResult, ex);
                     await Helpers.PostWebhookAsync(WebhookUrl, failResult, cancellationToken).ConfigureAwait(false);
                     return failResult;
                 }

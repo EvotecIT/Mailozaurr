@@ -276,7 +276,7 @@ public sealed partial class GmailApiClient : IDisposable {
 #endif
                 await QueuePendingMessageAsync(userId, message, cancellationToken).ConfigureAwait(false);
                 queued = true;
-                throw new HttpRequestException($"Gmail returned {(int)response.StatusCode} ({response.StatusCode}): {error}");
+                throw new GmailSubmissionException(response.StatusCode);
             }
         } catch (GmailAuthenticationException) {
             if (!queued) {

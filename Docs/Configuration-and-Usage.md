@@ -31,84 +31,128 @@ The shared model is implemented in:
 - [MailProfileSettingsKeys.cs](../Sources/Mailozaurr/MailProfileSettingsKeys.cs)
 - [MailSecretNames.cs](../Sources/Mailozaurr/MailSecretNames.cs)
 
-## Delivery routes for .NET applications
+## Typed delivery policies for applications
 
-The Mailozaurr library can load a JSON file that several applications share. The file defines transport
-profiles, credential references, and named routes. Each application chooses a route and supplies its
-own message. A route tries its profiles in the configured order. The engine snapshots routes when it
-is constructed. Recreate it to apply a changed profile or route order.
+Each application owns its delivery configuration. Applications can construct the same Mailozaurr types
+in code, bind them inside their own settings, or load JSON with
+`MailDeliveryConfiguration.ParseJson` or `LoadJson`. An application chooses where it stores configuration.
 
-```json
-{
-  "profiles": {
-    "reports-graph": {
-      "from": "reports@example.test",
-      "graph": {
-        "tenantId": "00000000-0000-4000-8000-000000000001",
-        "clientId": "00000000-0000-4000-8000-000000000002",
-        "clientSecret": { "source": "file", "key": "/run/secrets/graph-mail-client-secret" }
-      }
-    },
-    "reports-smtp": {
-      "from": "reports@example.test",
-      "smtp": {
-        "server": "smtp.example.test",
-        "port": 587,
-        "security": "StartTls",
-        "userName": "reports@example.test",
-        "password": { "source": "environment", "key": "MAIL_REPORTS_SMTP_PASSWORD" }
-      }
-    }
-  },
-  "routes": { "reports": ["reports-graph", "reports-smtp"] }
-}
-```
-
-Use the typed engine directly in the application. This works with the .NET package alone.
-
-```csharp
-var engine = new MailDeliveryEngine(MailDeliveryConfiguration.LoadJson(configPath));
-MailDeliveryResult result = await engine.SendAsync("reports", new DraftMessage {
-    To = new() { new() { Address = "operations@example.test" } },
-    Subject = "Weekly report",
-    TextBody = "The weekly report is ready."
-}, cancellationToken);
-```
-
-Code can also construct the same configuration types directly.
+A profile uses the existing `MailProfile` model. Graph, SMTP, Gmail, SendGrid, Mailgun, and Amazon SES
+share the same engine. A route selects profiles and sets retry and load-balancing policy.
 
 ```csharp
 var configuration = new MailDeliveryConfiguration {
     Profiles = {
-        ["relay"] = new MailDeliveryProfile {
-            From = "reports@example.test",
-            Smtp = new SmtpProfileDeliveryOptions {
-                Server = "relay.example.test",
-                Port = 25,
-                Security = SmtpSecurityMode.StartTls
+        ["primary"] = new() {
+            Profile = new MailProfile {
+                Kind = MailProfileKind.Smtp,
+                DefaultSender = "reports@example.test",
+                Settings = new() {
+                    [MailProfileSettingsKeys.Server] = "relay-a.example.test",
+                    [MailProfileSettingsKeys.AuthenticationEnabled] = "false",
+                    [MailProfileSettingsKeys.SecureSocketOptions] = "StartTls"
+                }
+            }
+        },
+        ["backup"] = new() {
+            Profile = new MailProfile {
+                Kind = MailProfileKind.Smtp,
+                DefaultSender = "reports@example.test",
+                Settings = new() {
+                    [MailProfileSettingsKeys.Server] = "relay-b.example.test",
+                    [MailProfileSettingsKeys.AuthenticationEnabled] = "false",
+                    [MailProfileSettingsKeys.SecureSocketOptions] = "StartTls"
+                }
             }
         }
     },
-    Routes = { ["reports"] = new() { "relay" } }
+    Routes = {
+        ["reports"] = new() {
+            Profiles = new() { "primary", "backup" },
+            RetryCount = 10,
+            Strategy = MailDeliveryStrategy.Failover
+        }
+    }
 };
-var engine = new MailDeliveryEngine(configuration);
+using var engine = new MailDeliveryEngine(configuration);
+MailDeliveryResult result = await engine.SendAsync("reports", new DraftMessage {
+    To = new() { new() { Address = "operations@example.test" } },
+    Subject = "Weekly report",
+    HtmlBody = html,
+    TextBody = plainText
+}, cancellationToken);
 ```
 
-For a relay that accepts unauthenticated SMTP, omit the username and password. Authenticated SMTP
-requires mandatory TLS. Graph uses application authentication with `Mail.Send` and submits one MIME
-request from the configured sender mailbox. A route can use SMTP when Graph explicitly rejects
-a message that exceeds its request limit.
+Use `RoundRobin` or `Random` to distribute starting profiles across messages. Known rejections still
+advance through the remaining profiles. `RetryCount` adds passes over transient failures, with
+`RetryDelay`, `RetryBackoff`, and `MaxRetryDelay` controlling their delay. Accepted messages and
+uncertain submissions stop delivery. An explicit later `SendAsync` call is a new send.
 
-Credential references are resolved before each attempt. Replace a mounted secret file atomically to
-rotate it while the application is running. An application can supply an `IMailCredentialResolver`
-to resolve the latest credential from its secret manager. Environment references use the current
-process environment.
+An SMTP profile can instead configure `MailProfile.SmtpDelivery` with multiple `Servers`,
+`Strategy`, `MaxAttempts`, and `CircuitBreakMinutes`. The canonical SMTP session handles those
+host attempts. Route retry counts apply to provider invocations, while `SmtpDelivery.MaxAttempts`
+bounds host attempts within one SMTP invocation. Keep an engine for the service or batch lifetime
+to preserve round-robin position, reusable connections, and host cooldowns. Dispose it when done.
 
-Fallback is limited to known safe failures. Examples include an unavailable credential, failure to
-open an authenticated Graph session, and an explicit SMTP rejection. If acceptance is uncertain, the
-route stops. Cancellation during submission can also leave acceptance uncertain. Inspect
-`MailDeliveryResult.Attempts` for the profile order and outcome. Treat the delivery JSON as trusted
-deployment configuration because it controls where credentials and messages are sent.
+The same types can appear in each application's JSON.
+
+```json
+{
+  "profiles": {
+    "graph": {
+      "profile": {
+        "kind": "Graph",
+        "defaultSender": "reports@example.test",
+        "settings": {
+          "tenantId": "00000000-0000-4000-8000-000000000001",
+          "clientId": "00000000-0000-4000-8000-000000000002"
+        }
+      },
+      "credentials": {
+        "clientSecret": { "source": "file", "key": "/run/secrets/graph-mail-secret" }
+      }
+    },
+    "smtp": {
+      "profile": {
+        "kind": "Smtp",
+        "defaultSender": "reports@example.test",
+        "settings": {
+          "server": "smtp.example.test",
+          "port": "587",
+          "secureSocketOptions": "StartTls",
+          "userName": "reports@example.test"
+        }
+      },
+      "credentials": {
+        "password": { "source": "environment", "key": "REPORTS_SMTP_PASSWORD" }
+      }
+    }
+  },
+  "routes": {
+    "reports": { "profiles": ["graph", "smtp"], "retryCount": 2, "strategy": "Failover" }
+  }
+}
+```
+
+Credential keys use `MailSecretNames`. For example, SendGrid and Mailgun use `apiKey`, SES uses
+`accessKeyId` and `secretAccessKey`, and Gmail can use an access token or refresh credentials.
+Provider-specific settings use the existing `MailProfileSettingsKeys` contract.
+
+Credentials resolve before every attempt. Atomically replace a mounted secret file to rotate it while
+the application runs, or supply `IMailCredentialResolver` for the application's secret manager.
+Environment references read the current process environment. Engine construction snapshots profile and
+route settings. Recreate the engine when those settings change.
+
+Fallback requires positive evidence that the provider did not accept the message. Transport loss during
+submission stops the route. Cancellation during submission can also leave acceptance uncertain.
+`MailDeliveryResult.Attempts` records the selected providers and whether each failure is retryable.
+The engine does not persist messages. Applications that need durable delayed delivery can use Mailozaurr's
+existing queue APIs and must preserve the acceptance decision before submitting again.
+
+Treat delivery configuration as trusted application configuration because it selects credentials and
+transport destinations. Typed sender, To/Cc/Bcc, ReplyTo, attachments, and message content use the common
+`DraftMessage` contract. Raw routing headers are rejected. Graph uses direct MIME `sendMail` with
+`Mail.Send`, and an explicit request-size rejection can fall back to another profile.
 
 ## Supported profile kinds
 

@@ -115,7 +115,7 @@ public sealed class SmtpSessionFactory : ISmtpSessionFactory {
         }
     }
 
-    private static string ResolveUserName(MailProfile profile) {
+    internal static string ResolveUserName(MailProfile profile) {
         if (profile.Settings.TryGetValue(MailProfileSettingsKeys.UserName, out var userName) && !string.IsNullOrWhiteSpace(userName)) {
             return userName.Trim();
         }
@@ -140,7 +140,7 @@ public sealed class SmtpSessionFactory : ISmtpSessionFactory {
         throw new InvalidOperationException($"Profile '{profile.Id}' requires setting '{key}'.");
     }
 
-    private static ProtocolAuthMode GetAuthMode(MailProfile profile) {
+    internal static ProtocolAuthMode GetAuthMode(MailProfile profile) {
         profile.Settings.TryGetValue(MailProfileSettingsKeys.AuthMode, out var rawMode);
         return ProtocolAuth.ParseMode(rawMode, ProtocolAuthMode.Basic);
     }

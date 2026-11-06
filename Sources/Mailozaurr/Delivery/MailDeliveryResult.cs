@@ -16,8 +16,9 @@ public enum MailDeliveryOutcome {
 /// <param name="Outcome">What was established about provider acceptance.</param>
 /// <param name="Code">Stable diagnostic code for a failed attempt.</param>
 /// <param name="ProviderMessageId">Provider message ID when available.</param>
+/// <param name="Retryable">Whether the failed profile is eligible for a later retry pass.</param>
 public sealed record MailDeliveryAttempt(string ProfileId, MailProfileKind Kind, MailDeliveryOutcome Outcome,
-    string? Code = null, string? ProviderMessageId = null);
+    string? Code = null, string? ProviderMessageId = null, bool Retryable = false);
 
 /// <summary>Ordered attempt history and the outcome of a route invocation.</summary>
 /// <param name="RouteId">Configured route ID.</param>
