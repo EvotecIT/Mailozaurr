@@ -201,6 +201,13 @@ public sealed class GmailSessionFactory : IGmailSessionFactory {
         return Task.FromResult(new GmailSession(new GmailApiClient(request.Credential, request.RefreshAccessTokenAsync), request.UserId));
     }
 
+    internal static Task<GmailSession> ConnectForSingleSendAsync(GmailSessionRequest request, CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
+        var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false });
+        var client = new GmailApiClient(http, credential: request.Credential, ownsHttpClient: true);
+        return Task.FromResult(new GmailSession(client, request.UserId));
+    }
+
     private static string ResolveUserId(MailProfile profile) {
         if (profile.Settings.TryGetValue(MailProfileSettingsKeys.Mailbox, out var mailbox) &&
             !string.IsNullOrWhiteSpace(mailbox)) {

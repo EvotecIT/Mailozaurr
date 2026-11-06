@@ -100,6 +100,9 @@ internal static class ProviderMailSendHandlerSupport {
                      !string.IsNullOrWhiteSpace(result.MessageId);
         return new SendResult {
             Succeeded = result.Status || queued,
+            DeliveryRejected = result.DeliveryRejected,
+            DeliveryUnknown = result.DeliveryUnknown,
+            IsTransient = result.IsTransient,
             ProfileId = profile.Id,
             ProfileKind = profile.Kind,
             ProviderMessageId = result.Status ? result.MessageId : null,

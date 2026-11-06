@@ -126,6 +126,9 @@ public class SesClientSendEmailAsyncTests {
         var result = await client.SendEmailAsync();
 
         Assert.False(result.Status);
+        Assert.True(result.DeliveryRejected);
+        Assert.False(result.DeliveryUnknown);
+        Assert.False(result.IsTransient);
         Assert.Single(handler.Requests);
     }
 

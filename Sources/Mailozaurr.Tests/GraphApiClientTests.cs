@@ -6,6 +6,35 @@ using Xunit;
 namespace Mailozaurr.Tests;
 
 public class GraphApiClientTests {
+    [Theory]
+    [InlineData(HttpStatusCode.Accepted)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async System.Threading.Tasks.Task DirectMimeSendPostsOnceToSendMailAndPreservesAttachments(HttpStatusCode status) {
+        using var handler = new RecordingHandler(new HttpResponseMessage(status));
+        using var http = new HttpClient(handler);
+        using var client = new GraphApiClient(http, credential: new OAuthCredential { AccessToken = "synthetic" });
+        using var mime = new MimeKit.MimeMessage { Subject = "Weekly report" };
+        mime.From.Add(MimeKit.MailboxAddress.Parse("sender@example.test"));
+        mime.To.Add(MimeKit.MailboxAddress.Parse("recipient@example.test"));
+        mime.Bcc.Add(MimeKit.MailboxAddress.Parse("audit@example.test"));
+        var body = new MimeKit.BodyBuilder { TextBody = "Report", HtmlBody = "<p>Report</p>" };
+        body.Attachments.Add("report.xlsx", new byte[] { 1, 2, 3 });
+        mime.Body = body.ToMessageBody();
+
+        Assert.Equal(status, await client.SendMimeMessageAsync(mime, "sender@example.test", CancellationToken.None));
+
+        using HttpRequestMessage request = Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Post, request.Method);
+        Assert.EndsWith("/users/sender%40example.test/sendMail", request.RequestUri!.AbsoluteUri);
+        Assert.Equal("text/plain", request.Content!.Headers.ContentType!.MediaType);
+        using var payload = new MemoryStream(Convert.FromBase64String(await request.Content.ReadAsStringAsync()));
+        using var received = MimeKit.MimeMessage.Load(payload);
+        Assert.Equal("Report", received.TextBody);
+        Assert.Equal("<p>Report</p>", received.HtmlBody);
+        Assert.Equal("audit@example.test", Assert.Single(received.Bcc.Mailboxes).Address);
+        Assert.Equal("report.xlsx", Assert.IsType<MimeKit.MimePart>(Assert.Single(received.Attachments)).FileName);
+    }
+
     [Fact]
     public async System.Threading.Tasks.Task CreateSubscriptionAsync_NullRequest_Throws() {
         var client = new GraphApiClient(new OAuthCredential { UserName = "u", AccessToken = "t", ExpiresOn = System.DateTimeOffset.MaxValue });

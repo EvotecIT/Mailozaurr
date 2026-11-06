@@ -33,4 +33,6 @@ public sealed class SendResult : OperationResult {
 
     /// <summary>Whether any attempt may have delivered without a confirmed acknowledgement.</summary>
     public bool DeliveryUnknown { get; set; }
+
+    internal bool DeliveryRejected { get; set; }
 }

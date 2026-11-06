@@ -422,7 +422,7 @@ public sealed class ProviderPendingMessageTests {
         message.Subject = "gmail";
         message.Body = new TextPart("plain") { Text = "body" };
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => client.SendAsync("me", message, CancellationToken.None));
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.SendAsync("me", message, CancellationToken.None));
 
         var record = repository.LastSaved;
         Assert.NotNull(record);

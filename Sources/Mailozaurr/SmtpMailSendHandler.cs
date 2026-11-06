@@ -121,7 +121,8 @@ public sealed class SmtpMailSendHandler : IMailSendHandler {
                 Port = result.Port,
                 Attempts = result.Attempts,
                 IsTransient = result.IsTransient,
-                DeliveryUnknown = result.DeliveryUnknown
+                DeliveryUnknown = result.DeliveryUnknown,
+                DeliveryRejected = result.DeliveryRejected
             };
         } finally {
             if (_deliverySession == null) session.Dispose();

@@ -30,6 +30,9 @@ public class SmtpResult {
     public bool IsTransient { get; set; }
     /// <summary>Whether a send lost transport confirmation and acceptance is unknown.</summary>
     public bool DeliveryUnknown { get; set; }
+
+    // Positive evidence for cross-profile fallback, independently of same-host retry policy.
+    internal bool DeliveryRejected { get; set; }
     /// <summary>Optional message returned by the operation.</summary>
     public string? Message { get; set; }
     /// <summary>Time taken to perform the action.</summary>
