@@ -66,8 +66,8 @@ public static class MailFileMimeAdapter {
         stream.Position = 0;
         var reader = new EmailDocumentReader(readerOptions);
         EmailReadResult result = useFileBackedContent
-            ? reader.ReadStreaming(stream, "message.eml", cancellationToken)
-            : reader.Read(stream, "message.eml", cancellationToken);
+            ? reader.ReadDocument(stream, EmailReadContentStorage.TemporaryFiles, "message.eml", cancellationToken)
+            : reader.ReadDocument(stream, "message.eml", cancellationToken);
         return new MailFileEmailDocumentConversionResult(result);
     }
 
@@ -85,8 +85,8 @@ public static class MailFileMimeAdapter {
         stream.Position = 0;
         var reader = new EmailDocumentReader(readerOptions);
         EmailReadResult result = useFileBackedContent
-            ? await reader.ReadStreamingAsync(stream, "message.eml", cancellationToken).ConfigureAwait(false)
-            : await reader.ReadAsync(stream, "message.eml", cancellationToken).ConfigureAwait(false);
+            ? await reader.ReadDocumentAsync(stream, EmailReadContentStorage.TemporaryFiles, "message.eml", cancellationToken).ConfigureAwait(false)
+            : await reader.ReadDocumentAsync(stream, "message.eml", cancellationToken).ConfigureAwait(false);
         return new MailFileEmailDocumentConversionResult(result);
     }
 
