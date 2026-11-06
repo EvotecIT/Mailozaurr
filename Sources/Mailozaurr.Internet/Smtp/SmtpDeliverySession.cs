@@ -129,6 +129,7 @@ public sealed class SmtpDeliverySession : IDisposable {
                     }
                     // A callback returning false provides no typed transient evidence: fail closed.
                     last.IsTransient = false;
+                    last.DeliveryRejected = !sending;
                 } catch (OperationCanceledException) when (ct.IsCancellationRequested) {
                     DropConnection(host);
                     throw;
@@ -143,6 +144,8 @@ public sealed class SmtpDeliverySession : IDisposable {
                         (transportStarted && IsTransient(exception));
                     var unknown = sending && transient && exception is not SmtpCommandException;
                     last = Failure(message, host.Endpoint.Server, host.Endpoint.Port, exception.Message, transient, unknown);
+                    last.DeliveryRejected = !sending ||
+                        exception is SmtpCommandException command && (int)command.StatusCode is >= 400 and <= 599;
                 }
                 AddAttempt(attempts, host, number, last!);
                 DropConnection(host);

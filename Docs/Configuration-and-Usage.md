@@ -31,6 +31,85 @@ The shared model is implemented in:
 - [MailProfileSettingsKeys.cs](../Sources/Mailozaurr/MailProfileSettingsKeys.cs)
 - [MailSecretNames.cs](../Sources/Mailozaurr/MailSecretNames.cs)
 
+## Delivery routes for .NET applications
+
+The Mailozaurr library can load a JSON file that several applications share. The file defines transport
+profiles, credential references, and named routes. Each application chooses a route and supplies its
+own message. A route tries its profiles in the configured order. The engine snapshots routes when it
+is constructed. Recreate it to apply a changed profile or route order.
+
+```json
+{
+  "profiles": {
+    "reports-graph": {
+      "from": "reports@example.test",
+      "graph": {
+        "tenantId": "00000000-0000-4000-8000-000000000001",
+        "clientId": "00000000-0000-4000-8000-000000000002",
+        "clientSecret": { "source": "file", "key": "/run/secrets/graph-mail-client-secret" }
+      }
+    },
+    "reports-smtp": {
+      "from": "reports@example.test",
+      "smtp": {
+        "server": "smtp.example.test",
+        "port": 587,
+        "security": "StartTls",
+        "userName": "reports@example.test",
+        "password": { "source": "environment", "key": "MAIL_REPORTS_SMTP_PASSWORD" }
+      }
+    }
+  },
+  "routes": { "reports": ["reports-graph", "reports-smtp"] }
+}
+```
+
+Use the typed engine directly in the application. This works with the .NET package alone.
+
+```csharp
+var engine = new MailDeliveryEngine(MailDeliveryConfiguration.LoadJson(configPath));
+MailDeliveryResult result = await engine.SendAsync("reports", new DraftMessage {
+    To = new() { new() { Address = "operations@example.test" } },
+    Subject = "Weekly report",
+    TextBody = "The weekly report is ready."
+}, cancellationToken);
+```
+
+Code can also construct the same configuration types directly.
+
+```csharp
+var configuration = new MailDeliveryConfiguration {
+    Profiles = {
+        ["relay"] = new MailDeliveryProfile {
+            From = "reports@example.test",
+            Smtp = new SmtpProfileDeliveryOptions {
+                Server = "relay.example.test",
+                Port = 25,
+                Security = SmtpSecurityMode.StartTls
+            }
+        }
+    },
+    Routes = { ["reports"] = new() { "relay" } }
+};
+var engine = new MailDeliveryEngine(configuration);
+```
+
+For a relay that accepts unauthenticated SMTP, omit the username and password. Authenticated SMTP
+requires mandatory TLS. Graph uses application authentication with `Mail.Send` and submits one MIME
+request from the configured sender mailbox. A route can use SMTP when Graph explicitly rejects
+a message that exceeds its request limit.
+
+Credential references are resolved before each attempt. Replace a mounted secret file atomically to
+rotate it while the application is running. An application can supply an `IMailCredentialResolver`
+to resolve the latest credential from its secret manager. Environment references use the current
+process environment.
+
+Fallback is limited to known safe failures. Examples include an unavailable credential, failure to
+open an authenticated Graph session, and an explicit SMTP rejection. If acceptance is uncertain, the
+route stops. Cancellation during submission can also leave acceptance uncertain. Inspect
+`MailDeliveryResult.Attempts` for the profile order and outcome. Treat the delivery JSON as trusted
+deployment configuration because it controls where credentials and messages are sent.
+
 ## Supported profile kinds
 
 Current shared profile kinds are:

@@ -201,13 +201,16 @@ public sealed class GraphSessionFactory : IGraphSessionFactory {
 
     private static Task<GraphSession> DefaultConnectAsync(GraphSessionRequest request, CancellationToken cancellationToken) {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(new GraphSession(
-            new GraphApiClient(request.Credential),
-            request.UserId,
-            request.Credential,
-            request.GraphCredential,
-            request.AuthenticationMode));
+        return Task.FromResult(CreateSession(request, new GraphApiClient(request.Credential)));
     }
+
+    internal static Task<GraphSession> ConnectForSingleSendAsync(GraphSessionRequest request, CancellationToken cancellationToken) {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(CreateSession(request, GraphApiClient.CreateSingleSendClient(request.Credential)));
+    }
+
+    private static GraphSession CreateSession(GraphSessionRequest request, GraphApiClient client) =>
+        new(client, request.UserId, request.Credential, request.GraphCredential, request.AuthenticationMode);
 
     private static string ResolveUserId(MailProfile profile) {
         if (profile.Settings.TryGetValue(MailProfileSettingsKeys.Mailbox, out var mailbox) &&
