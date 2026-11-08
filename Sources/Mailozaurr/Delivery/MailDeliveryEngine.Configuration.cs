@@ -42,18 +42,20 @@ public sealed partial class MailDeliveryEngine {
             if (profile.Settings.TryGetValue(MailProfileSettingsKeys.UseSsl, out var ssl) && bool.TryParse(ssl, out bool useSsl))
                 security = security.ResolveEffective(useSsl);
             if (profile.SmtpDelivery == null) {
-                int port = 587;
-                if (profile.Settings.TryGetValue(MailProfileSettingsKeys.Port, out var number)) port = int.Parse(number, System.Globalization.CultureInfo.InvariantCulture);
+                int port = SmtpSessionFactory.GetIntSetting(profile, MailProfileSettingsKeys.Port) ?? 587;
                 profile.SmtpDelivery = new SmtpDeliveryOptions {
                     Servers = new() { SmtpEndpoint.Parse(profile.Settings[MailProfileSettingsKeys.Server], port, security) },
                     MaxAttempts = 1,
                     CircuitBreakMinutes = 0
                 };
             }
+            SmtpSessionFactory.ValidateTransportSettings(profile);
             SmtpEndpoint[] endpoints = profile.SmtpDelivery.ResolveEndpoints(security);
             if (authenticate && endpoints.Any(endpoint => endpoint.SecureSocketOptions is not (SecureSocketOptions.StartTls or SecureSocketOptions.SslOnConnect)))
                 throw new ArgumentException($"Authenticated SMTP profile '{id}' requires mandatory TLS on every server.");
         }
+        if (profile.Kind is MailProfileKind.SendGrid or MailProfileKind.Mailgun or MailProfileKind.Ses)
+            ProviderMailSendHandlerSupport.ApplyRetrySettings(profile, static (_, _, _, _, _, _) => { });
         return new MailDeliveryProfile { Profile = profile, Credentials = credentials };
     }
 

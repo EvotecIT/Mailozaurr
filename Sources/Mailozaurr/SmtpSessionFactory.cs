@@ -50,11 +50,18 @@ public sealed class SmtpSessionFactory : ISmtpSessionFactory {
             ? await ResolveSecretAsync(profile, authMode, cancellationToken).ConfigureAwait(false)
             : string.Empty;
 
+        return CreateTransportRequest(profile, server, forDeliverySession ? port : endpoint?.Port ?? port,
+            forDeliverySession ? secureOptions : endpoint?.SecureSocketOptions ?? secureOptions,
+            forDeliverySession || endpoint == null ? useSsl : false, authenticationEnabled, userName, secret, authMode);
+    }
+
+    private static SmtpSessionRequest CreateTransportRequest(MailProfile profile, string server, int port,
+        SecureSocketOptions security, bool useSsl, bool authenticate, string userName, string secret, ProtocolAuthMode authMode) {
         return new SmtpSessionRequest {
             Server = server,
-            Port = forDeliverySession ? port : endpoint?.Port ?? port,
-            SecureSocketOptions = forDeliverySession ? secureOptions : endpoint?.SecureSocketOptions ?? secureOptions,
-            UseSsl = forDeliverySession || endpoint == null ? useSsl : false,
+            Port = port,
+            SecureSocketOptions = security,
+            UseSsl = useSsl,
             TimeoutMs = GetIntSetting(profile, MailProfileSettingsKeys.Timeout) ?? 30000,
             RetryCount = GetIntSetting(profile, MailProfileSettingsKeys.RetryCount) ?? 3,
             RetryDelayMilliseconds = GetIntSetting(profile, MailProfileSettingsKeys.RetryDelayMilliseconds) ?? 500,
@@ -64,11 +71,20 @@ public sealed class SmtpSessionFactory : ISmtpSessionFactory {
             RetryAlways = GetBoolSetting(profile, MailProfileSettingsKeys.RetryAlways) ?? false,
             SkipCertificateValidation = GetBoolSetting(profile, MailProfileSettingsKeys.SkipCertificateValidation) ?? false,
             SkipCertificateRevocation = GetBoolSetting(profile, MailProfileSettingsKeys.SkipCertificateRevocation) ?? false,
-            Authenticate = authenticationEnabled,
+            Authenticate = authenticate,
             UserName = userName,
             Password = secret,
             AuthMode = authMode
         };
+    }
+
+    internal static void ValidateTransportSettings(MailProfile profile) {
+        var request = CreateTransportRequest(profile, string.Empty, 587, GetSecureSocketOptions(profile),
+            GetBoolSetting(profile, MailProfileSettingsKeys.UseSsl) ?? false,
+            GetBoolSetting(profile, MailProfileSettingsKeys.AuthenticationEnabled) ?? true, string.Empty, string.Empty, GetAuthMode(profile));
+        if (request.TimeoutMs < 0)
+            throw new ArgumentException($"SMTP profile '{profile.Id}' timeout must be nonnegative.");
+        ProviderMailSendHandlerSupport.ApplyRetrySettings(profile, static (_, _, _, _, _, _) => { });
     }
 
     /// <summary>Validates and resolves the endpoint policy without acquiring credentials or connecting.</summary>
@@ -157,7 +173,7 @@ public sealed class SmtpSessionFactory : ISmtpSessionFactory {
         throw new InvalidOperationException($"Profile '{profile.Id}' has invalid secure socket option '{raw}'.");
     }
 
-    private static int? GetIntSetting(MailProfile profile, string key) {
+    internal static int? GetIntSetting(MailProfile profile, string key) {
         if (!profile.Settings.TryGetValue(key, out var raw) || string.IsNullOrWhiteSpace(raw)) {
             return null;
         }

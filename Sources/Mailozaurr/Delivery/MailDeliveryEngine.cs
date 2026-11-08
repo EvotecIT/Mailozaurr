@@ -21,7 +21,10 @@ public sealed partial class MailDeliveryEngine : IDisposable {
         _credentials = credentials ?? new MailCredentialResolver();
         foreach (var entry in configuration.Profiles ?? throw new ArgumentException("Profiles must be an object.")) {
             ValidateId(entry.Key);
-            _profiles.Add(entry.Key, SnapshotProfile(entry.Key, entry.Value));
+            MailDeliveryProfile profile = SnapshotProfile(entry.Key, entry.Value);
+            if (_credentials is MailCredentialResolver)
+                foreach (MailCredentialReference reference in profile.Credentials.Values) MailCredentialResolver.Validate(reference);
+            _profiles.Add(entry.Key, profile);
         }
         foreach (var entry in configuration.Routes ?? throw new ArgumentException("Routes must be an object.")) {
             ValidateId(entry.Key);
@@ -108,9 +111,11 @@ public sealed partial class MailDeliveryEngine : IDisposable {
                 return await SendGraphAsync(profile, secrets, validated, cancellationToken).ConfigureAwait(false);
             if (profile.Kind == MailProfileKind.Gmail)
                 return await SendGmailAsync(profile, secrets, validated, cancellationToken).ConfigureAwait(false);
+            if (profile.Kind == MailProfileKind.Smtp) {
+                var smtp = new SmtpMailSendHandler(new SmtpSessionFactory(secrets), SmtpSession(profile.Id));
+                return DeliveryResult(profile, await smtp.SendPreparedAsync(profile, validated, cancellationToken).ConfigureAwait(false));
+            }
             IMailSendHandler handler = profile.Kind switch {
-                MailProfileKind.Smtp => new SmtpMailSendHandler(new SmtpSessionFactory(secrets), SmtpSession(profile.Id)),
-
                 MailProfileKind.SendGrid => new SendGridMailSendHandler(secrets, singleAttempt: true),
                 MailProfileKind.Mailgun => new MailgunMailSendHandler(secrets, singleAttempt: true),
                 MailProfileKind.Ses => new SesMailSendHandler(secrets, singleAttempt: true),
@@ -118,14 +123,18 @@ public sealed partial class MailDeliveryEngine : IDisposable {
             };
             SendResult result = await handler.SendAsync(profile, new SendMessageRequest { ProfileId = profile.Id, Message = draft },
                 cancellationToken).ConfigureAwait(false);
-            if (result.Succeeded && !result.Queued)
-                return new MailDeliveryAttempt(profile.Id, profile.Kind, MailDeliveryOutcome.Accepted, ProviderMessageId: result.ProviderMessageId);
-            return result.DeliveryRejected && !result.DeliveryUnknown && !result.Queued
-                ? Failure(profile, MailDeliveryOutcome.SafeToFallback, "provider_rejected", result.IsTransient)
-                : Failure(profile, MailDeliveryOutcome.Unconfirmed, "delivery_unconfirmed");
+            return DeliveryResult(profile, result);
         } catch (Exception exception) when (IsOperational(exception, cancellationToken)) {
             return Failure(profile, MailDeliveryOutcome.Unconfirmed, "delivery_unconfirmed");
         }
+    }
+
+    private static MailDeliveryAttempt DeliveryResult(MailProfile profile, SendResult result) {
+        if (result.Succeeded && !result.Queued)
+            return new MailDeliveryAttempt(profile.Id, profile.Kind, MailDeliveryOutcome.Accepted, ProviderMessageId: result.ProviderMessageId);
+        return result.DeliveryRejected && !result.DeliveryUnknown && !result.Queued
+            ? Failure(profile, MailDeliveryOutcome.SafeToFallback, "provider_rejected", result.IsTransient)
+            : Failure(profile, MailDeliveryOutcome.Unconfirmed, "delivery_unconfirmed");
     }
 
     private SmtpDeliverySession SmtpSession(string id) {

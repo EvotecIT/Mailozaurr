@@ -192,6 +192,101 @@ public sealed class MailDeliveryEngineTests {
         using var engine = new MailDeliveryEngine(configuration);
         Assert.True(engine.ContainsRoute("reports"));
     }
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void BlankSmtpPortUsesTheCanonicalDefault(string port) {
+        var configuration = new MailDeliveryConfiguration {
+            Profiles = {
+                ["smtp"] = new() {
+                    Profile = new() {
+                        Kind = MailProfileKind.Smtp, DefaultSender = "sender@example.test",
+                        Settings = new() { ["server"] = "smtp.example.test", ["port"] = port, ["authenticationEnabled"] = "false" }
+                    }
+                }
+            },
+            Routes = { ["reports"] = new() { Profiles = new() { "smtp" } } }
+        };
+        using var engine = new MailDeliveryEngine(configuration);
+        Assert.True(engine.ContainsRoute("reports"));
+        Assert.Equal(587, SmtpSessionFactory.GetIntSetting(configuration.Profiles["smtp"].Profile, MailProfileSettingsKeys.Port) ?? 587);
+    }
+
+    [Theory]
+    [InlineData(MailProfileKind.Smtp, "timeout", "-1", typeof(ArgumentException))]
+    [InlineData(MailProfileKind.Smtp, "timeout", "invalid", typeof(InvalidOperationException))]
+    [InlineData(MailProfileKind.SendGrid, "retryDelayMilliseconds", "-1", typeof(InvalidOperationException))]
+    [InlineData(MailProfileKind.Mailgun, "retryDelayBackoff", "NaN", typeof(InvalidOperationException))]
+    [InlineData(MailProfileKind.Ses, "jitterMilliseconds", "-1", typeof(InvalidOperationException))]
+    public void InvalidTransportSettingsFailBeforeTheEngineCanSend(MailProfileKind kind, string setting, string value, Type exceptionType) {
+        var profile = new MailDeliveryProfile {
+            Profile = new() {
+                Kind = kind, DefaultSender = "sender@example.test",
+                Settings = new() { ["server"] = "smtp.example.test", ["authenticationEnabled"] = "false", [setting] = value }
+            },
+            Credentials = new() {
+                [MailSecretNames.ApiKey] = new("environment", "SYNTHETIC_API_KEY"),
+                [MailSecretNames.AccessKeyId] = new("environment", "SYNTHETIC_ACCESS_KEY"),
+                [MailSecretNames.SecretAccessKey] = new("environment", "SYNTHETIC_SECRET_KEY")
+            }
+        };
+        var configuration = new MailDeliveryConfiguration {
+            Profiles = { ["primary"] = profile },
+            Routes = { ["reports"] = new() { Profiles = new() { "primary" } } }
+        };
+        var error = Assert.Throws(exceptionType, () => new MailDeliveryEngine(configuration));
+        Assert.Contains(setting, error.Message);
+    }
+
+    [Theory]
+    [InlineData("unsupported", "credential", typeof(NotSupportedException))]
+    [InlineData("file", "relative-secret.txt", typeof(ArgumentException))]
+    public void InvalidDefaultCredentialReferenceIsRejectedButCustomResolverCanOwnItsMeaning(string source, string key, Type exceptionType) {
+        var configuration = new MailDeliveryConfiguration {
+            Profiles = {
+                ["provider"] = new() {
+                    Profile = new() { Kind = MailProfileKind.SendGrid, DefaultSender = "sender@example.test" },
+                    Credentials = new() { [MailSecretNames.ApiKey] = new(source, key) }
+                }
+            },
+            Routes = { ["reports"] = new() { Profiles = new() { "provider" }, RetryCount = 10 } }
+        };
+        Assert.Throws(exceptionType, () => new MailDeliveryEngine(configuration));
+        using var custom = new MailDeliveryEngine(configuration, new ObservedMissingCredentialResolver());
+        Assert.True(custom.ContainsRoute("reports"));
+    }
+
+    [Fact]
+    public async Task PreparedSmtpMessageKeepsItsAttachmentAfterTheSourceFileIsRemoved() {
+        await using var server = new LoopbackSmtpServer();
+        string path = Path.Combine(Path.GetTempPath(), "prepared-mail-" + Guid.NewGuid().ToString("N"));
+        try {
+            File.WriteAllText(path, "synthetic report content");
+            var profile = Configuration(server).Profiles["p0"].Profile;
+            profile.Id = profile.DisplayName = "prepared";
+            profile.SmtpDelivery = new() {
+                Servers = new() { new() { Server = "127.0.0.1", Port = server.Port, SecureSocketOptions = MailKit.Security.SecureSocketOptions.None } },
+                MaxAttempts = 1
+            };
+            var draft = Message();
+            draft.Attachments.Add(new() { Path = path, FileName = "report.txt" });
+            using var mime = await new DraftMimeMessageFactory().CreateAsync(profile, draft);
+            File.Delete(path);
+            using var session = new SmtpDeliverySession();
+            var handler = new SmtpMailSendHandler(new SmtpSessionFactory(), session);
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            SendResult result = await handler.SendPreparedAsync(profile, mime, timeout.Token);
+            Assert.True(result.Succeeded);
+            Assert.Equal(1, server.Accepted);
+            using var content = new MemoryStream();
+            var attachment = Assert.IsType<MimeKit.MimePart>(Assert.Single(mime.Attachments));
+            Assert.NotNull(attachment.Content);
+            attachment.Content.DecodeTo(content);
+            Assert.Equal("synthetic report content", System.Text.Encoding.UTF8.GetString(content.ToArray()));
+        } finally {
+            File.Delete(path);
+        }
+    }
     private static MailDeliveryConfiguration Configuration(params LoopbackSmtpServer[] servers) {
         var configuration = new MailDeliveryConfiguration();
         for (int i = 0; i < servers.Length; i++) {
