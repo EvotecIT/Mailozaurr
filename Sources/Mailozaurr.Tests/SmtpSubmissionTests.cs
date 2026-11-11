@@ -88,18 +88,30 @@ public sealed class SmtpSubmissionTests {
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task DirectSend_LostConfirmationDoesNotRetryOrQueue(bool retryAlways) {
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task DirectSend_LostConfirmationDoesNotRetryOrQueue(bool retryAlways, bool warningThrows) {
         await using var server = new LoopbackSmtpServer(dropAfterData: true);
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr-submission", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         Smtp? smtp = null;
+        var originalLogger = LoggingMessages.Logger;
+        var warned = false;
         try {
             var queue = new FilePendingMessageRepository(Path.Combine(directory, "pending.jsonl"));
             smtp = await ConnectAsync(server, queue);
             smtp.RetryCount = 3;
             smtp.RetryAlways = retryAlways;
+            if (warningThrows) {
+                LoggingMessages.Logger = new InternalLogger();
+                LoggingMessages.Logger.OnWarningMessage += (_, args) => {
+                    if (args.Message.Contains("Error during sending")) {
+                        warned = true;
+                        throw new InvalidOperationException("Warning subscriber failed");
+                    }
+                };
+            }
             var result = await smtp.SendAsync();
 
             Assert.False(result.Status);
@@ -108,8 +120,13 @@ public sealed class SmtpSubmissionTests {
             Assert.False(result.DeliveryAccepted);
             Assert.Empty(result.AcceptedRecipients);
             Assert.Equal(1, server.ContentSubmissions);
+            Assert.Equal(warningThrows, warned);
+            if (warningThrows) {
+                Assert.Contains("Warning subscriber failed", Assert.Single(result.PostSendErrors));
+            }
             Assert.Null(await queue.GetByMessageIdAsync(result.MessageId!));
         } finally {
+            LoggingMessages.Logger = originalLogger;
             smtp?.Dispose();
             Directory.Delete(directory, recursive: true);
         }

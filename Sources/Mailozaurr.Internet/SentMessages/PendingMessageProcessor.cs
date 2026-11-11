@@ -177,7 +177,7 @@ public sealed class PendingMessageProcessor {
                     await SaveOwnedAsync(leasedRecord, leaseId, CancellationToken.None).ConfigureAwait(false);
                     cancellationLeaseReleased = true;
                     observer.MessageFailed(leasedRecord, attempt, ex, stopwatch.Elapsed, willRetry: false, retryDelay: null);
-                    logger?.WriteWarning($"SMTP delivery of {leasedRecord.MessageId} is unknown; automatic retries are suspended pending reconciliation.");
+                    WriteTerminalWarning($"SMTP delivery of {leasedRecord.MessageId} is unknown; automatic retries are suspended pending reconciliation.");
                     cancellationToken.ThrowIfCancellationRequested();
                     return;
                 } catch (ProcessingLeaseLostException) {
@@ -235,11 +235,7 @@ public sealed class PendingMessageProcessor {
 
                 // Provider acceptance and queue acknowledgement are separate outcomes.
                 foreach (var error in leasedRecord.PostSendErrors) {
-                    try {
-                        logger?.WriteWarning($"Accepted delivery of {leasedRecord.MessageId}: {error}");
-                    } catch (Exception) {
-                        // Diagnostic subscribers cannot prevent acceptance persistence.
-                    }
+                    WriteTerminalWarning($"Accepted delivery of {leasedRecord.MessageId}: {error}");
                 }
                 // Persist an accepted marker before removing the record so a failed
                 // removal cannot turn a successful send into another delivery attempt.
@@ -268,6 +264,14 @@ public sealed class PendingMessageProcessor {
                 observer.MessageSent(acceptedRecord, attempt, stopwatch.Elapsed);
                 await RemoveOwnedAsync(leasedRecord.MessageId, leaseId, CancellationToken.None).ConfigureAwait(false);
             }, () => cancellationLeaseReleased).ConfigureAwait(false);
+        }
+    }
+
+    private void WriteTerminalWarning(string message) {
+        try {
+            logger?.WriteWarning(message);
+        } catch (Exception) {
+            // Diagnostic subscribers cannot interrupt acknowledgement or mask caller cancellation.
         }
     }
 

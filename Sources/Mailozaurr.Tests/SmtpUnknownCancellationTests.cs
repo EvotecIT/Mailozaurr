@@ -12,7 +12,15 @@ public sealed class SmtpUnknownCancellationTests {
             var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
                 [EmailProvider.None] = new UnknownSender(repository, caller)
             });
-            var run = new PendingMessageProcessor(repository, factory, processingLeaseDuration: TimeSpan.FromSeconds(3)).ProcessAsync(caller.Token);
+            var logger = new InternalLogger();
+            var warned = false;
+            logger.OnWarningMessage += (_, args) => {
+                if (args.Message.Contains("is unknown")) {
+                    warned = true;
+                    throw new InvalidOperationException("Warning subscriber failed");
+                }
+            };
+            var run = new PendingMessageProcessor(repository, factory, logger: logger, processingLeaseDuration: TimeSpan.FromSeconds(3)).ProcessAsync(caller.Token);
             try {
                 Assert.Same(run, await Task.WhenAny(run, Task.Delay(TimeSpan.FromSeconds(10))));
                 await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
@@ -21,6 +29,7 @@ public sealed class SmtpUnknownCancellationTests {
                 Assert.Null(held!.ProcessingLeaseId);
                 Assert.Equal(1, held.AttemptCount);
                 Assert.True(repository.RenewalObservedRelease);
+                Assert.True(warned);
             } finally {
                 caller.Cancel();
                 repository.Released.TrySetResult(true);

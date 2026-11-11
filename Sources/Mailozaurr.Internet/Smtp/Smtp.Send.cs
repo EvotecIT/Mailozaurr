@@ -381,13 +381,17 @@ public partial class Smtp {
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 throw;
             } catch (Exception exception) {
-                LogWarning($"Send-EmailMessage - Error during sending: {exception.Message}");
                 var unknown = exception is SmtpDeliveryUnknownException;
+                try {
+                    LogWarning($"Send-EmailMessage - Error during sending: {exception.Message}");
+                } catch (Exception diagnosticFailure) when (unknown) {
+                    postSendErrors.Add($"Submission diagnostics: {diagnosticFailure.Message}");
+                }
                 if (unknown || (!Helpers.IsTransient(exception) && !RetryAlways) || attempt >= RetryCount) {
                     if (ErrorAction == ActionPreference.Stop) throw;
                     var queued = !unknown && await EnqueuePendingMessageAsync(messageId, CredentialProtection.Default, cancellationToken).ConfigureAwait(false);
                     var failure = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", exception.Message) {
-                        MessageId = messageId, Queued = queued, DeliveryUnknown = unknown,
+                        MessageId = messageId, Queued = queued, DeliveryUnknown = unknown, PostSendErrors = postSendErrors,
                         IsTransient = Helpers.IsTransient(exception),
                         RejectedRecipients = exception is SmtpCommandException { ErrorCode: SmtpErrorCode.RecipientNotAccepted, Mailbox: { } mailbox }
                             ? new[] { mailbox.Address } : Array.Empty<string>()
