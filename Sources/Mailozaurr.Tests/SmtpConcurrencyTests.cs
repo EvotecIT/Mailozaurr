@@ -1,3 +1,5 @@
+using System.Linq;
+using System;
 using MailKit;
 using MimeKit;
 using System.Reflection;
@@ -12,7 +14,8 @@ public class SmtpConcurrencyTests {
         private int _active;
         public int Max;
 
-        public override async Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
+        public override async Task<MailKit.SendResult> SendAsync(MimeKit.FormatOptions options, MailKit.ISendRequest request, System.Threading.CancellationToken cancellationToken = default) {
+            var message = request.Message;
             var current = Interlocked.Increment(ref _active);
             int initialMax;
             do {
@@ -25,7 +28,7 @@ public class SmtpConcurrencyTests {
 
             await Task.Delay(100, cancellationToken);
             Interlocked.Decrement(ref _active);
-            return string.Empty;
+            return new MailKit.SendResult(string.Empty, request.Message.To.Mailboxes.ToArray(), Array.Empty<MimeKit.MailboxAddress>());
         }
     }
 

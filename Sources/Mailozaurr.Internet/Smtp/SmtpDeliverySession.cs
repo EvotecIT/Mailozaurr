@@ -242,7 +242,7 @@ public sealed class SmtpDeliverySession : IDisposable {
         // AuthenticationException wraps the server's command failure; SMTP status takes precedence over wrapper type.
         for (Exception? current = exception; current != null; current = current.InnerException) {
             if (current is SmtpCommandException command)
-                return (int)command.StatusCode >= 400 && (int)command.StatusCode < 500;
+                return command.IsTransient;
         }
         if (exception is MailKit.Security.AuthenticationException authentication) {
             // Explicit SASL authentication preserves SMTP status only in MailKit's invariant "ddd: " prefix.

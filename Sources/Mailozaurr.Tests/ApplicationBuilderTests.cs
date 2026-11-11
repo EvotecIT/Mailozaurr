@@ -1,3 +1,5 @@
+using System.Linq;
+using System;
 using MailKit.Net.Imap;
 using Mailozaurr;
 
@@ -408,7 +410,7 @@ public sealed class ApplicationBuilderTests {
 
         public override int Count => 1;
 
-        public override int GetMessageSize(int index, CancellationToken cancellationToken = default) => _content.Length;
+        public override long GetMessageSize(int index, CancellationToken cancellationToken = default) => _content.Length;
 
         public override Task<Stream> GetStreamAsync(
             int index,

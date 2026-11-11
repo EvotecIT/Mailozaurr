@@ -95,6 +95,10 @@ public sealed class PendingMessageProcessor {
                 continue;
             }
             if (ProviderFilter.HasValue && record.Provider != ProviderFilter.Value) continue;
+            if (record.DeliveryUnknownAt.HasValue) {
+                observer.MessageSkipped(record, PendingMessageSkipReason.DeliveryUnknown);
+                continue;
+            }
 
             if (string.IsNullOrWhiteSpace(record.MessageId)) {
                 observer.MessageSkipped(record, PendingMessageSkipReason.MissingMessageId);
@@ -114,6 +118,13 @@ public sealed class PendingMessageProcessor {
                 continue;
             }
             var leaseId = leasedRecord.ProcessingLeaseId;
+            if (leasedRecord.DeliveryUnknownAt.HasValue) {
+                leasedRecord.ProcessingLeaseUntil = null;
+                leasedRecord.ProcessingLeaseId = null;
+                await SaveOwnedAsync(leasedRecord, leaseId, CancellationToken.None).ConfigureAwait(false);
+                observer.MessageSkipped(leasedRecord, PendingMessageSkipReason.DeliveryUnknown);
+                continue;
+            }
 
             if (leasedRecord.DeadLetteredAt.HasValue) {
                 await ExecuteWithLeaseRenewalAsync(leasedRecord, cancellationToken,
@@ -150,8 +161,24 @@ public sealed class PendingMessageProcessor {
 
                 try {
                     var sender = senderFactory.GetSender(leasedRecord);
+                    if (leasedRecord.Provider == EmailProvider.None) {
+                        // Persist the hold before SMTP can submit DATA. A crash or a later
+                        // storage failure must not turn an unconfirmed send into a retry.
+                        leasedRecord.DeliveryUnknownAt = clock();
+                        await SaveOwnedAsync(leasedRecord, leaseId, deliveryToken).ConfigureAwait(false);
+                    }
                     await sender.SendAsync(leasedRecord, deliveryToken).ConfigureAwait(false);
                     stopwatch.Stop();
+                } catch (SmtpDeliveryUnknownException ex) {
+                    stopwatch.Stop();
+                    leasedRecord.DeliveryUnknownAt = clock();
+                    leasedRecord.ProcessingLeaseUntil = null;
+                    leasedRecord.ProcessingLeaseId = null;
+                    await SaveOwnedAsync(leasedRecord, leaseId, CancellationToken.None).ConfigureAwait(false);
+                    observer.MessageFailed(leasedRecord, attempt, ex, stopwatch.Elapsed, willRetry: false, retryDelay: null);
+                    logger?.WriteWarning($"SMTP delivery of {leasedRecord.MessageId} is unknown; automatic retries are suspended pending reconciliation.");
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return;
                 } catch (ProcessingLeaseLostException) {
                     stopwatch.Stop();
                     // A different worker may now own this record. The outcome of a
@@ -159,6 +186,7 @@ public sealed class PendingMessageProcessor {
                     throw;
                 } catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested) {
                     stopwatch.Stop();
+                    leasedRecord.DeliveryUnknownAt = null;
                     leasedRecord.ExchangeAttemptCount(originalAttemptCount);
                     leasedRecord.NextAttemptAt = ApplyDelay(clock(), TimeSpan.Zero);
                     leasedRecord.ProcessingLeaseUntil = null;
@@ -178,6 +206,7 @@ public sealed class PendingMessageProcessor {
                     throw;
                 } catch (Exception ex) {
                     stopwatch.Stop();
+                    leasedRecord.DeliveryUnknownAt = null;
                     var permanentFailure = permanentFailureDetector(ex);
                     var willRetry = !permanentFailure && attempt < maxRetryAttempts;
                     TimeSpan? delay = null;
@@ -207,6 +236,7 @@ public sealed class PendingMessageProcessor {
                 // Persist an accepted marker before removing the record so a failed
                 // removal cannot turn a successful send into another delivery attempt.
                 var acceptedRecord = leasedRecord.Clone();
+                acceptedRecord.DeliveryUnknownAt = null;
                 acceptedRecord.DeliveryAcceptedAt = clock();
                 acceptedRecord.NextAttemptAt = acceptedRecord.DeliveryAcceptedAt.Value;
                 try {

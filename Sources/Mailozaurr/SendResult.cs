@@ -33,4 +33,10 @@ public sealed class SendResult : OperationResult {
 
     /// <summary>Whether any attempt may have delivered without a confirmed acknowledgement.</summary>
     public bool DeliveryUnknown { get; set; }
+    /// <summary>SMTP envelope recipients accepted with a confirmed submission.</summary>
+    public IReadOnlyList<string> AcceptedRecipients { get; set; } = Array.Empty<string>();
+    /// <summary>SMTP envelope recipients explicitly rejected by the server.</summary>
+    public IReadOnlyList<string> RejectedRecipients { get; set; } = Array.Empty<string>();
+    /// <summary>Final SMTP submission response, when available.</summary>
+    public string? ResponseText { get; set; }
 }

@@ -15,7 +15,7 @@ public class ImapConnectionInfo : ConnectionInfoBase {
     /// <summary>Authentication mechanisms supported by the server.</summary>
     public ISet<string>? AuthenticationMechanisms { get; set; }
     /// <summary>Server capabilities.</summary>
-    public ImapCapabilities Capabilities { get; set; }
+    public ImapCapabilities Capabilities { get; set; } = new(Array.Empty<ImapCapability>());
     /// <summary>The underlying stream.</summary>
     public Stream? Stream { get; set; }
     /// <summary>Current state of the connection.</summary>

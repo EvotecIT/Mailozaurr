@@ -74,8 +74,10 @@ public sealed class SmtpPendingMessageEncryptionTests {
     }
 
     private sealed class ThrowingClientSmtp : ClientSmtp {
-        public override Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) =>
+        public override Task<MailKit.SendResult> SendAsync(MimeKit.FormatOptions options, MailKit.ISendRequest request, System.Threading.CancellationToken cancellationToken = default) {
+            var message = request.Message;
             throw new InvalidOperationException("Simulated failure");
+        }
     }
 
     private sealed class RecordingClient : ClientSmtp { }

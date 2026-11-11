@@ -26,7 +26,7 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
     private readonly bool _downloadMessageContent;
     private IMailFolder? _folder;
     private CancellationTokenSource? _cancel;
-    private CancellationTokenSource? _done;
+    private ImapIdleSession? _idleSession;
     private bool _messagesArrived;
     private Task? _idleTask;
     private bool _disposed;
@@ -103,6 +103,7 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
             _folder.MessageExpunged += OnMessageExpunged;
             await FetchNewMessagesAsync().ConfigureAwait(false);
 
+            _idleSession = _client.CreateIdleSession();
             _idleTask = IdleLoopAsync();
         } catch {
             if (_folder?.IsOpen == true) {
@@ -179,18 +180,8 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
     }
 
     private async Task WaitForNewMessagesAsync() {
-        if (_client.Capabilities.HasFlag(ImapCapabilities.Idle)) {
-            _done = new CancellationTokenSource(TimeSpan.FromMinutes(9));
-            try {
-                await _client.IdleAsync(_done.Token, _cancel!.Token).ConfigureAwait(false);
-            } finally {
-                _done.Dispose();
-                _done = null;
-            }
-        } else {
-            await Task.Delay(TimeSpan.FromMinutes(1), _cancel!.Token).ConfigureAwait(false);
-            await _client.NoOpAsync(_cancel.Token).ConfigureAwait(false);
-        }
+        await _idleSession!.WaitForChangesAsync(_cancel!.Token).ConfigureAwait(false);
+        _messagesArrived = true;
     }
 
     private async Task FetchNewMessagesAsync() {
@@ -219,7 +210,6 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
 
     private void OnCountChanged(object? sender, EventArgs e) {
         _messagesArrived = true;
-        _done?.Cancel();
     }
 
     private void OnMessageExpunged(object? sender, MessageEventArgs e) {
@@ -282,8 +272,7 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
             _folder = null;
         }
 
-        _done?.Dispose();
-        _done = null;
+        _idleSession = null;
 
         _cancel?.Dispose();
         _cancel = null;

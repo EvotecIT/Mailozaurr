@@ -27,6 +27,8 @@ public sealed class PendingMessageRecord {
     /// queue cleanup and must not be submitted to the provider again.
     /// </summary>
     public DateTimeOffset? DeliveryAcceptedAt { get; set; }
+    /// <summary>Time a submission lost confirmation. Clear only after reconciling delivery; automatic retries are suspended.</summary>
+    public DateTimeOffset? DeliveryUnknownAt { get; set; }
 
     /// <summary>
     /// Time when a terminal failure was durably recorded on the active queue.
@@ -110,6 +112,7 @@ public sealed class PendingMessageRecord {
         Timestamp = Timestamp,
         NextAttemptAt = NextAttemptAt,
         DeliveryAcceptedAt = DeliveryAcceptedAt,
+        DeliveryUnknownAt = DeliveryUnknownAt,
         DeadLetteredAt = DeadLetteredAt,
         DeadLetterReason = DeadLetterReason,
         DeadLetterAttempt = DeadLetterAttempt,

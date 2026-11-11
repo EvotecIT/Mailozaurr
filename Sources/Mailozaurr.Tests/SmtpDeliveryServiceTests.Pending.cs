@@ -101,7 +101,7 @@ public partial class SmtpDeliveryServiceTests {
     }
 
     [Fact]
-    public async Task ProcessPendingMessagesAsync_CanceledSend_IsSanitizedAndDoesNotConsumeRetry() {
+    public async Task ProcessPendingMessagesAsync_CanceledDuringSend_IsSanitizedAndSuspendsRetry() {
         using var cancellation = new CancellationTokenSource();
         var client = new MemoryClient { CancelAt = "send", Cancellation = cancellation };
         var smtp = CreateSmtp(client);
@@ -112,7 +112,8 @@ public partial class SmtpDeliveryServiceTests {
         Assert.Equal(client.Tokens[client.Tokens.Count - 1], error.CancellationToken);
         Assert.Null(error.InnerException);
         Assert.False(repository.Removed);
-        Assert.Equal(0, repository.Record!.AttemptCount);
+        Assert.Equal(1, repository.Record!.AttemptCount);
+        Assert.NotNull(repository.Record.DeliveryUnknownAt);
         Assert.True(client.Disposed);
     }
 }

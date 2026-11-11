@@ -44,7 +44,7 @@ public partial class Smtp {
                         if (!auth.Status) throw new InvalidOperationException(auth.Error ?? "SMTP authentication failed.");
                     }
                 }
-                await smtp.Client.SendAsync(message, ct).ConfigureAwait(false);
+                await SmtpSubmission.SendAsync(smtp.Client, message, ct).ConfigureAwait(false);
                 // Sent-log failures must not turn an accepted provider send into a retry.
                 var result = new SmtpResult(true, EmailAction.Send, SentMessageRecipients.Serialize(message.To),
                     Helpers.GetEmailAddress(message.From.Mailboxes.FirstOrDefault() ?? (object)string.Empty),

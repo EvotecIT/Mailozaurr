@@ -191,8 +191,7 @@ public static class Helpers {
 #endif
                 return true;
             case SmtpCommandException smtpEx:
-                var smtpCode = (int)smtpEx.StatusCode;
-                return smtpCode >= 400 && smtpCode < 500;
+                return smtpEx.IsTransient;
             case SmtpProtocolException:
                 return true;
             default:
