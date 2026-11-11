@@ -143,6 +143,9 @@ public sealed class SmtpDeliverySession : IDisposable {
                         (transportStarted && IsTransient(exception));
                     var unknown = sending && transient && exception is not SmtpCommandException;
                     last = Failure(message, host.Endpoint.Server, host.Endpoint.Port, exception.Message, transient, unknown);
+                    if (exception is SmtpCommandException { ErrorCode: SmtpErrorCode.RecipientNotAccepted, Mailbox: not null } rejection) {
+                        last.RejectedRecipients = new[] { rejection.Mailbox.Address };
+                    }
                 }
                 AddAttempt(attempts, host, number, last!);
                 DropConnection(host);

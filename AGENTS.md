@@ -7,3 +7,7 @@ Before adding or changing tests, read the shared authoring gate at
 `$CODEX_HOME/skills/test-audit/SKILL.md#authoring-gate` and proof guidance at
 `$CODEX_HOME/skills/contract-focused-tests/SKILL.md` (default CODEX_HOME: `~/.codex`).
 For an explicitly requested pruning campaign, read `$CODEX_HOME/skills/test-audit/CAMPAIGN.md`.
+
+## Shared test policy
+
+Before adding or changing tests, read the [test-audit authoring gate](<$CODEX_HOME/skills/test-audit/SKILL.md#authoring-gate>) and [contract-focused proof guidance](<$CODEX_HOME/skills/contract-focused-tests/SKILL.md>). Resolve these procedures against CODEX_HOME on each host.

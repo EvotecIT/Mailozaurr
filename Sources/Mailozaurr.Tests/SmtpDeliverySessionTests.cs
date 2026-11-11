@@ -250,6 +250,8 @@ public class SmtpDeliverySessionTests {
         Assert.False(result.DeliveryUnknown);
         Assert.Equal(primary.Port, Assert.Single(result.Attempts).Port);
         Assert.Equal(1, primary.Recipients);
+        Assert.Equal(recipientCode == 550 ? new[] { "recipient@example.invalid" } : Array.Empty<string>(), result.RejectedRecipients);
+        Assert.Empty(result.AcceptedRecipients);
         Assert.Equal(contentSubmissions, primary.ContentSubmissions);
         Assert.Equal(0, primary.Accepted);
         Assert.Equal(0, secondary.Connections);
