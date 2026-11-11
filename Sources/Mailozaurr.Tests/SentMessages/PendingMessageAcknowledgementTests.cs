@@ -45,6 +45,8 @@ public sealed class PendingMessageAcknowledgementTests {
 
         Assert.Equal(1, sender.SendCount);
         Assert.Equal(1, observer.SentCount);
+        Assert.NotNull(observer.SentRecord!.DeliveryAcceptedAt);
+        Assert.Null(observer.SentRecord.DeliveryUnknownAt);
         Assert.Null(repository.Record);
     }
 
@@ -187,9 +189,13 @@ public sealed class PendingMessageAcknowledgementTests {
 
     private sealed class CountingObserver : IPendingMessageProcessorObserver {
         public int SentCount { get; private set; }
+        public PendingMessageRecord? SentRecord { get; private set; }
         public void MessageSkipped(PendingMessageRecord record, PendingMessageSkipReason reason) { }
         public void MessageAttemptStarted(PendingMessageRecord record, int attempt) { }
-        public void MessageSent(PendingMessageRecord record, int attempt, TimeSpan duration) => SentCount++;
+        public void MessageSent(PendingMessageRecord record, int attempt, TimeSpan duration) {
+            SentCount++;
+            SentRecord = record.Clone();
+        }
         public void MessageFailed(PendingMessageRecord record, int attempt, Exception exception,
             TimeSpan duration, bool willRetry, TimeSpan? retryDelay) { }
         public void MessageDropped(PendingMessageRecord record, int attempt,

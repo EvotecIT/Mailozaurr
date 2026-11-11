@@ -38,8 +38,10 @@ public sealed class SmtpSubmissionTests {
         } finally { smtp?.Dispose(); Directory.Delete(directory, recursive: true); }
     }
 
-    [Fact]
-    public async Task QueuedSend_CompletionHandlerFailureDoesNotBecomeARejectedDelivery() {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task QueuedSend_CompletionHandlerFailureDoesNotBecomeARejectedDelivery(bool warningHandlerThrows) {
         await using var server = new LoopbackSmtpServer();
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr-submission", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -60,8 +62,14 @@ public sealed class SmtpSubmissionTests {
             });
             var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> { [EmailProvider.None] = sender });
             var observer = new AcceptanceObserver();
-            await new PendingMessageProcessor(queue, factory, observer: observer).ProcessAsync();
+            var logger = new InternalLogger();
+            logger.OnWarningMessage += (_, _) => {
+                if (warningHandlerThrows) throw new InvalidOperationException("Warning observer failed");
+            };
+            await new PendingMessageProcessor(queue, factory, logger: logger, observer: observer).ProcessAsync();
             Assert.NotNull(observer.Sent);
+            Assert.NotNull(observer.Sent!.DeliveryAcceptedAt);
+            Assert.Null(observer.Sent.DeliveryUnknownAt);
             Assert.Contains("Completion observer failed", Assert.Single(observer.Sent!.PostSendErrors));
             Assert.Equal(1, server.Accepted);
             Assert.Null(await queue.GetByMessageIdAsync("completion@example.invalid"));

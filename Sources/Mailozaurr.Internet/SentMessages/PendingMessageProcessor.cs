@@ -234,7 +234,13 @@ public sealed class PendingMessageProcessor {
                 }
 
                 // Provider acceptance and queue acknowledgement are separate outcomes.
-                foreach (var error in leasedRecord.PostSendErrors) logger?.WriteWarning($"Accepted delivery of {leasedRecord.MessageId}: {error}");
+                foreach (var error in leasedRecord.PostSendErrors) {
+                    try {
+                        logger?.WriteWarning($"Accepted delivery of {leasedRecord.MessageId}: {error}");
+                    } catch (Exception) {
+                        // Diagnostic subscribers cannot prevent acceptance persistence.
+                    }
+                }
                 // Persist an accepted marker before removing the record so a failed
                 // removal cannot turn a successful send into another delivery attempt.
                 var acceptedRecord = leasedRecord.Clone();
@@ -255,11 +261,11 @@ public sealed class PendingMessageProcessor {
                             $"Delivery of '{leasedRecord.MessageId}' was accepted, but queue acknowledgement failed.",
                             markerFailure, removalFailure);
                     }
-                    observer.MessageSent(leasedRecord, attempt, stopwatch.Elapsed);
+                    observer.MessageSent(acceptedRecord, attempt, stopwatch.Elapsed);
                     return;
                 }
 
-                observer.MessageSent(leasedRecord, attempt, stopwatch.Elapsed);
+                observer.MessageSent(acceptedRecord, attempt, stopwatch.Elapsed);
                 await RemoveOwnedAsync(leasedRecord.MessageId, leaseId, CancellationToken.None).ConfigureAwait(false);
             }, () => cancellationLeaseReleased).ConfigureAwait(false);
         }

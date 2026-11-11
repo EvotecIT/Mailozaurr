@@ -38,11 +38,15 @@ public sealed class ImapIdleListenerProtocolTests {
         using var client = new ImapClient();
         await client.ConnectAsync("127.0.0.1", server.Port, SecureSocketOptions.None);
         await using var listener = new ImapIdleListener(client, searchQuery: queryKind == 2 ? SearchQuery.Seen : queryKind == 1 ? SearchQuery.All : null);
+        var arrivals = new List<MailKit.UniqueId>();
+        listener.MessageSummaryArrived += (_, summary) => arrivals.Add(summary.Uid);
         await listener.StartAsync();
         await Within(server.SecondWait.Task);
         Assert.Equal(expectedSearches, server.Searches);
         await listener.StopAsync();
         Assert.True(client.IsConnected);
+        if (queryKind == 2) Assert.Equal(new MailKit.UniqueId(1), Assert.Single(arrivals));
+        else Assert.Empty(arrivals);
     }
 
     private static async Task Within(Task task) {
@@ -105,7 +109,9 @@ public sealed class ImapIdleListenerProtocolTests {
                     continue;
                 } else if (command.StartsWith("UID SEARCH")) {
                     Interlocked.Increment(ref searches);
-                    await writer.WriteLineAsync("* SEARCH 1");
+                    await writer.WriteLineAsync(command.Contains("SEEN") && waits == 0 ? "* SEARCH" : "* SEARCH 1");
+                } else if (command.StartsWith("UID FETCH")) {
+                    await writer.WriteLineAsync("* 1 FETCH (UID 1 ENVELOPE (NIL \"Newly seen\" NIL NIL NIL NIL NIL NIL NIL NIL))");
                 } else if (command == "IDLE" || command == "NOOP") {
                     waits++;
                     if (command == "IDLE") {
