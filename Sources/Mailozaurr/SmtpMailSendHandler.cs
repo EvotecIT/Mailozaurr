@@ -85,6 +85,8 @@ public sealed class SmtpMailSendHandler : IMailSendHandler {
                         ProfileKind = profile.Kind,
                         Queued = true,
                         QueueMessageId = queuedId,
+                        IsTransient = providerResult.IsTransient,
+                        RejectedRecipients = providerResult.RejectedRecipients,
                         Message = $"Message queued after send failure: {providerResult.Error ?? providerResult.Message ?? "SMTP send failed."}"
                     };
                 }

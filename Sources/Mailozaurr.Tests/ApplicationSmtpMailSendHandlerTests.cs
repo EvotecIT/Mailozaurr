@@ -65,7 +65,9 @@ public sealed class ApplicationSmtpMailSendHandlerTests {
 
                 return new SmtpResult(false, EmailAction.Send, "alice@example.com", "sender@example.com", "smtp.example.com", 587, TimeSpan.Zero, error: "temporary smtp failure") {
                     MessageId = message.MessageId ?? "queued-1",
-                    Queued = true
+                    Queued = true,
+                    IsTransient = true,
+                    RejectedRecipients = new[] { "alice@example.com" }
                 };
             });
 
@@ -93,6 +95,8 @@ public sealed class ApplicationSmtpMailSendHandlerTests {
 
         Assert.True(result.Succeeded);
         Assert.True(result.Queued);
+        Assert.True(result.IsTransient);
+        Assert.Equal(new[] { "alice@example.com" }, result.RejectedRecipients);
         Assert.NotNull(result.QueueMessageId);
         Assert.Contains("queued", result.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
