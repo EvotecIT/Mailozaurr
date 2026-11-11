@@ -63,10 +63,11 @@ public partial class Smtp {
                 }).ConfigureAwait(false);
             } finally {
                 try { smtp.Disconnect(); } catch (Exception exception) {
-                    if (acceptedResult != null) {
-                        smtp.RecordPostSendError(acceptedResult, "SMTP disconnect", exception);
-                    } else if (smtp.SuppressDiagnostics) {
+                    if (smtp.SuppressDiagnostics) {
+                        acceptedResult?.PostSendErrors.Add("SMTP disconnect failed.");
                         SmtpSessionService.TraceDisconnectFailureQuietly();
+                    } else if (acceptedResult != null) {
+                        smtp.RecordPostSendError(acceptedResult, "SMTP disconnect", exception);
                     } else {
                         try {
                             smtp.LogWarning($"ProcessPendingMessages - Disconnect failed: {exception.Message}");
