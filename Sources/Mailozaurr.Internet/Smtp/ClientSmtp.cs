@@ -36,6 +36,8 @@ public partial class ClientSmtp : SmtpClient {
     public MessagePriority Priority { get; set; }
     /// <summary>Delivery notification options.</summary>
     public DeliveryNotification[]? DeliveryNotificationOption { get; set; }
+    /// <summary>How much message content to include in delivery failure notifications.</summary>
+    public DeliveryStatusNotificationType DeliveryStatusNotificationType { get; set; }
     /// <summary>Custom headers to add to the message.</summary>
     public IDictionary<string, string>? Headers { get; set; }
     /// <summary>Download remote images referenced in HtmlBody and embed them.</summary>
@@ -88,12 +90,16 @@ public partial class ClientSmtp : SmtpClient {
     public virtual SmtpCapabilities GetCapabilitiesSnapshot() => Capabilities;
 
     /// <summary>
-    /// Determines which delivery status notifications should be requested for the specified recipient.
+    /// Creates a request with this client's delivery notification settings.
     /// </summary>
     /// <param name="message">The message being sent.</param>
-    /// <param name="mailbox">The recipient mailbox address.</param>
-    /// <returns>The delivery status notification flags to use, or <c>null</c>.</returns>
-    protected override DeliveryStatusNotification? GetDeliveryStatusNotifications(MimeMessage message, MailboxAddress mailbox) {
+    /// <returns>The per-message SMTP request.</returns>
+    internal SmtpSubmissionRequest CreateSendRequest(MimeMessage message) => new(message) {
+        DeliveryStatusNotificationType = DeliveryStatusNotificationType,
+        DeliveryStatusNotifications = GetDeliveryStatusNotifications()
+    };
+
+    private DeliveryStatusNotification? GetDeliveryStatusNotifications() {
         // Keep omission distinct from MailKit's zero-valued NOTIFY=NEVER.
         if (DeliveryNotificationOption == null) return null;
         DeliveryStatusNotification? combinedOption = null;

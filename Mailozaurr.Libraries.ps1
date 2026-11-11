@@ -9,6 +9,7 @@ $LibrariesByFolder = @{
         'Lib\Core\EmailValidation.dll'
         'Lib\Core\Mailozaurr.Jmap.dll'
         'Lib\Core\Microsoft.IdentityModel.Abstractions.dll'
+        'Lib\Core\MimeKit.Core.dll'
         'Lib\Core\Newtonsoft.Json.dll'
         'Lib\Core\Google.Apis.Core.dll'
         'Lib\Core\Google.Apis.dll'
@@ -24,11 +25,11 @@ $LibrariesByFolder = @{
         'Lib\Core\OfficeIMO.Email.Html.dll'
         'Lib\Core\System.CodeDom.dll'
         'Lib\Core\System.Formats.Asn1.dll'
+        'Lib\Core\MailKit.dll'
         'Lib\Core\Microsoft.Bcl.Cryptography.dll'
         'Lib\Core\Microsoft.Identity.Client.dll'
         'Lib\Core\System.Security.Cryptography.Pkcs.dll'
-        'Lib\Core\MimeKit.dll'
-        'Lib\Core\MailKit.dll'
+        'Lib\Core\MimeKit.Cryptography.dll'
         'Lib\Core\Mailozaurr.Artifacts.dll'
         'Lib\Core\System.Security.Cryptography.ProtectedData.dll'
         'Lib\Core\Mailozaurr.Internet.dll'
@@ -54,7 +55,8 @@ $LibrariesByFolder = @{
         'Lib\Default\System.Numerics.Vectors.dll'
         'Lib\Default\System.Runtime.CompilerServices.Unsafe.dll'
         'Lib\Default\System.Memory.dll'
-        'Lib\Default\MimeKit.dll'
+        'Lib\Default\MimeKit.Core.dll'
+        'Lib\Default\MimeKit.Cryptography.dll'
         'Lib\Default\OfficeIMO.Security.dll'
         'Lib\Default\System.Diagnostics.DiagnosticSource.dll'
         'Lib\Default\System.Formats.Asn1.dll'
@@ -72,8 +74,8 @@ $LibrariesByFolder = @{
         'Lib\Default\OfficeIMO.Email.Html.dll'
         'Lib\Default\System.Text.Encodings.Web.dll'
         'Lib\Default\System.Threading.Tasks.Extensions.dll'
-        'Lib\Default\MailKit.dll'
         'Lib\Default\Microsoft.Bcl.AsyncInterfaces.dll'
+        'Lib\Default\MailKit.dll'
         'Lib\Default\System.IO.Pipelines.dll'
         'Lib\Default\System.Text.Json.dll'
         'Lib\Default\Mailozaurr.Internet.dll'
@@ -83,6 +85,12 @@ $LibrariesByFolder = @{
         'Lib\Default\Mailozaurr.MicrosoftGraph.dll'
         'Lib\Default\Mailozaurr.dll'
         'Lib\Default\Mailozaurr.PowerShell.dll'
+    )
+    'Core/runtimes/win/lib/net7.0' = @(
+        'Lib\Core/runtimes/win/lib/net7.0\System.Management.dll'
+    )
+    'Core/runtimes/win/lib/net8.0' = @(
+        'Lib\Core/runtimes/win/lib/net8.0\System.Security.Cryptography.Pkcs.dll'
     )
 }
 

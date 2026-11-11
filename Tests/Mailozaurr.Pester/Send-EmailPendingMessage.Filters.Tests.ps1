@@ -54,7 +54,7 @@ Describe 'Send-EmailPendingMessage provider and message filters' {
 
         if (-not ('MimeKit.MimeMessage' -as [type])) {
             $binaryDirectory = Split-Path (Get-Command Send-EmailPendingMessage).ImplementingType.Assembly.Location
-            Add-Type -Path (Join-Path $binaryDirectory 'MimeKit.dll')
+            Add-Type -Path (Join-Path $binaryDirectory 'MimeKit.Core.dll')
         }
 
         if (-not ('FilterRecordingPendingMessageSender' -as [type])) {

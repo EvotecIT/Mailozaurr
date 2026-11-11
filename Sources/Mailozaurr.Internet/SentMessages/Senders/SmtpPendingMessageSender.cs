@@ -83,7 +83,7 @@ public sealed class SmtpPendingMessageSender : IPendingMessageSender {
                 var password = DecodePassword(record.Password);
                 await client.AuthenticateAsync(record.UserName!, password, ct).ConfigureAwait(false);
             }
-            await client.SendAsync(message, ct).ConfigureAwait(false);
+            await SmtpSubmission.SendAsync(client, message, ct, record.PostSendErrors).ConfigureAwait(false);
         } finally {
             try {
                 if (client.IsConnected) {

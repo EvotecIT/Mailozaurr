@@ -1,3 +1,5 @@
+using System.Linq;
+using System;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
@@ -16,13 +18,14 @@ public sealed class TransportReliabilityTests {
     private sealed class CountingSmtpClient : ClientSmtp {
         public int Sends;
         public CancellationTokenSource? CancelSource;
-        public override Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
+        public override Task<MailKit.SendResult> SendAsync(MimeKit.FormatOptions options, MailKit.ISendRequest request, System.Threading.CancellationToken cancellationToken = default) {
+            var message = request.Message;
             Sends++;
             if (CancelSource != null) {
                 CancelSource.Cancel();
-                return Task.FromCanceled<string>(cancellationToken);
+                return Task.FromCanceled<MailKit.SendResult>(cancellationToken);
             }
-            return Task.FromResult("accepted");
+            return Task.FromResult(new MailKit.SendResult("accepted", request.Message.To.Mailboxes.ToArray(), Array.Empty<MimeKit.MailboxAddress>()));
         }
     }
 
@@ -296,7 +299,10 @@ public sealed class TransportReliabilityTests {
     }
 
     private sealed class BarrierSmtpClient(ConcurrentSendBarrier barrier) : ClientSmtp {
-        public override Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) => barrier.SendAsync();
+        public override async Task<MailKit.SendResult> SendAsync(MimeKit.FormatOptions options, MailKit.ISendRequest request, System.Threading.CancellationToken cancellationToken = default) {
+            var message = request.Message;
+            return new MailKit.SendResult(await barrier.SendAsync(), request.Message.To.Mailboxes.ToArray(), Array.Empty<MimeKit.MailboxAddress>());
+        }
     }
 
     [Fact]

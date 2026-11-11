@@ -69,7 +69,11 @@ public sealed class SmtpMailSendHandler : IMailSendHandler {
                     ProfileKind = profile.Kind,
                     ProviderMessageId = providerResult.MessageId ?? message.MessageId,
                     QueueMessageId = providerResult.MessageId ?? message.MessageId,
-                    Message = "Message sent successfully."
+                    Message = "Message sent successfully.",
+                    AcceptedRecipients = providerResult.AcceptedRecipients,
+                    RejectedRecipients = providerResult.RejectedRecipients,
+                    ResponseText = providerResult.ResponseText,
+                    PostSendErrors = providerResult.PostSendErrors
                 };
             }
 
@@ -82,6 +86,8 @@ public sealed class SmtpMailSendHandler : IMailSendHandler {
                         ProfileKind = profile.Kind,
                         Queued = true,
                         QueueMessageId = queuedId,
+                        IsTransient = providerResult.IsTransient,
+                        RejectedRecipients = providerResult.RejectedRecipients,
                         Message = $"Message queued after send failure: {providerResult.Error ?? providerResult.Message ?? "SMTP send failed."}"
                     };
                 }
@@ -92,7 +98,10 @@ public sealed class SmtpMailSendHandler : IMailSendHandler {
                 ProfileId = profile.Id,
                 ProfileKind = profile.Kind,
                 ProviderMessageId = providerResult.MessageId ?? message.MessageId,
-                Message = providerResult.Error ?? providerResult.Message ?? "SMTP send failed."
+                Message = providerResult.Error ?? providerResult.Message ?? "SMTP send failed.",
+                DeliveryUnknown = providerResult.DeliveryUnknown,
+                IsTransient = providerResult.IsTransient,
+                RejectedRecipients = providerResult.RejectedRecipients
             };
         } finally {
             SmtpSessionService.DisposeQuietly(session);
@@ -121,7 +130,11 @@ public sealed class SmtpMailSendHandler : IMailSendHandler {
                 Port = result.Port,
                 Attempts = result.Attempts,
                 IsTransient = result.IsTransient,
-                DeliveryUnknown = result.DeliveryUnknown
+                DeliveryUnknown = result.DeliveryUnknown,
+                AcceptedRecipients = result.AcceptedRecipients,
+                RejectedRecipients = result.RejectedRecipients,
+                ResponseText = result.ResponseText,
+                PostSendErrors = result.PostSendErrors
             };
         } finally {
             if (_deliverySession == null) session.Dispose();

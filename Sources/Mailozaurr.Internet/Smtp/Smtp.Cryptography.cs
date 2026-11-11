@@ -109,7 +109,7 @@ public partial class Smtp {
         using (var ctx = new TemporarySecureMimeContext()) {
             try {
                 var signer = new CmsSigner(certificate) {
-                    DigestAlgorithm = DigestAlgorithm.Sha1
+                    DigestAlgorithm = DigestAlgorithm.Sha256
                 };
                 message.Body = MultipartSigned.Create(ctx, signer, body!);
             } catch (Exception ex) {

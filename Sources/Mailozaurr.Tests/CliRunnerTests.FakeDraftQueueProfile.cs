@@ -9,6 +9,7 @@ namespace Mailozaurr.Tests;
 
 public sealed partial class CliRunnerTests {
     private sealed class FakeQueueService : IMailQueueService {
+        public DateTimeOffset? DeliveryUnknownAt { get; set; }
         public string? LastGetMessageId { get; private set; }
 
         public string? LastRemoveMessageId { get; private set; }
@@ -34,6 +35,7 @@ public sealed partial class CliRunnerTests {
                 Provider = "Gmail",
                 ProfileKind = MailProfileKind.Gmail,
                 QueuedAt = DateTimeOffset.UtcNow.AddMinutes(-5),
+                DeliveryUnknownAt = DeliveryUnknownAt,
                 NextAttemptAt = DateTimeOffset.UtcNow.AddMinutes(1)
             });
         }
@@ -59,6 +61,7 @@ public sealed partial class CliRunnerTests {
                     Provider = "Gmail",
                     ProfileKind = MailProfileKind.Gmail,
                     QueuedAt = DateTimeOffset.UtcNow.AddMinutes(-10),
+                    DeliveryUnknownAt = DeliveryUnknownAt,
                     NextAttemptAt = DateTimeOffset.UtcNow.AddMinutes(1),
                     AttemptCount = 1,
                     HasProviderData = true

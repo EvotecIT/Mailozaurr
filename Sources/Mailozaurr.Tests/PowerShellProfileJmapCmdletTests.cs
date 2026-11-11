@@ -107,8 +107,8 @@ public sealed class PowerShellProfileJmapCmdletTests {
     private static object[] Contract<T>(string verb, string noun, bool supportsShouldProcess) =>
         new object[] { typeof(T), verb, noun, supportsShouldProcess };
 
-    private static string FindRepositoryFile(string fileName) {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+    private static string FindRepositoryFile(string fileName, [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = "") {
+        var directory = new DirectoryInfo(Path.GetDirectoryName(sourceFile)!);
         while (directory != null) {
             string candidate = Path.Combine(directory.FullName, fileName);
             if (File.Exists(candidate)) return candidate;

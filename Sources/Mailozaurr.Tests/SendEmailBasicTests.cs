@@ -1,3 +1,5 @@
+using System.Linq;
+using System;
 using Mailozaurr;
 using Mailozaurr.Definitions;
 using MimeKit;
@@ -16,10 +18,11 @@ namespace Mailozaurr.Tests {
             public bool SendCalled;
             public MimeMessage? LastMessage;
 
-            public override Task<string> SendAsync(MimeMessage message, System.Threading.CancellationToken cancellationToken = default, MailKit.ITransferProgress? progress = null) {
+            public override Task<MailKit.SendResult> SendAsync(MimeKit.FormatOptions options, MailKit.ISendRequest request, System.Threading.CancellationToken cancellationToken = default) {
+            var message = request.Message;
                 SendCalled = true;
                 LastMessage = message;
-                return Task.FromResult(string.Empty);
+                return Task.FromResult(new MailKit.SendResult(string.Empty, request.Message.To.Mailboxes.ToArray(), Array.Empty<MimeKit.MailboxAddress>()));
             }
         }
 

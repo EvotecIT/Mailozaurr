@@ -12,7 +12,8 @@ public sealed class ApplicationSmtpMailSendHandlerTests {
                 Assert.Equal("alice@example.com", message.To.Mailboxes.First().Address);
                 Assert.Equal("Hello SMTP", message.Subject);
                 return Task.FromResult(new SmtpResult(true, EmailAction.Send, "alice@example.com", "sender@example.com", "smtp.example.com", 587, TimeSpan.Zero) {
-                    MessageId = "smtp-msg-123"
+                    MessageId = "smtp-msg-123",
+                    PostSendErrors = new() { "Completion observer failed" }
                 });
             });
 
@@ -42,6 +43,7 @@ public sealed class ApplicationSmtpMailSendHandlerTests {
         Assert.Equal("work-smtp", result.ProfileId);
         Assert.Equal(MailProfileKind.Smtp, result.ProfileKind);
         Assert.Equal("smtp-msg-123", result.ProviderMessageId);
+        Assert.Equal("Completion observer failed", Assert.Single(result.PostSendErrors));
     }
 
     [Fact]
@@ -65,7 +67,9 @@ public sealed class ApplicationSmtpMailSendHandlerTests {
 
                 return new SmtpResult(false, EmailAction.Send, "alice@example.com", "sender@example.com", "smtp.example.com", 587, TimeSpan.Zero, error: "temporary smtp failure") {
                     MessageId = message.MessageId ?? "queued-1",
-                    Queued = true
+                    Queued = true,
+                    IsTransient = true,
+                    RejectedRecipients = new[] { "alice@example.com" }
                 };
             });
 
@@ -93,6 +97,8 @@ public sealed class ApplicationSmtpMailSendHandlerTests {
 
         Assert.True(result.Succeeded);
         Assert.True(result.Queued);
+        Assert.True(result.IsTransient);
+        Assert.Equal(new[] { "alice@example.com" }, result.RejectedRecipients);
         Assert.NotNull(result.QueueMessageId);
         Assert.Contains("queued", result.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }

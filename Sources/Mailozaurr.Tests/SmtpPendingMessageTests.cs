@@ -1,3 +1,5 @@
+using System.Linq;
+using System;
 using MailKit;
 using MimeKit;
 using System.IO;
@@ -12,14 +14,16 @@ namespace Mailozaurr.Tests;
 
 public sealed class SmtpPendingMessageTests {
     private sealed class FailClient : ClientSmtp {
-        public override Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
+        public override Task<MailKit.SendResult> SendAsync(MimeKit.FormatOptions options, MailKit.ISendRequest request, System.Threading.CancellationToken cancellationToken = default) {
+            var message = request.Message;
             throw new Exception("fail");
         }
     }
 
     private sealed class SuccessClient : ClientSmtp {
-        public override Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
-            return Task.FromResult(string.Empty);
+        public override Task<MailKit.SendResult> SendAsync(MimeKit.FormatOptions options, MailKit.ISendRequest request, System.Threading.CancellationToken cancellationToken = default) {
+            var message = request.Message;
+            return Task.FromResult(new MailKit.SendResult(string.Empty, request.Message.To.Mailboxes.ToArray(), Array.Empty<MimeKit.MailboxAddress>()));
         }
     }
 

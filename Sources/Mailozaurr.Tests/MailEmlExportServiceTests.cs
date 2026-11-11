@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text;
 using MailKit;
 using MailKit.Net.Pop3;
@@ -1386,7 +1387,7 @@ public sealed class MailEmlExportServiceTests {
 
         public override int Count => _messages.Count;
 
-        public override int GetMessageSize(int index, CancellationToken cancellationToken = default) =>
+        public override long GetMessageSize(int index, CancellationToken cancellationToken = default) =>
             index == _oversizedIndex ? 4096 : AnnouncedSizeOverride ?? GetBytes(_messages[index]).Length;
 
         public override Task<IList<string>> GetMessageUidsAsync(CancellationToken cancellationToken = default) {

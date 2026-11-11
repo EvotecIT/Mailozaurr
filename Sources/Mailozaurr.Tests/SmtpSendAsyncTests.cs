@@ -1,3 +1,5 @@
+using System.Linq;
+using System;
 using MailKit;
 using MimeKit;
 using System.Reflection;
@@ -10,9 +12,10 @@ namespace Mailozaurr.Tests;
 public class SmtpSendAsyncTests {
     private class FakeClient : ClientSmtp {
         public bool Called;
-        public override Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
+        public override Task<MailKit.SendResult> SendAsync(MimeKit.FormatOptions options, MailKit.ISendRequest request, System.Threading.CancellationToken cancellationToken = default) {
+            var message = request.Message;
             Called = true;
-            return Task.FromResult(string.Empty);
+            return Task.FromResult(new MailKit.SendResult(string.Empty, request.Message.To.Mailboxes.ToArray(), Array.Empty<MimeKit.MailboxAddress>()));
         }
     }
 

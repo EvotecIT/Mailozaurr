@@ -98,6 +98,7 @@ public class TemporarySmimeCertificateTests {
         var signResult = smtp.Sign(cert);
 
         Assert.True(signResult.Status);
+        Assert.Equal("sha-256", Assert.IsType<MimeKit.Cryptography.MultipartSigned>(smtp.Message.Body).ContentType.Parameters["micalg"]);
         Assert.True(MimeKitUtils.VerifySmimeSignature(smtp.Message, cert));
     }
 

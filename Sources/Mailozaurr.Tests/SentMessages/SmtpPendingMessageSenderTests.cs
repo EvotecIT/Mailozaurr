@@ -1,3 +1,5 @@
+using System.Linq;
+using System;
 using MailKit;
 using MailKit.Security;
 using MimeKit;
@@ -23,9 +25,10 @@ public sealed class SmtpPendingMessageSenderTests {
             return Task.CompletedTask;
         }
 
-        public override Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
+        public override Task<MailKit.SendResult> SendAsync(MimeKit.FormatOptions options, MailKit.ISendRequest request, System.Threading.CancellationToken cancellationToken = default) {
+            var message = request.Message;
             SentMessage = message;
-            return Task.FromResult(message.MessageId ?? string.Empty);
+            return Task.FromResult(new MailKit.SendResult(message.MessageId ?? string.Empty, request.Message.To.Mailboxes.ToArray(), Array.Empty<MimeKit.MailboxAddress>()));
         }
 
         public override Task DisconnectAsync(bool quit, CancellationToken cancellationToken = default) {

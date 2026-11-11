@@ -143,6 +143,9 @@ public sealed class SmtpDeliverySession : IDisposable {
                         (transportStarted && IsTransient(exception));
                     var unknown = sending && transient && exception is not SmtpCommandException;
                     last = Failure(message, host.Endpoint.Server, host.Endpoint.Port, exception.Message, transient, unknown);
+                    if (exception is SmtpCommandException { ErrorCode: SmtpErrorCode.RecipientNotAccepted, Mailbox: not null } rejection) {
+                        last.RejectedRecipients = new[] { rejection.Mailbox.Address };
+                    }
                 }
                 AddAttempt(attempts, host, number, last!);
                 DropConnection(host);
@@ -242,7 +245,7 @@ public sealed class SmtpDeliverySession : IDisposable {
         // AuthenticationException wraps the server's command failure; SMTP status takes precedence over wrapper type.
         for (Exception? current = exception; current != null; current = current.InnerException) {
             if (current is SmtpCommandException command)
-                return (int)command.StatusCode >= 400 && (int)command.StatusCode < 500;
+                return command.IsTransient;
         }
         if (exception is MailKit.Security.AuthenticationException authentication) {
             // Explicit SASL authentication preserves SMTP status only in MailKit's invariant "ddd: " prefix.

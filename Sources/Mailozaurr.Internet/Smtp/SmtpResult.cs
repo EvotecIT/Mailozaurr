@@ -30,6 +30,12 @@ public class SmtpResult {
     public bool IsTransient { get; set; }
     /// <summary>Whether a send lost transport confirmation and acceptance is unknown.</summary>
     public bool DeliveryUnknown { get; set; }
+    /// <summary>Envelope recipients accepted with a confirmed message submission.</summary>
+    public IReadOnlyList<string> AcceptedRecipients { get; set; } = Array.Empty<string>();
+    /// <summary>Envelope recipients explicitly rejected by the SMTP server.</summary>
+    public IReadOnlyList<string> RejectedRecipients { get; set; } = Array.Empty<string>();
+    /// <summary>Final SMTP submission response, when confirmed.</summary>
+    public string? ResponseText { get; set; }
     /// <summary>Optional message returned by the operation.</summary>
     public string? Message { get; set; }
     /// <summary>Time taken to perform the action.</summary>
