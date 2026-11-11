@@ -175,6 +175,7 @@ public sealed class PendingMessageProcessor {
                     leasedRecord.ProcessingLeaseUntil = null;
                     leasedRecord.ProcessingLeaseId = null;
                     await SaveOwnedAsync(leasedRecord, leaseId, CancellationToken.None).ConfigureAwait(false);
+                    cancellationLeaseReleased = true;
                     observer.MessageFailed(leasedRecord, attempt, ex, stopwatch.Elapsed, willRetry: false, retryDelay: null);
                     logger?.WriteWarning($"SMTP delivery of {leasedRecord.MessageId} is unknown; automatic retries are suspended pending reconciliation.");
                     cancellationToken.ThrowIfCancellationRequested();
@@ -233,6 +234,7 @@ public sealed class PendingMessageProcessor {
                 }
 
                 // Provider acceptance and queue acknowledgement are separate outcomes.
+                foreach (var error in leasedRecord.PostSendErrors) logger?.WriteWarning($"Accepted delivery of {leasedRecord.MessageId}: {error}");
                 // Persist an accepted marker before removing the record so a failed
                 // removal cannot turn a successful send into another delivery attempt.
                 var acceptedRecord = leasedRecord.Clone();

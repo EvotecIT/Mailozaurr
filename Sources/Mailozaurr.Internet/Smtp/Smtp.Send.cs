@@ -370,10 +370,11 @@ public partial class Smtp {
         if (readinessResult != null) return readinessResult;
         var messageId = EnsureMessageId();
         MarkTransportAttempted();
+        var postSendErrors = new List<string>();
         MailKit.SendResult sendResult;
         for (var attempt = 0; ; attempt++) {
             try {
-                sendResult = await SmtpSubmission.SendAsync(Client, Message, cancellationToken).ConfigureAwait(false);
+                sendResult = await SmtpSubmission.SendAsync(Client, Message, cancellationToken, postSendErrors).ConfigureAwait(false);
                 break;
             } catch (SmtpDeliveryUnknownException) when (cancellationToken.IsCancellationRequested) {
                 throw new OperationCanceledException(cancellationToken);
@@ -399,7 +400,7 @@ public partial class Smtp {
             }
         }
         var result = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging) {
-            MessageId = messageId, DeliveryAccepted = true, ResponseText = sendResult.ResponseText,
+            MessageId = messageId, DeliveryAccepted = true, ResponseText = sendResult.ResponseText, PostSendErrors = postSendErrors,
             AcceptedRecipients = sendResult.AcceptedRecipients.Select(mailbox => mailbox.Address).ToArray(),
             RejectedRecipients = sendResult.RejectedRecipients.Select(mailbox => mailbox.Address).ToArray()
         };

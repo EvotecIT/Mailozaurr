@@ -29,6 +29,8 @@ public sealed class PendingMessageRecord {
     public DateTimeOffset? DeliveryAcceptedAt { get; set; }
     /// <summary>Time a submission lost confirmation. Clear only after reconciling delivery; automatic retries are suspended.</summary>
     public DateTimeOffset? DeliveryUnknownAt { get; set; }
+    /// <summary>Failures in completion notifications after confirmed acceptance. These must not trigger a resend.</summary>
+    public List<string> PostSendErrors { get; set; } = new();
 
     /// <summary>
     /// Time when a terminal failure was durably recorded on the active queue.
@@ -113,6 +115,7 @@ public sealed class PendingMessageRecord {
         NextAttemptAt = NextAttemptAt,
         DeliveryAcceptedAt = DeliveryAcceptedAt,
         DeliveryUnknownAt = DeliveryUnknownAt,
+        PostSendErrors = new List<string>(PostSendErrors),
         DeadLetteredAt = DeadLetteredAt,
         DeadLetterReason = DeadLetterReason,
         DeadLetterAttempt = DeadLetterAttempt,

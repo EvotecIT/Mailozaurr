@@ -457,7 +457,11 @@ The .NET `Smtp.SendAsync` result reports SMTP acceptance through `Status` and `D
 
 An interrupted SMTP submission can leave acceptance unknown. `DeliveryUnknown` stops direct retries and queue-on-failure even when `RetryAlways` is enabled. Queued SMTP attempts persist a hold before submission; `DeliveryUnknownAt` retains that hold if confirmation is lost. Later workers, selected-message processing, and `ProcessAll` leave held records untouched until delivery has been reconciled. Cancellation during submission propagates as cancellation and retains the queue hold. Cancellation before submission does not consume a delivery attempt. Inspect the server's delivery evidence before explicitly clearing a hold or submitting a replacement.
 
+Custom SMTP queue senders signal an uncertain submission by throwing `SmtpDeliveryUnknownException`, including when cancellation interrupts confirmation. Use the original exception for failures known to occur before submission so those failures can retain the normal retry behavior.
+
 A failed sent-log write, queue acknowledgement, or webhook notification appears in `PostSendErrors` and does not trigger another SMTP send. `Smtp.ProcessPendingMessagesAsync` uses the shared queue processor's leases and acceptance markers and processes SMTP records only. S/MIME signing uses SHA-256. MailKit/MimeKit 5 expose new request, capability, and assembly contracts; C# consumers using their types should follow the upstream [MailKit](https://github.com/jstedfast/MailKit/blob/master/PortingGuide.md) and [MimeKit](https://github.com/jstedfast/MimeKit/blob/master/PortingGuide.md) porting guides when rebuilding.
+
+SMTP acceptance is captured before `MessageSent` notifications run. A failing completion handler preserves acceptance and reports its failure through `SmtpResult.PostSendErrors` and normalized `SendResult.PostSendErrors`. Queue observers can inspect the pending record's `PostSendErrors` in `IPendingMessageProcessorObserver.MessageSent`.
 
 When upgrading workers that share a pending-message log, let in-flight sends finish, then stop every queue processor, including scheduled and forced PowerShell runs, before updating them. Restart processing after all workers use the new version; existing queued records remain readable. Forced retries can process pre-upgrade scheduled records immediately after restart. Do not run an older worker against a log written by the new version: older compaction can discard acceptance and lease markers, and older forced retries can ignore active leases.
 
@@ -674,7 +678,7 @@ listener.MessageArrived += (s, msg) =>
 await listener.StartAsync();
 ```
 
-Call `Stop()` to end listening. See
+Call `Stop()` to request shutdown or await `StopAsync()` to finish it. The listener uses `ImapIdleSession` for IDLE renewal and NOOP fallback. Unfiltered listeners ignore flag-only batches; filtered listeners recheck the query when flags can affect membership. An unresponsive wait gets a two-second graceful shutdown window before its connection is disconnected. If the transport wait remains pending after disconnect, the client is disposed and must be replaced. See
 `Sources/Mailozaurr.Examples/ImapIdleListenerExample.cs` for a full example.
 
 Alternatively, use the PowerShell cmdlet `Wait-IMAPMessage` to output new

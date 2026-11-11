@@ -4,6 +4,7 @@ using MailKit.Search;
 using MimeKit;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -127,7 +128,7 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
     public void Stop() => _cancel?.Cancel();
 
     /// <summary>
-    /// Stops listening for new messages and waits for the listener loop to finish.
+    /// Stops listening and waits for the loop to finish. After a two-second graceful shutdown window, an unresponsive IDLE/NOOP connection is disconnected. A client whose wait remains pending is disposed and must be replaced.
     /// </summary>
     public async Task StopAsync() {
         var idleTask = _idleTask;
@@ -165,6 +166,9 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
                     await WaitForNewMessagesAsync().ConfigureAwait(false);
                 } catch (OperationCanceledException) when (_cancel.IsCancellationRequested) {
                     break;
+                } catch (Exception) when (_cancel.IsCancellationRequested) {
+                    // Forced disconnect can surface an I/O/protocol failure.
+                    break;
                 } catch (Exception ex) {
                     IdleError?.Invoke(this, ex);
                     try {
@@ -180,8 +184,33 @@ public class ImapIdleListener : IDisposable, IAsyncDisposable {
     }
 
     private async Task WaitForNewMessagesAsync() {
-        await _idleSession!.WaitForChangesAsync(_cancel!.Token).ConfigureAwait(false);
-        _messagesArrived = true;
+        var token = _cancel!.Token;
+        var cancelled = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = token.Register(() => cancelled.TrySetResult(true));
+        var wait = _idleSession!.WaitForChangesAsync(token);
+        if (await Task.WhenAny(wait, cancelled.Task).ConfigureAwait(false) != wait &&
+            await Task.WhenAny(wait, Task.Delay(TimeSpan.FromSeconds(2))).ConfigureAwait(false) != wait) {
+            try {
+                _client.Disconnect(quit: false);
+            } finally {
+                if (!wait.IsCompleted) {
+                    // A NOOP started without a transport token can outlive socket
+                    // closure. Prevent reuse and observe its eventual failure,
+                    // even if a disconnect notification throws.
+                    _ = wait.ContinueWith(completed => { _ = completed.Exception; }, CancellationToken.None,
+                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                    _client.Dispose();
+                }
+            }
+            token.ThrowIfCancellationRequested();
+        }
+        var changes = await wait.ConfigureAwait(false);
+        // CountChanged may already have recorded an arrival during a command.
+        // Filtered queries can depend on flags; an unfiltered listener only
+        // needs to rescan for arrivals, not for unrelated flag batches.
+        _messagesArrived |= changes.Events.Any(change => ReferenceEquals(change.Folder, _folder) &&
+            (_searchQuery != null && _searchQuery.Term != SearchTerm.All ||
+             change is CountChangedIdleEvent count && count.Count > count.PreviousCount));
     }
 
     private async Task FetchNewMessagesAsync() {

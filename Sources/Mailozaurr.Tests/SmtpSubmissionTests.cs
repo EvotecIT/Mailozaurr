@@ -5,6 +5,81 @@ namespace Mailozaurr.Tests;
 
 public sealed class SmtpSubmissionTests {
     [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task DirectSend_CompletionHandlerFailureDoesNotRetryOrQueue(int failureKind) {
+        await using var server = new LoopbackSmtpServer();
+        var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr-submission", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        Smtp? smtp = null;
+        try {
+            var queue = new FilePendingMessageRepository(Path.Combine(directory, "pending.jsonl"));
+            smtp = await ConnectAsync(server, queue);
+            using var caller = new CancellationTokenSource();
+            smtp.Client.MessageSent += (_, _) => {
+                if (failureKind == 2) {
+                    caller.Cancel();
+                    throw new OperationCanceledException("Completion observer failed", caller.Token);
+                }
+                throw failureKind == 1 ? new IOException("Completion observer failed") : new InvalidOperationException("Completion observer failed");
+            };
+            smtp.RetryAlways = true;
+            smtp.RetryCount = 2;
+            var result = await smtp.SendAsync(caller.Token);
+            Assert.True(result.Status);
+            Assert.True(result.DeliveryAccepted);
+            Assert.False(result.DeliveryUnknown);
+            Assert.False(result.Queued);
+            Assert.Equal(1, server.Accepted);
+            Assert.Equal(1, server.ContentSubmissions);
+            Assert.Contains("Completion observer failed", Assert.Single(result.PostSendErrors));
+            Assert.Null(await queue.GetByMessageIdAsync(result.MessageId!));
+        } finally { smtp?.Dispose(); Directory.Delete(directory, recursive: true); }
+    }
+
+    [Fact]
+    public async Task QueuedSend_CompletionHandlerFailureDoesNotBecomeARejectedDelivery() {
+        await using var server = new LoopbackSmtpServer();
+        var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr-submission", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        Smtp? smtp = null;
+        try {
+            var queue = new FilePendingMessageRepository(Path.Combine(directory, "pending.jsonl"));
+            smtp = await ConnectAsync(server);
+            using var stream = new MemoryStream();
+            await smtp.Message.WriteToAsync(stream);
+            await queue.SaveAsync(new PendingMessageRecord {
+                MessageId = "completion@example.invalid", Server = "127.0.0.1", Port = server.Port,
+                MimeMessage = Convert.ToBase64String(stream.ToArray()), ProviderData = new() { ["SecureSocketOptions"] = "None" }
+            });
+            var sender = new SmtpPendingMessageSender(() => {
+                var client = new ClientSmtp();
+                client.MessageSent += (_, _) => throw new InvalidOperationException("Completion observer failed");
+                return client;
+            });
+            var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> { [EmailProvider.None] = sender });
+            var observer = new AcceptanceObserver();
+            await new PendingMessageProcessor(queue, factory, observer: observer).ProcessAsync();
+            Assert.NotNull(observer.Sent);
+            Assert.Contains("Completion observer failed", Assert.Single(observer.Sent!.PostSendErrors));
+            Assert.Equal(1, server.Accepted);
+            Assert.Null(await queue.GetByMessageIdAsync("completion@example.invalid"));
+            await new PendingMessageProcessor(queue, factory, observer: observer).ProcessAsync();
+            Assert.Equal(1, server.ContentSubmissions);
+        } finally { smtp?.Dispose(); Directory.Delete(directory, recursive: true); }
+    }
+
+    private sealed class AcceptanceObserver : IPendingMessageProcessorObserver {
+        internal PendingMessageRecord? Sent;
+        public void MessageSent(PendingMessageRecord record, int attempt, TimeSpan duration) => Sent = record.Clone();
+        public void MessageSkipped(PendingMessageRecord record, PendingMessageSkipReason reason) { }
+        public void MessageAttemptStarted(PendingMessageRecord record, int attempt) { }
+        public void MessageFailed(PendingMessageRecord record, int attempt, Exception exception, TimeSpan duration, bool willRetry, TimeSpan? retryDelay) { }
+        public void MessageDropped(PendingMessageRecord record, int attempt, PendingMessageDropReason reason, Exception? exception) { }
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task DirectSend_LostConfirmationDoesNotRetryOrQueue(bool retryAlways) {
@@ -58,8 +133,10 @@ public sealed class SmtpSubmissionTests {
         }
     }
 
-    [Fact]
-    public async Task QueuedSend_LostConfirmationRemainsHeldAfterRepositoryReload() {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task QueuedSend_LostConfirmationRemainsHeldAfterRepositoryReload(bool customSender) {
         await using var server = new LoopbackSmtpServer(dropAfterData: true);
         var directory = Path.Combine(Path.GetTempPath(), "Mailozaurr-submission", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
@@ -77,18 +154,29 @@ public sealed class SmtpSubmissionTests {
                 MimeMessage = Convert.ToBase64String(stream.ToArray()),
                 ProviderData = new() { ["SecureSocketOptions"] = "None" }
             });
-            await new PendingMessageProcessor(queue).ProcessAsync();
+            var sender = new UnknownSender();
+            var factory = customSender ? new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> { [EmailProvider.None] = sender }) : null;
+            await new PendingMessageProcessor(queue, factory).ProcessAsync();
             var reloaded = new FilePendingMessageRepository(path);
             var held = await reloaded.GetByMessageIdAsync("unknown@example.invalid");
             Assert.NotNull(held);
             Assert.NotNull(held.DeliveryUnknownAt);
             Assert.Null(held.DeliveryAcceptedAt);
             Assert.Equal(1, held.AttemptCount);
-            await new PendingMessageProcessor(reloaded).ProcessAsync();
-            Assert.Equal(1, server.ContentSubmissions);
-            Assert.Equal(1, server.Connections);
+            await new PendingMessageProcessor(reloaded, factory).ProcessAsync();
+            Assert.Equal(customSender ? 0 : 1, server.ContentSubmissions);
+            Assert.Equal(customSender ? 0 : 1, server.Connections);
+            if (customSender) Assert.Equal(1, sender.Calls);
         } finally {
             Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private sealed class UnknownSender : IPendingMessageSender {
+        internal int Calls;
+        public Task SendAsync(PendingMessageRecord record, CancellationToken ct) {
+            Calls++;
+            throw new SmtpDeliveryUnknownException(new IOException("Custom transport lost confirmation"));
         }
     }
 

@@ -94,7 +94,7 @@ public partial class ClientSmtp : SmtpClient {
     /// </summary>
     /// <param name="message">The message being sent.</param>
     /// <returns>The per-message SMTP request.</returns>
-    internal SmtpSendRequest CreateSendRequest(MimeMessage message) => new(message) {
+    internal SmtpSubmissionRequest CreateSendRequest(MimeMessage message) => new(message) {
         DeliveryStatusNotificationType = DeliveryStatusNotificationType,
         DeliveryStatusNotifications = GetDeliveryStatusNotifications()
     };

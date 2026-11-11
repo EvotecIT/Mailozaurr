@@ -72,7 +72,8 @@ public sealed class SmtpMailSendHandler : IMailSendHandler {
                     Message = "Message sent successfully.",
                     AcceptedRecipients = providerResult.AcceptedRecipients,
                     RejectedRecipients = providerResult.RejectedRecipients,
-                    ResponseText = providerResult.ResponseText
+                    ResponseText = providerResult.ResponseText,
+                    PostSendErrors = providerResult.PostSendErrors
                 };
             }
 
@@ -132,7 +133,8 @@ public sealed class SmtpMailSendHandler : IMailSendHandler {
                 DeliveryUnknown = result.DeliveryUnknown,
                 AcceptedRecipients = result.AcceptedRecipients,
                 RejectedRecipients = result.RejectedRecipients,
-                ResponseText = result.ResponseText
+                ResponseText = result.ResponseText,
+                PostSendErrors = result.PostSendErrors
             };
         } finally {
             if (_deliverySession == null) session.Dispose();
