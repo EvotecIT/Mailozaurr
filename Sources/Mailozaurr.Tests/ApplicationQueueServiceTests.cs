@@ -4,6 +4,29 @@ namespace Mailozaurr.Tests;
 
 public sealed class ApplicationQueueServiceTests {
     [Fact]
+    public async Task UnknownDeliveryRemainsVisibleAndNotDueThroughEveryQueueProjection() {
+        string directory = CreateTemporaryDirectory();
+        try {
+            var repository = new FilePendingMessageRepository(Path.Combine(directory, "pending.jsonl"));
+            var unknownAt = DateTimeOffset.UtcNow.AddMinutes(-2);
+            await repository.SaveAsync(new PendingMessageRecord {
+                MessageId = "held", DeliveryUnknownAt = unknownAt,
+                NextAttemptAt = unknownAt, MimeMessage = Convert.ToBase64String(Array.Empty<byte>())
+            });
+            var service = new PendingMailQueueService(repository);
+            Assert.Equal(unknownAt, Assert.Single(await service.ListAsync()).DeliveryUnknownAt);
+            Assert.Equal(unknownAt, (await service.GetAsync("held"))!.DeliveryUnknownAt);
+            var compactList = Assert.Single(await service.ListCompactAsync());
+            var compactGet = (await service.GetCompactAsync("held"))!;
+            Assert.All(new[] { compactList, compactGet }, message => {
+                Assert.Equal(unknownAt, message.DeliveryUnknownAt);
+                Assert.False(message.IsDue);
+                Assert.Contains("reconciliation", message.Summary);
+            });
+        } finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Fact]
     public async Task ListAsyncReturnsQueuedMessagesInScheduleOrder() {
         var repository = new FilePendingMessageRepository(new PendingMessageRepositoryOptions {
             DirectoryPath = CreateTemporaryDirectory()

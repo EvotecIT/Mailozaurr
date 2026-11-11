@@ -20,6 +20,7 @@ public partial class Smtp {
             var originalIdentity = smtp.ConnectionPoolIdentity;
             var originalCredential = smtp.Credential;
             var originalAuthMode = smtp.credentialAuthMode;
+            SmtpResult? acceptedResult = null;
             try {
                 var data = record.ProviderData;
                 var options = originalSecureOptions;
@@ -46,12 +47,12 @@ public partial class Smtp {
                 }
                 await SmtpSubmission.SendAsync(smtp.Client, message, ct, record.PostSendErrors).ConfigureAwait(false);
                 // Sent-log failures must not turn an accepted provider send into a retry.
-                var result = new SmtpResult(true, EmailAction.Send, SentMessageRecipients.Serialize(message.To),
+                acceptedResult = new SmtpResult(true, EmailAction.Send, SentMessageRecipients.Serialize(message.To),
                     Helpers.GetEmailAddress(message.From.Mailboxes.FirstOrDefault() ?? (object)string.Empty),
                     server ?? string.Empty, record.Port ?? smtp.Port, TimeSpan.Zero) {
-                    DeliveryAccepted = true, MessageId = record.MessageId
+                    DeliveryAccepted = true, MessageId = record.MessageId, PostSendErrors = record.PostSendErrors
                 };
-                await smtp.RecordPostSendErrorAsync(result, "Sent-log persistence", async () => {
+                await smtp.RecordPostSendErrorAsync(acceptedResult, "Sent-log persistence", async () => {
                     if (smtp.SentMessageRepository != null) {
                         await smtp.SentMessageRepository.SaveAsync(new SentMessageRecord {
                             MessageId = message.MessageId ?? record.MessageId,
@@ -62,10 +63,16 @@ public partial class Smtp {
                 }).ConfigureAwait(false);
             } finally {
                 try { smtp.Disconnect(); } catch (Exception exception) {
-                    if (smtp.SuppressDiagnostics) {
+                    if (acceptedResult != null) {
+                        smtp.RecordPostSendError(acceptedResult, "SMTP disconnect", exception);
+                    } else if (smtp.SuppressDiagnostics) {
                         SmtpSessionService.TraceDisconnectFailureQuietly();
                     } else {
-                        smtp.LogWarning($"ProcessPendingMessages - Disconnect failed: {exception.Message}");
+                        try {
+                            smtp.LogWarning($"ProcessPendingMessages - Disconnect failed: {exception.Message}");
+                        } catch (Exception) {
+                            // Preserve the original send failure and restore transport settings.
+                        }
                     }
                 }
                 smtp.SkipCertificateValidation = originalSkip;

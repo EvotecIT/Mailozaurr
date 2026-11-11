@@ -142,6 +142,7 @@ public sealed class PendingMailQueueService : IMailQueueService {
         QueuedAt = record.Timestamp,
         NextAttemptAt = record.NextAttemptAt,
         AttemptCount = record.AttemptCount,
+        DeliveryUnknownAt = record.DeliveryUnknownAt,
         HasProviderData = record.ProviderData.Count > 0
     };
 
@@ -160,14 +161,17 @@ public sealed class PendingMailQueueService : IMailQueueService {
         ProfileKind = message.ProfileKind,
         NextAttemptAt = message.NextAttemptAt,
         AttemptCount = message.AttemptCount,
-        IsDue = message.NextAttemptAt <= DateTimeOffset.UtcNow,
+        DeliveryUnknownAt = message.DeliveryUnknownAt,
+        IsDue = !message.DeliveryUnknownAt.HasValue && message.NextAttemptAt <= DateTimeOffset.UtcNow,
         HasProviderData = message.HasProviderData,
         IsDeadLetter = message.IsDeadLetter,
         DeadLetterReason = message.DeadLetterReason,
         ErrorMessage = message.ErrorMessage,
         Summary = message.IsDeadLetter
             ? $"{message.MessageId} [{message.Provider}] dead-letter={message.DeadLetterReason} error={message.ErrorMessage ?? "(none)"}"
-            : $"{message.MessageId} [{message.Provider}] attempts={message.AttemptCount} next={message.NextAttemptAt:O}"
+            : message.DeliveryUnknownAt.HasValue
+                ? $"{message.MessageId} [{message.Provider}] delivery unknown; reconciliation required since {message.DeliveryUnknownAt:O}"
+                : $"{message.MessageId} [{message.Provider}] attempts={message.AttemptCount} next={message.NextAttemptAt:O}"
     };
 
     private static MailProfileKind MapProfileKind(EmailProvider provider) => provider switch {

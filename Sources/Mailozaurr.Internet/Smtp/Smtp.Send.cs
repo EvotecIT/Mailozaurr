@@ -404,7 +404,10 @@ public partial class Smtp {
             AcceptedRecipients = sendResult.AcceptedRecipients.Select(mailbox => mailbox.Address).ToArray(),
             RejectedRecipients = sendResult.RejectedRecipients.Select(mailbox => mailbox.Address).ToArray()
         };
-        LogVerbose($"Send-EmailMessage - Sent email to {SentTo}");
+        await RecordPostSendErrorAsync(result, "Completion notification", () => {
+            LogVerbose($"Send-EmailMessage - Sent email to {SentTo}");
+            return Task.CompletedTask;
+        }).ConfigureAwait(false);
         return await CompleteAcceptedSendAsync(result, cancellationToken).ConfigureAwait(false);
     }
 

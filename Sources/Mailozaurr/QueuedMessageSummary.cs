@@ -22,6 +22,9 @@ public sealed class QueuedMessageSummary {
     /// <summary>Number of delivery attempts already performed.</summary>
     public int AttemptCount { get; set; }
 
+    /// <summary>When SMTP confirmation was lost. Automatic delivery is suspended until reconciliation.</summary>
+    public DateTimeOffset? DeliveryUnknownAt { get; set; }
+
     /// <summary>Whether provider-specific metadata is present.</summary>
     public bool HasProviderData { get; set; }
 

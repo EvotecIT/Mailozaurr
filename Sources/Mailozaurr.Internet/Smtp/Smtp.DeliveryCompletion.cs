@@ -34,9 +34,17 @@ public partial class Smtp {
         try {
             await action().ConfigureAwait(false);
         } catch (Exception exception) {
-            var error = $"{stage}: {exception.Message}";
-            result.PostSendErrors.Add(error);
+            RecordPostSendError(result, stage, exception);
+        }
+    }
+
+    private void RecordPostSendError(SmtpResult result, string stage, Exception exception) {
+        var error = $"{stage}: {exception.Message}";
+        result.PostSendErrors.Add(error);
+        try {
             LogWarning($"Send-EmailMessage - {error}");
+        } catch (Exception diagnosticFailure) {
+            result.PostSendErrors.Add($"Completion diagnostics: {diagnosticFailure.Message}");
         }
     }
 }
