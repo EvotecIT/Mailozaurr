@@ -93,7 +93,9 @@ public static partial class CliRunner {
                 }
                 var queuedMessages = await application.Queue.ListAsync().ConfigureAwait(false);
                 await WriteSequenceAsync(output, queuedMessages, json, message =>
-                    $"{message.MessageId} [{message.Provider}] attempts={message.AttemptCount} next={message.NextAttemptAt:O}").ConfigureAwait(false);
+                    message.DeliveryUnknownAt.HasValue
+                        ? $"{message.MessageId} [{message.Provider}] delivery unknown; reconciliation required since {message.DeliveryUnknownAt:O}"
+                        : $"{message.MessageId} [{message.Provider}] attempts={message.AttemptCount} next={message.NextAttemptAt:O}").ConfigureAwait(false);
                 return 0;
             case "get":
                 if (parseResult.HasFlag("compact")) {
@@ -111,7 +113,9 @@ public static partial class CliRunner {
                     return 1;
                 }
                 await WriteItemAsync(output, queuedMessage, json, message =>
-                    $"{message.MessageId} [{message.Provider}] attempts={message.AttemptCount}").ConfigureAwait(false);
+                    message.DeliveryUnknownAt.HasValue
+                        ? $"{message.MessageId} [{message.Provider}] delivery unknown; reconciliation required since {message.DeliveryUnknownAt:O}"
+                        : $"{message.MessageId} [{message.Provider}] attempts={message.AttemptCount}").ConfigureAwait(false);
                 return 0;
             case "remove":
                 var removeResult = await application.Queue.RemoveAsync(RequireOption(parseResult, "message-id")).ConfigureAwait(false);
