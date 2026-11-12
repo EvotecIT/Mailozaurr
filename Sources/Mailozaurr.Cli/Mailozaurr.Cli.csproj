@@ -1,9 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
+      <PackageVersion>3.0.7</PackageVersion>
         <Company>Evotec</Company>
         <Authors>Przemyslaw Klys</Authors>
-        <VersionPrefix>3.0.6</VersionPrefix>
+        <VersionPrefix>3.0.7</VersionPrefix>
         <PackageId>Mailozaurr.Cli</PackageId>
         <Description>Command-line and MCP host for Mailozaurr profiles, mailbox operations, drafts, queues, and delivery.</Description>
         <Copyright>(c) 2011 - 2026 Przemyslaw Klys @ Evotec. All rights reserved.</Copyright>
@@ -33,7 +34,7 @@
 
     <ItemGroup>
       <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.14" />
-      <PackageReference Include="ModelContextProtocol" Version="2.3.0" />
+      <PackageReference Include="ModelContextProtocol" Version="2.4.0" />
       <PackageReference Include="System.CommandLine" Version="2.0.14" />
     </ItemGroup>
 

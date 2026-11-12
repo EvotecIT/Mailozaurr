@@ -15,7 +15,7 @@ public class PopConnectionInfo : ConnectionInfoBase {
     /// <summary>Authentication mechanisms supported by the server.</summary>
     public ISet<string>? AuthenticationMechanisms { get; set; }
     /// <summary>Server capabilities.</summary>
-    public Pop3Capabilities Capabilities { get; set; }
+    public Pop3Capabilities Capabilities { get; set; } = new(Array.Empty<Pop3Capability>());
     /// <summary>The underlying stream.</summary>
     public Stream? Stream { get; set; }
     /// <summary>Current state of the connection.</summary>

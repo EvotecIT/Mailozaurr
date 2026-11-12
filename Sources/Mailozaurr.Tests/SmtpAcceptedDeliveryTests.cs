@@ -1,3 +1,5 @@
+using System.Linq;
+using System;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
@@ -27,9 +29,10 @@ public sealed class SmtpAcceptedDeliveryTests {
         internal int QuitAttempts;
         internal bool Disposed;
         public override bool IsConnected => !Disposed;
-        public override Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
+        public override Task<MailKit.SendResult> SendAsync(MimeKit.FormatOptions options, MailKit.ISendRequest request, System.Threading.CancellationToken cancellationToken = default) {
+            var message = request.Message;
             Sends++;
-            return Task.FromResult("accepted");
+            return Task.FromResult(new MailKit.SendResult("accepted", request.Message.To.Mailboxes.ToArray(), Array.Empty<MimeKit.MailboxAddress>()));
         }
         public override void Disconnect(bool quit, CancellationToken cancellationToken = default) {
             QuitAttempts++;
@@ -117,9 +120,10 @@ public sealed class SmtpAcceptedDeliveryTests {
 
     private sealed class AcceptedClient : ClientSmtp {
         internal int Sends;
-        public override Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
+        public override Task<MailKit.SendResult> SendAsync(MimeKit.FormatOptions options, MailKit.ISendRequest request, System.Threading.CancellationToken cancellationToken = default) {
+            var message = request.Message;
             Sends++;
-            return Task.FromResult("accepted");
+            return Task.FromResult(new MailKit.SendResult("accepted", request.Message.To.Mailboxes.ToArray(), Array.Empty<MimeKit.MailboxAddress>()));
         }
     }
 

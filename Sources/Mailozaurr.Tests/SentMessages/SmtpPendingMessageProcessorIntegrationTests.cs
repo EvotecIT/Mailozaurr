@@ -93,8 +93,10 @@ public sealed class SmtpPendingMessageProcessorIntegrationTests {
         public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
-        public override Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) =>
+        public override Task<MailKit.SendResult> SendAsync(MimeKit.FormatOptions options, MailKit.ISendRequest request, System.Threading.CancellationToken cancellationToken = default) {
+            var message = request.Message;
             throw new InvalidOperationException("Simulated failure");
+        }
     }
 
     private sealed class CapturingClient : ClientSmtp {
@@ -109,8 +111,10 @@ public sealed class SmtpPendingMessageProcessorIntegrationTests {
             return Task.CompletedTask;
         }
 
-        public override Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) =>
-            Task.FromResult(message.MessageId ?? string.Empty);
+        public override Task<MailKit.SendResult> SendAsync(MimeKit.FormatOptions options, MailKit.ISendRequest request, System.Threading.CancellationToken cancellationToken = default) {
+            var message = request.Message;
+            return Task.FromResult(new MailKit.SendResult(message.MessageId ?? string.Empty, request.Message.To.Mailboxes.ToArray(), Array.Empty<MimeKit.MailboxAddress>()));
+        }
     }
 
     private sealed class RecordingPendingMessageRepository : IPendingMessageRepository {

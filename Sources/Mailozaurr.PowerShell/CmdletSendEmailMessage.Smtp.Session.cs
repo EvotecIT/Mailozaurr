@@ -80,7 +80,7 @@ public sealed partial class CmdletSendEmailMessage {
                 // Wrapper setters ignore null; reset omitted options on reused connections.
                 client.Client.DeliveryNotificationOption = DeliveryNotificationOption;
                 client.Client.DeliveryStatusNotificationType = DeliveryStatusNotificationType
-                    ?? MailKit.Net.Smtp.DeliveryStatusNotificationType.Unspecified;
+                    ?? MailKit.DeliveryStatusNotificationType.Unspecified;
             }, protocolLogging ? CreateLoggedSmtpTransport : null, CancellationToken.None).GetAwaiter().GetResult();
             if (status.DeliveryAccepted || status.DeliveryUnknown) smtpClient.MarkTransportAttempted();
             if (!string.IsNullOrEmpty(MimeMessagePath)) {

@@ -16,7 +16,8 @@ public sealed class MailFileOfficeImoContractsTests {
 
         string[] references = artifactAssembly.GetReferencedAssemblies().Select(item => item.Name!).ToArray();
         Assert.Contains("OfficeIMO.Email", references);
-        Assert.Contains("MimeKit", references);
+        Assert.Contains("MimeKit.Core", references);
+        Assert.Contains("MimeKit.Cryptography", references);
         Assert.DoesNotContain("OfficeIMO.Security", references);
         Assert.DoesNotContain("Mailozaurr.Internet", references);
         Assert.DoesNotContain("Google.Apis.Auth", references);

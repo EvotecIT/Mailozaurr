@@ -33,6 +33,13 @@ public class SmtpResult {
 
     // Positive evidence for cross-profile fallback, independently of same-host retry policy.
     internal bool DeliveryRejected { get; set; }
+
+    /// <summary>Envelope recipients accepted with a confirmed message submission.</summary>
+    public IReadOnlyList<string> AcceptedRecipients { get; set; } = Array.Empty<string>();
+    /// <summary>Envelope recipients explicitly rejected by the SMTP server.</summary>
+    public IReadOnlyList<string> RejectedRecipients { get; set; } = Array.Empty<string>();
+    /// <summary>Final SMTP submission response, when confirmed.</summary>
+    public string? ResponseText { get; set; }
     /// <summary>Optional message returned by the operation.</summary>
     public string? Message { get; set; }
     /// <summary>Time taken to perform the action.</summary>

@@ -51,7 +51,9 @@ public enum PendingMessageSkipReason {
     NotDue,
 
     /// <summary>The record was already leased by another processor.</summary>
-    LeaseNotAcquired
+    LeaseNotAcquired,
+    /// <summary>Submission confirmation is unknown and requires reconciliation before retry.</summary>
+    DeliveryUnknown
 }
 
 /// <summary>

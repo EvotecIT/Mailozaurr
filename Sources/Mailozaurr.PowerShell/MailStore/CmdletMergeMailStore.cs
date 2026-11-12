@@ -109,7 +109,7 @@ public sealed class CmdletMergeMailStore : MailStoreCmdletBase {
                 options,
                 CancelToken);
             WriteObject(report);
-            WriteStoreDiagnostics(report.Diagnostics, destination);
+            WriteStoreDiagnostics(report.NativeDiagnostics, destination);
         } catch (OperationCanceledException) when (CancelToken.IsCancellationRequested) {
             throw;
         } catch (Exception exception) {

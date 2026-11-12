@@ -66,7 +66,8 @@ public sealed class PackageAssemblyContractsTests {
     public void ArtifactAssemblyIsIndependentOfTransportProvidersAndConcreteSecurity() {
         string[] references = ReferencesOf(typeof(MailFileReader).Assembly);
 
-        Assert.Contains("MimeKit", references);
+        Assert.Contains("MimeKit.Core", references);
+        Assert.Contains("MimeKit.Cryptography", references);
         Assert.Contains("OfficeIMO.Email", references);
         Assert.DoesNotContain("Mailozaurr.Internet", references);
         Assert.DoesNotContain("Mailozaurr.MicrosoftGraph", references);

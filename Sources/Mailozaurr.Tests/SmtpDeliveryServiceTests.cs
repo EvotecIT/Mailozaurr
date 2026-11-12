@@ -1,3 +1,4 @@
+using System.Linq;
 using MailKit;
 using MailKit.Security;
 using Mailozaurr.Definitions;
@@ -72,14 +73,16 @@ public partial class SmtpDeliveryServiceTests {
             return Task.CompletedTask;
         }
 
-        public override string Send(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
+        public override MailKit.SendResult Send(MimeKit.FormatOptions options, MailKit.ISendRequest request, System.Threading.CancellationToken cancellationToken = default) {
+            var message = request.Message;
             Record("send", cancellationToken);
             SentMessage = message;
-            return string.Empty;
+            return new MailKit.SendResult(string.Empty, request.Message.To.Mailboxes.ToArray(), Array.Empty<MimeKit.MailboxAddress>());
         }
 
-        public override Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
-            return Task.FromResult(Send(message, cancellationToken, progress));
+        public override Task<MailKit.SendResult> SendAsync(MimeKit.FormatOptions options, MailKit.ISendRequest request, System.Threading.CancellationToken cancellationToken = default) {
+            var message = request.Message;
+            return Task.FromResult(Send(options, request, cancellationToken));
         }
 
         public override void Disconnect(bool quit, CancellationToken cancellationToken = default) {

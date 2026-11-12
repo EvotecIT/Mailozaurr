@@ -175,7 +175,7 @@ public sealed partial class CmdletSendEmailMessage : PSCmdlet {
     [Parameter(Mandatory = false, ParameterSetName = "SecureString")]
     [Parameter(Mandatory = false, ParameterSetName = "oAuth")]
     [Parameter(Mandatory = false, ParameterSetName = "Compatibility")]
-    public MailKit.Net.Smtp.DeliveryStatusNotificationType? DeliveryStatusNotificationType { get; set; }
+    public MailKit.DeliveryStatusNotificationType? DeliveryStatusNotificationType { get; set; }
 
     /// <summary>
     /// <para>Specifies a user account or API key/token for authentication. Used for SMTP, SendGrid, and Graph API.</para>

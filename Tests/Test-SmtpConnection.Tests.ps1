@@ -14,7 +14,7 @@ using MailKit.Security;
 using System.Threading;
 public class FakeClientPs3 : ClientSmtp {
     public override bool IsConnected => true;
-    public override SmtpCapabilities GetCapabilitiesSnapshot() => SmtpCapabilities.Pipelining;
+    public override SmtpCapabilities GetCapabilitiesSnapshot() => new SmtpCapabilities(new[] { SmtpCapability.Pipelining });
     public override void Connect(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default) {}
     public override void Disconnect(bool quit, CancellationToken cancellationToken = default) {}
     public override void NoOp(CancellationToken cancellationToken = default) {}
@@ -29,7 +29,7 @@ public static class FakeClientPs3Factory {
             [FakeClientPs3Factory]::Install()
             $result = Test-SmtpConnection -Server 'h'
             $result | Should -BeOfType 'Mailozaurr.SmtpConnectionInfo'
-            $result.Capabilities | Should -Match 'Pipelining'
+            $result.Capabilities.Contains([MailKit.Net.Smtp.SmtpCapability]::Pipelining) | Should -BeTrue
         } finally {
             [Mailozaurr.Smtp]::ResetClientFactory()
         }

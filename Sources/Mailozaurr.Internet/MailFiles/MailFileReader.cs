@@ -18,7 +18,7 @@ public static class MailFileReader {
         options ??= new MailFileReaderOptions();
         MailFileFormat format = ResolveFormat(fileInfo);
         EmailReaderOptions officeOptions = ResolveOfficeOptions(options);
-        EmailReadResult result = new EmailDocumentReader(officeOptions).Read(fileInfo.FullName);
+        EmailReadResult result = new EmailDocumentReader(officeOptions).ReadDocument(fileInfo.FullName);
         try {
             EnsureExpectedFormat(result.Document, format, fileInfo.FullName);
             return Project(fileInfo.FullName, format, result, options, officeOptions);
@@ -45,7 +45,7 @@ public static class MailFileReader {
         MailFileFormat format = ResolveFormat(fileInfo);
         EmailReaderOptions officeOptions = ResolveOfficeOptions(options);
         EmailReadResult result = await new EmailDocumentReader(officeOptions)
-            .ReadAsync(fileInfo.FullName, cancellationToken).ConfigureAwait(false);
+            .ReadDocumentAsync(fileInfo.FullName, cancellationToken).ConfigureAwait(false);
         try {
             EnsureExpectedFormat(result.Document, format, fileInfo.FullName);
             return Project(fileInfo.FullName, format, result, options, officeOptions);

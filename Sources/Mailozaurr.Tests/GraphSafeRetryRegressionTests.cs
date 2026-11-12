@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http;
@@ -157,7 +158,8 @@ public class GraphSafeRetryRegressionTests {
 
     private sealed class FailingSmtpClient : ClientSmtp {
         internal int Sends;
-        public override Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken = default, ITransferProgress? progress = null) {
+        public override Task<MailKit.SendResult> SendAsync(MimeKit.FormatOptions options, MailKit.ISendRequest request, System.Threading.CancellationToken cancellationToken = default) {
+            var message = request.Message;
             Sends++;
             throw new InvalidOperationException(Marker);
         }

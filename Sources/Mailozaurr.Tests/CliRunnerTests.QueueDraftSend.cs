@@ -6,6 +6,28 @@ using Mailozaurr.Cli;
 namespace Mailozaurr.Tests;
 
 public sealed partial class CliRunnerTests {
+    [Theory]
+    [InlineData("list", true)]
+    [InlineData("get", true)]
+    [InlineData("list", false)]
+    [InlineData("get", false)]
+    public async Task QueueHumanOutputDistinguishesReconciliationHolds(string command, bool held) {
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+        var fixture = CreateFixture();
+        fixture.QueueService.DeliveryUnknownAt = held ? DateTimeOffset.UtcNow.AddMinutes(-1) : null;
+        var arguments = command == "get" ? new[] { "queue", command, "--message-id", "queued-1" } : new[] { "queue", command };
+        var exitCode = await CliRunner.RunAsync(arguments, stdout, stderr, _ => fixture.CreateBuilder());
+        Assert.Equal(0, exitCode);
+        Assert.Contains("queued-1", stdout.ToString(), StringComparison.Ordinal);
+        if (held) {
+            Assert.Contains("delivery unknown; reconciliation required", stdout.ToString(), StringComparison.Ordinal);
+        } else {
+            Assert.Contains("attempts=", stdout.ToString(), StringComparison.Ordinal);
+            Assert.DoesNotContain("reconciliation", stdout.ToString(), StringComparison.Ordinal);
+        }
+    }
+
     [Fact]
     public async Task QueueListUsesApplicationQueueService() {
         using var stdout = new StringWriter();

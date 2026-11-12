@@ -370,19 +370,31 @@ public partial class Smtp {
         if (readinessResult != null) return readinessResult;
         var messageId = EnsureMessageId();
         MarkTransportAttempted();
+        var postSendErrors = new List<string>();
+        MailKit.SendResult sendResult;
         for (var attempt = 0; ; attempt++) {
             try {
-                await Client.SendAsync(Message, cancellationToken).ConfigureAwait(false);
+                sendResult = await SmtpSubmission.SendAsync(Client, Message, cancellationToken, postSendErrors).ConfigureAwait(false);
                 break;
+            } catch (SmtpDeliveryUnknownException) when (cancellationToken.IsCancellationRequested) {
+                throw new OperationCanceledException(cancellationToken);
             } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
                 throw;
             } catch (Exception exception) {
-                LogWarning($"Send-EmailMessage - Error during sending: {exception.Message}");
-                if ((!Helpers.IsTransient(exception) && !RetryAlways) || attempt >= RetryCount) {
+                var unknown = exception is SmtpDeliveryUnknownException;
+                try {
+                    LogWarning($"Send-EmailMessage - Error during sending: {exception.Message}");
+                } catch (Exception diagnosticFailure) when (unknown) {
+                    postSendErrors.Add($"Submission diagnostics: {diagnosticFailure.Message}");
+                }
+                if (unknown || (!Helpers.IsTransient(exception) && !RetryAlways) || attempt >= RetryCount) {
                     if (ErrorAction == ActionPreference.Stop) throw;
-                    var queued = await EnqueuePendingMessageAsync(messageId, CredentialProtection.Default, cancellationToken).ConfigureAwait(false);
+                    var queued = !unknown && await EnqueuePendingMessageAsync(messageId, CredentialProtection.Default, cancellationToken).ConfigureAwait(false);
                     var failure = new SmtpResult(false, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, "", exception.Message) {
-                        MessageId = messageId, Queued = queued
+                        MessageId = messageId, Queued = queued, DeliveryUnknown = unknown, PostSendErrors = postSendErrors,
+                        IsTransient = Helpers.IsTransient(exception),
+                        RejectedRecipients = exception is SmtpCommandException { ErrorCode: SmtpErrorCode.RecipientNotAccepted, Mailbox: { } mailbox }
+                            ? new[] { mailbox.Address } : Array.Empty<string>()
                     };
                     await RecordPostSendErrorAsync(failure, "Webhook notification", () => Helpers.PostWebhookAsync(WebhookUrl, failure, cancellationToken)).ConfigureAwait(false);
                     return failure;
@@ -392,9 +404,15 @@ public partial class Smtp {
             }
         }
         var result = new SmtpResult(true, EmailAction.Send, SentTo, SentFrom, Server, Port, Stopwatch.Elapsed, Logging) {
-            MessageId = messageId, DeliveryAccepted = true
+            MessageId = messageId, DeliveryAccepted = true, ResponseText = sendResult.ResponseText, PostSendErrors = postSendErrors,
+            AcceptedRecipients = sendResult.AcceptedRecipients.Select(mailbox => mailbox.Address).ToArray(),
+            RejectedRecipients = sendResult.RejectedRecipients.Select(mailbox => mailbox.Address).ToArray()
         };
-        LogVerbose($"Send-EmailMessage - Sent email to {SentTo}");
+        await RecordPostSendErrorAsync(result, "Completion notification", () => {
+            LogVerbose($"Send-EmailMessage - Sent email to {SentTo}");
+            return Task.CompletedTask;
+        }).ConfigureAwait(false);
         return await CompleteAcceptedSendAsync(result, cancellationToken).ConfigureAwait(false);
     }
+
 }
