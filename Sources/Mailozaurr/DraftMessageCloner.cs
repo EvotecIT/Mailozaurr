@@ -26,7 +26,7 @@ public static class DraftMessageCloner {
             TextBody = draft.TextBody,
             HtmlBody = draft.HtmlBody,
             Priority = draft.Priority,
-            Headers = new Dictionary<string, string>(
+            Headers = draft.Headers == null ? new(StringComparer.OrdinalIgnoreCase) : new Dictionary<string, string>(
                 draft.Headers,
                 StringComparer.OrdinalIgnoreCase),
             Attachments = draft.Attachments.Select(CloneAttachment).ToList()

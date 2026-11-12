@@ -30,6 +30,10 @@ public class SmtpResult {
     public bool IsTransient { get; set; }
     /// <summary>Whether a send lost transport confirmation and acceptance is unknown.</summary>
     public bool DeliveryUnknown { get; set; }
+
+    // Positive evidence for cross-profile fallback, independently of same-host retry policy.
+    internal bool DeliveryRejected { get; set; }
+
     /// <summary>Envelope recipients accepted with a confirmed message submission.</summary>
     public IReadOnlyList<string> AcceptedRecipients { get; set; } = Array.Empty<string>();
     /// <summary>Envelope recipients explicitly rejected by the SMTP server.</summary>

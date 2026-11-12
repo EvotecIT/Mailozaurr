@@ -112,10 +112,16 @@ public sealed class SmtpMailSendHandler : IMailSendHandler {
         if (request.QueueOnFailure) {
             throw new NotSupportedException("Multi-server SMTP delivery returns failed attempts directly; persist the failed request explicitly for later recovery.");
         }
-        if (_sessionFactory is not SmtpSessionFactory factory) {
+        if (_sessionFactory is not SmtpSessionFactory) {
             throw new NotSupportedException("SMTP delivery policies require SmtpSessionFactory.");
         }
         using var message = await _draftMimeMessageFactory.CreateAsync(profile, request.Message, cancellationToken).ConfigureAwait(false);
+        return await SendPreparedAsync(profile, message, cancellationToken).ConfigureAwait(false);
+    }
+
+    internal async Task<SendResult> SendPreparedAsync(MailProfile profile, MimeMessage message, CancellationToken cancellationToken) {
+        if (_sessionFactory is not SmtpSessionFactory factory || profile.SmtpDelivery == null)
+            throw new NotSupportedException("Prepared SMTP messages require the canonical delivery policy.");
         var transport = await factory.CreateRequestAsync(profile, cancellationToken, forDeliverySession: true).ConfigureAwait(false);
         var session = _deliverySession ?? new SmtpDeliverySession();
         try {
@@ -131,6 +137,7 @@ public sealed class SmtpMailSendHandler : IMailSendHandler {
                 Attempts = result.Attempts,
                 IsTransient = result.IsTransient,
                 DeliveryUnknown = result.DeliveryUnknown,
+                DeliveryRejected = result.DeliveryRejected,
                 AcceptedRecipients = result.AcceptedRecipients,
                 RejectedRecipients = result.RejectedRecipients,
                 ResponseText = result.ResponseText,

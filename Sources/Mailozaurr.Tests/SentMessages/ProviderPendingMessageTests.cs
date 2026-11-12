@@ -422,7 +422,9 @@ public sealed class ProviderPendingMessageTests {
         message.Subject = "gmail";
         message.Body = new TextPart("plain") { Text = "body" };
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => client.SendAsync("me", message, CancellationToken.None));
+        var rejection = await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.SendAsync("me", message, CancellationToken.None));
+        Assert.Contains("500 (InternalServerError)", rejection.Message);
+        Assert.Contains("{\"error\":\"failed\"}", rejection.Message);
 
         var record = repository.LastSaved;
         Assert.NotNull(record);

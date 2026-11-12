@@ -7,8 +7,20 @@ namespace Mailozaurr;
 /// </summary>
 internal static class HttpRetryPolicy {
     /// <summary>
-    /// Creates an HTTP exception that preserves the provider response status.
+    /// Records positive rejection evidence independently of provider retry behavior.
     /// </summary>
+    internal static void RecordFailure(SmtpResult result, Exception? exception) {
+#if NET5_0_OR_GREATER
+        var status = (exception as HttpRequestException)?.StatusCode;
+#else
+        var status = (exception as ProviderHttpRequestException)?.StatusCode;
+#endif
+        result.DeliveryRejected = status.HasValue && (int)status.Value is >= 400 and < 500 && (int)status.Value != 408;
+        result.IsTransient = status.HasValue && (int)status.Value == 429;
+        result.DeliveryUnknown = !result.DeliveryRejected;
+    }
+
+    /// <summary>Creates an HTTP exception that preserves the provider response status.</summary>
     internal static HttpRequestException CreateFailure(HttpStatusCode statusCode, string message) {
 #if NET5_0_OR_GREATER
         return new HttpRequestException(message, null, statusCode);
