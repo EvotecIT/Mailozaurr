@@ -1,3 +1,5 @@
+BeforeAll { . (Join-Path $PSScriptRoot 'TestHelpers/Add-MailozaurrTestType.ps1') }
+
 Describe 'Send-EmailMessage - SentLogPath OptIn' {
     BeforeAll {
         if (-not ('FakeClientSentLogPs' -as [type])) {
@@ -7,7 +9,7 @@ Describe 'Send-EmailMessage - SentLogPath OptIn' {
                 [MailKit.Security.SecureSocketOptions].Assembly.Location,
                 [MimeKit.MimeMessage].Assembly.Location
             )
-            Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+            Add-MailozaurrTestType -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
 using Mailozaurr;
 using MailKit;
 using MailKit.Security;
@@ -31,17 +33,18 @@ public class FakeClientSentLogPs : ClientSmtp {
         _connected = false;
     }
 
-    public override Task<string> SendAsync(MimeMessage message, CancellationToken cancellationToken, ITransferProgress progress) {
+    public override Task<MailKit.SendResult> SendAsync(FormatOptions options, ISendRequest request, CancellationToken cancellationToken = default(CancellationToken)) {
+        var message = request.Message;
         if (string.IsNullOrWhiteSpace(message.MessageId)) {
             message.MessageId = "fake-" + Guid.NewGuid().ToString("N") + "@mailozaurr.test";
         }
 
-        return Task.FromResult(message.MessageId);
+        return Task.FromResult(new MailKit.SendResult(message.MessageId, new System.Collections.Generic.List<MailboxAddress>(message.To.Mailboxes), new MailboxAddress[0]));
     }
 }
 public static class FakeClientSentLogPsFactory {
-    public static ClientSmtp Create(ProtocolLogger logger) => new FakeClientSentLogPs();
-    public static void Install() => Smtp.ClientFactory = Create;
+    public static ClientSmtp Create(ProtocolLogger logger) { return new FakeClientSentLogPs(); }
+    public static void Install() { Smtp.ClientFactory = Create; }
 }
 "@
         }

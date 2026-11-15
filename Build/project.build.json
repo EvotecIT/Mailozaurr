@@ -3,13 +3,13 @@
   "RootPath": "..",
   "ExpectedVersion": null,
   "ExpectedVersionMap": {
-    "Mailozaurr": "3.0.X",
-    "Mailozaurr.Internet": "3.0.X",
-    "Mailozaurr.MicrosoftGraph": "3.0.X",
-    "Mailozaurr.Gmail": "3.0.X",
-    "Mailozaurr.Jmap": "3.0.X",
-    "Mailozaurr.Artifacts": "3.0.X",
-    "Mailozaurr.Cli": "3.0.X"
+    "Mailozaurr": "3.1.X",
+    "Mailozaurr.Internet": "3.1.X",
+    "Mailozaurr.MicrosoftGraph": "3.1.X",
+    "Mailozaurr.Gmail": "3.1.X",
+    "Mailozaurr.Jmap": "3.1.X",
+    "Mailozaurr.Artifacts": "3.1.X",
+    "Mailozaurr.Cli": "3.1.X"
   },
   "ExpectedVersionMapAsInclude": true,
   "ExpectedVersionMapUseWildcards": false,

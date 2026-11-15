@@ -55,7 +55,11 @@ foreach ($CommandName in 'Get-SmtpConnectionPool', 'Send-EmailMessage') {
         throw "Expected command '$CommandName' to be exported by module '$($ImportedModule.Name)', but got '$($Command.ModuleName)'."
     }
 }
-$result = Invoke-Pester -Script $PSScriptRoot\Tests -Verbose -PassThru
+$result = Invoke-Pester -Path $PSScriptRoot\Tests -Output Detailed -PassThru -ErrorAction Stop
+
+if ($null -eq $result -or $result.TotalCount -eq 0) {
+    throw 'No PowerShell tests were executed.'
+}
 
 if ($result.FailedCount -gt 0) {
     throw "$($result.FailedCount) tests failed."

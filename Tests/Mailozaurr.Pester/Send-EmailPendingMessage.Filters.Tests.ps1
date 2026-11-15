@@ -1,19 +1,4 @@
-$script:FilterSenderReferencedAssemblies = $null
-
-function global:Get-FilterSenderReferencedAssemblies {
-    if ($null -eq $script:FilterSenderReferencedAssemblies) {
-        $referenceDirectory = Join-Path $PSHOME 'ref'
-        if (-not (Test-Path -Path $referenceDirectory)) {
-            throw 'Unable to locate PowerShell reference assemblies required for Add-Type.'
-        }
-
-        $script:FilterSenderReferencedAssemblies = @(
-            [Mailozaurr.PendingMessageRecord].Assembly.Location
-        ) + @(Get-ChildItem -Path $referenceDirectory -Filter '*.dll' -File | ForEach-Object { $_.FullName })
-    }
-
-    return $script:FilterSenderReferencedAssemblies
-}
+BeforeAll { . (Join-Path $PSScriptRoot '../TestHelpers/Add-MailozaurrTestType.ps1') }
 
 function global:New-PendingRecord {
     param(
@@ -52,15 +37,10 @@ Describe 'Send-EmailPendingMessage provider and message filters' {
             Import-Module $modulePath -Force
         }
 
-        if (-not ('MimeKit.MimeMessage' -as [type])) {
-            $binaryDirectory = Split-Path (Get-Command Send-EmailPendingMessage).ImplementingType.Assembly.Location
-            Add-Type -Path (Join-Path $binaryDirectory 'MimeKit.Core.dll')
-        }
-
         if (-not ('FilterRecordingPendingMessageSender' -as [type])) {
-            $assemblies = Get-FilterSenderReferencedAssemblies
+            $assemblies = @([Mailozaurr.PendingMessageRecord].Assembly.Location)
 
-            Add-Type -ReferencedAssemblies $assemblies -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+            Add-MailozaurrTestType -ReferencedAssemblies $assemblies -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
 using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
@@ -70,16 +50,17 @@ using Mailozaurr;
 
 public sealed class FilterRecordingPendingMessageSender : IPendingMessageSender {
     private readonly EmailProvider provider;
-    private static readonly ConcurrentDictionary<EmailProvider, ConcurrentBag<string>> Processed = new();
+    private static readonly ConcurrentDictionary<EmailProvider, ConcurrentBag<string>> Processed = new ConcurrentDictionary<EmailProvider, ConcurrentBag<string>>();
 
     public FilterRecordingPendingMessageSender(EmailProvider provider) {
         this.provider = provider;
     }
 
-    public static void Reset() => Processed.Clear();
+    public static void Reset() { Processed.Clear(); }
 
     public static string[] GetProcessedMessageIds(EmailProvider provider) {
-        if (Processed.TryGetValue(provider, out var records)) {
+        ConcurrentBag<string> records;
+        if (Processed.TryGetValue(provider, out records)) {
             return records.ToArray();
         }
 

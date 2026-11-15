@@ -252,6 +252,8 @@ jobs:
         shell: pwsh
         run: ./Build/Build-Module.ps1 -ConfigurationGateMode Build -SignModule:$false
 
-      - name: Run AssemblyLoadContext packaging regression
+      - name: Run PowerShell module suite
         shell: pwsh
-        run: Invoke-Pester -Path ./Tests/AssemblyLoadContext.Tests.ps1 -Output Detailed
+        run: |
+          Copy-Item -Path ./Artefacts/Unpacked/Modules/Mailozaurr/* -Destination . -Recurse -Force
+          ./Mailozaurr.Tests.ps1

@@ -1,3 +1,5 @@
+BeforeAll { . (Join-Path $PSScriptRoot 'TestHelpers/Add-MailozaurrTestType.ps1') }
+
 Describe 'Send-EmailPendingMessage' {
     BeforeAll {
         if (-not ('Mailozaurr.PendingMessageRecord' -as [type])) {
@@ -8,7 +10,7 @@ Describe 'Send-EmailPendingMessage' {
             $assemblies = @(
                 [Mailozaurr.PendingMessageRecord].Assembly.Location
             )
-            Add-Type -ReferencedAssemblies $assemblies -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+            Add-MailozaurrTestType -ReferencedAssemblies $assemblies -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
 using Mailozaurr;
 using System.Collections.Generic;
 using System.Threading;
@@ -17,9 +19,9 @@ using System.Threading.Tasks;
 public sealed class FakePendingMessageSender : IPendingMessageSender {
     private static int sendCount;
 
-    public static void Reset() => sendCount = 0;
+    public static void Reset() { sendCount = 0; }
 
-    public static int SendCount => sendCount;
+    public static int SendCount { get { return sendCount; } }
 
     public Task SendAsync(PendingMessageRecord record, CancellationToken ct) {
         sendCount++;

@@ -1,3 +1,5 @@
+BeforeAll { . (Join-Path $PSScriptRoot 'TestHelpers/Add-MailozaurrTestType.ps1') }
+
 Describe 'Save-POP3Message' {
     It 'Creates directory when saving message' {
         $refs = @(
@@ -5,7 +7,7 @@ Describe 'Save-POP3Message' {
             [MimeKit.MimeMessage].Assembly.Location
         )
         if (-not ('FakePop3MessageClient' -as [type])) {
-            Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+            Add-MailozaurrTestType -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
 using MailKit.Net.Pop3;
 using MimeKit;
 public class FakePop3MessageClient : Pop3Client {
@@ -17,9 +19,9 @@ public class FakePop3MessageClient : Pop3Client {
         _message.Subject = "test";
         _message.Body = new TextPart("plain") { Text = "body" };
     }
-    public override int Count => 1;
-    public override MimeMessage GetMessage(int index, System.Threading.CancellationToken cancellationToken = default, MailKit.ITransferProgress progress = null) {
-        return _message;
+    public override int Count { get { return 1; } }
+    public override System.Threading.Tasks.Task<MimeMessage> GetMessageAsync(int index, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken), MailKit.ITransferProgress progress = null) {
+        return System.Threading.Tasks.Task.FromResult(_message);
     }
 }
 "@
@@ -38,7 +40,7 @@ public class FakePop3MessageClient : Pop3Client {
             [MimeKit.MimeMessage].Assembly.Location
         )
         if (-not ('FakePop3MessageClient' -as [type])) {
-            Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+            Add-MailozaurrTestType -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
 using MailKit.Net.Pop3;
 using MimeKit;
 public class FakePop3MessageClient : Pop3Client {
@@ -50,9 +52,9 @@ public class FakePop3MessageClient : Pop3Client {
         _message.Subject = "test";
         _message.Body = new TextPart("plain") { Text = "body" };
     }
-    public override int Count => 1;
-    public override MimeMessage GetMessage(int index, System.Threading.CancellationToken cancellationToken = default, MailKit.ITransferProgress progress = null) {
-        return _message;
+    public override int Count { get { return 1; } }
+    public override System.Threading.Tasks.Task<MimeMessage> GetMessageAsync(int index, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken), MailKit.ITransferProgress progress = null) {
+        return System.Threading.Tasks.Task.FromResult(_message);
     }
 }
 "@
@@ -65,16 +67,22 @@ public class FakePop3MessageClient : Pop3Client {
         [System.IO.Directory]::CreateDirectory($tempDir) | Out-Null
         $oldTemp = $env:TEMP
         $oldTmp = $env:TMP
+        $oldTmpDir = $env:TMPDIR
         $env:TEMP = $tempDir
         $env:TMP = $tempDir
+        $env:TMPDIR = $tempDir
 
-        $target = '/sys/fail.msg'
-
-        Save-POP3Message -Client $info -Index 0 -Path $target | Out-Null
-
-        (Get-ChildItem $tempDir -Filter '*.eml') | Should -BeNullOrEmpty
-
-        $env:TEMP = $oldTemp
-        $env:TMP = $oldTmp
+        $target = Join-Path $TestDrive 'blocked.msg'
+        New-Item -ItemType Directory -Path $target | Out-Null
+        try {
+            [System.IO.Path]::GetTempPath().TrimEnd([char[]]@('\', '/')) | Should -Be ([System.IO.Path]::GetFullPath($tempDir))
+            Save-POP3Message -Client $info -Index 0 -Path $target | Out-Null
+            (Get-Item -LiteralPath $target).PSIsContainer | Should -BeTrue
+            (Get-ChildItem $tempDir -Filter '*.eml') | Should -BeNullOrEmpty
+        } finally {
+            $env:TEMP = $oldTemp
+            $env:TMP = $oldTmp
+            $env:TMPDIR = $oldTmpDir
+        }
     }
 }
