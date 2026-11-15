@@ -34,7 +34,7 @@ Describe 'Send-EmailMessage - Wildcard Attachments' {
     It 'Keeps file-backed Graph inline attachments eligible for upload sessions' {
         $file = Join-Path $TestDrive 'inline.png'
         'content' | Set-Content -LiteralPath $file
-        $descriptorType = [Mailozaurr.EmailMessage].Assembly.GetType('Mailozaurr.Definitions.FileAttachmentDescriptor', $true)
+        $descriptorType = [Mailozaurr.Smtp].Assembly.GetType('Mailozaurr.Definitions.FileAttachmentDescriptor', $true)
         $descriptor = [Activator]::CreateInstance($descriptorType, $file)
         $cmdlet = [Mailozaurr.PowerShell.CmdletSendEmailMessage]::new()
         $method = $cmdlet.GetType().GetMethod('MergeGraphAttachments', [System.Reflection.BindingFlags] 'NonPublic, Static')

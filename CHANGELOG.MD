@@ -1,4 +1,20 @@
-﻿#### 2.0.0 - Preview 6
+﻿#### 3.1.0 - 2026.11.15
+
+I've added a shared delivery engine so applications can configure mail routes once and apply the same provider selection, retry and failover policy across SMTP, Microsoft Graph, Gmail, SendGrid, Mailgun and Amazon SES.
+
+- Added `MailDeliveryEngine`, typed delivery configuration and JSON loading, with ordered failover, round-robin or random profile selection and bounded retry delays.
+- Added `IMailCredentialResolver` and a default resolver for environment variables and mounted secret files. Credentials are resolved before each attempt, so applications can rotate them without rebuilding the delivery engine.
+- Added structured attempt results and validation before opening a connection. SMTP routes reuse connections and prepared messages while preserving multi-server selection and cooldowns.
+- Updated MailKit and MimeKit to 5.0.0. SMTP results preserve recipient rejection details and distinguish accepted, rejected and uncertain submissions. Automatic retries and failover stop when acceptance is uncertain, including queued messages.
+- Preserved provider errors and prevented redirect replay in HTTP send paths. Improved IMAP IDLE cancellation and protocol handling.
+- Updated ModelContextProtocol to 2.4.0.
+- Expanded the curated PowerShell type surface for IMAP/POP3 message wrappers, pending-message records and options, SMTP results, Graph helpers, and MIME constructors while preserving assembly isolation.
+
+All seven NuGet packages and the PowerShell Gallery module share version 3.1.0. The libraries target .NET Framework 4.7.2, .NET 8 and .NET 10; the module supports Windows PowerShell 5.1 and PowerShell 7.
+
+[Changes since 3.0.7](https://github.com/EvotecIT/Mailozaurr/compare/Mailozaurr-v3.0.7...Mailozaurr-v3.1.0)
+
+#### 2.0.0 - Preview 6
 ##### What's Changed
 * docs: fix permissions typo in README by @PrzemyslawKlys in https://github.com/EvotecIT/Mailozaurr/pull/66
 * fix: correct verbose message for Get-IMAPFolder by @PrzemyslawKlys in https://github.com/EvotecIT/Mailozaurr/pull/67

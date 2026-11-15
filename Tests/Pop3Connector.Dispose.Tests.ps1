@@ -1,3 +1,5 @@
+BeforeAll { . (Join-Path $PSScriptRoot 'TestHelpers/Add-MailozaurrTestType.ps1') }
+
 Describe 'Pop3Connector disposal' {
     BeforeAll {
         $refs = @(
@@ -9,7 +11,7 @@ Describe 'Pop3Connector disposal' {
 
     It 'Disposes client after failed connect' {
         if (-not ('FailingPop3Client' -as [type])) {
-            Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+            Add-MailozaurrTestType -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
 using Mailozaurr;
 using MailKit.Net.Pop3;
 using MailKit.Security;
@@ -17,11 +19,11 @@ using System.Threading;
 using System.Threading.Tasks;
 public class FailingPop3Client : Pop3Client {
     public bool Disposed;
-    public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default) {
+    public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default(CancellationToken)) {
         throw new System.InvalidOperationException("fail");
     }
-    public override bool IsConnected => true;
-    public override bool IsAuthenticated => false;
+    public override bool IsConnected { get { return true; } }
+    public override bool IsAuthenticated { get { return false; } }
     protected override void Dispose(bool disposing) {
         Disposed = true;
         base.Dispose(disposing);
@@ -29,8 +31,8 @@ public class FailingPop3Client : Pop3Client {
 }
 public static class FailingPop3ClientFactory {
     public static Pop3Client Client;
-    public static Pop3Client Create() => Client;
-    public static void Install() => Pop3Connector.ClientFactory = Create;
+    public static Pop3Client Create() { return Client; }
+    public static void Install() { Pop3Connector.ClientFactory = Create; }
 }
 "@
         }
@@ -51,7 +53,7 @@ public static class FailingPop3ClientFactory {
 
     It 'Disposes client even when DisconnectAsync throws' {
         if (-not ('ThrowingDisconnectPop3Client' -as [type])) {
-            Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+            Add-MailozaurrTestType -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
 using Mailozaurr;
 using MailKit.Net.Pop3;
 using MailKit.Security;
@@ -60,12 +62,12 @@ using System.Threading.Tasks;
 public class ThrowingDisconnectPop3Client : Pop3Client {
     public bool Disposed;
     public bool DisconnectCalled;
-    public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default) {
+    public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default(CancellationToken)) {
         throw new System.InvalidOperationException("fail");
     }
-    public override bool IsConnected => true;
-    public override bool IsAuthenticated => false;
-    public override Task DisconnectAsync(bool quit, CancellationToken cancellationToken = default) {
+    public override bool IsConnected { get { return true; } }
+    public override bool IsAuthenticated { get { return false; } }
+    public override Task DisconnectAsync(bool quit, CancellationToken cancellationToken = default(CancellationToken)) {
         DisconnectCalled = true;
         throw new System.InvalidOperationException("disconnect");
     }
@@ -76,8 +78,8 @@ public class ThrowingDisconnectPop3Client : Pop3Client {
 }
 public static class ThrowingDisconnectPop3ClientFactory {
     public static Pop3Client Client;
-    public static Pop3Client Create() => Client;
-    public static void Install() => Pop3Connector.ClientFactory = Create;
+    public static Pop3Client Create() { return Client; }
+    public static void Install() { Pop3Connector.ClientFactory = Create; }
 }
 "@
         }

@@ -5,11 +5,8 @@ Describe 'Packaged AssemblyLoadContext isolation' {
             return
         }
 
-        $artefactsRoot = Join-Path $PSScriptRoot '..\Artefacts'
-        $packagedLoader = Get-ChildItem -LiteralPath $artefactsRoot -Filter 'Mailozaurr.ModuleLoadContext.dll' -Recurse -File | Select-Object -First 1
-        $packagedLoader | Should -Not -BeNullOrEmpty -Because 'Build\Build-Module.ps1 must create the packaged ALC loader before this regression runs'
-        $packagedModule = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $packagedLoader.FullName))
-        $packagedModuleRoot = Split-Path -Parent $packagedModule
+        $packagedModule = Join-Path $PSScriptRoot '..\Artefacts\Unpacked\Modules\Mailozaurr'
+        $packagedManifest = (Resolve-Path -LiteralPath (Join-Path $packagedModule 'Mailozaurr.psd1')).ProviderPath
         $expectedCommandAssemblyPath = (Resolve-Path -LiteralPath (Join-Path $packagedModule 'Lib\Core\Mailozaurr.PowerShell.dll')).ProviderPath
         $expectedIsolatedDependencyNames = @(
             'System.Formats.Asn1'
@@ -21,14 +18,11 @@ Describe 'Packaged AssemblyLoadContext isolation' {
             $null = Get-Item -LiteralPath (Join-Path $expectedCorePath "$dependencyName.dll") -ErrorAction Stop
         }
 
-        $moduleRootLiteral = $packagedModuleRoot.Replace("'", "''")
+        $moduleManifestLiteral = $packagedManifest.Replace("'", "''")
         $script = @"
 `$ErrorActionPreference = 'Stop'
 `$WarningPreference = 'SilentlyContinue'
-`$moduleRoot = '$moduleRootLiteral'
-`$env:PSModulePath = `$moduleRoot + [IO.Path]::PathSeparator + `$env:PSModulePath
-
-Import-Module Mailozaurr -Force
+Import-Module '$moduleManifestLiteral' -Force
 
 `$command = Get-Command Send-EmailMessage -Module Mailozaurr -ErrorAction Stop
 `$exportCommand = Get-Command Export-MailFile -Module Mailozaurr -ErrorAction Stop
@@ -44,6 +38,10 @@ Import-Module Mailozaurr -Force
 `$securePassword = ConvertTo-SecureString 'mailozaurr-regression' -AsPlainText -Force
 `$protectedPassword = ConvertFrom-SecureString `$securePassword
 `$plainPassword = `$smtp.ConvertSecureStringToPlainString(`$protectedPassword, `$true)
+`$imapMessage = [Mailozaurr.ImapEmailMessage]::new([MailKit.UniqueId]::MinValue, `$message)
+`$pop3Message = [Mailozaurr.Pop3EmailMessage]::new(0, `$message)
+`$pendingMessage = [Mailozaurr.PendingMessageRecord]::new()
+`$pendingMessage.MessageId = 'import-boundary'
 `$isolatedDependencyNames = @(
     'System.Formats.Asn1'
     'System.Security.Cryptography.Pkcs'
@@ -75,18 +73,36 @@ foreach (`$dependencyName in `$isolatedDependencyNames) {
     }
 }
 `$expectedAllowedTypes = @(
+    'MailKit.Net.Pop3.Pop3Client'
+    'MailKit.Net.Smtp.SmtpCapability'
+    'MailKit.Security.SecureSocketOptions'
+    'MailKit.UniqueId'
+    'Mailozaurr.ClientSmtp'
+    'Mailozaurr.Definitions.AttachmentStreamStagingOptions'
     'Mailozaurr.Definitions.EmailMessageContent'
+    'Mailozaurr.Definitions.StreamAttachmentDescriptor'
     'Mailozaurr.EmailEncryption'
     'Mailozaurr.EmailMessage'
     'Mailozaurr.EmailProvider'
+    'Mailozaurr.FilePendingMessageRepository'
     'Mailozaurr.FileSentMessageRepository'
+    'Mailozaurr.Graph'
     'Mailozaurr.GraphApiErrorParser'
     'Mailozaurr.GraphAttachment'
     'Mailozaurr.GraphContent'
+    'Mailozaurr.GraphEmailMessage'
+    'Mailozaurr.GraphEvent'
     'Mailozaurr.GraphHttpMethod'
+    'Mailozaurr.GraphMailboxFolderStatistics'
+    'Mailozaurr.GraphMailboxPermission'
     'Mailozaurr.GraphMessage'
+    'Mailozaurr.GraphMessageInfo'
     'Mailozaurr.GraphSendPolicy'
+    'Mailozaurr.GraphUploadSessionResult'
     'Mailozaurr.HtmlUtils'
+    'Mailozaurr.ImapEmailMessage'
+    'Mailozaurr.ImapMessageInfo'
+    'Mailozaurr.LoggingMessages'
     'Mailozaurr.MailozaurrOptions'
     'Mailozaurr.MailFileAddress'
     'Mailozaurr.MailFileAttachment'
@@ -96,9 +112,26 @@ foreach (`$dependencyName in `$isolatedDependencyNames) {
     'Mailozaurr.MailFileReaderOptions'
     'Mailozaurr.MailFileRecipient'
     'Mailozaurr.MailFileRecipientType'
+    'Mailozaurr.MicrosoftGraphUtils'
+    'Mailozaurr.NonDeliveryReports.NonDeliveryReport'
+    'Mailozaurr.PendingMessageRecord'
+    'Mailozaurr.PendingMessageRepositoryOptions'
+    'Mailozaurr.PendingMessageSenderFactory'
+    'Mailozaurr.Pop3Connector'
+    'Mailozaurr.Pop3EmailMessage'
+    'Mailozaurr.Pop3MessageInfo'
     'Mailozaurr.SendLogResolver'
+    'Mailozaurr.SentMessageRecord'
     'Mailozaurr.Smtp'
     'Mailozaurr.SmtpConnectionPool'
+    'Mailozaurr.SmtpConnectionInfo'
+    'Mailozaurr.SmtpDeliverySession'
+    'Mailozaurr.SmtpResult'
+    'Mailozaurr.TemporarySmimeCertificate'
+    'MimeKit.BodyBuilder'
+    'MimeKit.MailboxAddress'
+    'MimeKit.MimeMessage'
+    'MimeKit.TextPart'
     'OfficeIMO.Email.AddressBook.OfflineAddressBookReaderOptions'
     'OfficeIMO.Email.AddressBook.OfflineAddressBookObjectType'
     'OfficeIMO.Email.AddressBook.OfflineAddressBookSearchCheckpoint'
@@ -146,7 +179,8 @@ foreach (`$typeName in `$expectedAllowedTypes) {
 `$getTypeAccelerators = `$typeAccelerators.GetProperty('Get', [System.Reflection.BindingFlags] 'Static,Public,NonPublic')
 `$actualAllowedTypes = @(
     foreach (`$entry in `$getTypeAccelerators.GetValue(`$null).GetEnumerator()) {
-        if (`$entry.Key -notlike 'Mailozaurr.*' -and `$entry.Key -notlike 'OfficeIMO.Email.*') {
+        if (`$entry.Key -notlike 'Mailozaurr.*' -and `$entry.Key -notlike 'OfficeIMO.Email.*' -and
+            `$entry.Key -notlike 'MailKit.*' -and `$entry.Key -notlike 'MimeKit.*') {
             continue
         }
 
@@ -159,7 +193,7 @@ foreach (`$typeName in `$expectedAllowedTypes) {
 `$unexpectedAllowedTypes = @(`$actualAllowedTypes | Where-Object { `$expectedAllowedTypes -notcontains `$_ })
 `$unlistedTypeVisibleByName = `$true
 try {
-    `$null = [type]'Mailozaurr.MicrosoftGraphUtils'
+    `$null = [type]'Mailozaurr.PendingMessageProcessor'
 } catch {
     `$unlistedTypeVisibleByName = `$false
 }
@@ -190,6 +224,9 @@ try {
     SearchQueryALCIsDefault = [object]::ReferenceEquals(`$mailKitAlc, [System.Runtime.Loader.AssemblyLoadContext]::Default)
     SmtpCreated = `$null -ne `$smtp
     SecurePasswordRoundTrip = `$plainPassword
+    ImapMessageType = `$imapMessage.GetType().FullName
+    Pop3MessageType = `$pop3Message.GetType().FullName
+    PendingMessageId = `$pendingMessage.MessageId
     IsolatedDependencies = `$isolatedDependencies
     AllowedTypeCount = `$expectedAllowedTypes.Count
     ActualAllowedTypeCount = `$actualAllowedTypes.Count
@@ -232,6 +269,9 @@ try {
         $result.SearchQueryALCIsDefault | Should -BeFalse
         $result.SmtpCreated | Should -BeTrue
         $result.SecurePasswordRoundTrip | Should -Be 'mailozaurr-regression'
+        $result.ImapMessageType | Should -Be 'Mailozaurr.ImapEmailMessage'
+        $result.Pop3MessageType | Should -Be 'Mailozaurr.Pop3EmailMessage'
+        $result.PendingMessageId | Should -Be 'import-boundary'
         foreach ($dependencyName in $expectedIsolatedDependencyNames) {
             $dependency = $result.IsolatedDependencies.$dependencyName
             ($dependency.Path -replace '\\', '/') | Should -BeLike "$(($expectedCorePath -replace '\\', '/'))/*"
@@ -239,8 +279,8 @@ try {
             $dependency.ALC | Should -Be 'Mailozaurr'
             $dependency.ALCIsDefault | Should -BeFalse
         }
-        $result.AllowedTypeCount | Should -Be 53
-        $result.ActualAllowedTypeCount | Should -Be 53
+        $result.AllowedTypeCount | Should -Be 88
+        $result.ActualAllowedTypeCount | Should -Be 88
         @($result.MissingAllowedTypes).Count | Should -Be 0
         @($result.UnexpectedAllowedTypes).Count | Should -Be 0
         @($result.WrongAllowedTypeContexts).Count | Should -Be 0

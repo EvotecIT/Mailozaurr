@@ -1,3 +1,5 @@
+BeforeAll { . (Join-Path $PSScriptRoot 'TestHelpers/Add-MailozaurrTestType.ps1') }
+
 Describe 'Connect-POP3 SSL Options' {
     It 'Forwards provided enum to Pop3Connector' {
         $refs = @(
@@ -6,7 +8,7 @@ Describe 'Connect-POP3 SSL Options' {
             [MailKit.Security.SecureSocketOptions].Assembly.Location
         )
         if (-not ('FakePop3Client' -as [type])) {
-            Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+            Add-MailozaurrTestType -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
 using Mailozaurr;
 using MailKit.Net.Pop3;
 using MailKit.Security;
@@ -14,17 +16,17 @@ using System.Threading;
 using System.Threading.Tasks;
 public class FakePop3Client : Pop3Client {
     public SecureSocketOptions Passed;
-    public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default) {
+    public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default(CancellationToken)) {
         Passed = options;
         return Task.CompletedTask;
     }
-    public override bool IsConnected => true;
-    public override bool IsAuthenticated => true;
+    public override bool IsConnected { get { return true; } }
+    public override bool IsAuthenticated { get { return true; } }
 }
 public static class FakePop3ClientFactory {
     public static Pop3Client Client;
-    public static Pop3Client Create() => Client;
-    public static void Install() => Pop3Connector.ClientFactory = Create;
+    public static Pop3Client Create() { return Client; }
+    public static void Install() { Pop3Connector.ClientFactory = Create; }
 }
 "@
         }
@@ -47,7 +49,7 @@ public static class FakePop3ClientFactory {
             [MailKit.Security.SecureSocketOptions].Assembly.Location
         )
         if (-not ('FakePop3Client' -as [type])) {
-            Add-Type -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
+            Add-MailozaurrTestType -ReferencedAssemblies $refs -CompilerOptions '/nowarn:1701,1702' -TypeDefinition @"
 using Mailozaurr;
 using MailKit.Net.Pop3;
 using MailKit.Security;
@@ -55,17 +57,17 @@ using System.Threading;
 using System.Threading.Tasks;
 public class FakePop3Client : Pop3Client {
     public SecureSocketOptions Passed;
-    public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default) {
+    public override Task ConnectAsync(string host, int port, SecureSocketOptions options, CancellationToken cancellationToken = default(CancellationToken)) {
         Passed = options;
         return Task.CompletedTask;
     }
-    public override bool IsConnected => true;
-    public override bool IsAuthenticated => true;
+    public override bool IsConnected { get { return true; } }
+    public override bool IsAuthenticated { get { return true; } }
 }
 public static class FakePop3ClientFactory {
     public static Pop3Client Client;
-    public static Pop3Client Create() => Client;
-    public static void Install() => Pop3Connector.ClientFactory = Create;
+    public static Pop3Client Create() { return Client; }
+    public static void Install() { Pop3Connector.ClientFactory = Create; }
 }
 "@
         }
