@@ -250,11 +250,10 @@ jobs:
 
       - name: Build packaged module
         shell: pwsh
-        run: |
-          ./Build/Build-Module.ps1 -ConfigurationGateMode Build -SignModule:$false
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Copy-Item -Path ./Artefacts/Unpacked/Modules/Mailozaurr/* -Destination . -Recurse -Force
+        run: ./Build/Build-Module.ps1 -ConfigurationGateMode Build -SignModule:$false
 
       - name: Run PowerShell module suite
         shell: pwsh
-        run: ./Mailozaurr.Tests.ps1
+        run: |
+          Copy-Item -Path ./Artefacts/Unpacked/Modules/Mailozaurr/* -Destination . -Recurse -Force
+          ./Mailozaurr.Tests.ps1
