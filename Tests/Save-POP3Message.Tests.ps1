@@ -67,18 +67,22 @@ public class FakePop3MessageClient : Pop3Client {
         [System.IO.Directory]::CreateDirectory($tempDir) | Out-Null
         $oldTemp = $env:TEMP
         $oldTmp = $env:TMP
+        $oldTmpDir = $env:TMPDIR
         $env:TEMP = $tempDir
         $env:TMP = $tempDir
+        $env:TMPDIR = $tempDir
 
         $target = Join-Path $TestDrive 'blocked.msg'
         New-Item -ItemType Directory -Path $target | Out-Null
         try {
+            [System.IO.Path]::GetTempPath().TrimEnd([char[]]@('\', '/')) | Should -Be ([System.IO.Path]::GetFullPath($tempDir))
             Save-POP3Message -Client $info -Index 0 -Path $target | Out-Null
             (Get-Item -LiteralPath $target).PSIsContainer | Should -BeTrue
             (Get-ChildItem $tempDir -Filter '*.eml') | Should -BeNullOrEmpty
         } finally {
             $env:TEMP = $oldTemp
             $env:TMP = $oldTmp
+            $env:TMPDIR = $oldTmpDir
         }
     }
 }

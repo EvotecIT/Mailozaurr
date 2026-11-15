@@ -253,7 +253,7 @@ jobs:
         run: |
           ./Build/Build-Module.ps1 -ConfigurationGateMode Build -SignModule:$false
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Copy-Item -LiteralPath ./Artefacts/Unpacked/Modules/Mailozaurr/Lib -Destination ./Lib -Recurse -Force
+          Copy-Item -Path ./Artefacts/Unpacked/Modules/Mailozaurr/* -Destination . -Recurse -Force
 
       - name: Run PowerShell module suite
         shell: pwsh
