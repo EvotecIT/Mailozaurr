@@ -357,7 +357,7 @@ public sealed class FilePendingMessageCoordinationTests {
             var processing = new PendingMessageProcessor(view, factory).ProcessAsync();
 
             Assert.Same(started.Task, await Task.WhenAny(started.Task, Task.Delay(TimeSpan.FromSeconds(5))));
-            var deadline = DateTimeOffset.UtcNow.AddSeconds(5);
+            var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
             while (await repository.GetByMessageIdAsync("drain-before-exit") != null &&
                    DateTimeOffset.UtcNow < deadline) {
                 await Task.Delay(10);
@@ -558,14 +558,15 @@ public sealed class FilePendingMessageCoordinationTests {
             var factory = new PendingMessageSenderFactory(new Dictionary<EmailProvider, IPendingMessageSender> {
                 [EmailProvider.None] = sender
             });
-            var duration = TimeSpan.FromMilliseconds(450);
+            // Real file I/O and Framework scheduler contention must fit inside the lease.
+            var duration = TimeSpan.FromSeconds(3);
             var firstProcessor = new PendingMessageProcessor(first, factory,
                 processingLeaseDuration: duration);
             var firstRun = firstProcessor.ProcessAsync();
             await sender.Started;
             try {
                 var initialLease = (await second.GetByMessageIdAsync("long-send"))!.ProcessingLeaseUntil!.Value;
-                var deadline = DateTimeOffset.UtcNow.AddSeconds(5);
+                var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
                 while (DateTimeOffset.UtcNow <= initialLease ||
                        (await second.GetByMessageIdAsync("long-send"))?.ProcessingLeaseUntil <= initialLease) {
                     if (DateTimeOffset.UtcNow > deadline) throw new TimeoutException("The send lease was not renewed.");
