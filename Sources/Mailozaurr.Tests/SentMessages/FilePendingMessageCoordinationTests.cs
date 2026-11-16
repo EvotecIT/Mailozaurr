@@ -357,7 +357,7 @@ public sealed class FilePendingMessageCoordinationTests {
             var processing = new PendingMessageProcessor(view, factory).ProcessAsync();
 
             Assert.Same(started.Task, await Task.WhenAny(started.Task, Task.Delay(TimeSpan.FromSeconds(5))));
-            var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
+            var deadline = DateTimeOffset.UtcNow.AddSeconds(5);
             while (await repository.GetByMessageIdAsync("drain-before-exit") != null &&
                    DateTimeOffset.UtcNow < deadline) {
                 await Task.Delay(10);
