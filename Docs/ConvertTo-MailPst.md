@@ -10,10 +10,12 @@ Converts a supported mail store into a new Unicode PST.
 
 Converts PST, supported PST-compatible OST, OLM, Mbox, EMLX, EML, Maildir, Apple Mail, or EML directory sources through OfficeIMO.Email. The source is never modified and semantic verification is enabled by default.
 
+SplitSizeMB writes numbered parts (name.part001.pst, name.part002.pst, ...) of at most that estimated size instead of one PST, in received-time order. Every part is verified against the source before it is committed, and an EmailStorePstSplitReport is returned. DisplayName and SkipVerification do not apply to a split.
+
 ## SYNTAX
 ### __AllParameterSets
 ```powershell
-ConvertTo-MailPst [-InputPath] <string> [-OutputPath] <string> [-StoreReaderOptions <EmailStoreReaderOptions>] [-Force] [-FailOnDataLoss] [-StopOnItemError] [-ExcludeAssociatedItems] [-ExcludeOrphanedItems] [-ExcludeSearchFolders] [-MaxItems <int>] [-MaxNestedMessageDepth <int>] [-DisplayName <string>] [-SkipVerification] [-WhatIf] [-Confirm] [<CommonParameters>]
+ConvertTo-MailPst [-InputPath] <string> [-OutputPath] <string> [-StoreReaderOptions <EmailStoreReaderOptions>] [-Force] [-FailOnDataLoss] [-StopOnItemError] [-ExcludeAssociatedItems] [-ExcludeOrphanedItems] [-ExcludeSearchFolders] [-MaxItems <int>] [-MaxNestedMessageDepth <int>] [-DisplayName <string>] [-SkipVerification] [-SplitSizeMB <int>] [-MaxParts <int>] [-WhatIf] [-Confirm] [<CommonParameters>]
 ```
 
 ## DESCRIPTION
@@ -175,6 +177,22 @@ Accept pipeline input: False
 Accept wildcard characters: False
 ```
 
+### -MaxParts
+Largest number of parts written with SplitSizeMB.
+
+```yaml
+Type: Int32
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
 ### -OutputPath
 Destination Unicode PST path.
 
@@ -196,6 +214,22 @@ Skips the default staged semantic verification before committing the destination
 
 ```yaml
 Type: SwitchParameter
+Parameter Sets: __AllParameterSets
+Aliases: None
+Possible values:
+
+Required: False
+Position: named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+```
+
+### -SplitSizeMB
+Largest estimated size of one PST part in megabytes. Writes numbered parts instead of one PST.
+
+```yaml
+Type: Int32
 Parameter Sets: __AllParameterSets
 Aliases: None
 Possible values:
@@ -249,6 +283,7 @@ This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable
 ## OUTPUTS
 
 - `OfficeIMO.Email.Store.EmailStorePstConversionReport`
+- `OfficeIMO.Email.Store.EmailStorePstSplitReport`
 
 ## RELATED LINKS
 

@@ -113,6 +113,8 @@ Converts a supported mail store into a new Unicode PST.
 
 Converts PST, supported PST-compatible OST, OLM, Mbox, EMLX, EML, Maildir, Apple Mail, or EML directory sources through OfficeIMO.Email. The source is never modified and semantic verification is enabled by default.
 
+SplitSizeMB writes numbered parts (name.part001.pst, name.part002.pst, ...) of at most that estimated size instead of one PST, in received-time order. Every part is verified against the source before it is committed, and an EmailStorePstSplitReport is returned. DisplayName and SkipVerification do not apply to a split.
+
 ### [ConvertTo-OAuth2Credential](ConvertTo-OAuth2Credential.md)
 Creates a PSCredential object for OAuth2 authentication from a username and token.
 
@@ -144,6 +146,21 @@ The Disconnect-IMAP cmdlet disconnects an active MailKit IMAP client session. Pa
 Disconnects an active POP3 connection previously established with Connect-POP3.
 
 The Disconnect-POP3 cmdlet disconnects an active MailKit POP3 client session. Pass the PopConnectionInfo object returned by Connect-POP3 to this cmdlet to safely close the connection and release resources.
+
+### [Export-GraphMailboxToPst](Export-GraphMailboxToPst.md)
+Exports an Exchange Online mailbox to one or more PST files through Microsoft Graph.
+
+Reads the mailbox folder tree through Microsoft Graph and streams each message's MIME content straight into a new Unicode PST written by OfficeIMO.Email. The folder hierarchy is kept, and Inbox, Sent Items, Drafts, Junk Email and Outbox keep their Outlook roles. The mailbox is only read; nothing in it is changed.
+
+SplitSizeMB starts a new numbered part (name.part001.pst, name.part002.pst, ...) before an item would take the current part over the size. Each part is reopened and its item count checked, and the report lists every part with its size and SHA-256 hash.
+
+Mail is always exported. IncludeContacts, IncludeCalendar and IncludeTasks add contacts, calendar events and Microsoft To Do tasks as typed Outlook items. Recurring events keep their recurrence pattern; modified and cancelled occurrences of a series, and task recurrence, are not carried and are listed as partial items in the report.
+
+By default the export keeps a checkpoint next to the output. If it is interrupted, run the same command with -Resume to continue where it stopped without duplicating items. Use -NoCheckpoint to turn this off.
+
+Required Microsoft Graph permissions. Application (app-only) access: Mail.Read, plus Contacts.Read for IncludeContacts, Calendars.Read for IncludeCalendar and Tasks.Read.All for IncludeTasks. Delegated access to the signed-in user's own mailbox: Mail.Read, Contacts.Read, Calendars.Read and Tasks.Read. Delegated access to another mailbox the signed-in user can open: Mail.Read.Shared, Contacts.Read.Shared and Calendars.Read.Shared; Microsoft To Do tasks of another user are only available with application access. To limit an application to selected mailboxes, use RBAC for Applications in Exchange Online or an application access policy.
+
+The PST writer creates its own Deleted Items folder, so the mailbox's Deleted Items is written as a separate folder with the same name.
 
 ### [Export-MailFile](Export-MailFile.md)
 Exports messages as EML, MSG, OFT, TNEF, or local HTML copies.

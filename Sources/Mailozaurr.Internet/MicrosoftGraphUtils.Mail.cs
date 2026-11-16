@@ -380,6 +380,24 @@ public static partial class MicrosoftGraphUtils {
         string messageId,
         long maxBytes,
         CancellationToken cancellationToken = default) {
+        byte[] content = await GetMailMessageMimeBytesAsync(
+            credential,
+            userPrincipalName,
+            messageId,
+            maxBytes,
+            cancellationToken).ConfigureAwait(false);
+        using var buffer = new MemoryStream(content, writable: false);
+        MimeMessage message = await MimeMessage.LoadAsync(buffer, cancellationToken).ConfigureAwait(false);
+        return new BoundedMimeMessage(message, content.LongLength);
+    }
+
+    /// <summary>Downloads the raw MIME bytes of a message, failing when they exceed <paramref name="maxBytes"/>.</summary>
+    internal static async Task<byte[]> GetMailMessageMimeBytesAsync(
+        GraphCredential credential,
+        string userPrincipalName,
+        string messageId,
+        long maxBytes,
+        CancellationToken cancellationToken = default) {
         if (maxBytes <= 0 || maxBytes > int.MaxValue) throw new ArgumentOutOfRangeException(nameof(maxBytes));
         var token = await ConnectO365GraphAsync(
             credential,
@@ -396,7 +414,18 @@ public static partial class MicrosoftGraphUtils {
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode) {
+#if NET5_0_OR_GREATER
+                string errorContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+#else
+                string errorContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+#endif
+                throw new GraphApiException(
+                    response.StatusCode,
+                    $"GetMailMessageMimeBytesAsync - Error: {response.StatusCode} - {errorContent}",
+                    errorContent,
+                    response.Headers.RetryAfter?.Delta);
+            }
             if (response.Content.Headers.ContentLength is long declared && declared > maxBytes) {
                 throw new InvalidDataException($"Graph MIME message exceeded the {maxBytes} byte limit.");
             }
@@ -415,10 +444,7 @@ public static partial class MicrosoftGraphUtils {
                 }
                 buffer.Write(chunk, 0, read);
             }
-            long byteCount = buffer.Length;
-            buffer.Position = 0;
-            MimeMessage message = await MimeMessage.LoadAsync(buffer, cancellationToken).ConfigureAwait(false);
-            return new BoundedMimeMessage(message, byteCount);
+            return buffer.ToArray();
         } finally {
             ConcurrencySemaphore.Release();
         }
