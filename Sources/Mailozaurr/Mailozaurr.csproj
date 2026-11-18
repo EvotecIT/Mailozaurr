@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageVersion>3.1.0</PackageVersion>
+    <PackageVersion>3.1.1</PackageVersion>
     <Company>Evotec</Company>
     <Authors>Przemyslaw Klys</Authors>
-    <VersionPrefix>3.1.0</VersionPrefix>
+    <VersionPrefix>3.1.1</VersionPrefix>
     <AssemblyName>Mailozaurr</AssemblyName>
     <PackageId>Mailozaurr</PackageId>
     <Description>All Mailozaurr email transports, provider integrations, artifact interoperability, and reusable mail workflows for .NET.</Description>
