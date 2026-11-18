@@ -21,7 +21,7 @@ using Xunit;
 namespace Mailozaurr.Tests;
 
 [Collection("GraphCollection")]
-public sealed class GraphMailboxPstExportTests : IDisposable {
+public sealed partial class GraphMailboxPstExportTests : IDisposable {
     private const string Mailbox = "user@contoso.com";
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "mailozaurr-pst-" + Guid.NewGuid().ToString("N"));
     private readonly FakeGraphMailbox _graph = new FakeGraphMailbox();
@@ -115,6 +115,23 @@ public sealed class GraphMailboxPstExportTests : IDisposable {
         EmailDocument task = documents.Single(item => item.Document.OutlookItemKind == OutlookItemKind.Task).Document;
         Assert.Equal("File expenses", task.Subject);
         Assert.Equal(1, task.Task!.Status);
+    }
+
+    [Fact]
+    public async Task ExportsTaskCompletionAndModificationTimesAndReportsAttachments() {
+        _graph.TasksJson = "{\"value\":[{\"id\":\"task-complete\",\"title\":\"File expenses\",\"status\":\"completed\",\"hasAttachments\":true," +
+            "\"lastModifiedDateTime\":\"2026-03-12T15:30:00Z\",\"completedDateTime\":{\"dateTime\":\"2026-03-10T10:00:00\",\"timeZone\":\"UTC\"}}]}";
+        var options = NewOptions("completed-task.pst", GraphMailboxExportItemTypes.Tasks);
+
+        GraphMailboxPstExportReport report = await NewExporter(options).ExportAsync();
+
+        EmailDocument item = Assert.Single(ReadPart(Assert.Single(report.Parts).Path)).Document;
+        Assert.Equal(new DateTimeOffset(2026, 3, 12, 15, 30, 0, TimeSpan.Zero), item.MessageMetadata.ModifiedDate);
+        Assert.Equal(new DateTimeOffset(2026, 3, 10, 10, 0, 0, TimeSpan.Zero), item.Task!.CompletedAt);
+        Assert.True(item.Task.IsComplete);
+        Assert.Equal(1, report.Written.Tasks);
+        Assert.Contains(report.Issues, issue => issue.Kind == GraphMailboxExportIssueKind.Partial &&
+            issue.ItemId == "task-complete" && issue.Message.Contains("attachments are not carried"));
     }
 
     [Fact]
@@ -434,6 +451,7 @@ public sealed class GraphMailboxPstExportTests : IDisposable {
         internal bool IncludeHiddenFixture { get; set; }
         internal string InboxDisplayName { get; set; } = "Inbox";
         internal string? EventsJson { get; set; }
+        internal string? TasksJson { get; set; }
 
         internal Dictionary<string, (string Id, DateTimeOffset Received)[]> Messages { get; } =
             new Dictionary<string, (string, DateTimeOffset)[]> {
@@ -510,6 +528,7 @@ public sealed class GraphMailboxPstExportTests : IDisposable {
                 case "todo/lists":
                     return Json("{\"value\":[{\"id\":\"tasks-id\",\"displayName\":\"Tasks\",\"wellknownListName\":\"defaultList\"}]}");
                 case "todo/lists/tasks-id/tasks":
+                    if (TasksJson != null) return Json(TasksJson);
                     return Json("{\"value\":[{\"id\":\"task-1\",\"title\":\"File expenses\",\"status\":\"inProgress\",\"importance\":\"high\"," +
                         "\"dueDateTime\":{\"dateTime\":\"2026-03-10T00:00:00.0000000\",\"timeZone\":\"UTC\"}}]}");
             }

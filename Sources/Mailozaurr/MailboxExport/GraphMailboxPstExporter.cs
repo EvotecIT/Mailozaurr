@@ -18,7 +18,7 @@ namespace Mailozaurr.MailboxExport;
 /// would push the current part over its size estimate. With a checkpoint path, progress is committed atomically
 /// with the writer checkpoint so an interrupted export resumes without duplicates.
 /// </remarks>
-public sealed class GraphMailboxPstExporter {
+public sealed partial class GraphMailboxPstExporter {
     private const string MailPrefix = "m:";
     private const string ContactPrefix = "c:";
     private const string CalendarPrefix = "e:";
@@ -67,33 +67,17 @@ public sealed class GraphMailboxPstExporter {
     public async Task<GraphMailboxPstExportReport> ExportAsync(CancellationToken cancellationToken = default) {
         var stopwatch = Stopwatch.StartNew();
         string fingerprint = GraphMailboxPstExportState.BuildFingerprint(_options);
-        bool resumed = OpenWriter(fingerprint, cancellationToken);
+        using FileStream? destinationLock = LockDestination();
+        using FileStream? checkpointLock = LockCheckpoint();
+        bool resumed;
         bool completed = false;
         try {
-            await PlanFoldersAsync(cancellationToken).ConfigureAwait(false);
-            foreach (PlannedFolder folder in _folderOrder) {
-                if (!folder.Selected || _state.DoneFolders.Contains(folder.Key)) continue;
-                cancellationToken.ThrowIfCancellationRequested();
-                EnsurePstFolder(folder);
-                ReportProgress(folder.Path);
-                switch (folder.ItemType) {
-                    case GraphMailboxExportItemTypes.Mail:
-                        await ExportMessagesAsync(folder, cancellationToken).ConfigureAwait(false);
-                        break;
-                    case GraphMailboxExportItemTypes.Contacts:
-                        await ExportResourcesAsync(folder, _source.GetContactsAsync, cancellationToken).ConfigureAwait(false);
-                        break;
-                    case GraphMailboxExportItemTypes.Calendar:
-                        await ExportResourcesAsync(folder, _source.GetEventsAsync, cancellationToken).ConfigureAwait(false);
-                        break;
-                    case GraphMailboxExportItemTypes.Tasks:
-                        await ExportResourcesAsync(folder, _source.GetTasksAsync, cancellationToken).ConfigureAwait(false);
-                        break;
-                }
-                _state.DoneFolders.Add(folder.Key);
-                _state.ResetCursor(null);
+            resumed = OpenWriter(fingerprint, cancellationToken);
+            if (_writer != null) {
+                await ExportFoldersAsync(cancellationToken).ConfigureAwait(false);
+                CompletePart(isFinalPart: true, cancellationToken);
             }
-            CompletePart(cancellationToken);
+            FinishCheckpoint();
             completed = true;
         } finally {
             if (!completed) CloseIncompleteWriter();
@@ -110,120 +94,29 @@ public sealed class GraphMailboxPstExporter {
             stopwatch.Elapsed);
     }
 
-    private bool OpenWriter(string fingerprint, CancellationToken cancellationToken) {
-        string? checkpoint = _options.CheckpointPath;
-        if (checkpoint != null && File.Exists(checkpoint)) {
-            if (_options.Resume) {
-                _writer = EmailStorePstWriter.Resume(checkpoint, out byte[]? applicationState);
-                try {
-                    GraphMailboxPstExportState state = GraphMailboxPstExportState.Deserialize(applicationState);
-                    if (!string.Equals(state.Fingerprint, fingerprint, StringComparison.Ordinal)) {
-                        throw new InvalidOperationException(
-                            "The checkpoint belongs to an export with a different mailbox, destination, split settings, item types, item size limit, folder filters or date range.");
-                    }
-                    ValidateCompletedParts(state, cancellationToken);
-                    _state = state;
-                } catch {
-                    _writer.Dispose();
-                    _writer = null;
-                    throw;
-                }
-                return true;
-            }
-            if (!_options.Overwrite) {
-                throw new InvalidOperationException(
-                    $"A checkpoint from an earlier export exists at '{checkpoint}'. Resume it, or allow overwriting to start again.");
-            }
-            EmailStorePstWriter.DeleteCheckpoint(checkpoint);
-        }
-        _state = new GraphMailboxPstExportState { Fingerprint = fingerprint };
-        StartPart(1);
-        return false;
-    }
-
-    private void ValidateCompletedParts(GraphMailboxPstExportState state, CancellationToken cancellationToken) {
-        if (state.PartNumber < 1 || state.CompletedParts.Count != state.PartNumber - 1 ||
-            (_options.Split == null && state.CompletedParts.Count != 0)) {
-            throw new InvalidDataException("The checkpoint contains inconsistent completed PST part numbers.");
-        }
-
-        StringComparison pathComparison = Path.DirectorySeparatorChar == '\\'
-            ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        for (int i = 0; i < state.CompletedParts.Count; i++) {
+    private async Task ExportFoldersAsync(CancellationToken cancellationToken) {
+        await PlanFoldersAsync(cancellationToken).ConfigureAwait(false);
+        foreach (PlannedFolder folder in _folderOrder) {
+            if (!folder.Selected || _state.DoneFolders.Contains(folder.Key)) continue;
             cancellationToken.ThrowIfCancellationRequested();
-            GraphMailboxPstExportPart part = state.CompletedParts[i];
-            string expectedPath = GetPartPath(_options.DestinationPath, i + 1);
-            if (part.Number != i + 1 || !string.Equals(part.Path, expectedPath, pathComparison)) {
-                throw new InvalidDataException("The checkpoint contains an unexpected completed PST part path.");
+            EnsurePstFolder(folder);
+            ReportProgress(folder.Path);
+            switch (folder.ItemType) {
+                case GraphMailboxExportItemTypes.Mail:
+                    await ExportMessagesAsync(folder, cancellationToken).ConfigureAwait(false);
+                    break;
+                case GraphMailboxExportItemTypes.Contacts:
+                    await ExportResourcesAsync(folder, _source.GetContactsAsync, cancellationToken).ConfigureAwait(false);
+                    break;
+                case GraphMailboxExportItemTypes.Calendar:
+                    await ExportResourcesAsync(folder, _source.GetEventsAsync, cancellationToken).ConfigureAwait(false);
+                    break;
+                case GraphMailboxExportItemTypes.Tasks:
+                    await ExportResourcesAsync(folder, _source.GetTasksAsync, cancellationToken).ConfigureAwait(false);
+                    break;
             }
-            if (!File.Exists(expectedPath)) {
-                throw new InvalidDataException($"Completed PST part '{expectedPath}' is missing.");
-            }
-            if (!string.Equals(ComputeSha256(expectedPath), part.Sha256, StringComparison.OrdinalIgnoreCase)) {
-                throw new InvalidDataException($"Completed PST part '{expectedPath}' no longer matches its checkpoint SHA-256.");
-            }
-        }
-    }
-
-    private void StartPart(int number) {
-        _state.PartNumber = number;
-        _state.PartItems = 0;
-        _state.PartEstimatedBytes = 0;
-        _state.PstFolders.Clear();
-        string destination = _options.Split == null ? Path.GetFullPath(_options.DestinationPath) : GetPartPath(_options.DestinationPath, number);
-        var writerOptions = new EmailStorePstWriterOptions(
-            displayName: _options.DisplayName ?? _options.Mailbox,
-            overwriteExisting: _options.Overwrite,
-            failOnLoss: false,
-            checkpointPath: _options.CheckpointPath,
-            // Checkpoints are taken explicitly so the exporter state always matches the writer state.
-            checkpointIntervalItems: int.MaxValue,
-            retainCheckpointOnDispose: _options.CheckpointPath != null);
-        _writer = EmailStorePstWriter.Create(destination, writerOptions);
-        _itemsSinceCheckpoint = 0;
-        if (_options.CheckpointPath != null) _writer.Checkpoint(_state.Serialize());
-    }
-
-    private void CompletePart(CancellationToken cancellationToken) {
-        EmailStorePstWriter writer = _writer ?? throw new InvalidOperationException("No PST part is open.");
-        EmailStorePstWriteReport report = writer.Complete(cancellationToken);
-        writer.Dispose();
-        _writer = null;
-        _diagnostics.AddRange(report.NativeDiagnostics);
-        string path = report.DestinationPath;
-        bool? verified = null;
-        int? verifiedItems = null;
-        if (_options.Verify) {
-            verifiedItems = CountItems(path, cancellationToken);
-            verified = verifiedItems == _state.PartItems;
-        }
-        _state.CompletedParts.Add(new GraphMailboxPstExportPart(
-            _state.PartNumber,
-            path,
-            _state.PartItems,
-            report.FolderCount,
-            report.BytesWritten,
-            _state.PartEstimatedBytes,
-            ComputeSha256(path),
-            verified,
-            verifiedItems));
-    }
-
-    private void CloseIncompleteWriter() {
-        EmailStorePstWriter? writer = _writer;
-        if (writer == null) return;
-        _writer = null;
-        try {
-            if (_options.CheckpointPath != null) {
-                writer.Checkpoint(_state.Serialize());
-            } else {
-                writer.Abandon();
-            }
-        } catch (Exception) {
-            // A checkpoint that cannot be committed must not be replaced by one that disagrees with the exporter state.
-            try { writer.Abandon(); } catch (InvalidOperationException) { }
-        } finally {
-            writer.Dispose();
+            _state.DoneFolders.Add(folder.Key);
+            _state.ResetCursor(null);
         }
     }
 
@@ -414,7 +307,7 @@ public sealed class GraphMailboxPstExporter {
                     $"The export needs more than {split.MaxParts} parts at the selected split size. Increase the part limit to continue from a valid checkpoint.");
             }
             int next = _state.PartNumber + 1;
-            CompletePart(cancellationToken);
+            CompletePart(isFinalPart: false, cancellationToken);
             StartPart(next);
         }
         string pstFolderId = EnsurePstFolder(folder);

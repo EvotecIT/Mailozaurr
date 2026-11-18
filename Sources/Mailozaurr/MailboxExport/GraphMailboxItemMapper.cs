@@ -97,8 +97,7 @@ internal static class GraphMailboxItemMapper {
             item.IsRecurring = item.Recurrence != null;
         }
         if (GetBoolean(graphEvent, "hasAttachments") == true) {
-            const string attachmentWarning = "Calendar attachments are not carried.";
-            warning = warning == null ? attachmentWarning : warning + " " + attachmentWarning;
+            warning = AppendWarning(warning, "Calendar attachments are not carried.");
         }
 
         var document = new EmailDocument {
@@ -132,6 +131,7 @@ internal static class GraphMailboxItemMapper {
         var item = new OutlookTask {
             Start = GetDateTimeTimeZone(task, "startDateTime"),
             Due = GetDateTimeTimeZone(task, "dueDateTime"),
+            CompletedAt = GetDateTimeTimeZone(task, "completedDateTime"),
             Status = status switch {
                 "inProgress" => 1,
                 "completed" => 2,
@@ -149,6 +149,9 @@ internal static class GraphMailboxItemMapper {
         if (task.TryGetProperty("recurrence", out JsonElement recurrence) && recurrence.ValueKind == JsonValueKind.Object) {
             warning = "The task recurrence pattern was not carried; the task is written as a single task.";
         }
+        if (GetBoolean(task, "hasAttachments") == true) {
+            warning = AppendWarning(warning, "Task attachments are not carried.");
+        }
 
         var document = new EmailDocument {
             OutlookItemKind = OutlookItemKind.Task,
@@ -158,10 +161,10 @@ internal static class GraphMailboxItemMapper {
         };
         ApplyBody(task, document);
         ApplyCommon(task, document);
-        DateTimeOffset? completed = GetDateTimeTimeZone(task, "completedDateTime");
-        if (completed.HasValue) document.MessageMetadata.ModifiedDate = completed;
         return document;
     }
+
+    private static string AppendWarning(string? existing, string warning) => existing == null ? warning : existing + " " + warning;
 
     internal static DateTimeOffset? GetEventStart(JsonElement graphEvent) => GetDateTimeTimeZone(graphEvent, "start");
 
