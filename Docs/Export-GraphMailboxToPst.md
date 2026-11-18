@@ -10,11 +10,11 @@ Exports an Exchange Online mailbox to one or more PST files through Microsoft Gr
 
 Reads the mailbox folder tree through Microsoft Graph and streams each message's MIME content straight into a new Unicode PST written by OfficeIMO.Email. The folder hierarchy is kept, and Inbox, Sent Items, Drafts, Junk Email and Outbox keep their Outlook roles. The mailbox is only read; nothing in it is changed.
 
-SplitSizeMB uses an estimated size to start a new numbered part (name.part001.pst, name.part002.pst, ...). Actual PST sizes can differ, and a part can contain a single item larger than the estimate. Each part is reopened and its item count checked, and the report lists every part with its size and SHA-256 hash.
+SplitSizeMB uses an estimated size to start a new numbered part (name.part001.pst, name.part002.pst, ...). Actual PST sizes can differ, and a part can contain a single item larger than the estimate. By default, the exporter reopens each part and checks its item count. -SkipVerification skips that check. The report always includes each part's size and SHA-256 hash.
 
 Mail is always exported. IncludeContacts, IncludeCalendar and IncludeTasks add contacts, calendar events and Microsoft To Do tasks as typed Outlook items. Calendar attachments, modified and cancelled occurrences of a calendar series, and task recurrence are omitted and reported as partial items. Recurring calendar events keep their recurrence pattern.
 
-By default the export keeps a checkpoint next to the output. If it is interrupted, run the same command with -Resume. Before continuing, the exporter checks that each completed part still matches its stored SHA-256 hash. Use -NoCheckpoint to turn checkpoints off.
+By default the export keeps a checkpoint next to the output. To continue, add -Resume and keep the original mailbox, destination, split size, filters and item options. If the export stopped at -MaxParts, increase that limit when resuming from a valid checkpoint. The exporter checks each completed part against its stored SHA-256 hash before continuing. Use -NoCheckpoint to turn checkpoints off.
 
 For app-only access through unscoped Microsoft Entra consent, grant Mail.Read for mail, Contacts.Read for IncludeContacts and Calendars.Read for IncludeCalendar. These grants cover every mailbox in the tenant unless an Exchange Application Access Policy scopes them.
 
@@ -67,7 +67,7 @@ IncludeFolder patterns match paths such as Inbox\Projects and include the folder
 Export-GraphMailboxToPst -Identity 'user@contoso.com' -OutputPath 'C:\Export' -SplitSizeMB 5120 -Resume
 ```
 
-Run with the same parameters as the interrupted export.
+Keep the original mailbox, destination, split size, filters and item options. If the export reached its part limit, add a higher -MaxParts value.
 
 ## PARAMETERS
 
@@ -264,7 +264,7 @@ Accept wildcard characters: False
 ```
 
 ### -MaxParts
-Largest number of parts. The export stops with an error if it needs more.
+Largest number of parts. If the export needs more, raise this limit when resuming from a valid checkpoint.
 
 ```yaml
 Type: Int32
@@ -328,7 +328,7 @@ Accept wildcard characters: False
 ```
 
 ### -SkipVerification
-Skips reopening each part to check its item count.
+Skips reopening each part to check its item count. The SHA-256 hash is still calculated.
 
 ```yaml
 Type: SwitchParameter

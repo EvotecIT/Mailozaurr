@@ -161,6 +161,7 @@ internal sealed class GraphMailboxPstExportState {
             string destination = Path.GetFullPath(options.DestinationPath);
             writer.WriteString("destination", Path.DirectorySeparatorChar == '\\' ? destination.ToUpperInvariant() : destination);
             writer.WriteNumber("splitBytes", options.Split?.MaxEstimatedBytesPerPart ?? -1);
+            writer.WriteNumber("splitOverheadBytes", options.Split?.PerItemOverheadBytes ?? -1);
             writer.WriteNumber("itemTypes", (int)options.ItemTypes);
             WriteStrings(writer, "includeFolders", options.IncludeFolders);
             WriteStrings(writer, "excludeFolders", options.ExcludeFolders);

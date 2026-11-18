@@ -6,9 +6,9 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// <para type="synopsis">Exports an Exchange Online mailbox to one or more PST files through Microsoft Graph.</para>
 /// <para type="description">Reads the mailbox folder tree through Microsoft Graph and streams each message's MIME content straight into a new Unicode PST written by OfficeIMO.Email. The folder hierarchy is kept, and Inbox, Sent Items, Drafts, Junk Email and Outbox keep their Outlook roles. The mailbox is only read; nothing in it is changed.</para>
-/// <para type="description">SplitSizeMB uses an estimated size to start a new numbered part (name.part001.pst, name.part002.pst, ...). Actual PST sizes can differ, and a part can contain a single item larger than the estimate. Each part is reopened and its item count checked, and the report lists every part with its size and SHA-256 hash.</para>
+/// <para type="description">SplitSizeMB uses an estimated size to start a new numbered part (name.part001.pst, name.part002.pst, ...). Actual PST sizes can differ, and a part can contain a single item larger than the estimate. By default, the exporter reopens each part and checks its item count. -SkipVerification skips that check. The report always includes each part's size and SHA-256 hash.</para>
 /// <para type="description">Mail is always exported. IncludeContacts, IncludeCalendar and IncludeTasks add contacts, calendar events and Microsoft To Do tasks as typed Outlook items. Calendar attachments, modified and cancelled occurrences of a calendar series, and task recurrence are omitted and reported as partial items. Recurring calendar events keep their recurrence pattern.</para>
-/// <para type="description">By default the export keeps a checkpoint next to the output. If it is interrupted, run the same command with -Resume. Before continuing, the exporter checks that each completed part still matches its stored SHA-256 hash. Use -NoCheckpoint to turn checkpoints off.</para>
+/// <para type="description">By default the export keeps a checkpoint next to the output. To continue, add -Resume and keep the original mailbox, destination, split size, filters and item options. If the export stopped at -MaxParts, increase that limit when resuming from a valid checkpoint. The exporter checks each completed part against its stored SHA-256 hash before continuing. Use -NoCheckpoint to turn checkpoints off.</para>
 /// <para type="description">For app-only access through unscoped Microsoft Entra consent, grant Mail.Read for mail, Contacts.Read for IncludeContacts and Calendars.Read for IncludeCalendar. These grants cover every mailbox in the tenant unless an Exchange Application Access Policy scopes them.</para>
 /// <para type="description">For app-only access to selected mailboxes through Exchange Online Application RBAC, assign the corresponding scoped Application Mail.Read, Application Contacts.Read and Application Calendars.Read roles. Remove overlapping unscoped Microsoft Entra grants. Exchange RBAC and Microsoft Entra permissions are additive. IncludeTasks requires the separate Microsoft Graph application permission Tasks.Read.All because Exchange mailbox scopes do not cover Microsoft To Do.</para>
 /// <para type="description">Delegated access to the signed-in user's own mailbox uses Mail.Read, Contacts.Read, Calendars.Read and Tasks.Read as needed. For a shared mailbox the signed-in user can open, use Mail.Read.Shared, Contacts.Read.Shared and Calendars.Read.Shared. Reading another user's Microsoft To Do tasks requires app-only access.</para>
@@ -28,7 +28,7 @@ namespace Mailozaurr.PowerShell;
 /// <example>
 ///   <summary>Continue an interrupted export</summary>
 ///   <code>Export-GraphMailboxToPst -Identity 'user@contoso.com' -OutputPath 'C:\Export' -SplitSizeMB 5120 -Resume</code>
-///   <para>Run with the same parameters as the interrupted export.</para>
+///   <para>Keep the original mailbox, destination, split size, filters and item options. If the export reached its part limit, add a higher -MaxParts value.</para>
 /// </example>
 [Cmdlet(VerbsData.Export, "GraphMailboxToPst", SupportsShouldProcess = true)]
 [OutputType(typeof(GraphMailboxPstExportReport))]
@@ -52,7 +52,7 @@ public sealed class CmdletExportGraphMailboxToPst : MailStoreCmdletBase {
     [ValidateRange(1, 1_000_000)]
     public int SplitSizeMB { get; set; }
 
-    /// <summary>Largest number of parts. The export stops with an error if it needs more.</summary>
+    /// <summary>Largest number of parts. If the export needs more, raise this limit when resuming from a valid checkpoint.</summary>
     [Parameter]
     [ValidateRange(1, 10_000)]
     public int MaxParts { get; set; } = 1000;
@@ -116,7 +116,7 @@ public sealed class CmdletExportGraphMailboxToPst : MailStoreCmdletBase {
     [Parameter]
     public SwitchParameter StopOnItemError { get; set; }
 
-    /// <summary>Skips reopening each part to check its item count.</summary>
+    /// <summary>Skips reopening each part to check its item count. The SHA-256 hash is still calculated.</summary>
     [Parameter]
     public SwitchParameter SkipVerification { get; set; }
 
@@ -165,7 +165,7 @@ public sealed class CmdletExportGraphMailboxToPst : MailStoreCmdletBase {
         } catch (Exception exception) {
             progress.Complete();
             string hint = options.CheckpointPath != null && File.Exists(options.CheckpointPath)
-                ? " Run the same command with -Resume to continue."
+                ? " Use -Resume to continue from the checkpoint."
                 : string.Empty;
             WriteError(new ErrorRecord(
                 new InvalidOperationException(exception.Message + hint, exception),

@@ -305,6 +305,35 @@ public sealed class GraphMailboxPstExportTests : IDisposable {
         Assert.Equal(before, SnapshotPstFiles());
     }
 
+    [Fact]
+    public async Task ResumeAllowsRaisingPartLimitButRejectsChangedOverhead() {
+        var options = NewOptions("part-limit.pst", GraphMailboxExportItemTypes.Mail);
+        options.Split = new EmailStorePstSplitOptions(maxEstimatedBytesPerPart: 40 * 1024, maxParts: 1);
+        options.Verify = false;
+        InvalidOperationException limit = await Assert.ThrowsAsync<InvalidOperationException>(() => NewExporter(options).ExportAsync());
+        Assert.Contains("needs more than 1 parts", limit.Message);
+        Assert.True(File.Exists(options.CheckpointPath));
+
+        int requests = _graph.MimeRequests.Count;
+        options.Resume = true;
+        options.Split = new EmailStorePstSplitOptions(maxEstimatedBytesPerPart: 40 * 1024, perItemOverheadBytes: 8 * 1024, maxParts: 10);
+        InvalidOperationException mismatch = await Assert.ThrowsAsync<InvalidOperationException>(() => NewExporter(options).ExportAsync());
+        Assert.Contains("split settings", mismatch.Message);
+        Assert.Equal(requests, _graph.MimeRequests.Count);
+
+        options.Split = new EmailStorePstSplitOptions(maxEstimatedBytesPerPart: 40 * 1024, maxParts: 10);
+        GraphMailboxPstExportReport report = await NewExporter(options).ExportAsync();
+        Assert.True(report.Resumed);
+        Assert.Equal(7, report.Written.Messages);
+        Assert.Equal(new[] { 2, 2, 2, 1 }, report.Parts.Select(part => part.ItemCount));
+        Assert.Equal(7, report.Parts.SelectMany(part => ReadPart(part.Path)).Select(item => item.Document.Subject).Distinct().Count());
+        Assert.All(report.Parts, part => {
+            Assert.Null(part.Verified);
+            Assert.Null(part.VerifiedItemCount);
+            Assert.Equal(Sha256(part.Path), part.Sha256);
+        });
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

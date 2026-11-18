@@ -119,7 +119,7 @@ public sealed class GraphMailboxPstExporter {
                     GraphMailboxPstExportState state = GraphMailboxPstExportState.Deserialize(applicationState);
                     if (!string.Equals(state.Fingerprint, fingerprint, StringComparison.Ordinal)) {
                         throw new InvalidOperationException(
-                            "The checkpoint belongs to an export with a different mailbox, destination, split size, item types, folder filters or date range.");
+                            "The checkpoint belongs to an export with a different mailbox, destination, split settings, item types, item size limit, folder filters or date range.");
                     }
                     ValidateCompletedParts(state, cancellationToken);
                     _state = state;
@@ -411,7 +411,7 @@ public sealed class GraphMailboxPstExporter {
         if (split != null && _state.PartItems > 0 && _state.PartEstimatedBytes + estimate > split.MaxEstimatedBytesPerPart) {
             if (_state.PartNumber >= split.MaxParts) {
                 throw new InvalidOperationException(
-                    $"The export needs more than {split.MaxParts} parts at the selected split size.");
+                    $"The export needs more than {split.MaxParts} parts at the selected split size. Increase the part limit to continue from a valid checkpoint.");
             }
             int next = _state.PartNumber + 1;
             CompletePart(cancellationToken);
