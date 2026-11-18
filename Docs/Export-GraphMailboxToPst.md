@@ -12,7 +12,7 @@ Reads the mailbox folder tree through Microsoft Graph and streams each message's
 
 SplitSizeMB uses an estimated size to start a new numbered part (name.part001.pst, name.part002.pst, ...). Actual PST sizes can differ, and a part can contain a single item larger than the estimate. Each part is reopened and its item count checked, and the report lists every part with its size and SHA-256 hash.
 
-Mail is always exported. IncludeContacts, IncludeCalendar and IncludeTasks add contacts, calendar events and Microsoft To Do tasks as typed Outlook items. Recurring events keep their recurrence pattern; modified and cancelled occurrences of a series, and task recurrence, are not carried and are listed as partial items in the report.
+Mail is always exported. IncludeContacts, IncludeCalendar and IncludeTasks add contacts, calendar events and Microsoft To Do tasks as typed Outlook items. Calendar attachments, modified and cancelled occurrences of a calendar series, and task recurrence are omitted and reported as partial items. Recurring calendar events keep their recurrence pattern.
 
 By default the export keeps a checkpoint next to the output. If it is interrupted, run the same command with -Resume. Before continuing, the exporter checks that each completed part still matches its stored SHA-256 hash. Use -NoCheckpoint to turn checkpoints off.
 

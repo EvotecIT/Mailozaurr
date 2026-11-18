@@ -71,7 +71,10 @@ public sealed class GraphMailboxPstExportTests : IDisposable {
         Assert.Equal(1, report.ItemsSkipped);
         Assert.Contains(report.Issues, issue => issue.Kind == GraphMailboxExportIssueKind.Failed && issue.ItemId == "inbox-2");
         Assert.Contains(report.Issues, issue => issue.Kind == GraphMailboxExportIssueKind.Skipped && issue.ItemId == "projects-2");
-        Assert.Contains(report.Issues, issue => issue.Kind == GraphMailboxExportIssueKind.Partial && issue.ItemId == "event-weekly");
+        Assert.Contains(report.Issues, issue => issue.Kind == GraphMailboxExportIssueKind.Partial && issue.ItemId == "event-single" &&
+            issue.Message.Contains("attachments are not carried"));
+        Assert.Contains(report.Issues, issue => issue.Kind == GraphMailboxExportIssueKind.Partial && issue.ItemId == "event-weekly" &&
+            issue.Message.Contains("attachments are not carried") && issue.Message.Contains("Modified and cancelled occurrences"));
         Assert.Equal(2, _graph.MimeRequests.Count(id => id == "sent-1"));
 
         Assert.True(report.Parts.Count >= 4);
@@ -102,6 +105,7 @@ public sealed class GraphMailboxPstExportTests : IDisposable {
         Assert.Equal("ada@contoso.com", contact.Contact.Email1.Address);
         Assert.Equal("+1 555 0100", contact.Contact.Phones.Business);
 
+        Assert.Equal(OutlookItemKind.Appointment, documents.Single(item => item.Document.Subject == "Design review").Document.OutlookItemKind);
         EmailDocument weekly = documents.Single(item => item.Document.Subject == "Weekly sync").Document;
         Assert.Equal(OutlookItemKind.Appointment, weekly.OutlookItemKind);
         Assert.NotNull(weekly.Appointment!.Recurrence);
@@ -467,10 +471,10 @@ public sealed class GraphMailboxPstExportTests : IDisposable {
                 case "calendars/calendar-id/events":
                     if (EventsJson != null) return Json(EventsJson);
                     return Json("{\"value\":[" +
-                        "{\"id\":\"event-single\",\"subject\":\"Design review\",\"start\":{\"dateTime\":\"2026-03-03T13:00:00.0000000\",\"timeZone\":\"UTC\"}," +
+                        "{\"id\":\"event-single\",\"subject\":\"Design review\",\"hasAttachments\":true,\"start\":{\"dateTime\":\"2026-03-03T13:00:00.0000000\",\"timeZone\":\"UTC\"}," +
                         "\"end\":{\"dateTime\":\"2026-03-03T14:00:00.0000000\",\"timeZone\":\"UTC\"},\"showAs\":\"busy\"," +
                         "\"attendees\":[{\"type\":\"required\",\"emailAddress\":{\"name\":\"Ada\",\"address\":\"ada@contoso.com\"}}]}," +
-                        "{\"id\":\"event-weekly\",\"subject\":\"Weekly sync\",\"type\":\"seriesMaster\",\"start\":{\"dateTime\":\"2026-03-02T09:00:00.0000000\",\"timeZone\":\"UTC\"}," +
+                        "{\"id\":\"event-weekly\",\"subject\":\"Weekly sync\",\"hasAttachments\":true,\"type\":\"seriesMaster\",\"start\":{\"dateTime\":\"2026-03-02T09:00:00.0000000\",\"timeZone\":\"UTC\"}," +
                         "\"end\":{\"dateTime\":\"2026-03-02T09:30:00.0000000\",\"timeZone\":\"UTC\"},\"originalStartTimeZone\":\"UTC\"," +
                         "\"recurrence\":{\"pattern\":{\"type\":\"weekly\",\"interval\":1,\"daysOfWeek\":[\"monday\"],\"firstDayOfWeek\":\"monday\"}," +
                         "\"range\":{\"type\":\"numbered\",\"startDate\":\"2026-03-02\",\"numberOfOccurrences\":10,\"recurrenceTimeZone\":\"UTC\"}}}]}");

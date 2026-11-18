@@ -96,6 +96,10 @@ internal static class GraphMailboxItemMapper {
             item.Recurrence = MapRecurrence(recurrence, graphEvent, start, end, out warning);
             item.IsRecurring = item.Recurrence != null;
         }
+        if (GetBoolean(graphEvent, "hasAttachments") == true) {
+            const string attachmentWarning = "Calendar attachments are not carried.";
+            warning = warning == null ? attachmentWarning : warning + " " + attachmentWarning;
+        }
 
         var document = new EmailDocument {
             OutlookItemKind = OutlookItemKind.Appointment,
