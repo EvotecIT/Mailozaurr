@@ -67,7 +67,7 @@ public sealed class GraphMailboxPstExporter {
     public async Task<GraphMailboxPstExportReport> ExportAsync(CancellationToken cancellationToken = default) {
         var stopwatch = Stopwatch.StartNew();
         string fingerprint = GraphMailboxPstExportState.BuildFingerprint(_options);
-        bool resumed = OpenWriter(fingerprint);
+        bool resumed = OpenWriter(fingerprint, cancellationToken);
         bool completed = false;
         try {
             await PlanFoldersAsync(cancellationToken).ConfigureAwait(false);
@@ -110,7 +110,7 @@ public sealed class GraphMailboxPstExporter {
             stopwatch.Elapsed);
     }
 
-    private bool OpenWriter(string fingerprint) {
+    private bool OpenWriter(string fingerprint, CancellationToken cancellationToken) {
         string? checkpoint = _options.CheckpointPath;
         if (checkpoint != null && File.Exists(checkpoint)) {
             if (_options.Resume) {
@@ -121,6 +121,7 @@ public sealed class GraphMailboxPstExporter {
                         throw new InvalidOperationException(
                             "The checkpoint belongs to an export with a different mailbox, destination, split size, item types, folder filters or date range.");
                     }
+                    ValidateCompletedParts(state, cancellationToken);
                     _state = state;
                 } catch {
                     _writer.Dispose();
@@ -138,6 +139,30 @@ public sealed class GraphMailboxPstExporter {
         _state = new GraphMailboxPstExportState { Fingerprint = fingerprint };
         StartPart(1);
         return false;
+    }
+
+    private void ValidateCompletedParts(GraphMailboxPstExportState state, CancellationToken cancellationToken) {
+        if (state.PartNumber < 1 || state.CompletedParts.Count != state.PartNumber - 1 ||
+            (_options.Split == null && state.CompletedParts.Count != 0)) {
+            throw new InvalidDataException("The checkpoint contains inconsistent completed PST part numbers.");
+        }
+
+        StringComparison pathComparison = Path.DirectorySeparatorChar == '\\'
+            ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        for (int i = 0; i < state.CompletedParts.Count; i++) {
+            cancellationToken.ThrowIfCancellationRequested();
+            GraphMailboxPstExportPart part = state.CompletedParts[i];
+            string expectedPath = GetPartPath(_options.DestinationPath, i + 1);
+            if (part.Number != i + 1 || !string.Equals(part.Path, expectedPath, pathComparison)) {
+                throw new InvalidDataException("The checkpoint contains an unexpected completed PST part path.");
+            }
+            if (!File.Exists(expectedPath)) {
+                throw new InvalidDataException($"Completed PST part '{expectedPath}' is missing.");
+            }
+            if (!string.Equals(ComputeSha256(expectedPath), part.Sha256, StringComparison.OrdinalIgnoreCase)) {
+                throw new InvalidDataException($"Completed PST part '{expectedPath}' no longer matches its checkpoint SHA-256.");
+            }
+        }
     }
 
     private void StartPart(int number) {
@@ -349,10 +374,10 @@ public sealed class GraphMailboxPstExporter {
         GraphMailboxExportItemTypes type = folder.ItemType;
         string? subject = GraphMailboxExportSource.GetString(resource, type == GraphMailboxExportItemTypes.Tasks ? "title" :
             type == GraphMailboxExportItemTypes.Contacts ? "displayName" : "subject");
-        if (type == GraphMailboxExportItemTypes.Calendar && !EventInDateRange(resource)) return;
         EmailDocument document;
         string? warning = null;
         try {
+            if (type == GraphMailboxExportItemTypes.Calendar && !EventInDateRange(resource)) return;
             document = type switch {
                 GraphMailboxExportItemTypes.Contacts => GraphMailboxItemMapper.MapContact(resource),
                 GraphMailboxExportItemTypes.Calendar => GraphMailboxItemMapper.MapEvent(resource, out warning),
@@ -375,10 +400,8 @@ public sealed class GraphMailboxPstExporter {
     private bool EventInDateRange(JsonElement graphEvent) {
         if (!_options.StartDate.HasValue && !_options.EndDate.HasValue) return true;
         DateTimeOffset? start = GraphMailboxItemMapper.GetEventStart(graphEvent);
-        DateTimeOffset? end = GraphMailboxItemMapper.GetEventEnd(graphEvent);
         if (_options.EndDate.HasValue && start.HasValue && start.Value >= _options.EndDate.Value) return false;
-        if (_options.StartDate.HasValue && end.HasValue && end.Value < _options.StartDate.Value) return false;
-        return true;
+        return !_options.StartDate.HasValue || !GraphMailboxItemMapper.EventEndsBefore(graphEvent, _options.StartDate.Value);
     }
 
     private bool WriteItem(PlannedFolder folder, EmailDocument document, long payloadBytes, string id, string? subject,

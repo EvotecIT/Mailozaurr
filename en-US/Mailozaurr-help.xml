@@ -7705,10 +7705,12 @@ ensure credentials are disposed and not kept in memory.</maml:para>
       <maml:description>
         <maml:para>Exports an Exchange Online mailbox to one or more PST files through Microsoft Graph.</maml:para>
         <maml:para>Reads the mailbox folder tree through Microsoft Graph and streams each message's MIME content straight into a new Unicode PST written by OfficeIMO.Email. The folder hierarchy is kept, and Inbox, Sent Items, Drafts, Junk Email and Outbox keep their Outlook roles. The mailbox is only read; nothing in it is changed.</maml:para>
-        <maml:para>SplitSizeMB starts a new numbered part (name.part001.pst, name.part002.pst, ...) before an item would take the current part over the size. Each part is reopened and its item count checked, and the report lists every part with its size and SHA-256 hash.</maml:para>
+        <maml:para>SplitSizeMB uses an estimated size to start a new numbered part (name.part001.pst, name.part002.pst, ...). Actual PST sizes can differ, and a part can contain a single item larger than the estimate. Each part is reopened and its item count checked, and the report lists every part with its size and SHA-256 hash.</maml:para>
         <maml:para>Mail is always exported. IncludeContacts, IncludeCalendar and IncludeTasks add contacts, calendar events and Microsoft To Do tasks as typed Outlook items. Recurring events keep their recurrence pattern; modified and cancelled occurrences of a series, and task recurrence, are not carried and are listed as partial items in the report.</maml:para>
-        <maml:para>By default the export keeps a checkpoint next to the output. If it is interrupted, run the same command with -Resume to continue where it stopped without duplicating items. Use -NoCheckpoint to turn this off.</maml:para>
-        <maml:para>Required Microsoft Graph permissions. Application (app-only) access: Mail.Read, plus Contacts.Read for IncludeContacts, Calendars.Read for IncludeCalendar and Tasks.Read.All for IncludeTasks. Delegated access to the signed-in user's own mailbox: Mail.Read, Contacts.Read, Calendars.Read and Tasks.Read. Delegated access to another mailbox the signed-in user can open: Mail.Read.Shared, Contacts.Read.Shared and Calendars.Read.Shared; Microsoft To Do tasks of another user are only available with application access. To limit an application to selected mailboxes, use RBAC for Applications in Exchange Online or an application access policy.</maml:para>
+        <maml:para>By default the export keeps a checkpoint next to the output. If it is interrupted, run the same command with -Resume. Before continuing, the exporter checks that each completed part still matches its stored SHA-256 hash. Use -NoCheckpoint to turn checkpoints off.</maml:para>
+        <maml:para>For app-only access through unscoped Microsoft Entra consent, grant Mail.Read for mail, Contacts.Read for IncludeContacts and Calendars.Read for IncludeCalendar. These grants cover every mailbox in the tenant unless an Exchange Application Access Policy scopes them.</maml:para>
+        <maml:para>For app-only access to selected mailboxes through Exchange Online Application RBAC, assign the corresponding scoped Application Mail.Read, Application Contacts.Read and Application Calendars.Read roles. Remove overlapping unscoped Microsoft Entra grants. Exchange RBAC and Microsoft Entra permissions are additive. IncludeTasks requires the separate Microsoft Graph application permission Tasks.Read.All because Exchange mailbox scopes do not cover Microsoft To Do.</maml:para>
+        <maml:para>Delegated access to the signed-in user's own mailbox uses Mail.Read, Contacts.Read, Calendars.Read and Tasks.Read as needed. For a shared mailbox the signed-in user can open, use Mail.Read.Shared, Contacts.Read.Shared and Calendars.Read.Shared. Reading another user's Microsoft To Do tasks requires app-only access.</maml:para>
         <maml:para>The PST writer creates its own Deleted Items folder, so the mailbox's Deleted Items is written as a separate folder with the same name.</maml:para>
       </maml:description>
     </command:details>
@@ -7775,7 +7777,7 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <command:parameter required="false" variableLength="true" globbing="true" pipelineInput="False" position="named" aliases="none">
           <maml:name>ExcludeFolder</maml:name>
           <maml:description>
-            <maml:para>Folder path patterns to leave out, such as 'Deleted Items' or 'Junk Email'. A matching folder's subfolders are left out too.</maml:para>
+            <maml:para>Folder path patterns to leave out, such as 'Deleted Items' or 'Junk Email'. Patterns apply to mail, contacts, calendars and task lists. A matching folder's subfolders are left out too.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
           <dev:type>
@@ -7835,7 +7837,7 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <command:parameter required="false" variableLength="true" globbing="true" pipelineInput="False" position="named" aliases="none">
           <maml:name>IncludeFolder</maml:name>
           <maml:description>
-            <maml:para>Folder path patterns to export, such as 'Inbox' or 'Inbox\Projects*'. A matching folder's subfolders are included.</maml:para>
+            <maml:para>Folder path patterns to export, such as 'Inbox' or 'Inbox\Projects*'. Patterns apply to mail, contacts, calendars and task lists. A matching folder's subfolders are included.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
           <dev:type>
@@ -7931,7 +7933,7 @@ ensure credentials are disposed and not kept in memory.</maml:para>
         <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="none">
           <maml:name>SplitSizeMB</maml:name>
           <maml:description>
-            <maml:para>Largest size of one PST part in megabytes. Without it a single PST is written.</maml:para>
+            <maml:para>Estimated size of a PST part in MiB. Actual sizes can exceed the estimate, including when one item exceeds it. Omit this parameter to write a single PST.</maml:para>
           </maml:description>
           <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
           <dev:type>
@@ -8018,7 +8020,7 @@ ensure credentials are disposed and not kept in memory.</maml:para>
       <command:parameter required="false" variableLength="true" globbing="true" pipelineInput="False" position="named" aliases="none">
         <maml:name>ExcludeFolder</maml:name>
         <maml:description>
-          <maml:para>Folder path patterns to leave out, such as 'Deleted Items' or 'Junk Email'. A matching folder's subfolders are left out too.</maml:para>
+          <maml:para>Folder path patterns to leave out, such as 'Deleted Items' or 'Junk Email'. Patterns apply to mail, contacts, calendars and task lists. A matching folder's subfolders are left out too.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
         <dev:type>
@@ -8078,7 +8080,7 @@ ensure credentials are disposed and not kept in memory.</maml:para>
       <command:parameter required="false" variableLength="true" globbing="true" pipelineInput="False" position="named" aliases="none">
         <maml:name>IncludeFolder</maml:name>
         <maml:description>
-          <maml:para>Folder path patterns to export, such as 'Inbox' or 'Inbox\Projects*'. A matching folder's subfolders are included.</maml:para>
+          <maml:para>Folder path patterns to export, such as 'Inbox' or 'Inbox\Projects*'. Patterns apply to mail, contacts, calendars and task lists. A matching folder's subfolders are included.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">String[]</command:parameterValue>
         <dev:type>
@@ -8174,7 +8176,7 @@ ensure credentials are disposed and not kept in memory.</maml:para>
       <command:parameter required="false" variableLength="false" globbing="false" pipelineInput="False" position="named" aliases="none">
         <maml:name>SplitSizeMB</maml:name>
         <maml:description>
-          <maml:para>Largest size of one PST part in megabytes. Without it a single PST is written.</maml:para>
+          <maml:para>Estimated size of a PST part in MiB. Actual sizes can exceed the estimate, including when one item exceeds it. Omit this parameter to write a single PST.</maml:para>
         </maml:description>
         <command:parameterValue required="false" variableLength="false">Int32</command:parameterValue>
         <dev:type>
@@ -8229,7 +8231,7 @@ ensure credentials are disposed and not kept in memory.</maml:para>
     </maml:alertSet>
     <command:examples>
       <command:example>
-        <maml:title>Export a mailbox to 5 GB PST parts</maml:title>
+        <maml:title>Export a mailbox to PST parts with a 5 GiB target size</maml:title>
         <dev:code>Connect-EmailGraph -ClientId $clientId -CertificatePath './app.pfx' -CertificatePassword $pfxPassword -DirectoryId $tenantId&#xD;
             Export-GraphMailboxToPst -Identity 'user@contoso.com' -OutputPath 'C:\Export' -SplitSizeMB 5120</dev:code>
         <dev:remarks>
@@ -8238,9 +8240,9 @@ ensure credentials are disposed and not kept in memory.</maml:para>
       </command:example>
       <command:example>
         <maml:title>Export last year's Inbox and Sent Items with contacts and calendar</maml:title>
-        <dev:code>Export-GraphMailboxToPst -Identity 'user@contoso.com' -OutputPath 'C:\Export\user-2025.pst' -IncludeFolder 'Inbox', 'Sent Items' -StartDate '2025-01-01' -EndDate '2026-01-01' -IncludeContacts -IncludeCalendar</dev:code>
+        <dev:code>Export-GraphMailboxToPst -Identity 'user@contoso.com' -OutputPath 'C:\Export\user-2025.pst' -IncludeFolder 'Inbox', 'Sent Items', 'Contacts', 'Calendar' -StartDate '2025-01-01' -EndDate '2026-01-01' -IncludeContacts -IncludeCalendar</dev:code>
         <dev:remarks>
-          <maml:para>IncludeFolder patterns match folder paths such as Inbox\Projects and also select the folder's subfolders.</maml:para>
+          <maml:para>IncludeFolder patterns match paths such as Inbox\Projects and include the folder's subfolders. Use the actual mailbox folder and calendar names if they differ from the example.</maml:para>
         </dev:remarks>
       </command:example>
       <command:example>

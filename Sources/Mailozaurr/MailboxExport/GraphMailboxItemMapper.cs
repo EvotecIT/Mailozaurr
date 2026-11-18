@@ -161,18 +161,74 @@ internal static class GraphMailboxItemMapper {
 
     internal static DateTimeOffset? GetEventStart(JsonElement graphEvent) => GetDateTimeTimeZone(graphEvent, "start");
 
-    internal static DateTimeOffset? GetEventEnd(JsonElement graphEvent) {
-        if (graphEvent.TryGetProperty("recurrence", out JsonElement recurrence) && recurrence.ValueKind == JsonValueKind.Object &&
-            recurrence.TryGetProperty("range", out JsonElement range)) {
-            string? type = GetString(range, "type");
-            if (type == "noEnd" || type == "numbered") return null;
-            string? endDate = GetString(range, "endDate");
-            if (endDate != null && DateTime.TryParse(endDate, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date)) {
-                return new DateTimeOffset(date.Date.AddDays(1), TimeSpan.Zero);
-            }
+    /// <summary>Checks the lower bound, keeping events whose end cannot be determined safely.</summary>
+    internal static bool EventEndsBefore(JsonElement graphEvent, DateTimeOffset lowerBound) {
+        DateTimeOffset? end = GetDateTimeTimeZone(graphEvent, "end");
+        if (!graphEvent.TryGetProperty("recurrence", out JsonElement recurrence) || recurrence.ValueKind != JsonValueKind.Object) {
+            return end.HasValue && end.Value < lowerBound;
         }
-        return GetDateTimeTimeZone(graphEvent, "end");
+        if (!recurrence.TryGetProperty("range", out JsonElement range) || range.ValueKind != JsonValueKind.Object) return false;
+
+        string? rangeType = GetString(range, "type");
+        if (rangeType != "endDate" && rangeType != "numbered") return false;
+        DateTimeOffset? start = GetEventStart(graphEvent);
+        TimeZoneInfo? zone = FindTimeZone(GetRecurrenceZoneId(range, graphEvent));
+        if (!start.HasValue || !end.HasValue || zone == null) return false;
+
+        try {
+            DateTime localStart = TimeZoneInfo.ConvertTime(start.Value, zone).DateTime;
+            DateTime localEnd = TimeZoneInfo.ConvertTime(end.Value, zone).DateTime;
+            TimeSpan elapsed = end.Value >= start.Value ? end.Value - start.Value : TimeSpan.Zero;
+            TimeSpan wallClock = localEnd >= localStart ? localEnd - localStart : TimeSpan.Zero;
+            DateTime finalStart;
+            if (rangeType == "endDate") {
+                string? endDate = GetString(range, "endDate");
+                if (!DateTime.TryParseExact(endDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime date)) {
+                    return false;
+                }
+                // Graph's inclusive final date can be later than the last matching occurrence.
+                finalStart = date.Date.Add(localStart.TimeOfDay);
+            } else {
+                OutlookRecurrence? mapped = MapRecurrence(recurrence, graphEvent, start, end, out _);
+                if (mapped == null || mapped.RangeKind != OutlookRecurrenceRangeKind.OccurrenceCount) return false;
+                mapped.Duration = elapsed >= wallClock ? elapsed : wallClock;
+                // Look back a day in UTC so the local-clock window covers every UTC offset,
+                // including occurrences that end exactly at the lower bound.
+                long windowTicks = Math.Max(0, lowerBound.UtcTicks - TimeSpan.TicksPerDay);
+                OutlookRecurrenceExpansionResult expansion = OutlookRecurrenceExpander.Expand(mapped,
+                    new OutlookRecurrenceExpansionOptions { WindowStart = new DateTime(windowTicks) });
+                if (expansion.Truncated) return false;
+                OutlookRecurrenceOccurrence? final = expansion.Occurrences.LastOrDefault();
+                if (final == null) return true;
+                if (final.Sequence != mapped.OccurrenceCount) return false;
+                finalStart = final.Start;
+            }
+
+            DateTimeOffset? finalEnd = ResolveSeriesEnd(finalStart, elapsed, wallClock, zone);
+            return finalEnd.HasValue && finalEnd.Value < lowerBound;
+        } catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException) {
+            // An incomplete calendar pattern or out-of-range date cannot safely exclude the series.
+            return false;
+        }
     }
+
+    private static DateTimeOffset? ResolveSeriesEnd(DateTime localStart, TimeSpan elapsed, TimeSpan wallClock, TimeZoneInfo zone) {
+        DateTime localEnd = localStart.Add(wallClock);
+        if (zone.IsInvalidTime(localStart) || zone.IsInvalidTime(localEnd)) return null;
+        DateTimeOffset elapsedEnd = ResolveLatestLocalTime(localStart, zone).Add(elapsed);
+        DateTimeOffset wallClockEnd = ResolveLatestLocalTime(localEnd, zone);
+        return elapsedEnd >= wallClockEnd ? elapsedEnd : wallClockEnd;
+    }
+
+    private static DateTimeOffset ResolveLatestLocalTime(DateTime local, TimeZoneInfo zone) {
+        TimeSpan offset = zone.IsAmbiguousTime(local) ? zone.GetAmbiguousTimeOffsets(local).Min() : zone.GetUtcOffset(local);
+        return new DateTimeOffset(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), offset).ToUniversalTime();
+    }
+
+    private static string? GetRecurrenceZoneId(JsonElement range, JsonElement graphEvent) =>
+        GetString(range, "recurrenceTimeZone") ?? GetString(graphEvent, "originalStartTimeZone") ??
+        (graphEvent.TryGetProperty("start", out JsonElement start) && start.ValueKind == JsonValueKind.Object
+            ? GetString(start, "timeZone") : null);
 
     private static OutlookRecurrence? MapRecurrence(JsonElement recurrence, JsonElement graphEvent,
         DateTimeOffset? start, DateTimeOffset? end, out string? warning) {
@@ -182,7 +238,7 @@ internal static class GraphMailboxItemMapper {
             warning = "The recurrence pattern is incomplete; the series is written as its first occurrence.";
             return null;
         }
-        TimeZoneInfo zone = ResolveTimeZone(GetString(range, "recurrenceTimeZone") ?? GetString(graphEvent, "originalStartTimeZone"));
+        TimeZoneInfo zone = ResolveTimeZone(GetRecurrenceZoneId(range, graphEvent));
         DateTime localStart = TimeZoneInfo.ConvertTime(start.Value, zone).DateTime;
         var result = new OutlookRecurrence {
             Start = localStart,
@@ -240,6 +296,10 @@ internal static class GraphMailboxItemMapper {
                 warning = "The recurrence pattern type is not supported; the series is written as its first occurrence.";
                 return null;
         }
+        if (result.PatternKind == OutlookRecurrencePatternKind.MonthNth && days == OutlookRecurrenceDays.None) {
+            warning = "The recurrence pattern is missing its weekdays; the series is written as its first occurrence.";
+            return null;
+        }
         switch (GetString(range, "type")) {
             case "endDate":
                 string? endDate = GetString(range, "endDate");
@@ -275,7 +335,9 @@ internal static class GraphMailboxItemMapper {
     private static bool TryParseDay(string value, out DayOfWeek day) =>
         Enum.TryParse(value, ignoreCase: true, out day);
 
-    private static TimeZoneInfo ResolveTimeZone(string? id) {
+    private static TimeZoneInfo ResolveTimeZone(string? id) => FindTimeZone(id) ?? TimeZoneInfo.Utc;
+
+    private static TimeZoneInfo? FindTimeZone(string? id) {
         if (string.IsNullOrWhiteSpace(id) || string.Equals(id, "UTC", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(id, "tzone://Microsoft/Utc", StringComparison.OrdinalIgnoreCase)) {
             return TimeZoneInfo.Utc;
@@ -283,9 +345,9 @@ internal static class GraphMailboxItemMapper {
         try {
             return TimeZoneInfo.FindSystemTimeZoneById(id!);
         } catch (TimeZoneNotFoundException) {
-            return TimeZoneInfo.Utc;
+            return null;
         } catch (InvalidTimeZoneException) {
-            return TimeZoneInfo.Utc;
+            return null;
         }
     }
 

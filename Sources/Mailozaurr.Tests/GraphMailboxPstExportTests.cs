@@ -5,6 +5,7 @@ using OfficeIMO.Email.Store;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -12,6 +13,7 @@ using System.Net.Http;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -116,15 +118,9 @@ public sealed class GraphMailboxPstExportTests : IDisposable {
         var options = NewOptions("resume.pst", GraphMailboxExportItemTypes.Mail);
         options.Split = new EmailStorePstSplitOptions(maxEstimatedBytesPerPart: 40 * 1024);
         options.CheckpointIntervalItems = 2;
-        using (var cancellation = new CancellationTokenSource()) {
-            // Stop while the third Inbox message downloads, so the resumed run continues inside a folder.
-            _graph.OnMimeRequest = (id, count) => {
-                if (id == "inbox-3") cancellation.Cancel();
-            };
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => NewExporter(options).ExportAsync(cancellation.Token));
-        }
-        Assert.True(File.Exists(options.CheckpointPath));
-        _graph.OnMimeRequest = null;
+        // Part 1 is complete, and part 2 contains the third Inbox message when the child folder download is interrupted.
+        await InterruptExportAsync(options, "projects-1");
+        Assert.True(File.Exists(GraphMailboxPstExporter.GetPartPath(options.DestinationPath, 1)));
 
         options.Resume = true;
         GraphMailboxPstExportReport report = await NewExporter(options).ExportAsync();
@@ -159,6 +155,194 @@ public sealed class GraphMailboxPstExportTests : IDisposable {
         Assert.Equal(options.DestinationPath, part.Path);
         Assert.All(ReadPart(part.Path), item => Assert.Equal("Inbox", item.Folder));
     }
+
+    [Fact]
+    public async Task FractionalMessageBoundsPreserveInclusiveStartAndExclusiveEnd() {
+        var instant = new DateTimeOffset(2026, 1, 5, 8, 0, 0, TimeSpan.Zero);
+        _graph.Messages["inbox-id"] = new[] {
+            ("before-start", instant.AddTicks(1_000_000)),
+            ("at-start", instant.AddTicks(1_000_001)),
+            ("inside-window", instant.AddTicks(2_000_002)),
+            ("at-end", instant.AddTicks(3_000_003))
+        };
+        var options = NewOptions("fractional-bounds.pst", GraphMailboxExportItemTypes.Mail);
+        options.IncludeFolders.Add("Inbox");
+        options.ExcludeFolders.Add("Inbox\\Projects");
+        options.StartDate = instant.AddTicks(1_000_001);
+        options.EndDate = instant.AddTicks(3_000_003);
+
+        GraphMailboxPstExportReport report = await NewExporter(options).ExportAsync();
+
+        string request = Assert.Single(_graph.MessageListRequests);
+        Assert.Contains("receivedDateTime ge 2026-01-05T08:00:00.1000001Z and receivedDateTime lt 2026-01-05T08:00:00.3000003Z", request);
+        Assert.Equal(2, report.Written.Messages);
+        Assert.Equal(new[] { "Message at-start", "Message inside-window" }, report.Parts.SelectMany(part => ReadPart(part.Path)).Select(item => item.Document.Subject).OrderBy(subject => subject));
+    }
+
+    [Fact]
+    public async Task FractionalCheckpointResumesInsideOneSecondWithoutRewritingEarlierMessages() {
+        var instant = new DateTimeOffset(2026, 1, 5, 8, 0, 0, TimeSpan.Zero);
+        _graph.Messages["inbox-id"] = new[] {
+            ("inbox-1", instant.AddTicks(1_000_001)),
+            ("inbox-2", instant.AddTicks(2_000_002)),
+            ("inbox-3", instant.AddTicks(3_000_003))
+        };
+        var options = NewOptions("fractional-resume.pst", GraphMailboxExportItemTypes.Mail);
+        options.IncludeFolders.Add("Inbox");
+        options.ExcludeFolders.Add("Inbox\\Projects");
+        options.CheckpointIntervalItems = 2;
+        await InterruptExportAsync(options, "inbox-3");
+        int previousRequests = _graph.MessageListRequests.Count;
+        options.Resume = true;
+
+        GraphMailboxPstExportReport report = await NewExporter(options).ExportAsync();
+
+        Assert.True(report.Resumed);
+        Assert.Equal(3, report.Written.Messages);
+        Assert.Contains("receivedDateTime ge 2026-01-05T08:00:00.2000002Z", _graph.MessageListRequests.Skip(previousRequests).First());
+        Assert.Equal(new[] { "Message inbox-1", "Message inbox-2", "Message inbox-3" }, report.Parts.SelectMany(part => ReadPart(part.Path)).Select(item => item.Document.Subject).OrderBy(subject => subject));
+    }
+
+    [Fact]
+    public async Task DiscoversHiddenRootAndChildFoldersAndExportsTheirMessages() {
+        _graph.IncludeHiddenFixture = true;
+        var options = NewOptions("hidden.pst", GraphMailboxExportItemTypes.Mail);
+
+        GraphMailboxPstExportReport report = await NewExporter(options).ExportAsync();
+
+        Assert.Equal(2, _graph.FolderListRequests.Count);
+        Assert.All(_graph.FolderListRequests, request => Assert.Contains("includeHiddenFolders=true", request, StringComparison.OrdinalIgnoreCase));
+        var exported = report.Parts.SelectMany(part => ReadPart(part.Path)).ToArray();
+        Assert.Equal(9, report.Written.Messages);
+        Assert.Contains(exported, item => item.Folder == "Hidden Root" && item.Document.Subject == "Message hidden-root-1");
+        Assert.Contains(exported, item => item.Folder == "Inbox\\Hidden Child" && item.Document.Subject == "Message hidden-child-1");
+    }
+
+    [Theory]
+    [InlineData("expired-numbered", false)]
+    [InlineData("expired-large-numbered", false)]
+    [InlineData("incomplete-numbered", true)]
+    [InlineData("spring-forward-first-day", true)]
+    [InlineData("recurrence-zone-overlap", true)]
+    [InlineData("recurrence-zone-ended", false)]
+    [InlineData("unbounded-series", true)]
+    public async Task CalendarSeriesDateFilterUsesFiniteOccurrencesAndTheirRecurrenceZone(string scenario, bool included) {
+        var options = NewOptions("calendar-" + scenario + ".pst", GraphMailboxExportItemTypes.Calendar);
+        options.StartDate = new DateTimeOffset(2026, 1, 11, 8, 30, 0, TimeSpan.Zero);
+        if (scenario == "expired-large-numbered") {
+            _graph.EventsJson = RecurringCalendarPage("2020-01-06T09:00:00", "2020-01-06T09:30:00", "UTC",
+                "{\"type\":\"daily\",\"interval\":1}",
+                "{\"type\":\"numbered\",\"startDate\":\"2020-01-06\",\"numberOfOccurrences\":1001,\"recurrenceTimeZone\":\"UTC\"}");
+        } else if (scenario == "incomplete-numbered") {
+            _graph.EventsJson = RecurringCalendarPage("2020-01-06T09:00:00", "2020-01-06T09:30:00", "UTC",
+                "{\"type\":\"relativeMonthly\",\"interval\":1,\"index\":\"first\"}",
+                "{\"type\":\"numbered\",\"startDate\":\"2020-01-06\",\"numberOfOccurrences\":10,\"recurrenceTimeZone\":\"UTC\"}");
+        } else if (scenario == "spring-forward-first-day") {
+            options.StartDate = new DateTimeOffset(2026, 3, 16, 6, 30, 0, TimeSpan.Zero);
+            _graph.EventsJson = RecurringCalendarPage("2026-03-08T00:00:00", "2026-03-09T00:00:00", "Pacific Standard Time",
+                "{\"type\":\"weekly\",\"interval\":1,\"daysOfWeek\":[\"sunday\"]}",
+                "{\"type\":\"numbered\",\"startDate\":\"2026-03-08\",\"numberOfOccurrences\":2,\"recurrenceTimeZone\":\"Pacific Standard Time\"}");
+        } else if (scenario is "expired-numbered" or "unbounded-series") {
+            string range = scenario == "expired-numbered"
+                ? "{\"type\":\"numbered\",\"startDate\":\"2020-01-06\",\"numberOfOccurrences\":10,\"recurrenceTimeZone\":\"UTC\"}"
+                : "{\"type\":\"noEnd\",\"startDate\":\"2020-01-06\",\"recurrenceTimeZone\":\"UTC\"}";
+            _graph.EventsJson = RecurringCalendarPage("2020-01-06T09:00:00", "2020-01-06T09:30:00", "UTC",
+                "{\"type\":\"weekly\",\"interval\":1,\"daysOfWeek\":[\"monday\"],\"firstDayOfWeek\":\"monday\"}", range);
+        } else {
+            // The final 20:00–01:00 Pacific occurrence overlaps 08:30Z the following UTC day.
+            bool overlap = scenario == "recurrence-zone-overlap";
+            string start = overlap ? "2026-01-10" : "2026-01-08";
+            string end = overlap ? "2026-01-11" : "2026-01-09";
+            string until = overlap ? "2026-01-10" : "2026-01-09";
+            _graph.EventsJson = RecurringCalendarPage(start + "T20:00:00", end + "T01:00:00", "Pacific Standard Time",
+                "{\"type\":\"daily\",\"interval\":1}",
+                "{\"type\":\"endDate\",\"startDate\":\"" + start + "\",\"endDate\":\"" + until + "\",\"recurrenceTimeZone\":\"Pacific Standard Time\"}");
+        }
+
+        GraphMailboxPstExportReport report = await NewExporter(options).ExportAsync();
+
+        Assert.Equal(included ? 1 : 0, report.Written.Events);
+        var exported = report.Parts.SelectMany(part => ReadPart(part.Path)).ToArray();
+        Assert.Equal(included ? 1 : 0, exported.Length);
+        if (included) {
+            EmailDocument calendar = Assert.Single(exported).Document;
+            Assert.Equal("Filtered series", calendar.Subject);
+            Assert.Equal(OutlookItemKind.Appointment, calendar.OutlookItemKind);
+            if (scenario == "incomplete-numbered") {
+                Assert.Null(calendar.Appointment!.Recurrence);
+                Assert.Contains(report.Issues, issue => issue.Kind == GraphMailboxExportIssueKind.Partial && issue.Message.Contains("missing its weekdays"));
+            } else {
+                Assert.NotNull(calendar.Appointment!.Recurrence);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ResumeRejectsMissingOrModifiedCompletedPartBeforeWritingMoreOutput(bool deletePart) {
+        var options = NewOptions("integrity.pst", GraphMailboxExportItemTypes.Mail);
+        options.Split = new EmailStorePstSplitOptions(maxEstimatedBytesPerPart: 40 * 1024);
+        options.CheckpointIntervalItems = 2;
+        await InterruptExportAsync(options, "projects-1");
+        string completed = GraphMailboxPstExporter.GetPartPath(options.DestinationPath, 1);
+        Assert.Equal(2, ReadPart(completed).Count);
+        if (deletePart) File.Delete(completed);
+        else using (FileStream file = new FileStream(completed, FileMode.Append, FileAccess.Write)) file.WriteByte(0x7f);
+        string[] before = SnapshotPstFiles();
+        int requests = _graph.MimeRequests.Count;
+        options.Resume = true;
+
+        InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(() => NewExporter(options).ExportAsync());
+
+        Assert.Contains("Completed PST part", error.Message);
+        Assert.Contains(deletePart ? "is missing" : "checkpoint SHA-256", error.Message);
+        Assert.Equal(requests, _graph.MimeRequests.Count);
+        Assert.Equal(before, SnapshotPstFiles());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ResumeRejectsChangedFolderArraysWhoseSemicolonJoinedTextIsIdentical(bool exclude) {
+        var options = NewOptions("folder-fingerprint.pst", GraphMailboxExportItemTypes.Mail);
+        IList<string> patterns = exclude ? options.ExcludeFolders : options.IncludeFolders;
+        if (!exclude) _graph.InboxDisplayName = "Inbox;Archive";
+        patterns.Add("Inbox;Archive");
+        options.CheckpointIntervalItems = 2;
+        await InterruptExportAsync(options, "inbox-3");
+        patterns.Clear();
+        patterns.Add("Inbox");
+        patterns.Add("Archive");
+        int requests = _graph.MimeRequests.Count;
+        options.Resume = true;
+
+        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() => NewExporter(options).ExportAsync());
+
+        Assert.Contains("folder filters", error.Message);
+        Assert.Equal(requests, _graph.MimeRequests.Count);
+    }
+
+    private async Task InterruptExportAsync(GraphMailboxPstExportOptions options, string stopBeforeMessage) {
+        using (var cancellation = new CancellationTokenSource()) {
+            _graph.OnMimeRequest = (id, _) => { if (id == stopBeforeMessage) cancellation.Cancel(); };
+            try {
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => NewExporter(options).ExportAsync(cancellation.Token));
+            } finally {
+                _graph.OnMimeRequest = null;
+            }
+        }
+        Assert.True(File.Exists(options.CheckpointPath));
+    }
+
+    private string[] SnapshotPstFiles() => Directory.GetFiles(_directory, "*.pst", SearchOption.AllDirectories)
+        .OrderBy(path => path, StringComparer.Ordinal).Select(path => path + ":" + Sha256(path)).ToArray();
+
+    private static string RecurringCalendarPage(string start, string end, string zone, string pattern, string range) =>
+        "{\"value\":[{\"id\":\"event-filtered\",\"subject\":\"Filtered series\",\"type\":\"seriesMaster\"," +
+        "\"start\":{\"dateTime\":\"" + start + "\",\"timeZone\":\"" + zone + "\"}," +
+        "\"end\":{\"dateTime\":\"" + end + "\",\"timeZone\":\"" + zone + "\"},\"originalStartTimeZone\":\"" + zone + "\"," +
+        "\"recurrence\":{\"pattern\":" + pattern + ",\"range\":" + range + "}}]}";
 
     private GraphMailboxPstExportOptions NewOptions(string fileName, GraphMailboxExportItemTypes types) {
         string destination = Path.Combine(_directory, fileName);
@@ -212,9 +396,13 @@ public sealed class GraphMailboxPstExportTests : IDisposable {
         internal HashSet<string> OversizedMimeIds { get; } = new HashSet<string>();
         internal ConcurrentQueue<string> MimeRequests { get; } = new ConcurrentQueue<string>();
         internal ConcurrentQueue<string> MessageListRequests { get; } = new ConcurrentQueue<string>();
+        internal ConcurrentQueue<string> FolderListRequests { get; } = new ConcurrentQueue<string>();
         internal Action<string, int>? OnMimeRequest { get; set; }
+        internal bool IncludeHiddenFixture { get; set; }
+        internal string InboxDisplayName { get; set; } = "Inbox";
+        internal string? EventsJson { get; set; }
 
-        private static readonly Dictionary<string, (string Id, DateTimeOffset Received)[]> Messages =
+        internal Dictionary<string, (string Id, DateTimeOffset Received)[]> Messages { get; } =
             new Dictionary<string, (string, DateTimeOffset)[]> {
                 ["inbox-id"] = new[] {
                     ("inbox-1", new DateTimeOffset(2026, 1, 5, 8, 0, 0, TimeSpan.Zero)),
@@ -230,6 +418,12 @@ public sealed class GraphMailboxPstExportTests : IDisposable {
                 },
                 ["deleted-id"] = new[] {
                     ("deleted-1", new DateTimeOffset(2026, 1, 11, 8, 0, 0, TimeSpan.Zero))
+                },
+                ["hidden-root-id"] = new[] {
+                    ("hidden-root-1", new DateTimeOffset(2026, 1, 12, 8, 0, 0, TimeSpan.Zero))
+                },
+                ["hidden-child-id"] = new[] {
+                    ("hidden-child-1", new DateTimeOffset(2026, 1, 13, 8, 0, 0, TimeSpan.Zero))
                 }
             };
 
@@ -252,12 +446,16 @@ public sealed class GraphMailboxPstExportTests : IDisposable {
                 case "mailFolders/outbox":
                     return new HttpResponseMessage(HttpStatusCode.NotFound) { Content = new StringContent("{\"error\":{\"code\":\"ErrorItemNotFound\"}}") };
                 case "mailFolders":
+                    FolderListRequests.Enqueue(Uri.UnescapeDataString(uri));
                     return Json("{\"value\":[" +
-                        Folder("inbox-id", "Inbox", 3, 1) + "," +
+                        Folder("inbox-id", InboxDisplayName, Messages["inbox-id"].Length, 1) + "," +
                         Folder("sent-id", "Sent Items", 1, 0) + "," +
-                        Folder("deleted-id", "Deleted Items", 1, 0) + "]}");
+                        Folder("deleted-id", "Deleted Items", 1, 0) +
+                        (IncludeHiddenFixture && IncludesHidden(query) ? "," + Folder("hidden-root-id", "Hidden Root", 1, 0) : string.Empty) + "]}");
                 case "mailFolders/inbox-id/childFolders":
-                    return Json("{\"value\":[" + Folder("projects-id", "Projects", 2, 0) + "]}");
+                    FolderListRequests.Enqueue(Uri.UnescapeDataString(uri));
+                    return Json("{\"value\":[" + Folder("projects-id", "Projects", 2, 0) +
+                        (IncludeHiddenFixture && IncludesHidden(query) ? "," + Folder("hidden-child-id", "Hidden Child", 1, 0) : string.Empty) + "]}");
                 case "contactFolders":
                     return Json("{\"value\":[]}");
                 case "contacts":
@@ -267,6 +465,7 @@ public sealed class GraphMailboxPstExportTests : IDisposable {
                 case "calendars":
                     return Json("{\"value\":[{\"id\":\"calendar-id\",\"name\":\"Calendar\",\"isDefaultCalendar\":true}]}");
                 case "calendars/calendar-id/events":
+                    if (EventsJson != null) return Json(EventsJson);
                     return Json("{\"value\":[" +
                         "{\"id\":\"event-single\",\"subject\":\"Design review\",\"start\":{\"dateTime\":\"2026-03-03T13:00:00.0000000\",\"timeZone\":\"UTC\"}," +
                         "\"end\":{\"dateTime\":\"2026-03-03T14:00:00.0000000\",\"timeZone\":\"UTC\"},\"showAs\":\"busy\"," +
@@ -293,11 +492,15 @@ public sealed class GraphMailboxPstExportTests : IDisposable {
 
         private HttpResponseMessage MessagePage(string folderId, string query, string uri) {
             IEnumerable<(string Id, DateTimeOffset Received)> messages = Messages[folderId];
-            const string from = "receivedDateTime ge ";
-            int start = query.IndexOf(from, StringComparison.Ordinal);
-            if (start >= 0) {
-                DateTimeOffset bound = DateTimeOffset.Parse(query.Substring(start + from.Length, 20), System.Globalization.CultureInfo.InvariantCulture);
+            Match from = Regex.Match(query, @"receivedDateTime ge ([^\s&]+)");
+            if (from.Success) {
+                DateTimeOffset bound = DateTimeOffset.Parse(from.Groups[1].Value, CultureInfo.InvariantCulture);
                 messages = messages.Where(message => message.Received >= bound);
+            }
+            Match before = Regex.Match(query, @"receivedDateTime lt ([^\s&]+)");
+            if (before.Success) {
+                DateTimeOffset bound = DateTimeOffset.Parse(before.Groups[1].Value, CultureInfo.InvariantCulture);
+                messages = messages.Where(message => message.Received < bound);
             }
             // Two messages per page so paging continues through @odata.nextLink.
             int skip = query.Contains("$skip=2") ? 2 : 0;
@@ -306,7 +509,7 @@ public sealed class GraphMailboxPstExportTests : IDisposable {
             var body = new StringBuilder("{\"value\":[");
             body.Append(string.Join(",", page.Select(message =>
                 "{\"id\":\"" + message.Id + "\",\"subject\":\"Message " + message.Id + "\",\"receivedDateTime\":\"" +
-                message.Received.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ") + "\",\"isRead\":true,\"isDraft\":false," +
+                message.Received.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ", CultureInfo.InvariantCulture) + "\",\"isRead\":true,\"isDraft\":false," +
                 "\"importance\":\"normal\",\"categories\":[\"Blue\"]}")));
             body.Append(']');
             if (next != null) body.Append(",\"@odata.nextLink\":\"").Append(next).Append('"');
@@ -342,6 +545,8 @@ public sealed class GraphMailboxPstExportTests : IDisposable {
 
         private static string Folder(string id, string name, int items, int children) =>
             "{\"id\":\"" + id + "\",\"displayName\":\"" + name + "\",\"totalItemCount\":" + items + ",\"childFolderCount\":" + children + "}";
+
+        private static bool IncludesHidden(string query) => query.IndexOf("includeHiddenFolders=true", StringComparison.OrdinalIgnoreCase) >= 0;
 
         private static HttpResponseMessage Json(string body) =>
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") };

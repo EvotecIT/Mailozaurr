@@ -6,22 +6,24 @@ namespace Mailozaurr.PowerShell;
 /// <summary>
 /// <para type="synopsis">Exports an Exchange Online mailbox to one or more PST files through Microsoft Graph.</para>
 /// <para type="description">Reads the mailbox folder tree through Microsoft Graph and streams each message's MIME content straight into a new Unicode PST written by OfficeIMO.Email. The folder hierarchy is kept, and Inbox, Sent Items, Drafts, Junk Email and Outbox keep their Outlook roles. The mailbox is only read; nothing in it is changed.</para>
-/// <para type="description">SplitSizeMB starts a new numbered part (name.part001.pst, name.part002.pst, ...) before an item would take the current part over the size. Each part is reopened and its item count checked, and the report lists every part with its size and SHA-256 hash.</para>
+/// <para type="description">SplitSizeMB uses an estimated size to start a new numbered part (name.part001.pst, name.part002.pst, ...). Actual PST sizes can differ, and a part can contain a single item larger than the estimate. Each part is reopened and its item count checked, and the report lists every part with its size and SHA-256 hash.</para>
 /// <para type="description">Mail is always exported. IncludeContacts, IncludeCalendar and IncludeTasks add contacts, calendar events and Microsoft To Do tasks as typed Outlook items. Recurring events keep their recurrence pattern; modified and cancelled occurrences of a series, and task recurrence, are not carried and are listed as partial items in the report.</para>
-/// <para type="description">By default the export keeps a checkpoint next to the output. If it is interrupted, run the same command with -Resume to continue where it stopped without duplicating items. Use -NoCheckpoint to turn this off.</para>
-/// <para type="description">Required Microsoft Graph permissions. Application (app-only) access: Mail.Read, plus Contacts.Read for IncludeContacts, Calendars.Read for IncludeCalendar and Tasks.Read.All for IncludeTasks. Delegated access to the signed-in user's own mailbox: Mail.Read, Contacts.Read, Calendars.Read and Tasks.Read. Delegated access to another mailbox the signed-in user can open: Mail.Read.Shared, Contacts.Read.Shared and Calendars.Read.Shared; Microsoft To Do tasks of another user are only available with application access. To limit an application to selected mailboxes, use RBAC for Applications in Exchange Online or an application access policy.</para>
+/// <para type="description">By default the export keeps a checkpoint next to the output. If it is interrupted, run the same command with -Resume. Before continuing, the exporter checks that each completed part still matches its stored SHA-256 hash. Use -NoCheckpoint to turn checkpoints off.</para>
+/// <para type="description">For app-only access through unscoped Microsoft Entra consent, grant Mail.Read for mail, Contacts.Read for IncludeContacts and Calendars.Read for IncludeCalendar. These grants cover every mailbox in the tenant unless an Exchange Application Access Policy scopes them.</para>
+/// <para type="description">For app-only access to selected mailboxes through Exchange Online Application RBAC, assign the corresponding scoped Application Mail.Read, Application Contacts.Read and Application Calendars.Read roles. Remove overlapping unscoped Microsoft Entra grants. Exchange RBAC and Microsoft Entra permissions are additive. IncludeTasks requires the separate Microsoft Graph application permission Tasks.Read.All because Exchange mailbox scopes do not cover Microsoft To Do.</para>
+/// <para type="description">Delegated access to the signed-in user's own mailbox uses Mail.Read, Contacts.Read, Calendars.Read and Tasks.Read as needed. For a shared mailbox the signed-in user can open, use Mail.Read.Shared, Contacts.Read.Shared and Calendars.Read.Shared. Reading another user's Microsoft To Do tasks requires app-only access.</para>
 /// <para type="description">The PST writer creates its own Deleted Items folder, so the mailbox's Deleted Items is written as a separate folder with the same name.</para>
 /// </summary>
 /// <example>
-///   <summary>Export a mailbox to 5 GB PST parts</summary>
+///   <summary>Export a mailbox to PST parts with a 5 GiB target size</summary>
 ///   <code>Connect-EmailGraph -ClientId $clientId -CertificatePath './app.pfx' -CertificatePassword $pfxPassword -DirectoryId $tenantId
 /// Export-GraphMailboxToPst -Identity 'user@contoso.com' -OutputPath 'C:\Export' -SplitSizeMB 5120</code>
 ///   <para>Writes C:\Export\user@contoso.com.part001.pst, part002.pst and so on, and returns the export report.</para>
 /// </example>
 /// <example>
 ///   <summary>Export last year's Inbox and Sent Items with contacts and calendar</summary>
-///   <code>Export-GraphMailboxToPst -Identity 'user@contoso.com' -OutputPath 'C:\Export\user-2025.pst' -IncludeFolder 'Inbox', 'Sent Items' -StartDate '2025-01-01' -EndDate '2026-01-01' -IncludeContacts -IncludeCalendar</code>
-///   <para>IncludeFolder patterns match folder paths such as Inbox\Projects and also select the folder's subfolders.</para>
+///   <code>Export-GraphMailboxToPst -Identity 'user@contoso.com' -OutputPath 'C:\Export\user-2025.pst' -IncludeFolder 'Inbox', 'Sent Items', 'Contacts', 'Calendar' -StartDate '2025-01-01' -EndDate '2026-01-01' -IncludeContacts -IncludeCalendar</code>
+///   <para>IncludeFolder patterns match paths such as Inbox\Projects and include the folder's subfolders. Use the actual mailbox folder and calendar names if they differ from the example.</para>
 /// </example>
 /// <example>
 ///   <summary>Continue an interrupted export</summary>
@@ -45,7 +47,7 @@ public sealed class CmdletExportGraphMailboxToPst : MailStoreCmdletBase {
     [ValidateNotNullOrEmpty]
     public string? OutputPath { get; set; }
 
-    /// <summary>Largest size of one PST part in megabytes. Without it a single PST is written.</summary>
+    /// <summary>Estimated size of a PST part in MiB. Actual sizes can exceed the estimate, including when one item exceeds it. Omit this parameter to write a single PST.</summary>
     [Parameter]
     [ValidateRange(1, 1_000_000)]
     public int SplitSizeMB { get; set; }
@@ -55,12 +57,12 @@ public sealed class CmdletExportGraphMailboxToPst : MailStoreCmdletBase {
     [ValidateRange(1, 10_000)]
     public int MaxParts { get; set; } = 1000;
 
-    /// <summary>Folder path patterns to export, such as 'Inbox' or 'Inbox\Projects*'. A matching folder's subfolders are included.</summary>
+    /// <summary>Folder path patterns to export, such as 'Inbox' or 'Inbox\Projects*'. Patterns apply to mail, contacts, calendars and task lists. A matching folder's subfolders are included.</summary>
     [Parameter]
     [SupportsWildcards]
     public string[]? IncludeFolder { get; set; }
 
-    /// <summary>Folder path patterns to leave out, such as 'Deleted Items' or 'Junk Email'. A matching folder's subfolders are left out too.</summary>
+    /// <summary>Folder path patterns to leave out, such as 'Deleted Items' or 'Junk Email'. Patterns apply to mail, contacts, calendars and task lists. A matching folder's subfolders are left out too.</summary>
     [Parameter]
     [SupportsWildcards]
     public string[]? ExcludeFolder { get; set; }

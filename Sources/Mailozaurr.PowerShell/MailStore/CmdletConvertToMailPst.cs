@@ -143,7 +143,7 @@ public sealed class CmdletConvertToMailPst : MailStoreCmdletBase {
                 EmailStoreFields.ReceivedAt.Ascending(),
                 EmailStoreFields.SentAt.Ascending()
             },
-            maxItemsScanned: MaxItems == int.MaxValue ? 1_000_000 : MaxItems,
+            maxItemsScanned: MaxItems,
             pageSize: 1000);
         return new EmailStorePstSplitOptions(
             query: query,

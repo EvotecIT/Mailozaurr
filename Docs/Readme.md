@@ -152,13 +152,17 @@ Exports an Exchange Online mailbox to one or more PST files through Microsoft Gr
 
 Reads the mailbox folder tree through Microsoft Graph and streams each message's MIME content straight into a new Unicode PST written by OfficeIMO.Email. The folder hierarchy is kept, and Inbox, Sent Items, Drafts, Junk Email and Outbox keep their Outlook roles. The mailbox is only read; nothing in it is changed.
 
-SplitSizeMB starts a new numbered part (name.part001.pst, name.part002.pst, ...) before an item would take the current part over the size. Each part is reopened and its item count checked, and the report lists every part with its size and SHA-256 hash.
+SplitSizeMB uses an estimated size to start a new numbered part (name.part001.pst, name.part002.pst, ...). Actual PST sizes can differ, and a part can contain a single item larger than the estimate. Each part is reopened and its item count checked, and the report lists every part with its size and SHA-256 hash.
 
 Mail is always exported. IncludeContacts, IncludeCalendar and IncludeTasks add contacts, calendar events and Microsoft To Do tasks as typed Outlook items. Recurring events keep their recurrence pattern; modified and cancelled occurrences of a series, and task recurrence, are not carried and are listed as partial items in the report.
 
-By default the export keeps a checkpoint next to the output. If it is interrupted, run the same command with -Resume to continue where it stopped without duplicating items. Use -NoCheckpoint to turn this off.
+By default the export keeps a checkpoint next to the output. If it is interrupted, run the same command with -Resume. Before continuing, the exporter checks that each completed part still matches its stored SHA-256 hash. Use -NoCheckpoint to turn checkpoints off.
 
-Required Microsoft Graph permissions. Application (app-only) access: Mail.Read, plus Contacts.Read for IncludeContacts, Calendars.Read for IncludeCalendar and Tasks.Read.All for IncludeTasks. Delegated access to the signed-in user's own mailbox: Mail.Read, Contacts.Read, Calendars.Read and Tasks.Read. Delegated access to another mailbox the signed-in user can open: Mail.Read.Shared, Contacts.Read.Shared and Calendars.Read.Shared; Microsoft To Do tasks of another user are only available with application access. To limit an application to selected mailboxes, use RBAC for Applications in Exchange Online or an application access policy.
+For app-only access through unscoped Microsoft Entra consent, grant Mail.Read for mail, Contacts.Read for IncludeContacts and Calendars.Read for IncludeCalendar. These grants cover every mailbox in the tenant unless an Exchange Application Access Policy scopes them.
+
+For app-only access to selected mailboxes through Exchange Online Application RBAC, assign the corresponding scoped Application Mail.Read, Application Contacts.Read and Application Calendars.Read roles. Remove overlapping unscoped Microsoft Entra grants. Exchange RBAC and Microsoft Entra permissions are additive. IncludeTasks requires the separate Microsoft Graph application permission Tasks.Read.All because Exchange mailbox scopes do not cover Microsoft To Do.
+
+Delegated access to the signed-in user's own mailbox uses Mail.Read, Contacts.Read, Calendars.Read and Tasks.Read as needed. For a shared mailbox the signed-in user can open, use Mail.Read.Shared, Contacts.Read.Shared and Calendars.Read.Shared. Reading another user's Microsoft To Do tasks requires app-only access.
 
 The PST writer creates its own Deleted Items folder, so the mailbox's Deleted Items is written as a separate folder with the same name.
 

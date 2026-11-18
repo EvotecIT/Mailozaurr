@@ -5,7 +5,7 @@ namespace Mailozaurr.MailboxExport;
 
 /// <summary>Exporter progress committed atomically with each PST writer checkpoint.</summary>
 internal sealed class GraphMailboxPstExportState {
-    internal const int Version = 1;
+    internal const int Version = 2;
 
     internal string Fingerprint { get; set; } = string.Empty;
     internal int PartNumber { get; set; } = 1;
@@ -154,16 +154,21 @@ internal sealed class GraphMailboxPstExportState {
     }
 
     internal static string BuildFingerprint(GraphMailboxPstExportOptions options) {
-        var builder = new StringBuilder();
-        builder.Append(options.Mailbox.ToUpperInvariant()).Append('|')
-            .Append(Path.GetFullPath(options.DestinationPath).ToUpperInvariant()).Append('|')
-            .Append(options.Split?.MaxEstimatedBytesPerPart.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-").Append('|')
-            .Append((int)options.ItemTypes).Append('|')
-            .Append(string.Join(";", options.IncludeFolders)).Append('|')
-            .Append(string.Join(";", options.ExcludeFolders)).Append('|')
-            .Append(options.StartDate?.UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-").Append('|')
-            .Append(options.EndDate?.UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-").Append('|')
-            .Append(options.MaxItemBytes.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        return builder.ToString();
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream)) {
+            writer.WriteStartObject();
+            writer.WriteString("mailbox", options.Mailbox.ToUpperInvariant());
+            string destination = Path.GetFullPath(options.DestinationPath);
+            writer.WriteString("destination", Path.DirectorySeparatorChar == '\\' ? destination.ToUpperInvariant() : destination);
+            writer.WriteNumber("splitBytes", options.Split?.MaxEstimatedBytesPerPart ?? -1);
+            writer.WriteNumber("itemTypes", (int)options.ItemTypes);
+            WriteStrings(writer, "includeFolders", options.IncludeFolders);
+            WriteStrings(writer, "excludeFolders", options.ExcludeFolders);
+            writer.WriteNumber("startUtcTicks", options.StartDate?.UtcTicks ?? -1);
+            writer.WriteNumber("endUtcTicks", options.EndDate?.UtcTicks ?? -1);
+            writer.WriteNumber("maxItemBytes", options.MaxItemBytes);
+            writer.WriteEndObject();
+        }
+        return Encoding.UTF8.GetString(stream.ToArray());
     }
 }

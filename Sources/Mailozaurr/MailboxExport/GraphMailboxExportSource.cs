@@ -207,7 +207,7 @@ public sealed class GraphMailboxExportSource : IGraphMailboxExportSource {
     }
 
     private static string FormatFilterDate(DateTimeOffset value) =>
-        value.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+        value.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'", CultureInfo.InvariantCulture);
 
     private async Task<GraphExportPage<JsonElement>> GetResourcePageAsync(string uri, CancellationToken cancellationToken) {
         using JsonDocument page = await GetJsonAsync(uri, cancellationToken).ConfigureAwait(false);
@@ -270,6 +270,7 @@ public sealed class GraphMailboxExportSource : IGraphMailboxExportSource {
 
     private static Dictionary<string, object> FolderQuery() => new Dictionary<string, object> {
         ["$select"] = "id,displayName,parentFolderId,totalItemCount,childFolderCount",
+        ["includeHiddenFolders"] = "true",
         ["$top"] = PageSize
     };
 
