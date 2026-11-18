@@ -90,9 +90,11 @@ jobs:
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ !cancelled() && (failure() || github.event_name == 'workflow_dispatch') }}
+        continue-on-error: true
         with:
           name: test-results-windows
+          retention-days: 1
           path: '**/*.trx'
 
   test-ubuntu:
@@ -156,9 +158,11 @@ jobs:
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ !cancelled() && (failure() || github.event_name == 'workflow_dispatch') }}
+        continue-on-error: true
         with:
           name: test-results-ubuntu
+          retention-days: 1
           path: '**/*.trx'
   test-macos:
     name: 'macOS'
@@ -221,9 +225,11 @@ jobs:
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ !cancelled() && (failure() || github.event_name == 'workflow_dispatch') }}
+        continue-on-error: true
         with:
           name: test-results-macos
+          retention-days: 1
           path: '**/*.trx'
   test-module-alc:
     name: 'PowerShell ALC packaging'
