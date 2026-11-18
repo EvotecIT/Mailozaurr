@@ -43,7 +43,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: psd1
-          retention-days: 1
           path: Mailozaurr.psd1
 
   test-windows-ps5:
